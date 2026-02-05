@@ -10,7 +10,7 @@ const quickFocuses = [
 
 const samplePlan = [
   {
-    day: "Day 1 — Full Body Strength",
+    day: "Day 1 ï¿½ Full Body Strength",
     blocks: [
       "Warmup: 5 min bike + dynamic mobility",
       "A1: Goblet squat 4 x 8",
@@ -21,7 +21,7 @@ const samplePlan = [
     ]
   },
   {
-    day: "Day 2 — Conditioning",
+    day: "Day 2 ï¿½ Conditioning",
     blocks: [
       "Warmup: jump rope 3 min",
       "Intervals: 8 x 30s hard / 60s easy",
@@ -29,7 +29,7 @@ const samplePlan = [
     ]
   },
   {
-    day: "Day 3 — Lower Body + Core",
+    day: "Day 3 ï¿½ Lower Body + Core",
     blocks: [
       "Warmup: hip openers + glute activation",
       "A1: Split squat 4 x 8",
@@ -97,12 +97,7 @@ export default function App() {
   return (
     <div className="page" style={gradient}>
       <header className="title">
-        <p className="eyebrow">AI workout builder</p>
         <h1>AI Workout Studio</h1>
-        <p className="subhead">
-          Build a workout plan that adapts to your schedule, equipment, and
-          energy.
-        </p>
         <div className="focus-row">
           {quickFocuses.map((item) => (
             <span key={item} className="pill">
@@ -147,6 +142,8 @@ export default function App() {
                 <option value="3">3</option>
                 <option value="4">4</option>
                 <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
               </select>
             </label>
             <label>
