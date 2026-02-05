@@ -96,60 +96,19 @@ export default function App() {
 
   return (
     <div className="page" style={gradient}>
-      <header className="hero">
-        <nav className="nav">
-          <div className="logo">AI Workout Studio</div>
-          <div className="nav-actions">
-            <button className="ghost">Templates</button>
-            <button className="ghost">Pricing</button>
-            <button className="cta">Start Free</button>
-          </div>
-        </nav>
-
-        <div className="hero-grid">
-          <div>
-            <p className="eyebrow">Coach-level plans in seconds</p>
-            <h1>
-              Build a workout plan that adapts to your schedule, equipment, and
-              energy.
-            </h1>
-            <p className="subhead">
-              Train smarter with AI-built sessions designed around your goal,
-              experience, and time. No fluff. Just a clear plan you can follow
-              today.
-            </p>
-            <div className="focus-row">
-              {quickFocuses.map((item) => (
-                <span key={item} className="pill">
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="hero-card">
-            <div className="hero-card-top">
-              <div>
-                <p className="card-label">Today&apos;s focus</p>
-                <h3>Lower body strength + core</h3>
-              </div>
-              <span className="tag">45 min</span>
-            </div>
-            <div className="hero-card-body">
-              <div>
-                <p className="metric">8</p>
-                <span className="metric-label">Exercises</span>
-              </div>
-              <div>
-                <p className="metric">4</p>
-                <span className="metric-label">Blocks</span>
-              </div>
-              <div>
-                <p className="metric">2</p>
-                <span className="metric-label">Finishers</span>
-              </div>
-            </div>
-            <button className="cta full">Generate Plan</button>
-          </div>
+      <header className="title">
+        <p className="eyebrow">AI workout builder</p>
+        <h1>AI Workout Studio</h1>
+        <p className="subhead">
+          Build a workout plan that adapts to your schedule, equipment, and
+          energy.
+        </p>
+        <div className="focus-row">
+          {quickFocuses.map((item) => (
+            <span key={item} className="pill">
+              {item}
+            </span>
+          ))}
         </div>
       </header>
 
@@ -247,18 +206,6 @@ export default function App() {
           </div>
         </section>
       </main>
-
-      <footer className="footer">
-        <div>
-          <strong>AI Workout Studio</strong>
-          <p className="muted">Train with clarity, track with confidence.</p>
-        </div>
-        <div className="footer-links">
-          <button className="ghost">Privacy</button>
-          <button className="ghost">Terms</button>
-          <button className="ghost">Support</button>
-        </div>
-      </footer>
     </div>
   );
 }
