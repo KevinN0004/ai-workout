@@ -306,8 +306,7 @@ app.post("/api/generate", async (req, res) => {
 
     const response = await client.responses.create({
       model,
-      input: promptWithContext,
-      temperature: 0.7
+      input: promptWithContext
     });
 
     const plan =
