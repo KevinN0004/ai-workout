@@ -194,6 +194,10 @@ select:focus {
   color: #f8f9ff;
 }
 
+.body-visual-panel h2 {
+  margin-bottom: 16px;
+}
+
 .body-visual {
   border-radius: 20px;
   border: 1px dashed rgba(255, 255, 255, 0.2);
@@ -203,6 +207,7 @@ select:focus {
   place-items: center;
   gap: 12px;
   text-align: center;
+  min-height: 320px;
 }
 
 .body-frame {

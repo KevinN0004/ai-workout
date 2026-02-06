@@ -123,8 +123,8 @@ export default function App() {
       </header>
 
       <main className="content">
-        <section className="panel split-panel">
-          <div>
+        <section className="split-panel">
+          <div className="panel">
             <div className="panel-header">
               <div>
                 <h2>Personal data</h2>
@@ -249,9 +249,12 @@ export default function App() {
             </form>
           </div>
 
-          <div className="body-visual">
-            <div className="body-frame" aria-hidden="true" />
-            <p className="muted">Body type visual placeholder</p>
+          <div className="panel body-visual-panel">
+            <h2>Body type</h2>
+            <div className="body-visual">
+              <div className="body-frame" aria-hidden="true" />
+              <p className="muted">Body type visual placeholder</p>
+            </div>
           </div>
         </section>
 
