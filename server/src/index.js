@@ -118,7 +118,7 @@ app.post("/api/auth/signup", async (req, res) => {
         workouts: [],
         calories: [],
         goals: {
-          goalType: "Build lean strength",
+          targetWeight: 160,
           targetCalories: 2200,
           weeklyWorkouts: 3
         }
@@ -175,7 +175,7 @@ app.get("/api/dashboard", requireAuth, async (req, res) => {
         workouts: [],
         calories: [],
         goals: {
-          goalType: "Build lean strength",
+          targetWeight: 160,
           targetCalories: 2200,
           weeklyWorkouts: 3
         }
@@ -195,7 +195,7 @@ app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
       workouts: [],
       calories: [],
       goals: {
-        goalType: "Build lean strength",
+        targetWeight: 160,
         targetCalories: 2200,
         weeklyWorkouts: 3
       }
@@ -228,7 +228,7 @@ app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
       workouts: [],
       calories: [],
       goals: {
-        goalType: "Build lean strength",
+        targetWeight: 160,
         targetCalories: 2200,
         weeklyWorkouts: 3
       }
@@ -250,13 +250,13 @@ app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
 });
 
 app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
-  const { goalType, targetCalories, weeklyWorkouts } = req.body || {};
+  const { targetWeight, targetCalories, weeklyWorkouts } = req.body || {};
   const updated = await updateUser(req.user.id, (user) => {
     const dashboard = user.dashboard || {
       workouts: [],
       calories: [],
       goals: {
-        goalType: "Build lean strength",
+        targetWeight: 160,
         targetCalories: 2200,
         weeklyWorkouts: 3
       }
@@ -266,7 +266,7 @@ app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
       dashboard: {
         ...dashboard,
         goals: {
-          goalType: goalType || dashboard.goals.goalType,
+          targetWeight: Number(targetWeight) || dashboard.goals.targetWeight,
           targetCalories:
             Number(targetCalories) || dashboard.goals.targetCalories,
           weeklyWorkouts:

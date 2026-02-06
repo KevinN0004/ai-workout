@@ -98,11 +98,10 @@ export default function App() {
     duration: ""
   });
   const [calorieForm, setCalorieForm] = useState({
-    date: "",
     calories: ""
   });
   const [goalForm, setGoalForm] = useState({
-    goalType: "Build lean strength",
+    targetWeight: "160",
     targetCalories: "2200",
     weeklyWorkouts: "3"
   });
@@ -279,7 +278,7 @@ export default function App() {
         setDashboard(data.dashboard);
         if (data.dashboard?.goals) {
           setGoalForm({
-            goalType: data.dashboard.goals.goalType || "Build lean strength",
+            targetWeight: String(data.dashboard.goals.targetWeight || 160),
             targetCalories: String(data.dashboard.goals.targetCalories || 2200),
             weeklyWorkouts: String(data.dashboard.goals.weeklyWorkouts || 3)
           });
@@ -365,11 +364,15 @@ export default function App() {
     e.preventDefault();
     setDashError("");
     try {
+      const payload = {
+        ...calorieForm,
+        date: new Date().toISOString().slice(0, 10)
+      };
       const res = await fetch("/api/dashboard/calories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(calorieForm)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -377,7 +380,7 @@ export default function App() {
       }
       const data = await res.json();
       setDashboard(data.dashboard);
-      setCalorieForm({ date: "", calories: "" });
+      setCalorieForm({ calories: "" });
     } catch (err) {
       setDashError(err.message || "Unable to save calories.");
     }
@@ -527,6 +530,56 @@ export default function App() {
       100,
       Math.round((avgCalories / calorieGoal) * 100)
     );
+    const today = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, index) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - index));
+      return d;
+    });
+    const last7Keys = last7Days.map((d) => d.toISOString().slice(0, 10));
+    const caloriesByDate = calories.reduce((acc, item) => {
+      if (!item?.date) return acc;
+      const key = item.date;
+      const next = Number(item.calories || 0);
+      acc[key] = (acc[key] || 0) + (Number.isNaN(next) ? 0 : next);
+      return acc;
+    }, {});
+    const workoutsByDate = workouts.reduce((acc, item) => {
+      if (!item?.date) return acc;
+      const key = item.date;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const calorieSeries = last7Keys.map((key) => caloriesByDate[key] || 0);
+    const workoutSeries = last7Keys.map((key) => workoutsByDate[key] || 0);
+    const avgDailyWorkouts = last7Workouts.length / 7;
+    const remainingWorkouts = Math.max(weeklyGoal - last7Workouts.length, 0);
+    const daysToGoal =
+      avgDailyWorkouts > 0 ? Math.ceil(remainingWorkouts / avgDailyWorkouts) : null;
+    const goalPaceText = remainingWorkouts === 0
+      ? "Weekly workout goal reached."
+      : avgDailyWorkouts > 0
+      ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
+      : "Log a workout to start your pace estimate.";
+    const calorieDelta = Math.round(avgCalories - calorieGoal);
+
+    const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
+      const safeValues = values.length ? values : [0];
+      const max = Math.max(...safeValues, 1);
+      const min = Math.min(...safeValues, 0);
+      const range = max - min || 1;
+      const stepX = (width - padding * 2) / Math.max(safeValues.length - 1, 1);
+      return safeValues
+        .map((value, index) => {
+          const x = padding + stepX * index;
+          const y =
+            height -
+            padding -
+            ((value - min) / range) * (height - padding * 2);
+          return `${index === 0 ? "M" : "L"}${x},${y}`;
+        })
+        .join(" ");
+    };
 
     return (
       <div className="page" style={gradient}>
@@ -618,20 +671,20 @@ export default function App() {
               </section>
                 <section className="panel dashboard-card">
                   <h2>Weekly progress</h2>
-                  <div className="stat-row">
-                    <div>
-                      <p className="muted">Workouts this week</p>
-                      <h3>{last7Workouts.length}</h3>
-                    </div>
-                    <div>
-                      <p className="muted">Avg calories</p>
-                      <h3>{Math.round(avgCalories)}</h3>
-                    </div>
-                    <div>
-                      <p className="muted">Goal</p>
-                      <h3>{goals.goalType}</h3>
-                    </div>
+                <div className="stat-row">
+                  <div>
+                    <p className="muted">Workouts this week</p>
+                    <h3>{last7Workouts.length}</h3>
                   </div>
+                  <div>
+                    <p className="muted">Avg calories</p>
+                    <h3>{Math.round(avgCalories)}</h3>
+                  </div>
+                  <div>
+                    <p className="muted">Target weight</p>
+                    <h3>{goals.targetWeight || goalForm.targetWeight} lb</h3>
+                  </div>
+                </div>
                   <div className="progress-block">
                     <div className="progress-label">
                       Workouts ({last7Workouts.length}/{weeklyGoal})
@@ -778,104 +831,173 @@ export default function App() {
 
           {dashView === "calories" && (
             <section className="panel dashboard-card span-2">
-              <h2>Calories & goals</h2>
-              <form className="form dashboard-form" onSubmit={submitGoals}>
-                <label>
-                  Goal type
-                  <select
-                    value={goalForm.goalType}
-                    onChange={(e) =>
-                      setGoalForm((prev) => ({ ...prev, goalType: e.target.value }))
-                    }
-                  >
-                    <option>Build lean strength</option>
-                    <option>Fat loss</option>
-                    <option>Endurance base</option>
-                    <option>Body recomposition</option>
-                  </select>
-                </label>
-                <label>
-                  Target calories
-                  <input
-                    type="number"
-                    min="1200"
-                    max="4000"
-                    value={goalForm.targetCalories}
-                    onChange={(e) =>
-                      setGoalForm((prev) => ({
-                        ...prev,
-                        targetCalories: e.target.value
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Weekly workouts
-                  <select
-                    value={goalForm.weeklyWorkouts}
-                    onChange={(e) =>
-                      setGoalForm((prev) => ({
-                        ...prev,
-                        weeklyWorkouts: e.target.value
-                      }))
-                    }
-                  >
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </label>
-                <button className="ghost" type="submit">
-                  Update goals
+              <header className="panel-header">
+                <div>
+                  <h2>Overall goal</h2>
+                  <p className="muted">
+                    Target weight: {goalForm.targetWeight} lb
+                  </p>
+                </div>
+                <button className="cta" type="submit" form="goals-form">
+                  Save goals
                 </button>
-              </form>
-
-              <form className="form dashboard-form" onSubmit={submitCalories}>
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={calorieForm.date}
-                    onChange={(e) =>
-                      setCalorieForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Calories
-                  <input
-                    type="number"
-                    min="1200"
-                    max="5000"
-                    value={calorieForm.calories}
-                    onChange={(e) =>
-                      setCalorieForm((prev) => ({
-                        ...prev,
-                        calories: e.target.value
-                      }))
-                    }
-                    required
-                  />
-                </label>
-                <button className="cta" type="submit">
-                  Log calories
-                </button>
-              </form>
-
-              <div className="list">
-                {calories.map((item) => (
-                  <div key={item.id} className="list-row">
-                    <div>
-                      <strong>{item.date}</strong>
-                      <span className="muted"> · {item.calories} kcal</span>
+              </header>
+              <div className="dashboard-split">
+                <div className="dashboard-main">
+                  <section className="panel dashboard-card">
+                    <h3>Calories</h3>
+                    <div className="stat-row">
+                      <div>
+                        <p className="muted">Avg (7 days)</p>
+                        <h3>{Math.round(avgCalories)}</h3>
+                      </div>
+                      <div>
+                        <p className="muted">Target</p>
+                        <h3>{calorieGoal}</h3>
+                      </div>
+                      <div>
+                        <p className="muted">Delta</p>
+                        <h3>{calorieDelta <= 0 ? "On track" : `+${calorieDelta}`}</h3>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {!calories.length && (
-                  <p className="muted">No calories logged yet.</p>
-                )}
+                    <div className="chart-card">
+                      <div className="chart-header">
+                        <h4>Calories per day (7 days)</h4>
+                        <span className="muted">Line graph</span>
+                      </div>
+                      <svg
+                        className="chart"
+                        viewBox="0 0 260 110"
+                        role="img"
+                        aria-label="Calories line chart"
+                      >
+                        <path
+                          className="chart-line"
+                          d={buildLinePath(calorieSeries)}
+                        />
+                      </svg>
+                      <div className="chart-labels">
+                        <span>{last7Keys[0]}</span>
+                        <span>{last7Keys[last7Keys.length - 1]}</span>
+                      </div>
+                    </div>
+                    <form className="form dashboard-form" onSubmit={submitCalories}>
+                      <label>
+                        Calories
+                        <input
+                          type="number"
+                          min="1200"
+                          max="5000"
+                          value={calorieForm.calories}
+                          onChange={(e) =>
+                            setCalorieForm((prev) => ({
+                              ...prev,
+                              calories: e.target.value
+                            }))
+                          }
+                          required
+                        />
+                      </label>
+                      <button className="ghost" type="submit">
+                        Log calories
+                      </button>
+                    </form>
+
+                    <div className="list">
+                      {calories.map((item) => (
+                        <div key={item.id} className="list-row">
+                          <div>
+                            <strong>{item.date}</strong>
+                            <span className="muted"> · {item.calories} kcal</span>
+                          </div>
+                        </div>
+                      ))}
+                      {!calories.length && (
+                        <p className="muted">No calories logged yet.</p>
+                      )}
+                    </div>
+                  </section>
+                </div>
+                <aside className="dashboard-side">
+                  <section className="panel dashboard-card">
+                    <h3>Goals</h3>
+                    <p className="muted">{goalPaceText}</p>
+                    <div className="chart-card">
+                      <div className="chart-header">
+                        <h4>Workouts per day (7 days)</h4>
+                        <span className="muted">Line graph</span>
+                      </div>
+                      <svg
+                        className="chart"
+                        viewBox="0 0 260 110"
+                        role="img"
+                        aria-label="Workouts line chart"
+                      >
+                        <path
+                          className="chart-line chart-line-alt"
+                          d={buildLinePath(workoutSeries)}
+                        />
+                      </svg>
+                      <div className="chart-labels">
+                        <span>{last7Keys[0]}</span>
+                        <span>{last7Keys[last7Keys.length - 1]}</span>
+                      </div>
+                    </div>
+                    <form
+                      id="goals-form"
+                      className="form dashboard-form"
+                      onSubmit={submitGoals}
+                    >
+                      <label>
+                        Target weight (lb)
+                        <input
+                          type="number"
+                          min="80"
+                          max="400"
+                          value={goalForm.targetWeight}
+                          onChange={(e) =>
+                            setGoalForm((prev) => ({
+                              ...prev,
+                              targetWeight: e.target.value
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Target calories
+                        <input
+                          type="number"
+                          min="1200"
+                          max="4000"
+                          value={goalForm.targetCalories}
+                          onChange={(e) =>
+                            setGoalForm((prev) => ({
+                              ...prev,
+                              targetCalories: e.target.value
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Weekly workouts
+                        <select
+                          value={goalForm.weeklyWorkouts}
+                          onChange={(e) =>
+                            setGoalForm((prev) => ({
+                              ...prev,
+                              weeklyWorkouts: e.target.value
+                            }))
+                          }
+                        >
+                          <option value="2">2</option>
+                          <option value="3">3</option>
+                          <option value="4">4</option>
+                          <option value="5">5</option>
+                        </select>
+                      </label>
+                    </form>
+                  </section>
+                </aside>
               </div>
             </section>
           )}

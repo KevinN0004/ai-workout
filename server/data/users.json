@@ -15,7 +15,13 @@
           "notes": ""
         }
       ],
-      "calories": [],
+      "calories": [
+        {
+          "id": "5f12343c-2725-456f-853b-b3b4df549665",
+          "date": "2026-02-07",
+          "calories": 1233
+        }
+      ],
       "goals": {
         "goalType": "Build lean strength",
         "targetCalories": 2200,
