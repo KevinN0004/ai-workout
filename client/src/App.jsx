@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const quickFocuses = [
   "Strength + hypertrophy",
@@ -82,6 +82,12 @@ export default function App() {
   const [weightUnit, setWeightUnit] = useState("kg");
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerStep, setPlannerStep] = useState(1);
+  const [route, setRoute] = useState(window.location.pathname);
+  const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authForm, setAuthForm] = useState({ email: "", password: "" });
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
@@ -217,10 +223,149 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const onPop = () => setRoute(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setUser(data.user || null);
+      } catch {
+        setUser(null);
+      }
+    };
+    loadSession();
+  }, []);
+
+  const go = (path) => {
+    window.history.pushState({}, "", path);
+    setRoute(path);
+  };
+
+  const onAuthChange = (e) => {
+    setAuthForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const onAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await fetch(`/api/auth/${authMode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(authForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to authenticate.");
+      }
+      const data = await res.json();
+      setUser(data.user || null);
+      setAuthForm({ email: "", password: "" });
+      go("/");
+    } catch (err) {
+      setAuthError(err.message || "Unable to authenticate.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const onLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    setUser(null);
+    go("/");
+  };
+
+  if (route === "/auth") {
+    return (
+      <div className="page auth-page" style={gradient}>
+        <header className="title">
+          <h1>AI Workout Studio</h1>
+          <p className="muted">Sign in to unlock advanced planning.</p>
+        </header>
+        <main className="auth-card">
+          <div className="segmented">
+            <button
+              type="button"
+              className={authMode === "login" ? "active" : ""}
+              onClick={() => setAuthMode("login")}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              className={authMode === "signup" ? "active" : ""}
+              onClick={() => setAuthMode("signup")}
+            >
+              Sign up
+            </button>
+          </div>
+          <form className="form auth-form" onSubmit={onAuthSubmit}>
+            <label>
+              Email
+              <input
+                name="email"
+                type="email"
+                value={authForm.email}
+                onChange={onAuthChange}
+                placeholder="you@email.com"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                name="password"
+                type="password"
+                value={authForm.password}
+                onChange={onAuthChange}
+                placeholder="••••••••"
+                required
+              />
+            </label>
+            <button className="cta" type="submit" disabled={authLoading}>
+              {authLoading
+                ? "Working..."
+                : authMode === "login"
+                ? "Login"
+                : "Create account"}
+            </button>
+          </form>
+          {authError && <p className="error">{authError}</p>}
+          <button type="button" className="ghost" onClick={() => go("/")}>
+            Back to home
+          </button>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="page" style={gradient}>
       <header className="title">
         <h1>AI Workout Studio</h1>
+        <div className="auth-actions">
+          {user ? (
+            <>
+              <span className="muted">Signed in as {user.email}</span>
+              <button type="button" className="ghost" onClick={onLogout}>
+                Log out
+              </button>
+            </>
+          ) : (
+            <button type="button" className="ghost" onClick={() => go("/auth")}>
+              Login / Sign up
+            </button>
+          )}
+        </div>
         <div className="focus-row">
           {quickFocuses.map((item) => (
             <button
