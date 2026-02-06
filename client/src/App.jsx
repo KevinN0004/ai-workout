@@ -76,6 +76,8 @@ const samplePlan = [
   }
 ];
 
+const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
   const [heightUnit, setHeightUnit] = useState("cm");
@@ -1005,28 +1007,72 @@ export default function App() {
           {dashView === "plans" && (
             <section className="panel dashboard-card span-2">
               <h2>Plan hub</h2>
-              <div className="hub-grid">
-                <div className="hub-card">
-                  <h3>Workout plans</h3>
-                  <p className="muted">Generate weekly plans and progressions.</p>
-                  <button type="button" className="ghost" onClick={() => go("/")}>
-                    Open planner
-                  </button>
-                </div>
-                <div className="hub-card">
-                  <h3>Meal prep</h3>
-                  <p className="muted">Build calorie-aligned meal templates.</p>
-                  <button type="button" className="ghost">
-                    Coming soon
-                  </button>
-                </div>
-                <div className="hub-card">
-                  <h3>Coaching tips</h3>
-                  <p className="muted">Daily insights based on your activity.</p>
-                  <button type="button" className="ghost">
-                    Coming soon
-                  </button>
-                </div>
+              <div className="plan-rows">
+                <section className="plan-row">
+                  <div className="plan-row-header">
+                    <div>
+                      <h3>Workout week</h3>
+                      <p className="muted">Build your weekly training block.</p>
+                    </div>
+                    <button type="button" className="ghost" onClick={() => go("/")}>
+                      Open planner
+                    </button>
+                    </div>
+                    <div className="plan-row-grid">
+                      {weekDays.map((day) => (
+                        <div key={day} className="hub-card">
+                          <h4>{day}</h4>
+                          <p className="muted">Daily workout focus placeholder.</p>
+                          <p className="muted">Session length: 45 min</p>
+                          <p className="muted">Primary lift: TBD</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                <section className="plan-row">
+                  <div className="plan-row-header">
+                    <div>
+                      <h3>Meals week</h3>
+                      <p className="muted">Plan meals that align with your goals.</p>
+                    </div>
+                    <button type="button" className="ghost">
+                      Coming soon
+                    </button>
+                    </div>
+                    <div className="plan-row-grid">
+                      {weekDays.map((day) => (
+                        <div key={day} className="hub-card">
+                          <h4>{day}</h4>
+                          <p className="muted">Meals: breakfast, lunch, dinner.</p>
+                          <p className="muted">Calories: TBD</p>
+                          <p className="muted">Prep note: TBD</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                <section className="plan-row">
+                  <div className="plan-row-header">
+                    <div>
+                      <h3>Tips week</h3>
+                      <p className="muted">Guidance to keep the week on track.</p>
+                    </div>
+                    <button type="button" className="ghost">
+                      Coming soon
+                    </button>
+                  </div>
+                  <div className="plan-row-grid plan-row-grid-split">
+                    <div className="hub-card">
+                      <h4>Daily tips</h4>
+                      <p className="muted">Short cues that match your workload.</p>
+                    </div>
+                    <div className="hub-card">
+                      <h4>Weekly tips</h4>
+                      <p className="muted">Big picture adjustments for the week.</p>
+                    </div>
+                  </div>
+                </section>
               </div>
             </section>
           )}
