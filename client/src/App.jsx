@@ -89,6 +89,26 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authForm, setAuthForm] = useState({ email: "", password: "" });
+  const [dashboard, setDashboard] = useState(null);
+  const [dashLoading, setDashLoading] = useState(false);
+  const [dashError, setDashError] = useState("");
+  const [workoutForm, setWorkoutForm] = useState({
+    date: "",
+    focus: "",
+    duration: "",
+    notes: ""
+  });
+  const [calorieForm, setCalorieForm] = useState({
+    date: "",
+    calories: ""
+  });
+  const [goalForm, setGoalForm] = useState({
+    goalType: "Build lean strength",
+    targetCalories: "2200",
+    weeklyWorkouts: "3"
+  });
+  const [dashView, setDashView] = useState("summary");
+  const [dashNavOpen, setDashNavOpen] = useState(false);
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
@@ -244,6 +264,35 @@ export default function App() {
     loadSession();
   }, []);
 
+  useEffect(() => {
+    if (route !== "/dashboard" || !user) return;
+    const loadDashboard = async () => {
+      setDashLoading(true);
+      setDashError("");
+      try {
+        const res = await fetch("/api/dashboard", { credentials: "include" });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to load dashboard.");
+        }
+        const data = await res.json();
+        setDashboard(data.dashboard);
+        if (data.dashboard?.goals) {
+          setGoalForm({
+            goalType: data.dashboard.goals.goalType || "Build lean strength",
+            targetCalories: String(data.dashboard.goals.targetCalories || 2200),
+            weeklyWorkouts: String(data.dashboard.goals.weeklyWorkouts || 3)
+          });
+        }
+      } catch (err) {
+        setDashError(err.message || "Unable to load dashboard.");
+      } finally {
+        setDashLoading(false);
+      }
+    };
+    loadDashboard();
+  }, [route, user]);
+
   const go = (path) => {
     window.history.pushState({}, "", path);
     setRoute(path);
@@ -283,6 +332,71 @@ export default function App() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
     go("/");
+  };
+
+  const submitWorkout = async (e) => {
+    e.preventDefault();
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/workouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(workoutForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save workout.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      setWorkoutForm({ date: "", focus: "", duration: "", notes: "" });
+    } catch (err) {
+      setDashError(err.message || "Unable to save workout.");
+    }
+  };
+
+  const submitCalories = async (e) => {
+    e.preventDefault();
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/calories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(calorieForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save calories.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      setCalorieForm({ date: "", calories: "" });
+    } catch (err) {
+      setDashError(err.message || "Unable to save calories.");
+    }
+  };
+
+  const submitGoals = async (e) => {
+    e.preventDefault();
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(goalForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save goals.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+    } catch (err) {
+      setDashError(err.message || "Unable to save goals.");
+    }
   };
 
   if (route === "/auth") {
@@ -359,11 +473,73 @@ export default function App() {
   }
 
   if (route === "/dashboard") {
+    if (!user) {
+      return (
+        <div className="page" style={gradient}>
+          <header className="title">
+            <div className="header-top">
+              <h1>Dashboard</h1>
+              <div className="auth-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => go("/auth")}
+                >
+                  Login / Sign up
+                </button>
+              </div>
+            </div>
+            <p className="muted">Please sign in to access your dashboard.</p>
+          </header>
+        </div>
+      );
+    }
+
+    const workouts = dashboard?.workouts || [];
+    const calories = dashboard?.calories || [];
+    const goals = dashboard?.goals || goalForm;
+
+    const last7Cutoff = new Date();
+    last7Cutoff.setDate(last7Cutoff.getDate() - 6);
+    const last7Workouts = workouts.filter((item) => {
+      const d = new Date(item.date);
+      return !Number.isNaN(d) && d >= last7Cutoff;
+    });
+    const last7Calories = calories.filter((item) => {
+      const d = new Date(item.date);
+      return !Number.isNaN(d) && d >= last7Cutoff;
+    });
+    const avgCalories =
+      last7Calories.reduce((sum, item) => sum + (item.calories || 0), 0) /
+      (last7Calories.length || 1);
+    const weeklyGoal = Number(goals.weeklyWorkouts || 3);
+    const workoutProgress = Math.min(
+      100,
+      Math.round((last7Workouts.length / weeklyGoal) * 100)
+    );
+    const calorieGoal = Number(goals.targetCalories || 2200);
+    const calorieProgress = Math.min(
+      100,
+      Math.round((avgCalories / calorieGoal) * 100)
+    );
+
     return (
       <div className="page" style={gradient}>
         <header className="title">
           <div className="header-top">
-            <h1>Dashboard</h1>
+            <div className="header-left">
+              <h1>Dashboard</h1>
+              <div className="nav-trigger">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setDashNavOpen(true)}
+                >
+                  Open menu
+                </button>
+                <span className="muted">Current: {dashView}</span>
+              </div>
+            </div>
             <div className="auth-actions">
               {user ? (
                 <>
@@ -379,14 +555,417 @@ export default function App() {
               )}
             </div>
           </div>
-          <p className="muted">Empty dashboard — ready for advanced planning.</p>
+          <p className="muted">
+            Visual summary of your progress and key metrics.
+          </p>
         </header>
-        <main className="panel center-panel">
-          <p className="muted">This is a placeholder dashboard.</p>
-          <button type="button" className="ghost" onClick={() => go("/")}>
-            Back to home
-          </button>
+        <main className="dashboard-grid">
+          {dashView === "summary" && (
+            <>
+              <section className="panel dashboard-card">
+                <h2>Weekly progress</h2>
+                <div className="stat-row">
+                  <div>
+                    <p className="muted">Workouts this week</p>
+                    <h3>{last7Workouts.length}</h3>
+                  </div>
+                  <div>
+                    <p className="muted">Avg calories</p>
+                    <h3>{Math.round(avgCalories)}</h3>
+                  </div>
+                  <div>
+                    <p className="muted">Goal</p>
+                    <h3>{goals.goalType}</h3>
+                  </div>
+                </div>
+                <div className="progress-block">
+                  <div className="progress-label">
+                    Workouts ({last7Workouts.length}/{weeklyGoal})
+                  </div>
+                  <div className="progress-bar">
+                    <span style={{ width: `${workoutProgress}%` }} />
+                  </div>
+                </div>
+                <div className="progress-block">
+                  <div className="progress-label">
+                    Calories ({Math.round(avgCalories)}/{calorieGoal})
+                  </div>
+                  <div className="progress-bar">
+                    <span style={{ width: `${calorieProgress}%` }} />
+                  </div>
+                </div>
+              </section>
+
+              <section className="panel dashboard-card">
+                <h2>Recent activity</h2>
+                <div className="list">
+                  {workouts.slice(0, 4).map((item) => (
+                    <div key={item.id} className="list-row">
+                      <div>
+                        <strong>{item.date}</strong>
+                        <span className="muted">
+                          {item.focus ? ` · ${item.focus}` : ""}
+                        </span>
+                      </div>
+                      <span>{item.duration} min</span>
+                    </div>
+                  ))}
+                  {!workouts.length && (
+                    <p className="muted">No workouts logged yet.</p>
+                  )}
+                </div>
+              </section>
+
+              <section className="panel dashboard-card span-2">
+                <h2>Plan hub</h2>
+                <div className="hub-grid">
+                  <div className="hub-card">
+                    <h3>Workout plans</h3>
+                    <p className="muted">Generate weekly plans and progressions.</p>
+                    <button type="button" className="ghost" onClick={() => go("/")}>
+                      Open planner
+                    </button>
+                  </div>
+                  <div className="hub-card">
+                    <h3>Meal prep</h3>
+                    <p className="muted">Build calorie-aligned meal templates.</p>
+                    <button type="button" className="ghost">
+                      Coming soon
+                    </button>
+                  </div>
+                  <div className="hub-card">
+                    <h3>Coaching tips</h3>
+                    <p className="muted">Daily insights based on your activity.</p>
+                    <button type="button" className="ghost">
+                      Coming soon
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {dashView === "workouts" && (
+            <section className="panel dashboard-card span-2">
+              <h2>Workout log</h2>
+              <form className="form dashboard-form" onSubmit={submitWorkout}>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={workoutForm.date}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  Focus
+                  <input
+                    value={workoutForm.focus}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
+                    }
+                    placeholder="Strength, conditioning..."
+                  />
+                </label>
+                <label>
+                  Duration (minutes)
+                  <input
+                    type="number"
+                    min="10"
+                    max="180"
+                    value={workoutForm.duration}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({
+                        ...prev,
+                        duration: e.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <label className="full">
+                  Notes
+                  <input
+                    value={workoutForm.notes}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                    placeholder="How it felt, PRs, modifications"
+                  />
+                </label>
+                <button className="cta" type="submit">
+                  Save workout
+                </button>
+              </form>
+              <div className="list">
+                {workouts.map((item) => (
+                  <div key={item.id} className="list-row">
+                    <div>
+                      <strong>{item.date}</strong>
+                      <span className="muted">
+                        {item.focus ? ` · ${item.focus}` : ""}
+                      </span>
+                    </div>
+                    <span>{item.duration} min</span>
+                  </div>
+                ))}
+                {!workouts.length && (
+                  <p className="muted">No workouts logged yet.</p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {dashView === "calories" && (
+            <section className="panel dashboard-card span-2">
+              <h2>Calories & goals</h2>
+              <form className="form dashboard-form" onSubmit={submitGoals}>
+                <label>
+                  Goal type
+                  <select
+                    value={goalForm.goalType}
+                    onChange={(e) =>
+                      setGoalForm((prev) => ({ ...prev, goalType: e.target.value }))
+                    }
+                  >
+                    <option>Build lean strength</option>
+                    <option>Fat loss</option>
+                    <option>Endurance base</option>
+                    <option>Body recomposition</option>
+                  </select>
+                </label>
+                <label>
+                  Target calories
+                  <input
+                    type="number"
+                    min="1200"
+                    max="4000"
+                    value={goalForm.targetCalories}
+                    onChange={(e) =>
+                      setGoalForm((prev) => ({
+                        ...prev,
+                        targetCalories: e.target.value
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Weekly workouts
+                  <select
+                    value={goalForm.weeklyWorkouts}
+                    onChange={(e) =>
+                      setGoalForm((prev) => ({
+                        ...prev,
+                        weeklyWorkouts: e.target.value
+                      }))
+                    }
+                  >
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                  </select>
+                </label>
+                <button className="ghost" type="submit">
+                  Update goals
+                </button>
+              </form>
+
+              <form className="form dashboard-form" onSubmit={submitCalories}>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={calorieForm.date}
+                    onChange={(e) =>
+                      setCalorieForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  Calories
+                  <input
+                    type="number"
+                    min="1200"
+                    max="5000"
+                    value={calorieForm.calories}
+                    onChange={(e) =>
+                      setCalorieForm((prev) => ({
+                        ...prev,
+                        calories: e.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <button className="cta" type="submit">
+                  Log calories
+                </button>
+              </form>
+
+              <div className="list">
+                {calories.map((item) => (
+                  <div key={item.id} className="list-row">
+                    <div>
+                      <strong>{item.date}</strong>
+                      <span className="muted"> · {item.calories} kcal</span>
+                    </div>
+                  </div>
+                ))}
+                {!calories.length && (
+                  <p className="muted">No calories logged yet.</p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {dashView === "plans" && (
+            <section className="panel dashboard-card span-2">
+              <h2>Plan hub</h2>
+              <div className="hub-grid">
+                <div className="hub-card">
+                  <h3>Workout plans</h3>
+                  <p className="muted">Generate weekly plans and progressions.</p>
+                  <button type="button" className="ghost" onClick={() => go("/")}>
+                    Open planner
+                  </button>
+                </div>
+                <div className="hub-card">
+                  <h3>Meal prep</h3>
+                  <p className="muted">Build calorie-aligned meal templates.</p>
+                  <button type="button" className="ghost">
+                    Coming soon
+                  </button>
+                </div>
+                <div className="hub-card">
+                  <h3>Coaching tips</h3>
+                  <p className="muted">Daily insights based on your activity.</p>
+                  <button type="button" className="ghost">
+                    Coming soon
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {dashView === "meal" && (
+            <section className="panel dashboard-card span-2">
+              <h2>Meal prep</h2>
+              <p className="muted">Placeholder for meal prep planning.</p>
+            </section>
+          )}
+
+          {dashView === "tips" && (
+            <section className="panel dashboard-card span-2">
+              <h2>Tips</h2>
+              <p className="muted">Placeholder for coaching tips.</p>
+            </section>
+          )}
+
+          {dashView === "home" && (
+            <section className="panel dashboard-card span-2 center-panel">
+              <p className="muted">Return to the main home planner.</p>
+              <button type="button" className="ghost" onClick={() => go("/")}>
+                Back to home
+              </button>
+            </section>
+          )}
         </main>
+        {dashLoading && <p className="muted">Loading dashboard...</p>}
+        {dashError && <p className="error">{dashError}</p>}
+        {dashNavOpen && (
+          <div className="drawer-backdrop" onClick={() => setDashNavOpen(false)}>
+            <aside
+              className="drawer"
+              onClick={(e) => e.stopPropagation()}
+              role="navigation"
+            >
+              <div className="drawer-header">
+                <h3>Dashboard menu</h3>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setDashNavOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="drawer-links">
+                <button
+                  type="button"
+                  className={dashView === "summary" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("summary");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Summary
+                </button>
+                <button
+                  type="button"
+                  className={dashView === "workouts" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("workouts");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Workout log
+                </button>
+                <button
+                  type="button"
+                  className={dashView === "calories" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("calories");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Calories & goals
+                </button>
+                <button
+                  type="button"
+                  className={dashView === "plans" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("plans");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Plan hub
+                </button>
+                <button
+                  type="button"
+                  className={dashView === "meal" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("meal");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Meal prep
+                </button>
+                <button
+                  type="button"
+                  className={dashView === "tips" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("tips");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Tips
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => go("/")}
+                >
+                  Back to home
+                </button>
+              </div>
+            </aside>
+          </div>
+        )}
       </div>
     );
   }

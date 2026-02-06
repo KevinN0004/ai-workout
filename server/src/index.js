@@ -69,6 +69,23 @@ const getSessionUser = async (req) => {
   return users.find((user) => user.id === session.userId) || null;
 };
 
+const requireAuth = async (req, res, next) => {
+  const user = await getSessionUser(req);
+  if (!user) return res.status(401).json({ error: "Not signed in." });
+  req.user = user;
+  next();
+};
+
+const updateUser = async (userId, updater) => {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) return null;
+  const next = updater(users[idx]);
+  users[idx] = next;
+  await writeUsers(users);
+  return next;
+};
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -96,7 +113,16 @@ app.post("/api/auth/signup", async (req, res) => {
       email: email.toLowerCase(),
       salt,
       hash,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      dashboard: {
+        workouts: [],
+        calories: [],
+        goals: {
+          goalType: "Build lean strength",
+          targetCalories: 2200,
+          weeklyWorkouts: 3
+        }
+      }
     };
     users.push(newUser);
     await writeUsers(users);
@@ -139,6 +165,117 @@ app.post("/api/auth/logout", (req, res) => {
   if (token) sessions.delete(token);
   res.setHeader("Set-Cookie", "sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
   res.json({ ok: true });
+});
+
+app.get("/api/dashboard", requireAuth, async (req, res) => {
+  const user = req.user;
+  if (!user.dashboard) {
+    return res.json({
+      dashboard: {
+        workouts: [],
+        calories: [],
+        goals: {
+          goalType: "Build lean strength",
+          targetCalories: 2200,
+          weeklyWorkouts: 3
+        }
+      }
+    });
+  }
+  res.json({ dashboard: user.dashboard });
+});
+
+app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
+  const { date, focus, duration, notes } = req.body || {};
+  if (!date || !duration) {
+    return res.status(400).json({ error: "Date and duration are required." });
+  }
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = user.dashboard || {
+      workouts: [],
+      calories: [],
+      goals: {
+        goalType: "Build lean strength",
+        targetCalories: 2200,
+        weeklyWorkouts: 3
+      }
+    };
+    const workout = {
+      id: crypto.randomUUID(),
+      date,
+      focus: focus || "General",
+      duration: Number(duration),
+      notes: notes || ""
+    };
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        workouts: [workout, ...dashboard.workouts]
+      }
+    };
+  });
+  res.json({ dashboard: updated.dashboard });
+});
+
+app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
+  const { date, calories } = req.body || {};
+  if (!date || !calories) {
+    return res.status(400).json({ error: "Date and calories are required." });
+  }
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = user.dashboard || {
+      workouts: [],
+      calories: [],
+      goals: {
+        goalType: "Build lean strength",
+        targetCalories: 2200,
+        weeklyWorkouts: 3
+      }
+    };
+    const entry = {
+      id: crypto.randomUUID(),
+      date,
+      calories: Number(calories)
+    };
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        calories: [entry, ...dashboard.calories]
+      }
+    };
+  });
+  res.json({ dashboard: updated.dashboard });
+});
+
+app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
+  const { goalType, targetCalories, weeklyWorkouts } = req.body || {};
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = user.dashboard || {
+      workouts: [],
+      calories: [],
+      goals: {
+        goalType: "Build lean strength",
+        targetCalories: 2200,
+        weeklyWorkouts: 3
+      }
+    };
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        goals: {
+          goalType: goalType || dashboard.goals.goalType,
+          targetCalories:
+            Number(targetCalories) || dashboard.goals.targetCalories,
+          weeklyWorkouts:
+            Number(weeklyWorkouts) || dashboard.goals.weeklyWorkouts
+        }
+      }
+    };
+  });
+  res.json({ dashboard: updated.dashboard });
 });
 
 app.post("/api/generate", async (req, res) => {
