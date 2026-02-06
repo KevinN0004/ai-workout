@@ -93,10 +93,9 @@ export default function App() {
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
   const [workoutForm, setWorkoutForm] = useState({
-    date: "",
+    date: new Date().toISOString().slice(0, 10),
     focus: "",
-    duration: "",
-    notes: ""
+    duration: ""
   });
   const [calorieForm, setCalorieForm] = useState({
     date: "",
@@ -109,6 +108,7 @@ export default function App() {
   });
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
+  const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
@@ -350,7 +350,12 @@ export default function App() {
       }
       const data = await res.json();
       setDashboard(data.dashboard);
-      setWorkoutForm({ date: "", focus: "", duration: "", notes: "" });
+      setWorkoutForm({
+        date: new Date().toISOString().slice(0, 10),
+        focus: "",
+        duration: ""
+      });
+      setWorkoutModalOpen(false);
     } catch (err) {
       setDashError(err.message || "Unable to save workout.");
     }
@@ -733,59 +738,25 @@ export default function App() {
 
           {dashView === "workouts" && (
             <section className="panel dashboard-card span-2">
-              <h2>Workout log</h2>
-              <form className="form dashboard-form" onSubmit={submitWorkout}>
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={workoutForm.date}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Focus
-                  <input
-                    value={workoutForm.focus}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
-                    }
-                    placeholder="Strength, conditioning..."
-                  />
-                </label>
-                <label>
-                  Duration (minutes)
-                  <input
-                    type="number"
-                    min="10"
-                    max="180"
-                    value={workoutForm.duration}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({
-                        ...prev,
-                        duration: e.target.value
-                      }))
-                    }
-                    required
-                  />
-                </label>
-                <label className="full">
-                  Notes
-                  <input
-                    value={workoutForm.notes}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({ ...prev, notes: e.target.value }))
-                    }
-                    placeholder="How it felt, PRs, modifications"
-                  />
-                </label>
-                <button className="cta" type="submit">
-                  Save workout
+              <div className="panel-header">
+                <div>
+                  <h2>Workout log</h2>
+                  <p className="muted">Log each session with a quick add.</p>
+                </div>
+                <button
+                  type="button"
+                  className="cta"
+                  onClick={() => {
+                    setWorkoutForm((prev) => ({
+                      ...prev,
+                      date: new Date().toISOString().slice(0, 10)
+                    }));
+                    setWorkoutModalOpen(true);
+                  }}
+                >
+                  Add workout
                 </button>
-              </form>
+              </div>
               <div className="list">
                 {workouts.map((item) => (
                   <div key={item.id} className="list-row">
@@ -963,6 +934,71 @@ export default function App() {
         </main>
         {dashLoading && <p className="muted">Loading dashboard...</p>}
         {dashError && <p className="error">{dashError}</p>}
+        {workoutModalOpen && (
+          <div
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setWorkoutModalOpen(false)}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Add workout</h2>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setWorkoutModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <form className="form dashboard-form workout-modal-form" onSubmit={submitWorkout}>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={workoutForm.date}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  Focus
+                  <input
+                    value={workoutForm.focus}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
+                    }
+                    placeholder="Strength, conditioning..."
+                  />
+                </label>
+                <label>
+                  Duration (minutes)
+                  <input
+                    type="number"
+                    min="10"
+                    max="180"
+                    value={workoutForm.duration}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({
+                        ...prev,
+                        duration: e.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <div className="modal-submit">
+                  <button className="cta" type="submit">
+                    Save workout
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
         {dashNavOpen && (
           <div className="drawer-backdrop" onClick={() => setDashNavOpen(false)}>
             <aside

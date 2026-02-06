@@ -231,6 +231,17 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.workout-modal-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.modal-submit {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
 .list {
   display: grid;
   gap: 10px;
