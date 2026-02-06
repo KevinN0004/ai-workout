@@ -41,6 +41,17 @@ const samplePlan = [
 ];
 
 export default function App() {
+  const [personalMode, setPersonalMode] = useState("basic");
+  const [personal, setPersonal] = useState({
+    name: "",
+    age: "",
+    height: "",
+    weight: "",
+    sex: "",
+    bodyFat: "",
+    activity: "Moderate",
+    notes: ""
+  });
   const [form, setForm] = useState({
     goal: "Build lean strength and energy",
     equipment: "Dumbbells, yoga mat",
@@ -62,6 +73,10 @@ export default function App() {
     }),
     []
   );
+
+  const onPersonalChange = (e) => {
+    setPersonal((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const onChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -108,6 +123,138 @@ export default function App() {
       </header>
 
       <main className="content">
+        <section className="panel split-panel">
+          <div>
+            <div className="panel-header">
+              <div>
+                <h2>Personal data</h2>
+                <p className="muted">
+                  Start with the essentials, or switch to the advanced form for
+                  extra detail.
+                </p>
+              </div>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={personalMode === "basic" ? "active" : ""}
+                  onClick={() => setPersonalMode("basic")}
+                >
+                  Basic
+                </button>
+                <button
+                  type="button"
+                  className={personalMode === "advanced" ? "active" : ""}
+                  onClick={() => setPersonalMode("advanced")}
+                >
+                  Advanced
+                </button>
+              </div>
+            </div>
+
+            <form className="form personal-form">
+              <label>
+                Full name
+                <input
+                  name="name"
+                  value={personal.name}
+                  onChange={onPersonalChange}
+                  placeholder="Jordan Lee"
+                />
+              </label>
+              <label>
+                Age
+                <input
+                  name="age"
+                  value={personal.age}
+                  onChange={onPersonalChange}
+                  type="number"
+                  min="10"
+                  max="99"
+                  placeholder="28"
+                />
+              </label>
+              <label>
+                Height (cm)
+                <input
+                  name="height"
+                  value={personal.height}
+                  onChange={onPersonalChange}
+                  type="number"
+                  min="120"
+                  max="230"
+                  placeholder="175"
+                />
+              </label>
+              <label>
+                Weight (kg)
+                <input
+                  name="weight"
+                  value={personal.weight}
+                  onChange={onPersonalChange}
+                  type="number"
+                  min="35"
+                  max="200"
+                  placeholder="72"
+                />
+              </label>
+              <label>
+                Sex
+                <select name="sex" value={personal.sex} onChange={onPersonalChange}>
+                  <option value="">Select</option>
+                  <option>Female</option>
+                  <option>Male</option>
+                  <option>Non-binary</option>
+                  <option>Prefer not to say</option>
+                </select>
+              </label>
+
+              {personalMode === "advanced" && (
+                <>
+                  <label>
+                    Body fat %
+                    <input
+                      name="bodyFat"
+                      value={personal.bodyFat}
+                      onChange={onPersonalChange}
+                      type="number"
+                      min="5"
+                      max="50"
+                      placeholder="18"
+                    />
+                  </label>
+                  <label>
+                    Activity level
+                    <select
+                      name="activity"
+                      value={personal.activity}
+                      onChange={onPersonalChange}
+                    >
+                      <option>Light</option>
+                      <option>Moderate</option>
+                      <option>High</option>
+                      <option>Very high</option>
+                    </select>
+                  </label>
+                  <label className="full">
+                    Notes
+                    <input
+                      name="notes"
+                      value={personal.notes}
+                      onChange={onPersonalChange}
+                      placeholder="Sleep schedule, stress, recent training"
+                    />
+                  </label>
+                </>
+              )}
+            </form>
+          </div>
+
+          <div className="body-visual">
+            <div className="body-frame" aria-hidden="true" />
+            <p className="muted">Body type visual placeholder</p>
+          </div>
+        </section>
+
         <section className="panel">
           <div>
             <h2>Design your plan</h2>

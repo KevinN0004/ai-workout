@@ -84,8 +84,46 @@ h2 {
   backdrop-filter: blur(8px);
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.segmented {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  color: #cdd4ff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.segmented button.active {
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffd9a0;
+}
+
 .muted-panel {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.split-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
 }
 
 .form {
@@ -93,6 +131,10 @@ h2 {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-top: 20px;
+}
+
+.personal-form .full {
+  grid-column: 1 / -1;
 }
 
 label {
@@ -152,6 +194,29 @@ select:focus {
   color: #f8f9ff;
 }
 
+.body-visual {
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(6, 10, 20, 0.6);
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.body-frame {
+  width: min(220px, 100%);
+  aspect-ratio: 2 / 3;
+  border-radius: 999px 999px 24px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02)
+  );
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -177,5 +242,14 @@ select:focus {
 @media (max-width: 720px) {
   .page {
     padding: 24px 16px 32px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .split-panel {
+    grid-template-columns: 1fr;
   }
 }
