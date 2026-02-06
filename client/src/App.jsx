@@ -1250,13 +1250,6 @@ export default function App() {
                 >
                   Guides
                 </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => go("/")}
-                >
-                  Back to home
-                </button>
               </div>
             </aside>
           </div>
@@ -1266,7 +1259,7 @@ export default function App() {
   }
 
   return (
-    <div className="page" style={gradient}>
+    <div className="page home-page" style={gradient}>
       <header className="title">
         <div className="header-top">
           <div className="header-left" />
