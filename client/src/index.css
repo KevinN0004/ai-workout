@@ -288,6 +288,11 @@ select {
   font-family: inherit;
 }
 
+select option {
+  color: #0b0f1a;
+  background: #f8f9ff;
+}
+
 input:focus,
 select:focus {
   outline: 2px solid rgba(255, 179, 71, 0.6);
