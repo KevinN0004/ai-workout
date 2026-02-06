@@ -87,6 +87,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authForm, setAuthForm] = useState({ email: "", password: "" });
   const [personal, setPersonal] = useState({
     name: "",
@@ -270,7 +271,7 @@ export default function App() {
       const data = await res.json();
       setUser(data.user || null);
       setAuthForm({ email: "", password: "" });
-      go("/");
+      go("/dashboard");
     } catch (err) {
       setAuthError(err.message || "Unable to authenticate.");
     } finally {
@@ -321,10 +322,19 @@ export default function App() {
               />
             </label>
             <label>
-              Password
+              <span className="label-row">
+                Password
+                <button
+                  type="button"
+                  className="ghost ghost-inline"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </span>
               <input
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={authForm.password}
                 onChange={onAuthChange}
                 placeholder="••••••••"
@@ -348,23 +358,58 @@ export default function App() {
     );
   }
 
+  if (route === "/dashboard") {
+    return (
+      <div className="page" style={gradient}>
+        <header className="title">
+          <div className="header-top">
+            <h1>Dashboard</h1>
+            <div className="auth-actions">
+              {user ? (
+                <>
+                  <span className="muted">Signed in as {user.email}</span>
+                  <button type="button" className="ghost" onClick={onLogout}>
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="ghost" onClick={() => go("/auth")}>
+                  Login / Sign up
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="muted">Empty dashboard — ready for advanced planning.</p>
+        </header>
+        <main className="panel center-panel">
+          <p className="muted">This is a placeholder dashboard.</p>
+          <button type="button" className="ghost" onClick={() => go("/")}>
+            Back to home
+          </button>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="page" style={gradient}>
       <header className="title">
-        <h1>AI Workout Studio</h1>
-        <div className="auth-actions">
-          {user ? (
-            <>
-              <span className="muted">Signed in as {user.email}</span>
-              <button type="button" className="ghost" onClick={onLogout}>
-                Log out
+        <div className="header-top">
+          <h1>AI Workout Studio</h1>
+          <div className="auth-actions">
+            {user ? (
+              <>
+                <span className="muted">Signed in as {user.email}</span>
+                <button type="button" className="ghost" onClick={onLogout}>
+                  Log out
+                </button>
+              </>
+            ) : (
+              <button type="button" className="ghost" onClick={() => go("/auth")}>
+                Login / Sign up
               </button>
-            </>
-          ) : (
-            <button type="button" className="ghost" onClick={() => go("/auth")}>
-              Login / Sign up
-            </button>
-          )}
+            )}
+          </div>
         </div>
         <div className="focus-row">
           {quickFocuses.map((item) => (

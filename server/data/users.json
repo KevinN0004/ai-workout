@@ -1,0 +1,9 @@
+[
+  {
+    "id": "3af8330e-7cc2-47af-afb8-66c0b9c8d42d",
+    "email": "admin@test.com",
+    "salt": "dca321ee63a5358d2a808f2b9a677a0a",
+    "hash": "86b86bab667832309549e3bdc4d12836f3af421d88adade2feeae70fe17471214304c18316c1c702556d1458d0e58d7acd650101f0c68bc4ac9a22acec4e367a",
+    "createdAt": "2026-02-06T09:06:43.031Z"
+  }
+]
