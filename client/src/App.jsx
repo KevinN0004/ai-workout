@@ -510,12 +510,13 @@ export default function App() {
                       <button
                         key={item}
                         type="button"
-                        className={`pill ${
+                        className={`equip-card ${
                           form.equipment.includes(item) ? "active" : ""
                         }`}
                         onClick={() => toggleEquipment(item)}
                       >
-                        {item}
+                        <span className="equip-thumb" aria-hidden="true" />
+                        <span className="equip-label">{item}</span>
                       </button>
                     ))}
                   </div>
