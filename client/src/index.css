@@ -119,11 +119,63 @@ h2 {
   justify-items: center;
 }
 
+.overview-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.overview-card {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 8, 16, 0.6);
+  display: grid;
+  gap: 10px;
+}
+
+.overview-card h3 {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #ffd9a0;
+}
+
+.overview-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #f8f9ff;
+}
+
 .dashboard-grid {
   max-width: 1100px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.dashboard-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr);
+  gap: 24px;
+}
+
+.dashboard-main,
+.dashboard-side {
+  display: grid;
   gap: 24px;
 }
 
@@ -206,6 +258,19 @@ h2 {
   background: rgba(255, 255, 255, 0.05);
   display: grid;
   gap: 10px;
+}
+
+.chart-placeholder {
+  min-height: 180px;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 179, 71, 0.18), transparent 45%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 16px;
 }
 
 .auth-page .title {
@@ -598,6 +663,15 @@ select:focus {
   .modal-header,
   .modal-footer {
     flex-direction: column;
+  }
+
+  .overview-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-split {
+    grid-template-columns: 1fr;
   }
 }
 .drawer-backdrop {
