@@ -488,7 +488,10 @@ export default function App() {
         <div className="page" style={gradient}>
           <header className="title">
             <div className="header-top">
-              <h1>Dashboard</h1>
+              <div className="header-left" />
+              <div className="header-center">
+                <h1>Dashboard</h1>
+              </div>
               <div className="auth-actions">
                 <button
                   type="button"
@@ -588,7 +591,6 @@ export default function App() {
         <header className="title">
           <div className="header-top">
             <div className="header-left">
-              <h1>Dashboard</h1>
               <div className="nav-trigger">
                 <button
                   type="button"
@@ -599,6 +601,9 @@ export default function App() {
                 </button>
                 <span className="muted">Current: {dashView}</span>
               </div>
+            </div>
+            <div className="header-center">
+              <h1>Dashboard</h1>
             </div>
             <div className="auth-actions">
               {user ? (
@@ -1193,7 +1198,7 @@ export default function App() {
                     setDashNavOpen(false);
                   }}
                 >
-                  Summary
+                  Home
                 </button>
                 <button
                   type="button"
@@ -1203,7 +1208,7 @@ export default function App() {
                     setDashNavOpen(false);
                   }}
                 >
-                  Workout log
+                  Logs
                 </button>
                 <button
                   type="button"
@@ -1213,7 +1218,7 @@ export default function App() {
                     setDashNavOpen(false);
                   }}
                 >
-                  Calories & goals
+                  Goal
                 </button>
                 <button
                   type="button"
@@ -1223,7 +1228,7 @@ export default function App() {
                     setDashNavOpen(false);
                   }}
                 >
-                  Plan hub
+                  Weekly plan
                 </button>
                 <button
                   type="button"
@@ -1243,7 +1248,7 @@ export default function App() {
                     setDashNavOpen(false);
                   }}
                 >
-                  Tips
+                  Guides
                 </button>
                 <button
                   type="button"
@@ -1264,7 +1269,10 @@ export default function App() {
     <div className="page" style={gradient}>
       <header className="title">
         <div className="header-top">
-          <h1>AI Workout Studio</h1>
+          <div className="header-left" />
+          <div className="header-center">
+            <h1>AI Workout Studio</h1>
+          </div>
           <div className="auth-actions">
             {user ? (
               <>
