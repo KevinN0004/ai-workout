@@ -113,7 +113,9 @@ export default function App() {
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
-    height: "",
+    heightCm: "",
+    heightFeet: "",
+    heightInches: "",
     weight: "",
     sex: "",
     bodyFat: "",
@@ -144,18 +146,27 @@ export default function App() {
     []
   );
 
-  const toCm = (value, fromUnit) => {
-    if (!value) return "";
-    const num = Number(value);
-    if (Number.isNaN(num)) return value;
-    return fromUnit === "in" ? String(Math.round(num * 2.54)) : String(num);
+  const toCmFromFeetInches = (feetValue, inchesValue) => {
+    const feetNum = Number(feetValue);
+    const inchesNum = Number(inchesValue);
+    if (Number.isNaN(feetNum) && Number.isNaN(inchesNum)) return "";
+    const totalInches = (Number.isNaN(feetNum) ? 0 : feetNum * 12) +
+      (Number.isNaN(inchesNum) ? 0 : inchesNum);
+    if (!totalInches) return "";
+    return String(Math.round(totalInches * 2.54));
   };
 
-  const toInches = (value, fromUnit) => {
-    if (!value) return "";
-    const num = Number(value);
-    if (Number.isNaN(num)) return value;
-    return fromUnit === "cm" ? String(Math.round(num / 2.54)) : String(num);
+  const toFeetInchesFromCm = (cmValue) => {
+    const cmNum = Number(cmValue);
+    if (!cmNum || Number.isNaN(cmNum)) return { feet: "", inches: "" };
+    const totalInches = cmNum / 2.54;
+    let feet = Math.floor(totalInches / 12);
+    let inches = Math.round(totalInches - feet * 12);
+    if (inches === 12) {
+      feet += 1;
+      inches = 0;
+    }
+    return { feet: String(feet), inches: String(inches) };
   };
 
   const toKg = (value, fromUnit) => {
@@ -1262,8 +1273,7 @@ export default function App() {
     <div className="page home-page" style={gradient}>
       <header className="title">
         <div className="header-top">
-          <div className="header-left" />
-          <div className="header-center">
+          <div className="header-left">
             <h1>AI Workout Studio</h1>
           </div>
           <div className="auth-actions">
@@ -1348,15 +1358,22 @@ export default function App() {
               </label>
               <label>
                 <span className="label-row">
-                  Height ({heightUnit})
-                  <span className="unit-toggle" role="group" aria-label="Height units">
+                  Height ({heightUnit === "cm" ? "cm" : "ft/in"})
+                  <span
+                    className="unit-toggle"
+                    role="group"
+                    aria-label="Height units"
+                  >
                     <button
                       type="button"
                       className={heightUnit === "cm" ? "active" : ""}
                       onClick={() => {
                         setPersonal((prev) => ({
                           ...prev,
-                          height: toCm(prev.height, heightUnit)
+                          heightCm: toCmFromFeetInches(
+                            prev.heightFeet,
+                            prev.heightInches
+                          )
                         }));
                         setHeightUnit("cm");
                       }}
@@ -1365,28 +1382,55 @@ export default function App() {
                     </button>
                     <button
                       type="button"
-                      className={heightUnit === "in" ? "active" : ""}
+                      className={heightUnit === "ft" ? "active" : ""}
                       onClick={() => {
+                        const next = toFeetInchesFromCm(personal.heightCm);
                         setPersonal((prev) => ({
                           ...prev,
-                          height: toInches(prev.height, heightUnit)
+                          heightFeet: next.feet,
+                          heightInches: next.inches
                         }));
-                        setHeightUnit("in");
+                        setHeightUnit("ft");
                       }}
                     >
-                      in
+                      ft/in
                     </button>
                   </span>
                 </span>
-                <input
-                  name="height"
-                  value={personal.height}
-                  onChange={onPersonalChange}
-                  type="number"
-                  min={heightUnit === "cm" ? "120" : "47"}
-                  max={heightUnit === "cm" ? "230" : "91"}
-                  placeholder={heightUnit === "cm" ? "175" : "69"}
-                />
+                {heightUnit === "cm" ? (
+                  <input
+                    name="heightCm"
+                    value={personal.heightCm}
+                    onChange={onPersonalChange}
+                    type="number"
+                    min="120"
+                    max="230"
+                    placeholder="175"
+                  />
+                ) : (
+                  <div className="height-split">
+                    <input
+                      name="heightFeet"
+                      value={personal.heightFeet}
+                      onChange={onPersonalChange}
+                      type="number"
+                      min="3"
+                      max="7"
+                      placeholder="5"
+                    />
+                    <span className="muted">ft</span>
+                    <input
+                      name="heightInches"
+                      value={personal.heightInches}
+                      onChange={onPersonalChange}
+                      type="number"
+                      min="0"
+                      max="11"
+                      placeholder="9"
+                    />
+                    <span className="muted">in</span>
+                  </div>
+                )}
               </label>
               <label>
                 <span className="label-row">

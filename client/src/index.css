@@ -639,6 +639,13 @@ label {
   color: #ffd9a0;
 }
 
+.height-split {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
 input,
 select {
   background: rgba(255, 255, 255, 0.08);
