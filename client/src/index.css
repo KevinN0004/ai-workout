@@ -67,6 +67,15 @@ h2 {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   font-size: 0.9rem;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.pill.active {
+  background: rgba(255, 179, 71, 0.2);
+  border-color: rgba(255, 179, 71, 0.5);
+  color: #ffd9a0;
 }
 
 .content {
@@ -74,6 +83,13 @@ h2 {
   margin: 0 auto;
   display: grid;
   gap: 24px;
+}
+
+.center-panel {
+  text-align: center;
+  display: grid;
+  gap: 16px;
+  justify-items: center;
 }
 
 .panel {
@@ -121,9 +137,9 @@ h2 {
 
 .split-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .form {
@@ -131,6 +147,91 @@ h2 {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-top: 20px;
+}
+
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 18, 0.7);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.modal {
+  width: min(900px, 100%);
+  background: rgba(12, 16, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+  text-align: center;
+}
+
+.modal-header,
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-body {
+  display: grid;
+  gap: 20px;
+}
+
+.step-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.step-top {
+  display: flex;
+  justify-content: center;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.step-panel h3 {
+  font-size: 1.2rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f1f5ff;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.step-indicator {
+  color: #aab3ff;
+  font-size: 0.9rem;
+}
+
+.personal-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .personal-form .full {
@@ -288,5 +389,14 @@ select:focus {
 
   .split-panel {
     grid-template-columns: 1fr;
+  }
+
+  .personal-form {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-header,
+  .modal-footer {
+    flex-direction: column;
   }
 }

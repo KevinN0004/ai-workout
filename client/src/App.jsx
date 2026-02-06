@@ -8,6 +8,42 @@ const quickFocuses = [
   "Endurance base"
 ];
 
+const goalOptions = [
+  "Build lean strength and energy",
+  "Fat loss + conditioning",
+  "Mobility + recovery",
+  "Athletic power",
+  "Endurance base"
+];
+
+const equipmentOptionsByEnv = {
+  Home: [
+    "Bodyweight only",
+    "Dumbbells",
+    "Kettlebell",
+    "Resistance bands",
+    "Adjustable bench",
+    "Yoga mat"
+  ],
+  Commercial: [
+    "Full gym access",
+    "Barbell + plates",
+    "Cable machine",
+    "Smith machine",
+    "Cardio machines",
+    "Free weights"
+  ]
+};
+
+const injuryOptions = [
+  "None",
+  "Lower back",
+  "Knee",
+  "Shoulder",
+  "Hip",
+  "Wrist/Elbow"
+];
+
 const samplePlan = [
   {
     day: "Day 1 � Full Body Strength",
@@ -44,6 +80,8 @@ export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
   const [heightUnit, setHeightUnit] = useState("cm");
   const [weightUnit, setWeightUnit] = useState("kg");
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerStep, setPlannerStep] = useState(1);
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
@@ -56,11 +94,13 @@ export default function App() {
   });
   const [form, setForm] = useState({
     goal: "Build lean strength and energy",
-    equipment: "Dumbbells, yoga mat",
+    equipment: ["Dumbbells"],
     duration: "45",
     level: "Intermediate",
     injuries: "None",
-    days: "3"
+    days: "3",
+    focuses: [],
+    environment: "Home"
   });
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
@@ -112,6 +152,44 @@ export default function App() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const toggleEquipment = (item) => {
+    setForm((prev) => {
+      const exists = prev.equipment.includes(item);
+      return {
+        ...prev,
+        equipment: exists
+          ? prev.equipment.filter((equip) => equip !== item)
+          : [...prev.equipment, item]
+      };
+    });
+  };
+
+  const onEnvironmentChange = (nextEnv) => {
+    const nextOptions = equipmentOptionsByEnv[nextEnv] || [];
+    setForm((prev) => {
+      const filtered = prev.equipment.filter((item) =>
+        nextOptions.includes(item)
+      );
+      return {
+        ...prev,
+        environment: nextEnv,
+        equipment: filtered.length ? filtered : [nextOptions[0]].filter(Boolean)
+      };
+    });
+  };
+
+  const toggleFocus = (item) => {
+    setForm((prev) => {
+      const exists = prev.focuses.includes(item);
+      return {
+        ...prev,
+        focuses: exists
+          ? prev.focuses.filter((focus) => focus !== item)
+          : [...prev.focuses, item]
+      };
+    });
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -145,9 +223,14 @@ export default function App() {
         <h1>AI Workout Studio</h1>
         <div className="focus-row">
           {quickFocuses.map((item) => (
-            <span key={item} className="pill">
+            <button
+              key={item}
+              type="button"
+              className={`pill ${form.focuses.includes(item) ? "active" : ""}`}
+              onClick={() => toggleFocus(item)}
+            >
               {item}
-            </span>
+            </button>
           ))}
         </div>
       </header>
@@ -348,76 +431,17 @@ export default function App() {
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel center-panel">
           <div>
             <h2>Design your plan</h2>
             <p className="muted">
-              Tell the AI coach what you&apos;re working with and it will produce a
-              structured multi-day plan.
+              Open the planner to configure your training details across guided
+              steps.
             </p>
           </div>
-          <form className="form" onSubmit={onSubmit}>
-            <label>
-              Goal
-              <input
-                name="goal"
-                value={form.goal}
-                onChange={onChange}
-                placeholder="Strength, fat loss, endurance, mobility"
-              />
-            </label>
-            <label>
-              Equipment
-              <input
-                name="equipment"
-                value={form.equipment}
-                onChange={onChange}
-                placeholder="Dumbbells, kettlebell, treadmill"
-              />
-            </label>
-            <label>
-              Days per week
-              <select name="days" value={form.days} onChange={onChange}>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-              </select>
-            </label>
-            <label>
-              Session length (minutes)
-              <input
-                name="duration"
-                value={form.duration}
-                onChange={onChange}
-                type="number"
-                min="20"
-                max="90"
-              />
-            </label>
-            <label>
-              Experience level
-              <select name="level" value={form.level} onChange={onChange}>
-                <option>Beginner</option>
-                <option>Intermediate</option>
-                <option>Advanced</option>
-              </select>
-            </label>
-            <label>
-              Injuries or limitations
-              <input
-                name="injuries"
-                value={form.injuries}
-                onChange={onChange}
-                placeholder="Lower back, knee, shoulder"
-              />
-            </label>
-            <button className="cta" type="submit" disabled={loading}>
-              {loading ? "Generating..." : "Generate workout"}
-            </button>
-          </form>
+          <button className="cta" type="button" onClick={() => setPlannerOpen(true)}>
+            Open planner
+          </button>
           {error && <p className="error">{error}</p>}
           {result && (
             <div className="result">
@@ -443,6 +467,149 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      {plannerOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>Planner</h2>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setPlannerOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              {plannerStep === 1 && (
+                <div className="step-panel">
+                  <h3>Step 1 — Environment & equipment</h3>
+                  <div className="step-top">
+                    <div className="segmented">
+                      <button
+                        type="button"
+                        className={form.environment === "Home" ? "active" : ""}
+                        onClick={() => onEnvironmentChange("Home")}
+                      >
+                        Home
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          form.environment === "Commercial" ? "active" : ""
+                        }
+                        onClick={() => onEnvironmentChange("Commercial")}
+                      >
+                        Commercial
+                      </button>
+                    </div>
+                  </div>
+                  <div className="option-grid">
+                    {equipmentOptionsByEnv[form.environment].map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`pill ${
+                          form.equipment.includes(item) ? "active" : ""
+                        }`}
+                        onClick={() => toggleEquipment(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {plannerStep === 2 && (
+                <div className="step-panel">
+                  <h3>Step 2 — Schedule & constraints</h3>
+                  <form className="form" onSubmit={onSubmit}>
+                    <label>
+                      Days per week
+                      <select name="days" value={form.days} onChange={onChange}>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                      </select>
+                    </label>
+                    <label>
+                      Session length (minutes)
+                      <select
+                        name="duration"
+                        value={form.duration}
+                        onChange={onChange}
+                      >
+                        <option value="30">30</option>
+                        <option value="45">45</option>
+                        <option value="60">60</option>
+                        <option value="75">75</option>
+                        <option value="90">90</option>
+                      </select>
+                    </label>
+                    <label>
+                      Experience level
+                      <select name="level" value={form.level} onChange={onChange}>
+                        <option>Beginner</option>
+                        <option>Intermediate</option>
+                        <option>Advanced</option>
+                      </select>
+                    </label>
+                    <label>
+                      Injuries or limitations
+                      <select
+                        name="injuries"
+                        value={form.injuries}
+                        onChange={onChange}
+                      >
+                        {injuryOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </form>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <div className="step-indicator">Step {plannerStep} of 2</div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
+                  disabled={plannerStep === 1}
+                >
+                  Back
+                </button>
+                {plannerStep < 2 ? (
+                  <button
+                    type="button"
+                    className="cta"
+                    onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    className="cta"
+                    type="button"
+                    disabled={loading}
+                    onClick={onSubmit}
+                  >
+                    {loading ? "Generating..." : "Generate workout"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
