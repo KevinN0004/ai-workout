@@ -42,6 +42,8 @@ const samplePlan = [
 
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
+  const [heightUnit, setHeightUnit] = useState("cm");
+  const [weightUnit, setWeightUnit] = useState("kg");
   const [personal, setPersonal] = useState({
     name: "",
     age: "",
@@ -73,6 +75,34 @@ export default function App() {
     }),
     []
   );
+
+  const toCm = (value, fromUnit) => {
+    if (!value) return "";
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return fromUnit === "in" ? String(Math.round(num * 2.54)) : String(num);
+  };
+
+  const toInches = (value, fromUnit) => {
+    if (!value) return "";
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return fromUnit === "cm" ? String(Math.round(num / 2.54)) : String(num);
+  };
+
+  const toKg = (value, fromUnit) => {
+    if (!value) return "";
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return fromUnit === "lb" ? String(Math.round(num * 0.453592)) : String(num);
+  };
+
+  const toLb = (value, fromUnit) => {
+    if (!value) return "";
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return fromUnit === "kg" ? String(Math.round(num / 0.453592)) : String(num);
+  };
 
   const onPersonalChange = (e) => {
     setPersonal((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -174,27 +204,87 @@ export default function App() {
                 />
               </label>
               <label>
-                Height (cm)
+                <span className="label-row">
+                  Height ({heightUnit})
+                  <span className="unit-toggle" role="group" aria-label="Height units">
+                    <button
+                      type="button"
+                      className={heightUnit === "cm" ? "active" : ""}
+                      onClick={() => {
+                        setPersonal((prev) => ({
+                          ...prev,
+                          height: toCm(prev.height, heightUnit)
+                        }));
+                        setHeightUnit("cm");
+                      }}
+                    >
+                      cm
+                    </button>
+                    <button
+                      type="button"
+                      className={heightUnit === "in" ? "active" : ""}
+                      onClick={() => {
+                        setPersonal((prev) => ({
+                          ...prev,
+                          height: toInches(prev.height, heightUnit)
+                        }));
+                        setHeightUnit("in");
+                      }}
+                    >
+                      in
+                    </button>
+                  </span>
+                </span>
                 <input
                   name="height"
                   value={personal.height}
                   onChange={onPersonalChange}
                   type="number"
-                  min="120"
-                  max="230"
-                  placeholder="175"
+                  min={heightUnit === "cm" ? "120" : "47"}
+                  max={heightUnit === "cm" ? "230" : "91"}
+                  placeholder={heightUnit === "cm" ? "175" : "69"}
                 />
               </label>
               <label>
-                Weight (kg)
+                <span className="label-row">
+                  Weight ({weightUnit})
+                  <span className="unit-toggle" role="group" aria-label="Weight units">
+                    <button
+                      type="button"
+                      className={weightUnit === "kg" ? "active" : ""}
+                      onClick={() => {
+                        setPersonal((prev) => ({
+                          ...prev,
+                          weight: toKg(prev.weight, weightUnit)
+                        }));
+                        setWeightUnit("kg");
+                      }}
+                    >
+                      kg
+                    </button>
+                    <button
+                      type="button"
+                      className={weightUnit === "lb" ? "active" : ""}
+                      onClick={() => {
+                        setPersonal((prev) => ({
+                          ...prev,
+                          weight: toLb(prev.weight, weightUnit)
+                        }));
+                        setWeightUnit("lb");
+                      }}
+                    >
+                      lb
+                    </button>
+                  </span>
+                </span>
                 <input
                   name="weight"
                   value={personal.weight}
                   onChange={onPersonalChange}
                   type="number"
-                  min="35"
-                  max="200"
-                  placeholder="72"
+                  min={weightUnit === "kg" ? "35" : "77"}
+                  max={weightUnit === "kg" ? "200" : "440"}
+                  placeholder={weightUnit === "kg" ? "72" : "160"}
                 />
               </label>
               <label>

@@ -145,6 +145,38 @@ label {
   color: #cdd4ff;
 }
 
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.unit-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px;
+  border-radius: 999px;
+}
+
+.unit-toggle button {
+  border: none;
+  background: transparent;
+  color: #cdd4ff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.unit-toggle button.active {
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffd9a0;
+}
+
 input,
 select {
   background: rgba(255, 255, 255, 0.08);
