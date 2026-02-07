@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -14,7 +14,7 @@ const port = process.env.PORT || 5000;
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const usersFile = path.join(process.cwd(), "data", "users.json");
 const sessions = new Map();
 
@@ -280,8 +280,8 @@ app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
 
 app.post("/api/generate", async (req, res) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_API_KEY." });
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
     }
 
     const {
@@ -295,7 +295,7 @@ app.post("/api/generate", async (req, res) => {
       focuses = []
     } = req.body || {};
 
-    const model = process.env.OPENAI_MODEL || "gpt-5";
+    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
     const equipmentLine = Array.isArray(equipment)
       ? equipment.join(", ")
       : equipment;
@@ -304,15 +304,9 @@ app.post("/api/generate", async (req, res) => {
     const prompt = `You are an expert fitness coach. Create a ${days}-day workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment: ${equipment}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Provide a day-by-day plan with warmup, main lifts, accessories, and finisher/conditioning.\n- Include sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- Output in clean plain text with clear day headings.`;
     const promptWithContext = `${prompt}\n\nEnvironment: ${environment}\nFocuses: ${focusLine}\nEquipment list: ${equipmentLine}`;
 
-    const response = await client.responses.create({
-      model,
-      input: promptWithContext
-    });
-
-    const plan =
-      response.output_text ||
-      response.output?.[0]?.content?.[0]?.text ||
-      "";
+    const model = gemini.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(promptWithContext);
+    const plan = result?.response?.text?.() || "";
 
     if (!plan) {
       return res.status(502).json({ error: "No plan generated." });
