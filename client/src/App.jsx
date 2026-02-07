@@ -241,6 +241,7 @@ export default function App() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(form)
       });
 
@@ -251,6 +252,13 @@ export default function App() {
 
       const data = await res.json();
       setResult(data.plan);
+      if (data.savedPlan) {
+        setDashboard((prev) =>
+          prev
+            ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] }
+            : prev
+        );
+      }
       setPlanModalOpen(true);
     } catch (err) {
       setError(err.message || "Unable to generate plan.");
@@ -281,27 +289,49 @@ export default function App() {
     doc.save("ai-workout-plan.pdf");
   };
 
-  const parsedPlan = useMemo(() => {
-    if (!result) return [];
-    const lines = result
+  const planSections = useMemo(() => {
+    if (!result) return { days: [], notes: [] };
+    const rawLines = result
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
+    const notesStart = rawLines.findIndex((line) =>
+      /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line)
+    );
+
+    let lines = rawLines;
+    let notes = [];
+
+    if (notesStart >= 0) {
+      const headerLine = rawLines[notesStart];
+      const strippedHeader = headerLine.replace(
+        /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\s*[:\-]?\s*/i,
+        ""
+      );
+      notes = [
+        ...[strippedHeader].filter((line) => line),
+        ...rawLines.slice(notesStart + 1)
+      ];
+      lines = rawLines.slice(0, notesStart);
+    }
+
     const isDayHeader = (line) => /^day\s*\d+/i.test(line);
     const dayIndices = lines
       .map((line, index) => (isDayHeader(line) ? index : -1))
       .filter((index) => index >= 0);
 
-    if (!dayIndices.length) {
-      return [{ title: "Your plan", lines }];
-    }
+    const days = dayIndices.length
+      ? dayIndices.map((start, idx) => {
+          const end = dayIndices[idx + 1] ?? lines.length;
+          const title = lines[start];
+          const dayLines = lines.slice(start + 1, end);
+          return { title, lines: dayLines };
+        })
+      : lines.length
+      ? [{ title: "Your plan", lines }]
+      : [];
 
-    return dayIndices.map((start, idx) => {
-      const end = dayIndices[idx + 1] ?? lines.length;
-      const title = lines[start];
-      const dayLines = lines.slice(start + 1, end);
-      return { title, lines: dayLines };
-    });
+    return { days, notes };
   }, [result]);
 
   useEffect(() => {
@@ -570,6 +600,7 @@ export default function App() {
     const workouts = dashboard?.workouts || [];
     const calories = dashboard?.calories || [];
     const goals = dashboard?.goals || goalForm;
+    const plans = dashboard?.plans || [];
 
     const last7Cutoff = new Date();
     last7Cutoff.setDate(last7Cutoff.getDate() - 6);
@@ -1071,6 +1102,39 @@ export default function App() {
           {dashView === "plans" && (
             <section className="panel dashboard-card span-2">
               <h2>Plan hub</h2>
+              {plans.length ? (
+                <div className="grid">
+                  {plans.slice(0, 3).map((plan) => (
+                    <article key={plan.id} className="plan-card">
+                      <h3>{plan.goal || "Workout plan"}</h3>
+                      <p className="muted">
+                        {plan.days ? `${plan.days} days` : "Custom"} •{" "}
+                        {plan.level || "All levels"} •{" "}
+                        {plan.environment || "Any environment"}
+                      </p>
+                      <p className="muted">
+                        {new Date(plan.createdAt).toLocaleDateString()}
+                      </p>
+                      <div className="plan-card-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            setResult(plan.plan || "");
+                            setPlanModalOpen(true);
+                          }}
+                        >
+                          View plan
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted">
+                  Generate a plan to see it saved here.
+                </p>
+              )}
               <div className="plan-rows">
                 <section className="plan-row">
                   <div className="plan-row-header">
@@ -1758,34 +1822,61 @@ export default function App() {
         </div>
       )}
       {planModalOpen && result && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
+        <div
+          className="modal-backdrop plan-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="modal plan-modal">
             <div className="modal-header">
               <h2>Your AI Plan</h2>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setPlanModalOpen(false)}
-              >
-                Close
-              </button>
+              <div className="modal-actions">
+                {!user && (
+                  <button type="button" className="cta" onClick={() => go("/auth")}>
+                    Login / Sign up
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setPlanModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
             <div className="modal-body">
-              <div className="grid">
-                {parsedPlan.map((day, index) => (
-                  <article className="plan-card" key={`${day.title}-${index}`}>
-                    <h3>{day.title}</h3>
-                    {day.lines.length ? (
-                      <ul>
-                        {day.lines.map((line, lineIndex) => (
-                          <li key={`${index}-${lineIndex}-${line}`}>{line}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted">No details provided.</p>
-                    )}
-                  </article>
-                ))}
+              <div className="plan-modal-content">
+                <section className="plan-modal-plan">
+                  <div className="grid">
+                    {planSections.days.map((day, index) => (
+                      <article className="plan-card" key={`${day.title}-${index}`}>
+                        <h3>{day.title}</h3>
+                        {day.lines.length ? (
+                          <ul>
+                            {day.lines.map((line, lineIndex) => (
+                              <li key={`${index}-${lineIndex}-${line}`}>{line}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted">No details provided.</p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                <section className="plan-modal-notes">
+                  <h3>Coach notes</h3>
+                  {planSections.notes.length ? (
+                    <ul>
+                      {planSections.notes.map((line, index) => (
+                        <li key={`${index}-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">No coach notes provided.</p>
+                  )}
+                </section>
               </div>
             </div>
             <div className="modal-footer">

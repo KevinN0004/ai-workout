@@ -117,6 +117,7 @@ app.post("/api/auth/signup", async (req, res) => {
       dashboard: {
         workouts: [],
         calories: [],
+        plans: [],
         goals: {
           targetWeight: 160,
           targetCalories: 2200,
@@ -174,6 +175,7 @@ app.get("/api/dashboard", requireAuth, async (req, res) => {
       dashboard: {
         workouts: [],
         calories: [],
+        plans: [],
         goals: {
           targetWeight: 160,
           targetCalories: 2200,
@@ -194,6 +196,7 @@ app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
     const dashboard = user.dashboard || {
       workouts: [],
       calories: [],
+      plans: [],
       goals: {
         targetWeight: 160,
         targetCalories: 2200,
@@ -227,6 +230,7 @@ app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
     const dashboard = user.dashboard || {
       workouts: [],
       calories: [],
+      plans: [],
       goals: {
         targetWeight: 160,
         targetCalories: 2200,
@@ -255,6 +259,7 @@ app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
     const dashboard = user.dashboard || {
       workouts: [],
       calories: [],
+      plans: [],
       goals: {
         targetWeight: 160,
         targetCalories: 2200,
@@ -312,7 +317,47 @@ app.post("/api/generate", async (req, res) => {
       return res.status(502).json({ error: "No plan generated." });
     }
 
-    res.json({ plan });
+    const sessionUser = await getSessionUser(req);
+    let savedPlan = null;
+
+    if (sessionUser) {
+      const planEntry = {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        goal,
+        equipment: Array.isArray(equipment) ? equipment : [equipment].filter(Boolean),
+        duration: Number(duration),
+        level,
+        injuries,
+        days: Number(days),
+        environment,
+        focuses: Array.isArray(focuses) ? focuses : [],
+        plan
+      };
+
+      const updated = await updateUser(sessionUser.id, (user) => {
+        const dashboard = user.dashboard || {
+          workouts: [],
+          calories: [],
+          plans: [],
+          goals: {
+            targetWeight: 160,
+            targetCalories: 2200,
+            weeklyWorkouts: 3
+          }
+        };
+        return {
+          ...user,
+          dashboard: {
+            ...dashboard,
+            plans: [planEntry, ...(dashboard.plans || [])]
+          }
+        };
+      });
+      savedPlan = updated?.dashboard?.plans?.[0] || planEntry;
+    }
+
+    res.json({ plan, savedPlan });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });
   }
