@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 
 const quickFocuses = [
   "Strength + hypertrophy",
@@ -135,6 +136,7 @@ export default function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [planModalOpen, setPlanModalOpen] = useState(false);
 
   const gradient = useMemo(
     () => ({
@@ -249,12 +251,58 @@ export default function App() {
 
       const data = await res.json();
       setResult(data.plan);
+      setPlanModalOpen(true);
     } catch (err) {
       setError(err.message || "Unable to generate plan.");
     } finally {
       setLoading(false);
     }
   };
+
+  const downloadPlanPdf = () => {
+    if (!result) return;
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const margin = 48;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const lineHeight = 16;
+    const lines = doc.splitTextToSize(result, pageWidth - margin * 2);
+
+    let y = margin;
+    lines.forEach((line) => {
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+
+    doc.save("ai-workout-plan.pdf");
+  };
+
+  const parsedPlan = useMemo(() => {
+    if (!result) return [];
+    const lines = result
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const isDayHeader = (line) => /^day\s*\d+/i.test(line);
+    const dayIndices = lines
+      .map((line, index) => (isDayHeader(line) ? index : -1))
+      .filter((index) => index >= 0);
+
+    if (!dayIndices.length) {
+      return [{ title: "Your plan", lines }];
+    }
+
+    return dayIndices.map((start, idx) => {
+      const end = dayIndices[idx + 1] ?? lines.length;
+      const title = lines[start];
+      const dayLines = lines.slice(start + 1, end);
+      return { title, lines: dayLines };
+    });
+  }, [result]);
 
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
@@ -1547,12 +1595,6 @@ export default function App() {
             Open planner
           </button>
           {error && <p className="error">{error}</p>}
-          {result && (
-            <div className="result">
-              <h3>AI Plan</h3>
-              <pre>{result}</pre>
-            </div>
-          )}
         </section>
 
         <section className="panel muted-panel">
@@ -1710,6 +1752,54 @@ export default function App() {
                     {loading ? "Generating..." : "Generate workout"}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {planModalOpen && result && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>Your AI Plan</h2>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setPlanModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="grid">
+                {parsedPlan.map((day, index) => (
+                  <article className="plan-card" key={`${day.title}-${index}`}>
+                    <h3>{day.title}</h3>
+                    {day.lines.length ? (
+                      <ul>
+                        {day.lines.map((line, lineIndex) => (
+                          <li key={`${index}-${lineIndex}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted">No details provided.</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <div className="modal-actions">
+                <button type="button" className="cta" onClick={downloadPlanPdf}>
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setPlanModalOpen(false)}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
