@@ -799,6 +799,17 @@ select:focus {
   line-height: 1.4;
 }
 
+.hub-list {
+  margin-top: 10px;
+  padding-left: 16px;
+  list-style: disc;
+  display: grid;
+  gap: 6px;
+  color: #cfd7ff;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 24px 16px 32px;

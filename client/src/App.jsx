@@ -315,9 +315,20 @@ export default function App() {
       lines = rawLines.slice(0, notesStart);
     }
 
-    const isDayHeader = (line) => /^day\s*\d+/i.test(line);
+    const weekdayMap = [
+      ["monday", "Monday"],
+      ["tuesday", "Tuesday"],
+      ["wednesday", "Wednesday"],
+      ["thursday", "Thursday"],
+      ["friday", "Friday"],
+      ["saturday", "Saturday"],
+      ["sunday", "Sunday"]
+    ];
+    const isWeekdayHeader = (line) =>
+      weekdayMap.some(([key]) => line.toLowerCase().startsWith(key));
+
     const dayIndices = lines
-      .map((line, index) => (isDayHeader(line) ? index : -1))
+      .map((line, index) => (isWeekdayHeader(line) ? index : -1))
       .filter((index) => index >= 0);
 
     const days = dayIndices.length
@@ -333,6 +344,37 @@ export default function App() {
 
     return { days, notes };
   }, [result]);
+
+  const latestPlanByWeekday = useMemo(() => {
+    const plans = dashboard?.plans || [];
+    if (!plans.length) return {};
+    const source = plans[0]?.plan || "";
+    const lines = source
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const notesStart = lines.findIndex((line) =>
+      /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line)
+    );
+    const planLines = notesStart >= 0 ? lines.slice(0, notesStart) : lines;
+    const week = {};
+    let current = null;
+    planLines.forEach((line) => {
+      const lower = line.toLowerCase();
+      if (lower.startsWith("monday")) current = "Monday";
+      else if (lower.startsWith("tuesday")) current = "Tuesday";
+      else if (lower.startsWith("wednesday")) current = "Wednesday";
+      else if (lower.startsWith("thursday")) current = "Thursday";
+      else if (lower.startsWith("friday")) current = "Friday";
+      else if (lower.startsWith("saturday")) current = "Saturday";
+      else if (lower.startsWith("sunday")) current = "Sunday";
+      else if (current) {
+        if (!week[current]) week[current] = [];
+        week[current].push(line);
+      }
+    });
+    return week;
+  }, [dashboard]);
 
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
@@ -1150,9 +1192,17 @@ export default function App() {
                       {weekDays.map((day) => (
                         <div key={day} className="hub-card">
                           <h4>{day}</h4>
-                          <p className="muted">Daily workout focus placeholder.</p>
-                          <p className="muted">Session length: 45 min</p>
-                          <p className="muted">Primary lift: TBD</p>
+                          {latestPlanByWeekday[day]?.length ? (
+                            <ul className="hub-list">
+                              {latestPlanByWeekday[day].slice(0, 4).map((line) => (
+                                <li key={`${day}-${line}`}>{line}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="muted">
+                              Generate a weekly plan to populate this day.
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>

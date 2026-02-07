@@ -306,7 +306,7 @@ app.post("/api/generate", async (req, res) => {
       : equipment;
     const focusLine = Array.isArray(focuses) ? focuses.join(", ") : focuses;
 
-    const prompt = `You are an expert fitness coach. Create a ${days}-day workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment: ${equipment}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Provide a day-by-day plan with warmup, main lifts, accessories, and finisher/conditioning.\n- Include sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- Output in clean plain text with clear day headings.`;
+    const prompt = `You are an expert fitness coach. Create a weekly workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment: ${equipment}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Use weekday headings exactly as: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.\n- For each day include: Warmup, Main lifts, Accessories, and Finisher/conditioning with sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- End with a section labeled \"Coach Notes:\" containing tips and recovery guidance.\n- Output in clean plain text with clear headings.`;
     const promptWithContext = `${prompt}\n\nEnvironment: ${environment}\nFocuses: ${focusLine}\nEquipment list: ${equipmentLine}`;
 
     const model = gemini.getGenerativeModel({ model: modelName });
