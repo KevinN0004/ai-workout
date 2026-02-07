@@ -1887,11 +1887,6 @@ export default function App() {
             <div className="modal-header">
               <h2>Your AI Plan</h2>
               <div className="modal-actions">
-                {!user && (
-                  <button type="button" className="cta" onClick={() => go("/auth")}>
-                    Login / Sign up
-                  </button>
-                )}
                 <button
                   type="button"
                   className="ghost icon-button"
@@ -1945,16 +1940,11 @@ export default function App() {
                               )
                             )}
                           </ul>
-                        ) : (
-                          <p className="muted">No details provided.</p>
-                        )}
+                        ) : null}
                       </div>
                     </>
                   ) : (
-                    <div className="plan-day">
-                      <h3>Your plan</h3>
-                      <p className="muted">No structured days were detected.</p>
-                    </div>
+                    <div className="plan-day" />
                   )}
                 </section>
                 <section className="plan-modal-notes">
@@ -1965,9 +1955,7 @@ export default function App() {
                         <li key={`${index}-${line}`}>{line}</li>
                       ))}
                     </ul>
-                  ) : (
-                    <p className="muted">No coach notes provided.</p>
-                  )}
+                  ) : null}
                 </section>
               </div>
             </div>
