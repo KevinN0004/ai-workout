@@ -351,6 +351,12 @@ export default function App() {
     setActiveDayIndex(0);
   }, [planSections.days.length, result]);
 
+  useEffect(() => {
+    const shouldLock = planModalOpen || plannerOpen || workoutModalOpen;
+    document.body.classList.toggle("no-scroll", shouldLock);
+    return () => document.body.classList.remove("no-scroll");
+  }, [planModalOpen, plannerOpen, workoutModalOpen]);
+
   const latestPlanByWeekday = useMemo(() => {
     const plans = dashboard?.plans || [];
     if (!plans.length) return {};
