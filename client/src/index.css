@@ -512,6 +512,14 @@ h2 {
   grid-template-rows: auto 1fr auto;
 }
 
+.plan-modal h2 {
+  font-size: 1.6rem;
+}
+
+.plan-modal h3 {
+  font-size: 1.15rem;
+}
+
 .modal-header,
 .modal-footer {
   display: flex;
@@ -533,8 +541,51 @@ h2 {
 }
 
 .plan-modal-plan {
-  overflow: auto;
+  overflow: hidden;
   padding-right: 8px;
+}
+
+.plan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.plan-tabs button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-tabs button.active {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(255, 179, 71, 0.5);
+  color: #ffd9a0;
+}
+
+.plan-day {
+  background: rgba(6, 10, 20, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.plan-day ul {
+  margin-top: 10px;
+  padding-left: 18px;
+  list-style: disc;
+  display: grid;
+  gap: 10px;
+  color: #cfd7ff;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .plan-modal-notes {
@@ -551,6 +602,13 @@ h2 {
   color: #cfd7ff;
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.plan-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: rgba(12, 16, 30, 0.98);
+  padding-top: 8px;
 }
 
 .step-panel {

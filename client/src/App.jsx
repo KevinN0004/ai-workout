@@ -137,6 +137,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
 
   const gradient = useMemo(
     () => ({
@@ -344,6 +345,11 @@ export default function App() {
 
     return { days, notes };
   }, [result]);
+
+  useEffect(() => {
+    if (!planSections.days.length) return;
+    setActiveDayIndex(0);
+  }, [planSections.days.length, result]);
 
   const latestPlanByWeekday = useMemo(() => {
     const plans = dashboard?.plans || [];
@@ -1898,22 +1904,45 @@ export default function App() {
             <div className="modal-body">
               <div className="plan-modal-content">
                 <section className="plan-modal-plan">
-                  <div className="grid">
-                    {planSections.days.map((day, index) => (
-                      <article className="plan-card" key={`${day.title}-${index}`}>
-                        <h3>{day.title}</h3>
-                        {day.lines.length ? (
+                  {planSections.days.length ? (
+                    <>
+                      <div className="plan-tabs" role="tablist" aria-label="Plan days">
+                        {planSections.days.map((day, index) => (
+                          <button
+                            key={`${day.title}-${index}`}
+                            type="button"
+                            role="tab"
+                            className={index === activeDayIndex ? "active" : ""}
+                            aria-selected={index === activeDayIndex}
+                            onClick={() => setActiveDayIndex(index)}
+                          >
+                            {day.title}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="plan-day" role="tabpanel">
+                        <h3>{planSections.days[activeDayIndex]?.title}</h3>
+                        {planSections.days[activeDayIndex]?.lines?.length ? (
                           <ul>
-                            {day.lines.map((line, lineIndex) => (
-                              <li key={`${index}-${lineIndex}-${line}`}>{line}</li>
-                            ))}
+                            {planSections.days[activeDayIndex].lines.map(
+                              (line, lineIndex) => (
+                                <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
+                                  {line}
+                                </li>
+                              )
+                            )}
                           </ul>
                         ) : (
                           <p className="muted">No details provided.</p>
                         )}
-                      </article>
-                    ))}
-                  </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="plan-day">
+                      <h3>Your plan</h3>
+                      <p className="muted">No structured days were detected.</p>
+                    </div>
+                  )}
                 </section>
                 <section className="plan-modal-notes">
                   <h3>Coach notes</h3>
@@ -1929,18 +1958,24 @@ export default function App() {
                 </section>
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer plan-modal-footer">
               <div className="modal-actions">
                 <button type="button" className="cta" onClick={downloadPlanPdf}>
                   Download PDF
                 </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => setPlanModalOpen(false)}
-                >
-                  Close
-                </button>
+                {!user ? (
+                  <button type="button" className="ghost" onClick={() => go("/auth")}>
+                    Login / Sign up
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setPlanModalOpen(false)}
+                  >
+                    Close
+                  </button>
+                )}
               </div>
             </div>
           </div>
