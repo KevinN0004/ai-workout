@@ -251,6 +251,58 @@ export default function App() {
     });
   };
 
+  const openPlannerFromProfile = () => {
+    const latestPlan = dashboard?.plans?.[0] || null;
+    const profile = user?.profile || {};
+    const activityToLevel = {
+      Light: "Beginner",
+      Moderate: "Intermediate",
+      High: "Advanced",
+      "Very high": "Advanced"
+    };
+
+    const inferInjuryFromNotes = (notes) => {
+      const text = (notes || "").toLowerCase();
+      if (!text) return "";
+      if (text.includes("lower back") || text.includes("back")) return "Lower back";
+      if (text.includes("knee")) return "Knee";
+      if (text.includes("shoulder")) return "Shoulder";
+      if (text.includes("hip")) return "Hip";
+      if (text.includes("wrist") || text.includes("elbow")) return "Wrist/Elbow";
+      return "";
+    };
+
+    setForm((prev) => {
+      const environment = latestPlan?.environment || prev.environment || "Home";
+      const envEquipment = equipmentOptionsByEnv[environment] || [];
+      const nextEquipment = Array.isArray(latestPlan?.equipment)
+        ? latestPlan.equipment.filter((item) => envEquipment.includes(item))
+        : prev.equipment.filter((item) => envEquipment.includes(item));
+      const nextInjuries =
+        latestPlan?.injuries ||
+        inferInjuryFromNotes(profile.notes) ||
+        prev.injuries ||
+        "None";
+
+      return {
+        ...prev,
+        goal: latestPlan?.goal || dashboard?.goals?.goalType || prev.goal,
+        duration: String(latestPlan?.duration || prev.duration || "45"),
+        level: latestPlan?.level || activityToLevel[profile.activity] || prev.level,
+        injuries: nextInjuries,
+        days: String(latestPlan?.days || dashboard?.goals?.weeklyWorkouts || prev.days || "3"),
+        environment,
+        equipment: nextEquipment.length
+          ? nextEquipment
+          : [envEquipment[0]].filter(Boolean),
+        focuses: Array.isArray(latestPlan?.focuses) ? latestPlan.focuses : prev.focuses
+      };
+    });
+
+    setPlannerStep(1);
+    setPlannerOpen(true);
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -279,6 +331,7 @@ export default function App() {
             : prev
         );
       }
+      setPlannerOpen(false);
       setPlanModalOpen(true);
     } catch (err) {
       setError(err.message || "Unable to generate plan.");
@@ -308,6 +361,246 @@ export default function App() {
 
     doc.save("ai-workout-plan.pdf");
   };
+
+  const plannerModal = plannerOpen && (
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal">
+        <div className="modal-header">
+          <h2>Planner</h2>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setPlannerOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+        <div className="modal-body">
+          {plannerStep === 1 && (
+            <div className="step-panel">
+              <h3>Step 1 â€” Environment & equipment</h3>
+              <div className="step-top">
+                <div className="segmented">
+                  <button
+                    type="button"
+                    className={form.environment === "Home" ? "active" : ""}
+                    onClick={() => onEnvironmentChange("Home")}
+                  >
+                    Home
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      form.environment === "Commercial" ? "active" : ""
+                    }
+                    onClick={() => onEnvironmentChange("Commercial")}
+                  >
+                    Commercial
+                  </button>
+                </div>
+              </div>
+              <div className="option-grid">
+                {equipmentOptionsByEnv[form.environment].map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`equip-card ${
+                      form.equipment.includes(item) ? "active" : ""
+                    }`}
+                    onClick={() => toggleEquipment(item)}
+                  >
+                    <span className="equip-thumb" aria-hidden="true" />
+                    <span className="equip-label">{item}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {plannerStep === 2 && (
+            <div className="step-panel">
+              <h3>Step 2 â€” Schedule & constraints</h3>
+              <form className="form" onSubmit={onSubmit}>
+                <label>
+                  Days per week
+                  <select name="days" value={form.days} onChange={onChange}>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                  </select>
+                </label>
+                <label>
+                  Session length (minutes)
+                  <select
+                    name="duration"
+                    value={form.duration}
+                    onChange={onChange}
+                  >
+                    <option value="30">30</option>
+                    <option value="45">45</option>
+                    <option value="60">60</option>
+                    <option value="75">75</option>
+                    <option value="90">90</option>
+                  </select>
+                </label>
+                <label>
+                  Experience level
+                  <select name="level" value={form.level} onChange={onChange}>
+                    <option>Beginner</option>
+                    <option>Intermediate</option>
+                    <option>Advanced</option>
+                  </select>
+                </label>
+                <label>
+                  Injuries or limitations
+                  <select
+                    name="injuries"
+                    value={form.injuries}
+                    onChange={onChange}
+                  >
+                    {injuryOptions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </form>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <div className="step-indicator">Step {plannerStep} of 2</div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
+              disabled={plannerStep === 1}
+            >
+              Back
+            </button>
+            {plannerStep < 2 ? (
+              <button
+                type="button"
+                className="cta"
+                onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                className="cta"
+                type="button"
+                disabled={loading}
+                onClick={onSubmit}
+              >
+                {loading ? "Generating..." : "Generate workout"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const generatedPlanModal = planModalOpen && result && (
+    <div
+      className="modal-backdrop plan-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="modal plan-modal">
+        <div className="modal-header">
+          <h2>Your AI Plan</h2>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost icon-button"
+              aria-label="Close"
+              onClick={() => setPlanModalOpen(false)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="modal-body">
+          <div className="plan-modal-content">
+            <section className="plan-modal-plan">
+              {planSections.days.length ? (
+                <>
+                  <div className="plan-tabs" role="tablist" aria-label="Plan days">
+                    {planSections.days.map((day, index) => (
+                      <button
+                        key={`${day.title}-${index}`}
+                        type="button"
+                        role="tab"
+                        className={index === activeDayIndex ? "active" : ""}
+                        aria-selected={index === activeDayIndex}
+                        onClick={() => setActiveDayIndex(index)}
+                      >
+                        {day.title}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="plan-day" role="tabpanel">
+                    <h3>{planSections.days[activeDayIndex]?.title}</h3>
+                    {planSections.days[activeDayIndex]?.lines?.length ? (
+                      <ul>
+                        {planSections.days[activeDayIndex].lines.map(
+                          (line, lineIndex) => (
+                            <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
+                              {line}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <div className="plan-day" />
+              )}
+            </section>
+            <section className="plan-modal-notes">
+              <h3>Coach notes</h3>
+              {planSections.notes.length ? (
+                <ul>
+                  {planSections.notes.map((line, index) => (
+                    <li key={`${index}-${line}`}>{line}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          </div>
+        </div>
+        <div className="modal-footer plan-modal-footer">
+          <div className="modal-actions">
+            <button type="button" className="cta" onClick={downloadPlanPdf}>
+              Download PDF
+            </button>
+            <button type="button" className="ghost" onClick={() => go("/auth")}>
+              Login / Sign up
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const planSections = useMemo(() => {
     if (!result) return { days: [], notes: [] };
@@ -426,6 +719,26 @@ export default function App() {
     };
     loadSession();
   }, []);
+
+  useEffect(() => {
+    const profile = user?.profile;
+    if (!profile) return;
+    const cm = profile.heightCm ? String(profile.heightCm) : "";
+    const nextFeetInches = toFeetInchesFromCm(cm);
+    setPersonal((prev) => ({
+      ...prev,
+      name: profile.name || "",
+      age: profile.age ? String(profile.age) : "",
+      heightCm: cm,
+      heightFeet: nextFeetInches.feet,
+      heightInches: nextFeetInches.inches,
+      weight: profile.weightKg ? String(profile.weightKg) : "",
+      sex: profile.sex || "",
+      bodyFat: profile.bodyFat ? String(profile.bodyFat) : "",
+      activity: profile.activity || "Moderate",
+      notes: profile.notes || ""
+    }));
+  }, [user]);
 
   useEffect(() => {
     if (route !== "/dashboard" || !user) return;
@@ -922,7 +1235,7 @@ export default function App() {
                   <button
                     type="button"
                     className="ghost"
-                    onClick={() => setPlannerOpen(true)}
+                    onClick={openPlannerFromProfile}
                   >
                     Update plan
                   </button>
@@ -1018,7 +1331,7 @@ export default function App() {
                     <div className="hub-card">
                       <h3>Workout plans</h3>
                       <p className="muted">Generate weekly plans and progressions.</p>
-                      <button type="button" className="ghost" onClick={() => go("/")}>
+                      <button type="button" className="ghost" onClick={openPlannerFromProfile}>
                         Open planner
                       </button>
                     </div>
@@ -1334,7 +1647,7 @@ export default function App() {
                       <h3>Workout week</h3>
                       <p className="muted">Build your weekly training block.</p>
                     </div>
-                    <button type="button" className="ghost" onClick={() => go("/")}>
+                    <button type="button" className="ghost" onClick={openPlannerFromProfile}>
                       Open planner
                     </button>
                     </div>
@@ -1528,6 +1841,8 @@ export default function App() {
             </div>
           </div>
         )}
+        {plannerModal}
+        {generatedPlanModal}
         {dashNavOpen && (
           <div className="drawer-backdrop" onClick={() => setDashNavOpen(false)}>
             <aside
@@ -1900,7 +2215,7 @@ export default function App() {
               steps.
             </p>
           </div>
-          <button className="cta" type="button" onClick={() => setPlannerOpen(true)}>
+          <button className="cta" type="button" onClick={openPlannerFromProfile}>
             Open planner
           </button>
           {error && <p className="error">{error}</p>}
@@ -1923,244 +2238,10 @@ export default function App() {
         </section>
       </main>
 
-      {plannerOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>Planner</h2>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setPlannerOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="modal-body">
-              {plannerStep === 1 && (
-                <div className="step-panel">
-                  <h3>Step 1 — Environment & equipment</h3>
-                  <div className="step-top">
-                    <div className="segmented">
-                      <button
-                        type="button"
-                        className={form.environment === "Home" ? "active" : ""}
-                        onClick={() => onEnvironmentChange("Home")}
-                      >
-                        Home
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          form.environment === "Commercial" ? "active" : ""
-                        }
-                        onClick={() => onEnvironmentChange("Commercial")}
-                      >
-                        Commercial
-                      </button>
-                    </div>
-                  </div>
-                  <div className="option-grid">
-                    {equipmentOptionsByEnv[form.environment].map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        className={`equip-card ${
-                          form.equipment.includes(item) ? "active" : ""
-                        }`}
-                        onClick={() => toggleEquipment(item)}
-                      >
-                        <span className="equip-thumb" aria-hidden="true" />
-                        <span className="equip-label">{item}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {plannerStep === 2 && (
-                <div className="step-panel">
-                  <h3>Step 2 — Schedule & constraints</h3>
-                  <form className="form" onSubmit={onSubmit}>
-                    <label>
-                      Days per week
-                      <select name="days" value={form.days} onChange={onChange}>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="7">7</option>
-                      </select>
-                    </label>
-                    <label>
-                      Session length (minutes)
-                      <select
-                        name="duration"
-                        value={form.duration}
-                        onChange={onChange}
-                      >
-                        <option value="30">30</option>
-                        <option value="45">45</option>
-                        <option value="60">60</option>
-                        <option value="75">75</option>
-                        <option value="90">90</option>
-                      </select>
-                    </label>
-                    <label>
-                      Experience level
-                      <select name="level" value={form.level} onChange={onChange}>
-                        <option>Beginner</option>
-                        <option>Intermediate</option>
-                        <option>Advanced</option>
-                      </select>
-                    </label>
-                    <label>
-                      Injuries or limitations
-                      <select
-                        name="injuries"
-                        value={form.injuries}
-                        onChange={onChange}
-                      >
-                        {injuryOptions.map((item) => (
-                          <option key={item} value={item}>
-                            {item}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </form>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <div className="step-indicator">Step {plannerStep} of 2</div>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
-                  disabled={plannerStep === 1}
-                >
-                  Back
-                </button>
-                {plannerStep < 2 ? (
-                  <button
-                    type="button"
-                    className="cta"
-                    onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
-                  >
-                    Next
-                  </button>
-                ) : (
-                  <button
-                    className="cta"
-                    type="button"
-                    disabled={loading}
-                    onClick={onSubmit}
-                  >
-                    {loading ? "Generating..." : "Generate workout"}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {planModalOpen && result && (
-        <div
-          className="modal-backdrop plan-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="modal plan-modal">
-            <div className="modal-header">
-              <h2>Your AI Plan</h2>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="ghost icon-button"
-                  aria-label="Close"
-                  onClick={() => setPlanModalOpen(false)}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M6 6l12 12M18 6L6 18"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="modal-body">
-              <div className="plan-modal-content">
-                <section className="plan-modal-plan">
-                  {planSections.days.length ? (
-                    <>
-                      <div className="plan-tabs" role="tablist" aria-label="Plan days">
-                        {planSections.days.map((day, index) => (
-                          <button
-                            key={`${day.title}-${index}`}
-                            type="button"
-                            role="tab"
-                            className={index === activeDayIndex ? "active" : ""}
-                            aria-selected={index === activeDayIndex}
-                            onClick={() => setActiveDayIndex(index)}
-                          >
-                            {day.title}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="plan-day" role="tabpanel">
-                        <h3>{planSections.days[activeDayIndex]?.title}</h3>
-                        {planSections.days[activeDayIndex]?.lines?.length ? (
-                          <ul>
-                            {planSections.days[activeDayIndex].lines.map(
-                              (line, lineIndex) => (
-                                <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
-                                  {line}
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="plan-day" />
-                  )}
-                </section>
-                <section className="plan-modal-notes">
-                  <h3>Coach notes</h3>
-                  {planSections.notes.length ? (
-                    <ul>
-                      {planSections.notes.map((line, index) => (
-                        <li key={`${index}-${line}`}>{line}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </section>
-              </div>
-            </div>
-            <div className="modal-footer plan-modal-footer">
-              <div className="modal-actions">
-                <button type="button" className="cta" onClick={downloadPlanPdf}>
-                  Download PDF
-                </button>
-                <button type="button" className="ghost" onClick={() => go("/auth")}>
-                  Login / Sign up
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {plannerModal}
+      {generatedPlanModal}
+
     </div>
   );
 }
+

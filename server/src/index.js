@@ -133,7 +133,13 @@ app.get("/api/health", (req, res) => {
 app.get("/api/auth/me", async (req, res) => {
   const user = await getSessionUser(req);
   if (!user) return res.status(401).json({ error: "Not signed in." });
-  res.json({ user: { id: user.id, email: user.email } });
+  res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      profile: user.profile || defaultProfile()
+    }
+  });
 });
 
 app.post("/api/auth/signup", async (req, res) => {
@@ -173,7 +179,13 @@ app.post("/api/auth/signup", async (req, res) => {
       "Set-Cookie",
       `sid=${token}; HttpOnly; Path=/; SameSite=Lax`
     );
-    res.json({ user: { id: newUser.id, email: newUser.email } });
+    res.json({
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        profile: newUser.profile || defaultProfile()
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });
   }
@@ -195,7 +207,13 @@ app.post("/api/auth/login", async (req, res) => {
       "Set-Cookie",
       `sid=${token}; HttpOnly; Path=/; SameSite=Lax`
     );
-    res.json({ user: { id: user.id, email: user.email } });
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        profile: user.profile || defaultProfile()
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });
   }
