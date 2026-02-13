@@ -1,1 +1,62 @@
-/* TipsView uses shared panel and text styles from base.css */
+.tips-view {
+  gap: 20px;
+}
+
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.guide-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 10, 20, 0.55);
+  display: grid;
+  gap: 8px;
+}
+
+.guide-card h3 {
+  font-size: 1rem;
+  color: #ffd9a0;
+}
+
+.guide-card p {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: #dce2ff;
+}
+
+.guide-dose {
+  margin-top: 4px;
+  color: #aab3ff;
+  font-weight: 600;
+}
+
+.guide-rules {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 10px;
+}
+
+.guide-rules h3 {
+  font-size: 1.05rem;
+}
+
+.guide-list {
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: #cfd7ff;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .tips-grid {
+    grid-template-columns: 1fr;
+  }
+}
