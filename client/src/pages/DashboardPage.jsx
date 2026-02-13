@@ -198,7 +198,7 @@ export default function DashboardPage({
       />
     );
   } else if (dashView === "meal") {
-    activeView = <MealView />;
+    activeView = <MealView dashboard={dashboard} fallbackPlan={form} />;
   } else if (dashView === "tips") {
     activeView = <TipsView />;
   } else if (dashView === "settings") {
