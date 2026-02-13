@@ -396,12 +396,20 @@ h2 {
   padding: 16px;
 }
 
+.auth-page {
+  display: block;
+}
+
 .auth-page .title {
-  margin-bottom: 24px;
+  margin: 0 0 24px;
+  max-width: 100%;
+  width: 100%;
+  text-align: center;
 }
 
 .auth-card {
-  max-width: 480px;
+  width: min(520px, 100%);
+  max-width: 100%;
   margin: 0 auto;
   background: rgba(12, 16, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -410,10 +418,31 @@ h2 {
   display: grid;
   gap: 16px;
   text-align: center;
+  align-content: center;
+  min-height: 440px;
 }
 
 .auth-form {
   grid-template-columns: 1fr;
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.auth-card-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-card-top .segmented {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.auth-close {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .panel {
@@ -887,6 +916,14 @@ select:focus {
 @media (max-width: 720px) {
   .page {
     padding: 24px 16px 32px;
+  }
+
+  .auth-page {
+    display: block;
+  }
+
+  .auth-card {
+    min-height: 0;
   }
 
   .panel-header {

@@ -949,28 +949,45 @@ export default function App() {
           </p>
         </header>
         <main className="auth-card">
-          <div className="segmented">
+          <div className="auth-card-top">
+            <div className="segmented">
+              <button
+                type="button"
+                className={authMode === "login" ? "active" : ""}
+                onClick={() => {
+                  setAuthMode("login");
+                  setSignupStep("credentials");
+                  setAuthError("");
+                }}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className={authMode === "signup" ? "active" : ""}
+                onClick={() => {
+                  setAuthMode("signup");
+                  setSignupStep("credentials");
+                  setAuthError("");
+                }}
+              >
+                Sign up
+              </button>
+            </div>
             <button
               type="button"
-              className={authMode === "login" ? "active" : ""}
-              onClick={() => {
-                setAuthMode("login");
-                setSignupStep("credentials");
-                setAuthError("");
-              }}
+              className="ghost icon-button auth-close"
+              onClick={() => go("/")}
+              aria-label="Close"
             >
-              Login
-            </button>
-            <button
-              type="button"
-              className={authMode === "signup" ? "active" : ""}
-              onClick={() => {
-                setAuthMode("signup");
-                setSignupStep("credentials");
-                setAuthError("");
-              }}
-            >
-              Sign up
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
           </div>
           <form className="form auth-form" onSubmit={onAuthSubmit}>
@@ -1105,9 +1122,6 @@ export default function App() {
             </button>
           </form>
           {authError && <p className="error">{authError}</p>}
-          <button type="button" className="ghost" onClick={() => go("/")}>
-            Back to home
-          </button>
         </main>
       </div>
     );
