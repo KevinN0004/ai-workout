@@ -1,0 +1,156 @@
+.plan-modal-backdrop {
+  padding: 24px;
+}
+
+.plan-modal {
+  width: min(1200px, 86.6vw);
+  height: 86.6vh;
+  border-radius: 24px;
+  padding: 28px 32px;
+  text-align: left;
+  grid-template-rows: auto 1fr auto;
+}
+
+.plan-modal h2 {
+  font-size: 1.6rem;
+}
+
+.plan-modal h3 {
+  font-size: 1.15rem;
+}
+
+.plan-modal-content {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 24px;
+}
+
+.plan-modal-plan {
+  overflow: hidden;
+  padding-right: 8px;
+}
+
+.plan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.plan-tabs button {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-tabs button.active {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(255, 179, 71, 0.5);
+  color: #ffd9a0;
+}
+
+.plan-day {
+  background: rgba(6, 10, 20, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.plan-day ul {
+  margin-top: 10px;
+  padding-left: 18px;
+  list-style: disc;
+  display: grid;
+  gap: 10px;
+  color: #cfd7ff;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.plan-modal-notes {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 16px;
+}
+
+.plan-modal-notes ul {
+  margin-top: 8px;
+  padding-left: 18px;
+  list-style: disc;
+  display: grid;
+  gap: 8px;
+  color: #cfd7ff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.plan-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: rgba(12, 16, 30, 0.98);
+  padding-top: 8px;
+}
+
+.step-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.step-panel h3 {
+  font-size: 1.2rem;
+}
+
+.step-top {
+  display: flex;
+  justify-content: center;
+}
+
+.step-indicator {
+  color: #aab3ff;
+  font-size: 0.9rem;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.equip-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.equip-card.active {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(255, 179, 71, 0.5);
+  color: #ffd9a0;
+}
+
+.equip-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 30% 30%, rgba(255, 179, 71, 0.3), transparent 55%);
+}
+
+.equip-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
