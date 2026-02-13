@@ -17,6 +17,17 @@ app.use(express.json({ limit: "1mb" }));
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const usersFile = path.join(process.cwd(), "data", "users.json");
 const sessions = new Map();
+const defaultProfile = () => ({
+  name: "",
+  age: null,
+  heightCm: null,
+  weightKg: null,
+  sex: "",
+  bodyFat: null,
+  activity: "Moderate",
+  notes: "",
+  updatedAt: new Date().toISOString()
+});
 
 const readUsers = async () => {
   try {
@@ -114,6 +125,7 @@ app.post("/api/auth/signup", async (req, res) => {
       salt,
       hash,
       createdAt: new Date().toISOString(),
+      profile: defaultProfile(),
       dashboard: {
         workouts: [],
         calories: [],
