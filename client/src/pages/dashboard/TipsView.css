@@ -2,36 +2,66 @@
   gap: 20px;
 }
 
-.tips-grid {
+.group-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.group-toggles button {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #dce2ff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-toggles button.active {
+  background: rgba(255, 179, 71, 0.2);
+  border-color: rgba(255, 179, 71, 0.45);
+  color: #ffd9a0;
+}
+
+.exercise-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px;
 }
 
-.guide-card {
+.exercise-card {
   padding: 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(6, 10, 20, 0.55);
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-.guide-card h3 {
-  font-size: 1rem;
+.exercise-group {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: #ffd9a0;
 }
 
-.guide-card p {
+.exercise-card h3 {
+  font-size: 0.98rem;
+  color: #ffd9a0;
+}
+
+.exercise-card p {
   font-size: 0.9rem;
   line-height: 1.35;
   color: #dce2ff;
 }
 
-.guide-dose {
-  margin-top: 4px;
-  color: #aab3ff;
-  font-weight: 600;
+.exercise-focus {
+  color: #cfd7ff;
+  font-size: 0.85rem;
 }
 
 .guide-rules {
@@ -56,7 +86,7 @@
 }
 
 @media (max-width: 720px) {
-  .tips-grid {
+  .exercise-grid {
     grid-template-columns: 1fr;
   }
 }

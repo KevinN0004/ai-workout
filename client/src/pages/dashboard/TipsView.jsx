@@ -1,50 +1,96 @@
+import { useMemo, useState } from "react";
 import "./TipsView.css";
 
 export default function TipsView() {
-  const workoutGuides = [
+  const muscleGuides = [
     {
-      title: "Strength Training",
-      focus: "Build muscle and increase force output.",
-      bestFor: "Body composition goals and long-term progression.",
-      example: "3 to 5 sets of compound lifts in the 4-10 rep range.",
-      dose: "2-4 sessions per week"
+      group: "Chest",
+      target: "Pecs, front delts, triceps",
+      workouts: [
+        { name: "Barbell bench press", sets: "4 x 5-8", focus: "Chest + triceps" },
+        { name: "Incline dumbbell press", sets: "3 x 8-12", focus: "Upper chest" },
+        { name: "Push-ups", sets: "3 x 10-20", focus: "Chest endurance" },
+        { name: "Cable fly", sets: "3 x 12-15", focus: "Chest isolation" }
+      ]
     },
     {
-      title: "Hypertrophy",
-      focus: "Increase muscle size with moderate loads and volume.",
-      bestFor: "Adding lean mass and improving muscle definition.",
-      example: "3 to 4 sets per exercise in the 8-15 rep range.",
-      dose: "2-5 sessions per week"
+      group: "Back",
+      target: "Lats, upper back, biceps",
+      workouts: [
+        { name: "Pull-ups", sets: "4 x 5-10", focus: "Lats + biceps" },
+        { name: "Lat pulldown", sets: "3 x 8-12", focus: "Lat width" },
+        { name: "Barbell row", sets: "4 x 6-10", focus: "Mid-back thickness" },
+        { name: "Seated cable row", sets: "3 x 10-12", focus: "Upper back control" }
+      ]
     },
     {
-      title: "HIIT / Conditioning",
-      focus: "Improve work capacity with short, hard intervals.",
-      bestFor: "Time-efficient cardio and athletic conditioning.",
-      example: "20-30 seconds hard effort, 60-90 seconds easy, repeat 8-12 rounds.",
-      dose: "1-3 sessions per week"
+      group: "Shoulders",
+      target: "Front, lateral, and rear delts",
+      workouts: [
+        { name: "Overhead press", sets: "4 x 5-8", focus: "Front delts + triceps" },
+        { name: "Lateral raise", sets: "3 x 12-15", focus: "Side delts" },
+        { name: "Rear-delt fly", sets: "3 x 12-15", focus: "Rear delts" },
+        { name: "Arnold press", sets: "3 x 8-12", focus: "Full shoulder development" }
+      ]
     },
     {
-      title: "Steady-State Cardio",
-      focus: "Build aerobic base and support recovery.",
-      bestFor: "Heart health, endurance, and lower-stress training days.",
-      example: "30-60 minutes at conversational pace.",
-      dose: "2-5 sessions per week"
+      group: "Arms",
+      target: "Biceps, triceps, forearms",
+      workouts: [
+        { name: "EZ-bar curl", sets: "3 x 8-12", focus: "Biceps mass" },
+        { name: "Hammer curl", sets: "3 x 10-12", focus: "Brachialis + forearms" },
+        { name: "Rope pushdown", sets: "3 x 10-15", focus: "Triceps isolation" },
+        { name: "Skull crushers", sets: "3 x 8-12", focus: "Long-head triceps" }
+      ]
     },
     {
-      title: "Mobility + Core",
-      focus: "Improve movement quality and trunk stability.",
-      bestFor: "Warm-up days, desk-heavy weeks, and injury prevention.",
-      example: "20-30 minute circuit of hips, thoracic spine, and anti-rotation core work.",
-      dose: "3-6 short sessions per week"
+      group: "Legs (Quads + Hamstrings)",
+      target: "Quads, hamstrings, calves",
+      workouts: [
+        { name: "Back squat", sets: "4 x 5-8", focus: "Quads + glutes" },
+        { name: "Romanian deadlift", sets: "4 x 6-10", focus: "Hamstrings + glutes" },
+        { name: "Walking lunges", sets: "3 x 10/leg", focus: "Single-leg strength" },
+        { name: "Leg press", sets: "3 x 10-15", focus: "Quad volume" }
+      ]
     },
     {
-      title: "Recovery Session",
-      focus: "Reduce fatigue while staying active.",
-      bestFor: "Deload weeks, soreness, or poor sleep days.",
-      example: "Light walk, easy bike, breath work, and gentle stretching.",
-      dose: "As needed between hard sessions"
+      group: "Glutes",
+      target: "Glute max, glute med, posterior chain",
+      workouts: [
+        { name: "Hip thrust", sets: "4 x 6-10", focus: "Glute max" },
+        { name: "Bulgarian split squat", sets: "3 x 8-12/leg", focus: "Glute + quad" },
+        { name: "Cable kickback", sets: "3 x 12-15", focus: "Glute isolation" },
+        { name: "Step-ups", sets: "3 x 10/leg", focus: "Glute drive + balance" }
+      ]
+    },
+    {
+      group: "Core",
+      target: "Abs, obliques, deep trunk stabilizers",
+      workouts: [
+        { name: "Plank variations", sets: "3 x 30-60 sec", focus: "Anti-extension" },
+        { name: "Hanging knee raise", sets: "3 x 8-15", focus: "Lower abs" },
+        { name: "Dead bug", sets: "3 x 10/side", focus: "Core bracing" },
+        { name: "Pallof press", sets: "3 x 10-12/side", focus: "Anti-rotation" }
+      ]
     }
   ];
+  const [activeGroup, setActiveGroup] = useState("All");
+  const toggleGroups = ["All", ...muscleGuides.map((guide) => guide.group)];
+
+  const visibleExercises = useMemo(() => {
+    const selectedGuides =
+      activeGroup === "All"
+        ? muscleGuides
+        : muscleGuides.filter((guide) => guide.group === activeGroup);
+
+    return selectedGuides.flatMap((guide) =>
+      guide.workouts.map((workout) => ({
+        ...workout,
+        group: guide.group,
+        target: guide.target
+      }))
+    );
+  }, [activeGroup]);
 
   return (
     <section className="panel dashboard-card span-2 tips-view">
@@ -52,35 +98,49 @@ export default function TipsView() {
         <div>
           <h2>Workout guide</h2>
           <p className="muted">
-            Use this as a quick guide to choose different workouts based on your goal and
-            energy level.
+            Workouts are sorted by the main muscle group they hit so you can plan sessions
+            faster.
           </p>
         </div>
       </div>
 
-      <div className="tips-grid">
-        {workoutGuides.map((guide) => (
-          <article key={guide.title} className="guide-card">
-            <h3>{guide.title}</h3>
-            <p>{guide.focus}</p>
-            <p>
-              <strong>Best for:</strong> {guide.bestFor}
+      <div className="group-toggles" role="tablist" aria-label="Filter exercises by muscle group">
+        {toggleGroups.map((group) => (
+          <button
+            key={group}
+            type="button"
+            className={group === activeGroup ? "active" : ""}
+            onClick={() => setActiveGroup(group)}
+            aria-pressed={group === activeGroup}
+          >
+            {group}
+          </button>
+        ))}
+      </div>
+
+      <div className="exercise-grid">
+        {visibleExercises.map((exercise) => (
+          <article key={`${exercise.group}-${exercise.name}`} className="exercise-card">
+            <p className="exercise-group">{exercise.group}</p>
+            <h3>{exercise.name}</h3>
+            <p className="exercise-target">
+              <strong>Hits:</strong> {exercise.target}
             </p>
-            <p>
-              <strong>Try this:</strong> {guide.example}
+            <p className="exercise-sets">
+              <strong>Sets/Reps:</strong> {exercise.sets}
             </p>
-            <p className="guide-dose">{guide.dose}</p>
+            <p className="exercise-focus">{exercise.focus}</p>
           </article>
         ))}
       </div>
 
       <section className="guide-rules">
-        <h3>How to pick today&rsquo;s workout</h3>
+        <h3>Simple split ideas</h3>
         <ul className="guide-list">
-          <li>High energy: prioritize strength, hypertrophy, or HIIT.</li>
-          <li>Medium energy: use steady-state cardio or mixed resistance work.</li>
-          <li>Low energy or high soreness: switch to mobility or recovery training.</li>
-          <li>Progress first: increase load, reps, or time gradually week to week.</li>
+          <li>Push day: chest, shoulders, triceps.</li>
+          <li>Pull day: back, biceps, rear delts.</li>
+          <li>Leg day: quads, hamstrings, glutes, calves.</li>
+          <li>Add core work 2-4 times per week at the end of sessions.</li>
         </ul>
       </section>
     </section>
