@@ -28,6 +28,35 @@ const defaultProfile = () => ({
   notes: "",
   updatedAt: new Date().toISOString()
 });
+const allowedSexes = new Set(["Female", "Male", "Non-binary", "Prefer not to say"]);
+const allowedActivities = new Set(["Light", "Moderate", "High", "Very high"]);
+
+const cleanText = (value, maxLen = 120) =>
+  typeof value === "string" ? value.trim().slice(0, maxLen) : "";
+
+const toNullableNumber = (value, min, max) => {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  if (num < min || num > max) return null;
+  return num;
+};
+
+const buildProfile = (input = {}) => {
+  const base = defaultProfile();
+  return {
+    ...base,
+    name: cleanText(input.name, 80),
+    age: toNullableNumber(input.age, 10, 120),
+    heightCm: toNullableNumber(input.heightCm, 100, 260),
+    weightKg: toNullableNumber(input.weightKg, 25, 400),
+    sex: allowedSexes.has(input.sex) ? input.sex : "",
+    bodyFat: toNullableNumber(input.bodyFat, 3, 70),
+    activity: allowedActivities.has(input.activity) ? input.activity : base.activity,
+    notes: cleanText(input.notes, 500),
+    updatedAt: new Date().toISOString()
+  };
+};
 
 const readUsers = async () => {
   try {
@@ -109,7 +138,7 @@ app.get("/api/auth/me", async (req, res) => {
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
+    const { email, password, profile } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required." });
     }
@@ -125,7 +154,7 @@ app.post("/api/auth/signup", async (req, res) => {
       salt,
       hash,
       createdAt: new Date().toISOString(),
-      profile: defaultProfile(),
+      profile: buildProfile(profile),
       dashboard: {
         workouts: [],
         calories: [],

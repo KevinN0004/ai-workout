@@ -78,6 +78,17 @@ const samplePlan = [
 ];
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const defaultAuthForm = {
+  email: "",
+  password: "",
+  name: "",
+  age: "",
+  heightCm: "",
+  weightKg: "",
+  sex: "",
+  activity: "Moderate",
+  notes: ""
+};
 
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
@@ -91,7 +102,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [authForm, setAuthForm] = useState({ email: "", password: "" });
+  const [authForm, setAuthForm] = useState(defaultAuthForm);
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
@@ -451,11 +462,27 @@ export default function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
+      const payload =
+        authMode === "signup"
+          ? {
+              email: authForm.email,
+              password: authForm.password,
+              profile: {
+                name: authForm.name,
+                age: authForm.age,
+                heightCm: authForm.heightCm,
+                weightKg: authForm.weightKg,
+                sex: authForm.sex,
+                activity: authForm.activity,
+                notes: authForm.notes
+              }
+            }
+          : { email: authForm.email, password: authForm.password };
       const res = await fetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(authForm)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -463,7 +490,7 @@ export default function App() {
       }
       const data = await res.json();
       setUser(data.user || null);
-      setAuthForm({ email: "", password: "" });
+      setAuthForm({ ...defaultAuthForm });
       go("/dashboard");
     } catch (err) {
       setAuthError(err.message || "Unable to authenticate.");
@@ -588,6 +615,87 @@ export default function App() {
                 required
               />
             </label>
+            {authMode === "signup" && (
+              <>
+                <label>
+                  Full name
+                  <input
+                    name="name"
+                    value={authForm.name}
+                    onChange={onAuthChange}
+                    placeholder="Jordan Lee"
+                  />
+                </label>
+                <label>
+                  Age
+                  <input
+                    name="age"
+                    type="number"
+                    min="10"
+                    max="120"
+                    value={authForm.age}
+                    onChange={onAuthChange}
+                    placeholder="28"
+                  />
+                </label>
+                <label>
+                  Height (cm)
+                  <input
+                    name="heightCm"
+                    type="number"
+                    min="100"
+                    max="260"
+                    value={authForm.heightCm}
+                    onChange={onAuthChange}
+                    placeholder="175"
+                  />
+                </label>
+                <label>
+                  Weight (kg)
+                  <input
+                    name="weightKg"
+                    type="number"
+                    min="25"
+                    max="400"
+                    value={authForm.weightKg}
+                    onChange={onAuthChange}
+                    placeholder="72"
+                  />
+                </label>
+                <label>
+                  Sex
+                  <select name="sex" value={authForm.sex} onChange={onAuthChange}>
+                    <option value="">Select</option>
+                    <option>Female</option>
+                    <option>Male</option>
+                    <option>Non-binary</option>
+                    <option>Prefer not to say</option>
+                  </select>
+                </label>
+                <label>
+                  Activity level
+                  <select
+                    name="activity"
+                    value={authForm.activity}
+                    onChange={onAuthChange}
+                  >
+                    <option>Light</option>
+                    <option>Moderate</option>
+                    <option>High</option>
+                    <option>Very high</option>
+                  </select>
+                </label>
+                <label className="full">
+                  Notes
+                  <input
+                    name="notes"
+                    value={authForm.notes}
+                    onChange={onAuthChange}
+                    placeholder="Optional training context"
+                  />
+                </label>
+              </>
+            )}
             <label>
               <span className="label-row">
                 Password
