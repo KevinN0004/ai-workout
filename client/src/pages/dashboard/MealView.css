@@ -21,6 +21,25 @@
   color: #d8ddff;
 }
 
+.meal-sections {
+  display: grid;
+  gap: 24px;
+}
+
+.meal-section {
+  display: grid;
+  gap: 14px;
+}
+
+.meal-section-header {
+  display: grid;
+  gap: 4px;
+}
+
+.meal-section-header h3 {
+  font-size: 1.25rem;
+}
+
 .meal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
