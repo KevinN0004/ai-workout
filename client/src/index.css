@@ -959,7 +959,7 @@ body.no-scroll {
   padding: 20px;
   display: grid;
   gap: 16px;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
 }
 
 .drawer-header {
@@ -975,7 +975,8 @@ body.no-scroll {
   align-content: center;
 }
 
-.drawer-links button {
+.drawer-links button,
+.drawer-footer button {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid transparent;
   color: inherit;
@@ -989,8 +990,18 @@ body.no-scroll {
   font-size: 24px;
 }
 
-.drawer-links button.active {
+.drawer-links button.active,
+.drawer-footer button.active {
   background: rgba(255, 179, 71, 0.2);
   border-color: rgba(255, 179, 71, 0.4);
   color: #ffd9a0;
+}
+
+.drawer-footer {
+  display: grid;
+}
+
+.profile-icon-button {
+  width: 40px;
+  height: 40px;
 }

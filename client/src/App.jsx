@@ -77,7 +77,15 @@ const samplePlan = [
   }
 ];
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const weekDays = [
+  { label: "Mon", key: "Monday" },
+  { label: "Tue", key: "Tuesday" },
+  { label: "Wed", key: "Wednesday" },
+  { label: "Thu", key: "Thursday" },
+  { label: "Fri", key: "Friday" },
+  { label: "Sat", key: "Saturday" },
+  { label: "Sun", key: "Sunday" }
+];
 const defaultAuthForm = {
   email: "",
   password: "",
@@ -860,7 +868,29 @@ export default function App() {
             <div className="auth-actions">
               {user ? (
                 <>
-                  <span className="muted">Signed in as {user.email}</span>
+                  <button
+                    type="button"
+                    className="ghost icon-button profile-icon-button"
+                    onClick={() => setDashView("settings")}
+                    aria-label="Open profile settings"
+                    title={user.email}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                      <path
+                        d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
                   <button type="button" className="ghost" onClick={onLogout}>
                     Log out
                   </button>
@@ -1309,13 +1339,13 @@ export default function App() {
                     </button>
                     </div>
                     <div className="plan-row-grid">
-                      {weekDays.map((day) => (
-                        <div key={day} className="hub-card">
-                          <h4>{day}</h4>
-                          {latestPlanByWeekday[day]?.length ? (
+                      {weekDays.map(({ label, key }) => (
+                        <div key={key} className="hub-card">
+                          <h4>{label}</h4>
+                          {latestPlanByWeekday[key]?.length ? (
                             <ul className="hub-list">
-                              {latestPlanByWeekday[day].slice(0, 4).map((line) => (
-                                <li key={`${day}-${line}`}>{line}</li>
+                              {latestPlanByWeekday[key].slice(0, 4).map((line) => (
+                                <li key={`${key}-${line}`}>{line}</li>
                               ))}
                             </ul>
                           ) : (
@@ -1339,9 +1369,9 @@ export default function App() {
                     </button>
                     </div>
                     <div className="plan-row-grid">
-                      {weekDays.map((day) => (
-                        <div key={day} className="hub-card">
-                          <h4>{day}</h4>
+                      {weekDays.map(({ label, key }) => (
+                        <div key={key} className="hub-card">
+                          <h4>{label}</h4>
                           <p className="muted">Meals: breakfast, lunch, dinner.</p>
                           <p className="muted">Calories: TBD</p>
                           <p className="muted">Prep note: TBD</p>
@@ -1386,6 +1416,39 @@ export default function App() {
             <section className="panel dashboard-card span-2">
               <h2>Tips</h2>
               <p className="muted">Placeholder for coaching tips.</p>
+            </section>
+          )}
+
+          {dashView === "settings" && (
+            <section className="panel dashboard-card span-2">
+              <div className="panel-header">
+                <div>
+                  <h2>Settings</h2>
+                  <p className="muted">Manage your profile and account actions.</p>
+                </div>
+              </div>
+              <div className="dashboard-split">
+                <section className="panel dashboard-card">
+                  <h3>Profile</h3>
+                  <div className="list">
+                    <div className="list-row">
+                      <span className="muted">Email</span>
+                      <strong>{user?.email}</strong>
+                    </div>
+                  </div>
+                </section>
+                <aside className="dashboard-side">
+                  <section className="panel dashboard-card">
+                    <h3>Account</h3>
+                    <p className="muted">
+                      You can sign out from this device at any time.
+                    </p>
+                    <button type="button" className="ghost" onClick={onLogout}>
+                      Log out
+                    </button>
+                  </section>
+                </aside>
+              </div>
             </section>
           )}
 
@@ -1542,6 +1605,18 @@ export default function App() {
                   }}
                 >
                   Guides
+                </button>
+              </div>
+              <div className="drawer-footer">
+                <button
+                  type="button"
+                  className={dashView === "settings" ? "active" : ""}
+                  onClick={() => {
+                    setDashView("settings");
+                    setDashNavOpen(false);
+                  }}
+                >
+                  Settings
                 </button>
               </div>
             </aside>
