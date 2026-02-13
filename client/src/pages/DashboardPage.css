@@ -50,12 +50,15 @@
 
 .drawer {
   width: min(320px, 85vw);
+  height: 100dvh;
+  max-height: 100dvh;
   background: rgba(12, 16, 30, 0.98);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   padding: 20px;
   display: grid;
   gap: 16px;
   grid-template-rows: auto 1fr auto;
+  overflow-y: auto;
 }
 
 .drawer-header {

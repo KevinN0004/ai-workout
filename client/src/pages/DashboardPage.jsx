@@ -208,131 +208,133 @@ export default function DashboardPage({
   }
 
   return (
-    <div className="page" style={gradient}>
-      <header className="title">
-        <div className="header-top">
-          <div className="header-left">
-            <div className="nav-trigger">
+    <>
+      <div className="page" style={gradient}>
+        <header className="title">
+          <div className="header-top">
+            <div className="header-left">
+              <div className="nav-trigger">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setDashNavOpen(true)}
+                >
+                  Open menu
+                </button>
+                <span className="muted">Current: {dashView}</span>
+              </div>
+            </div>
+            <div className="header-center">
+              <h1>Dashboard</h1>
+            </div>
+            <div className="auth-actions">
               <button
                 type="button"
-                className="ghost"
-                onClick={() => setDashNavOpen(true)}
+                className="ghost icon-button profile-icon-button"
+                onClick={() => setDashView("settings")}
+                aria-label="Open profile settings"
+                title={user.email}
               >
-                Open menu
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <circle
+                    cx="12"
+                    cy="8"
+                    r="4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <path
+                    d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-              <span className="muted">Current: {dashView}</span>
-            </div>
-          </div>
-          <div className="header-center">
-            <h1>Dashboard</h1>
-          </div>
-          <div className="auth-actions">
-            <button
-              type="button"
-              className="ghost icon-button profile-icon-button"
-              onClick={() => setDashView("settings")}
-              aria-label="Open profile settings"
-              title={user.email}
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                <circle
-                  cx="12"
-                  cy="8"
-                  r="4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                />
-                <path
-                  d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-            <button type="button" className="ghost" onClick={onLogout}>
-              Log out
-            </button>
-          </div>
-        </div>
-        <p className="muted">Visual summary of your progress and key metrics.</p>
-      </header>
-
-      <main className="dashboard-grid">{activeView}</main>
-
-      {dashLoading && <p className="muted">Loading dashboard...</p>}
-      {dashError && <p className="error">{dashError}</p>}
-
-      {workoutModalOpen && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setWorkoutModalOpen(false)}
-        >
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add workout</h2>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setWorkoutModalOpen(false)}
-              >
-                Close
+              <button type="button" className="ghost" onClick={onLogout}>
+                Log out
               </button>
             </div>
-            <form className="form dashboard-form workout-modal-form" onSubmit={submitWorkout}>
-              <label>
-                Date
-                <input
-                  type="date"
-                  value={workoutForm.date}
-                  onChange={(e) =>
-                    setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
-                  }
-                  required
-                />
-              </label>
-              <label>
-                Focus
-                <input
-                  value={workoutForm.focus}
-                  onChange={(e) =>
-                    setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
-                  }
-                  placeholder="Strength, conditioning..."
-                />
-              </label>
-              <label>
-                Duration (minutes)
-                <input
-                  type="number"
-                  min="10"
-                  max="180"
-                  value={workoutForm.duration}
-                  onChange={(e) =>
-                    setWorkoutForm((prev) => ({
-                      ...prev,
-                      duration: e.target.value
-                    }))
-                  }
-                  required
-                />
-              </label>
-              <div className="modal-submit">
-                <button className="cta" type="submit">
-                  Save workout
+          </div>
+          <p className="muted">Visual summary of your progress and key metrics.</p>
+        </header>
+
+        <main className="dashboard-grid">{activeView}</main>
+
+        {dashLoading && <p className="muted">Loading dashboard...</p>}
+        {dashError && <p className="error">{dashError}</p>}
+
+        {workoutModalOpen && (
+          <div
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setWorkoutModalOpen(false)}
+          >
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Add workout</h2>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setWorkoutModalOpen(false)}
+                >
+                  Close
                 </button>
               </div>
-            </form>
+              <form className="form dashboard-form workout-modal-form" onSubmit={submitWorkout}>
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={workoutForm.date}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  Focus
+                  <input
+                    value={workoutForm.focus}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
+                    }
+                    placeholder="Strength, conditioning..."
+                  />
+                </label>
+                <label>
+                  Duration (minutes)
+                  <input
+                    type="number"
+                    min="10"
+                    max="180"
+                    value={workoutForm.duration}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({
+                        ...prev,
+                        duration: e.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <div className="modal-submit">
+                  <button className="cta" type="submit">
+                    Save workout
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {plannerModal}
-      {generatedPlanModal}
+        {plannerModal}
+        {generatedPlanModal}
+      </div>
 
       {dashNavOpen && (
         <div className="drawer-backdrop" onClick={() => setDashNavOpen(false)}>
@@ -424,6 +426,6 @@ export default function DashboardPage({
           </aside>
         </div>
       )}
-    </div>
+    </>
   );
 }
