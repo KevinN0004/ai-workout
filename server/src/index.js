@@ -142,6 +142,27 @@ app.get("/api/auth/me", async (req, res) => {
   });
 });
 
+app.get("/api/profile", requireAuth, (req, res) => {
+  res.json({ profile: req.user.profile || defaultProfile() });
+});
+
+app.post("/api/profile", requireAuth, async (req, res) => {
+  try {
+    const profileInput = req.body || {};
+    const updated = await updateUser(req.user.id, (user) => ({
+      ...user,
+      profile: buildProfile({
+        ...(user.profile || defaultProfile()),
+        ...profileInput
+      })
+    }));
+    if (!updated) return res.status(404).json({ error: "User not found." });
+    res.json({ profile: updated.profile || defaultProfile() });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
 app.post("/api/auth/signup", async (req, res) => {
   try {
     const { email, password, profile } = req.body || {};

@@ -88,7 +88,9 @@ const weekDays = [
 ];
 const defaultAuthForm = {
   email: "",
-  password: "",
+  password: ""
+};
+const defaultSignupProfileForm = {
   name: "",
   age: "",
   heightCm: "",
@@ -110,7 +112,11 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [authForm, setAuthForm] = useState(defaultAuthForm);
+  const [authForm, setAuthForm] = useState({ ...defaultAuthForm });
+  const [signupProfileForm, setSignupProfileForm] = useState({
+    ...defaultSignupProfileForm
+  });
+  const [signupStep, setSignupStep] = useState("credentials");
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
@@ -778,32 +784,47 @@ export default function App() {
     setAuthForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const onSignupProfileChange = (e) => {
+    setSignupProfileForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
   const onAuthSubmit = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
     setAuthError("");
     try {
-      const payload =
-        authMode === "signup"
-          ? {
-              email: authForm.email,
-              password: authForm.password,
-              profile: {
-                name: authForm.name,
-                age: authForm.age,
-                heightCm: authForm.heightCm,
-                weightKg: authForm.weightKg,
-                sex: authForm.sex,
-                activity: authForm.activity,
-                notes: authForm.notes
-              }
-            }
-          : { email: authForm.email, password: authForm.password };
+      if (authMode === "signup" && signupStep === "profile") {
+        const res = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(signupProfileForm)
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to save profile.");
+        }
+        const data = await res.json();
+        setUser((prev) =>
+          prev
+            ? { ...prev, profile: data.profile || prev.profile }
+            : prev
+        );
+        setAuthForm({ ...defaultAuthForm });
+        setSignupProfileForm({ ...defaultSignupProfileForm });
+        setSignupStep("credentials");
+        go("/dashboard");
+        return;
+      }
+
       const res = await fetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(payload)
+        body: JSON.stringify(authForm)
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -811,6 +832,22 @@ export default function App() {
       }
       const data = await res.json();
       setUser(data.user || null);
+
+      if (authMode === "signup") {
+        const profile = data?.user?.profile || {};
+        setSignupProfileForm({
+          name: profile.name || "",
+          age: profile.age ? String(profile.age) : "",
+          heightCm: profile.heightCm ? String(profile.heightCm) : "",
+          weightKg: profile.weightKg ? String(profile.weightKg) : "",
+          sex: profile.sex || "",
+          activity: profile.activity || "Moderate",
+          notes: profile.notes || ""
+        });
+        setSignupStep("profile");
+        return;
+      }
+
       setAuthForm({ ...defaultAuthForm });
       go("/dashboard");
     } catch (err) {
@@ -905,45 +942,59 @@ export default function App() {
       <div className="page auth-page" style={gradient}>
         <header className="title">
           <h1>AI Workout Studio</h1>
-          <p className="muted">Sign in to unlock advanced planning.</p>
+          <p className="muted">
+            {authMode === "signup" && signupStep === "profile"
+              ? "Step 2 of 2: add your profile details."
+              : "Sign in to unlock advanced planning."}
+          </p>
         </header>
         <main className="auth-card">
           <div className="segmented">
             <button
               type="button"
               className={authMode === "login" ? "active" : ""}
-              onClick={() => setAuthMode("login")}
+              onClick={() => {
+                setAuthMode("login");
+                setSignupStep("credentials");
+                setAuthError("");
+              }}
             >
               Login
             </button>
             <button
               type="button"
               className={authMode === "signup" ? "active" : ""}
-              onClick={() => setAuthMode("signup")}
+              onClick={() => {
+                setAuthMode("signup");
+                setSignupStep("credentials");
+                setAuthError("");
+              }}
             >
               Sign up
             </button>
           </div>
           <form className="form auth-form" onSubmit={onAuthSubmit}>
-            <label>
-              Email
-              <input
-                name="email"
-                type="email"
-                value={authForm.email}
-                onChange={onAuthChange}
-                placeholder="you@email.com"
-                required
-              />
-            </label>
-            {authMode === "signup" && (
+            {!(authMode === "signup" && signupStep === "profile") && (
+              <label>
+                Email
+                <input
+                  name="email"
+                  type="email"
+                  value={authForm.email}
+                  onChange={onAuthChange}
+                  placeholder="you@email.com"
+                  required
+                />
+              </label>
+            )}
+            {authMode === "signup" && signupStep === "profile" && (
               <>
                 <label>
                   Full name
                   <input
                     name="name"
-                    value={authForm.name}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.name}
+                    onChange={onSignupProfileChange}
                     placeholder="Jordan Lee"
                   />
                 </label>
@@ -954,8 +1005,8 @@ export default function App() {
                     type="number"
                     min="10"
                     max="120"
-                    value={authForm.age}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.age}
+                    onChange={onSignupProfileChange}
                     placeholder="28"
                   />
                 </label>
@@ -966,8 +1017,8 @@ export default function App() {
                     type="number"
                     min="100"
                     max="260"
-                    value={authForm.heightCm}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.heightCm}
+                    onChange={onSignupProfileChange}
                     placeholder="175"
                   />
                 </label>
@@ -978,14 +1029,18 @@ export default function App() {
                     type="number"
                     min="25"
                     max="400"
-                    value={authForm.weightKg}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.weightKg}
+                    onChange={onSignupProfileChange}
                     placeholder="72"
                   />
                 </label>
                 <label>
                   Sex
-                  <select name="sex" value={authForm.sex} onChange={onAuthChange}>
+                  <select
+                    name="sex"
+                    value={signupProfileForm.sex}
+                    onChange={onSignupProfileChange}
+                  >
                     <option value="">Select</option>
                     <option>Female</option>
                     <option>Male</option>
@@ -997,8 +1052,8 @@ export default function App() {
                   Activity level
                   <select
                     name="activity"
-                    value={authForm.activity}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.activity}
+                    onChange={onSignupProfileChange}
                   >
                     <option>Light</option>
                     <option>Moderate</option>
@@ -1010,39 +1065,43 @@ export default function App() {
                   Notes
                   <input
                     name="notes"
-                    value={authForm.notes}
-                    onChange={onAuthChange}
+                    value={signupProfileForm.notes}
+                    onChange={onSignupProfileChange}
                     placeholder="Optional training context"
                   />
                 </label>
               </>
             )}
-            <label>
-              <span className="label-row">
-                Password
-                <button
-                  type="button"
-                  className="ghost ghost-inline"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </span>
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={authForm.password}
-                onChange={onAuthChange}
-                placeholder="••••••••"
-                required
-              />
-            </label>
+            {!(authMode === "signup" && signupStep === "profile") && (
+              <label>
+                <span className="label-row">
+                  Password
+                  <button
+                    type="button"
+                    className="ghost ghost-inline"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </span>
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={authForm.password}
+                  onChange={onAuthChange}
+                  placeholder="********"
+                  required
+                />
+              </label>
+            )}
             <button className="cta" type="submit" disabled={authLoading}>
               {authLoading
                 ? "Working..."
                 : authMode === "login"
                 ? "Login"
-                : "Create account"}
+                : signupStep === "credentials"
+                ? "Continue"
+                : "Save profile"}
             </button>
           </form>
           {authError && <p className="error">{authError}</p>}
@@ -1607,39 +1666,6 @@ export default function App() {
           {dashView === "plans" && (
             <section className="panel dashboard-card span-2">
               <h2>Plan hub</h2>
-              {plans.length ? (
-                <div className="grid">
-                  {plans.slice(0, 3).map((plan) => (
-                    <article key={plan.id} className="plan-card">
-                      <h3>{plan.goal || "Workout plan"}</h3>
-                      <p className="muted">
-                        {plan.days ? `${plan.days} days` : "Custom"} •{" "}
-                        {plan.level || "All levels"} •{" "}
-                        {plan.environment || "Any environment"}
-                      </p>
-                      <p className="muted">
-                        {new Date(plan.createdAt).toLocaleDateString()}
-                      </p>
-                      <div className="plan-card-actions">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            setResult(plan.plan || "");
-                            setPlanModalOpen(true);
-                          }}
-                        >
-                          View plan
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">
-                  Generate a plan to see it saved here.
-                </p>
-              )}
               <div className="plan-rows">
                 <section className="plan-row">
                   <div className="plan-row-header">
@@ -1648,7 +1674,7 @@ export default function App() {
                       <p className="muted">Build your weekly training block.</p>
                     </div>
                     <button type="button" className="ghost" onClick={openPlannerFromProfile}>
-                      Open planner
+                      Update plan
                     </button>
                     </div>
                     <div className="plan-row-grid">
@@ -2244,4 +2270,6 @@ export default function App() {
     </div>
   );
 }
+
+
 
