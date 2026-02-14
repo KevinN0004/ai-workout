@@ -101,7 +101,23 @@
     "dashboard": {
       "workouts": [],
       "calories": [],
-      "plans": [],
+      "plans": [
+        {
+          "id": "f29f6c1e-bc74-4a23-9132-314153a47d49",
+          "createdAt": "2026-02-14T11:59:51.038Z",
+          "goal": "Build lean strength and energy",
+          "equipment": [
+            "Full gym access"
+          ],
+          "duration": 45,
+          "level": "Intermediate",
+          "injuries": "None",
+          "days": 6,
+          "environment": "Commercial",
+          "focuses": [],
+          "plan": "Monday\nWarmup: 5 mins (Leg swings, bodyweight squats, glute bridges)\nMain lifts:\n- Back Squats: 3 x 6 (90s rest)\n- Romanian Deadlifts: 3 x 10 (60s rest)\nAccessories:\n- Walking Lunges: 3 x 12 per leg (60s rest)\n- Leg Press: 2 x 15 (45s rest)\nFinisher/conditioning:\n- Kettlebell Swings: 3 x 20 (30s rest)\n\nTuesday\nWarmup: 5 mins (Arm circles, band pull-aparts, cat-cow)\nMain lifts:\n- Flat Dumbbell Bench Press: 3 x 8 (90s rest)\n- Seated Overhead Press (Dumbbell): 3 x 10 (60s rest)\nAccessories:\n- Lateral Raises: 3 x 15 (45s rest)\n- Tricep Dips: 3 x Max reps (60s rest)\nFinisher/conditioning:\n- Push-up AMRAP: 2 sets to failure (60s rest)\n\nWednesday\nWarmup: 5 mins (Dynamic stretching)\nMain lifts:\n- Active Recovery: 30-minute brisk walk or light incline treadmill\nAccessories:\n- Full Body Mobility Flow: 10 mins (Yoga based)\nFinisher/conditioning:\n- None (Focus on recovery)\n\nThursday\nWarmup: 5 mins (Hip circles, bird-dogs, air squats)\nMain lifts:\n- Trap Bar or Conventional Deadlift: 3 x 5 (120s rest)\n- Goblet Squats: 3 x 12 (60s rest)\nAccessories:\n- Leg Curls: 3 x 12 (45s rest)\n- Calf Raises: 3 x 15 (45s rest)\nFinisher/conditioning:\n- Box Jumps or Step-ups: 3 x 10 (60s rest)\n\nFriday\nWarmup: 5 mins (Scapular pull-ups, thoracic rotations)\nMain lifts:\n- Pull-ups or Lat Pulldowns: 3 x 8-10 (90s rest)\n- Seated Cable Rows: 3 x 10 (60s rest)\nAccessories:\n- Face Pulls: 3 x 15 (45s rest)\n- Dumbbell Bicep Curls: 3 x 12 (45s rest)\nFinisher/conditioning:\n- Medicine Ball Slams: 3 x 15 (30s rest)\n\nSaturday\nWarmup: 5 mins (Light jog or rowing machine)\nMain lifts:\n- Conditioning Circuit: 3 rounds (60s rest between rounds)\n  - 15 Kettlebell Snatches/Swings\n  - 15 Goblet Squats\n  - 15 Push-ups\nAccessories:\n- Plank: 3 x 60 seconds (30s rest)\n- Hanging Leg Raises: 3 x 12 (45s rest)\nFinisher/conditioning:\n- 10 mins Moderate Intensity Steady State (Rowing or Cycling)\n\nSunday\nWarmup: None\nMain lifts: Rest Day\nAccessories: None\nFinisher/conditioning: None\n\nCoach Notes:\n1. Progressive Overload: Aim to increase the weight or add one rep to each set every week to ensure strength gains.\n2. Form First: As an intermediate, focus on the mind-muscle connection. If your form breaks down, lower the weight.\n3. Energy Management: Ensure you are eating enough protein (0.8g-1g per lb of body weight) to support lean muscle growth.\n4. Rest: The 45-minute limit is strict; keep your phone away and stick to the rest timers to ensure you finish all movements.\n5. Hydration: Drink at least 1 liter of water during the session to maintain energy levels through the finisher."
+        }
+      ],
       "goals": {
         "targetWeight": 160,
         "targetCalories": 2200,

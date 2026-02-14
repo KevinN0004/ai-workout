@@ -175,6 +175,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const isDashboardRoute =
+    route === "/dashboard" || route.startsWith("/dashboard/");
 
   const gradient = useMemo(
     () => ({
@@ -350,7 +352,13 @@ export default function App() {
         );
       }
       setPlannerOpen(false);
-      setPlanModalOpen(true);
+      if (isDashboardRoute) {
+        setPlanModalOpen(false);
+        setDashView("summary");
+        go("/dashboard");
+      } else {
+        setPlanModalOpen(true);
+      }
     } catch (err) {
       setError(err.message || "Unable to generate plan.");
     } finally {
@@ -759,7 +767,7 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (route !== "/dashboard" || !user) return;
+    if (!isDashboardRoute || !user) return;
     const loadDashboard = async () => {
       setDashLoading(true);
       setDashError("");
@@ -785,11 +793,15 @@ export default function App() {
       }
     };
     loadDashboard();
-  }, [route, user]);
+  }, [isDashboardRoute, user]);
 
   const go = (path) => {
-    window.history.pushState({}, "", path);
-    setRoute(path);
+    const normalizedPath =
+      path === "/dashboard/" || path.startsWith("/dashboard/")
+        ? "/dashboard"
+        : path;
+    window.history.pushState({}, "", normalizedPath);
+    setRoute(normalizedPath);
   };
 
   const onAuthChange = (e) => {
@@ -972,7 +984,7 @@ export default function App() {
     );
   }
 
-  if (route === "/dashboard") {
+  if (isDashboardRoute) {
     return (
       <DashboardPage
         gradient={gradient}

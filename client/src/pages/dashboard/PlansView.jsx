@@ -47,6 +47,87 @@ export default function PlansView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedDay]);
 
+  const trainingDays = weekDays.filter(
+    ({ key }) => (latestPlanByWeekday[key] || []).length > 0
+  ).length;
+  const recoveryDays = Math.max(weekDays.length - trainingDays, 0);
+
+  const dailyTips = weekDays.map(({ label, key }) => {
+    const lines = latestPlanByWeekday[key] || [];
+    const merged = lines.join(" ").toLowerCase();
+
+    if (!lines.length) {
+      return {
+        label,
+        text: "Recovery day: keep intensity low, do 15-30 min easy movement, and prioritize sleep and hydration."
+      };
+    }
+
+    if (
+      merged.includes("push") ||
+      merged.includes("chest") ||
+      merged.includes("shoulder") ||
+      merged.includes("triceps")
+    ) {
+      return {
+        label,
+        text: "Push focus: keep shoulder blades stable on presses, stop 1-2 reps before failure, and track top-set load."
+      };
+    }
+
+    if (
+      merged.includes("pull") ||
+      merged.includes("back") ||
+      merged.includes("biceps") ||
+      merged.includes("row")
+    ) {
+      return {
+        label,
+        text: "Pull focus: start reps by driving elbows back, control the eccentric, and match pull volume to push volume."
+      };
+    }
+
+    if (
+      merged.includes("leg") ||
+      merged.includes("quad") ||
+      merged.includes("hamstring") ||
+      merged.includes("glute") ||
+      merged.includes("squat") ||
+      merged.includes("deadlift") ||
+      merged.includes("lunge")
+    ) {
+      return {
+        label,
+        text: "Leg focus: use longer rest on compounds (2-3 min), keep reps controlled, and avoid adding load if depth breaks down."
+      };
+    }
+
+    if (
+      merged.includes("hiit") ||
+      merged.includes("conditioning") ||
+      merged.includes("cardio") ||
+      merged.includes("run") ||
+      merged.includes("cycle")
+    ) {
+      return {
+        label,
+        text: "Conditioning focus: keep effort targets clear, avoid sprinting every interval, and recover fully between hard bouts."
+      };
+    }
+
+    return {
+      label,
+      text: "Session focus: prioritize your first compound lifts, keep form strict, and progress by small weekly increments."
+    };
+  });
+
+  const weeklyTips = [
+    "Progressive overload: add 1 rep or small load increases only when form stays clean.",
+    "Balance push and pull work to keep shoulders healthy and posture strong.",
+    `Keep at least ${Math.max(recoveryDays, 1)} recovery day${Math.max(recoveryDays, 1) === 1 ? "" : "s"} this week.`,
+    "Use a deload every 4-8 weeks or sooner if performance and recovery are dropping."
+  ];
+
   return (
     <section className="panel dashboard-card span-2">
       <h2>Plan hub</h2>
@@ -140,18 +221,29 @@ export default function PlansView({
               <h3>Tips week</h3>
               <p className="muted">Guidance to keep the week on track.</p>
             </div>
-            <button type="button" className="ghost">
-              Coming soon
-            </button>
+            <div className="tips-status-pill">
+              {trainingDays} training day{trainingDays === 1 ? "" : "s"} | {recoveryDays} recovery
+              day{recoveryDays === 1 ? "" : "s"}
+            </div>
           </div>
           <div className="plan-row-grid plan-row-grid-split">
             <div className="hub-card">
-              <h4>Daily tips</h4>
-              <p className="muted">Short cues that match your workload.</p>
+              <h4>Daily cues</h4>
+              <ul className="hub-list tips-day-list">
+                {dailyTips.map((tip) => (
+                  <li key={`tip-${tip.label}`}>
+                    <strong>{tip.label}:</strong> {tip.text}
+                  </li>
+                ))}
+              </ul>
             </div>
             <div className="hub-card">
-              <h4>Weekly tips</h4>
-              <p className="muted">Big picture adjustments for the week.</p>
+              <h4>Weekly principles</h4>
+              <ul className="hub-list tips-week-list">
+                {weeklyTips.map((tip) => (
+                  <li key={`weekly-${tip}`}>{tip}</li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>

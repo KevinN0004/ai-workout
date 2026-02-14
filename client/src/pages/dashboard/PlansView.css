@@ -60,6 +60,17 @@
   text-align: center;
 }
 
+.tips-status-pill {
+  border: 1px solid rgba(122, 213, 255, 0.45);
+  color: #bde7ff;
+  background: rgba(122, 213, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .meal-day-type {
   margin-top: 8px;
   color: #ffd9a0;
@@ -80,6 +91,14 @@
 
 .meal-week-list li strong {
   color: #f7f8ff;
+}
+
+.tips-day-list li strong {
+  color: #f7f8ff;
+}
+
+.tips-week-list li {
+  color: #d8e4ff;
 }
 
 .plan-day-detail-modal {
