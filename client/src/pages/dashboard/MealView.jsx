@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { detectTrack } from "./planUtils";
 import "./MealView.css";
 
 const FALLBACK_IMAGE = `data:image/svg+xml,${encodeURIComponent(
@@ -771,32 +772,6 @@ const EXTRA_MEAL_LIBRARY = {
       }
     }
   ]
-};
-
-const detectTrack = (goalText = "") => {
-  const lower = goalText.toLowerCase();
-  if (
-    lower.includes("fat loss") ||
-    lower.includes("cut") ||
-    lower.includes("conditioning")
-  ) {
-    return "fat_loss";
-  }
-  if (
-    lower.includes("endurance") ||
-    lower.includes("athletic") ||
-    lower.includes("performance")
-  ) {
-    return "endurance";
-  }
-  if (
-    lower.includes("mobility") ||
-    lower.includes("recovery") ||
-    lower.includes("joint")
-  ) {
-    return "recovery";
-  }
-  return "lean_strength";
 };
 
 const getCalorieBand = (targetCalories) => {

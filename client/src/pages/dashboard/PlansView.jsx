@@ -47,86 +47,91 @@ export default function PlansView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedDay]);
 
-  const trainingDays = weekDays.filter(
-    ({ key }) => (latestPlanByWeekday[key] || []).length > 0
-  ).length;
-  const recoveryDays = Math.max(weekDays.length - trainingDays, 0);
+  const { trainingDays, recoveryDays, dailyTips, weeklyTips } = useMemo(() => {
+    const trainingDays = weekDays.filter(
+      ({ key }) => (latestPlanByWeekday[key] || []).length > 0
+    ).length;
+    const recoveryDays = Math.max(weekDays.length - trainingDays, 0);
 
-  const dailyTips = weekDays.map(({ label, key }) => {
-    const lines = latestPlanByWeekday[key] || [];
-    const merged = lines.join(" ").toLowerCase();
+    const dailyTips = weekDays.map(({ label, key }) => {
+      const lines = latestPlanByWeekday[key] || [];
+      const merged = lines.join(" ").toLowerCase();
 
-    if (!lines.length) {
+      if (!lines.length) {
+        return {
+          label,
+          text: "Recovery day: keep intensity low, do 15-30 min easy movement, and prioritize sleep and hydration."
+        };
+      }
+
+      if (
+        merged.includes("push") ||
+        merged.includes("chest") ||
+        merged.includes("shoulder") ||
+        merged.includes("triceps")
+      ) {
+        return {
+          label,
+          text: "Push focus: keep shoulder blades stable on presses, stop 1-2 reps before failure, and track top-set load."
+        };
+      }
+
+      if (
+        merged.includes("pull") ||
+        merged.includes("back") ||
+        merged.includes("biceps") ||
+        merged.includes("row")
+      ) {
+        return {
+          label,
+          text: "Pull focus: start reps by driving elbows back, control the eccentric, and match pull volume to push volume."
+        };
+      }
+
+      if (
+        merged.includes("leg") ||
+        merged.includes("quad") ||
+        merged.includes("hamstring") ||
+        merged.includes("glute") ||
+        merged.includes("squat") ||
+        merged.includes("deadlift") ||
+        merged.includes("lunge")
+      ) {
+        return {
+          label,
+          text: "Leg focus: use longer rest on compounds (2-3 min), keep reps controlled, and avoid adding load if depth breaks down."
+        };
+      }
+
+      if (
+        merged.includes("hiit") ||
+        merged.includes("conditioning") ||
+        merged.includes("cardio") ||
+        merged.includes("run") ||
+        merged.includes("cycle")
+      ) {
+        return {
+          label,
+          text: "Conditioning focus: keep effort targets clear, avoid sprinting every interval, and recover fully between hard bouts."
+        };
+      }
+
       return {
         label,
-        text: "Recovery day: keep intensity low, do 15-30 min easy movement, and prioritize sleep and hydration."
+        text: "Session focus: prioritize your first compound lifts, keep form strict, and progress by small weekly increments."
       };
-    }
+    });
 
-    if (
-      merged.includes("push") ||
-      merged.includes("chest") ||
-      merged.includes("shoulder") ||
-      merged.includes("triceps")
-    ) {
-      return {
-        label,
-        text: "Push focus: keep shoulder blades stable on presses, stop 1-2 reps before failure, and track top-set load."
-      };
-    }
+    const minRecoveryDays = Math.max(recoveryDays, 1);
+    const weeklyTips = [
+      "Progressive overload: add 1 rep or small load increases only when form stays clean.",
+      "Balance push and pull work to keep shoulders healthy and posture strong.",
+      `Keep at least ${minRecoveryDays} recovery day${minRecoveryDays === 1 ? "" : "s"} this week.`,
+      "Use a deload every 4-8 weeks or sooner if performance and recovery are dropping."
+    ];
 
-    if (
-      merged.includes("pull") ||
-      merged.includes("back") ||
-      merged.includes("biceps") ||
-      merged.includes("row")
-    ) {
-      return {
-        label,
-        text: "Pull focus: start reps by driving elbows back, control the eccentric, and match pull volume to push volume."
-      };
-    }
-
-    if (
-      merged.includes("leg") ||
-      merged.includes("quad") ||
-      merged.includes("hamstring") ||
-      merged.includes("glute") ||
-      merged.includes("squat") ||
-      merged.includes("deadlift") ||
-      merged.includes("lunge")
-    ) {
-      return {
-        label,
-        text: "Leg focus: use longer rest on compounds (2-3 min), keep reps controlled, and avoid adding load if depth breaks down."
-      };
-    }
-
-    if (
-      merged.includes("hiit") ||
-      merged.includes("conditioning") ||
-      merged.includes("cardio") ||
-      merged.includes("run") ||
-      merged.includes("cycle")
-    ) {
-      return {
-        label,
-        text: "Conditioning focus: keep effort targets clear, avoid sprinting every interval, and recover fully between hard bouts."
-      };
-    }
-
-    return {
-      label,
-      text: "Session focus: prioritize your first compound lifts, keep form strict, and progress by small weekly increments."
-    };
-  });
-
-  const weeklyTips = [
-    "Progressive overload: add 1 rep or small load increases only when form stays clean.",
-    "Balance push and pull work to keep shoulders healthy and posture strong.",
-    `Keep at least ${Math.max(recoveryDays, 1)} recovery day${Math.max(recoveryDays, 1) === 1 ? "" : "s"} this week.`,
-    "Use a deload every 4-8 weeks or sooner if performance and recovery are dropping."
-  ];
+    return { trainingDays, recoveryDays, dailyTips, weeklyTips };
+  }, [weekDays, latestPlanByWeekday]);
 
   return (
     <section className="panel dashboard-card span-2">

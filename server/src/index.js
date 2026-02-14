@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
+import { promisify } from "util";
 
 dotenv.config();
 
@@ -17,6 +18,9 @@ app.use(express.json({ limit: "1mb" }));
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const usersFile = path.join(process.cwd(), "data", "users.json");
 const sessions = new Map();
+const pbkdf2Async = promisify(crypto.pbkdf2);
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 const defaultProfile = () => ({
   name: "",
   age: null,
@@ -30,6 +34,37 @@ const defaultProfile = () => ({
 });
 const allowedSexes = new Set(["Female", "Male", "Non-binary", "Prefer not to say"]);
 const allowedActivities = new Set(["Light", "Moderate", "High", "Very high"]);
+const defaultGoals = () => ({
+  targetWeight: 160,
+  targetCalories: 2200,
+  weeklyWorkouts: 3
+});
+const defaultDashboard = () => ({
+  workouts: [],
+  calories: [],
+  plans: [],
+  goals: defaultGoals()
+});
+const buildDashboard = (input = {}) => {
+  const base = defaultDashboard();
+  const goals = input.goals || {};
+  return {
+    ...base,
+    workouts: Array.isArray(input.workouts) ? input.workouts : [],
+    calories: Array.isArray(input.calories) ? input.calories : [],
+    plans: Array.isArray(input.plans) ? input.plans : [],
+    goals: {
+      ...base.goals,
+      targetWeight:
+        toNullableNumber(goals.targetWeight, 80, 400) ?? base.goals.targetWeight,
+      targetCalories:
+        toNullableNumber(goals.targetCalories, 1200, 4500) ??
+        base.goals.targetCalories,
+      weeklyWorkouts:
+        toNullableNumber(goals.weeklyWorkouts, 1, 7) ?? base.goals.weeklyWorkouts
+    }
+  };
+};
 
 const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
@@ -41,6 +76,12 @@ const toNullableNumber = (value, min, max) => {
   if (num < min || num > max) return null;
   return num;
 };
+
+const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
+  (Array.isArray(value) ? value : [value])
+    .map((item) => cleanText(item, maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -58,12 +99,26 @@ const buildProfile = (input = {}) => {
   };
 };
 
+let usersCache = null;
+let usersCacheMtimeMs = 0;
+
 const readUsers = async () => {
   try {
+    const stat = await fs.stat(usersFile);
+    if (usersCache && usersCacheMtimeMs === stat.mtimeMs) {
+      return usersCache;
+    }
     const raw = await fs.readFile(usersFile, "utf-8");
-    return JSON.parse(raw || "[]");
+    const parsed = JSON.parse(raw || "[]");
+    usersCache = Array.isArray(parsed) ? parsed : [];
+    usersCacheMtimeMs = stat.mtimeMs;
+    return usersCache;
   } catch (err) {
-    if (err.code === "ENOENT") return [];
+    if (err.code === "ENOENT") {
+      usersCache = [];
+      usersCacheMtimeMs = 0;
+      return [];
+    }
     throw err;
   }
 };
@@ -74,37 +129,82 @@ const writeUsers = async (users) => {
   const tmp = `${usersFile}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(users, null, 2), "utf-8");
   await fs.rename(tmp, usersFile);
+  usersCache = users;
+  try {
+    const stat = await fs.stat(usersFile);
+    usersCacheMtimeMs = stat.mtimeMs;
+  } catch {
+    usersCacheMtimeMs = Date.now();
+  }
 };
 
-const hashPassword = (password, salt = crypto.randomBytes(16).toString("hex")) => {
-  const hash = crypto.pbkdf2Sync(password, salt, 120000, 64, "sha512");
+const hashPassword = async (password, salt = crypto.randomBytes(16).toString("hex")) => {
+  const hash = await pbkdf2Async(password, salt, 120000, 64, "sha512");
   return { salt, hash: hash.toString("hex") };
 };
 
-const verifyPassword = (password, user) => {
-  const hash = crypto.pbkdf2Sync(password, user.salt, 120000, 64, "sha512");
-  return crypto.timingSafeEqual(Buffer.from(user.hash, "hex"), hash);
+const verifyPassword = async (password, user) => {
+  if (!user?.salt || !user?.hash) return false;
+  const hash = await pbkdf2Async(password, user.salt, 120000, 64, "sha512");
+  const storedHash = Buffer.from(user.hash, "hex");
+  if (storedHash.length !== hash.length) return false;
+  return crypto.timingSafeEqual(storedHash, hash);
 };
 
 const parseCookies = (cookieHeader = "") =>
   cookieHeader.split(";").reduce((acc, pair) => {
     const [key, ...rest] = pair.trim().split("=");
     if (!key) return acc;
-    acc[key] = decodeURIComponent(rest.join("="));
+    const rawValue = rest.join("=");
+    try {
+      acc[key] = decodeURIComponent(rawValue);
+    } catch {
+      acc[key] = rawValue;
+    }
     return acc;
   }, {});
 
+const pruneExpiredSessions = () => {
+  const now = Date.now();
+  for (const [token, session] of sessions) {
+    if (now - session.createdAt > SESSION_TTL_MS) {
+      sessions.delete(token);
+    }
+  }
+};
+
+const setSessionCookie = (res, token) => {
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+  res.setHeader(
+    "Set-Cookie",
+    `sid=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${cookieSecure}`
+  );
+};
+
+const clearSessionCookie = (res) => {
+  res.setHeader(
+    "Set-Cookie",
+    `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
+  );
+};
+
 const createSession = (userId) => {
+  pruneExpiredSessions();
   const token = crypto.randomBytes(24).toString("hex");
   sessions.set(token, { userId, createdAt: Date.now() });
   return token;
 };
 
 const getSessionUser = async (req) => {
+  pruneExpiredSessions();
   const cookies = parseCookies(req.headers.cookie || "");
   const token = cookies.sid;
   if (!token || !sessions.has(token)) return null;
   const session = sessions.get(token);
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+    sessions.delete(token);
+    return null;
+  }
   const users = await readUsers();
   return users.find((user) => user.id === session.userId) || null;
 };
@@ -166,40 +266,32 @@ app.post("/api/profile", requireAuth, async (req, res) => {
 app.post("/api/auth/signup", async (req, res) => {
   try {
     const { email, password, profile } = req.body || {};
-    if (!email || !password) {
+    const normalizedEmail = cleanText(email, 254).toLowerCase();
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: "Email and password required." });
     }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+    }
     const users = await readUsers();
-    const exists = users.find((user) => user.email === email.toLowerCase());
+    const exists = users.find((user) => user.email === normalizedEmail);
     if (exists) {
       return res.status(409).json({ error: "Account already exists." });
     }
-    const { salt, hash } = hashPassword(password);
+    const { salt, hash } = await hashPassword(password);
     const newUser = {
       id: crypto.randomUUID(),
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       salt,
       hash,
       createdAt: new Date().toISOString(),
       profile: buildProfile(profile),
-      dashboard: {
-        workouts: [],
-        calories: [],
-        plans: [],
-        goals: {
-          targetWeight: 160,
-          targetCalories: 2200,
-          weeklyWorkouts: 3
-        }
-      }
+      dashboard: defaultDashboard()
     };
     users.push(newUser);
     await writeUsers(users);
     const token = createSession(newUser.id);
-    res.setHeader(
-      "Set-Cookie",
-      `sid=${token}; HttpOnly; Path=/; SameSite=Lax`
-    );
+    setSessionCookie(res, token);
     res.json({
       user: {
         id: newUser.id,
@@ -215,19 +307,17 @@ app.post("/api/auth/signup", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) {
+    const normalizedEmail = cleanText(email, 254).toLowerCase();
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: "Email and password required." });
     }
     const users = await readUsers();
-    const user = users.find((u) => u.email === email.toLowerCase());
-    if (!user || !verifyPassword(password, user)) {
+    const user = users.find((u) => u.email === normalizedEmail);
+    if (!user || !(await verifyPassword(password, user))) {
       return res.status(401).json({ error: "Invalid credentials." });
     }
     const token = createSession(user.id);
-    res.setHeader(
-      "Set-Cookie",
-      `sid=${token}; HttpOnly; Path=/; SameSite=Lax`
-    );
+    setSessionCookie(res, token);
     res.json({
       user: {
         id: user.id,
@@ -244,51 +334,32 @@ app.post("/api/auth/logout", (req, res) => {
   const cookies = parseCookies(req.headers.cookie || "");
   const token = cookies.sid;
   if (token) sessions.delete(token);
-  res.setHeader("Set-Cookie", "sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax");
+  clearSessionCookie(res);
   res.json({ ok: true });
 });
 
 app.get("/api/dashboard", requireAuth, async (req, res) => {
   const user = req.user;
   if (!user.dashboard) {
-    return res.json({
-      dashboard: {
-        workouts: [],
-        calories: [],
-        plans: [],
-        goals: {
-          targetWeight: 160,
-          targetCalories: 2200,
-          weeklyWorkouts: 3
-        }
-      }
-    });
+    return res.json({ dashboard: defaultDashboard() });
   }
-  res.json({ dashboard: user.dashboard });
+  res.json({ dashboard: buildDashboard(user.dashboard) });
 });
 
 app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
   const { date, focus, duration, notes } = req.body || {};
-  if (!date || !duration) {
+  const parsedDuration = toNullableNumber(duration, 5, 360);
+  if (!cleanText(date, 20) || parsedDuration === null) {
     return res.status(400).json({ error: "Date and duration are required." });
   }
   const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = user.dashboard || {
-      workouts: [],
-      calories: [],
-      plans: [],
-      goals: {
-        targetWeight: 160,
-        targetCalories: 2200,
-        weeklyWorkouts: 3
-      }
-    };
+    const dashboard = buildDashboard(user.dashboard);
     const workout = {
       id: crypto.randomUUID(),
-      date,
-      focus: focus || "General",
-      duration: Number(duration),
-      notes: notes || ""
+      date: cleanText(date, 20),
+      focus: cleanText(focus, 80) || "General",
+      duration: parsedDuration,
+      notes: cleanText(notes, 500)
     };
     return {
       ...user,
@@ -298,29 +369,22 @@ app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
       }
     };
   });
+  if (!updated) return res.status(404).json({ error: "User not found." });
   res.json({ dashboard: updated.dashboard });
 });
 
 app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
   const { date, calories } = req.body || {};
-  if (!date || !calories) {
+  const parsedCalories = toNullableNumber(calories, 800, 10000);
+  if (!cleanText(date, 20) || parsedCalories === null) {
     return res.status(400).json({ error: "Date and calories are required." });
   }
   const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = user.dashboard || {
-      workouts: [],
-      calories: [],
-      plans: [],
-      goals: {
-        targetWeight: 160,
-        targetCalories: 2200,
-        weeklyWorkouts: 3
-      }
-    };
+    const dashboard = buildDashboard(user.dashboard);
     const entry = {
       id: crypto.randomUUID(),
-      date,
-      calories: Number(calories)
+      date: cleanText(date, 20),
+      calories: parsedCalories
     };
     return {
       ...user,
@@ -330,36 +394,30 @@ app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
       }
     };
   });
+  if (!updated) return res.status(404).json({ error: "User not found." });
   res.json({ dashboard: updated.dashboard });
 });
 
 app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
   const { targetWeight, targetCalories, weeklyWorkouts } = req.body || {};
+  const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
+  const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
+  const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
   const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = user.dashboard || {
-      workouts: [],
-      calories: [],
-      plans: [],
-      goals: {
-        targetWeight: 160,
-        targetCalories: 2200,
-        weeklyWorkouts: 3
-      }
-    };
+    const dashboard = buildDashboard(user.dashboard);
     return {
       ...user,
       dashboard: {
         ...dashboard,
         goals: {
-          targetWeight: Number(targetWeight) || dashboard.goals.targetWeight,
-          targetCalories:
-            Number(targetCalories) || dashboard.goals.targetCalories,
-          weeklyWorkouts:
-            Number(weeklyWorkouts) || dashboard.goals.weeklyWorkouts
+          targetWeight: parsedTargetWeight ?? dashboard.goals.targetWeight,
+          targetCalories: parsedTargetCalories ?? dashboard.goals.targetCalories,
+          weeklyWorkouts: parsedWeeklyWorkouts ?? dashboard.goals.weeklyWorkouts
         }
       }
     };
   });
+  if (!updated) return res.status(404).json({ error: "User not found." });
   res.json({ dashboard: updated.dashboard });
 });
 
@@ -369,24 +427,21 @@ app.post("/api/generate", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
     }
 
-    const {
-      goal = "Build strength and energy",
-      equipment = "Bodyweight",
-      duration = "45",
-      level = "Intermediate",
-      injuries = "None",
-      days = "3",
-      environment = "Home",
-      focuses = []
-    } = req.body || {};
+    const body = req.body || {};
+    const goal = cleanText(body.goal, 120) || "Build strength and energy";
+    const equipment = toCleanArray(body.equipment, 10, 80);
+    const duration = toNullableNumber(body.duration, 15, 180) ?? 45;
+    const level = cleanText(body.level, 40) || "Intermediate";
+    const injuries = cleanText(body.injuries, 140) || "None";
+    const days = toNullableNumber(body.days, 1, 7) ?? 3;
+    const environment = cleanText(body.environment, 40) || "Home";
+    const focuses = toCleanArray(body.focuses, 8, 60);
 
     const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const equipmentLine = Array.isArray(equipment)
-      ? equipment.join(", ")
-      : equipment;
-    const focusLine = Array.isArray(focuses) ? focuses.join(", ") : focuses;
+    const equipmentLine = equipment.join(", ") || "Bodyweight";
+    const focusLine = focuses.join(", ") || "General fitness";
 
-    const prompt = `You are an expert fitness coach. Create a weekly workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment: ${equipment}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Use weekday headings exactly as: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.\n- For each day include: Warmup, Main lifts, Accessories, and Finisher/conditioning with sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- End with a section labeled \"Coach Notes:\" containing tips and recovery guidance.\n- Output in clean plain text with clear headings.`;
+    const prompt = `You are an expert fitness coach. Create a weekly workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment: ${equipmentLine}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Use weekday headings exactly as: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.\n- For each day include: Warmup, Main lifts, Accessories, and Finisher/conditioning with sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- End with a section labeled \"Coach Notes:\" containing tips and recovery guidance.\n- Output in clean plain text with clear headings.`;
     const promptWithContext = `${prompt}\n\nEnvironment: ${environment}\nFocuses: ${focusLine}\nEquipment list: ${equipmentLine}`;
 
     const model = gemini.getGenerativeModel({ model: modelName });
@@ -405,27 +460,18 @@ app.post("/api/generate", async (req, res) => {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         goal,
-        equipment: Array.isArray(equipment) ? equipment : [equipment].filter(Boolean),
-        duration: Number(duration),
+        equipment,
+        duration,
         level,
         injuries,
-        days: Number(days),
+        days,
         environment,
-        focuses: Array.isArray(focuses) ? focuses : [],
+        focuses,
         plan
       };
 
       const updated = await updateUser(sessionUser.id, (user) => {
-        const dashboard = user.dashboard || {
-          workouts: [],
-          calories: [],
-          plans: [],
-          goals: {
-            targetWeight: 160,
-            targetCalories: 2200,
-            weeklyWorkouts: 3
-          }
-        };
+        const dashboard = buildDashboard(user.dashboard);
         return {
           ...user,
           dashboard: {
