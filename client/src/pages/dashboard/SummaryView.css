@@ -2,7 +2,7 @@
   text-transform: uppercase;
   letter-spacing: 0.2em;
   font-size: 12px;
-  color: #ffd9a0;
+  color: #f2f2f2;
   margin-bottom: 12px;
 }
 
@@ -28,7 +28,7 @@
   padding: 18px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(5, 8, 16, 0.6);
+  background: rgba(0, 0, 0, 0.6);
   display: grid;
   gap: 10px;
 }
@@ -37,13 +37,13 @@
   font-size: 1.25rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #ffd9a0;
+  color: #f2f2f2;
 }
 
 .overview-value {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #f8f9ff;
+  color: #f3f3f3;
 }
 
 .stat-row {
@@ -62,7 +62,7 @@
 }
 
 .progress-label {
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.9rem;
 }
 
@@ -77,7 +77,7 @@
 .progress-bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(120deg, #ffb347, #ff5f6d);
+  background: linear-gradient(120deg, #ffffff, #b5b5b5);
   border-radius: 999px;
 }
 
@@ -115,7 +115,7 @@
   padding-left: 16px;
   display: grid;
   gap: 6px;
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.86rem;
   line-height: 1.35;
 }
@@ -137,16 +137,16 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
-  color: #f8f9ff;
+  color: #f3f3f3;
   padding: 6px 12px;
   font: inherit;
   cursor: pointer;
 }
 
 .summary-range-toggle button.active {
-  border-color: rgba(255, 179, 71, 0.55);
-  background: rgba(255, 179, 71, 0.2);
-  color: #ffd9a0;
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.2);
+  color: #f2f2f2;
 }
 
 .summary-chart-header {
@@ -164,17 +164,17 @@
 
 .summary-chart-line {
   fill: none;
-  stroke: #ffb347;
+  stroke: #ffffff;
   stroke-width: 3;
   stroke-linecap: round;
 }
 
 .summary-chart-line-alt {
-  stroke: #8be9fd;
+  stroke: #cfcfcf;
 }
 
 .summary-chart-line-recovery {
-  stroke: #7dff9a;
+  stroke: #a9a9a9;
 }
 
 .summary-chart-labels {
@@ -196,3 +196,4 @@
     align-items: flex-start;
   }
 }
+

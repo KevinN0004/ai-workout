@@ -11,7 +11,7 @@
 .group-toggles button {
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #dce2ff;
+  color: #dfdfdf;
   border-radius: 999px;
   padding: 8px 14px;
   font-family: inherit;
@@ -21,9 +21,9 @@
 }
 
 .group-toggles button.active {
-  background: rgba(255, 179, 71, 0.2);
-  border-color: rgba(255, 179, 71, 0.45);
-  color: #ffd9a0;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #f2f2f2;
 }
 
 .exercise-grid {
@@ -35,7 +35,7 @@
 .exercise-tile {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  background: rgba(6, 10, 20, 0.55);
+  background: rgba(0, 0, 0, 0.55);
   overflow: hidden;
   display: grid;
   gap: 0;
@@ -60,28 +60,28 @@
 
 .exercise-tile h3 {
   font-size: 1.25rem;
-  color: #eaf0ff;
+  color: #e9e9e9;
 }
 
 .exercise-group {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #ffd9a0;
+  color: #f2f2f2;
 }
 
 .exercise-modal-body p {
   font-size: 1rem;
   line-height: 1.35;
-  color: #dce2ff;
+  color: #dfdfdf;
 }
 
 .exercise-what {
-  color: #e8ecff;
+  color: #e6e6e6;
 }
 
 .exercise-focus {
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.85rem;
 }
 
@@ -97,7 +97,7 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -128,7 +128,7 @@
 }
 
 .exercise-details-open h4 {
-  color: #ffd9a0;
+  color: #f2f2f2;
   font-size: 1.125rem;
   margin-bottom: 8px;
 }
@@ -137,12 +137,12 @@
   padding-left: 18px;
   display: grid;
   gap: 8px;
-  color: #dce2ff;
+  color: #dfdfdf;
   font-size: 0.86rem;
 }
 
 .video-link {
-  color: #9ed9ff;
+  color: #dddddd;
   font-size: 0.85rem;
   text-decoration: underline;
   width: fit-content;
@@ -165,7 +165,7 @@
   padding-left: 18px;
   display: grid;
   gap: 8px;
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.9rem;
 }
 
@@ -190,12 +190,12 @@
 }
 
 .training-card h4 {
-  color: #ffd9a0;
+  color: #f2f2f2;
   font-size: 1.125rem;
 }
 
 .training-card p {
-  color: #e3e8ff;
+  color: #e2e2e2;
   font-size: 1rem;
   line-height: 1.35;
 }
@@ -204,7 +204,7 @@
   padding-left: 18px;
   display: grid;
   gap: 6px;
-  color: #cfd7ff;
+  color: #cecece;
   font-size: 0.875rem;
   line-height: 1.4;
 }
@@ -224,3 +224,4 @@
     grid-template-columns: 1fr;
   }
 }
+

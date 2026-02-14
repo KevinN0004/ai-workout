@@ -18,7 +18,7 @@
 
 .meal-context p {
   margin: 0;
-  color: #d8ddff;
+  color: #d9d9d9;
 }
 
 .meal-sections {
@@ -61,7 +61,7 @@
 
 .meal-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 179, 71, 0.5);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .meal-card img {
@@ -83,7 +83,7 @@
 
 .meal-card-meta {
   font-size: 0.87rem;
-  color: #cfd6ff;
+  color: #cccccc;
 }
 
 .meal-modal {
@@ -124,7 +124,7 @@
 }
 
 .meal-modal-left p {
-  color: #d8ddff;
+  color: #d9d9d9;
   max-width: 34ch;
 }
 
@@ -142,16 +142,16 @@
 }
 
 .meal-list li {
-  color: #e7eaff;
+  color: #e4e4e4;
 }
 
 .meal-links a {
-  color: #ffd9a0;
+  color: #f2f2f2;
   text-underline-offset: 2px;
 }
 
 .meal-links a:hover {
-  color: #ffb347;
+  color: #ffffff;
 }
 
 @media (max-width: 900px) {
@@ -175,3 +175,4 @@
     padding-bottom: 18px;
   }
 }
+
