@@ -3,9 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
-import fs from "fs/promises";
-import path from "path";
 import { promisify } from "util";
+import { connectDatabase } from "./db.js";
+import User from "./models/User.js";
 
 dotenv.config();
 
@@ -16,7 +16,6 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const usersFile = path.join(process.cwd(), "data", "users.json");
 const sessions = new Map();
 const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -109,43 +108,48 @@ const isCompleteSignupProfile = (profile) =>
       profile?.bodyFat !== null
   );
 
-let usersCache = null;
-let usersCacheMtimeMs = 0;
-
-const readUsers = async () => {
-  try {
-    const stat = await fs.stat(usersFile);
-    if (usersCache && usersCacheMtimeMs === stat.mtimeMs) {
-      return usersCache;
-    }
-    const raw = await fs.readFile(usersFile, "utf-8");
-    const parsed = JSON.parse(raw || "[]");
-    usersCache = Array.isArray(parsed) ? parsed : [];
-    usersCacheMtimeMs = stat.mtimeMs;
-    return usersCache;
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      usersCache = [];
-      usersCacheMtimeMs = 0;
-      return [];
-    }
-    throw err;
-  }
+const mapMongoDocToUser = (doc) => {
+  if (!doc) return null;
+  const source = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  return {
+    id: source.userId,
+    email: source.email,
+    salt: source.salt,
+    hash: source.hash,
+    createdAt: source.createdAt,
+    profile: source.profile,
+    dashboard: source.dashboard
+  };
 };
 
-const writeUsers = async (users) => {
-  const dir = path.dirname(usersFile);
-  await fs.mkdir(dir, { recursive: true });
-  const tmp = `${usersFile}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(users, null, 2), "utf-8");
-  await fs.rename(tmp, usersFile);
-  usersCache = users;
-  try {
-    const stat = await fs.stat(usersFile);
-    usersCacheMtimeMs = stat.mtimeMs;
-  } catch {
-    usersCacheMtimeMs = Date.now();
-  }
+const mapUserToMongoDoc = (user) => {
+  const doc = {
+    userId: user.id,
+    email: cleanText(user.email, 254).toLowerCase(),
+    salt: user.salt,
+    hash: user.hash,
+    createdAt: user.createdAt || new Date().toISOString()
+  };
+  if (user.profile !== undefined) doc.profile = user.profile;
+  if (user.dashboard !== undefined) doc.dashboard = user.dashboard;
+  return doc;
+};
+
+const findUserById = async (userId) => {
+  const doc = await User.findOne({ userId });
+  return mapMongoDocToUser(doc);
+};
+
+const findUserByEmail = async (email) => {
+  const doc = await User.findOne({
+    email: cleanText(email, 254).toLowerCase()
+  });
+  return mapMongoDocToUser(doc);
+};
+
+const createUser = async (user) => {
+  const doc = await User.create(mapUserToMongoDoc(user));
+  return mapMongoDocToUser(doc);
 };
 
 const hashPassword = async (password, salt = crypto.randomBytes(16).toString("hex")) => {
@@ -215,8 +219,7 @@ const getSessionUser = async (req) => {
     sessions.delete(token);
     return null;
   }
-  const users = await readUsers();
-  return users.find((user) => user.id === session.userId) || null;
+  return findUserById(session.userId);
 };
 
 const requireAuth = async (req, res, next) => {
@@ -227,13 +230,21 @@ const requireAuth = async (req, res, next) => {
 };
 
 const updateUser = async (userId, updater) => {
-  const users = await readUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx === -1) return null;
-  const next = updater(users[idx]);
-  users[idx] = next;
-  await writeUsers(users);
-  return next;
+  const current = await findUserById(userId);
+  if (!current) return null;
+
+  const next = updater({
+    ...current,
+    profile: current.profile ? structuredClone(current.profile) : current.profile,
+    dashboard: current.dashboard ? structuredClone(current.dashboard) : current.dashboard
+  });
+  if (!next) return null;
+
+  const replacement = mapUserToMongoDoc(next);
+  const updatedDoc = await User.findOneAndReplace({ userId }, replacement, {
+    new: true
+  });
+  return mapMongoDocToUser(updatedDoc);
 };
 
 app.get("/api/health", (req, res) => {
@@ -283,8 +294,7 @@ app.post("/api/auth/signup", async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters." });
     }
-    const users = await readUsers();
-    const exists = users.find((user) => user.email === normalizedEmail);
+    const exists = await findUserByEmail(normalizedEmail);
     if (exists) {
       return res.status(409).json({ error: "Account already exists." });
     }
@@ -304,8 +314,7 @@ app.post("/api/auth/signup", async (req, res) => {
       profile: builtProfile,
       dashboard: defaultDashboard()
     };
-    users.push(newUser);
-    await writeUsers(users);
+    await createUser(newUser);
     const token = createSession(newUser.id);
     setSessionCookie(res, token);
     res.json({
@@ -327,8 +336,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!normalizedEmail || !password) {
       return res.status(400).json({ error: "Email and password required." });
     }
-    const users = await readUsers();
-    const user = users.find((u) => u.email === normalizedEmail);
+    const user = await findUserByEmail(normalizedEmail);
     if (!user || !(await verifyPassword(password, user))) {
       return res.status(401).json({ error: "Invalid credentials." });
     }
@@ -505,6 +513,20 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
-});
+const startServer = async () => {
+  try {
+    const { mongoUri, migratedFrom, migratedCount } = await connectDatabase();
+    if (migratedFrom) {
+      console.log(`Migrated ${migratedCount} user(s) from ${migratedFrom} to MongoDB.`);
+    }
+    console.log(`MongoDB connected: ${mongoUri}`);
+    app.listen(port, () => {
+      console.log(`Server listening on http://localhost:${port}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
+};
+
+startServer();
