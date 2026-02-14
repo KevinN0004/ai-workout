@@ -85,7 +85,7 @@
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
@@ -149,7 +149,7 @@
 
 .plan-card h3 {
   margin-bottom: 8px;
-  font-size: 1.05rem;
+  font-size: 1.25rem;
 }
 
 .plan-card ul {
@@ -159,7 +159,7 @@
   display: grid;
   gap: 8px;
   color: #cfd7ff;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1.4;
 }
 

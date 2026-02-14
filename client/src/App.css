@@ -16,7 +16,7 @@
 }
 
 .plan-modal h3 {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
 }
 
 .plan-modal-content {
@@ -86,7 +86,7 @@
   display: grid;
   gap: 8px;
   color: #cfd7ff;
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
 
@@ -103,7 +103,7 @@
 }
 
 .step-panel h3 {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
 }
 
 .step-top {
@@ -113,7 +113,7 @@
 
 .step-indicator {
   color: #aab3ff;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
 }
 
 .option-grid {
@@ -152,5 +152,5 @@
 
 .equip-label {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }

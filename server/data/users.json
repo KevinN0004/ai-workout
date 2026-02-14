@@ -36,6 +36,19 @@
       },
       "plans": [
         {
+          "id": "2786545d-e4e5-4584-9ffc-ddc602c8bbfc",
+          "createdAt": "2026-02-14T11:43:16.643Z",
+          "goal": "Build lean strength and energy",
+          "equipment": [],
+          "duration": 45,
+          "level": "Intermediate",
+          "injuries": "None",
+          "days": 3,
+          "environment": "Commercial",
+          "focuses": [],
+          "plan": "Monday\nWarmup: 5 mins (Dynamic stretching: leg swings, world’s greatest stretch, bodyweight squats).\nMain lifts: Back Squat (3 x 6-8, rest 2m), Romanian Deadlift (3 x 8-10, rest 90s).\nAccessories: Walking Lunges (3 x 12/leg, rest 60s), Calf Raises (3 x 15, rest 45s).\nFinisher/conditioning: Kettlebell Swings (4 x 20, rest 30s).\n\nTuesday\nWarmup: 5 mins (Arm circles, band pull-aparts, scapular push-ups).\nMain lifts: Barbell Bench Press (3 x 6-8, rest 2m), Overhead Press (3 x 8-10, rest 90s).\nAccessories: Incline DB Press (3 x 10, rest 60s), Lateral Raises (3 x 15, rest 45s).\nFinisher/conditioning: Push-ups (3 x AMRAP, rest 45s).\n\nWednesday\nWarmup: 5 mins (Light walking/mobility flow).\nMain lifts: Active Recovery Day.\nAccessories: 20-30 minute light incline walk or steady-state cycling.\nFinisher/conditioning: 10 mins foam rolling/static stretching.\n\nThursday\nWarmup: 5 mins (Hip circles, glute bridges, bird-dogs).\nMain lifts: Conventional Deadlift (3 x 5, rest 2-3m), Leg Press (3 x 10-12, rest 90s).\nAccessories: Bulgarian Split Squats (3 x 10/leg, rest 60s), Leg Curls (3 x 12, rest 60s).\nFinisher/conditioning: 500m Row sprint x 3 (rest 1m between sprints).\n\nFriday\nWarmup: 5 mins (Cat-cow, shoulder dislocations with PVC/band).\nMain lifts: Pull-ups or Lat Pulldowns (3 x 8-10, rest 90s), Barbell Rows (3 x 8-10, rest 90s).\nAccessories: Face Pulls (3 x 15, rest 45s), DB Bicep Curls (3 x 12, rest 45s).\nFinisher/conditioning: Battle Ropes (5 rounds: 30s on / 30s off).\n\nSaturday\nWarmup: 5 mins (Full body dynamic movement).\nMain lifts: DB Thrusters (4 x 10, rest 60s).\nAccessories: Goblet Squats (3 x 12, rest 60s), Plank (3 x 60s, rest 45s).\nFinisher/conditioning: 15-minute HIIT circuit (30s Mountain Climbers, 30s Burpees, 30s Air Squats, 30s Rest).\n\nSunday\nWarmup: None.\nMain lifts: Full Rest Day.\nAccessories: Optional light walking.\nFinisher/conditioning: None.\n\nCoach Notes:\n- Progressive Overload: To build lean strength, aim to increase the weight or reps slightly every week.\n- Tempo: Control the eccentric (lowering) phase of every lift for 2 seconds to maximize muscle tension.\n- Hydration & Energy: Drink at least 3 liters of water daily. If energy feels low, ensure you are eating enough protein (approx. 1g per lb of body weight).\n- Recovery: Prioritize 7-8 hours of sleep. If you feel overly fatigued, reduce the weight on \"Accessories\" by 10% for one session.\n- Form: Since you are training in a commercial gym, utilize mirrors to check your spine alignment, especially during Deadlifts and Squats."
+        },
+        {
           "id": "3880e8c6-694b-4266-ba91-abc2e47e4dee",
           "createdAt": "2026-02-07T12:03:52.806Z",
           "goal": "Build lean strength and energy",

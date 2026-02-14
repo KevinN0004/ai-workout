@@ -4,6 +4,20 @@
   font-family: "Space Grotesk", system-ui, sans-serif;
   color: #fff;
   background-color: #000;
+  --font-body: 16px;
+  --font-body-large: 18px;
+  --font-small: 14px;
+  --font-caption: 12px;
+  --font-button: 15px;
+  --font-h1-min: 28px;
+  --font-h1-max: 32px;
+  --font-h2-min: 22px;
+  --font-h2-max: 28px;
+  --font-h3-min: 20px;
+  --font-h3-max: 24px;
+  --font-h4: 18px;
+  --font-h5: 16px;
+  --font-h6: 14px;
 }
 
 * {
@@ -16,6 +30,8 @@ body {
   min-height: 100vh;
   background: #000;
   color: #fff;
+  font-size: var(--font-body);
+  line-height: 1.5;
 }
 
 body.no-scroll {
@@ -73,13 +89,45 @@ body.no-scroll {
 
 h1 {
   font-family: "Fraunces", serif;
-  font-size: clamp(2.4rem, 4vw, 3.6rem);
+  font-size: clamp(var(--font-h1-min), 4vw, var(--font-h1-max));
   line-height: 1.05;
   margin-bottom: 12px;
 }
 
 h2 {
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(var(--font-h2-min), 3vw, var(--font-h2-max));
+}
+
+h3 {
+  font-size: clamp(var(--font-h3-min), 2.4vw, var(--font-h3-max));
+}
+
+h4 {
+  font-size: var(--font-h4);
+}
+
+h5 {
+  font-size: var(--font-h5);
+}
+
+h6 {
+  font-size: var(--font-h6);
+}
+
+p,
+li,
+input,
+select,
+textarea {
+  font-size: var(--font-body);
+}
+
+small {
+  font-size: var(--font-caption);
+}
+
+button {
+  font-size: var(--font-button);
 }
 
 .panel {
@@ -115,7 +163,7 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.9rem;
+  font-size: var(--font-small);
   color: #cdd4ff;
 }
 
@@ -183,7 +231,7 @@ select:focus {
 
 .ghost-inline {
   padding: 4px 10px;
-  font-size: 0.8rem;
+  font-size: var(--font-caption);
 }
 
 .cta {
@@ -200,6 +248,7 @@ select:focus {
 .muted {
   color: #aab3ff;
   margin-top: 8px;
+  font-size: var(--font-small);
 }
 
 .error {
@@ -269,6 +318,10 @@ select:focus {
 }
 
 @media (max-width: 720px) {
+  body {
+    font-size: 16px;
+  }
+
   .page {
     padding: 24px 16px 32px;
   }
