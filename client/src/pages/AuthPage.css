@@ -30,6 +30,10 @@
   margin: 0 auto;
 }
 
+.auth-form .full {
+  grid-column: 1 / -1;
+}
+
 .auth-card-top {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -45,6 +49,38 @@
 .auth-close {
   grid-column: 3;
   justify-self: end;
+}
+
+.unit-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px;
+  border-radius: 999px;
+}
+
+.unit-toggle button {
+  border: none;
+  background: transparent;
+  color: #cdd4ff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.unit-toggle button.active {
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffd9a0;
+}
+
+.height-split {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 720px) {

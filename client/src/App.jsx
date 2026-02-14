@@ -98,8 +98,12 @@ const defaultSignupProfileForm = {
   name: "",
   age: "",
   heightCm: "",
+  heightFeet: "",
+  heightInches: "",
+  weight: "",
   weightKg: "",
   sex: "",
+  bodyFat: "",
   activity: "Moderate",
   notes: ""
 };
@@ -129,6 +133,8 @@ export default function App() {
     ...defaultSignupProfileForm
   });
   const [signupStep, setSignupStep] = useState("credentials");
+  const [signupHeightUnit, setSignupHeightUnit] = useState("cm");
+  const [signupWeightUnit, setSignupWeightUnit] = useState("kg");
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
@@ -820,25 +826,45 @@ export default function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
+      if (authMode === "signup" && signupStep === "credentials") {
+        setSignupStep("profile");
+        return;
+      }
+
       if (authMode === "signup" && signupStep === "profile") {
-        const res = await fetch("/api/profile", {
+        const normalizedProfile = {
+          ...signupProfileForm,
+          heightCm:
+            signupHeightUnit === "ft"
+              ? toCmFromFeetInches(
+                  signupProfileForm.heightFeet,
+                  signupProfileForm.heightInches
+                )
+              : signupProfileForm.heightCm,
+          weightKg:
+            signupWeightUnit === "lb"
+              ? toKg(signupProfileForm.weight, "lb")
+              : signupProfileForm.weight || signupProfileForm.weightKg
+        };
+        const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(signupProfileForm)
+          body: JSON.stringify({
+            ...authForm,
+            profile: normalizedProfile
+          })
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
-          throw new Error(payload?.error || "Unable to save profile.");
+          throw new Error(payload?.error || "Unable to create account.");
         }
         const data = await res.json();
-        setUser((prev) =>
-          prev
-            ? { ...prev, profile: data.profile || prev.profile }
-            : prev
-        );
+        setUser(data.user || null);
         setAuthForm({ ...defaultAuthForm });
         setSignupProfileForm({ ...defaultSignupProfileForm });
+        setSignupHeightUnit("cm");
+        setSignupWeightUnit("kg");
         setSignupStep("credentials");
         go("/dashboard");
         return;
@@ -856,21 +882,6 @@ export default function App() {
       }
       const data = await res.json();
       setUser(data.user || null);
-
-      if (authMode === "signup") {
-        const profile = data?.user?.profile || {};
-        setSignupProfileForm({
-          name: profile.name || "",
-          age: profile.age ? String(profile.age) : "",
-          heightCm: profile.heightCm ? String(profile.heightCm) : "",
-          weightKg: profile.weightKg ? String(profile.weightKg) : "",
-          sex: profile.sex || "",
-          activity: profile.activity || "Moderate",
-          notes: profile.notes || ""
-        });
-        setSignupStep("profile");
-        return;
-      }
 
       setAuthForm({ ...defaultAuthForm });
       go("/dashboard");
@@ -976,6 +987,14 @@ export default function App() {
         onAuthChange={onAuthChange}
         signupProfileForm={signupProfileForm}
         onSignupProfileChange={onSignupProfileChange}
+        signupHeightUnit={signupHeightUnit}
+        setSignupHeightUnit={setSignupHeightUnit}
+        signupWeightUnit={signupWeightUnit}
+        setSignupWeightUnit={setSignupWeightUnit}
+        toCmFromFeetInches={toCmFromFeetInches}
+        toFeetInchesFromCm={toFeetInchesFromCm}
+        toKg={toKg}
+        toLb={toLb}
         showPassword={showPassword}
         setShowPassword={setShowPassword}
         authLoading={authLoading}

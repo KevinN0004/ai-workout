@@ -99,6 +99,16 @@ const buildProfile = (input = {}) => {
   };
 };
 
+const isCompleteSignupProfile = (profile) =>
+  Boolean(
+    cleanText(profile?.name, 80) &&
+      profile?.age !== null &&
+      profile?.heightCm !== null &&
+      profile?.weightKg !== null &&
+      cleanText(profile?.sex, 40) &&
+      profile?.bodyFat !== null
+  );
+
 let usersCache = null;
 let usersCacheMtimeMs = 0;
 
@@ -278,6 +288,12 @@ app.post("/api/auth/signup", async (req, res) => {
     if (exists) {
       return res.status(409).json({ error: "Account already exists." });
     }
+    const builtProfile = buildProfile(profile);
+    if (!isCompleteSignupProfile(builtProfile)) {
+      return res.status(400).json({
+        error: "Complete profile details are required to create an account."
+      });
+    }
     const { salt, hash } = await hashPassword(password);
     const newUser = {
       id: crypto.randomUUID(),
@@ -285,7 +301,7 @@ app.post("/api/auth/signup", async (req, res) => {
       salt,
       hash,
       createdAt: new Date().toISOString(),
-      profile: buildProfile(profile),
+      profile: builtProfile,
       dashboard: defaultDashboard()
     };
     users.push(newUser);
