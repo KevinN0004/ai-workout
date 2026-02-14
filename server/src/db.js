@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import mongoose from "mongoose";
 import User from "./models/User.js";
 
-const defaultMongoUri = "mongodb://127.0.0.1:27017/ai_workout";
+const defaultMongoUri = "mongodb://127.0.0.1:27017/ai_workout_backend";
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 const parseUsers = (raw) => {

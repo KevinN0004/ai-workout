@@ -82,6 +82,12 @@ const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
     .filter(Boolean)
     .slice(0, maxItems);
 
+const openMeteoBaseUrl = cleanText(
+  process.env.OPEN_METEO_BASE_URL || "https://api.open-meteo.com/v1/forecast",
+  240
+);
+const openMeteoTimeoutMs = 10000;
+
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
   return {
@@ -107,6 +113,110 @@ const isCompleteSignupProfile = (profile) =>
       cleanText(profile?.sex, 40) &&
       profile?.bodyFat !== null
   );
+
+const toFiniteNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const weatherCodeToText = (code) => {
+  const value = Number(code);
+  if (value === 0) return "Clear sky";
+  if ([1, 2, 3].includes(value)) return "Partly cloudy";
+  if ([45, 48].includes(value)) return "Fog";
+  if ([51, 53, 55, 56, 57].includes(value)) return "Drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "Rain";
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return "Snow";
+  if ([95, 96, 99].includes(value)) return "Thunderstorm";
+  return "Unknown";
+};
+
+const isSevereWeatherCode = (code) => [95, 96, 99].includes(Number(code));
+
+const isOutdoorFriendlyNow = (current = {}) => {
+  const temperature = toFiniteNumber(current.temperature_2m);
+  const wind = toFiniteNumber(current.wind_speed_10m);
+  const precipitation = toFiniteNumber(current.precipitation);
+  const weatherCode = toFiniteNumber(current.weather_code);
+
+  if (weatherCode !== null && isSevereWeatherCode(weatherCode)) return false;
+  if (temperature !== null && (temperature < 3 || temperature > 34)) return false;
+  if (wind !== null && wind > 32) return false;
+  if (precipitation !== null && precipitation >= 1.0) return false;
+  return true;
+};
+
+const buildWorkoutRecommendation = (current = {}) => {
+  const reasons = [];
+  const weatherCode = toFiniteNumber(current.weather_code);
+  const weatherText = weatherCode === null ? "Unknown" : weatherCodeToText(weatherCode);
+  const temperature = toFiniteNumber(current.temperature_2m);
+  const wind = toFiniteNumber(current.wind_speed_10m);
+  const precipitation = toFiniteNumber(current.precipitation);
+  const outdoorFriendly = isOutdoorFriendlyNow(current);
+
+  if (temperature !== null && (temperature < 8 || temperature > 30)) {
+    reasons.push("Temperature is outside a comfortable outdoor training range.");
+  }
+  if (wind !== null && wind > 25) {
+    reasons.push("Wind is high, which can make runs and cycling harder.");
+  }
+  if (precipitation !== null && precipitation >= 0.5) {
+    reasons.push("Precipitation is present.");
+  }
+  if (weatherCode !== null && isSevereWeatherCode(weatherCode)) {
+    reasons.push("Storm conditions detected.");
+  }
+  if (!reasons.length) {
+    reasons.push("Weather looks suitable for outdoor training.");
+  }
+
+  return {
+    workoutType: outdoorFriendly ? "outdoor" : "indoor",
+    summary: outdoorFriendly
+      ? "Outdoor session is recommended today."
+      : "Indoor session is recommended today.",
+    reasons,
+    weatherText
+  };
+};
+
+const fetchOpenMeteo = async (query) => {
+  if (typeof fetch !== "function") {
+    const err = new Error("This Node runtime does not support fetch.");
+    err.status = 500;
+    throw err;
+  }
+
+  const url = new URL(openMeteoBaseUrl);
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null || value === "") continue;
+    url.searchParams.set(key, String(value));
+  }
+  url.searchParams.set("timezone", "auto");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
+      err.status = response.status >= 500 ? 502 : response.status;
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      const timeoutErr = new Error("Open-Meteo request timed out.");
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const mapMongoDocToUser = (doc) => {
   if (!doc) return null;
@@ -249,6 +359,103 @@ const updateUser = async (userId, updater) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/weather/current", async (req, res) => {
+  try {
+    const latitude = toNullableNumber(req.query.latitude, -90, 90);
+    const longitude = toNullableNumber(req.query.longitude, -180, 180);
+    if (latitude === null || longitude === null) {
+      return res.status(400).json({ error: "Valid latitude and longitude are required." });
+    }
+
+    const data = await fetchOpenMeteo({
+      latitude,
+      longitude,
+      current:
+        "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day"
+    });
+
+    const current = data?.current || {};
+    res.json({
+      location: {
+        latitude: toFiniteNumber(data?.latitude),
+        longitude: toFiniteNumber(data?.longitude),
+        timezone: cleanText(data?.timezone, 80)
+      },
+      current: {
+        time: cleanText(current.time, 40),
+        temperatureC: toFiniteNumber(current.temperature_2m),
+        apparentTemperatureC: toFiniteNumber(current.apparent_temperature),
+        precipitationMm: toFiniteNumber(current.precipitation),
+        windSpeedKmh: toFiniteNumber(current.wind_speed_10m),
+        humidityPct: toFiniteNumber(current.relative_humidity_2m),
+        isDay: Number(current.is_day) === 1,
+        weatherCode: toFiniteNumber(current.weather_code),
+        weatherText: weatherCodeToText(current.weather_code)
+      }
+    });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/weather/recommendation", async (req, res) => {
+  try {
+    const latitude = toNullableNumber(req.query.latitude, -90, 90);
+    const longitude = toNullableNumber(req.query.longitude, -180, 180);
+    if (latitude === null || longitude === null) {
+      return res.status(400).json({ error: "Valid latitude and longitude are required." });
+    }
+
+    const data = await fetchOpenMeteo({
+      latitude,
+      longitude,
+      current:
+        "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum"
+    });
+
+    const current = data?.current || {};
+    const recommendation = buildWorkoutRecommendation(current);
+    const days = Array.isArray(data?.daily?.time) ? data.daily.time.length : 0;
+    const daily = [];
+    for (let i = 0; i < days; i += 1) {
+      daily.push({
+        date: cleanText(data.daily.time[i], 20),
+        weatherCode: toFiniteNumber(data.daily.weather_code?.[i]),
+        weatherText: weatherCodeToText(data.daily.weather_code?.[i]),
+        tempMaxC: toFiniteNumber(data.daily.temperature_2m_max?.[i]),
+        tempMinC: toFiniteNumber(data.daily.temperature_2m_min?.[i]),
+        precipitationMm: toFiniteNumber(data.daily.precipitation_sum?.[i])
+      });
+    }
+
+    res.json({
+      location: {
+        latitude: toFiniteNumber(data?.latitude),
+        longitude: toFiniteNumber(data?.longitude),
+        timezone: cleanText(data?.timezone, 80)
+      },
+      current: {
+        time: cleanText(current.time, 40),
+        temperatureC: toFiniteNumber(current.temperature_2m),
+        apparentTemperatureC: toFiniteNumber(current.apparent_temperature),
+        precipitationMm: toFiniteNumber(current.precipitation),
+        windSpeedKmh: toFiniteNumber(current.wind_speed_10m),
+        humidityPct: toFiniteNumber(current.relative_humidity_2m),
+        isDay: Number(current.is_day) === 1,
+        weatherCode: toFiniteNumber(current.weather_code),
+        weatherText: weatherCodeToText(current.weather_code)
+      },
+      recommendation,
+      daily
+    });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.get("/api/auth/me", async (req, res) => {
