@@ -1037,6 +1037,50 @@ export default function App() {
     }
   };
 
+  const saveExerciseToPlan = async (exercisePayload) => {
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/saved-exercises", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(exercisePayload || {})
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save exercise.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      return { ok: true, data };
+    } catch (err) {
+      const message = err.message || "Unable to save exercise.";
+      setDashError(message);
+      return { ok: false, error: message };
+    }
+  };
+
+  const removeSavedExercise = async (entryId) => {
+    setDashError("");
+    try {
+      const res = await fetch(`/api/dashboard/saved-exercises/${entryId}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to remove saved exercise.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      return { ok: true, data };
+    } catch (err) {
+      const message = err.message || "Unable to remove saved exercise.";
+      setDashError(message);
+      return { ok: false, error: message };
+    }
+  };
+
   if (route === "/auth") {
     return (
       <AuthPage
@@ -1101,6 +1145,8 @@ export default function App() {
         weatherLoading={weatherLoading}
         weatherError={weatherError}
         refreshWeatherRecommendation={loadWeatherRecommendation}
+        onSaveExerciseToPlan={saveExerciseToPlan}
+        onRemoveSavedExercise={removeSavedExercise}
         plannerModal={plannerModal}
         generatedPlanModal={generatedPlanModal}
       />

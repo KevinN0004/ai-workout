@@ -279,7 +279,8 @@ export default function TipsView({
   form,
   dashboard,
   latestPlanByWeekday,
-  weatherData
+  weatherData,
+  onSaveExerciseToPlan
 }) {
   const [meta, setMeta] = useState({ categories: [], muscles: [], equipment: [] });
   const [query, setQuery] = useState("");
@@ -293,6 +294,9 @@ export default function TipsView({
   const [exercises, setExercises] = useState([]);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [saveFeedback, setSaveFeedback] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [savingIds, setSavingIds] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -419,6 +423,65 @@ export default function TipsView({
     [track, weeklyWorkouts, duration, activity, weatherMode, injuryText]
   );
 
+  const savedExercises = Array.isArray(dashboard?.savedExercises)
+    ? dashboard.savedExercises
+    : [];
+  const savedKeys = useMemo(() => {
+    return new Set(
+      savedExercises.map((item) => {
+        const idPart =
+          item?.exerciseId !== null && item?.exerciseId !== undefined
+            ? `id:${item.exerciseId}`
+            : "";
+        const namePart = normalizeText(item?.name);
+        return `${idPart}|${namePart}`;
+      })
+    );
+  }, [savedExercises]);
+
+  const toExerciseKey = (exercise) =>
+    `${exercise?.id !== null && exercise?.id !== undefined ? `id:${exercise.id}` : ""}|${normalizeText(exercise?.name)}`;
+
+  const isSaved = (exercise) => savedKeys.has(toExerciseKey(exercise));
+
+  const buildSavePayload = (exercise, recommendation) => ({
+    exerciseId: exercise?.id ?? null,
+    name: exercise?.name || "",
+    category: exercise?.category?.name || "",
+    muscles: Array.isArray(exercise?.muscles) ? exercise.muscles.map((item) => item?.name) : [],
+    equipment: Array.isArray(exercise?.equipment)
+      ? exercise.equipment.map((item) => item?.name)
+      : [],
+    imageUrl: getExerciseImage(exercise),
+    videoUrl: resolveMediaUrl(exercise?.videos?.[0]?.url || ""),
+    reason: recommendation?.reasons?.[0] || ""
+  });
+
+  const saveExercise = async (exercise, recommendation) => {
+    if (!onSaveExerciseToPlan) return;
+    const key = toExerciseKey(exercise);
+    if (isSaved(exercise)) {
+      setSaveFeedback(`"${exercise?.name}" is already saved.`);
+      setSaveError("");
+      return;
+    }
+
+    setSaveFeedback("");
+    setSaveError("");
+    setSavingIds((prev) => ({ ...prev, [key]: true }));
+    try {
+      const result = await onSaveExerciseToPlan(buildSavePayload(exercise, recommendation));
+      if (!result?.ok) {
+        throw new Error(result?.error || "Unable to save exercise.");
+      }
+      setSaveFeedback(`Saved "${exercise?.name}" to your plan.`);
+    } catch (err) {
+      setSaveError(err?.message || "Unable to save exercise.");
+    } finally {
+      setSavingIds((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const openExerciseModal = (payload) => {
     setSelectedExercise(payload);
   };
@@ -492,6 +555,8 @@ export default function TipsView({
       )}
       {metaError && <p className="error">{metaError}</p>}
       {libraryError && <p className="error">{libraryError}</p>}
+      {saveError && <p className="error">{saveError}</p>}
+      {saveFeedback && <p className="muted save-feedback">{saveFeedback}</p>}
 
       <section className="tips-block">
         <div className="tips-block-header">
@@ -510,24 +575,38 @@ export default function TipsView({
               .filter(Boolean)
               .slice(0, 2)
               .join(", ");
+            const key = toExerciseKey(exercise);
+            const saved = isSaved(exercise);
+            const isSaving = Boolean(savingIds[key]);
             return (
-              <button
-                key={`smart-${exercise.id}`}
-                type="button"
-                className="exercise-tile"
-                onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
-              >
-                <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                <div className="exercise-tile-meta">
-                  <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                  <h3>{exercise.name}</h3>
-                  <p className="muted">{equipmentText || "No equipment metadata"}</p>
-                  <div className="recommendation-row">
-                    <span className="score-chip">{entry.score} pts</span>
-                    <span className="muted">{entry.reasons[0]}</span>
+              <article key={`smart-${exercise.id}`} className="exercise-tile">
+                <button
+                  type="button"
+                  className="exercise-tile-open"
+                  onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
+                >
+                  <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                  <div className="exercise-tile-meta">
+                    <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                    <h3>{exercise.name}</h3>
+                    <p className="muted">{equipmentText || "No equipment metadata"}</p>
+                    <div className="recommendation-row">
+                      <span className="score-chip">{entry.score} pts</span>
+                      <span className="muted">{entry.reasons[0]}</span>
+                    </div>
                   </div>
+                </button>
+                <div className="exercise-tile-actions">
+                  <button
+                    type="button"
+                    className="ghost save-chip"
+                    disabled={saved || isSaving}
+                    onClick={() => saveExercise(exercise, entry)}
+                  >
+                    {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                  </button>
                 </div>
-              </button>
+              </article>
             );
           })}
           {!recommendations.length && (
@@ -566,20 +645,34 @@ export default function TipsView({
               .filter(Boolean)
               .slice(0, 2)
               .join(", ");
+            const key = toExerciseKey(exercise);
+            const saved = isSaved(exercise);
+            const isSaving = Boolean(savingIds[key]);
             return (
-              <button
-                key={`library-${exercise.id}`}
-                type="button"
-                className="exercise-tile"
-                onClick={() => openExerciseModal(exercise)}
-              >
-                <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                <div className="exercise-tile-meta">
-                  <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                  <h3>{exercise.name}</h3>
-                  <p className="muted">{equipmentText || "No equipment metadata"}</p>
+              <article key={`library-${exercise.id}`} className="exercise-tile">
+                <button
+                  type="button"
+                  className="exercise-tile-open"
+                  onClick={() => openExerciseModal(exercise)}
+                >
+                  <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                  <div className="exercise-tile-meta">
+                    <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                    <h3>{exercise.name}</h3>
+                    <p className="muted">{equipmentText || "No equipment metadata"}</p>
+                  </div>
+                </button>
+                <div className="exercise-tile-actions">
+                  <button
+                    type="button"
+                    className="ghost save-chip"
+                    disabled={saved || isSaving}
+                    onClick={() => saveExercise(exercise)}
+                  >
+                    {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                  </button>
                 </div>
-              </button>
+              </article>
             );
           })}
           {!exercises.length && !libraryLoading && (
@@ -626,6 +719,25 @@ export default function TipsView({
                   .filter(Boolean)
                   .join(", ") || "Not specified"}
               </p>
+              <div className="tips-save-actions">
+                <button
+                  type="button"
+                  className="cta save-modal-button"
+                  disabled={
+                    isSaved(selectedExercise) ||
+                    Boolean(savingIds[toExerciseKey(selectedExercise)])
+                  }
+                  onClick={() =>
+                    saveExercise(selectedExercise, selectedExercise?.recommendation)
+                  }
+                >
+                  {isSaved(selectedExercise)
+                    ? "Saved to plan"
+                    : savingIds[toExerciseKey(selectedExercise)]
+                    ? "Saving..."
+                    : "Save to my plan"}
+                </button>
+              </div>
               {selectedExercise.description ? (
                 <p className="exercise-what">{selectedExercise.description}</p>
               ) : (

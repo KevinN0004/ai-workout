@@ -60,6 +60,8 @@ export default function DashboardPage({
   weatherLoading,
   weatherError,
   refreshWeatherRecommendation,
+  onSaveExerciseToPlan,
+  onRemoveSavedExercise,
   plannerModal,
   generatedPlanModal
 }) {
@@ -367,6 +369,7 @@ export default function DashboardPage({
         openPlannerFromProfile={openPlannerFromProfile}
         dashboard={dashboard}
         fallbackPlan={form}
+        onRemoveSavedExercise={onRemoveSavedExercise}
       />
     );
   } else if (dashView === "meal") {
@@ -379,6 +382,7 @@ export default function DashboardPage({
         dashboard={dashboard}
         latestPlanByWeekday={latestPlanByWeekday}
         weatherData={weatherData}
+        onSaveExerciseToPlan={onSaveExerciseToPlan}
       />
     );
   } else if (dashView === "settings") {

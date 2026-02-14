@@ -7,7 +7,8 @@ export default function PlansView({
   latestPlanByWeekday,
   openPlannerFromProfile,
   dashboard,
-  fallbackPlan
+  fallbackPlan,
+  onRemoveSavedExercise
 }) {
   const [selectedDetail, setSelectedDetail] = useState(null);
 
@@ -133,6 +134,10 @@ export default function PlansView({
     return { trainingDays, recoveryDays, dailyTips, weeklyTips };
   }, [weekDays, latestPlanByWeekday]);
 
+  const savedExercises = Array.isArray(dashboard?.savedExercises)
+    ? dashboard.savedExercises
+    : [];
+
   return (
     <section className="panel dashboard-card span-2">
       <h2>Plan hub</h2>
@@ -168,6 +173,65 @@ export default function PlansView({
                 <p className="hub-card-hint">View day details</p>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="plan-row">
+          <div className="plan-row-header">
+            <div>
+              <h3>Saved exercise bank</h3>
+              <p className="muted">
+                Movements saved from the guides library for quick reference in your weekly plans.
+              </p>
+            </div>
+            <div className="tips-status-pill">
+              {savedExercises.length} saved exercise{savedExercises.length === 1 ? "" : "s"}
+            </div>
+          </div>
+          <div className="plan-row-grid">
+            {savedExercises.map((item) => (
+              <article key={item.id} className="hub-card saved-exercise-card">
+                <h4>{item.name || "Exercise"}</h4>
+                <p className="muted">
+                  {item.category || "General"}{" "}
+                  {item.source ? `| ${String(item.source).toUpperCase()}` : ""}
+                </p>
+                {Array.isArray(item.muscles) && item.muscles.length ? (
+                  <p className="muted">Muscles: {item.muscles.slice(0, 4).join(", ")}</p>
+                ) : null}
+                {Array.isArray(item.equipment) && item.equipment.length ? (
+                  <p className="muted">Equipment: {item.equipment.slice(0, 3).join(", ")}</p>
+                ) : null}
+                {item.reason ? <p className="muted">Why saved: {item.reason}</p> : null}
+                <div className="saved-exercise-actions">
+                  {item.videoUrl ? (
+                    <a
+                      href={item.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ghost"
+                    >
+                      Video
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => onRemoveSavedExercise?.(item.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+            {!savedExercises.length ? (
+              <article className="hub-card">
+                <h4>No saved exercises yet</h4>
+                <p className="muted">
+                  Open Guides, browse Wger exercises, and tap Save to add your favorites here.
+                </p>
+              </article>
+            ) : null}
           </div>
         </section>
 

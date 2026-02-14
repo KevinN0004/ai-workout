@@ -42,6 +42,7 @@ const defaultDashboard = () => ({
   workouts: [],
   calories: [],
   plans: [],
+  savedExercises: [],
   goals: defaultGoals()
 });
 const buildDashboard = (input = {}) => {
@@ -52,6 +53,9 @@ const buildDashboard = (input = {}) => {
     workouts: Array.isArray(input.workouts) ? input.workouts : [],
     calories: Array.isArray(input.calories) ? input.calories : [],
     plans: Array.isArray(input.plans) ? input.plans : [],
+    savedExercises: Array.isArray(input.savedExercises)
+      ? input.savedExercises.slice(0, 200)
+      : [],
     goals: {
       ...base.goals,
       targetWeight:
@@ -81,6 +85,28 @@ const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
     .map((item) => cleanText(item, maxLen))
     .filter(Boolean)
     .slice(0, maxItems);
+
+const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
+  (Array.isArray(value) ? value : [])
+    .map((item) =>
+      cleanText(typeof item === "string" ? item : item?.name, maxLen)
+    )
+    .filter(Boolean)
+    .slice(0, maxItems);
+
+const buildSavedExerciseEntry = (input = {}) => ({
+  id: cleanText(input.id, 64) || crypto.randomUUID(),
+  exerciseId: toNullableNumber(input.exerciseId, 1, 10000000),
+  name: cleanText(input.name, 180),
+  category: cleanText(input.category, 120),
+  muscles: toCleanNameArray(input.muscles, 10, 120),
+  equipment: toCleanNameArray(input.equipment, 10, 120),
+  imageUrl: cleanText(input.imageUrl, 320),
+  videoUrl: cleanText(input.videoUrl, 320),
+  reason: cleanText(input.reason, 260),
+  source: "wger",
+  savedAt: new Date().toISOString()
+});
 
 const openMeteoBaseUrl = cleanText(
   process.env.OPEN_METEO_BASE_URL || "https://api.open-meteo.com/v1/forecast",
@@ -906,6 +932,64 @@ app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
   });
   if (!updated) return res.status(404).json({ error: "User not found." });
   res.json({ dashboard: updated.dashboard });
+});
+
+app.post("/api/dashboard/saved-exercises", requireAuth, async (req, res) => {
+  const payload = req.body || {};
+  const entry = buildSavedExerciseEntry(payload);
+  if (!entry.name) {
+    return res.status(400).json({ error: "Exercise name is required." });
+  }
+
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = buildDashboard(user.dashboard);
+    const existing = Array.isArray(dashboard.savedExercises)
+      ? dashboard.savedExercises
+      : [];
+    const next = existing.filter((item) => {
+      if (entry.exerciseId !== null && item?.exerciseId === entry.exerciseId) return false;
+      if (
+        cleanText(item?.name, 180).toLowerCase() ===
+        entry.name.toLowerCase()
+      ) {
+        return false;
+      }
+      return true;
+    });
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        savedExercises: [entry, ...next].slice(0, 200)
+      }
+    };
+  });
+  if (!updated) return res.status(404).json({ error: "User not found." });
+  res.json({
+    dashboard: updated.dashboard,
+    savedExercise: updated.dashboard?.savedExercises?.[0] || entry
+  });
+});
+
+app.delete("/api/dashboard/saved-exercises/:id", requireAuth, async (req, res) => {
+  const entryId = cleanText(req.params.id, 64);
+  if (!entryId) return res.status(400).json({ error: "Exercise id is required." });
+
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = buildDashboard(user.dashboard);
+    const next = (Array.isArray(dashboard.savedExercises) ? dashboard.savedExercises : []).filter(
+      (item) => cleanText(item?.id, 64) !== entryId
+    );
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        savedExercises: next
+      }
+    };
+  });
+  if (!updated) return res.status(404).json({ error: "User not found." });
+  res.json({ dashboard: updated.dashboard, ok: true });
 });
 
 app.post("/api/generate", async (req, res) => {

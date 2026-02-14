@@ -147,6 +147,23 @@
   margin-top: 0;
 }
 
+.saved-exercise-card {
+  gap: 8px;
+}
+
+.saved-exercise-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.saved-exercise-actions .ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 @media (max-width: 720px) {
   .plan-row-header {
     flex-direction: column;

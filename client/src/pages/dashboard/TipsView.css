@@ -31,6 +31,10 @@
   gap: 12px;
 }
 
+.save-feedback {
+  color: #d8d8d8;
+}
+
 .tips-block-header {
   display: grid;
   gap: 4px;
@@ -48,11 +52,20 @@
   background: rgba(0, 0, 0, 0.55);
   overflow: hidden;
   display: grid;
-  gap: 0;
+  gap: 8px;
   text-align: left;
   color: inherit;
-  cursor: pointer;
   padding: 0;
+}
+
+.exercise-tile-open {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .exercise-tile img {
@@ -84,6 +97,16 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.exercise-tile-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 12px;
+}
+
+.save-chip {
+  min-height: 34px;
 }
 
 .score-chip {
@@ -139,6 +162,15 @@
 .exercise-modal-body {
   display: grid;
   gap: 10px;
+}
+
+.tips-save-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.save-modal-button {
+  min-height: 36px;
 }
 
 .exercise-modal-body p {
