@@ -56,6 +56,10 @@ export default function DashboardPage({
   submitGoals,
   weekDays,
   latestPlanByWeekday,
+  weatherData,
+  weatherLoading,
+  weatherError,
+  refreshWeatherRecommendation,
   plannerModal,
   generatedPlanModal
 }) {
@@ -319,6 +323,10 @@ export default function DashboardPage({
         buildLinePath={buildLinePath}
         trendRanges={trendRanges}
         todayRecommendation={todayRecommendation}
+        weatherData={weatherData}
+        weatherLoading={weatherLoading}
+        weatherError={weatherError}
+        refreshWeatherRecommendation={refreshWeatherRecommendation}
         onOpenPlans={() => setDashView("plans")}
         onOpenMeal={() => setDashView("meal")}
       />

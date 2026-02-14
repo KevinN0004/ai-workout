@@ -42,6 +42,10 @@ export default function SummaryView({
   buildLinePath,
   trendRanges,
   todayRecommendation,
+  weatherData,
+  weatherLoading,
+  weatherError,
+  refreshWeatherRecommendation,
   onOpenPlans,
   onOpenMeal
 }) {
@@ -49,6 +53,14 @@ export default function SummaryView({
   const activeTrend = trendRanges?.[trendRange] || trendRanges?.week || null;
   const selectedMeal = todayRecommendation?.mealPlan || null;
   const workoutLines = todayRecommendation?.workoutLines || [];
+  const weatherCurrent = weatherData?.current || null;
+  const weatherRecommendation = weatherData?.recommendation || null;
+  const weatherReasons = Array.isArray(weatherRecommendation?.reasons)
+    ? weatherRecommendation.reasons
+    : [];
+  const nextForecast = Array.isArray(weatherData?.daily)
+    ? weatherData.daily.slice(0, 3)
+    : [];
 
   return (
     <div className="dashboard-split span-2">
@@ -155,6 +167,53 @@ export default function SummaryView({
               <button type="button" className="ghost" onClick={onOpenMeal}>
                 Open meal prep
               </button>
+            </article>
+            <article className="hub-card">
+              <div className="weather-card-header">
+                <h3>Weather mode</h3>
+                <button type="button" className="ghost" onClick={refreshWeatherRecommendation}>
+                  Refresh
+                </button>
+              </div>
+              {weatherLoading ? (
+                <p className="muted">Checking local conditions...</p>
+              ) : weatherError ? (
+                <p className="muted">{weatherError}</p>
+              ) : weatherRecommendation ? (
+                <>
+                  <p className="weather-badge">
+                    {weatherRecommendation.workoutType === "outdoor"
+                      ? "Outdoor day"
+                      : "Indoor day"}
+                  </p>
+                  <p>{weatherRecommendation.summary}</p>
+                  <p className="muted">
+                    {weatherCurrent?.temperatureC ?? "--"} C,{" "}
+                    {weatherCurrent?.weatherText || weatherRecommendation.weatherText}
+                  </p>
+                  {weatherReasons.length ? (
+                    <ul className="hub-list weather-reasons">
+                      {weatherReasons.slice(0, 3).map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {nextForecast.length ? (
+                    <div className="weather-forecast">
+                      {nextForecast.map((day) => (
+                        <div key={day.date} className="weather-forecast-row">
+                          <span>{day.date}</span>
+                          <span>
+                            {day.tempMinC ?? "--"}-{day.tempMaxC ?? "--"} C
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p className="muted">No weather recommendation loaded yet.</p>
+              )}
             </article>
           </div>
         </section>

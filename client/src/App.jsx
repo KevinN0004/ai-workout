@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -138,6 +138,9 @@ export default function App() {
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState("");
   const [workoutForm, setWorkoutForm] = useState({
     date: getLocalDateKey(),
     focus: "",
@@ -732,6 +735,61 @@ export default function App() {
     return week;
   }, [dashboard]);
 
+  const loadWeatherRecommendation = useCallback(async () => {
+    if (!navigator?.geolocation) {
+      setWeatherError("Location is not available in this browser.");
+      return;
+    }
+
+    setWeatherLoading(true);
+    setWeatherError("");
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 1000 * 60 * 10
+        });
+      });
+      const latitude = Number(position?.coords?.latitude);
+      const longitude = Number(position?.coords?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new Error("Unable to determine location coordinates.");
+      }
+
+      const query = new URLSearchParams({
+        latitude: String(latitude),
+        longitude: String(longitude)
+      });
+      const res = await fetch(`/api/weather/recommendation?${query.toString()}`, {
+        credentials: "include"
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to load weather recommendation.");
+      }
+      const data = await res.json();
+      setWeatherData(data || null);
+    } catch (err) {
+      if (typeof err?.code === "number") {
+        if (err.code === 1) {
+          setWeatherError("Location permission was denied.");
+        } else if (err.code === 2) {
+          setWeatherError("Location information is unavailable.");
+        } else if (err.code === 3) {
+          setWeatherError("Location request timed out.");
+        } else {
+          setWeatherError("Unable to access location.");
+        }
+      } else {
+        setWeatherError(err?.message || "Unable to load weather recommendation.");
+      }
+      setWeatherData(null);
+    } finally {
+      setWeatherLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
     window.addEventListener("popstate", onPop);
@@ -800,6 +858,11 @@ export default function App() {
     };
     loadDashboard();
   }, [isDashboardRoute, user]);
+
+  useEffect(() => {
+    if (!isDashboardRoute || !user) return;
+    loadWeatherRecommendation();
+  }, [isDashboardRoute, user, loadWeatherRecommendation]);
 
   const go = (path) => {
     const normalizedPath =
@@ -895,6 +958,8 @@ export default function App() {
   const onLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
+    setWeatherData(null);
+    setWeatherError("");
     go("/");
   };
 
@@ -1032,6 +1097,10 @@ export default function App() {
         submitGoals={submitGoals}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
+        weatherData={weatherData}
+        weatherLoading={weatherLoading}
+        weatherError={weatherError}
+        refreshWeatherRecommendation={loadWeatherRecommendation}
         plannerModal={plannerModal}
         generatedPlanModal={generatedPlanModal}
       />
