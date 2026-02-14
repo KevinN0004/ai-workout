@@ -87,6 +87,10 @@ const openMeteoBaseUrl = cleanText(
   240
 );
 const openMeteoTimeoutMs = 10000;
+const wgerBaseUrl = cleanText(process.env.WGER_BASE_URL || "https://wger.de/api/v2", 240);
+const wgerApiToken = cleanText(process.env.WGER_API_TOKEN || "", 240);
+const wgerDefaultLanguage = toNullableNumber(process.env.WGER_DEFAULT_LANGUAGE, 1, 100) ?? 2;
+const wgerTimeoutMs = 12000;
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -216,6 +220,142 @@ const fetchOpenMeteo = async (query) => {
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const normalizePlainText = (value, maxLen = 500) => {
+  if (typeof value !== "string") return "";
+  const stripped = value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return stripped.slice(0, maxLen);
+};
+
+const parseMultiNumberQuery = (input, min, max, maxItems = 8) => {
+  if (input === undefined || input === null || input === "") return [];
+  const list = Array.isArray(input) ? input : String(input).split(",");
+  const values = [];
+  for (const raw of list) {
+    const num = toNullableNumber(String(raw).trim(), min, max);
+    if (num === null) continue;
+    values.push(Math.trunc(num));
+    if (values.length >= maxItems) break;
+  }
+  return values;
+};
+
+const wgerRequest = async (endpoint, options = {}) => {
+  if (typeof fetch !== "function") {
+    const err = new Error("This Node runtime does not support fetch.");
+    err.status = 500;
+    throw err;
+  }
+
+  const { query = {} } = options;
+  const base = wgerBaseUrl.replace(/\/+$/, "");
+  const path = String(endpoint || "").replace(/^\/+/, "");
+  const url = new URL(`${base}/${path}`);
+
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item === undefined || item === null || item === "") continue;
+        url.searchParams.append(key, String(item));
+      }
+      continue;
+    }
+    url.searchParams.set(key, String(value));
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
+      signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = cleanText(
+        data?.detail || data?.reason || data?.message || "Wger request failed.",
+        220
+      );
+      const err = new Error(message);
+      err.status = response.status >= 500 ? 502 : response.status;
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      const timeoutErr = new Error("Wger request timed out.");
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const pickWgerTranslation = (translations, preferredLanguage) => {
+  const list = Array.isArray(translations) ? translations : [];
+  if (!list.length) return null;
+
+  const exact = list.find(
+    (item) => Number(item?.language) === Number(preferredLanguage) && cleanText(item?.name, 200)
+  );
+  if (exact) return exact;
+
+  const english = list.find(
+    (item) => Number(item?.language) === 2 && cleanText(item?.name, 200)
+  );
+  if (english) return english;
+
+  return list.find((item) => cleanText(item?.name, 200)) || list[0] || null;
+};
+
+const mapWgerExercise = (exercise, preferredLanguage = wgerDefaultLanguage) => {
+  const translation = pickWgerTranslation(exercise?.translations, preferredLanguage);
+  const images = (Array.isArray(exercise?.images) ? exercise.images : [])
+    .map((item) => ({
+      id: item?.id ?? null,
+      url: cleanText(item?.image || item?.url, 240),
+      isMain: Boolean(item?.is_main || item?.isMain)
+    }))
+    .filter((item) => item.url);
+  const videos = (Array.isArray(exercise?.videos) ? exercise.videos : [])
+    .map((item) => ({
+      id: item?.id ?? null,
+      url: cleanText(item?.video || item?.url, 240)
+    }))
+    .filter((item) => item.url);
+
+  return {
+    id: exercise?.id ?? null,
+    uuid: cleanText(exercise?.uuid, 80),
+    name: cleanText(translation?.name, 180),
+    description: normalizePlainText(translation?.description || "", 2200),
+    language: toFiniteNumber(translation?.language),
+    category: {
+      id: exercise?.category?.id ?? toFiniteNumber(exercise?.category),
+      name: cleanText(exercise?.category?.name, 120)
+    },
+    muscles: (Array.isArray(exercise?.muscles) ? exercise.muscles : []).map((item) => ({
+      id: item?.id ?? toFiniteNumber(item),
+      name: cleanText(item?.name_en || item?.name, 120)
+    })),
+    secondaryMuscles: (Array.isArray(exercise?.muscles_secondary)
+      ? exercise.muscles_secondary
+      : []
+    ).map((item) => ({
+      id: item?.id ?? toFiniteNumber(item),
+      name: cleanText(item?.name_en || item?.name, 120)
+    })),
+    equipment: (Array.isArray(exercise?.equipment) ? exercise.equipment : []).map((item) => ({
+      id: item?.id ?? toFiniteNumber(item),
+      name: cleanText(item?.name, 120)
+    })),
+    images,
+    videos
+  };
 };
 
 const mapMongoDocToUser = (doc) => {
@@ -452,6 +592,122 @@ app.get("/api/weather/recommendation", async (req, res) => {
       recommendation,
       daily
     });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/wger/meta", async (req, res) => {
+  try {
+    const [categoriesData, musclesData, equipmentData] = await Promise.all([
+      wgerRequest("exercisecategory/", { query: { limit: 200 } }),
+      wgerRequest("muscle/", { query: { limit: 200 } }),
+      wgerRequest("equipment/", { query: { limit: 200 } })
+    ]);
+
+    const categories = (Array.isArray(categoriesData?.results) ? categoriesData.results : []).map(
+      (item) => ({
+        id: item?.id ?? null,
+        name: cleanText(item?.name, 120)
+      })
+    );
+    const muscles = (Array.isArray(musclesData?.results) ? musclesData.results : []).map(
+      (item) => ({
+        id: item?.id ?? null,
+        name: cleanText(item?.name_en || item?.name, 120)
+      })
+    );
+    const equipment = (Array.isArray(equipmentData?.results) ? equipmentData.results : []).map(
+      (item) => ({
+        id: item?.id ?? null,
+        name: cleanText(item?.name, 120)
+      })
+    );
+
+    res.json({ categories, muscles, equipment });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/wger/exercises", async (req, res) => {
+  try {
+    const limit = toNullableNumber(req.query.limit, 1, 80) ?? 15;
+    const offset = toNullableNumber(req.query.offset, 0, 5000) ?? 0;
+    const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
+    const categories = parseMultiNumberQuery(req.query.category, 1, 10000);
+    const muscles = parseMultiNumberQuery(req.query.muscle, 1, 10000);
+    const equipment = parseMultiNumberQuery(req.query.equipment, 1, 10000);
+    const q = cleanText(req.query.q, 120).toLowerCase();
+    const upstreamLimit = q ? Math.min(Math.max(limit * 4, 100), 200) : limit;
+
+    const query = {
+      limit: upstreamLimit,
+      offset,
+      language
+    };
+    if (categories.length) query.category = categories;
+    if (muscles.length) query.muscles = muscles;
+    if (equipment.length) query.equipment = equipment;
+
+    const data = await wgerRequest("exerciseinfo/", { query });
+    const exercises = (Array.isArray(data?.results) ? data.results : [])
+      .map((item) => mapWgerExercise(item, language))
+      .filter((item) => {
+        if (!q) return true;
+        const haystack = [
+          item.name,
+          item.description,
+          item.category?.name,
+          ...(Array.isArray(item.muscles) ? item.muscles.map((m) => m.name) : [])
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .slice(0, limit);
+
+    res.json({
+      count: q ? exercises.length : toFiniteNumber(data?.count) ?? exercises.length,
+      next: cleanText(data?.next, 300),
+      previous: cleanText(data?.previous, 300),
+      limit,
+      offset,
+      language,
+      exercises
+    });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/wger/exercises/:id", async (req, res) => {
+  try {
+    const id = toNullableNumber(req.params.id, 1, 1000000);
+    if (id === null) {
+      return res.status(400).json({ error: "Valid exercise id is required." });
+    }
+    const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
+    let data = await wgerRequest("exerciseinfo/", {
+      query: {
+        id: Math.trunc(id),
+        language
+      }
+    });
+    let source = Array.isArray(data?.results) ? data.results[0] : null;
+    if (!source) {
+      data = await wgerRequest("exerciseinfo/", {
+        query: {
+          id: Math.trunc(id)
+        }
+      });
+      source = Array.isArray(data?.results) ? data.results[0] : null;
+    }
+    if (!source) return res.status(404).json({ error: "Exercise not found." });
+    res.json({ exercise: mapWgerExercise(source, language) });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     res.status(status).json({ error: err?.message || "Server error." });

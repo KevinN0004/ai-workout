@@ -1,493 +1,590 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { detectTrack } from "./planUtils";
 import "./TipsView.css";
 
-const muscleGuides = [
-  {
-    group: "Chest",
-    target: "Pecs, front delts, triceps",
-    workouts: [
-      {
-        name: "Barbell bench press",
-        sets: "4 x 5-8",
-        focus: "Chest strength",
-        what: "A horizontal press that builds pressing strength and overall chest mass.",
-        equipment: ["Flat bench", "Barbell", "Weight plates", "Rack"],
-        formSteps: [
-          "Set eyes directly under the bar and plant feet firmly on the floor.",
-          "Create a stable upper back arch and squeeze shoulder blades together.",
-          "Lower the bar to the mid-chest with elbows around 45 degrees from your torso.",
-          "Press up in a slight arc while keeping wrists stacked over elbows."
-        ],
-        videoUrl: "https://example.com/bench-press-placeholder"
-      },
-      {
-        name: "Incline dumbbell press",
-        sets: "3 x 8-12",
-        focus: "Upper chest",
-        what: "A chest press variation on an incline that emphasizes the upper chest fibers.",
-        equipment: ["Adjustable bench", "Dumbbells"],
-        formSteps: [
-          "Set bench angle around 30 to 45 degrees and keep your core braced.",
-          "Start with dumbbells at upper chest level and wrists neutral.",
-          "Press up and slightly inward without slamming the dumbbells together.",
-          "Lower with control until elbows are just below shoulder line."
-        ],
-        videoUrl: "https://example.com/incline-press-placeholder"
-      },
-      {
-        name: "Push-ups",
-        sets: "3 x 10-20",
-        focus: "Chest endurance",
-        what: "A bodyweight pressing move that develops chest, triceps, and shoulder control.",
-        equipment: ["Bodyweight", "Exercise mat (optional)"],
-        formSteps: [
-          "Place hands slightly wider than shoulder width and stack shoulders over wrists.",
-          "Lock in a straight line from head to heels by bracing abs and glutes.",
-          "Lower chest toward the floor while keeping elbows at roughly 30 to 45 degrees.",
-          "Press back up without letting hips sag or shoulders shrug."
-        ],
-        videoUrl: "https://example.com/push-up-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Back",
-    target: "Lats, upper back, biceps",
-    workouts: [
-      {
-        name: "Pull-ups",
-        sets: "4 x 5-10",
-        focus: "Lat and upper back strength",
-        what: "A vertical pulling movement that builds upper-body pulling strength and back width.",
-        equipment: ["Pull-up bar", "Assistance band or machine (optional)"],
-        formSteps: [
-          "Start from a dead hang with a tight grip and slight core brace.",
-          "Drive elbows down toward your ribs as your chest lifts to the bar.",
-          "Avoid swinging by keeping legs quiet and torso controlled.",
-          "Lower slowly to full arm extension before the next rep."
-        ],
-        videoUrl: "https://example.com/pull-up-placeholder"
-      },
-      {
-        name: "Barbell row",
-        sets: "4 x 6-10",
-        focus: "Mid-back thickness",
-        what: "A hip-hinged row that targets lats, rhomboids, and spinal erectors.",
-        equipment: ["Barbell", "Weight plates"],
-        formSteps: [
-          "Hinge at the hips until torso is about 30 to 45 degrees to the floor.",
-          "Keep a neutral spine and brace your core before each pull.",
-          "Row bar toward lower ribs by driving elbows behind you.",
-          "Lower under control without rounding your lower back."
-        ],
-        videoUrl: "https://example.com/barbell-row-placeholder"
-      },
-      {
-        name: "Lat pulldown",
-        sets: "3 x 8-12",
-        focus: "Lat width",
-        what: "A machine-based vertical pull used to build lat strength and control.",
-        equipment: ["Lat pulldown machine"],
-        formSteps: [
-          "Sit tall with thighs secured under pads and chest up.",
-          "Begin by depressing shoulders, then pull bar to upper chest.",
-          "Keep torso mostly upright and avoid excessive leaning.",
-          "Return the bar slowly to full stretch without losing control."
-        ],
-        videoUrl: "https://example.com/lat-pulldown-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Shoulders",
-    target: "Front, lateral, and rear delts",
-    workouts: [
-      {
-        name: "Overhead press",
-        sets: "4 x 5-8",
-        focus: "Front delts and triceps",
-        what: "A vertical pressing pattern that develops shoulder strength and pressing power.",
-        equipment: ["Barbell or dumbbells", "Rack (for barbell)"],
-        formSteps: [
-          "Stand tall with glutes and abs tight to prevent lower-back overextension.",
-          "Start weight at shoulder level with forearms vertical.",
-          "Press overhead in a straight path while moving head slightly back then through.",
-          "Lock out with biceps near ears and control the descent."
-        ],
-        videoUrl: "https://example.com/overhead-press-placeholder"
-      },
-      {
-        name: "Lateral raise",
-        sets: "3 x 12-15",
-        focus: "Side delts",
-        what: "An isolation move that builds shoulder width by targeting the lateral deltoid.",
-        equipment: ["Light dumbbells or cable"],
-        formSteps: [
-          "Stand with soft knees and slight forward torso lean.",
-          "Raise arms out to the sides until hands reach shoulder height.",
-          "Lead with elbows and keep wrists neutral.",
-          "Lower slowly and avoid using momentum."
-        ],
-        videoUrl: "https://example.com/lateral-raise-placeholder"
-      },
-      {
-        name: "Rear-delt fly",
-        sets: "3 x 12-15",
-        focus: "Rear delts",
-        what: "A posterior shoulder exercise that improves shoulder balance and posture.",
-        equipment: ["Dumbbells or reverse fly machine"],
-        formSteps: [
-          "Hinge hips so torso is near parallel to the floor.",
-          "Keep elbows slightly bent and lift arms wide.",
-          "Focus on squeezing rear shoulders rather than shrugging traps.",
-          "Pause briefly at the top and lower under control."
-        ],
-        videoUrl: "https://example.com/rear-delt-fly-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Arms",
-    target: "Biceps, triceps, forearms",
-    workouts: [
-      {
-        name: "EZ-bar curl",
-        sets: "3 x 8-12",
-        focus: "Biceps mass",
-        what: "A controlled curling movement that emphasizes biceps through elbow flexion.",
-        equipment: ["EZ curl bar", "Weight plates"],
-        formSteps: [
-          "Stand upright with elbows tucked close to your sides.",
-          "Curl weight by flexing elbows, keeping upper arms still.",
-          "Squeeze biceps at the top without leaning backward.",
-          "Lower slowly to full extension for each rep."
-        ],
-        videoUrl: "https://example.com/ez-curl-placeholder"
-      },
-      {
-        name: "Hammer curl",
-        sets: "3 x 10-12",
-        focus: "Brachialis and forearms",
-        what: "A neutral-grip curl that builds arm thickness and grip-supporting musculature.",
-        equipment: ["Dumbbells"],
-        formSteps: [
-          "Hold dumbbells with palms facing each other.",
-          "Curl up while keeping elbows pinned to your torso.",
-          "Stop just before shoulders roll forward.",
-          "Lower with control and maintain neutral wrist position."
-        ],
-        videoUrl: "https://example.com/hammer-curl-placeholder"
-      },
-      {
-        name: "Rope pushdown",
-        sets: "3 x 10-15",
-        focus: "Triceps isolation",
-        what: "A cable movement that isolates the triceps using elbow extension.",
-        equipment: ["Cable stack", "Rope attachment"],
-        formSteps: [
-          "Set cable at top position and hold rope with elbows at your sides.",
-          "Extend elbows fully while spreading rope at the bottom.",
-          "Keep shoulders down and avoid leaning into the rep.",
-          "Return to start with control while keeping tension on triceps."
-        ],
-        videoUrl: "https://example.com/rope-pushdown-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Legs (Quads + Hamstrings)",
-    target: "Quads, hamstrings, calves",
-    workouts: [
-      {
-        name: "Back squat",
-        sets: "4 x 5-8",
-        focus: "Lower-body strength",
-        what: "A foundational leg lift that builds strength through knee and hip flexion.",
-        equipment: ["Barbell", "Squat rack", "Weight plates"],
-        formSteps: [
-          "Set bar on upper traps, brace core, and set feet shoulder-width apart.",
-          "Sit down and back while keeping knees tracking over toes.",
-          "Descend to comfortable depth with neutral spine.",
-          "Drive through midfoot to stand while keeping chest and hips rising together."
-        ],
-        videoUrl: "https://example.com/back-squat-placeholder"
-      },
-      {
-        name: "Romanian deadlift",
-        sets: "4 x 6-10",
-        focus: "Hamstrings and glutes",
-        what: "A hip-hinge lift focused on posterior-chain strength and hamstring loading.",
-        equipment: ["Barbell or dumbbells"],
-        formSteps: [
-          "Start standing tall with soft knees and lats engaged.",
-          "Hinge hips back while keeping bar close to your legs.",
-          "Lower until you feel a strong hamstring stretch without spinal rounding.",
-          "Drive hips forward to stand and squeeze glutes at the top."
-        ],
-        videoUrl: "https://example.com/rdl-placeholder"
-      },
-      {
-        name: "Walking lunges",
-        sets: "3 x 10 per leg",
-        focus: "Single-leg control",
-        what: "A unilateral lower-body move that builds balance, stability, and leg strength.",
-        equipment: ["Bodyweight or dumbbells"],
-        formSteps: [
-          "Step forward long enough to keep both knees near 90 degrees.",
-          "Lower under control until back knee is just above the floor.",
-          "Push through front heel to stand and bring rear leg through.",
-          "Keep torso upright and hips square throughout."
-        ],
-        videoUrl: "https://example.com/walking-lunge-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Glutes",
-    target: "Glute max, glute med, posterior chain",
-    workouts: [
-      {
-        name: "Hip thrust",
-        sets: "4 x 6-10",
-        focus: "Glute max power",
-        what: "A glute-dominant bridge pattern that emphasizes hip extension strength.",
-        equipment: ["Bench", "Barbell", "Padding", "Weight plates"],
-        formSteps: [
-          "Set upper back on bench edge and bar across hips with padding.",
-          "Plant feet so shins are near vertical at lockout.",
-          "Drive hips up by squeezing glutes, keeping ribs down.",
-          "Pause at the top and lower slowly without collapsing."
-        ],
-        videoUrl: "https://example.com/hip-thrust-placeholder"
-      },
-      {
-        name: "Bulgarian split squat",
-        sets: "3 x 8-12 per leg",
-        focus: "Glute and quad hypertrophy",
-        what: "A rear-foot-elevated squat that loads each leg independently.",
-        equipment: ["Bench or step", "Dumbbells (optional)"],
-        formSteps: [
-          "Place rear foot on bench and front foot far enough for stable descent.",
-          "Lower by bending front knee while maintaining upright torso.",
-          "Keep front knee aligned over toes and back knee moving down.",
-          "Drive through front foot to stand and repeat."
-        ],
-        videoUrl: "https://example.com/bulgarian-split-squat-placeholder"
-      },
-      {
-        name: "Cable kickback",
-        sets: "3 x 12-15",
-        focus: "Glute isolation",
-        what: "A low-load glute isolation move that targets hip extension without spinal load.",
-        equipment: ["Cable machine", "Ankle strap"],
-        formSteps: [
-          "Attach ankle strap and hold machine for balance.",
-          "Slightly hinge forward and keep core braced.",
-          "Kick working leg back using glute contraction, not lower-back swing.",
-          "Return slowly and keep constant tension on each rep."
-        ],
-        videoUrl: "https://example.com/cable-kickback-placeholder"
-      }
-    ]
-  },
-  {
-    group: "Core",
-    target: "Abs, obliques, deep trunk stabilizers",
-    workouts: [
-      {
-        name: "Plank variations",
-        sets: "3 x 30-60 sec",
-        focus: "Anti-extension core strength",
-        what: "An isometric core drill that trains trunk stiffness and posture control.",
-        equipment: ["Bodyweight", "Mat (optional)"],
-        formSteps: [
-          "Stack shoulders over elbows and align head, hips, and heels.",
-          "Brace abs and glutes as if preparing for a punch.",
-          "Breathe slowly while keeping hips level.",
-          "End set once spinal position starts to break."
-        ],
-        videoUrl: "https://example.com/plank-placeholder"
-      },
-      {
-        name: "Hanging knee raise",
-        sets: "3 x 8-15",
-        focus: "Lower abs and hip flexors",
-        what: "A hanging core move that trains trunk control and lower abdominal strength.",
-        equipment: ["Pull-up bar or captain chair"],
-        formSteps: [
-          "Hang with active shoulders and controlled body position.",
-          "Tilt pelvis slightly and raise knees toward chest.",
-          "Avoid swinging by lifting and lowering with control.",
-          "Lower legs slowly to reset before each rep."
-        ],
-        videoUrl: "https://example.com/hanging-knee-raise-placeholder"
-      },
-      {
-        name: "Pallof press",
-        sets: "3 x 10-12 per side",
-        focus: "Anti-rotation stability",
-        what: "A cable or band anti-rotation drill that strengthens obliques and trunk stability.",
-        equipment: ["Cable machine or resistance band"],
-        formSteps: [
-          "Stand sideways to cable or band and hold handle at chest height.",
-          "Brace core and press handle straight out without torso turning.",
-          "Pause briefly at full extension while keeping hips square.",
-          "Bring hands back in and repeat for controlled reps."
-        ],
-        videoUrl: "https://example.com/pallof-press-placeholder"
-      }
-    ]
-  }
+const DEFAULT_LIMIT = 48;
+
+const normalizeText = (value) =>
+  typeof value === "string" ? value.toLowerCase().trim() : "";
+
+const uniqueList = (items) => [...new Set(items.filter(Boolean))];
+
+const resolveMediaUrl = (url) => {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `https://wger.de${url}`;
+  return url;
+};
+
+const getExerciseImage = (exercise) => {
+  const images = Array.isArray(exercise?.images) ? exercise.images : [];
+  const mainImage = images.find((item) => item?.isMain && item?.url);
+  const fallback = mainImage?.url || images[0]?.url;
+  const resolved = resolveMediaUrl(fallback);
+  if (resolved) return resolved;
+  return `https://placehold.co/640x420?text=${encodeURIComponent(exercise?.name || "Exercise")}`;
+};
+
+const trackCategoryMap = {
+  lean_strength: ["Chest", "Back", "Legs", "Shoulders", "Arms"],
+  fat_loss: ["Cardio", "Legs", "Abs", "Back"],
+  endurance: ["Cardio", "Legs", "Back", "Abs"],
+  recovery: ["Abs", "Back", "Shoulders", "Legs"]
+};
+
+const keywordCategoryMap = [
+  { keyword: "push", categories: ["Chest", "Shoulders", "Arms"] },
+  { keyword: "pull", categories: ["Back", "Arms", "Shoulders"] },
+  { keyword: "chest", categories: ["Chest", "Shoulders"] },
+  { keyword: "back", categories: ["Back"] },
+  { keyword: "shoulder", categories: ["Shoulders"] },
+  { keyword: "arm", categories: ["Arms"] },
+  { keyword: "bicep", categories: ["Arms"] },
+  { keyword: "tricep", categories: ["Arms"] },
+  { keyword: "leg", categories: ["Legs", "Calves"] },
+  { keyword: "quad", categories: ["Legs"] },
+  { keyword: "hamstring", categories: ["Legs"] },
+  { keyword: "glute", categories: ["Legs"] },
+  { keyword: "core", categories: ["Abs"] },
+  { keyword: "ab", categories: ["Abs"] },
+  { keyword: "cardio", categories: ["Cardio"] },
+  { keyword: "conditioning", categories: ["Cardio"] },
+  { keyword: "run", categories: ["Cardio", "Legs"] }
 ];
 
-const trainingSections = [
-  {
-    title: "Rest Days",
-    summary: "Recovery days are where adaptation happens, not a break from progress.",
-    points: [
-      "Take at least 1 to 2 full recovery days each week.",
-      "Use light walking or mobility instead of hard training on rest days.",
-      "If soreness or fatigue stays high for days, add recovery before adding volume."
-    ]
-  },
-  {
-    title: "Progressive Overload",
-    summary: "To improve, training demand should gradually increase over time.",
-    points: [
-      "Increase one variable at a time: weight, reps, sets, or tempo quality.",
-      "Use small weekly jumps and keep form strict before adding load.",
-      "If technique breaks, hold load steady and progress with cleaner reps first."
-    ]
-  },
-  {
-    title: "Push vs Pull Days",
-    summary: "Splitting movement patterns helps balance training stress and recovery.",
-    points: [
-      "Push day: chest, shoulders, triceps pressing patterns.",
-      "Pull day: back, rear delts, biceps pulling patterns.",
-      "Match pulling volume to pushing volume to support shoulder health."
-    ]
-  },
-  {
-    title: "Volume and Intensity",
-    summary: "Effective plans manage both how much work you do and how hard it is.",
-    points: [
-      "Main lifts: lower reps and heavier load with longer rest periods.",
-      "Accessory lifts: moderate reps and controlled tempo for hypertrophy.",
-      "Keep 1 to 3 reps in reserve most sets to manage fatigue."
-    ]
-  },
-  {
-    title: "Deload Strategy",
-    summary: "Planned easier weeks help you recover and continue progressing.",
-    points: [
-      "Every 4 to 8 weeks, reduce load or set count by roughly 30 to 50 percent.",
-      "Maintain movement patterns, but lower overall stress.",
-      "Return to normal training when joints, sleep, and performance improve."
-    ]
-  },
-  {
-    title: "Warm-Up and Prep",
-    summary: "A focused warm-up improves movement quality and reduces injury risk.",
-    points: [
-      "Start with 5 to 10 minutes of low-intensity cardio or dynamic movement.",
-      "Add mobility drills specific to the session (hips, shoulders, thoracic spine).",
-      "Perform ramp-up sets before your first heavy working set."
-    ]
+const equipmentKeywordMap = {
+  "bodyweight only": ["bodyweight", "none (bodyweight exercise)"],
+  dumbbells: ["dumbbell", "kettlebell"],
+  kettlebell: ["kettlebell", "dumbbell"],
+  "resistance bands": ["band", "resistance"],
+  "adjustable bench": ["bench", "incline bench"],
+  "yoga mat": ["mat", "bodyweight"],
+  "full gym access": [
+    "barbell",
+    "dumbbell",
+    "machine",
+    "bench",
+    "cable",
+    "kettlebell",
+    "bodyweight"
+  ],
+  "barbell + plates": ["barbell"],
+  "cable machine": ["cable"],
+  "smith machine": ["barbell", "smith"],
+  "cardio machines": ["cardio", "bike", "row", "elliptical", "treadmill"],
+  "free weights": ["barbell", "dumbbell", "kettlebell"]
+};
+
+const injuryKeywordRules = {
+  "lower back": ["deadlift", "good morning", "hyperextension", "bent-over"],
+  back: ["deadlift", "good morning", "hyperextension", "bent-over"],
+  knee: ["jump", "lunge", "pistol", "squat", "step-up"],
+  shoulder: ["press", "snatch", "jerk", "dip", "raise", "pulldown"],
+  hip: ["lunge", "squat", "deadlift", "kickback"],
+  wrist: ["push-up", "curl", "press", "dip", "extension"],
+  elbow: ["curl", "press", "extension", "dip"]
+};
+
+const buildContextCategories = ({ track, goalText, todayLines }) => {
+  const categories = [...(trackCategoryMap[track] || trackCategoryMap.lean_strength)];
+  const sourceText = normalizeText(`${goalText} ${todayLines.join(" ")}`);
+  for (const rule of keywordCategoryMap) {
+    if (sourceText.includes(rule.keyword)) categories.push(...rule.categories);
   }
-];
+  return uniqueList(categories);
+};
 
-export default function TipsView() {
-  const [activeGroup, setActiveGroup] = useState("All");
-  const [selectedExercise, setSelectedExercise] = useState(null);
-  const toggleGroups = ["All", ...muscleGuides.map((guide) => guide.group)];
+const buildEquipmentKeywords = ({ form }) => {
+  const selected = Array.isArray(form?.equipment) ? form.equipment : [];
+  const keywords = [];
+  for (const item of selected) {
+    const key = normalizeText(item);
+    keywords.push(...(equipmentKeywordMap[key] || []));
+  }
+  if (!keywords.length && normalizeText(form?.environment) === "home") {
+    keywords.push("bodyweight", "none (bodyweight exercise)", "dumbbell", "band");
+  }
+  return uniqueList(keywords);
+};
 
-  const visibleExercises = useMemo(() => {
-    const selectedGuides =
-      activeGroup === "All"
-        ? muscleGuides
-        : muscleGuides.filter((guide) => guide.group === activeGroup);
+const detectInjuryFlags = (injuryText) => {
+  const source = normalizeText(injuryText);
+  const active = [];
+  for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
+    if (source.includes(injury)) active.push({ injury, keywords });
+  }
+  return active;
+};
 
-    return selectedGuides.flatMap((guide) =>
-      guide.workouts.map((workout) => ({
-        ...workout,
-        group: guide.group,
-        target: guide.target,
-        imageUrl: `https://placehold.co/640x420?text=${encodeURIComponent(workout.name)}`
-      }))
+const scoreExercise = (exercise, context) => {
+  const reasons = [];
+  let score = 0;
+  const categoryName = exercise?.category?.name || "";
+  const categoryLower = normalizeText(categoryName);
+  const nameLower = normalizeText(exercise?.name);
+  const descriptionLower = normalizeText(exercise?.description);
+  const equipmentNames = (Array.isArray(exercise?.equipment) ? exercise.equipment : [])
+    .map((item) => normalizeText(item?.name))
+    .filter(Boolean);
+  const muscleNames = (Array.isArray(exercise?.muscles) ? exercise.muscles : [])
+    .map((item) => normalizeText(item?.name))
+    .filter(Boolean);
+
+  if (context.preferredCategories.some((name) => normalizeText(name) === categoryLower)) {
+    score += 5;
+    reasons.push(`Matches your ${categoryName || "current"} focus.`);
+  }
+
+  if (context.weatherMode === "outdoor" && categoryLower === "cardio") {
+    score += 2;
+    reasons.push("Good fit for an outdoor-focused day.");
+  }
+
+  if (context.weatherMode === "indoor" && categoryLower !== "cardio") {
+    score += 1;
+    reasons.push("Works well as an indoor training option.");
+  }
+
+  if (context.equipmentKeywords.length) {
+    const equipmentMatch = context.equipmentKeywords.some((keyword) =>
+      equipmentNames.some((name) => name.includes(keyword))
     );
-  }, [activeGroup]);
+    const bodyweightFriendly = equipmentNames.some((name) =>
+      name.includes("bodyweight") || name.includes("none (bodyweight")
+    );
+    if (equipmentMatch) {
+      score += 3;
+      reasons.push("Fits your available equipment.");
+    } else if (context.homeMode && bodyweightFriendly) {
+      score += 2;
+      reasons.push("Bodyweight-friendly for home setup.");
+    }
+  }
+
+  for (const token of context.goalTokens) {
+    if (!token || token.length < 4) continue;
+    if (nameLower.includes(token) || descriptionLower.includes(token)) {
+      score += 1;
+      reasons.push("Aligns with your current goal wording.");
+      break;
+    }
+  }
+
+  for (const token of context.todayTokens) {
+    if (!token || token.length < 4) continue;
+    if (
+      nameLower.includes(token) ||
+      descriptionLower.includes(token) ||
+      muscleNames.some((muscle) => muscle.includes(token))
+    ) {
+      score += 2;
+      reasons.push("Supports today's planned training emphasis.");
+      break;
+    }
+  }
+
+  for (const flag of context.injuryFlags) {
+    const conflict = flag.keywords.some(
+      (keyword) => nameLower.includes(keyword) || descriptionLower.includes(keyword)
+    );
+    if (conflict) {
+      score -= 7;
+      reasons.push(`Potentially high stress for ${flag.injury}.`);
+    }
+  }
+
+  if (score <= 0) {
+    reasons.push("Available in your current library filters.");
+  }
+
+  return {
+    exercise,
+    score,
+    reasons: uniqueList(reasons)
+  };
+};
+
+const buildGuideCards = ({
+  track,
+  weeklyWorkouts,
+  duration,
+  activity,
+  weatherMode,
+  injuryText
+}) => {
+  const splitText =
+    weeklyWorkouts >= 5
+      ? "Use a 5-day split: push, pull, legs, upper, lower with 1-2 recovery days."
+      : weeklyWorkouts === 4
+      ? "Use an upper/lower split with one conditioning day and one full recovery day."
+      : weeklyWorkouts <= 2
+      ? "Use full-body sessions each workout day and keep a mobility block on off days."
+      : "Use push/pull/legs or full-body rotation based on available days.";
+
+  const intensityText =
+    track === "fat_loss"
+      ? "Keep compounds at 6-10 reps and add short finishers; keep 1-2 reps in reserve."
+      : track === "endurance"
+      ? "Prioritize sustainable pacing and controlled intervals before adding load."
+      : track === "recovery"
+      ? "Use submax loads, slower eccentrics, and higher movement quality focus."
+      : "Progress top sets gradually and add load only after clean reps across all sets.";
+
+  const volumeText =
+    activity === "Very high" || activity === "High"
+      ? "Target 14-20 quality sets per major muscle weekly, then deload every 4-6 weeks."
+      : "Target 10-16 quality sets per major muscle weekly and deload every 6-8 weeks.";
+
+  const weatherText =
+    weatherMode === "outdoor"
+      ? "Weather favors outdoor work: place cardio blocks before sunset and hydrate early."
+      : weatherMode === "indoor"
+      ? "Weather favors indoor work: bias strength circuits, machines, and controlled conditioning."
+      : "Weather mode unavailable: default to your planned split and adjust by RPE.";
+
+  const injuryGuidance = normalizeText(injuryText)
+    ? "Injury note detected: use controlled tempo, pain-free ranges, and swap high-risk patterns."
+    : "No injury note detected: maintain warm-up sets and full range where technique stays stable.";
+
+  return [
+    {
+      title: "Split Strategy",
+      text: splitText
+    },
+    {
+      title: "Load Progression",
+      text: intensityText
+    },
+    {
+      title: "Volume Target",
+      text: volumeText
+    },
+    {
+      title: "Session Budget",
+      text: `With ${duration} minute sessions, keep 1-2 main lifts and 2-4 accessories per day.`
+    },
+    {
+      title: "Weather Adjustment",
+      text: weatherText
+    },
+    {
+      title: "Injury Guardrails",
+      text: injuryGuidance
+    }
+  ];
+};
+
+export default function TipsView({
+  user,
+  form,
+  dashboard,
+  latestPlanByWeekday,
+  weatherData
+}) {
+  const [meta, setMeta] = useState({ categories: [], muscles: [], equipment: [] });
+  const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [muscleId, setMuscleId] = useState("");
+  const [equipmentId, setEquipmentId] = useState("");
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryError, setLibraryError] = useState("");
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaError, setMetaError] = useState("");
+  const [exercises, setExercises] = useState([]);
+  const [selectedExercise, setSelectedExercise] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMeta = async () => {
+      setMetaLoading(true);
+      setMetaError("");
+      try {
+        const res = await fetch("/api/wger/meta", { credentials: "include" });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to load exercise metadata.");
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setMeta({
+          categories: Array.isArray(data?.categories) ? data.categories : [],
+          muscles: Array.isArray(data?.muscles) ? data.muscles : [],
+          equipment: Array.isArray(data?.equipment) ? data.equipment : []
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setMetaError(err?.message || "Unable to load exercise metadata.");
+      } finally {
+        if (!cancelled) setMetaLoading(false);
+      }
+    };
+    loadMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadExercises = async () => {
+      setLibraryLoading(true);
+      setLibraryError("");
+      try {
+        const params = new URLSearchParams({
+          limit: String(DEFAULT_LIMIT),
+          offset: "0",
+          language: "2"
+        });
+        if (query.trim()) params.set("q", query.trim());
+        if (categoryId) params.set("category", categoryId);
+        if (muscleId) params.set("muscle", muscleId);
+        if (equipmentId) params.set("equipment", equipmentId);
+
+        const res = await fetch(`/api/wger/exercises?${params.toString()}`, {
+          credentials: "include"
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to load exercise library.");
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setExercises(Array.isArray(data?.exercises) ? data.exercises : []);
+      } catch (err) {
+        if (cancelled) return;
+        setLibraryError(err?.message || "Unable to load exercise library.");
+        setExercises([]);
+      } finally {
+        if (!cancelled) setLibraryLoading(false);
+      }
+    };
+    loadExercises();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, categoryId, muscleId, equipmentId, refreshTick]);
+
+  const todayWeekday = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const todayLines = latestPlanByWeekday?.[todayWeekday] || [];
+  const goalText =
+    dashboard?.plans?.[0]?.goal ||
+    dashboard?.goals?.goalType ||
+    form?.goal ||
+    "Build lean strength and energy";
+  const injuryText = `${form?.injuries || ""} ${user?.profile?.notes || ""}`.trim();
+  const weatherMode = weatherData?.recommendation?.workoutType || "";
+  const track = detectTrack(goalText);
+  const weeklyWorkouts = Number(dashboard?.goals?.weeklyWorkouts || form?.days || 3);
+  const duration = Number(form?.duration || 45);
+  const activity = user?.profile?.activity || "Moderate";
+
+  const recommendationContext = useMemo(() => {
+    const preferredCategories = buildContextCategories({
+      track,
+      goalText,
+      todayLines
+    });
+    const equipmentKeywords = buildEquipmentKeywords({ form });
+    const goalTokens = uniqueList(normalizeText(goalText).split(/[^a-z0-9]+/));
+    const todayTokens = uniqueList(normalizeText(todayLines.join(" ")).split(/[^a-z0-9]+/));
+    const injuryFlags = detectInjuryFlags(injuryText);
+    return {
+      preferredCategories,
+      equipmentKeywords,
+      goalTokens,
+      todayTokens,
+      injuryFlags,
+      weatherMode,
+      homeMode: normalizeText(form?.environment) === "home"
+    };
+  }, [track, goalText, todayLines, form, injuryText, weatherMode]);
+
+  const recommendations = useMemo(() => {
+    const scored = exercises.map((exercise) => scoreExercise(exercise, recommendationContext));
+    scored.sort((a, b) => b.score - a.score || a.exercise.name.localeCompare(b.exercise.name));
+    return scored.slice(0, 12);
+  }, [exercises, recommendationContext]);
+
+  const guideCards = useMemo(
+    () =>
+      buildGuideCards({
+        track,
+        weeklyWorkouts,
+        duration,
+        activity,
+        weatherMode,
+        injuryText
+      }),
+    [track, weeklyWorkouts, duration, activity, weatherMode, injuryText]
+  );
+
+  const openExerciseModal = (payload) => {
+    setSelectedExercise(payload);
+  };
 
   return (
     <section className="panel dashboard-card span-2 tips-view">
       <div className="panel-header">
         <div>
-          <h2>Workout guide</h2>
+          <h2>Guides + exercise library</h2>
           <p className="muted">
-            Click any workout tile to open detailed guidance with form steps, equipment, and
-            a placeholder video link.
+            Live Wger exercise data with personalized ranking based on your plan, equipment,
+            weather mode, and injury notes.
           </p>
         </div>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => setRefreshTick((value) => value + 1)}
+        >
+          Refresh library
+        </button>
       </div>
 
-      <div className="group-toggles" role="tablist" aria-label="Filter exercises by muscle group">
-        {toggleGroups.map((group) => (
-          <button
-            key={group}
-            type="button"
-            className={group === activeGroup ? "active" : ""}
-            onClick={() => setActiveGroup(group)}
-            aria-pressed={group === activeGroup}
-          >
-            {group}
-          </button>
-        ))}
-      </div>
-
-      <div className="exercise-grid">
-        {visibleExercises.map((exercise) => (
-          <button
-            key={`${exercise.group}-${exercise.name}`}
-            type="button"
-            className="exercise-tile"
-            onClick={() => setSelectedExercise(exercise)}
-          >
-            <img src={exercise.imageUrl} alt={exercise.name} loading="lazy" />
-            <div className="exercise-tile-meta">
-              <p className="exercise-group">{exercise.group}</p>
-              <h3>{exercise.name}</h3>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <section className="guide-rules">
-        <h3>Simple split ideas</h3>
-        <ul className="guide-list">
-          <li>Push day: chest, shoulders, triceps.</li>
-          <li>Pull day: back, biceps, rear delts.</li>
-          <li>Leg day: quads, hamstrings, glutes, calves.</li>
-          <li>Add core work 2-4 times per week at the end of sessions.</li>
-        </ul>
+      <section className="tips-filters">
+        <label>
+          Search
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="e.g. row, squat, plank"
+          />
+        </label>
+        <label>
+          Category
+          <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">All categories</option>
+            {meta.categories.map((item) => (
+              <option key={`category-${item.id}`} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Muscle
+          <select value={muscleId} onChange={(event) => setMuscleId(event.target.value)}>
+            <option value="">All muscles</option>
+            {meta.muscles.map((item) => (
+              <option key={`muscle-${item.id}`} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Equipment
+          <select value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)}>
+            <option value="">All equipment</option>
+            {meta.equipment.map((item) => (
+              <option key={`equipment-${item.id}`} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
-      <section className="training-guide">
-        <h3>Guide to Effective Workout Structure</h3>
-        <p className="muted">
-          Use these principles to organize your week, recover well, and keep results moving.
-        </p>
+      {(metaLoading || libraryLoading) && (
+        <p className="muted">Loading Wger exercise data...</p>
+      )}
+      {metaError && <p className="error">{metaError}</p>}
+      {libraryError && <p className="error">{libraryError}</p>}
+
+      <section className="tips-block">
+        <div className="tips-block-header">
+          <h3>Smart picks for you</h3>
+          <p className="muted">
+            Ranking algorithm favors your goal track ({track.replace("_", " ")}), available
+            equipment, and today&apos;s training context.
+          </p>
+        </div>
+        <div className="exercise-grid">
+          {recommendations.map((entry) => {
+            const exercise = entry.exercise;
+            const imageUrl = getExerciseImage(exercise);
+            const equipmentText = (exercise.equipment || [])
+              .map((item) => item?.name)
+              .filter(Boolean)
+              .slice(0, 2)
+              .join(", ");
+            return (
+              <button
+                key={`smart-${exercise.id}`}
+                type="button"
+                className="exercise-tile"
+                onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
+              >
+                <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                <div className="exercise-tile-meta">
+                  <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                  <h3>{exercise.name}</h3>
+                  <p className="muted">{equipmentText || "No equipment metadata"}</p>
+                  <div className="recommendation-row">
+                    <span className="score-chip">{entry.score} pts</span>
+                    <span className="muted">{entry.reasons[0]}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {!recommendations.length && (
+            <p className="muted">No exercises available for current filters.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="tips-block">
+        <div className="tips-block-header">
+          <h3>Algorithm-backed guide upgrades</h3>
+          <p className="muted">
+            Tactical planning cues generated from your weekly settings and live conditions.
+          </p>
+        </div>
         <div className="training-guide-grid">
-          {trainingSections.map((section) => (
-            <article key={section.title} className="training-card">
-              <h4>{section.title}</h4>
-              <p>{section.summary}</p>
-              <ul className="training-points">
-                {section.points.map((point) => (
-                  <li key={`${section.title}-${point}`}>{point}</li>
-                ))}
-              </ul>
+          {guideCards.map((card) => (
+            <article key={card.title} className="training-card">
+              <h4>{card.title}</h4>
+              <p>{card.text}</p>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="tips-block">
+        <div className="tips-block-header">
+          <h3>Exercise library</h3>
+          <p className="muted">Browse and open any movement for details, cues, and media links.</p>
+        </div>
+        <div className="exercise-grid">
+          {exercises.map((exercise) => {
+            const imageUrl = getExerciseImage(exercise);
+            const equipmentText = (exercise.equipment || [])
+              .map((item) => item?.name)
+              .filter(Boolean)
+              .slice(0, 2)
+              .join(", ");
+            return (
+              <button
+                key={`library-${exercise.id}`}
+                type="button"
+                className="exercise-tile"
+                onClick={() => openExerciseModal(exercise)}
+              >
+                <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                <div className="exercise-tile-meta">
+                  <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                  <h3>{exercise.name}</h3>
+                  <p className="muted">{equipmentText || "No equipment metadata"}</p>
+                </div>
+              </button>
+            );
+          })}
+          {!exercises.length && !libraryLoading && (
+            <p className="muted">No exercises found for this filter set.</p>
+          )}
         </div>
       </section>
 
@@ -505,50 +602,64 @@ export default function TipsView() {
                 Close
               </button>
             </div>
-
             <img
               className="exercise-modal-image"
-              src={selectedExercise.imageUrl}
+              src={getExerciseImage(selectedExercise)}
               alt={selectedExercise.name}
             />
-
             <div className="exercise-modal-body">
               <p className="exercise-target">
-                <strong>Hits:</strong> {selectedExercise.target}
-              </p>
-              <p className="exercise-sets">
-                <strong>Sets/Reps:</strong> {selectedExercise.sets}
+                <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
               </p>
               <p className="exercise-focus">
-                <strong>Goal:</strong> {selectedExercise.focus}
+                <strong>Primary muscles:</strong>{" "}
+                {(selectedExercise.muscles || [])
+                  .map((item) => item.name)
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .join(", ") || "Not specified"}
               </p>
-              <p className="exercise-what">{selectedExercise.what}</p>
+              <p className="exercise-focus">
+                <strong>Equipment:</strong>{" "}
+                {(selectedExercise.equipment || [])
+                  .map((item) => item.name)
+                  .filter(Boolean)
+                  .join(", ") || "Not specified"}
+              </p>
+              {selectedExercise.description ? (
+                <p className="exercise-what">{selectedExercise.description}</p>
+              ) : (
+                <p className="muted">No description provided for this exercise.</p>
+              )}
 
-              <div className="equipment-list">
-                {selectedExercise.equipment.map((item) => (
-                  <span key={`${selectedExercise.name}-${item}`} className="equipment-chip">
-                    {item}
-                  </span>
-                ))}
-              </div>
+              {selectedExercise?.recommendation?.reasons?.length ? (
+                <section className="exercise-details-open">
+                  <h4>Why this was recommended</h4>
+                  <ul>
+                    {selectedExercise.recommendation.reasons.map((reason) => (
+                      <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
-              <section className="exercise-details-open">
-                <h4>How to perform</h4>
-                <ol>
-                  {selectedExercise.formSteps.map((step) => (
-                    <li key={`${selectedExercise.name}-${step}`}>{step}</li>
+              {(selectedExercise.videos || []).length ? (
+                <div className="video-links">
+                  {(selectedExercise.videos || []).slice(0, 2).map((item) => (
+                    <a
+                      key={`${selectedExercise.id}-video-${item.id || item.url}`}
+                      href={resolveMediaUrl(item.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="video-link"
+                    >
+                      Watch reference video
+                    </a>
                   ))}
-                </ol>
-              </section>
-
-              <a
-                href={selectedExercise.videoUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="video-link"
-              >
-                Reference video (placeholder)
-              </a>
+                </div>
+              ) : (
+                <p className="muted">No video links available for this exercise.</p>
+              )}
             </div>
           </div>
         </div>

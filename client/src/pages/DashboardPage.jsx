@@ -372,7 +372,15 @@ export default function DashboardPage({
   } else if (dashView === "meal") {
     activeView = <MealView dashboard={dashboard} fallbackPlan={form} />;
   } else if (dashView === "tips") {
-    activeView = <TipsView />;
+    activeView = (
+      <TipsView
+        user={user}
+        form={form}
+        dashboard={dashboard}
+        latestPlanByWeekday={latestPlanByWeekday}
+        weatherData={weatherData}
+      />
+    );
   } else if (dashView === "settings") {
     activeView = <SettingsView user={user} onLogout={onLogout} />;
   } else if (dashView === "home") {
