@@ -195,6 +195,8 @@ export default function DashboardPage({
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
         openPlannerFromProfile={openPlannerFromProfile}
+        dashboard={dashboard}
+        fallbackPlan={form}
       />
     );
   } else if (dashView === "meal") {

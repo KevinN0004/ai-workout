@@ -29,6 +29,44 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.hub-card-button {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.hub-card-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 179, 71, 0.45);
+}
+
+.hub-card-hint {
+  font-size: 0.78rem;
+  color: #ffd9a0;
+}
+
+.meal-track-pill {
+  border: 1px solid rgba(255, 179, 71, 0.45);
+  color: #ffd9a0;
+  background: rgba(255, 179, 71, 0.12);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.meal-day-type {
+  margin-top: 8px;
+  color: #ffd9a0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .hub-list {
   margin-top: 10px;
   padding-left: 16px;
@@ -40,6 +78,56 @@
   line-height: 1.35;
 }
 
+.meal-week-list li strong {
+  color: #f7f8ff;
+}
+
+.plan-day-detail-modal {
+  width: min(980px, 100%);
+  text-align: left;
+}
+
+.plan-day-detail-modal .modal-header {
+  position: relative;
+  justify-content: center;
+}
+
+.plan-day-detail-modal .modal-header h2 {
+  text-align: center;
+}
+
+.plan-day-detail-modal .modal-header .ghost {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.plan-day-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.plan-day-detail-col {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.plan-day-detail-col h3 {
+  text-align: center;
+}
+
+.plan-day-detail-col p,
+.plan-day-detail-col .hub-list {
+  text-align: left;
+}
+
+.plan-detail-list {
+  margin-top: 0;
+}
+
 @media (max-width: 720px) {
   .plan-row-header {
     flex-direction: column;
@@ -49,4 +137,16 @@
   .plan-row-grid-split {
     grid-template-columns: 1fr;
   }
+
+  .plan-day-detail-modal .modal-header {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+  }
+
+  .plan-day-detail-modal .modal-header .ghost {
+    position: static;
+    transform: none;
+  }
+
 }

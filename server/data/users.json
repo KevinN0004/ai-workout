@@ -8,6 +8,13 @@
     "dashboard": {
       "workouts": [
         {
+          "id": "e49b53ec-58a4-4a1d-b3f1-385d3c81fa62",
+          "date": "2026-02-14",
+          "focus": "strengtgh",
+          "duration": 46,
+          "notes": ""
+        },
+        {
           "id": "fdef4100-c7a8-462d-8e30-7f03d18a70a9",
           "date": "2026-02-06",
           "focus": "strength",
