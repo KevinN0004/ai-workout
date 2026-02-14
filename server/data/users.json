@@ -80,5 +80,33 @@
         }
       ]
     }
+  },
+  {
+    "id": "21ffa709-4c51-423a-9b82-7688c3865b7f",
+    "email": "admin@admin",
+    "salt": "62abd3a2db50a969536cd9e0c66706aa",
+    "hash": "eed8dbb8972cb4e52cd8e62bdb6fdea6a9f8427edc9b012b818156582b2f25518478e811fae80f26e5e3fef663ba8b31a70796b2c664c48409d67475962c7971",
+    "createdAt": "2026-02-14T11:53:30.670Z",
+    "profile": {
+      "name": "",
+      "age": 26,
+      "heightCm": null,
+      "weightKg": null,
+      "sex": "Female",
+      "bodyFat": null,
+      "activity": "High",
+      "notes": "",
+      "updatedAt": "2026-02-14T11:53:46.802Z"
+    },
+    "dashboard": {
+      "workouts": [],
+      "calories": [],
+      "plans": [],
+      "goals": {
+        "targetWeight": 160,
+        "targetCalories": 2200,
+        "weeklyWorkouts": 3
+      }
+    }
   }
 ]

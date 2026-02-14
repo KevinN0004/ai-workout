@@ -6,7 +6,27 @@ import MealView from "./dashboard/MealView";
 import TipsView from "./dashboard/TipsView";
 import SettingsView from "./dashboard/SettingsView";
 import DashboardHomeView from "./dashboard/DashboardHomeView";
+import { buildWeeklyMealPlan } from "./dashboard/planUtils";
 import "./DashboardPage.css";
+
+const parseDateValue = (value) => {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const toDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export default function DashboardPage({
   gradient,
@@ -62,57 +82,122 @@ export default function DashboardPage({
   const workouts = dashboard?.workouts || [];
   const calories = dashboard?.calories || [];
   const goals = dashboard?.goals || goalForm;
+  const today = new Date();
+  const todayDate = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
 
-  const last7Cutoff = new Date();
+  const last7Cutoff = new Date(todayDate);
   last7Cutoff.setDate(last7Cutoff.getDate() - 6);
+
+  const caloriesByDate = calories.reduce((acc, item) => {
+    const parsedDate = parseDateValue(item?.date);
+    if (!parsedDate) return acc;
+    const key = toDateKey(parsedDate);
+    const nextCalories = Number(item?.calories || 0);
+    if (Number.isNaN(nextCalories)) return acc;
+    acc[key] = (acc[key] || 0) + nextCalories;
+    return acc;
+  }, {});
+
+  const workoutsByDate = workouts.reduce((acc, item) => {
+    const parsedDate = parseDateValue(item?.date);
+    if (!parsedDate) return acc;
+    const key = toDateKey(parsedDate);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const workoutMinutesByDate = workouts.reduce((acc, item) => {
+    const parsedDate = parseDateValue(item?.date);
+    if (!parsedDate) return acc;
+    const key = toDateKey(parsedDate);
+    const minutes = Number(item?.duration || 0);
+    acc[key] = (acc[key] || 0) + (Number.isNaN(minutes) ? 0 : minutes);
+    return acc;
+  }, {});
+
   const last7Workouts = workouts.filter((item) => {
-    const d = new Date(item.date);
-    return !Number.isNaN(d) && d >= last7Cutoff;
+    const parsedDate = parseDateValue(item?.date);
+    return Boolean(parsedDate && parsedDate >= last7Cutoff);
   });
   const last7Calories = calories.filter((item) => {
-    const d = new Date(item.date);
-    return !Number.isNaN(d) && d >= last7Cutoff;
+    const parsedDate = parseDateValue(item?.date);
+    return Boolean(parsedDate && parsedDate >= last7Cutoff);
   });
 
   const avgCalories =
-    last7Calories.reduce((sum, item) => sum + (item.calories || 0), 0) /
+    last7Calories.reduce((sum, item) => sum + Number(item?.calories || 0), 0) /
     (last7Calories.length || 1);
-  const weeklyGoal = Number(goals.weeklyWorkouts || 3);
+  const weeklyGoal = Math.max(Number(goals.weeklyWorkouts || 3), 1);
   const workoutProgress = Math.min(
     100,
     Math.round((last7Workouts.length / weeklyGoal) * 100)
   );
-  const calorieGoal = Number(goals.targetCalories || 2200);
+  const calorieGoal = Math.max(Number(goals.targetCalories || 2200), 1);
   const calorieProgress = Math.min(
     100,
     Math.round((avgCalories / calorieGoal) * 100)
   );
 
-  const today = new Date();
-  const last7Days = Array.from({ length: 7 }, (_, index) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (6 - index));
-    return d;
-  });
-  const last7Keys = last7Days.map((d) => d.toISOString().slice(0, 10));
+  const buildRangeKeys = (days) =>
+    Array.from({ length: days }, (_, index) => {
+      const date = new Date(todayDate);
+      date.setDate(date.getDate() - (days - 1 - index));
+      return toDateKey(date);
+    });
 
-  const caloriesByDate = calories.reduce((acc, item) => {
-    if (!item?.date) return acc;
-    const key = item.date;
-    const next = Number(item.calories || 0);
-    acc[key] = (acc[key] || 0) + (Number.isNaN(next) ? 0 : next);
-    return acc;
-  }, {});
+  const formatRangeLabel = (key) => {
+    const parsedDate = parseDateValue(key);
+    return parsedDate
+      ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : key;
+  };
 
-  const workoutsByDate = workouts.reduce((acc, item) => {
-    if (!item?.date) return acc;
-    const key = item.date;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+  const buildRecoveryScore = (key) => {
+    const dailyCalories = caloriesByDate[key] || calorieGoal;
+    const caloriePenalty = Math.min(
+      (Math.abs(dailyCalories - calorieGoal) / calorieGoal) * 55,
+      40
+    );
+    const minutes = workoutMinutesByDate[key] || 0;
+    const loadPenalty = Math.min((minutes / 90) * 30, 30);
+    const restBonus = workoutsByDate[key] ? 0 : 8;
+    return Math.round(clamp(78 - caloriePenalty - loadPenalty + restBonus, 30, 95));
+  };
 
-  const calorieSeries = last7Keys.map((key) => caloriesByDate[key] || 0);
-  const workoutSeries = last7Keys.map((key) => workoutsByDate[key] || 0);
+  const buildTrendSet = (keys) => {
+    const caloriesSeries = keys.map((key) => caloriesByDate[key] || 0);
+    const workoutSeries = keys.map((key) => workoutsByDate[key] || 0);
+    const recoverySeries = keys.map((key) => buildRecoveryScore(key));
+    return {
+      keys,
+      caloriesSeries,
+      workoutSeries,
+      recoverySeries,
+      startLabel: formatRangeLabel(keys[0]),
+      endLabel: formatRangeLabel(keys[keys.length - 1]),
+      activeDays: workoutSeries.filter((value) => value > 0).length,
+      avgCalories:
+        caloriesSeries.reduce((sum, value) => sum + value, 0) / (keys.length || 1),
+      avgRecovery:
+        recoverySeries.reduce((sum, value) => sum + value, 0) / (keys.length || 1)
+    };
+  };
+
+  const trendRanges = {
+    week: buildTrendSet(buildRangeKeys(7)),
+    month: buildTrendSet(buildRangeKeys(30))
+  };
+
+  const calorieSeries = trendRanges.week.caloriesSeries;
+  const workoutSeries = trendRanges.week.workoutSeries;
+  const last7Keys = trendRanges.week.keys;
+  const recentWorkouts = [...workouts].sort((a, b) =>
+    String(b?.date || "").localeCompare(String(a?.date || ""))
+  );
 
   const avgDailyWorkouts = last7Workouts.length / 7;
   const remainingWorkouts = Math.max(weeklyGoal - last7Workouts.length, 0);
@@ -125,6 +210,28 @@ export default function DashboardPage({
       ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
       : "Log a workout to start your pace estimate.";
   const calorieDelta = Math.round(avgCalories - calorieGoal);
+
+  const latestPlan = dashboard?.plans?.[0];
+  const weeklyMealPlan = buildWeeklyMealPlan({
+    weekDays,
+    latestPlanByWeekday,
+    goalText:
+      latestPlan?.goal ||
+      dashboard?.goals?.goalType ||
+      form?.goal ||
+      "Build lean strength and energy",
+    targetCalories: goals.targetCalories
+  });
+  const todayWeekday = todayDate.toLocaleDateString("en-US", { weekday: "long" });
+  const todayMealPlan =
+    weeklyMealPlan.days.find((day) => day.key === todayWeekday) ||
+    weeklyMealPlan.days[0] ||
+    null;
+  const todayRecommendation = {
+    weekday: todayWeekday,
+    workoutLines: latestPlanByWeekday?.[todayWeekday] || [],
+    mealPlan: todayMealPlan
+  };
 
   const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
     const safeValues = values.length ? values : [0];
@@ -158,7 +265,12 @@ export default function DashboardPage({
         workoutProgress={workoutProgress}
         calorieGoal={calorieGoal}
         calorieProgress={calorieProgress}
-        workouts={workouts}
+        workouts={recentWorkouts}
+        buildLinePath={buildLinePath}
+        trendRanges={trendRanges}
+        todayRecommendation={todayRecommendation}
+        onOpenPlans={() => setDashView("plans")}
+        onOpenMeal={() => setDashView("meal")}
       />
     );
   } else if (dashView === "workouts") {
