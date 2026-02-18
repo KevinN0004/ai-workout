@@ -40,7 +40,10 @@ const defaultGoals = () => ({
 });
 const defaultDashboard = () => ({
   workouts: [],
+  workoutSessions: [],
   calories: [],
+  mealLogs: [],
+  progressMetrics: [],
   plans: [],
   savedExercises: [],
   goals: defaultGoals()
@@ -50,8 +53,15 @@ const buildDashboard = (input = {}) => {
   const goals = input.goals || {};
   return {
     ...base,
-    workouts: Array.isArray(input.workouts) ? input.workouts : [],
+    workouts: Array.isArray(input.workouts) ? input.workouts.slice(0, 500) : [],
+    workoutSessions: Array.isArray(input.workoutSessions)
+      ? input.workoutSessions.slice(0, 500)
+      : [],
     calories: Array.isArray(input.calories) ? input.calories : [],
+    mealLogs: Array.isArray(input.mealLogs) ? input.mealLogs.slice(0, 800) : [],
+    progressMetrics: Array.isArray(input.progressMetrics)
+      ? input.progressMetrics.slice(0, 400)
+      : [],
     plans: Array.isArray(input.plans) ? input.plans : [],
     savedExercises: Array.isArray(input.savedExercises)
       ? input.savedExercises.slice(0, 200)
@@ -93,6 +103,68 @@ const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
     )
     .filter(Boolean)
     .slice(0, maxItems);
+
+const allowedMealTypes = new Set([
+  "breakfast",
+  "lunch",
+  "dinner",
+  "snack",
+  "drink",
+  "other"
+]);
+
+const buildWorkoutSessionEntry = (input = {}) => ({
+  id: cleanText(input.id, 64) || crypto.randomUUID(),
+  date: cleanText(input.date, 20),
+  focus: cleanText(input.focus, 80) || "General",
+  duration: toNullableNumber(input.duration, 5, 360),
+  exercises: toCleanArray(input.exercises, 18, 140),
+  sets: toNullableNumber(input.sets, 1, 80),
+  reps: toNullableNumber(input.reps, 1, 120),
+  intensityRpe: toNullableNumber(input.intensityRpe ?? input.rpe, 1, 10),
+  notes: cleanText(input.notes, 500),
+  createdAt: new Date().toISOString()
+});
+
+const toWorkoutSummaryEntry = (session) => ({
+  id: cleanText(session?.id, 64) || crypto.randomUUID(),
+  date: cleanText(session?.date, 20),
+  focus: cleanText(session?.focus, 80) || "General",
+  duration: toNullableNumber(session?.duration, 5, 360),
+  exercises: toCleanArray(session?.exercises, 18, 140),
+  sets: toNullableNumber(session?.sets, 1, 80),
+  reps: toNullableNumber(session?.reps, 1, 120),
+  intensityRpe: toNullableNumber(session?.intensityRpe, 1, 10),
+  notes: cleanText(session?.notes, 500),
+  createdAt: cleanText(session?.createdAt, 40) || new Date().toISOString()
+});
+
+const buildMealLogEntry = (input = {}) => {
+  const mealTypeRaw = cleanText(input.mealType, 40).toLowerCase();
+  return {
+    id: cleanText(input.id, 64) || crypto.randomUUID(),
+    date: cleanText(input.date, 20),
+    mealType: allowedMealTypes.has(mealTypeRaw) ? mealTypeRaw : "other",
+    name: cleanText(input.name, 140),
+    calories: toNullableNumber(input.calories, 0, 5000),
+    proteinG: toNullableNumber(input.proteinG, 0, 400),
+    carbsG: toNullableNumber(input.carbsG, 0, 700),
+    fatG: toNullableNumber(input.fatG, 0, 300),
+    notes: cleanText(input.notes, 300),
+    loggedAt: new Date().toISOString()
+  };
+};
+
+const buildProgressMetricEntry = (input = {}) => ({
+  id: cleanText(input.id, 64) || crypto.randomUUID(),
+  date: cleanText(input.date, 20),
+  weightLb: toNullableNumber(input.weightLb, 50, 700),
+  bodyFatPct: toNullableNumber(input.bodyFatPct, 2, 70),
+  waistCm: toNullableNumber(input.waistCm, 30, 250),
+  restingHr: toNullableNumber(input.restingHr, 30, 220),
+  notes: cleanText(input.notes, 320),
+  loggedAt: new Date().toISOString()
+});
 
 const buildSavedExerciseEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
@@ -859,31 +931,35 @@ app.get("/api/dashboard", requireAuth, async (req, res) => {
   res.json({ dashboard: buildDashboard(user.dashboard) });
 });
 
-app.post("/api/dashboard/workouts", requireAuth, async (req, res) => {
-  const { date, focus, duration, notes } = req.body || {};
-  const parsedDuration = toNullableNumber(duration, 5, 360);
-  if (!cleanText(date, 20) || parsedDuration === null) {
+app.post(["/api/dashboard/workouts", "/api/dashboard/workout-sessions"], requireAuth, async (req, res) => {
+  const session = buildWorkoutSessionEntry(req.body || {});
+  if (!session.date || session.duration === null) {
     return res.status(400).json({ error: "Date and duration are required." });
   }
+
   const updated = await updateUser(req.user.id, (user) => {
     const dashboard = buildDashboard(user.dashboard);
-    const workout = {
-      id: crypto.randomUUID(),
-      date: cleanText(date, 20),
-      focus: cleanText(focus, 80) || "General",
-      duration: parsedDuration,
-      notes: cleanText(notes, 500)
-    };
+    const workoutSummary = toWorkoutSummaryEntry(session);
+    const nextSessions = [session, ...dashboard.workoutSessions].slice(0, 500);
+    const nextWorkouts = [
+      workoutSummary,
+      ...dashboard.workouts.filter((item) => cleanText(item?.id, 64) !== workoutSummary.id)
+    ].slice(0, 500);
     return {
       ...user,
       dashboard: {
         ...dashboard,
-        workouts: [workout, ...dashboard.workouts]
+        workoutSessions: nextSessions,
+        workouts: nextWorkouts
       }
     };
   });
+
   if (!updated) return res.status(404).json({ error: "User not found." });
-  res.json({ dashboard: updated.dashboard });
+  res.json({
+    dashboard: updated.dashboard,
+    workoutSession: updated.dashboard?.workoutSessions?.[0] || session
+  });
 });
 
 app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
@@ -897,7 +973,9 @@ app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
     const entry = {
       id: crypto.randomUUID(),
       date: cleanText(date, 20),
-      calories: parsedCalories
+      calories: parsedCalories,
+      source: "manual",
+      updatedAt: new Date().toISOString()
     };
     return {
       ...user,
@@ -932,6 +1010,108 @@ app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
   });
   if (!updated) return res.status(404).json({ error: "User not found." });
   res.json({ dashboard: updated.dashboard });
+});
+
+app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
+  const mealLog = buildMealLogEntry(req.body || {});
+  if (!mealLog.date || !mealLog.name) {
+    return res.status(400).json({ error: "Date and meal name are required." });
+  }
+  if (
+    mealLog.calories === null &&
+    mealLog.proteinG === null &&
+    mealLog.carbsG === null &&
+    mealLog.fatG === null
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Add calories or at least one macro value for the meal." });
+  }
+
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = buildDashboard(user.dashboard);
+    const mealLogs = [mealLog, ...dashboard.mealLogs].slice(0, 800);
+    const hasManualCaloriesForDay = dashboard.calories.some(
+      (item) =>
+        cleanText(item?.date, 20) === mealLog.date &&
+        cleanText(item?.source || "manual", 20) !== "meal_logs"
+    );
+
+    let calories = dashboard.calories;
+    if (!hasManualCaloriesForDay) {
+      const dayCalories = mealLogs.reduce((sum, item) => {
+        if (cleanText(item?.date, 20) !== mealLog.date) return sum;
+        return sum + (toNullableNumber(item?.calories, 0, 5000) ?? 0);
+      }, 0);
+      calories = dashboard.calories.filter(
+        (item) =>
+          !(
+            cleanText(item?.date, 20) === mealLog.date &&
+            cleanText(item?.source || "", 20) === "meal_logs"
+          )
+      );
+      if (dayCalories > 0) {
+        calories = [
+          {
+            id: `meal-logs-${mealLog.date}`,
+            date: mealLog.date,
+            calories: Math.round(dayCalories),
+            source: "meal_logs",
+            updatedAt: new Date().toISOString()
+          },
+          ...calories
+        ];
+      }
+    }
+
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        mealLogs,
+        calories: calories.slice(0, 1000)
+      }
+    };
+  });
+
+  if (!updated) return res.status(404).json({ error: "User not found." });
+  res.json({
+    dashboard: updated.dashboard,
+    mealLog: updated.dashboard?.mealLogs?.[0] || mealLog
+  });
+});
+
+app.post("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
+  const metric = buildProgressMetricEntry(req.body || {});
+  if (!metric.date) {
+    return res.status(400).json({ error: "Date is required." });
+  }
+  if (
+    metric.weightLb === null &&
+    metric.bodyFatPct === null &&
+    metric.waistCm === null &&
+    metric.restingHr === null
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Add at least one metric: weight, body fat, waist, or resting heart rate." });
+  }
+
+  const updated = await updateUser(req.user.id, (user) => {
+    const dashboard = buildDashboard(user.dashboard);
+    return {
+      ...user,
+      dashboard: {
+        ...dashboard,
+        progressMetrics: [metric, ...dashboard.progressMetrics].slice(0, 400)
+      }
+    };
+  });
+  if (!updated) return res.status(404).json({ error: "User not found." });
+  res.json({
+    dashboard: updated.dashboard,
+    progressMetric: updated.dashboard?.progressMetrics?.[0] || metric
+  });
 });
 
 app.post("/api/dashboard/saved-exercises", requireAuth, async (req, res) => {

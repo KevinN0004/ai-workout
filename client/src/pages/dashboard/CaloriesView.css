@@ -42,3 +42,13 @@
   color: #b3b3b3;
 }
 
+.progress-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .progress-form {
+    grid-template-columns: 1fr;
+  }
+}
+

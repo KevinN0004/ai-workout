@@ -785,8 +785,30 @@ const handleImageError = (event) => {
   event.currentTarget.src = FALLBACK_IMAGE;
 };
 
-export default function MealView({ dashboard, fallbackPlan }) {
+export default function MealView({
+  dashboard,
+  fallbackPlan,
+  mealLogForm,
+  setMealLogForm,
+  submitMealLog,
+  mealLogs
+}) {
   const [activeMealId, setActiveMealId] = useState(null);
+  const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];
+  const safeMealLogForm = mealLogForm || {
+    date: "",
+    mealType: "breakfast",
+    name: "",
+    calories: "",
+    proteinG: "",
+    carbsG: "",
+    fatG: "",
+    notes: ""
+  };
+  const updateMealLogForm =
+    typeof setMealLogForm === "function" ? setMealLogForm : () => {};
+  const onSubmitMealLog =
+    typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
 
   const mealContext = useMemo(() => {
     const latestPlan = dashboard?.plans?.[0];
@@ -880,6 +902,134 @@ export default function MealView({ dashboard, fallbackPlan }) {
           </p>
         </aside>
       </div>
+
+      <section className="meal-log-panel">
+        <div className="meal-log-header">
+          <h3>Meal log history</h3>
+          <p className="muted">Track meals and macros. Saved to your database.</p>
+        </div>
+        <form className="form dashboard-form meal-log-form" onSubmit={onSubmitMealLog}>
+          <label>
+            Date
+            <input
+              type="date"
+              value={safeMealLogForm.date}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, date: event.target.value }))
+              }
+              required
+            />
+          </label>
+          <label>
+            Meal type
+            <select
+              value={safeMealLogForm.mealType}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, mealType: event.target.value }))
+              }
+            >
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+              <option value="snack">Snack</option>
+              <option value="drink">Drink</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            Meal name
+            <input
+              value={safeMealLogForm.name}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, name: event.target.value }))
+              }
+              placeholder="Chicken rice bowl"
+              required
+            />
+          </label>
+          <label>
+            Calories
+            <input
+              type="number"
+              min="0"
+              max="5000"
+              value={safeMealLogForm.calories}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, calories: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Protein (g)
+            <input
+              type="number"
+              min="0"
+              max="400"
+              value={safeMealLogForm.proteinG}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, proteinG: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Carbs (g)
+            <input
+              type="number"
+              min="0"
+              max="700"
+              value={safeMealLogForm.carbsG}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, carbsG: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Fat (g)
+            <input
+              type="number"
+              min="0"
+              max="300"
+              value={safeMealLogForm.fatG}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, fatG: event.target.value }))
+              }
+            />
+          </label>
+          <label>
+            Notes
+            <input
+              value={safeMealLogForm.notes}
+              onChange={(event) =>
+                updateMealLogForm((prev) => ({ ...prev, notes: event.target.value }))
+              }
+              placeholder="Post-workout meal"
+            />
+          </label>
+          <button className="ghost meal-log-submit" type="submit">
+            Save meal log
+          </button>
+        </form>
+
+        <div className="list">
+          {safeMealLogs.slice(0, 8).map((item) => (
+            <div key={item.id} className="list-row">
+              <div>
+                <strong>{item.date}</strong>
+                <span className="muted">
+                  {" "}
+                  - {(item.mealType || "other").replace(/^\w/, (value) => value.toUpperCase())}
+                  {item.name ? ` - ${item.name}` : ""}
+                </span>
+                <p className="muted meal-log-meta">
+                  {item.calories ?? "--"} kcal | P {item.proteinG ?? "--"} / C {item.carbsG ?? "--"} / F{" "}
+                  {item.fatG ?? "--"}
+                </p>
+              </div>
+            </div>
+          ))}
+          {!safeMealLogs.length && <p className="muted">No meal logs yet.</p>}
+        </div>
+      </section>
 
       <div className="meal-sections">
         {mealContext.sections.map((section) => (

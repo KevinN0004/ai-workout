@@ -35,15 +35,29 @@ export default function WorkoutsView({
         </button>
       </div>
       <div className="list">
-        {workouts.map((item) => (
-          <div key={item.id} className="list-row">
-            <div>
-              <strong>{item.date}</strong>
-              <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
+        {workouts.map((item) => {
+          const sessionMeta = [
+            item.sets ? `${item.sets} sets` : "",
+            item.reps ? `${item.reps} reps` : "",
+            item.intensityRpe ? `RPE ${item.intensityRpe}` : ""
+          ]
+            .filter(Boolean)
+            .join(" | ");
+          return (
+            <div key={item.id} className="list-row workout-row">
+              <div className="workout-row-copy">
+                <strong>{item.date}</strong>
+                <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
+                {!!item.exercises?.length && (
+                  <p className="muted workout-detail">{item.exercises.join(", ")}</p>
+                )}
+                {!!sessionMeta && <p className="muted workout-detail">{sessionMeta}</p>}
+                {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
+              </div>
+              <span>{item.duration} min</span>
             </div>
-            <span>{item.duration} min</span>
-          </div>
-        ))}
+          );
+        })}
         {!workouts.length && <p className="muted">No workouts logged yet.</p>}
       </div>
     </section>

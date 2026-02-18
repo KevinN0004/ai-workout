@@ -1,1 +1,14 @@
-/* WorkoutsView specific styles are inherited from SummaryView.css and DashboardPage.css */
+.workout-row {
+  align-items: flex-start;
+}
+
+.workout-row-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.workout-detail {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}

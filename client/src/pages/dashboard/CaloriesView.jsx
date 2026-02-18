@@ -15,7 +15,11 @@ export default function CaloriesView({
   setCalorieForm,
   calories,
   goalPaceText,
-  submitGoals
+  submitGoals,
+  progressMetrics,
+  progressForm,
+  setProgressForm,
+  submitProgressMetric
 }) {
   return (
     <section className="panel dashboard-card span-2">
@@ -173,6 +177,123 @@ export default function CaloriesView({
                 </select>
               </label>
             </form>
+          </section>
+
+          <section className="panel dashboard-card">
+            <h3>Progress metrics</h3>
+            <p className="muted">Log body metrics over time and keep historical records.</p>
+            <form className="form dashboard-form progress-form" onSubmit={submitProgressMetric}>
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={progressForm.date}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      date: e.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Weight (lb)
+                <input
+                  type="number"
+                  min="50"
+                  max="700"
+                  value={progressForm.weightLb}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      weightLb: e.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Body fat (%)
+                <input
+                  type="number"
+                  min="2"
+                  max="70"
+                  step="0.1"
+                  value={progressForm.bodyFatPct}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      bodyFatPct: e.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Waist (cm)
+                <input
+                  type="number"
+                  min="30"
+                  max="250"
+                  step="0.1"
+                  value={progressForm.waistCm}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      waistCm: e.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Resting HR
+                <input
+                  type="number"
+                  min="30"
+                  max="220"
+                  value={progressForm.restingHr}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      restingHr: e.target.value
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Notes
+                <input
+                  value={progressForm.notes}
+                  onChange={(e) =>
+                    setProgressForm((prev) => ({
+                      ...prev,
+                      notes: e.target.value
+                    }))
+                  }
+                  placeholder="Weekly check-in"
+                />
+              </label>
+              <button className="ghost" type="submit">
+                Save metric
+              </button>
+            </form>
+
+            <div className="list">
+              {(Array.isArray(progressMetrics) ? progressMetrics : []).slice(0, 6).map((item) => (
+                <div key={item.id} className="list-row">
+                  <div>
+                    <strong>{item.date}</strong>
+                    <span className="muted">
+                      {" "}
+                      - W {item.weightLb ?? "--"} lb | BF {item.bodyFatPct ?? "--"}% | Waist{" "}
+                      {item.waistCm ?? "--"} cm | RHR {item.restingHr ?? "--"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {!progressMetrics?.length && (
+                <p className="muted">No progress metrics logged yet.</p>
+              )}
+            </div>
           </section>
         </aside>
       </div>

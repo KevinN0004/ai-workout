@@ -144,10 +144,33 @@ export default function App() {
   const [workoutForm, setWorkoutForm] = useState({
     date: getLocalDateKey(),
     focus: "",
-    duration: ""
+    duration: "",
+    exercises: "",
+    sets: "",
+    reps: "",
+    intensityRpe: "",
+    notes: ""
   });
   const [calorieForm, setCalorieForm] = useState({
     calories: ""
+  });
+  const [mealLogForm, setMealLogForm] = useState({
+    date: getLocalDateKey(),
+    mealType: "breakfast",
+    name: "",
+    calories: "",
+    proteinG: "",
+    carbsG: "",
+    fatG: "",
+    notes: ""
+  });
+  const [progressForm, setProgressForm] = useState({
+    date: getLocalDateKey(),
+    weightLb: "",
+    bodyFatPct: "",
+    waistCm: "",
+    restingHr: "",
+    notes: ""
   });
   const [goalForm, setGoalForm] = useState({
     targetWeight: "160",
@@ -967,11 +990,18 @@ export default function App() {
     e.preventDefault();
     setDashError("");
     try {
-      const res = await fetch("/api/dashboard/workouts", {
+      const payload = {
+        ...workoutForm,
+        exercises: workoutForm.exercises
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      };
+      const res = await fetch("/api/dashboard/workout-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(workoutForm)
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -982,7 +1012,12 @@ export default function App() {
       setWorkoutForm({
         date: getLocalDateKey(),
         focus: "",
-        duration: ""
+        duration: "",
+        exercises: "",
+        sets: "",
+        reps: "",
+        intensityRpe: "",
+        notes: ""
       });
       setWorkoutModalOpen(false);
     } catch (err) {
@@ -1034,6 +1069,66 @@ export default function App() {
       setDashboard(data.dashboard);
     } catch (err) {
       setDashError(err.message || "Unable to save goals.");
+    }
+  };
+
+  const submitMealLog = async (e) => {
+    e.preventDefault();
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/meal-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(mealLogForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save meal log.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      setMealLogForm({
+        date: getLocalDateKey(),
+        mealType: "breakfast",
+        name: "",
+        calories: "",
+        proteinG: "",
+        carbsG: "",
+        fatG: "",
+        notes: ""
+      });
+    } catch (err) {
+      setDashError(err.message || "Unable to save meal log.");
+    }
+  };
+
+  const submitProgressMetric = async (e) => {
+    e.preventDefault();
+    setDashError("");
+    try {
+      const res = await fetch("/api/dashboard/progress-metrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(progressForm)
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save progress metric.");
+      }
+      const data = await res.json();
+      setDashboard(data.dashboard);
+      setProgressForm({
+        date: getLocalDateKey(),
+        weightLb: "",
+        bodyFatPct: "",
+        waistCm: "",
+        restingHr: "",
+        notes: ""
+      });
+    } catch (err) {
+      setDashError(err.message || "Unable to save progress metric.");
     }
   };
 
@@ -1138,6 +1233,12 @@ export default function App() {
         calorieForm={calorieForm}
         setCalorieForm={setCalorieForm}
         submitCalories={submitCalories}
+        mealLogForm={mealLogForm}
+        setMealLogForm={setMealLogForm}
+        submitMealLog={submitMealLog}
+        progressForm={progressForm}
+        setProgressForm={setProgressForm}
+        submitProgressMetric={submitProgressMetric}
         submitGoals={submitGoals}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}

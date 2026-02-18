@@ -53,6 +53,12 @@ export default function DashboardPage({
   calorieForm,
   setCalorieForm,
   submitCalories,
+  mealLogForm,
+  setMealLogForm,
+  submitMealLog,
+  progressForm,
+  setProgressForm,
+  submitProgressMetric,
   submitGoals,
   weekDays,
   latestPlanByWeekday,
@@ -65,8 +71,14 @@ export default function DashboardPage({
   plannerModal,
   generatedPlanModal
 }) {
-  const workouts = dashboard?.workouts || [];
+  const workouts = Array.isArray(dashboard?.workoutSessions) && dashboard.workoutSessions.length
+    ? dashboard.workoutSessions
+    : dashboard?.workouts || [];
   const calories = dashboard?.calories || [];
+  const mealLogs = Array.isArray(dashboard?.mealLogs) ? dashboard.mealLogs : [];
+  const progressMetrics = Array.isArray(dashboard?.progressMetrics)
+    ? dashboard.progressMetrics
+    : [];
   const goals = dashboard?.goals || goalForm;
   const {
     last7Workouts,
@@ -359,6 +371,10 @@ export default function DashboardPage({
         calories={calories}
         goalPaceText={goalPaceText}
         submitGoals={submitGoals}
+        progressMetrics={progressMetrics}
+        progressForm={progressForm}
+        setProgressForm={setProgressForm}
+        submitProgressMetric={submitProgressMetric}
       />
     );
   } else if (dashView === "plans") {
@@ -373,7 +389,16 @@ export default function DashboardPage({
       />
     );
   } else if (dashView === "meal") {
-    activeView = <MealView dashboard={dashboard} fallbackPlan={form} />;
+    activeView = (
+      <MealView
+        dashboard={dashboard}
+        fallbackPlan={form}
+        mealLogForm={mealLogForm}
+        setMealLogForm={setMealLogForm}
+        submitMealLog={submitMealLog}
+        mealLogs={mealLogs}
+      />
+    );
   } else if (dashView === "tips") {
     activeView = (
       <TipsView
@@ -513,6 +538,81 @@ export default function DashboardPage({
                       }))
                     }
                     required
+                  />
+                </label>
+                <label>
+                  Exercises (comma-separated)
+                  <input
+                    value={workoutForm.exercises}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({
+                        ...prev,
+                        exercises: e.target.value
+                      }))
+                    }
+                    placeholder="Squat, bench press, row"
+                  />
+                </label>
+                <div className="dashboard-form-grid compact">
+                  <label>
+                    Sets
+                    <input
+                      type="number"
+                      min="1"
+                      max="80"
+                      value={workoutForm.sets}
+                      onChange={(e) =>
+                        setWorkoutForm((prev) => ({
+                          ...prev,
+                          sets: e.target.value
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Reps
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={workoutForm.reps}
+                      onChange={(e) =>
+                        setWorkoutForm((prev) => ({
+                          ...prev,
+                          reps: e.target.value
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Intensity (RPE 1-10)
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      step="0.5"
+                      value={workoutForm.intensityRpe}
+                      onChange={(e) =>
+                        setWorkoutForm((prev) => ({
+                          ...prev,
+                          intensityRpe: e.target.value
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <label>
+                  Session notes
+                  <textarea
+                    value={workoutForm.notes}
+                    onChange={(e) =>
+                      setWorkoutForm((prev) => ({
+                        ...prev,
+                        notes: e.target.value
+                      }))
+                    }
+                    rows={3}
+                    placeholder="How did the session feel?"
                   />
                 </label>
                 <div className="modal-submit">
