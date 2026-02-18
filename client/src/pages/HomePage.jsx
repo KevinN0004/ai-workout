@@ -246,18 +246,6 @@ export default function HomePage({
               {personalMode === "advanced" && (
                 <>
                   <label>
-                    Body fat %
-                    <input
-                      name="bodyFat"
-                      value={personal.bodyFat}
-                      onChange={onPersonalChange}
-                      type="number"
-                      min="5"
-                      max="50"
-                      placeholder="18"
-                    />
-                  </label>
-                  <label>
                     Activity level
                     <select
                       name="activity"

@@ -212,8 +212,7 @@ const isCompleteSignupProfile = (profile) =>
       profile?.age !== null &&
       profile?.heightCm !== null &&
       profile?.weightKg !== null &&
-      cleanText(profile?.sex, 40) &&
-      profile?.bodyFat !== null
+      cleanText(profile?.sex, 40)
   );
 
 const toFiniteNumber = (value) => {

@@ -231,19 +231,6 @@ export default function AuthPage({
                 />
               </label>
               <label>
-                Body fat (%)
-                <input
-                  name="bodyFat"
-                  type="number"
-                  min="3"
-                  max="70"
-                  value={signupProfileForm.bodyFat}
-                  onChange={onSignupProfileChange}
-                  placeholder="18"
-                  required
-                />
-              </label>
-              <label>
                 Sex
                 <select
                   name="sex"
