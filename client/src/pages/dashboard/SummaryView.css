@@ -131,6 +131,44 @@
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.12));
 }
 
+.air-quality-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.air-quality-good {
+  background: linear-gradient(130deg, rgba(34, 197, 94, 0.85), rgba(22, 163, 74, 0.72));
+}
+
+.air-quality-moderate {
+  background: linear-gradient(130deg, rgba(250, 204, 21, 0.9), rgba(234, 179, 8, 0.76));
+}
+
+.air-quality-unhealthy-for-sensitive-groups {
+  background: linear-gradient(130deg, rgba(249, 115, 22, 0.9), rgba(234, 88, 12, 0.76));
+}
+
+.air-quality-unhealthy {
+  background: linear-gradient(130deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.78));
+}
+
+.air-quality-very-unhealthy {
+  background: linear-gradient(130deg, rgba(124, 58, 237, 0.92), rgba(109, 40, 217, 0.8));
+}
+
+.air-quality-hazardous,
+.air-quality-unknown {
+  background: linear-gradient(130deg, rgba(76, 29, 149, 0.92), rgba(88, 28, 135, 0.8));
+}
+
 .weather-reasons {
   margin-top: 0;
 }

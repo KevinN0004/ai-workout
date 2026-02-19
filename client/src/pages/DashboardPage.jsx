@@ -66,6 +66,10 @@ export default function DashboardPage({
   weatherLoading,
   weatherError,
   refreshWeatherRecommendation,
+  airQualityData,
+  airQualityLoading,
+  airQualityError,
+  refreshAirQuality,
   onSaveExerciseToPlan,
   onRemoveSavedExercise,
   plannerModal,
@@ -341,6 +345,10 @@ export default function DashboardPage({
         weatherLoading={weatherLoading}
         weatherError={weatherError}
         refreshWeatherRecommendation={refreshWeatherRecommendation}
+        airQualityData={airQualityData}
+        airQualityLoading={airQualityLoading}
+        airQualityError={airQualityError}
+        refreshAirQuality={refreshAirQuality}
         onOpenPlans={() => setDashView("plans")}
         onOpenMeal={() => setDashView("meal")}
       />

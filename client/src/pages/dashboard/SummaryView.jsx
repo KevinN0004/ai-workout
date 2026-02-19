@@ -46,6 +46,10 @@ export default function SummaryView({
   weatherLoading,
   weatherError,
   refreshWeatherRecommendation,
+  airQualityData,
+  airQualityLoading,
+  airQualityError,
+  refreshAirQuality,
   onOpenPlans,
   onOpenMeal
 }) {
@@ -61,6 +65,14 @@ export default function SummaryView({
   const nextForecast = Array.isArray(weatherData?.daily)
     ? weatherData.daily.slice(0, 3)
     : [];
+  const airSummary = airQualityData?.summary || null;
+  const airLocation = airQualityData?.location || null;
+  const topPollutants = Array.isArray(airQualityData?.pollutants)
+    ? airQualityData.pollutants.slice(0, 3)
+    : [];
+  const airLevelClass = String(airSummary?.level || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
 
   return (
     <div className="dashboard-split span-2">
@@ -213,6 +225,50 @@ export default function SummaryView({
                 </>
               ) : (
                 <p className="muted">No weather recommendation loaded yet.</p>
+              )}
+            </article>
+            <article className="hub-card">
+              <div className="weather-card-header">
+                <h3>Air quality</h3>
+                <button type="button" className="ghost" onClick={refreshAirQuality}>
+                  Refresh
+                </button>
+              </div>
+              {airQualityLoading ? (
+                <p className="muted">Checking local air quality...</p>
+              ) : airQualityError ? (
+                <p className="muted">{airQualityError}</p>
+              ) : airSummary ? (
+                <>
+                  <p className={`air-quality-badge air-quality-${airLevelClass}`}>
+                    {airSummary.level || "Unknown"}
+                  </p>
+                  <p>{airSummary.guidance}</p>
+                  <p className="muted">
+                    {airSummary.primaryPollutant || "PM2.5"}:{" "}
+                    {airSummary.pm25 ?? "--"} ug/m3
+                    {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
+                      ? ` | US AQI ${airSummary.aqiUs}`
+                      : ""}
+                  </p>
+                  {airLocation?.name ? (
+                    <p className="muted">
+                      Station: {airLocation.name}
+                      {airLocation.city ? ` (${airLocation.city})` : ""}
+                    </p>
+                  ) : null}
+                  {topPollutants.length ? (
+                    <ul className="hub-list weather-reasons">
+                      {topPollutants.map((item) => (
+                        <li key={`${item.code}-${item.measuredAt}`}>
+                          {item.label || item.code}: {item.value} {item.unit}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              ) : (
+                <p className="muted">No air quality data loaded yet.</p>
               )}
             </article>
           </div>

@@ -187,6 +187,9 @@ const openMeteoBaseUrl = cleanText(
   240
 );
 const openMeteoTimeoutMs = 10000;
+const openAqBaseUrl = cleanText(process.env.OPENAQ_BASE_URL || "https://api.openaq.org/v3", 240);
+const openAqApiKey = cleanText(process.env.OPENAQ_API_KEY || "", 240);
+const openAqTimeoutMs = 12000;
 const wgerBaseUrl = cleanText(process.env.WGER_BASE_URL || "https://wger.de/api/v2", 240);
 const wgerApiToken = cleanText(process.env.WGER_API_TOKEN || "", 240);
 const wgerDefaultLanguage = toNullableNumber(process.env.WGER_DEFAULT_LANGUAGE, 1, 100) ?? 2;
@@ -329,6 +332,231 @@ const fetchOpenMeteo = async (query) => {
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const openAqRequest = async (endpoint, query = {}) => {
+  if (!openAqApiKey) {
+    const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
+    err.status = 503;
+    throw err;
+  }
+  if (typeof fetch !== "function") {
+    const err = new Error("This Node runtime does not support fetch.");
+    err.status = 500;
+    throw err;
+  }
+
+  const base = openAqBaseUrl.replace(/\/+$/, "");
+  const path = String(endpoint || "").replace(/^\/+/, "");
+  const url = new URL(`${base}/${path}`);
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null || value === "") continue;
+    url.searchParams.set(key, String(value));
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "X-API-Key": openAqApiKey
+      },
+      signal: controller.signal
+    });
+    const rawBody = await response.text();
+    let data = {};
+    try {
+      data = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      data = rawBody;
+    }
+    if (!response.ok) {
+      const stringBody = cleanText(typeof data === "string" ? data : "", 220);
+      const firstError =
+        Array.isArray(data) && data.length
+          ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
+          : "";
+      const err = new Error(
+        cleanText(
+          firstError ||
+            (typeof data === "object" && data
+              ? data?.message || data?.detail || data?.error
+              : "") ||
+            stringBody ||
+            "OpenAQ request failed.",
+          220
+        )
+      );
+      err.status = response.status >= 500 ? 502 : response.status;
+      throw err;
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      const timeoutErr = new Error("OpenAQ request timed out.");
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const openAqParameterLabel = (code = "") => {
+  const key = cleanText(code, 40).toLowerCase();
+  const labels = {
+    pm25: "PM2.5",
+    "pm2.5": "PM2.5",
+    pm10: "PM10",
+    o3: "Ozone",
+    no2: "Nitrogen dioxide",
+    so2: "Sulfur dioxide",
+    co: "Carbon monoxide"
+  };
+  return labels[key] || (key ? key.toUpperCase() : "");
+};
+
+const firstFinite = (values) => {
+  for (const value of values) {
+    const num = toFiniteNumber(value);
+    if (num !== null) return num;
+  }
+  return null;
+};
+
+const firstClean = (values, maxLen = 80) => {
+  for (const value of values) {
+    const text = cleanText(value, maxLen);
+    if (text) return text;
+  }
+  return "";
+};
+
+const extractOpenAqMeasurement = (item = {}) => {
+  const parameterObj =
+    item?.parameter ||
+    item?.sensor?.parameter ||
+    item?.sensors?.[0]?.parameter ||
+    item?.measurement?.parameter ||
+    {};
+  const code = cleanText(
+    parameterObj?.name || item?.parameter || item?.name || item?.sensorName,
+    40
+  ).toLowerCase();
+  const value = firstFinite([
+    item?.value,
+    item?.summary?.value,
+    item?.latest?.value,
+    item?.measurement?.value,
+    item?.measurements?.[0]?.value
+  ]);
+  const unit = firstClean(
+    [
+      item?.unit,
+      parameterObj?.units,
+      parameterObj?.unit,
+      item?.summary?.unit,
+      item?.latest?.unit
+    ],
+    24
+  );
+  const measuredAt = firstClean(
+    [
+      item?.datetime?.utc,
+      item?.datetime?.local,
+      item?.date?.utc,
+      item?.date?.local,
+      item?.latest?.datetime?.utc,
+      item?.latest?.datetime?.local
+    ],
+    50
+  );
+  const label =
+    firstClean(
+      [parameterObj?.displayName, parameterObj?.display_name, parameterObj?.name],
+      80
+    ) || openAqParameterLabel(code);
+
+  return { code, label, value, unit, measuredAt };
+};
+
+const pm25ToUsAqi = (pm25) => {
+  if (pm25 === null || pm25 === undefined || pm25 === "") return null;
+  const value = Number(pm25);
+  if (!Number.isFinite(value) || value < 0) return null;
+  const points = [
+    { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
+    { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
+    { cLow: 35.5, cHigh: 55.4, iLow: 101, iHigh: 150 },
+    { cLow: 55.5, cHigh: 150.4, iLow: 151, iHigh: 200 },
+    { cLow: 150.5, cHigh: 250.4, iLow: 201, iHigh: 300 },
+    { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 }
+  ];
+  for (const point of points) {
+    if (value < point.cLow || value > point.cHigh) continue;
+    const ratio = (value - point.cLow) / (point.cHigh - point.cLow || 1);
+    return Math.round(point.iLow + ratio * (point.iHigh - point.iLow));
+  }
+  return 500;
+};
+
+const aqiBand = (aqi) => {
+  if (aqi === null || aqi === undefined || aqi === "") {
+    return {
+      level: "Unknown",
+      workoutType: "indoor",
+      guidance: "Air quality data is limited. Prefer flexible indoor options."
+    };
+  }
+  const value = Number(aqi);
+  if (!Number.isFinite(value)) {
+    return {
+      level: "Unknown",
+      workoutType: "indoor",
+      guidance: "Air quality data is limited. Prefer flexible indoor options."
+    };
+  }
+  if (value <= 50) {
+    return {
+      level: "Good",
+      workoutType: "outdoor",
+      guidance: "Air quality is good for outdoor sessions."
+    };
+  }
+  if (value <= 100) {
+    return {
+      level: "Moderate",
+      workoutType: "outdoor",
+      guidance: "Outdoor training is usually fine; sensitive groups should monitor symptoms."
+    };
+  }
+  if (value <= 150) {
+    return {
+      level: "Unhealthy for sensitive groups",
+      workoutType: "indoor",
+      guidance: "Reduce outdoor intensity, especially for cardio-heavy sessions."
+    };
+  }
+  if (value <= 200) {
+    return {
+      level: "Unhealthy",
+      workoutType: "indoor",
+      guidance: "Indoor sessions are recommended today."
+    };
+  }
+  if (value <= 300) {
+    return {
+      level: "Very unhealthy",
+      workoutType: "indoor",
+      guidance: "Avoid outdoor exertion and prioritize indoor training."
+    };
+  }
+  return {
+    level: "Hazardous",
+    workoutType: "indoor",
+    guidance: "Avoid outdoor training."
+  };
 };
 
 const normalizePlainText = (value, maxLen = 500) => {
@@ -700,6 +928,92 @@ app.get("/api/weather/recommendation", async (req, res) => {
       },
       recommendation,
       daily
+    });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/air-quality/current", async (req, res) => {
+  try {
+    const latitude = toNullableNumber(req.query.latitude, -90, 90);
+    const longitude = toNullableNumber(req.query.longitude, -180, 180);
+    if (latitude === null || longitude === null) {
+      return res.status(400).json({ error: "Valid latitude and longitude are required." });
+    }
+
+    const radiusKm = toNullableNumber(req.query.radiusKm, 1, 100) ?? 25;
+    const locationData = await openAqRequest("locations", {
+      coordinates: `${latitude},${longitude}`,
+      radius: Math.round(radiusKm * 1000),
+      limit: 1
+    });
+    const location = Array.isArray(locationData?.results) ? locationData.results[0] : null;
+    if (!location) {
+      return res.status(404).json({ error: "No nearby air quality station found." });
+    }
+
+    const locationId = toNullableNumber(location?.id, 1, 1000000000);
+    if (locationId === null) {
+      return res.status(502).json({ error: "OpenAQ response missing location id." });
+    }
+
+    const latestData = await openAqRequest(`locations/${Math.trunc(locationId)}/latest`);
+    const rawReadings = Array.isArray(latestData?.results) ? latestData.results : [];
+    const sensorMap = new Map(
+      (Array.isArray(location?.sensors) ? location.sensors : []).map((sensor) => [
+        String(sensor?.id),
+        sensor
+      ])
+    );
+    const byCode = new Map();
+    for (const entry of rawReadings) {
+      const linkedSensor = sensorMap.get(String(entry?.sensorsId));
+      const parsed = extractOpenAqMeasurement({
+        ...entry,
+        sensor: linkedSensor || entry?.sensor
+      });
+      if (!parsed.code || parsed.value === null) continue;
+      if (!byCode.has(parsed.code)) byCode.set(parsed.code, parsed);
+    }
+    const pollutants = Array.from(byCode.values()).slice(0, 12);
+
+    const pm25Reading =
+      pollutants.find((item) => ["pm25", "pm2.5", "pm2_5", "pm2p5"].includes(item.code)) || null;
+    const pm25 = pm25Reading?.value ?? null;
+    const aqiUs = pm25ToUsAqi(pm25);
+    const recommendation = aqiBand(aqiUs);
+
+    res.json({
+      location: {
+        id: toFiniteNumber(location?.id),
+        name: cleanText(location?.name, 120),
+        city: cleanText(location?.city || location?.locality, 120),
+        country: cleanText(location?.country?.name || location?.country?.code || "", 80),
+        latitude: toFiniteNumber(location?.coordinates?.latitude),
+        longitude: toFiniteNumber(location?.coordinates?.longitude),
+        distanceM: toFiniteNumber(location?.distance)
+      },
+      summary: {
+        level: recommendation.level,
+        workoutType: recommendation.workoutType,
+        guidance: recommendation.guidance,
+        primaryPollutant:
+          pm25Reading?.label ||
+          pollutants[0]?.label ||
+          openAqParameterLabel(pollutants[0]?.code) ||
+          "Unknown",
+        pm25,
+        aqiUs
+      },
+      pollutants: pollutants.map((item) => ({
+        code: item.code,
+        label: item.label || openAqParameterLabel(item.code),
+        value: item.value,
+        unit: item.unit,
+        measuredAt: item.measuredAt
+      }))
     });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;

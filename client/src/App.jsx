@@ -142,6 +142,9 @@ export default function App() {
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
+  const [airQualityData, setAirQualityData] = useState(null);
+  const [airQualityLoading, setAirQualityLoading] = useState(false);
+  const [airQualityError, setAirQualityError] = useState("");
   const [workoutForm, setWorkoutForm] = useState({
     date: getLocalDateKey(),
     focus: "",
@@ -759,28 +762,32 @@ export default function App() {
     return week;
   }, [dashboard]);
 
-  const loadWeatherRecommendation = useCallback(async () => {
+  const getCurrentCoordinates = useCallback(async () => {
     if (!navigator?.geolocation) {
-      setWeatherError("Location is not available in this browser.");
-      return;
+      const err = new Error("Location is not available in this browser.");
+      err.code = "GEO_NOT_AVAILABLE";
+      throw err;
     }
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false,
+        timeout: 12000,
+        maximumAge: 1000 * 60 * 10
+      });
+    });
+    const latitude = Number(position?.coords?.latitude);
+    const longitude = Number(position?.coords?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new Error("Unable to determine location coordinates.");
+    }
+    return { latitude, longitude };
+  }, []);
 
+  const loadWeatherRecommendation = useCallback(async () => {
     setWeatherLoading(true);
     setWeatherError("");
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,
-          timeout: 12000,
-          maximumAge: 1000 * 60 * 10
-        });
-      });
-      const latitude = Number(position?.coords?.latitude);
-      const longitude = Number(position?.coords?.longitude);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        throw new Error("Unable to determine location coordinates.");
-      }
-
+      const { latitude, longitude } = await getCurrentCoordinates();
       const query = new URLSearchParams({
         latitude: String(latitude),
         longitude: String(longitude)
@@ -812,7 +819,47 @@ export default function App() {
     } finally {
       setWeatherLoading(false);
     }
-  }, []);
+  }, [getCurrentCoordinates]);
+
+  const loadAirQuality = useCallback(async () => {
+    setAirQualityLoading(true);
+    setAirQualityError("");
+    try {
+      const { latitude, longitude } = await getCurrentCoordinates();
+      const query = new URLSearchParams({
+        latitude: String(latitude),
+        longitude: String(longitude)
+      });
+      const res = await fetch(`/api/air-quality/current?${query.toString()}`, {
+        credentials: "include"
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to load air quality.");
+      }
+      const data = await res.json();
+      setAirQualityData(data || null);
+    } catch (err) {
+      if (typeof err?.code === "number") {
+        if (err.code === 1) {
+          setAirQualityError("Location permission was denied.");
+        } else if (err.code === 2) {
+          setAirQualityError("Location information is unavailable.");
+        } else if (err.code === 3) {
+          setAirQualityError("Location request timed out.");
+        } else {
+          setAirQualityError("Unable to access location.");
+        }
+      } else if (err?.code === "GEO_NOT_AVAILABLE") {
+        setAirQualityError(err.message);
+      } else {
+        setAirQualityError(err?.message || "Unable to load air quality.");
+      }
+      setAirQualityData(null);
+    } finally {
+      setAirQualityLoading(false);
+    }
+  }, [getCurrentCoordinates]);
 
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
@@ -890,7 +937,8 @@ export default function App() {
   useEffect(() => {
     if (!isDashboardRoute || !user) return;
     loadWeatherRecommendation();
-  }, [isDashboardRoute, user, loadWeatherRecommendation]);
+    loadAirQuality();
+  }, [isDashboardRoute, user, loadWeatherRecommendation, loadAirQuality]);
 
   const go = (path) => {
     const normalizedPath =
@@ -1001,6 +1049,8 @@ export default function App() {
     setUser(null);
     setWeatherData(null);
     setWeatherError("");
+    setAirQualityData(null);
+    setAirQualityError("");
     go("/");
   };
 
@@ -1262,6 +1312,10 @@ export default function App() {
         weatherLoading={weatherLoading}
         weatherError={weatherError}
         refreshWeatherRecommendation={loadWeatherRecommendation}
+        airQualityData={airQualityData}
+        airQualityLoading={airQualityLoading}
+        airQualityError={airQualityError}
+        refreshAirQuality={loadAirQuality}
         onSaveExerciseToPlan={saveExerciseToPlan}
         onRemoveSavedExercise={removeSavedExercise}
         plannerModal={plannerModal}
