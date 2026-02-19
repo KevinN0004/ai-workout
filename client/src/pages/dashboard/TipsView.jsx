@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { detectTrack } from "./planUtils";
+import ModalPortal from "../../components/ModalPortal";
 import "./TipsView.css";
 
 const DEFAULT_LIMIT = 48;
@@ -679,99 +680,101 @@ export default function TipsView({
       </section>
 
       {selectedExercise && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setSelectedExercise(null)}
-        >
-          <div className="modal exercise-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{selectedExercise.name}</h3>
-              <button type="button" className="ghost" onClick={() => setSelectedExercise(null)}>
-                Close
-              </button>
-            </div>
-            <img
-              className="exercise-modal-image"
-              src={getExerciseImage(selectedExercise)}
-              alt={selectedExercise.name}
-            />
-            <div className="exercise-modal-body">
-              <p className="exercise-target">
-                <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
-              </p>
-              <p className="exercise-focus">
-                <strong>Primary muscles:</strong>{" "}
-                {(selectedExercise.muscles || [])
-                  .map((item) => item.name)
-                  .filter(Boolean)
-                  .slice(0, 4)
-                  .join(", ") || "Not specified"}
-              </p>
-              <p className="exercise-focus">
-                <strong>Equipment:</strong>{" "}
-                {(selectedExercise.equipment || [])
-                  .map((item) => item.name)
-                  .filter(Boolean)
-                  .join(", ") || "Not specified"}
-              </p>
-              <div className="tips-save-actions">
-                <button
-                  type="button"
-                  className="cta save-modal-button"
-                  disabled={
-                    isSaved(selectedExercise) ||
-                    Boolean(savingIds[toExerciseKey(selectedExercise)])
-                  }
-                  onClick={() =>
-                    saveExercise(selectedExercise, selectedExercise?.recommendation)
-                  }
-                >
-                  {isSaved(selectedExercise)
-                    ? "Saved to plan"
-                    : savingIds[toExerciseKey(selectedExercise)]
-                    ? "Saving..."
-                    : "Save to my plan"}
+        <ModalPortal open={Boolean(selectedExercise)}>
+          <div
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setSelectedExercise(null)}
+          >
+            <div className="modal exercise-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h3>{selectedExercise.name}</h3>
+                <button type="button" className="ghost" onClick={() => setSelectedExercise(null)}>
+                  Close
                 </button>
               </div>
-              {selectedExercise.description ? (
-                <p className="exercise-what">{selectedExercise.description}</p>
-              ) : (
-                <p className="muted">No description provided for this exercise.</p>
-              )}
-
-              {selectedExercise?.recommendation?.reasons?.length ? (
-                <section className="exercise-details-open">
-                  <h4>Why this was recommended</h4>
-                  <ul>
-                    {selectedExercise.recommendation.reasons.map((reason) => (
-                      <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-
-              {(selectedExercise.videos || []).length ? (
-                <div className="video-links">
-                  {(selectedExercise.videos || []).slice(0, 2).map((item) => (
-                    <a
-                      key={`${selectedExercise.id}-video-${item.id || item.url}`}
-                      href={resolveMediaUrl(item.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="video-link"
-                    >
-                      Watch reference video
-                    </a>
-                  ))}
+              <img
+                className="exercise-modal-image"
+                src={getExerciseImage(selectedExercise)}
+                alt={selectedExercise.name}
+              />
+              <div className="exercise-modal-body">
+                <p className="exercise-target">
+                  <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
+                </p>
+                <p className="exercise-focus">
+                  <strong>Primary muscles:</strong>{" "}
+                  {(selectedExercise.muscles || [])
+                    .map((item) => item.name)
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .join(", ") || "Not specified"}
+                </p>
+                <p className="exercise-focus">
+                  <strong>Equipment:</strong>{" "}
+                  {(selectedExercise.equipment || [])
+                    .map((item) => item.name)
+                    .filter(Boolean)
+                    .join(", ") || "Not specified"}
+                </p>
+                <div className="tips-save-actions">
+                  <button
+                    type="button"
+                    className="cta save-modal-button"
+                    disabled={
+                      isSaved(selectedExercise) ||
+                      Boolean(savingIds[toExerciseKey(selectedExercise)])
+                    }
+                    onClick={() =>
+                      saveExercise(selectedExercise, selectedExercise?.recommendation)
+                    }
+                  >
+                    {isSaved(selectedExercise)
+                      ? "Saved to plan"
+                      : savingIds[toExerciseKey(selectedExercise)]
+                      ? "Saving..."
+                      : "Save to my plan"}
+                  </button>
                 </div>
-              ) : (
-                <p className="muted">No video links available for this exercise.</p>
-              )}
+                {selectedExercise.description ? (
+                  <p className="exercise-what">{selectedExercise.description}</p>
+                ) : (
+                  <p className="muted">No description provided for this exercise.</p>
+                )}
+
+                {selectedExercise?.recommendation?.reasons?.length ? (
+                  <section className="exercise-details-open">
+                    <h4>Why this was recommended</h4>
+                    <ul>
+                      {selectedExercise.recommendation.reasons.map((reason) => (
+                        <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {(selectedExercise.videos || []).length ? (
+                  <div className="video-links">
+                    {(selectedExercise.videos || []).slice(0, 2).map((item) => (
+                      <a
+                        key={`${selectedExercise.id}-video-${item.id || item.url}`}
+                        href={resolveMediaUrl(item.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="video-link"
+                      >
+                        Watch reference video
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted">No video links available for this exercise.</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </section>
   );

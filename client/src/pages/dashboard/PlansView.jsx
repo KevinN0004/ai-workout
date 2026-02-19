@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildWeeklyMealPlan } from "./planUtils";
+import ModalPortal from "../../components/ModalPortal";
 import "./PlansView.css";
 
 export default function PlansView({
@@ -319,73 +320,75 @@ export default function PlansView({
       </div>
 
       {selectedDay && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${selectedDay.key} ${selectedDetail?.mode || "day"} details`}
-          onClick={() => setSelectedDetail(null)}
-        >
+        <ModalPortal open={Boolean(selectedDay)}>
           <div
-            className="modal plan-day-detail-modal"
-            onClick={(event) => event.stopPropagation()}
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedDay.key} ${selectedDetail?.mode || "day"} details`}
+            onClick={() => setSelectedDetail(null)}
           >
-            <div className="modal-header">
-              <h2>
-                {selectedDay.key}{" "}
-                {selectedDetail?.mode === "workout" ? "Workout" : "Meal"} details
-              </h2>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setSelectedDetail(null)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="modal-body plan-day-detail-grid">
-              {selectedDetail?.mode === "workout" ? (
-                <section className="plan-day-detail-col">
-                  <h3>Workout details</h3>
-                  {selectedDay.workoutLines.length ? (
+            <div
+              className="modal plan-day-detail-modal"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>
+                  {selectedDay.key}{" "}
+                  {selectedDetail?.mode === "workout" ? "Workout" : "Meal"} details
+                </h2>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setSelectedDetail(null)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="modal-body plan-day-detail-grid">
+                {selectedDetail?.mode === "workout" ? (
+                  <section className="plan-day-detail-col">
+                    <h3>Workout details</h3>
+                    {selectedDay.workoutLines.length ? (
+                      <ul className="hub-list plan-detail-list">
+                        {selectedDay.workoutLines.map((line) => (
+                          <li key={`${selectedDay.key}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted">
+                        Recovery or rest day. No workout block assigned.
+                      </p>
+                    )}
+                  </section>
+                ) : (
+                  <section className="plan-day-detail-col">
+                    <h3>Meal details</h3>
                     <ul className="hub-list plan-detail-list">
-                      {selectedDay.workoutLines.map((line) => (
-                        <li key={`${selectedDay.key}-${line}`}>{line}</li>
-                      ))}
+                      <li>
+                        <strong>Breakfast:</strong> {selectedDay.breakfast}
+                      </li>
+                      <li>
+                        <strong>Lunch:</strong> {selectedDay.lunch}
+                      </li>
+                      <li>
+                        <strong>Dinner:</strong> {selectedDay.dinner}
+                      </li>
+                      <li>
+                        <strong>Snack:</strong> {selectedDay.snack}
+                      </li>
+                      <li>
+                        <strong>Drink:</strong> {selectedDay.drink}
+                      </li>
                     </ul>
-                  ) : (
-                    <p className="muted">
-                      Recovery or rest day. No workout block assigned.
-                    </p>
-                  )}
-                </section>
-              ) : (
-                <section className="plan-day-detail-col">
-                  <h3>Meal details</h3>
-                  <ul className="hub-list plan-detail-list">
-                    <li>
-                      <strong>Breakfast:</strong> {selectedDay.breakfast}
-                    </li>
-                    <li>
-                      <strong>Lunch:</strong> {selectedDay.lunch}
-                    </li>
-                    <li>
-                      <strong>Dinner:</strong> {selectedDay.dinner}
-                    </li>
-                    <li>
-                      <strong>Snack:</strong> {selectedDay.snack}
-                    </li>
-                    <li>
-                      <strong>Drink:</strong> {selectedDay.drink}
-                    </li>
-                  </ul>
-                  <p className="muted">Calories target: ~{selectedDay.calories}</p>
-                  <p className="muted">Prep note: {selectedDay.prepNote}</p>
-                </section>
-              )}
+                    <p className="muted">Calories target: ~{selectedDay.calories}</p>
+                    <p className="muted">Prep note: {selectedDay.prepNote}</p>
+                  </section>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </section>
   );

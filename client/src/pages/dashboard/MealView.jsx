@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { detectTrack } from "./planUtils";
+import ModalPortal from "../../components/ModalPortal";
 import "./MealView.css";
 
 const FALLBACK_IMAGE = `data:image/svg+xml,${encodeURIComponent(
@@ -1066,60 +1067,62 @@ export default function MealView({
       </div>
 
       {activeMeal && (
-        <div
-          className="modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Meal details for ${activeMeal.title}`}
-          onClick={() => setActiveMealId(null)}
-        >
-          <div className="modal meal-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header meal-modal-header">
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setActiveMealId(null)}
-              >
-                Close
-              </button>
-            </div>
+        <ModalPortal open={Boolean(activeMeal)}>
+          <div
+            className="modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Meal details for ${activeMeal.title}`}
+            onClick={() => setActiveMealId(null)}
+          >
+            <div className="modal meal-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header meal-modal-header">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setActiveMealId(null)}
+                >
+                  Close
+                </button>
+              </div>
 
-            <div className="modal-body">
-              <div className="meal-modal-grid">
-                <section className="meal-modal-left">
-                  <h3>{activeMeal.title}</h3>
-                  <img
-                    src={activeMeal.image}
-                    alt={activeMeal.title}
-                    onError={handleImageError}
-                  />
-                  <p>{activeMeal.blurb}</p>
-                  <p>{activeMeal.portionNote}</p>
-                </section>
+              <div className="modal-body">
+                <div className="meal-modal-grid">
+                  <section className="meal-modal-left">
+                    <h3>{activeMeal.title}</h3>
+                    <img
+                      src={activeMeal.image}
+                      alt={activeMeal.title}
+                      onError={handleImageError}
+                    />
+                    <p>{activeMeal.blurb}</p>
+                    <p>{activeMeal.portionNote}</p>
+                  </section>
 
-                <section className="meal-modal-right">
-                  <h3>Ingredients</h3>
-                  <ul className="meal-list">
-                    {activeMeal.ingredients.map((ingredient) => (
-                      <li key={ingredient}>{ingredient}</li>
-                    ))}
-                  </ul>
+                  <section className="meal-modal-right">
+                    <h3>Ingredients</h3>
+                    <ul className="meal-list">
+                      {activeMeal.ingredients.map((ingredient) => (
+                        <li key={ingredient}>{ingredient}</li>
+                      ))}
+                    </ul>
 
-                  <h3>Recipe links</h3>
-                  <ul className="meal-list meal-links">
-                    {activeMeal.recipes.map((recipe) => (
-                      <li key={recipe.url}>
-                        <a href={recipe.url} target="_blank" rel="noreferrer">
-                          {recipe.label}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                    <h3>Recipe links</h3>
+                    <ul className="meal-list meal-links">
+                      {activeMeal.recipes.map((recipe) => (
+                        <li key={recipe.url}>
+                          <a href={recipe.url} target="_blank" rel="noreferrer">
+                            {recipe.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </section>
   );

@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import HomePage from "./pages/HomePage";
+import ModalPortal from "./components/ModalPortal";
 import "./App.css";
 
 const quickFocuses = [
@@ -425,243 +426,247 @@ export default function App() {
   };
 
   const plannerModal = plannerOpen && (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-header">
-          <h2>Planner</h2>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setPlannerOpen(false)}
-          >
-            Close
-          </button>
-        </div>
-        <div className="modal-body">
-          {plannerStep === 1 && (
-            <div className="step-panel">
-              <h3>Step 1 - Environment & equipment</h3>
-              <div className="step-top">
-                <div className="segmented">
-                  <button
-                    type="button"
-                    className={form.environment === "Home" ? "active" : ""}
-                    onClick={() => onEnvironmentChange("Home")}
-                  >
-                    Home
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      form.environment === "Commercial" ? "active" : ""
-                    }
-                    onClick={() => onEnvironmentChange("Commercial")}
-                  >
-                    Commercial
-                  </button>
-                </div>
-              </div>
-              <div className="option-grid">
-                {equipmentOptionsByEnv[form.environment].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`equip-card ${
-                      form.equipment.includes(item) ? "active" : ""
-                    }`}
-                    onClick={() => toggleEquipment(item)}
-                  >
-                    <span className="equip-thumb" aria-hidden="true" />
-                    <span className="equip-label">{item}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {plannerStep === 2 && (
-            <div className="step-panel">
-              <h3>Step 2 - Schedule & constraints</h3>
-              <form className="form" onSubmit={onSubmit}>
-                <label>
-                  Days per week
-                  <select name="days" value={form.days} onChange={onChange}>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                  </select>
-                </label>
-                <label>
-                  Session length (minutes)
-                  <select
-                    name="duration"
-                    value={form.duration}
-                    onChange={onChange}
-                  >
-                    <option value="30">30</option>
-                    <option value="45">45</option>
-                    <option value="60">60</option>
-                    <option value="75">75</option>
-                    <option value="90">90</option>
-                  </select>
-                </label>
-                <label>
-                  Experience level
-                  <select name="level" value={form.level} onChange={onChange}>
-                    <option>Beginner</option>
-                    <option>Intermediate</option>
-                    <option>Advanced</option>
-                  </select>
-                </label>
-                <label>
-                  Injuries or limitations
-                  <select
-                    name="injuries"
-                    value={form.injuries}
-                    onChange={onChange}
-                  >
-                    {injuryOptions.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </form>
-            </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <div className="step-indicator">Step {plannerStep} of 2</div>
-          <div className="modal-actions">
+    <ModalPortal open={plannerOpen}>
+      <div className="modal-backdrop" role="dialog" aria-modal="true">
+        <div className="modal">
+          <div className="modal-header">
+            <h2>Planner</h2>
             <button
               type="button"
               className="ghost"
-              onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
-              disabled={plannerStep === 1}
+              onClick={() => setPlannerOpen(false)}
             >
-              Back
+              Close
             </button>
-            {plannerStep < 2 ? (
-              <button
-                type="button"
-                className="cta"
-                onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                className="cta"
-                type="button"
-                disabled={loading}
-                onClick={onSubmit}
-              >
-                {loading ? "Generating..." : "Generate workout"}
-              </button>
+          </div>
+          <div className="modal-body">
+            {plannerStep === 1 && (
+              <div className="step-panel">
+                <h3>Step 1 - Environment & equipment</h3>
+                <div className="step-top">
+                  <div className="segmented">
+                    <button
+                      type="button"
+                      className={form.environment === "Home" ? "active" : ""}
+                      onClick={() => onEnvironmentChange("Home")}
+                    >
+                      Home
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        form.environment === "Commercial" ? "active" : ""
+                      }
+                      onClick={() => onEnvironmentChange("Commercial")}
+                    >
+                      Commercial
+                    </button>
+                  </div>
+                </div>
+                <div className="option-grid">
+                  {equipmentOptionsByEnv[form.environment].map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`equip-card ${
+                        form.equipment.includes(item) ? "active" : ""
+                      }`}
+                      onClick={() => toggleEquipment(item)}
+                    >
+                      <span className="equip-thumb" aria-hidden="true" />
+                      <span className="equip-label">{item}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
+            {plannerStep === 2 && (
+              <div className="step-panel">
+                <h3>Step 2 - Schedule & constraints</h3>
+                <form className="form" onSubmit={onSubmit}>
+                  <label>
+                    Days per week
+                    <select name="days" value={form.days} onChange={onChange}>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                    </select>
+                  </label>
+                  <label>
+                    Session length (minutes)
+                    <select
+                      name="duration"
+                      value={form.duration}
+                      onChange={onChange}
+                    >
+                      <option value="30">30</option>
+                      <option value="45">45</option>
+                      <option value="60">60</option>
+                      <option value="75">75</option>
+                      <option value="90">90</option>
+                    </select>
+                  </label>
+                  <label>
+                    Experience level
+                    <select name="level" value={form.level} onChange={onChange}>
+                      <option>Beginner</option>
+                      <option>Intermediate</option>
+                      <option>Advanced</option>
+                    </select>
+                  </label>
+                  <label>
+                    Injuries or limitations
+                    <select
+                      name="injuries"
+                      value={form.injuries}
+                      onChange={onChange}
+                    >
+                      {injuryOptions.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </form>
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <div className="step-indicator">Step {plannerStep} of 2</div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
+                disabled={plannerStep === 1}
+              >
+                Back
+              </button>
+              {plannerStep < 2 ? (
+                <button
+                  type="button"
+                  className="cta"
+                  onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  className="cta"
+                  type="button"
+                  disabled={loading}
+                  onClick={onSubmit}
+                >
+                  {loading ? "Generating..." : "Generate workout"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 
   const generatedPlanModal = planModalOpen && result && (
-    <div
-      className="modal-backdrop plan-modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="modal plan-modal">
-        <div className="modal-header">
-          <h2>Your AI Plan</h2>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="ghost icon-button"
-              aria-label="Close"
-              onClick={() => setPlanModalOpen(false)}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="20"
-                height="20"
-                aria-hidden="true"
+    <ModalPortal open={Boolean(planModalOpen && result)}>
+      <div
+        className="modal-backdrop plan-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="modal plan-modal">
+          <div className="modal-header">
+            <h2>Your AI Plan</h2>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost icon-button"
+                aria-label="Close"
+                onClick={() => setPlanModalOpen(false)}
               >
-                <path
-                  d="M6 6l12 12M18 6L6 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="modal-body">
-          <div className="plan-modal-content">
-            <section className="plan-modal-plan">
-              {planSections.days.length ? (
-                <>
-                  <div className="plan-tabs" role="tablist" aria-label="Plan days">
-                    {planSections.days.map((day, index) => (
-                      <button
-                        key={`${day.title}-${index}`}
-                        type="button"
-                        role="tab"
-                        className={index === activeDayIndex ? "active" : ""}
-                        aria-selected={index === activeDayIndex}
-                        onClick={() => setActiveDayIndex(index)}
-                      >
-                        {day.title}
-                      </button>
+          <div className="modal-body">
+            <div className="plan-modal-content">
+              <section className="plan-modal-plan">
+                {planSections.days.length ? (
+                  <>
+                    <div className="plan-tabs" role="tablist" aria-label="Plan days">
+                      {planSections.days.map((day, index) => (
+                        <button
+                          key={`${day.title}-${index}`}
+                          type="button"
+                          role="tab"
+                          className={index === activeDayIndex ? "active" : ""}
+                          aria-selected={index === activeDayIndex}
+                          onClick={() => setActiveDayIndex(index)}
+                        >
+                          {day.title}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="plan-day" role="tabpanel">
+                      <h3>{planSections.days[activeDayIndex]?.title}</h3>
+                      {planSections.days[activeDayIndex]?.lines?.length ? (
+                        <ul>
+                          {planSections.days[activeDayIndex].lines.map(
+                            (line, lineIndex) => (
+                              <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
+                                {line}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div className="plan-day" />
+                )}
+              </section>
+              <section className="plan-modal-notes">
+                <h3>Coach notes</h3>
+                {planSections.notes.length ? (
+                  <ul>
+                    {planSections.notes.map((line, index) => (
+                      <li key={`${index}-${line}`}>{line}</li>
                     ))}
-                  </div>
-                  <div className="plan-day" role="tabpanel">
-                    <h3>{planSections.days[activeDayIndex]?.title}</h3>
-                    {planSections.days[activeDayIndex]?.lines?.length ? (
-                      <ul>
-                        {planSections.days[activeDayIndex].lines.map(
-                          (line, lineIndex) => (
-                            <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
-                              {line}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <div className="plan-day" />
-              )}
-            </section>
-            <section className="plan-modal-notes">
-              <h3>Coach notes</h3>
-              {planSections.notes.length ? (
-                <ul>
-                  {planSections.notes.map((line, index) => (
-                    <li key={`${index}-${line}`}>{line}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
+                  </ul>
+                ) : null}
+              </section>
+            </div>
           </div>
-        </div>
-        <div className="modal-footer plan-modal-footer">
-          <div className="modal-actions">
-            <button type="button" className="cta" onClick={downloadPlanPdf}>
-              Download PDF
-            </button>
-            <button type="button" className="ghost" onClick={() => go("/auth")}>
-              Login / Sign up
-            </button>
+          <div className="modal-footer plan-modal-footer">
+            <div className="modal-actions">
+              <button type="button" className="cta" onClick={downloadPlanPdf}>
+                Download PDF
+              </button>
+              <button type="button" className="ghost" onClick={() => go("/auth")}>
+                Login / Sign up
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 
   const planSections = useMemo(() => {
@@ -724,12 +729,6 @@ export default function App() {
     if (!planSections.days.length) return;
     setActiveDayIndex(0);
   }, [planSections.days.length, result]);
-
-  useEffect(() => {
-    const shouldLock = planModalOpen || plannerOpen || workoutModalOpen;
-    document.body.classList.toggle("no-scroll", shouldLock);
-    return () => document.body.classList.remove("no-scroll");
-  }, [planModalOpen, plannerOpen, workoutModalOpen]);
 
   const latestPlanByWeekday = useMemo(() => {
     const plans = dashboard?.plans || [];

@@ -8,6 +8,7 @@ import TipsView from "./dashboard/TipsView";
 import SettingsView from "./dashboard/SettingsView";
 import DashboardHomeView from "./dashboard/DashboardHomeView";
 import { buildWeeklyMealPlan } from "./dashboard/planUtils";
+import ModalPortal from "../components/ModalPortal";
 import "./DashboardPage.css";
 
 const parseDateValue = (value) => {
@@ -496,13 +497,14 @@ export default function DashboardPage({
         {dashError && <p className="error">{dashError}</p>}
 
         {workoutModalOpen && (
-          <div
-            className="modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setWorkoutModalOpen(false)}
-          >
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <ModalPortal open={workoutModalOpen}>
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setWorkoutModalOpen(false)}
+            >
+              <div className="modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Add workout</h2>
                 <button
@@ -633,7 +635,8 @@ export default function DashboardPage({
                 </div>
               </form>
             </div>
-          </div>
+            </div>
+          </ModalPortal>
         )}
 
         {plannerModal}
