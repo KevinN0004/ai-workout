@@ -139,7 +139,7 @@ export default function PlansView({
     : [];
 
   return (
-    <section className="panel dashboard-card span-2">
+    <section className="panel plans-view">
       <h2>Plan hub</h2>
       <div className="plan-rows">
         <section className="plan-row">

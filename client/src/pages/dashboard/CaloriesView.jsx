@@ -22,7 +22,7 @@ export default function CaloriesView({
   submitProgressMetric
 }) {
   return (
-    <section className="panel dashboard-card span-2 goal-page">
+    <section className="panel goal-view">
       <header className="panel-header">
         <div>
           <h2>Overall goal</h2>
@@ -32,11 +32,11 @@ export default function CaloriesView({
           Save goals
         </button>
       </header>
-      <div className="dashboard-split">
-        <div className="dashboard-main">
-          <section className="panel dashboard-card">
+      <div className="goal-layout">
+        <div className="goal-main">
+          <section className="panel goal-card">
             <h3>Calories</h3>
-            <div className="stat-row">
+            <div className="goal-stat-row">
               <div>
                 <p className="muted">Avg (7 days)</p>
                 <h3>{Math.round(avgCalories)}</h3>
@@ -68,7 +68,7 @@ export default function CaloriesView({
                 <span>{last7Keys[last7Keys.length - 1]}</span>
               </div>
             </div>
-            <form className="form dashboard-form" onSubmit={submitCalories}>
+            <form className="form goal-form" onSubmit={submitCalories}>
               <label>
                 Calories
                 <input
@@ -85,14 +85,14 @@ export default function CaloriesView({
                   required
                 />
               </label>
-              <button className="ghost" type="submit">
+              <button className="ghost goal-action-button" type="submit">
                 Log calories
               </button>
             </form>
 
-            <div className="list">
+            <div className="goal-list">
               {calories.map((item) => (
-                <div key={item.id} className="list-row">
+                <div key={item.id} className="goal-list-row">
                   <div>
                     <strong>{item.date}</strong>
                     <span className="muted"> - {item.calories} kcal</span>
@@ -103,8 +103,8 @@ export default function CaloriesView({
             </div>
           </section>
         </div>
-        <aside className="dashboard-side">
-          <section className="panel dashboard-card">
+        <aside className="goal-side">
+          <section className="panel goal-card">
             <h3>Goals</h3>
             <p className="muted">{goalPaceText}</p>
             <div className="chart-card">
@@ -128,7 +128,7 @@ export default function CaloriesView({
                 <span>{last7Keys[last7Keys.length - 1]}</span>
               </div>
             </div>
-            <form id="goals-form" className="form dashboard-form" onSubmit={submitGoals}>
+            <form id="goals-form" className="form goal-form" onSubmit={submitGoals}>
               <label>
                 Target weight (lb)
                 <input
@@ -179,10 +179,10 @@ export default function CaloriesView({
             </form>
           </section>
 
-          <section className="panel dashboard-card">
+          <section className="panel goal-card">
             <h3>Progress metrics</h3>
             <p className="muted">Log body metrics over time and keep historical records.</p>
-            <form className="form dashboard-form progress-form" onSubmit={submitProgressMetric}>
+            <form className="form goal-form progress-form" onSubmit={submitProgressMetric}>
               <label>
                 Date
                 <input
@@ -272,14 +272,14 @@ export default function CaloriesView({
                   placeholder="Weekly check-in"
                 />
               </label>
-              <button className="ghost" type="submit">
+              <button className="ghost goal-action-button" type="submit">
                 Save metric
               </button>
             </form>
 
-            <div className="list">
+            <div className="goal-list">
               {(Array.isArray(progressMetrics) ? progressMetrics : []).slice(0, 6).map((item) => (
-                <div key={item.id} className="list-row">
+                <div key={item.id} className="goal-list-row">
                   <div>
                     <strong>{item.date}</strong>
                     <span className="muted">

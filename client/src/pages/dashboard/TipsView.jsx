@@ -487,7 +487,7 @@ export default function TipsView({
   };
 
   return (
-    <section className="panel dashboard-card span-2 tips-view">
+    <section className="panel tips-view">
       <div className="panel-header">
         <div>
           <h2>Guides + exercise library</h2>

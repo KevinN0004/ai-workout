@@ -1,9 +1,15 @@
-.plan-rows {
+.plans-view {
+  width: 100%;
   display: grid;
   gap: 20px;
 }
 
-.plan-row {
+.plans-view .plan-rows {
+  display: grid;
+  gap: 20px;
+}
+
+.plans-view .plan-row {
   padding: 20px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -12,24 +18,32 @@
   gap: 16px;
 }
 
-.plan-row-header {
+.plans-view .plan-row-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
 }
 
-.plan-row-grid {
+.plans-view .plan-row-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
 }
 
-.plan-row-grid-split {
+.plans-view .plan-row-grid-split {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.hub-card-button {
+.plans-view .hub-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  gap: 10px;
+}
+
+.plans-view .hub-card-button {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.08);
   text-align: left;
@@ -39,17 +53,17 @@
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
-.hub-card-button:hover {
+.plans-view .hub-card-button:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.45);
 }
 
-.hub-card-hint {
+.plans-view .hub-card-hint {
   font-size: 0.78rem;
   color: #f2f2f2;
 }
 
-.meal-track-pill {
+.plans-view .meal-track-pill {
   border: 1px solid rgba(255, 255, 255, 0.45);
   color: #f2f2f2;
   background: rgba(255, 255, 255, 0.12);
@@ -60,7 +74,7 @@
   text-align: center;
 }
 
-.tips-status-pill {
+.plans-view .tips-status-pill {
   border: 1px solid rgba(255, 255, 255, 0.35);
   color: #e3e3e3;
   background: rgba(255, 255, 255, 0.1);
@@ -71,14 +85,14 @@
   text-align: center;
 }
 
-.meal-day-type {
+.plans-view .meal-day-type {
   margin-top: 8px;
   color: #f2f2f2;
   font-size: 0.8rem;
   font-weight: 600;
 }
 
-.hub-list {
+.plans-view .hub-list {
   margin-top: 10px;
   padding-left: 16px;
   list-style: disc;
@@ -89,75 +103,72 @@
   line-height: 1.35;
 }
 
-.meal-week-list li strong {
+.plans-view .meal-week-list li strong,
+.plans-view .tips-day-list li strong {
   color: #f3f3f3;
 }
 
-.tips-day-list li strong {
-  color: #f3f3f3;
-}
-
-.tips-week-list li {
+.plans-view .tips-week-list li {
   color: #dcdcdc;
 }
 
-.plan-day-detail-modal {
+.plans-view .plan-day-detail-modal {
   width: min(980px, 100%);
   text-align: left;
 }
 
-.plan-day-detail-modal .modal-header {
+.plans-view .plan-day-detail-modal .modal-header {
   position: relative;
   justify-content: center;
 }
 
-.plan-day-detail-modal .modal-header h2 {
+.plans-view .plan-day-detail-modal .modal-header h2 {
   text-align: center;
 }
 
-.plan-day-detail-modal .modal-header .ghost {
+.plans-view .plan-day-detail-modal .modal-header .ghost {
   position: absolute;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
 }
 
-.plan-day-detail-grid {
+.plans-view .plan-day-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
-.plan-day-detail-col {
+.plans-view .plan-day-detail-col {
   display: grid;
   gap: 10px;
   align-content: start;
 }
 
-.plan-day-detail-col h3 {
+.plans-view .plan-day-detail-col h3 {
   text-align: center;
 }
 
-.plan-day-detail-col p,
-.plan-day-detail-col .hub-list {
+.plans-view .plan-day-detail-col p,
+.plans-view .plan-day-detail-col .hub-list {
   text-align: left;
 }
 
-.plan-detail-list {
+.plans-view .plan-detail-list {
   margin-top: 0;
 }
 
-.saved-exercise-card {
+.plans-view .saved-exercise-card {
   gap: 8px;
 }
 
-.saved-exercise-actions {
+.plans-view .saved-exercise-actions {
   display: flex;
   gap: 8px;
   margin-top: 6px;
 }
 
-.saved-exercise-actions .ghost {
+.plans-view .saved-exercise-actions .ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -165,25 +176,23 @@
 }
 
 @media (max-width: 720px) {
-  .plan-row-header {
+  .plans-view .plan-row-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .plan-row-grid-split {
+  .plans-view .plan-row-grid-split {
     grid-template-columns: 1fr;
   }
 
-  .plan-day-detail-modal .modal-header {
+  .plans-view .plan-day-detail-modal .modal-header {
     display: grid;
     justify-items: center;
     gap: 10px;
   }
 
-  .plan-day-detail-modal .modal-header .ghost {
+  .plans-view .plan-day-detail-modal .modal-header .ghost {
     position: static;
     transform: none;
   }
-
 }
-

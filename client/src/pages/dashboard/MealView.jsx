@@ -882,7 +882,7 @@ export default function MealView({
   }, [activeMeal]);
 
   return (
-    <section className="panel dashboard-card span-2">
+    <section className="panel meal-view">
       <div className="meal-view-header">
         <div>
           <h2>Meal prep</h2>
@@ -908,7 +908,7 @@ export default function MealView({
           <h3>Meal log history</h3>
           <p className="muted">Track meals and macros. Saved to your database.</p>
         </div>
-        <form className="form dashboard-form meal-log-form" onSubmit={onSubmitMealLog}>
+        <form className="form meal-log-form" onSubmit={onSubmitMealLog}>
           <label>
             Date
             <input
@@ -1010,9 +1010,9 @@ export default function MealView({
           </button>
         </form>
 
-        <div className="list">
+        <div className="meal-log-list">
           {safeMealLogs.slice(0, 8).map((item) => (
-            <div key={item.id} className="list-row">
+            <div key={item.id} className="meal-log-row">
               <div>
                 <strong>{item.date}</strong>
                 <span className="muted">

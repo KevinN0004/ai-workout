@@ -1,11 +1,17 @@
-.meal-view-header {
+.meal-view {
+  width: 100%;
+  display: grid;
+  gap: 20px;
+}
+
+.meal-view .meal-view-header {
   display: flex;
   justify-content: space-between;
   gap: 18px;
   align-items: flex-start;
 }
 
-.meal-context {
+.meal-view .meal-context {
   min-width: 280px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
@@ -16,17 +22,17 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
-.meal-context p {
+.meal-view .meal-context p {
   margin: 0;
   color: #d9d9d9;
 }
 
-.meal-sections {
+.meal-view .meal-sections {
   display: grid;
   gap: 24px;
 }
 
-.meal-log-panel {
+.meal-view .meal-log-panel {
   display: grid;
   gap: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -35,45 +41,60 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
-.meal-log-header {
+.meal-view .meal-log-header {
   display: grid;
   gap: 2px;
 }
 
-.meal-log-form {
+.meal-view .meal-log-form {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.meal-log-submit {
+.meal-view .meal-log-submit {
   justify-self: start;
 }
 
-.meal-log-meta {
+.meal-view .meal-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.meal-view .meal-log-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.meal-view .meal-log-meta {
   margin: 4px 0 0;
   font-size: 0.8rem;
 }
 
-.meal-section {
+.meal-view .meal-section {
   display: grid;
   gap: 14px;
 }
 
-.meal-section-header {
+.meal-view .meal-section-header {
   display: grid;
   gap: 4px;
 }
 
-.meal-section-header h3 {
+.meal-view .meal-section-header h3 {
   font-size: 1.25rem;
 }
 
-.meal-grid {
+.meal-view .meal-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 16px;
 }
 
-.meal-card {
+.meal-view .meal-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   overflow: hidden;
@@ -86,49 +107,49 @@
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
-.meal-card:hover {
+.meal-view .meal-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.meal-card img {
+.meal-view .meal-card img {
   width: 100%;
   height: 170px;
   object-fit: cover;
   display: block;
 }
 
-.meal-card-copy {
+.meal-view .meal-card-copy {
   padding: 12px;
   display: grid;
   gap: 8px;
 }
 
-.meal-card-copy h3 {
+.meal-view .meal-card-copy h3 {
   font-size: 1.25rem;
 }
 
-.meal-card-meta {
+.meal-view .meal-card-meta {
   font-size: 0.87rem;
   color: #cccccc;
 }
 
-.meal-modal {
+.meal-view .meal-modal {
   width: min(960px, 100%);
   text-align: initial;
 }
 
-.meal-modal-header {
+.meal-view .meal-modal-header {
   justify-content: flex-end;
 }
 
-.meal-modal-grid {
+.meal-view .meal-modal-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: 24px;
 }
 
-.meal-modal-left {
+.meal-view .meal-modal-left {
   border-right: 1px solid rgba(255, 255, 255, 0.12);
   padding-right: 20px;
   display: grid;
@@ -137,12 +158,12 @@
   text-align: center;
 }
 
-.meal-modal-left h3,
-.meal-modal-right h3 {
+.meal-view .meal-modal-left h3,
+.meal-view .meal-modal-right h3 {
   text-align: center;
 }
 
-.meal-modal-left img {
+.meal-view .meal-modal-left img {
   width: min(320px, 100%);
   aspect-ratio: 4 / 3;
   object-fit: cover;
@@ -150,60 +171,59 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.meal-modal-left p {
+.meal-view .meal-modal-left p {
   color: #d9d9d9;
   max-width: 34ch;
 }
 
-.meal-modal-right {
+.meal-view .meal-modal-right {
   text-align: left;
   display: grid;
   align-content: start;
   gap: 10px;
 }
 
-.meal-list {
+.meal-view .meal-list {
   padding-left: 20px;
   display: grid;
   gap: 8px;
 }
 
-.meal-list li {
+.meal-view .meal-list li {
   color: #e4e4e4;
 }
 
-.meal-links a {
+.meal-view .meal-links a {
   color: #f2f2f2;
   text-underline-offset: 2px;
 }
 
-.meal-links a:hover {
+.meal-view .meal-links a:hover {
   color: #ffffff;
 }
 
 @media (max-width: 900px) {
-  .meal-view-header {
+  .meal-view .meal-view-header {
     flex-direction: column;
   }
 
-  .meal-context {
+  .meal-view .meal-context {
     width: 100%;
     min-width: 0;
   }
 
-  .meal-modal-grid {
+  .meal-view .meal-modal-grid {
     grid-template-columns: 1fr;
   }
 
-  .meal-modal-left {
+  .meal-view .meal-modal-left {
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     padding-right: 0;
     padding-bottom: 18px;
   }
 
-  .meal-log-form {
+  .meal-view .meal-log-form {
     grid-template-columns: 1fr;
   }
 }
-

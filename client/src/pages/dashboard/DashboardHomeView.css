@@ -1,1 +1,9 @@
-/* DashboardHomeView uses shared center-panel styles from base.css */
+.dashboard-home-view {
+  width: 100%;
+  min-height: clamp(220px, 40vh, 420px);
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+}

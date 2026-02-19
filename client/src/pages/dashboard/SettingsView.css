@@ -1,1 +1,39 @@
-/* SettingsView specific styles are inherited from SummaryView.css and DashboardPage.css */
+.settings-view {
+  width: 100%;
+  display: grid;
+  gap: 20px;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
+  gap: 24px;
+}
+
+.settings-side,
+.settings-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 960px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}

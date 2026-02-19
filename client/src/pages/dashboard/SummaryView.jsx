@@ -11,7 +11,7 @@ function TrendChart({
   endLabel
 }) {
   return (
-    <section className="panel dashboard-card">
+    <section className="panel summary-card">
       <div className="summary-chart-header">
         <h2>{title}</h2>
         <span className="muted">{subtitle}</span>
@@ -75,9 +75,9 @@ export default function SummaryView({
     .replace(/[^a-z0-9]+/g, "-");
 
   return (
-    <div className="dashboard-split span-2">
-      <div className="dashboard-main">
-        <section className="panel dashboard-card overview-panel">
+    <section className="summary-view">
+      <div className="summary-main">
+        <section className="panel summary-card overview-panel">
           <div className="overview-header">
             <div>
               <p className="eyebrow">Overview</p>
@@ -122,7 +122,7 @@ export default function SummaryView({
           </div>
         </section>
 
-        <section className="panel dashboard-card">
+        <section className="panel summary-card">
           <div className="overview-header">
             <div>
               <h2>{todayRecommendation?.weekday || "Today"} recommendations</h2>
@@ -274,7 +274,7 @@ export default function SummaryView({
           </div>
         </section>
 
-        <section className="panel dashboard-card">
+        <section className="panel summary-card">
           <h2>Weekly progress</h2>
           <div className="stat-row">
             <div>
@@ -308,11 +308,11 @@ export default function SummaryView({
           </div>
         </section>
 
-        <section className="panel dashboard-card">
+        <section className="panel summary-card">
           <h2>Recent activity</h2>
-          <div className="list">
+          <div className="summary-list">
             {workouts.slice(0, 4).map((item) => (
-              <div key={item.id} className="list-row">
+              <div key={item.id} className="summary-list-row">
                 <div>
                   <strong>{item.date}</strong>
                   <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
@@ -326,8 +326,8 @@ export default function SummaryView({
 
       </div>
 
-      <aside className="dashboard-side">
-        <section className="panel dashboard-card">
+      <aside className="summary-side">
+        <section className="panel summary-card">
           <div className="summary-range-header">
             <h2>Trend window</h2>
             <div className="summary-range-toggle" role="group" aria-label="Trend range">
@@ -404,6 +404,6 @@ export default function SummaryView({
           </>
         )}
       </aside>
-    </div>
+    </section>
   );
 }

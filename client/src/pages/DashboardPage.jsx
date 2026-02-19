@@ -356,7 +356,10 @@ export default function DashboardPage({
   } else if (dashView === "workouts") {
     activeView = (
       <WorkoutsView
-        workouts={workouts}
+        workouts={recentWorkouts}
+        calories={calories}
+        mealLogs={mealLogs}
+        progressMetrics={progressMetrics}
         setWorkoutForm={setWorkoutForm}
         setWorkoutModalOpen={setWorkoutModalOpen}
       />
@@ -510,7 +513,7 @@ export default function DashboardPage({
                   Close
                 </button>
               </div>
-              <form className="form dashboard-form workout-modal-form" onSubmit={submitWorkout}>
+              <form className="form dashboard-workout-form" onSubmit={submitWorkout}>
                 <label>
                   Date
                   <input
@@ -561,7 +564,7 @@ export default function DashboardPage({
                     placeholder="Squat, bench press, row"
                   />
                 </label>
-                <div className="dashboard-form-grid compact">
+                <div className="dashboard-workout-grid">
                   <label>
                     Sets
                     <input

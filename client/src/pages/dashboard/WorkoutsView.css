@@ -1,14 +1,48 @@
-.workout-row {
-  align-items: flex-start;
+.workouts-view {
+  width: 100%;
+  display: grid;
+  gap: 16px;
 }
 
-.workout-row-copy {
+.workouts-view .logs-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.workouts-view .log-section {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.workouts-view .log-list,
+.workouts-view .workout-list {
+  display: grid;
+  gap: 10px;
+}
+
+.workouts-view .log-list-row,
+.workouts-view .workout-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workouts-view .workout-row-copy {
   display: grid;
   gap: 4px;
 }
 
-.workout-detail {
+.workouts-view .workout-detail {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.35;
 }
+
