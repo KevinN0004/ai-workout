@@ -30,6 +30,11 @@
   margin: 0 auto;
 }
 
+.auth-form.signup-profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(640px, 100%);
+}
+
 .auth-form .full {
   grid-column: 1 / -1;
 }
@@ -90,5 +95,9 @@
 
   .auth-card {
     min-height: 0;
+  }
+
+  .auth-form.signup-profile-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -21,6 +21,8 @@ const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 const defaultProfile = () => ({
+  firstName: "",
+  lastName: "",
   name: "",
   age: null,
   heightCm: null,
@@ -192,9 +194,18 @@ const wgerTimeoutMs = 12000;
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
+  const rawName = cleanText(input.name, 80);
+  const rawFirst = cleanText(input.firstName, 40);
+  const rawLast = cleanText(input.lastName, 60);
+  const nameParts = rawName.split(/\s+/).filter(Boolean);
+  const firstName = rawFirst || nameParts[0] || "";
+  const lastName = rawLast || nameParts.slice(1).join(" ") || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   return {
     ...base,
-    name: cleanText(input.name, 80),
+    firstName,
+    lastName,
+    name: fullName || rawName,
     age: toNullableNumber(input.age, 10, 120),
     heightCm: toNullableNumber(input.heightCm, 100, 260),
     weightKg: toNullableNumber(input.weightKg, 25, 400),
@@ -208,7 +219,8 @@ const buildProfile = (input = {}) => {
 
 const isCompleteSignupProfile = (profile) =>
   Boolean(
-    cleanText(profile?.name, 80) &&
+    cleanText(profile?.firstName, 40) &&
+      cleanText(profile?.lastName, 60) &&
       profile?.age !== null &&
       profile?.heightCm !== null &&
       profile?.weightKg !== null &&
@@ -1241,10 +1253,7 @@ app.post("/api/generate", async (req, res) => {
 
 const startServer = async () => {
   try {
-    const { mongoUri, migratedFrom, migratedCount } = await connectDatabase();
-    if (migratedFrom) {
-      console.log(`Migrated ${migratedCount} user(s) from ${migratedFrom} to MongoDB.`);
-    }
+    const { mongoUri } = await connectDatabase();
     console.log(`MongoDB connected: ${mongoUri}`);
     app.listen(port, () => {
       console.log(`Server listening on http://localhost:${port}`);

@@ -3,10 +3,8 @@ import "./AuthPage.css";
 export default function AuthPage({
   gradient,
   authMode,
-  setAuthMode,
+  onAuthModeChange,
   signupStep,
-  setSignupStep,
-  setAuthError,
   go,
   onAuthSubmit,
   authForm,
@@ -47,9 +45,7 @@ export default function AuthPage({
               type="button"
               className={authMode === "login" ? "active" : ""}
               onClick={() => {
-                setAuthMode("login");
-                setSignupStep("credentials");
-                setAuthError("");
+                onAuthModeChange("login");
               }}
             >
               Login
@@ -58,9 +54,7 @@ export default function AuthPage({
               type="button"
               className={authMode === "signup" ? "active" : ""}
               onClick={() => {
-                setAuthMode("signup");
-                setSignupStep("credentials");
-                setAuthError("");
+                onAuthModeChange("signup");
               }}
             >
               Sign up
@@ -82,7 +76,14 @@ export default function AuthPage({
             </svg>
           </button>
         </div>
-        <form className="form auth-form" onSubmit={onAuthSubmit}>
+        <form
+          className={`form auth-form ${
+            authMode === "signup" && signupStep === "profile"
+              ? "signup-profile-grid"
+              : ""
+          }`}
+          onSubmit={onAuthSubmit}
+        >
           {!(authMode === "signup" && signupStep === "profile") && (
             <label>
               Email
@@ -99,12 +100,22 @@ export default function AuthPage({
           {authMode === "signup" && signupStep === "profile" && (
             <>
               <label>
-                Full name
+                First name
                 <input
-                  name="name"
-                  value={signupProfileForm.name}
+                  name="firstName"
+                  value={signupProfileForm.firstName}
                   onChange={onSignupProfileChange}
-                  placeholder="Jordan Lee"
+                  placeholder="Jordan"
+                  required
+                />
+              </label>
+              <label>
+                Last name
+                <input
+                  name="lastName"
+                  value={signupProfileForm.lastName}
+                  onChange={onSignupProfileChange}
+                  placeholder="Lee"
                   required
                 />
               </label>

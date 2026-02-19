@@ -95,7 +95,8 @@ const defaultAuthForm = {
   password: ""
 };
 const defaultSignupProfileForm = {
-  name: "",
+  firstName: "",
+  lastName: "",
   age: "",
   heightCm: "",
   heightFeet: "",
@@ -838,9 +839,13 @@ export default function App() {
     if (!profile) return;
     const cm = profile.heightCm ? String(profile.heightCm) : "";
     const nextFeetInches = toFeetInchesFromCm(cm);
+    const fullName =
+      [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
+      profile.name ||
+      "";
     setPersonal((prev) => ({
       ...prev,
-      name: profile.name || "",
+      name: fullName,
       age: profile.age ? String(profile.age) : "",
       heightCm: cm,
       heightFeet: nextFeetInches.feet,
@@ -905,6 +910,19 @@ export default function App() {
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  const onAuthModeChange = (mode) => {
+    const isSwitchingMode = mode !== authMode;
+    setAuthMode(mode);
+    setSignupStep("credentials");
+    setAuthError("");
+    if (!isSwitchingMode) return;
+    setAuthForm({ ...defaultAuthForm });
+    setSignupProfileForm({ ...defaultSignupProfileForm });
+    setSignupHeightUnit("cm");
+    setSignupWeightUnit("kg");
+    setShowPassword(false);
   };
 
   const onAuthSubmit = async (e) => {
@@ -1181,10 +1199,8 @@ export default function App() {
       <AuthPage
         gradient={gradient}
         authMode={authMode}
-        setAuthMode={setAuthMode}
+        onAuthModeChange={onAuthModeChange}
         signupStep={signupStep}
-        setSignupStep={setSignupStep}
-        setAuthError={setAuthError}
         go={go}
         onAuthSubmit={onAuthSubmit}
         authForm={authForm}
