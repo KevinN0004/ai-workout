@@ -41,6 +41,15 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
+.meal-view .mealdb-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
 .meal-view .meal-log-header {
   display: grid;
   gap: 2px;
@@ -52,6 +61,15 @@
 
 .meal-view .meal-log-submit {
   justify-self: start;
+}
+
+.meal-view .mealdb-search-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.meal-view .mealdb-search-submit {
+  justify-self: start;
+  align-self: end;
 }
 
 .meal-view .meal-log-list {
@@ -224,6 +242,10 @@
   }
 
   .meal-view .meal-log-form {
+    grid-template-columns: 1fr;
+  }
+
+  .meal-view .mealdb-search-form {
     grid-template-columns: 1fr;
   }
 }

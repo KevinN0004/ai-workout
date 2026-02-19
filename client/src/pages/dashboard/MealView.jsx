@@ -786,6 +786,47 @@ const handleImageError = (event) => {
   event.currentTarget.src = FALLBACK_IMAGE;
 };
 
+const normalizeMealDbMeal = (meal = {}) => {
+  const id = typeof meal?.id === "string" ? meal.id.trim() : "";
+  const title = typeof meal?.title === "string" ? meal.title.trim() : "";
+  const image = typeof meal?.image === "string" ? meal.image.trim() : "";
+  const category = typeof meal?.category === "string" ? meal.category.trim() : "";
+  const area = typeof meal?.area === "string" ? meal.area.trim() : "";
+  const rawBlurb = typeof meal?.blurb === "string" ? meal.blurb.trim() : "";
+  const blurb = rawBlurb || [category, area].filter(Boolean).join(" | ") || "MealDB recipe";
+
+  const ingredients = (Array.isArray(meal?.ingredients) ? meal.ingredients : [])
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 20);
+  const recipes = (Array.isArray(meal?.recipes) ? meal.recipes : [])
+    .map((item) => ({
+      label: typeof item?.label === "string" ? item.label.trim() : "",
+      url: typeof item?.url === "string" ? item.url.trim() : ""
+    }))
+    .filter((item) => item.label && item.url)
+    .slice(0, 8);
+
+  return {
+    ...meal,
+    id,
+    title,
+    image: image || FALLBACK_IMAGE,
+    blurb,
+    calories: meal?.calories ?? null,
+    ingredients,
+    recipes
+  };
+};
+
+const getMealDbSeedQuery = (goalText = "") => {
+  const track = detectTrack(goalText || "Build lean strength and energy");
+  if (track === "fat_loss") return "salad";
+  if (track === "endurance") return "pasta";
+  if (track === "recovery") return "salmon";
+  return "chicken";
+};
+
 export default function MealView({
   dashboard,
   fallbackPlan,
@@ -795,6 +836,11 @@ export default function MealView({
   mealLogs
 }) {
   const [activeMealId, setActiveMealId] = useState(null);
+  const [mealDbInput, setMealDbInput] = useState("");
+  const [mealDbQuery, setMealDbQuery] = useState("");
+  const [mealDbMeals, setMealDbMeals] = useState([]);
+  const [mealDbLoading, setMealDbLoading] = useState(false);
+  const [mealDbError, setMealDbError] = useState("");
   const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];
   const safeMealLogForm = mealLogForm || {
     date: "",
@@ -810,9 +856,82 @@ export default function MealView({
     typeof setMealLogForm === "function" ? setMealLogForm : () => {};
   const onSubmitMealLog =
     typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
+  const latestPlan = dashboard?.plans?.[0];
+  const goalTextForSearch =
+    latestPlan?.goal ||
+    dashboard?.goals?.goalType ||
+    fallbackPlan?.goal ||
+    "Build lean strength and energy";
+
+  useEffect(() => {
+    if (mealDbQuery || mealDbInput) return;
+    const seedQuery = getMealDbSeedQuery(goalTextForSearch);
+    setMealDbInput(seedQuery);
+    setMealDbQuery(seedQuery);
+  }, [goalTextForSearch, mealDbInput, mealDbQuery]);
+
+  useEffect(() => {
+    const query = mealDbQuery.trim();
+    if (!query) {
+      setMealDbMeals([]);
+      setMealDbError("");
+      setMealDbLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const loadMealDbMeals = async () => {
+      setMealDbLoading(true);
+      setMealDbError("");
+      try {
+        const params = new URLSearchParams({
+          query,
+          limit: "8"
+        });
+        const res = await fetch(`/api/mealdb/search?${params.toString()}`, {
+          credentials: "include",
+          signal: controller.signal
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to load MealDB recipes.");
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        const normalized = (Array.isArray(data?.meals) ? data.meals : [])
+          .map((item) => normalizeMealDbMeal(item))
+          .filter((item) => item.id && item.title);
+        setMealDbMeals(normalized);
+      } catch (err) {
+        if (cancelled || err?.name === "AbortError") return;
+        setMealDbMeals([]);
+        setMealDbError(err?.message || "Unable to load MealDB recipes.");
+      } finally {
+        if (!cancelled) setMealDbLoading(false);
+      }
+    };
+
+    loadMealDbMeals();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [mealDbQuery]);
+
+  const onSubmitMealDbSearch = (event) => {
+    event.preventDefault();
+    const nextQuery = mealDbInput.trim();
+    if (!nextQuery) {
+      setMealDbQuery("");
+      setMealDbMeals([]);
+      setMealDbError("");
+      return;
+    }
+    setMealDbQuery(nextQuery);
+  };
 
   const mealContext = useMemo(() => {
-    const latestPlan = dashboard?.plans?.[0];
     const goalText =
       latestPlan?.goal ||
       dashboard?.goals?.goalType ||
@@ -839,6 +958,14 @@ export default function MealView({
 
     const sections = [
       {
+        key: "mealdb-live",
+        title: "MealDB Recipes",
+        subtitle: mealDbQuery
+          ? `Live recipe results for "${mealDbQuery}".`
+          : "Live recipe results from TheMealDB.",
+        meals: withPortions(mealDbMeals)
+      },
+      {
         key: "main-courses",
         title: "Main Courses",
         subtitle: "Primary meals aligned to your current goal and calories.",
@@ -863,15 +990,18 @@ export default function MealView({
         meals: withPortions(EXTRA_MEAL_LIBRARY.drinks)
       }
     ];
-    const allMeals = sections.flatMap((section) => section.meals);
+    const visibleSections = sections.filter((section) => Array.isArray(section.meals) && section.meals.length);
+    const allMeals = visibleSections.flatMap((section) => section.meals);
 
-    return { goalText, targetCalories, weeklyDays, sections, allMeals };
-  }, [dashboard, fallbackPlan]);
+    return { goalText, targetCalories, weeklyDays, sections: visibleSections, allMeals };
+  }, [dashboard, fallbackPlan, latestPlan, mealDbMeals, mealDbQuery]);
 
   const activeMeal = useMemo(
     () => mealContext.allMeals.find((meal) => meal.id === activeMealId) || null,
     [mealContext.allMeals, activeMealId]
   );
+  const activeMealIngredients = Array.isArray(activeMeal?.ingredients) ? activeMeal.ingredients : [];
+  const activeMealRecipes = Array.isArray(activeMeal?.recipes) ? activeMeal.recipes : [];
 
   useEffect(() => {
     if (!activeMeal) return undefined;
@@ -1032,6 +1162,32 @@ export default function MealView({
         </div>
       </section>
 
+      <section className="mealdb-panel">
+        <div className="meal-log-header">
+          <h3>MealDB recipe finder</h3>
+          <p className="muted">
+            Search live recipes from TheMealDB and open any card for full ingredients.
+          </p>
+        </div>
+        <form className="form mealdb-search-form" onSubmit={onSubmitMealDbSearch}>
+          <label>
+            Search
+            <input
+              value={mealDbInput}
+              onChange={(event) => setMealDbInput(event.target.value)}
+              placeholder="chicken, pasta, salmon"
+            />
+          </label>
+          <button className="ghost mealdb-search-submit" type="submit" disabled={mealDbLoading}>
+            {mealDbLoading ? "Searching..." : "Search"}
+          </button>
+        </form>
+        {mealDbError && <p className="error">{mealDbError}</p>}
+        {!mealDbLoading && !mealDbError && mealDbQuery && !mealDbMeals.length && (
+          <p className="muted">No MealDB recipes found for "{mealDbQuery}".</p>
+        )}
+      </section>
+
       <div className="meal-sections">
         {mealContext.sections.map((section) => (
           <section key={section.key} className="meal-section">
@@ -1057,7 +1213,11 @@ export default function MealView({
                   <div className="meal-card-copy">
                     <h3>{meal.title}</h3>
                     <p className="muted">{meal.blurb}</p>
-                    <p className="meal-card-meta">Approx. {meal.calories} calories</p>
+                    <p className="meal-card-meta">
+                      {meal.calories === null || meal.calories === undefined || meal.calories === ""
+                        ? "Calories not provided"
+                        : `Approx. ${meal.calories} calories`}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -1096,26 +1256,28 @@ export default function MealView({
                       onError={handleImageError}
                     />
                     <p>{activeMeal.blurb}</p>
-                    <p>{activeMeal.portionNote}</p>
+                    {activeMeal.portionNote ? <p>{activeMeal.portionNote}</p> : null}
                   </section>
 
                   <section className="meal-modal-right">
                     <h3>Ingredients</h3>
                     <ul className="meal-list">
-                      {activeMeal.ingredients.map((ingredient) => (
+                      {activeMealIngredients.map((ingredient) => (
                         <li key={ingredient}>{ingredient}</li>
                       ))}
+                      {!activeMealIngredients.length && <li>No ingredient details available.</li>}
                     </ul>
 
                     <h3>Recipe links</h3>
                     <ul className="meal-list meal-links">
-                      {activeMeal.recipes.map((recipe) => (
+                      {activeMealRecipes.map((recipe) => (
                         <li key={recipe.url}>
                           <a href={recipe.url} target="_blank" rel="noreferrer">
                             {recipe.label}
                           </a>
                         </li>
                       ))}
+                      {!activeMealRecipes.length && <li>No recipe links available.</li>}
                     </ul>
                   </section>
                 </div>

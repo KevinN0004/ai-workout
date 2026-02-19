@@ -194,6 +194,11 @@ const wgerBaseUrl = cleanText(process.env.WGER_BASE_URL || "https://wger.de/api/
 const wgerApiToken = cleanText(process.env.WGER_API_TOKEN || "", 240);
 const wgerDefaultLanguage = toNullableNumber(process.env.WGER_DEFAULT_LANGUAGE, 1, 100) ?? 2;
 const wgerTimeoutMs = 12000;
+const mealDbBaseUrl = cleanText(
+  process.env.MEALDB_BASE_URL || "https://www.themealdb.com/api/json/v1/1",
+  240
+);
+const mealDbTimeoutMs = 12000;
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -630,6 +635,96 @@ const wgerRequest = async (endpoint, options = {}) => {
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const mealDbRequest = async (endpoint, query = {}) => {
+  if (typeof fetch !== "function") {
+    const err = new Error("This Node runtime does not support fetch.");
+    err.status = 500;
+    throw err;
+  }
+
+  const base = mealDbBaseUrl.replace(/\/+$/, "");
+  const path = String(endpoint || "").replace(/^\/+/, "");
+  const url = new URL(`${base}/${path}`);
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null || value === "") continue;
+    url.searchParams.set(key, String(value));
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const rawBody = await response.text();
+    let data = {};
+    try {
+      data = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      const err = new Error(
+        cleanText(
+          data?.message || data?.detail || data?.error || "MealDB request failed.",
+          220
+        )
+      );
+      err.status = response.status >= 500 ? 502 : response.status;
+      throw err;
+    }
+
+    return data;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      const timeoutErr = new Error("MealDB request timed out.");
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const mapMealDbIngredients = (meal = {}) => {
+  const ingredients = [];
+  for (let i = 1; i <= 20; i += 1) {
+    const ingredient = cleanText(meal?.[`strIngredient${i}`], 100);
+    if (!ingredient) continue;
+    const measure = cleanText(meal?.[`strMeasure${i}`], 80);
+    ingredients.push(cleanText(`${measure ? `${measure} ` : ""}${ingredient}`, 140));
+  }
+  return ingredients;
+};
+
+const mapMealDbMeal = (meal = {}) => {
+  const source = cleanText(meal?.strSource, 320);
+  const youtube = cleanText(meal?.strYoutube, 320);
+  const instructions = normalizePlainText(meal?.strInstructions || "", 2200);
+  const category = cleanText(meal?.strCategory, 80);
+  const area = cleanText(meal?.strArea, 80);
+  const metaLine = [category, area].filter(Boolean).join(" | ");
+  const blurb = cleanText(instructions.slice(0, 180) || metaLine || "Recipe from TheMealDB.", 260);
+  const recipes = [];
+  if (source) recipes.push({ label: "Source", url: source });
+  if (youtube) recipes.push({ label: "YouTube", url: youtube });
+
+  return {
+    id: cleanText(meal?.idMeal, 40) ? `mealdb-${cleanText(meal?.idMeal, 40)}` : "",
+    sourceId: cleanText(meal?.idMeal, 40),
+    title: cleanText(meal?.strMeal, 180),
+    image: cleanText(meal?.strMealThumb, 320),
+    blurb,
+    calories: null,
+    category,
+    area,
+    instructions,
+    ingredients: mapMealDbIngredients(meal),
+    recipes,
+    source: "mealdb"
+  };
 };
 
 const pickWgerTranslation = (translations, preferredLanguage) => {
@@ -1131,6 +1226,27 @@ app.get("/api/wger/exercises/:id", async (req, res) => {
     }
     if (!source) return res.status(404).json({ error: "Exercise not found." });
     res.json({ exercise: mapWgerExercise(source, language) });
+  } catch (err) {
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    res.status(status).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/mealdb/search", async (req, res) => {
+  try {
+    const query = cleanText(req.query.query ?? req.query.q, 100);
+    if (!query) {
+      return res.status(400).json({ error: "Query is required." });
+    }
+    const limit = toNullableNumber(req.query.limit, 1, 20) ?? 8;
+
+    const data = await mealDbRequest("search.php", { s: query });
+    const meals = (Array.isArray(data?.meals) ? data.meals : [])
+      .map((item) => mapMealDbMeal(item))
+      .filter((item) => item.id && item.title)
+      .slice(0, limit);
+
+    res.json({ query, count: meals.length, meals });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     res.status(status).json({ error: err?.message || "Server error." });
