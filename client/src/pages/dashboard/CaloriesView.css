@@ -35,6 +35,12 @@
   align-items: end;
 }
 
+.goal-view .goal-form select {
+  width: fit-content;
+  min-width: 4.5rem;
+  max-width: 100%;
+}
+
 .goal-view .chart-card {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);

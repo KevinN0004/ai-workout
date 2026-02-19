@@ -590,10 +590,7 @@ export default function TipsView({
                     <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
                     <h3>{exercise.name}</h3>
                     <p className="muted">{equipmentText || "No equipment metadata"}</p>
-                    <div className="recommendation-row">
-                      <span className="score-chip">{entry.score} pts</span>
-                      <span className="muted">{entry.reasons[0]}</span>
-                    </div>
+                    <p className="muted">{entry.reasons[0]}</p>
                   </div>
                 </button>
                 <div className="exercise-tile-actions">
