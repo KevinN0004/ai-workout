@@ -22,7 +22,7 @@ export default function CaloriesView({
   submitProgressMetric
 }) {
   return (
-    <section className="panel dashboard-card span-2">
+    <section className="panel dashboard-card span-2 goal-page">
       <header className="panel-header">
         <div>
           <h2>Overall goal</h2>
