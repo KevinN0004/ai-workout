@@ -32,7 +32,7 @@ export default function HomePage({
       <header className="title">
         <div className="header-top">
           <div className="header-left">
-            <h1>AI Workout Studio</h1>
+            <h1>Workout Generator</h1>
           </div>
           <div className="auth-actions">
             {user ? (
@@ -68,11 +68,7 @@ export default function HomePage({
           <div className="panel">
             <div className="panel-header">
               <div>
-                <h2>Personal data</h2>
-                <p className="muted">
-                  Start with the essentials, or switch to the advanced form for
-                  extra detail.
-                </p>
+                <h2>Personal Info</h2>
               </div>
               <div className="segmented">
                 <button
@@ -124,6 +120,21 @@ export default function HomePage({
                   >
                     <button
                       type="button"
+                      className={heightUnit === "ft" ? "active" : ""}
+                      onClick={() => {
+                        const next = toFeetInchesFromCm(personal.heightCm);
+                        setPersonal((prev) => ({
+                          ...prev,
+                          heightFeet: next.feet,
+                          heightInches: next.inches
+                        }));
+                        setHeightUnit("ft");
+                      }}
+                    >
+                      ft/in
+                    </button>
+                    <button
+                      type="button"
                       className={heightUnit === "cm" ? "active" : ""}
                       onClick={() => {
                         setPersonal((prev) => ({
@@ -137,21 +148,6 @@ export default function HomePage({
                       }}
                     >
                       cm
-                    </button>
-                    <button
-                      type="button"
-                      className={heightUnit === "ft" ? "active" : ""}
-                      onClick={() => {
-                        const next = toFeetInchesFromCm(personal.heightCm);
-                        setPersonal((prev) => ({
-                          ...prev,
-                          heightFeet: next.feet,
-                          heightInches: next.inches
-                        }));
-                        setHeightUnit("ft");
-                      }}
-                    >
-                      ft/in
                     </button>
                   </span>
                 </span>
@@ -196,19 +192,6 @@ export default function HomePage({
                   <span className="unit-toggle" role="group" aria-label="Weight units">
                     <button
                       type="button"
-                      className={weightUnit === "kg" ? "active" : ""}
-                      onClick={() => {
-                        setPersonal((prev) => ({
-                          ...prev,
-                          weight: toKg(prev.weight, weightUnit)
-                        }));
-                        setWeightUnit("kg");
-                      }}
-                    >
-                      kg
-                    </button>
-                    <button
-                      type="button"
                       className={weightUnit === "lb" ? "active" : ""}
                       onClick={() => {
                         setPersonal((prev) => ({
@@ -219,6 +202,19 @@ export default function HomePage({
                       }}
                     >
                       lb
+                    </button>
+                    <button
+                      type="button"
+                      className={weightUnit === "kg" ? "active" : ""}
+                      onClick={() => {
+                        setPersonal((prev) => ({
+                          ...prev,
+                          weight: toKg(prev.weight, weightUnit)
+                        }));
+                        setWeightUnit("kg");
+                      }}
+                    >
+                      kg
                     </button>
                   </span>
                 </span>
@@ -259,7 +255,7 @@ export default function HomePage({
                     </select>
                   </label>
                   <label className="full">
-                    Notes
+                    Additional Info
                     <input
                       name="notes"
                       value={personal.notes}
@@ -273,7 +269,7 @@ export default function HomePage({
           </div>
 
           <div className="panel body-visual-panel">
-            <h2>Body type</h2>
+            <h2>Physique</h2>
             <div className="body-visual">
               <div className="body-frame" aria-hidden="true" />
               <p className="muted">Body type visual placeholder</p>
@@ -284,19 +280,15 @@ export default function HomePage({
         <section className="panel center-panel">
           <div>
             <h2>Design your plan</h2>
-            <p className="muted">
-              Open the planner to configure your training details across guided
-              steps.
-            </p>
           </div>
           <button className="cta" type="button" onClick={openPlannerFromProfile}>
-            Open planner
+            Create
           </button>
           {error && <p className="error">{error}</p>}
         </section>
 
         <section className="panel muted-panel">
-          <h2>Sample plan snapshot</h2>
+          <h2>Sample  weekly plan</h2>
           <div className="grid">
             {samplePlan.map((block) => (
               <article key={block.day} className="plan-card">
