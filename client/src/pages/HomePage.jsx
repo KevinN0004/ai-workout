@@ -248,10 +248,25 @@ export default function HomePage({
                       value={personal.activity}
                       onChange={onPersonalChange}
                     >
+                      <option value="">Select</option>
                       <option>Light</option>
                       <option>Moderate</option>
                       <option>High</option>
                       <option>Very high</option>
+                    </select>
+                  </label>
+                  <label>
+                    Sleep
+                    <select
+                      name="sleep"
+                      value={personal.sleep}
+                      onChange={onPersonalChange}
+                    >
+                      <option value="">Select</option>
+                      <option>Less than 4</option>
+                      <option>4 - 6 hours</option>
+                      <option>7 - 8 hours</option>
+                      <option>More than 8</option>
                     </select>
                   </label>
                   <label className="full">
@@ -260,7 +275,7 @@ export default function HomePage({
                       name="notes"
                       value={personal.notes}
                       onChange={onPersonalChange}
-                      placeholder="Sleep schedule, stress, recent training"
+                      placeholder="Past training, dietary restrictions, ilness"
                     />
                   </label>
                 </>

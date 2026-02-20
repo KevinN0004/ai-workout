@@ -7,19 +7,19 @@ import ModalPortal from "./components/ModalPortal";
 import "./App.css";
 
 const quickFocuses = [
-  "Strength + hypertrophy",
-  "Fat loss + conditioning",
-  "Mobility + recovery",
-  "Athletic power",
-  "Endurance base"
+  "Strength",
+  "Weight Loss",
+  "Mobility",
+  "Recovery",
+  "Cardio"
 ];
 
 const goalOptions = [
   "Build lean strength and energy",
   "Fat loss + conditioning",
-  "Mobility + recovery",
-  "Athletic power",
-  "Endurance base"
+  "Mobility",
+  "Recovery",
+  "Cardio"
 ];
 
 const equipmentOptionsByEnv = {
@@ -27,6 +27,7 @@ const equipmentOptionsByEnv = {
     "Bodyweight only",
     "Dumbbells",
     "Kettlebell",
+    "Pull-up bar",
     "Resistance bands",
     "Adjustable bench",
     "Yoga mat"
