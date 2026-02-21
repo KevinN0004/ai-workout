@@ -4,11 +4,11 @@
   font-family: "Space Grotesk", system-ui, sans-serif;
   color: #fff;
   background-color: #000;
-  --font-body: 16px;
+  --font-body: 20px;
   --font-body-large: 18px;
   --font-small: 14px;
-  --font-caption: 12px;
-  --font-button: 15px;
+  --font-caption: 14px;
+  --font-button: 16px;
   --font-h1-min: 30px;
   --font-h1-max: 40px;
   --font-h2-min: 22px;

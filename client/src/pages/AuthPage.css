@@ -19,7 +19,7 @@
   padding: 28px;
   display: grid;
   gap: 16px;
-  text-align: center;
+  text-align: left;
   align-content: center;
   min-height: 440px;
 }

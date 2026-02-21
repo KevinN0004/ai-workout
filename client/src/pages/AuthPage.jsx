@@ -31,11 +31,11 @@ export default function AuthPage({
   return (
     <div className="page auth-page" style={gradient}>
       <header className="title">
-        <h1>AI Workout Studio</h1>
+        <h1>Workout Generator</h1>
         <p className="muted">
           {authMode === "signup" && signupStep === "profile"
             ? "Step 2 of 2: add your profile details."
-            : "Sign in to unlock advanced planning."}
+            : "Sign in to enter dashboard."}
         </p>
       </header>
       <main className="auth-card">
@@ -57,7 +57,7 @@ export default function AuthPage({
                 onAuthModeChange("signup");
               }}
             >
-              Sign up
+              Sign Up
             </button>
           </div>
           <button
