@@ -198,7 +198,7 @@ export default function CaloriesView({
                 />
               </label>
               <label>
-                Weight (lb)
+                Weight lb
                 <input
                   type="number"
                   min="50"

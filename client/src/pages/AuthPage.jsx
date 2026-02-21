@@ -134,7 +134,7 @@ export default function AuthPage({
               </label>
               <label>
                 <span className="label-row">
-                  Height ({signupHeightUnit === "cm" ? "cm" : "ft/in"})
+                  Height
                   <span className="unit-toggle" role="group" aria-label="Height units">
                     <button
                       type="button"
@@ -179,34 +179,38 @@ export default function AuthPage({
                   />
                 ) : (
                   <div className="height-split">
-                    <input
-                      name="heightFeet"
-                      type="number"
-                      min="3"
-                      max="8"
-                      value={signupProfileForm.heightFeet}
-                      onChange={onSignupProfileChange}
-                      placeholder="5"
-                      required
-                    />
-                    <span className="muted">ft</span>
-                    <input
-                      name="heightInches"
-                      type="number"
-                      min="0"
-                      max="11"
-                      value={signupProfileForm.heightInches}
-                      onChange={onSignupProfileChange}
-                      placeholder="9"
-                      required
-                    />
-                    <span className="muted">in</span>
+                    <div className="height-field">
+                      <input
+                        name="heightFeet"
+                        type="number"
+                        min="3"
+                        max="8"
+                        value={signupProfileForm.heightFeet}
+                        onChange={onSignupProfileChange}
+                        placeholder="5"
+                        required
+                      />
+                      <span className="height-unit">ft</span>
+                    </div>
+                    <div className="height-field">
+                      <input
+                        name="heightInches"
+                        type="number"
+                        min="0"
+                        max="11"
+                        value={signupProfileForm.heightInches}
+                        onChange={onSignupProfileChange}
+                        placeholder="9"
+                        required
+                      />
+                      <span className="height-unit">in</span>
+                    </div>
                   </div>
                 )}
               </label>
               <label>
                 <span className="label-row">
-                  Weight ({signupWeightUnit})
+                  Weight
                   <span className="unit-toggle" role="group" aria-label="Weight units">
                     <button
                       type="button"

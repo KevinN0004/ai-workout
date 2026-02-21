@@ -29,13 +29,17 @@
 }
 
 .home-page .title {
+  width: min(1200px, 66.666vw);
   max-width: 100%;
   margin: 20px 0 36px;
+  margin-left: auto;
+  margin-right: auto;
   text-align: center;
 }
 
 .home-page .content {
-  max-width: 1100px;
+  width: min(1200px, 66.666vw);
+  max-width: 100%;
   margin: 0 auto;
 }
 
@@ -47,7 +51,7 @@
 
 .home-page .header-left {
   justify-items: center;
-  margin-left: 200px;
+  margin-left: 0;
 }
 
 .home-page .auth-actions {
@@ -62,8 +66,64 @@
   align-items: start;
 }
 
+.personal-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.personal-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.personal-panel-header h2 {
+  margin: 0;
+}
+
 .personal-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  margin-top: 0;
+}
+
+.personal-form label {
+  width: 100%;
+}
+
+.personal-form.basic-mode label {
+  padding-top: 2px;
+}
+
+.personal-form.basic-mode label.metric-field {
+  padding-top: 0;
+}
+
+.personal-form.advanced-mode label {
+  padding-top: 4px;
+}
+
+.personal-form.advanced-mode label.metric-field {
+  padding-top: 0;
+  margin-top: -1px;
+}
+
+.personal-form.advanced-mode label.metric-height {
+  margin-top: -3px;
+}
+
+.personal-form .label-row {
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+}
+
+.personal-form .label-row .unit-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .personal-form.advanced-mode {
@@ -125,9 +185,28 @@
 
 .height-split {
   display: grid;
-  grid-template-columns: 1fr auto 1fr auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.height-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.height-field input {
+  min-width: 0;
+}
+
+.height-unit {
+  margin-top: 0;
+  line-height: 1;
+  color: #aab3ff;
+  font-size: var(--font-small);
 }
 
 .muted-panel {
@@ -194,6 +273,16 @@
 }
 
 @media (max-width: 720px) {
+  .home-page .title,
+  .home-page .content {
+    width: 100%;
+  }
+
+  .personal-panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .split-panel {
     grid-template-columns: 1fr;
   }

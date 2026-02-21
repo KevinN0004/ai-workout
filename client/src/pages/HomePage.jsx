@@ -88,11 +88,9 @@ export default function HomePage({
 
       <main className="content">
         <section className="split-panel">
-          <div className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Personal Info</h2>
-              </div>
+          <div className="panel personal-panel">
+            <header className="personal-panel-header">
+              <h2>Personal Info</h2>
               <div className="segmented">
                 <button
                   type="button"
@@ -109,10 +107,10 @@ export default function HomePage({
                   Advanced
                 </button>
               </div>
-            </div>
+            </header>
 
             <form
-              className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : ""}`}
+              className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : "basic-mode"}`}
             >
               <label>
                 Full name
@@ -135,9 +133,9 @@ export default function HomePage({
                   placeholder="28"
                 />
               </label>
-              <label>
+              <label className="metric-field metric-height">
                 <span className="label-row">
-                  Height ({heightUnit === "cm" ? "cm" : "ft/in"})
+                  Height
                   <span
                     className="unit-toggle"
                     role="group"
@@ -188,32 +186,36 @@ export default function HomePage({
                   />
                 ) : (
                   <div className="height-split">
-                    <input
-                      name="heightFeet"
-                      value={personal.heightFeet}
-                      onChange={onPersonalChange}
-                      type="number"
-                      min="3"
-                      max="7"
-                      placeholder="5"
-                    />
-                    <span className="muted">ft</span>
-                    <input
-                      name="heightInches"
-                      value={personal.heightInches}
-                      onChange={onPersonalChange}
-                      type="number"
-                      min="0"
-                      max="11"
-                      placeholder="9"
-                    />
-                    <span className="muted">in</span>
+                    <div className="height-field">
+                      <input
+                        name="heightFeet"
+                        value={personal.heightFeet}
+                        onChange={onPersonalChange}
+                        type="number"
+                        min="3"
+                        max="7"
+                        placeholder="5"
+                      />
+                      <span className="height-unit">ft</span>
+                    </div>
+                    <div className="height-field">
+                      <input
+                        name="heightInches"
+                        value={personal.heightInches}
+                        onChange={onPersonalChange}
+                        type="number"
+                        min="0"
+                        max="11"
+                        placeholder="9"
+                      />
+                      <span className="height-unit">in</span>
+                    </div>
                   </div>
                 )}
               </label>
-              <label>
+              <label className="metric-field">
                 <span className="label-row">
-                  Weight ({weightUnit})
+                  Weight
                   <span className="unit-toggle" role="group" aria-label="Weight units">
                     <button
                       type="button"

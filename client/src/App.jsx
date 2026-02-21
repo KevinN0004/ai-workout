@@ -263,9 +263,7 @@ export default function App() {
   const gradient = useMemo(
     () => ({
       background:
-        "radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.14) 0%, transparent 40%)," +
-        "radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 45%)," +
-        "linear-gradient(135deg, #000 0%, #111 100%)"
+        "radial-gradient(circle at center, rgba(189, 189, 189, 0.34) 0%, rgba(151, 151, 151, 0.16) 20%, rgba(110, 110, 110, 0.06) 36%, rgba(0, 0, 0, 0.96) 58%, #000 78%)"
     }),
     []
   );

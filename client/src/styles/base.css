@@ -28,7 +28,14 @@
 
 body {
   min-height: 100vh;
-  background: #000;
+  background: radial-gradient(
+    circle at center,
+    rgba(189, 189, 189, 0.34) 0%,
+    rgba(151, 151, 151, 0.16) 20%,
+    rgba(110, 110, 110, 0.06) 36%,
+    rgba(0, 0, 0, 0.96) 58%,
+    #000 78%
+  );
   color: #fff;
   font-size: var(--font-body);
   line-height: 1.5;
