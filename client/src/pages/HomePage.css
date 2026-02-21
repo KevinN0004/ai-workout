@@ -66,8 +66,36 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.personal-form.advanced-mode {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .personal-form .full {
   grid-column: 1 / -1;
+}
+
+.day-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.day-toggle-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d7ddff;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+
+.day-toggle-btn.active {
+  background: rgba(255, 179, 71, 0.2);
+  border-color: rgba(255, 179, 71, 0.5);
+  color: #ffd9a0;
 }
 
 .unit-toggle {
@@ -172,5 +200,9 @@
 
   .personal-form {
     grid-template-columns: 1fr;
+  }
+
+  .day-toggle-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

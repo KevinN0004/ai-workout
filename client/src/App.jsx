@@ -196,6 +196,12 @@ export default function App() {
     sex: "",
     bodyFat: "",
     activity: "Moderate",
+    sleep: "",
+    timeline: "",
+    experience: "",
+    trainingDays: [],
+    nutrition: "",
+    cardio: "",
     notes: ""
   });
   const [form, setForm] = useState({
@@ -901,6 +907,12 @@ export default function App() {
       sex: profile.sex || "",
       bodyFat: profile.bodyFat ? String(profile.bodyFat) : "",
       activity: profile.activity || "Moderate",
+      sleep: "",
+      timeline: "",
+      experience: "",
+      trainingDays: [],
+      nutrition: "",
+      cardio: "",
       notes: profile.notes || ""
     }));
   }, [user]);
@@ -1278,6 +1290,7 @@ export default function App() {
       <DashboardPage
         gradient={gradient}
         user={user}
+        personal={personal}
         go={go}
         onLogout={onLogout}
         dashboard={dashboard}

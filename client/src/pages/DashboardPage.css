@@ -44,6 +44,10 @@
   align-items: center;
 }
 
+.drawer-header h3 {
+  font-size: 17px;
+}
+
 .drawer-links {
   display: grid;
   gap: 10px;

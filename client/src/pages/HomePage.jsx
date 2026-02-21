@@ -27,6 +27,29 @@ export default function HomePage({
   plannerModal,
   generatedPlanModal
 }) {
+  const trainingDayOptions = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+  ];
+
+  const toggleTrainingDay = (day) => {
+    setPersonal((prev) => {
+      const selectedDays = Array.isArray(prev.trainingDays) ? prev.trainingDays : [];
+      const isSelected = selectedDays.includes(day);
+      return {
+        ...prev,
+        trainingDays: isSelected
+          ? selectedDays.filter((item) => item !== day)
+          : [...selectedDays, day]
+      };
+    });
+  };
+
   return (
     <div className="page home-page" style={gradient}>
       <header className="title">
@@ -88,7 +111,9 @@ export default function HomePage({
               </div>
             </div>
 
-            <form className="form personal-form">
+            <form
+              className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : ""}`}
+            >
               <label>
                 Full name
                 <input
@@ -270,12 +295,87 @@ export default function HomePage({
                     </select>
                   </label>
                   <label className="full">
+                    Goal timeline
+                    <input
+                      name="timeline"
+                      value={personal.timeline}
+                      onChange={onPersonalChange}
+                      placeholder="Example: 12 weeks to lose 10 lb"
+                    />
+                  </label>
+                  <label>
+                    Training experience
+                    <select
+                      name="experience"
+                      value={personal.experience}
+                      onChange={onPersonalChange}
+                    >
+                      <option value="">Select</option>
+                      <option>Beginner</option>
+                      <option>Intermediate</option>
+                      <option>Advanced</option>
+                    </select>
+                  </label>
+                  <label>
+                    Nutrition preference
+                    <select
+                      name="nutrition"
+                      value={personal.nutrition}
+                      onChange={onPersonalChange}
+                    >
+                      <option value="">Select</option>
+                      <option>No preference</option>
+                      <option>High-protein</option>
+                      <option>Balanced</option>
+                      <option>Low-carb</option>
+                      <option>Vegetarian</option>
+                      <option>Vegan</option>
+                    </select>
+                  </label>
+                  <label>
+                    Cardio preference
+                    <select
+                      name="cardio"
+                      value={personal.cardio}
+                      onChange={onPersonalChange}
+                    >
+                      <option value="">Select</option>
+                      <option>None</option>
+                      <option>Walking</option>
+                      <option>Running</option>
+                      <option>Cycling</option>
+                      <option>Rowing</option>
+                      <option>Swimming</option>
+                      <option>HIIT</option>
+                      <option>Mixed</option>
+                    </select>
+                  </label>
+                  <label className="full">
+                    Training days
+                    <div className="day-toggle-grid">
+                      {trainingDayOptions.map((day) => {
+                        const isSelected = Array.isArray(personal.trainingDays) &&
+                          personal.trainingDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            className={`day-toggle-btn ${isSelected ? "active" : ""}`}
+                            onClick={() => toggleTrainingDay(day)}
+                          >
+                            {day.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </label>
+                  <label className="full">
                     Additional Info
                     <input
                       name="notes"
                       value={personal.notes}
                       onChange={onPersonalChange}
-                      placeholder="Past training, dietary restrictions, ilness"
+                      placeholder="Past training, dietary restrictions, illness"
                     />
                   </label>
                 </>

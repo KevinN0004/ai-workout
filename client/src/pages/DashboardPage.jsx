@@ -33,6 +33,7 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 export default function DashboardPage({
   gradient,
   user,
+  personal,
   go,
   onLogout,
   dashboard,
@@ -423,7 +424,7 @@ export default function DashboardPage({
       />
     );
   } else if (dashView === "settings") {
-    activeView = <SettingsView user={user} onLogout={onLogout} />;
+    activeView = <SettingsView user={user} personal={personal} onLogout={onLogout} />;
   } else if (dashView === "home") {
     activeView = <DashboardHomeView go={go} />;
   }

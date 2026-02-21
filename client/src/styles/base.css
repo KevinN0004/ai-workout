@@ -4,7 +4,7 @@
   font-family: "Space Grotesk", system-ui, sans-serif;
   color: #fff;
   background-color: #000;
-  --font-body: 20px;
+  --font-body: 16px;
   --font-body-large: 18px;
   --font-small: 14px;
   --font-caption: 14px;
@@ -163,7 +163,7 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: var(--font-small);
+  font-size: 15px;
   color: #cdd4ff;
 }
 

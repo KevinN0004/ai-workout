@@ -32,6 +32,12 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.settings-value {
+  text-align: right;
+  max-width: 65%;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 960px) {
   .settings-layout {
     grid-template-columns: 1fr;
