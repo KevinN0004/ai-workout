@@ -826,6 +826,7 @@ const getMealDbSeedQuery = (goalText = "") => {
   if (track === "recovery") return "salmon";
   return "chicken";
 };
+const COURSE_ALL_KEY = "all-courses";
 
 export default function MealView({
   dashboard,
@@ -836,6 +837,7 @@ export default function MealView({
   mealLogs
 }) {
   const [activeMealId, setActiveMealId] = useState(null);
+  const [activeCourseKey, setActiveCourseKey] = useState(COURSE_ALL_KEY);
   const [mealDbInput, setMealDbInput] = useState("");
   const [mealDbQuery, setMealDbQuery] = useState("");
   const [mealDbMeals, setMealDbMeals] = useState([]);
@@ -990,11 +992,28 @@ export default function MealView({
         meals: withPortions(EXTRA_MEAL_LIBRARY.drinks)
       }
     ];
-    const visibleSections = sections.filter((section) => Array.isArray(section.meals) && section.meals.length);
-    const allMeals = visibleSections.flatMap((section) => section.meals);
+    const allMeals = sections.flatMap((section) => section.meals);
+    const courseOptions = [
+      { key: COURSE_ALL_KEY, title: "All courses", count: allMeals.length },
+      ...sections.map((section) => ({
+        key: section.key,
+        title: section.title,
+        count: Array.isArray(section.meals) ? section.meals.length : 0
+      }))
+    ];
 
-    return { goalText, targetCalories, weeklyDays, sections: visibleSections, allMeals };
+    return { goalText, targetCalories, weeklyDays, sections, allMeals, courseOptions };
   }, [dashboard, fallbackPlan, latestPlan, mealDbMeals, mealDbQuery]);
+
+  const displayedSections = useMemo(() => {
+    if (activeCourseKey === COURSE_ALL_KEY) {
+      return mealContext.sections.filter(
+        (section) => Array.isArray(section.meals) && section.meals.length
+      );
+    }
+    const selected = mealContext.sections.find((section) => section.key === activeCourseKey);
+    return selected ? [selected] : [];
+  }, [mealContext.sections, activeCourseKey]);
 
   const activeMeal = useMemo(
     () => mealContext.allMeals.find((meal) => meal.id === activeMealId) || null,
@@ -1011,6 +1030,12 @@ export default function MealView({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeMeal]);
+
+  useEffect(() => {
+    if (activeCourseKey === COURSE_ALL_KEY) return;
+    const hasActiveCourse = mealContext.sections.some((section) => section.key === activeCourseKey);
+    if (!hasActiveCourse) setActiveCourseKey(COURSE_ALL_KEY);
+  }, [activeCourseKey, mealContext.sections]);
 
   return (
     <section className="panel meal-view">
@@ -1188,42 +1213,69 @@ export default function MealView({
         )}
       </section>
 
+      <section className="meal-course-panel">
+        <div className="meal-log-header">
+          <h3>Course options</h3>
+          <p className="muted">Pick a course to focus your meal browsing.</p>
+        </div>
+        <div className="meal-course-controls" role="tablist" aria-label="Meal course options">
+          {mealContext.courseOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={`meal-course-pill ${activeCourseKey === option.key ? "active" : ""}`}
+              onClick={() => setActiveCourseKey(option.key)}
+            >
+              {option.title}
+              <span className="meal-course-count">{option.count}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="meal-sections">
-        {mealContext.sections.map((section) => (
+        {displayedSections.map((section) => (
           <section key={section.key} className="meal-section">
             <div className="meal-section-header">
               <h3>{section.title}</h3>
               <p className="muted">{section.subtitle}</p>
             </div>
-            <div className="meal-grid" role="list" aria-label={`${section.title} suggestions`}>
-              {section.meals.map((meal) => (
-                <button
-                  key={meal.id}
-                  type="button"
-                  className="meal-card"
-                  role="listitem"
-                  onClick={() => setActiveMealId(meal.id)}
-                >
-                  <img
-                    src={meal.image}
-                    alt={meal.title}
-                    loading="lazy"
-                    onError={handleImageError}
-                  />
-                  <div className="meal-card-copy">
-                    <h3>{meal.title}</h3>
-                    <p className="muted">{meal.blurb}</p>
-                    <p className="meal-card-meta">
-                      {meal.calories === null || meal.calories === undefined || meal.calories === ""
-                        ? "Calories not provided"
-                        : `Approx. ${meal.calories} calories`}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {Array.isArray(section.meals) && section.meals.length ? (
+              <div className="meal-grid" role="list" aria-label={`${section.title} suggestions`}>
+                {section.meals.map((meal) => (
+                  <button
+                    key={meal.id}
+                    type="button"
+                    className="meal-card"
+                    role="listitem"
+                    onClick={() => setActiveMealId(meal.id)}
+                  >
+                    <img
+                      src={meal.image}
+                      alt={meal.title}
+                      loading="lazy"
+                      onError={handleImageError}
+                    />
+                    <div className="meal-card-copy">
+                      <h3>{meal.title}</h3>
+                      <p className="muted">{meal.blurb}</p>
+                      <p className="meal-card-meta">
+                        {meal.calories === null || meal.calories === undefined || meal.calories === ""
+                          ? "Calories not provided"
+                          : `Approx. ${meal.calories} calories`}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No options available in this course yet.</p>
+            )}
           </section>
         ))}
+        {!displayedSections.length && (
+          <p className="muted">No course options are available right now.</p>
+        )}
       </div>
 
       {activeMeal && (

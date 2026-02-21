@@ -50,6 +50,44 @@
   background: rgba(0, 0, 0, 0.35);
 }
 
+.meal-view .meal-course-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.meal-view .meal-course-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meal-view .meal-course-pill {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e8e8;
+  border-radius: 999px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.meal-view .meal-course-pill:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.meal-view .meal-course-pill.active {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.meal-view .meal-course-count {
+  font-size: 0.75rem;
+  color: #cbcbcb;
+}
+
 .meal-view .meal-log-header {
   display: grid;
   gap: 2px;
