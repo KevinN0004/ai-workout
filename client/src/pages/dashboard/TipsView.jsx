@@ -690,87 +690,102 @@ export default function TipsView({
             <div className="modal exercise-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <h3>{selectedExercise.name}</h3>
-                <button type="button" className="ghost" onClick={() => setSelectedExercise(null)}>
-                  Close
+                <button
+                  type="button"
+                  className="ghost icon-button"
+                  aria-label="Close"
+                  onClick={() => setSelectedExercise(null)}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      d="M6 6l12 12M18 6L6 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
-              <img
-                className="exercise-modal-image"
-                src={getExerciseImage(selectedExercise)}
-                alt={selectedExercise.name}
-              />
-              <div className="exercise-modal-body">
-                <p className="exercise-target">
-                  <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
-                </p>
-                <p className="exercise-focus">
-                  <strong>Primary muscles:</strong>{" "}
-                  {(selectedExercise.muscles || [])
-                    .map((item) => item.name)
-                    .filter(Boolean)
-                    .slice(0, 4)
-                    .join(", ") || "Not specified"}
-                </p>
-                <p className="exercise-focus">
-                  <strong>Equipment:</strong>{" "}
-                  {(selectedExercise.equipment || [])
-                    .map((item) => item.name)
-                    .filter(Boolean)
-                    .join(", ") || "Not specified"}
-                </p>
-                <div className="tips-save-actions">
-                  <button
-                    type="button"
-                    className="cta save-modal-button"
-                    disabled={
-                      isSaved(selectedExercise) ||
-                      Boolean(savingIds[toExerciseKey(selectedExercise)])
-                    }
-                    onClick={() =>
-                      saveExercise(selectedExercise, selectedExercise?.recommendation)
-                    }
-                  >
-                    {isSaved(selectedExercise)
-                      ? "Saved to plan"
-                      : savingIds[toExerciseKey(selectedExercise)]
-                      ? "Saving..."
-                      : "Save to my plan"}
-                  </button>
-                </div>
-                {selectedExercise.description ? (
-                  <p className="exercise-what">{selectedExercise.description}</p>
-                ) : (
-                  <p className="muted">No description provided for this exercise.</p>
-                )}
-
-                {selectedExercise?.recommendation?.reasons?.length ? (
-                  <section className="exercise-details-open">
-                    <h4>Why this was recommended</h4>
-                    <ul>
-                      {selectedExercise.recommendation.reasons.map((reason) => (
-                        <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
-
-                {(selectedExercise.videos || []).length ? (
-                  <div className="video-links">
-                    {(selectedExercise.videos || []).slice(0, 2).map((item) => (
-                      <a
-                        key={`${selectedExercise.id}-video-${item.id || item.url}`}
-                        href={resolveMediaUrl(item.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="video-link"
-                      >
-                        Watch reference video
-                      </a>
-                    ))}
+              <div className="exercise-modal-content">
+                <img
+                  className="exercise-modal-image"
+                  src={getExerciseImage(selectedExercise)}
+                  alt={selectedExercise.name}
+                />
+                <div className="exercise-modal-body">
+                  <p className="exercise-target">
+                    <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
+                  </p>
+                  <p className="exercise-focus">
+                    <strong>Primary muscles:</strong>{" "}
+                    {(selectedExercise.muscles || [])
+                      .map((item) => item.name)
+                      .filter(Boolean)
+                      .slice(0, 4)
+                      .join(", ") || "Not specified"}
+                  </p>
+                  <p className="exercise-focus">
+                    <strong>Equipment:</strong>{" "}
+                    {(selectedExercise.equipment || [])
+                      .map((item) => item.name)
+                      .filter(Boolean)
+                      .join(", ") || "Not specified"}
+                  </p>
+                  <div className="tips-save-actions">
+                    <button
+                      type="button"
+                      className="cta save-modal-button"
+                      disabled={
+                        isSaved(selectedExercise) ||
+                        Boolean(savingIds[toExerciseKey(selectedExercise)])
+                      }
+                      onClick={() =>
+                        saveExercise(selectedExercise, selectedExercise?.recommendation)
+                      }
+                    >
+                      {isSaved(selectedExercise)
+                        ? "Saved to plan"
+                        : savingIds[toExerciseKey(selectedExercise)]
+                        ? "Saving..."
+                        : "Save to my plan"}
+                    </button>
                   </div>
-                ) : (
-                  <p className="muted">No video links available for this exercise.</p>
-                )}
+                  {selectedExercise.description ? (
+                    <p className="exercise-what">{selectedExercise.description}</p>
+                  ) : (
+                    <p className="muted">No description provided for this exercise.</p>
+                  )}
+
+                  {selectedExercise?.recommendation?.reasons?.length ? (
+                    <section className="exercise-details-open">
+                      <h4>Why this was recommended</h4>
+                      <ul>
+                        {selectedExercise.recommendation.reasons.map((reason) => (
+                          <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+
+                  {(selectedExercise.videos || []).length ? (
+                    <div className="video-links">
+                      {(selectedExercise.videos || []).slice(0, 2).map((item) => (
+                        <a
+                          key={`${selectedExercise.id}-video-${item.id || item.url}`}
+                          href={resolveMediaUrl(item.url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="video-link"
+                        >
+                          Watch reference video
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">No video links available for this exercise.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

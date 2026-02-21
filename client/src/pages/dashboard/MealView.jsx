@@ -1291,27 +1291,39 @@ export default function MealView({
               <div className="modal-header meal-modal-header">
                 <button
                   type="button"
-                  className="ghost"
+                  className="ghost icon-button"
+                  aria-label="Close"
                   onClick={() => setActiveMealId(null)}
                 >
-                  Close
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      d="M6 6l12 12M18 6L6 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
 
               <div className="modal-body">
                 <div className="meal-modal-grid">
                   <section className="meal-modal-left">
-                    <h3>{activeMeal.title}</h3>
                     <img
                       src={activeMeal.image}
                       alt={activeMeal.title}
                       onError={handleImageError}
                     />
-                    <p>{activeMeal.blurb}</p>
-                    {activeMeal.portionNote ? <p>{activeMeal.portionNote}</p> : null}
                   </section>
 
                   <section className="meal-modal-right">
+                    <h3 className="meal-modal-title">{activeMeal.title}</h3>
+                    <p className="meal-modal-summary">{activeMeal.blurb}</p>
+                    {activeMeal.portionNote ? (
+                      <p className="meal-modal-summary">{activeMeal.portionNote}</p>
+                    ) : null}
+
                     <h3>Ingredients</h3>
                     <ul className="meal-list">
                       {activeMealIngredients.map((ingredient) => (

@@ -152,53 +152,62 @@
   line-height: 1.4;
 }
 
-.tips-view .exercise-modal {
-  width: min(880px, 100%);
+.exercise-modal {
+  width: min(980px, 100%);
   text-align: left;
 }
 
-.tips-view .exercise-modal-image {
+.exercise-modal-content {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  column-gap: 24px;
+  align-items: stretch;
+  min-width: 620px;
+}
+
+.exercise-modal-image {
   width: 100%;
-  max-height: 320px;
+  aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  align-self: center;
 }
 
-.tips-view .exercise-modal-body {
+.exercise-modal-body {
   display: grid;
   gap: 10px;
 }
 
-.tips-view .tips-save-actions {
+.exercise-modal .tips-save-actions {
   display: flex;
   justify-content: center;
 }
 
-.tips-view .save-modal-button {
+.exercise-modal .save-modal-button {
   min-height: 36px;
 }
 
-.tips-view .exercise-modal-body p {
+.exercise-modal-body p {
   color: #dfdfdf;
   line-height: 1.35;
 }
 
-.tips-view .exercise-target {
+.exercise-modal .exercise-target {
   color: #e9e9e9;
 }
 
-.tips-view .exercise-focus {
+.exercise-modal .exercise-focus {
   color: #d2d2d2;
   font-size: 0.9rem;
 }
 
-.tips-view .exercise-what {
+.exercise-modal .exercise-what {
   color: #ebebeb;
   font-size: 0.96rem;
 }
 
-.tips-view .exercise-details-open {
+.exercise-modal .exercise-details-open {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   padding: 10px 12px;
@@ -207,12 +216,12 @@
   gap: 8px;
 }
 
-.tips-view .exercise-details-open h4 {
+.exercise-modal .exercise-details-open h4 {
   color: #f2f2f2;
   font-size: 1rem;
 }
 
-.tips-view .exercise-details-open ul {
+.exercise-modal .exercise-details-open ul {
   padding-left: 18px;
   display: grid;
   gap: 6px;
@@ -221,12 +230,12 @@
   line-height: 1.35;
 }
 
-.tips-view .video-links {
+.exercise-modal .video-links {
   display: grid;
   gap: 8px;
 }
 
-.tips-view .video-link {
+.exercise-modal .video-link {
   color: #dddddd;
   font-size: 0.86rem;
   text-decoration: underline;

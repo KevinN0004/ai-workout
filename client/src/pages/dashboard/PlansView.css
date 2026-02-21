@@ -112,49 +112,49 @@
   color: #dcdcdc;
 }
 
-.plans-view .plan-day-detail-modal {
+.plan-day-detail-modal {
   width: min(980px, 100%);
   text-align: left;
 }
 
-.plans-view .plan-day-detail-modal .modal-header {
+.plan-day-detail-modal .modal-header {
   position: relative;
   justify-content: center;
 }
 
-.plans-view .plan-day-detail-modal .modal-header h2 {
+.plan-day-detail-modal .modal-header h2 {
   text-align: center;
 }
 
-.plans-view .plan-day-detail-modal .modal-header .ghost {
+.plan-day-detail-modal .modal-header .ghost {
   position: absolute;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
 }
 
-.plans-view .plan-day-detail-grid {
+.plan-day-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
-.plans-view .plan-day-detail-col {
+.plan-day-detail-col {
   display: grid;
   gap: 10px;
   align-content: start;
 }
 
-.plans-view .plan-day-detail-col h3 {
+.plan-day-detail-col h3 {
   text-align: center;
 }
 
-.plans-view .plan-day-detail-col p,
-.plans-view .plan-day-detail-col .hub-list {
+.plan-day-detail-col p,
+.plan-day-detail-col .hub-list {
   text-align: left;
 }
 
-.plans-view .plan-detail-list {
+.plan-detail-list {
   margin-top: 0;
 }
 
@@ -185,13 +185,13 @@
     grid-template-columns: 1fr;
   }
 
-  .plans-view .plan-day-detail-modal .modal-header {
+  .plan-day-detail-modal .modal-header {
     display: grid;
     justify-items: center;
     gap: 10px;
   }
 
-  .plans-view .plan-day-detail-modal .modal-header .ghost {
+  .plan-day-detail-modal .modal-header .ghost {
     position: static;
     transform: none;
   }
