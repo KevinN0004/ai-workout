@@ -244,7 +244,7 @@
 }
 
 .visual-stage-shell {
-  width: min(320px, 100%);
+  width: min(335px, 100%);
 }
 
 .visual-stage {
@@ -256,123 +256,34 @@
     rgba(255, 255, 255, 0.02) 52%,
     rgba(255, 255, 255, 0.01)
   );
-  min-height: 320px;
+  min-height: 345px;
   display: grid;
   place-items: center;
   overflow: hidden;
 }
 
-.physique-svg {
+.physique-render-surface {
   width: 100%;
-  height: auto;
+  height: 430px;
   transform-origin: 50% 56%;
   will-change: transform, opacity;
 }
 
-.physique-info-tab-dock {
-  position: absolute;
-  top: -1px;
-  left: calc(100% - 1px);
-  display: grid;
-  justify-items: start;
-  gap: 0;
-  width: 235px;
-  max-width: 235px;
-  z-index: 3;
-}
-
-.physique-info-tab {
-  position: static;
+.physique-2d-svg {
   width: 100%;
-  max-width: 235px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(8, 12, 24, 0.94);
-  backdrop-filter: blur(10px);
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-}
-
-.physique-glow {
-  fill: rgba(255, 168, 94, 0.12);
-}
-
-.physique-arm,
-.physique-head,
-.physique-torso {
-  transition: fill 220ms ease, stroke 220ms ease;
-}
-
-.physique-meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 6px;
-}
-
-.physique-chip {
-  font-size: 0.72rem;
-  border-radius: 999px;
-  padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
-  color: #e9eeff;
-  will-change: transform, opacity;
-}
-
-.physique-chip.tone-good {
-  border-color: rgba(96, 227, 162, 0.46);
-  color: #9af4c8;
-}
-
-.physique-chip.tone-cool,
-.physique-chip.tone-neutral {
-  border-color: rgba(164, 187, 255, 0.42);
-  color: #c8d7ff;
-}
-
-.physique-chip.tone-warm {
-  border-color: rgba(255, 192, 116, 0.46);
-  color: #ffd8a3;
-}
-
-.physique-chip.tone-alert {
-  border-color: rgba(255, 124, 124, 0.46);
-  color: #ffb3b3;
-}
-
-.physique-stats {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-
-.physique-stat {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 8px 9px;
-  will-change: transform, opacity;
-}
-
-.physique-stat-label {
+  height: 100%;
   display: block;
-  font-size: 0.7rem;
-  color: #aab3ff;
 }
 
-.physique-stat-value {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.86rem;
-  color: #f0f4ff;
+.physique-outline-part {
+  transition: stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease;
+  vector-effect: non-scaling-stroke;
 }
 
 .physique-footnote {
-  text-align: left;
-  margin-top: 0;
-  font-size: 0.72rem;
+  text-align: center;
+  margin: 2px 0 0;
+  font-size: 0.78rem;
 }
 
 .grid {
@@ -436,25 +347,11 @@
   }
 
   .visual-stage {
-    min-height: 280px;
+    min-height: 300px;
   }
 
-  .physique-info-tab-dock {
-    position: static;
-    justify-items: center;
-    width: 100%;
-    max-width: 100%;
-    gap: 6px;
-  }
-
-  .physique-info-tab {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 14px;
-  }
-
-  .physique-meta {
-    justify-content: center;
+  .physique-render-surface {
+    height: 345px;
   }
 
   .physique-footnote {
@@ -463,21 +360,5 @@
 
   .day-toggle-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1100px) {
-  .physique-info-tab-dock {
-    position: static;
-    justify-items: center;
-    width: 100%;
-    max-width: 100%;
-    margin-top: 10px;
-    gap: 6px;
-  }
-
-  .physique-info-tab {
-    max-width: 100%;
-    border-radius: 14px;
   }
 }

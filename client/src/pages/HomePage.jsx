@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
+import PhysiqueSilhouette2D from "../components/PhysiqueSilhouette2D";
 import "./HomePage.css";
+
+const BODY_PART_SEQUENCE = ["head", "leftArm", "rightArm", "upper", "lower"];
+const ACTIVE_PART_LABELS = {
+  head: "Head and neck",
+  leftArm: "Left arm",
+  rightArm: "Right arm",
+  upper: "Torso",
+  lower: "Lower body"
+};
 
 export default function HomePage({
   gradient,
@@ -53,18 +63,9 @@ export default function HomePage({
   };
 
   const visualPanelRef = useRef(null);
-  const svgRef = useRef(null);
-  const glowRef = useRef(null);
-  const leftArmRef = useRef(null);
-  const rightArmRef = useRef(null);
-  const headRef = useRef(null);
-  const torsoRef = useRef(null);
-  const morphAnimationRef = useRef(null);
-  const breatheAnimationRef = useRef(null);
   const introTimelineRef = useRef(null);
-  const silhouetteModelRef = useRef(null);
-
-  const centerX = 140;
+  const stagePulseRef = useRef(null);
+  const [activeBodyPart, setActiveBodyPart] = useState("head");
 
   const toFiniteNumber = (value) => {
     const parsed = Number(value);
@@ -244,7 +245,7 @@ export default function HomePage({
   const glowAlpha = clamp(0.1 + muscleScore * 0.06 + leannessScore * 0.03, 0.08, 0.24);
   const glowRadius = clamp(114 + shoulderHalf * 0.6 + hipHalf * 0.3, 118, 170);
 
-  const targetSilhouetteModel = useMemo(
+  const silhouetteShape = useMemo(
     () => ({
       shoulderHalf,
       chestHalf,
@@ -298,149 +299,57 @@ export default function HomePage({
       glowRadius
     ]
   );
-  const silhouetteModelKey = useMemo(
-    () =>
-      Object.values(targetSilhouetteModel)
-        .map((value) => Number(value).toFixed(4))
-        .join("|"),
-    [targetSilhouetteModel]
-  );
-
-  const buildTorsoPath = (model) => [
-    `M ${centerX - model.shoulderHalf} ${model.shoulderY}`,
-    `C ${centerX - model.chestHalf} ${model.chestY - 16}, ${centerX - model.chestHalf} ${model.chestY + 8}, ${centerX - model.chestHalf} ${model.chestY}`,
-    `C ${centerX - model.waistHalf} ${model.waistY - 30}, ${centerX - model.waistHalf} ${model.waistY - 10}, ${centerX - model.waistHalf} ${model.waistY}`,
-    `C ${centerX - model.hipHalf} ${model.hipY - 20}, ${centerX - model.thighHalf} ${model.thighY - 12}, ${centerX - model.thighHalf} ${model.thighY}`,
-    `C ${centerX - model.calfHalf} ${model.calfY - 20}, ${centerX - model.calfHalf} ${model.calfY + 6}, ${centerX - model.calfHalf} ${model.calfY}`,
-    `L ${centerX - (model.calfHalf - 6)} ${model.ankleY}`,
-    `L ${centerX + (model.calfHalf - 6)} ${model.ankleY}`,
-    `L ${centerX + model.calfHalf} ${model.calfY}`,
-    `C ${centerX + model.calfHalf} ${model.calfY + 6}, ${centerX + model.calfHalf} ${model.calfY - 20}, ${centerX + model.thighHalf} ${model.thighY}`,
-    `C ${centerX + model.thighHalf} ${model.thighY - 12}, ${centerX + model.hipHalf} ${model.hipY - 20}, ${centerX + model.waistHalf} ${model.waistY}`,
-    `C ${centerX + model.waistHalf} ${model.waistY - 10}, ${centerX + model.waistHalf} ${model.waistY - 30}, ${centerX + model.chestHalf} ${model.chestY}`,
-    `C ${centerX + model.chestHalf} ${model.chestY + 8}, ${centerX + model.chestHalf} ${model.chestY - 16}, ${centerX + model.shoulderHalf} ${model.shoulderY}`,
-    `Q ${centerX} ${model.shoulderY - 32} ${centerX - model.shoulderHalf} ${model.shoulderY}`,
-    "Z"
-  ].join(" ");
-
-  const applySilhouetteModel = (model) => {
-    const glowEl = glowRef.current;
-    const leftArmEl = leftArmRef.current;
-    const rightArmEl = rightArmRef.current;
-    const headEl = headRef.current;
-    const torsoEl = torsoRef.current;
-    if (!glowEl || !leftArmEl || !rightArmEl || !headEl || !torsoEl) return;
-
-    const fill = `hsl(${Math.round(model.fillHue)} ${Math.round(model.fillSaturation)}% ${Math.round(model.fillLightness)}%)`;
-    const stroke = `hsl(${Math.round(model.fillHue)} ${Math.round(Math.min(96, model.fillSaturation + 10))}% ${Math.round(model.strokeLightness)}%)`;
-    const glow = `hsla(${Math.round(model.fillHue + 2)} ${Math.round(model.glowSaturation)}% ${Math.round(model.fillLightness + 10)}% / ${model.glowAlpha.toFixed(3)})`;
-    const armY = model.shoulderY + 14;
-
-    leftArmEl.setAttribute("x", String(centerX - model.shoulderHalf - model.armWidth - 7));
-    leftArmEl.setAttribute("y", String(armY));
-    leftArmEl.setAttribute("width", String(model.armWidth));
-    leftArmEl.setAttribute("height", String(model.armHeight));
-    leftArmEl.setAttribute("rx", String(model.armWidth / 2));
-
-    rightArmEl.setAttribute("x", String(centerX + model.shoulderHalf + 7));
-    rightArmEl.setAttribute("y", String(armY));
-    rightArmEl.setAttribute("width", String(model.armWidth));
-    rightArmEl.setAttribute("height", String(model.armHeight));
-    rightArmEl.setAttribute("rx", String(model.armWidth / 2));
-
-    headEl.setAttribute("cx", String(centerX));
-    headEl.setAttribute("cy", String(model.headCenterY));
-    headEl.setAttribute("r", String(model.headRadius));
-
-    torsoEl.setAttribute("d", buildTorsoPath(model));
-
-    glowEl.setAttribute("cx", String(centerX));
-    glowEl.setAttribute("cy", String(model.hipY - 42));
-    glowEl.setAttribute("r", String(model.glowRadius));
-    glowEl.setAttribute("fill", glow);
-
-    [leftArmEl, rightArmEl, headEl, torsoEl].forEach((el) => {
-      el.setAttribute("fill", fill);
-      el.setAttribute("stroke", stroke);
-    });
-  };
 
   useEffect(() => {
-    if (!visualPanelRef.current || !svgRef.current) return undefined;
+    if (!visualPanelRef.current) return undefined;
 
     introTimelineRef.current?.cancel();
-    breatheAnimationRef.current?.cancel();
+    stagePulseRef.current?.cancel();
 
-    const chipEls = Array.from(visualPanelRef.current.querySelectorAll(".physique-chip"));
-    const statEls = Array.from(visualPanelRef.current.querySelectorAll(".physique-stat"));
+    const stageEl = visualPanelRef.current.querySelector(".visual-stage");
+    const renderSurfaceEl = visualPanelRef.current.querySelector(".physique-render-surface");
+    if (!stageEl || !renderSurfaceEl) return undefined;
 
     introTimelineRef.current = createTimeline({
       defaults: { ease: "outCubic", duration: 360 }
     })
-      .add(svgRef.current, { opacity: [0.4, 1], scale: [0.95, 1], duration: 460 })
+      .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: 380 })
       .add(
-        chipEls,
+        renderSurfaceEl,
         {
-          opacity: [0, 1],
-          translateY: [8, 0],
-          delay: (_, index) => index * 52,
-          duration: 280
+          opacity: [0.6, 1],
+          scale: [0.93, 1],
+          duration: 460
         },
-        "<<+=80"
-      )
-      .add(
-        statEls,
-        {
-          opacity: [0, 1],
-          translateY: [10, 0],
-          delay: (_, index) => index * 48,
-          duration: 270
-        },
-        "<<+=40"
+        "<<+=50"
       );
 
-    breatheAnimationRef.current = animate(svgRef.current, {
+    stagePulseRef.current = animate(renderSurfaceEl, {
       scaleX: [1, 0.994, 1],
-      scaleY: [1, 1.012, 1],
+      scaleY: [1, 1.01, 1],
       duration: 4300,
-      delay: 420,
+      delay: 520,
       ease: "inOutSine",
       loop: true
     });
 
     return () => {
       introTimelineRef.current?.cancel();
-      breatheAnimationRef.current?.cancel();
+      stagePulseRef.current?.cancel();
     };
   }, []);
 
   useEffect(() => {
-    if (!svgRef.current) return undefined;
-
-    if (!silhouetteModelRef.current) {
-      silhouetteModelRef.current = { ...targetSilhouetteModel };
-      applySilhouetteModel(silhouetteModelRef.current);
-      return undefined;
-    }
-
-    const workingModel = silhouetteModelRef.current;
-    morphAnimationRef.current?.cancel();
-    morphAnimationRef.current = animate(workingModel, {
-      ...targetSilhouetteModel,
-      duration: 760,
-      ease: "inOutQuart",
-      onUpdate: () => applySilhouetteModel(workingModel)
-    });
+    let partIndex = 0;
+    setActiveBodyPart(BODY_PART_SEQUENCE[partIndex]);
+    const cycleId = window.setInterval(() => {
+      partIndex = (partIndex + 1) % BODY_PART_SEQUENCE.length;
+      setActiveBodyPart(BODY_PART_SEQUENCE[partIndex]);
+    }, 980);
 
     return () => {
-      morphAnimationRef.current?.cancel();
+      window.clearInterval(cycleId);
     };
-  }, [silhouetteModelKey, targetSilhouetteModel]);
-
-  useEffect(() => () => {
-    morphAnimationRef.current?.cancel();
-    breatheAnimationRef.current?.cancel();
-    introTimelineRef.current?.cancel();
   }, []);
 
   const bmiCategory = getBmiCategory(bmi);
@@ -451,46 +360,11 @@ export default function HomePage({
     if (fatScore > 0.72) return "Mass";
     return "Balanced";
   })();
-
-  const hasBodyCompositionDriver = ageValue !== null || explicitBodyFat !== null;
-  const completionChecks = [
-    Boolean(resolvedHeightCm),
-    Boolean(resolvedWeightKg),
-    hasBodyCompositionDriver,
-    Boolean(personal.sex)
-  ];
-  const completionScore = completionChecks.filter(Boolean).length / completionChecks.length;
-
-  const heightDisplay = (() => {
-    if (!resolvedHeightCm) return "--";
-    const cmRounded = Math.round(resolvedHeightCm);
-    const imperial = toFeetInchesFromCm(String(cmRounded));
-    const imperialText = imperial.feet ? `${imperial.feet}'${imperial.inches}"` : "";
-    const metricText = `${cmRounded} cm`;
-    if (!imperialText) return metricText;
-    return heightUnit === "ft"
-      ? `${imperialText} (${metricText})`
-      : `${metricText} (${imperialText})`;
-  })();
-
-  const weightDisplay = (() => {
-    if (!resolvedWeightKg) return "--";
-    const kgRounded = Math.round(resolvedWeightKg);
-    const lbRounded = Math.round(Number(toLb(String(kgRounded), "kg")));
-    const metricText = `${kgRounded} kg`;
-    const imperialText = Number.isFinite(lbRounded) ? `${lbRounded} lb` : "";
-    if (!imperialText) return metricText;
-    return weightUnit === "lb"
-      ? `${imperialText} (${metricText})`
-      : `${metricText} (${imperialText})`;
-  })();
-  const bodyFatLabel = explicitBodyFat !== null ? "Body fat" : "Estimated body fat";
-  const bodyFatDisplay = effectiveBodyFat !== null ? `${effectiveBodyFat}%` : "Add age";
-  const ffmiDisplay = ffmi !== null ? ffmi : "--";
+  const activePartLabel = ACTIVE_PART_LABELS[activeBodyPart] || "Head and neck";
 
   const visualLabel = bmi !== null
-    ? `Physique silhouette: ${physiqueType.toLowerCase()} profile. BMI ${bmi}, ${bmiCategory.label}.`
-    : "Physique silhouette preview. Add height and weight for a personalized shape.";
+    ? `Physique silhouette: ${physiqueType.toLowerCase()} profile. BMI ${bmi}, ${bmiCategory.label}. Active region ${activePartLabel.toLowerCase()}.`
+    : `Physique silhouette preview. Active region ${activePartLabel.toLowerCase()}. Add height and weight for a personalized shape.`;
 
   return (
     <div className="page home-page" style={gradient}>
@@ -833,90 +707,18 @@ export default function HomePage({
               <div className="body-visual-layout">
                 <div className="visual-stage-shell">
                   <div className="visual-stage" role="img" aria-label={visualLabel}>
-                    <svg
-                      ref={svgRef}
-                      className="physique-svg"
-                      viewBox="0 0 280 430"
-                      aria-hidden="true"
-                    >
-                      <circle ref={glowRef} className="physique-glow" cx="140" cy="225" r="132" />
-                      <rect
-                        ref={leftArmRef}
-                        className="physique-arm"
-                        x="68"
-                        y="116"
-                        width="16"
-                        height="176"
-                        rx="8"
-                        strokeWidth="1.5"
+                    <div className="physique-render-surface">
+                      <PhysiqueSilhouette2D
+                        shape={silhouetteShape}
+                        activePart={activeBodyPart}
                       />
-                      <rect
-                        ref={rightArmRef}
-                        className="physique-arm"
-                        x="196"
-                        y="116"
-                        width="16"
-                        height="176"
-                        rx="8"
-                        strokeWidth="1.5"
-                      />
-                      <circle
-                        ref={headRef}
-                        className="physique-head"
-                        cx="140"
-                        cy="58"
-                        r="20"
-                        strokeWidth="2"
-                      />
-                      <path
-                        ref={torsoRef}
-                        className="physique-torso"
-                        d="M 96 101 C 104 128, 104 153, 104 144 C 120 190, 120 213, 120 220 C 112 248, 118 295, 118 320 C 122 350, 122 376, 122 372 L 128 412 L 152 412 L 158 372 C 158 376, 158 350, 162 320 C 162 295, 168 248, 160 220 C 160 213, 160 190, 176 144 C 176 153, 176 128, 184 101 Q 140 70 96 101 Z"
-                        strokeWidth="2"
-                      />
-                    </svg>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="physique-info-tab-dock">
-              <aside className="physique-info-tab">
-                <div className="physique-meta">
-                  <span className="physique-chip">{physiqueType} profile</span>
-                  <span className={`physique-chip tone-${bmiCategory.tone}`}>{bmiCategory.label}</span>
-                  <span className="physique-chip">
-                    Profile input {Math.round(completionScore * 100)}%
-                  </span>
-                </div>
-
-                <div className="physique-stats">
-                  <article className="physique-stat">
-                    <span className="physique-stat-label">Height</span>
-                    <strong className="physique-stat-value">{heightDisplay}</strong>
-                  </article>
-                  <article className="physique-stat">
-                    <span className="physique-stat-label">Weight</span>
-                    <strong className="physique-stat-value">{weightDisplay}</strong>
-                  </article>
-                  <article className="physique-stat">
-                    <span className="physique-stat-label">BMI</span>
-                    <strong className="physique-stat-value">{bmi !== null ? bmi : "--"}</strong>
-                  </article>
-                  <article className="physique-stat">
-                    <span className="physique-stat-label">{bodyFatLabel}</span>
-                    <strong className="physique-stat-value">{bodyFatDisplay}</strong>
-                  </article>
-                  <article className="physique-stat">
-                    <span className="physique-stat-label">Lean mass index (FFMI)</span>
-                    <strong className="physique-stat-value">{ffmiDisplay}</strong>
-                  </article>
-                </div>
-
-                <p className="muted physique-footnote">
-                  Preview model uses BMI, body fat, activity, and lean-mass estimation from your profile.
-                </p>
-              </aside>
+              <p className="muted physique-footnote">
+                {physiqueType} profile preview. Active region: {activePartLabel}.
+              </p>
             </div>
           </div>
         </section>
