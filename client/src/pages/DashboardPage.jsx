@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SummaryView from "./dashboard/SummaryView";
 import WorkoutsView from "./dashboard/WorkoutsView";
 import CaloriesView from "./dashboard/CaloriesView";
@@ -77,6 +77,8 @@ export default function DashboardPage({
   plannerModal,
   generatedPlanModal
 }) {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
   const workouts = Array.isArray(dashboard?.workoutSessions) && dashboard.workoutSessions.length
     ? dashboard.workoutSessions
     : dashboard?.workouts || [];
@@ -86,6 +88,28 @@ export default function DashboardPage({
     ? dashboard.progressMetrics
     : [];
   const goals = dashboard?.goals || goalForm;
+
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+
+    const closeProfileMenuOnOutsideClick = (event) => {
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const closeProfileMenuOnEscape = (event) => {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeProfileMenuOnOutsideClick);
+    document.addEventListener("keydown", closeProfileMenuOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeProfileMenuOnOutsideClick);
+      document.removeEventListener("keydown", closeProfileMenuOnEscape);
+    };
+  }, [profileMenuOpen]);
   const {
     last7Workouts,
     avgCalories,
@@ -424,7 +448,7 @@ export default function DashboardPage({
       />
     );
   } else if (dashView === "settings") {
-    activeView = <SettingsView user={user} personal={personal} onLogout={onLogout} />;
+    activeView = <SettingsView user={user} personal={personal} />;
   } else if (dashView === "home") {
     activeView = <DashboardHomeView go={go} />;
   }
@@ -459,34 +483,62 @@ export default function DashboardPage({
               <h1>Dashboard</h1>
             </div>
             <div className="auth-actions">
-              <button
-                type="button"
-                className="ghost icon-button profile-icon-button"
-                onClick={() => setDashView("settings")}
-                aria-label="Open profile settings"
-                title={user.email}
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                  <circle
-                    cx="12"
-                    cy="8"
-                    r="4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  />
-                  <path
-                    d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-              <button type="button" className="ghost" onClick={onLogout}>
-                Log out
-              </button>
+              <div className="profile-menu" ref={profileMenuRef}>
+                <button
+                  type="button"
+                  className="ghost icon-button profile-icon-button"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
+                  aria-label="Open profile menu"
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                  aria-controls="profile-menu-dropdown"
+                  title={user.email}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <circle
+                      cx="12"
+                      cy="8"
+                      r="4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    />
+                    <path
+                      d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+                {profileMenuOpen && (
+                  <div id="profile-menu-dropdown" className="profile-menu-dropdown" role="menu">
+                    <button
+                      type="button"
+                      className="profile-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setDashView("settings");
+                        setProfileMenuOpen(false);
+                      }}
+                    >
+                      View profile
+                    </button>
+                    <button
+                      type="button"
+                      className="profile-menu-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        onLogout();
+                      }}
+                    >
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <p className="muted">Visual summary of your progress and key metrics.</p>

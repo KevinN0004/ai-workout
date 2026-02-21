@@ -86,6 +86,42 @@
   height: 40px;
 }
 
+.profile-menu {
+  position: relative;
+}
+
+.profile-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 170px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 10, 10, 0.98);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+}
+
+.profile-menu-item {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.profile-menu-item:hover,
+.profile-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+
 @media (max-width: 720px) {
   .dashboard-workout-form {
     grid-template-columns: 1fr;

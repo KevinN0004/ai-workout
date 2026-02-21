@@ -111,6 +111,36 @@ const defaultSignupProfileForm = {
   notes: ""
 };
 
+const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
+
+const getRegionFromLocale = (locale) => {
+  if (!locale || typeof locale !== "string") return "";
+  const localeParts = locale.split(/[-_]/).filter(Boolean);
+  if (localeParts.length > 1 && localeParts[1]) {
+    return localeParts[1].toUpperCase();
+  }
+  try {
+    const parsed = new Intl.Locale(locale);
+    return parsed.region ? parsed.region.toUpperCase() : "";
+  } catch {
+    return "";
+  }
+};
+
+const getPreferredMeasurementSystem = () => {
+  if (typeof navigator === "undefined") return "metric";
+  const locales = Array.isArray(navigator.languages) && navigator.languages.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const locale of locales) {
+    const region = getRegionFromLocale(locale);
+    if (IMPERIAL_REGION_CODES.has(region)) {
+      return "imperial";
+    }
+  }
+  return "metric";
+};
+
 const getLocalDateKey = () => {
   const date = new Date();
   const year = date.getFullYear();
@@ -121,8 +151,12 @@ const getLocalDateKey = () => {
 
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
-  const [heightUnit, setHeightUnit] = useState("cm");
-  const [weightUnit, setWeightUnit] = useState("kg");
+  const [heightUnit, setHeightUnit] = useState(() =>
+    getPreferredMeasurementSystem() === "imperial" ? "ft" : "cm"
+  );
+  const [weightUnit, setWeightUnit] = useState(() =>
+    getPreferredMeasurementSystem() === "imperial" ? "lb" : "kg"
+  );
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerStep, setPlannerStep] = useState(1);
   const [route, setRoute] = useState(window.location.pathname);
@@ -136,8 +170,12 @@ export default function App() {
     ...defaultSignupProfileForm
   });
   const [signupStep, setSignupStep] = useState("credentials");
-  const [signupHeightUnit, setSignupHeightUnit] = useState("cm");
-  const [signupWeightUnit, setSignupWeightUnit] = useState("kg");
+  const [signupHeightUnit, setSignupHeightUnit] = useState(() =>
+    getPreferredMeasurementSystem() === "imperial" ? "ft" : "cm"
+  );
+  const [signupWeightUnit, setSignupWeightUnit] = useState(() =>
+    getPreferredMeasurementSystem() === "imperial" ? "lb" : "kg"
+  );
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
