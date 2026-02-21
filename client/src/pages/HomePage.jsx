@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef } from "react";
+import { animate, createTimeline } from "animejs";
 import "./HomePage.css";
 
 export default function HomePage({
@@ -49,6 +51,446 @@ export default function HomePage({
       };
     });
   };
+
+  const visualPanelRef = useRef(null);
+  const svgRef = useRef(null);
+  const glowRef = useRef(null);
+  const leftArmRef = useRef(null);
+  const rightArmRef = useRef(null);
+  const headRef = useRef(null);
+  const torsoRef = useRef(null);
+  const morphAnimationRef = useRef(null);
+  const breatheAnimationRef = useRef(null);
+  const introTimelineRef = useRef(null);
+  const silhouetteModelRef = useRef(null);
+
+  const centerX = 140;
+
+  const toFiniteNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const roundTo = (value, decimals = 1) => {
+    const factor = 10 ** decimals;
+    return Math.round(value * factor) / factor;
+  };
+
+  const resolvedHeightCm = (() => {
+    const fromCmInput = toFiniteNumber(personal.heightCm);
+    const fromImperialInput = toFiniteNumber(
+      toCmFromFeetInches(personal.heightFeet, personal.heightInches)
+    );
+    const picked = heightUnit === "ft"
+      ? fromImperialInput ?? fromCmInput
+      : fromCmInput ?? fromImperialInput;
+    return picked && picked > 0 ? picked : null;
+  })();
+
+  const resolvedWeightKg = (() => {
+    const normalized = toFiniteNumber(toKg(personal.weight, weightUnit));
+    return normalized && normalized > 0 ? normalized : null;
+  })();
+
+  const ageValue = (() => {
+    const parsed = toFiniteNumber(personal.age);
+    return parsed && parsed > 0 ? parsed : null;
+  })();
+
+  const bmi = (() => {
+    if (!resolvedHeightCm || !resolvedWeightKg) return null;
+    const heightMeters = resolvedHeightCm / 100;
+    return Number((resolvedWeightKg / (heightMeters * heightMeters)).toFixed(1));
+  })();
+
+  const getBmiCategory = (value) => {
+    if (value === null) return { label: "No BMI yet", tone: "neutral" };
+    if (value < 18.5) return { label: "Underweight", tone: "cool" };
+    if (value < 25) return { label: "Healthy range", tone: "good" };
+    if (value < 30) return { label: "Overweight", tone: "warm" };
+    return { label: "Obesity range", tone: "alert" };
+  };
+
+  const sexValue = String(personal.sex || "").toLowerCase();
+  const isFemale = sexValue.includes("female");
+  const isMale = sexValue.includes("male") && !isFemale;
+  const sexFactor = isFemale ? 0 : isMale ? 1 : 0.5;
+  const explicitBodyFat = (() => {
+    const value = toFiniteNumber(personal.bodyFat);
+    return value === null ? null : clamp(value, 3, 60);
+  })();
+
+  const estimatedBodyFat = (() => {
+    if (bmi === null || ageValue === null) return null;
+    const estimate = 1.2 * bmi + 0.23 * ageValue - 10.8 * sexFactor - 5.4;
+    return roundTo(clamp(estimate, 3, 60), 1);
+  })();
+  const effectiveBodyFat = explicitBodyFat ?? estimatedBodyFat;
+  const fatRange = isFemale
+    ? { lean: 16, high: 44 }
+    : isMale
+      ? { lean: 8, high: 34 }
+      : { lean: 12, high: 39 };
+
+  const activityScoreMap = {
+    Light: 0.25,
+    Moderate: 0.45,
+    High: 0.65,
+    "Very high": 0.8
+  };
+
+  const trainingDaysCount = Array.isArray(personal.trainingDays)
+    ? personal.trainingDays.length
+    : 0;
+  const hasStrengthFocus = form.focuses.includes("Strength");
+  const hasWeightLossFocus = form.focuses.includes("Weight Loss");
+  const hasCardioFocus = form.focuses.includes("Cardio");
+  const activityScore = clamp(
+    (activityScoreMap[personal.activity] ?? 0.45) + trainingDaysCount * 0.03,
+    0,
+    1
+  );
+
+  const bmiMassScore = bmi !== null ? clamp((bmi - 18.5) / (34 - 18.5), 0, 1) : 0.45;
+  const bodyFatMassScore = effectiveBodyFat !== null
+    ? clamp((effectiveBodyFat - fatRange.lean) / (fatRange.high - fatRange.lean), 0, 1)
+    : null;
+  const fatScore = clamp(
+    (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.78 +
+      bmiMassScore * 0.22,
+    0,
+    1
+  );
+
+  const leanMassKg = resolvedWeightKg && effectiveBodyFat !== null
+    ? resolvedWeightKg * (1 - effectiveBodyFat / 100)
+    : null;
+  const ffmi = (() => {
+    if (!leanMassKg || !resolvedHeightCm) return null;
+    const heightM = resolvedHeightCm / 100;
+    return roundTo(leanMassKg / (heightM * heightM), 1);
+  })();
+  const ffmiRange = isFemale
+    ? { low: 13, high: 21 }
+    : isMale
+      ? { low: 15, high: 25 }
+      : { low: 14, high: 23 };
+  const ffmiScore = ffmi !== null
+    ? clamp((ffmi - ffmiRange.low) / (ffmiRange.high - ffmiRange.low), 0, 1)
+    : null;
+  const experienceBoost = personal.experience === "Advanced"
+    ? 0.08
+    : personal.experience === "Intermediate"
+      ? 0.04
+      : 0;
+  const nutritionBoost = personal.nutrition === "High-protein" ? 0.04 : 0;
+  const muscleScore = clamp(
+    (ffmiScore !== null ? ffmiScore : activityScore) * 0.62 +
+      activityScore * 0.24 +
+      (hasStrengthFocus ? 0.12 : 0) +
+      experienceBoost +
+      nutritionBoost -
+      (hasWeightLossFocus ? 0.05 : 0),
+    0,
+    1
+  );
+  const leannessScore = clamp(
+    (1 - fatScore) * 0.74 +
+      (hasWeightLossFocus || hasCardioFocus ? 0.2 : 0) -
+      (hasStrengthFocus ? 0.04 : 0),
+    0,
+    1
+  );
+
+  const heightNorm = resolvedHeightCm
+    ? clamp((resolvedHeightCm - 150) / (205 - 150), 0, 1)
+    : 0.48;
+  const shoulderFrameOffset = isMale ? 2.5 : isFemale ? -1.5 : 0.5;
+  const shoulderHalf = clamp(
+    38 + shoulderFrameOffset + muscleScore * 24 + leannessScore * 3 - fatScore * 2,
+    31,
+    72
+  );
+  const chestHalf = clamp(31 + muscleScore * 16 + fatScore * 7, 24, 60);
+  const waistHalf = clamp(
+    17.5 + fatScore * 18 - muscleScore * 3 - leannessScore * 4 + (isFemale ? 1.8 : 0),
+    13,
+    48
+  );
+  const hipHalf = clamp(27 + fatScore * 10 + (isFemale ? 7 : 2), 22, 55);
+  const thighHalf = clamp(20 + fatScore * 8 + muscleScore * 7 + (isFemale ? 1.5 : 0), 16, 45);
+  const calfHalf = clamp(thighHalf * 0.67 + muscleScore * 1.2, 13, 32);
+  const armWidth = clamp(10.5 + muscleScore * 7 + fatScore * 2.5, 9, 24);
+  const armHeight = clamp(158 + heightNorm * 26, 148, 192);
+  const headRadius = clamp(19 + fatScore * 2 + (isFemale ? 0.7 : 0), 17, 27);
+
+  const legBias = (heightNorm - 0.5) * 18;
+  const torsoBias = (heightNorm - 0.5) * 8;
+  const shoulderY = 100 - torsoBias * 0.4;
+  const chestY = 143 + torsoBias * 0.2;
+  const waistY = 218 + torsoBias + legBias * 0.1;
+  const hipY = 266 + torsoBias + legBias * 0.24;
+  const thighY = 319 + legBias * 0.55;
+  const calfY = 372 + legBias * 0.84;
+  const ankleY = 412 + legBias;
+  const headCenterY = 57 - torsoBias * 0.3;
+
+  const fillHue = 18 + leannessScore * 24 + muscleScore * 5;
+  const fillSaturation = clamp(53 + muscleScore * 18 - fatScore * 8, 40, 88);
+  const fillLightness = clamp(51 + leannessScore * 13 - fatScore * 5, 40, 74);
+  const strokeLightness = clamp(fillLightness - 24, 20, 48);
+  const glowSaturation = clamp(fillSaturation + 8, 46, 94);
+  const glowAlpha = clamp(0.1 + muscleScore * 0.06 + leannessScore * 0.03, 0.08, 0.24);
+  const glowRadius = clamp(114 + shoulderHalf * 0.6 + hipHalf * 0.3, 118, 170);
+
+  const targetSilhouetteModel = useMemo(
+    () => ({
+      shoulderHalf,
+      chestHalf,
+      waistHalf,
+      hipHalf,
+      thighHalf,
+      calfHalf,
+      armWidth,
+      armHeight,
+      headRadius,
+      shoulderY,
+      chestY,
+      waistY,
+      hipY,
+      thighY,
+      calfY,
+      ankleY,
+      headCenterY,
+      fillHue,
+      fillSaturation,
+      fillLightness,
+      strokeLightness,
+      glowSaturation,
+      glowAlpha,
+      glowRadius
+    }),
+    [
+      shoulderHalf,
+      chestHalf,
+      waistHalf,
+      hipHalf,
+      thighHalf,
+      calfHalf,
+      armWidth,
+      armHeight,
+      headRadius,
+      shoulderY,
+      chestY,
+      waistY,
+      hipY,
+      thighY,
+      calfY,
+      ankleY,
+      headCenterY,
+      fillHue,
+      fillSaturation,
+      fillLightness,
+      strokeLightness,
+      glowSaturation,
+      glowAlpha,
+      glowRadius
+    ]
+  );
+  const silhouetteModelKey = useMemo(
+    () =>
+      Object.values(targetSilhouetteModel)
+        .map((value) => Number(value).toFixed(4))
+        .join("|"),
+    [targetSilhouetteModel]
+  );
+
+  const buildTorsoPath = (model) => [
+    `M ${centerX - model.shoulderHalf} ${model.shoulderY}`,
+    `C ${centerX - model.chestHalf} ${model.chestY - 16}, ${centerX - model.chestHalf} ${model.chestY + 8}, ${centerX - model.chestHalf} ${model.chestY}`,
+    `C ${centerX - model.waistHalf} ${model.waistY - 30}, ${centerX - model.waistHalf} ${model.waistY - 10}, ${centerX - model.waistHalf} ${model.waistY}`,
+    `C ${centerX - model.hipHalf} ${model.hipY - 20}, ${centerX - model.thighHalf} ${model.thighY - 12}, ${centerX - model.thighHalf} ${model.thighY}`,
+    `C ${centerX - model.calfHalf} ${model.calfY - 20}, ${centerX - model.calfHalf} ${model.calfY + 6}, ${centerX - model.calfHalf} ${model.calfY}`,
+    `L ${centerX - (model.calfHalf - 6)} ${model.ankleY}`,
+    `L ${centerX + (model.calfHalf - 6)} ${model.ankleY}`,
+    `L ${centerX + model.calfHalf} ${model.calfY}`,
+    `C ${centerX + model.calfHalf} ${model.calfY + 6}, ${centerX + model.calfHalf} ${model.calfY - 20}, ${centerX + model.thighHalf} ${model.thighY}`,
+    `C ${centerX + model.thighHalf} ${model.thighY - 12}, ${centerX + model.hipHalf} ${model.hipY - 20}, ${centerX + model.waistHalf} ${model.waistY}`,
+    `C ${centerX + model.waistHalf} ${model.waistY - 10}, ${centerX + model.waistHalf} ${model.waistY - 30}, ${centerX + model.chestHalf} ${model.chestY}`,
+    `C ${centerX + model.chestHalf} ${model.chestY + 8}, ${centerX + model.chestHalf} ${model.chestY - 16}, ${centerX + model.shoulderHalf} ${model.shoulderY}`,
+    `Q ${centerX} ${model.shoulderY - 32} ${centerX - model.shoulderHalf} ${model.shoulderY}`,
+    "Z"
+  ].join(" ");
+
+  const applySilhouetteModel = (model) => {
+    const glowEl = glowRef.current;
+    const leftArmEl = leftArmRef.current;
+    const rightArmEl = rightArmRef.current;
+    const headEl = headRef.current;
+    const torsoEl = torsoRef.current;
+    if (!glowEl || !leftArmEl || !rightArmEl || !headEl || !torsoEl) return;
+
+    const fill = `hsl(${Math.round(model.fillHue)} ${Math.round(model.fillSaturation)}% ${Math.round(model.fillLightness)}%)`;
+    const stroke = `hsl(${Math.round(model.fillHue)} ${Math.round(Math.min(96, model.fillSaturation + 10))}% ${Math.round(model.strokeLightness)}%)`;
+    const glow = `hsla(${Math.round(model.fillHue + 2)} ${Math.round(model.glowSaturation)}% ${Math.round(model.fillLightness + 10)}% / ${model.glowAlpha.toFixed(3)})`;
+    const armY = model.shoulderY + 14;
+
+    leftArmEl.setAttribute("x", String(centerX - model.shoulderHalf - model.armWidth - 7));
+    leftArmEl.setAttribute("y", String(armY));
+    leftArmEl.setAttribute("width", String(model.armWidth));
+    leftArmEl.setAttribute("height", String(model.armHeight));
+    leftArmEl.setAttribute("rx", String(model.armWidth / 2));
+
+    rightArmEl.setAttribute("x", String(centerX + model.shoulderHalf + 7));
+    rightArmEl.setAttribute("y", String(armY));
+    rightArmEl.setAttribute("width", String(model.armWidth));
+    rightArmEl.setAttribute("height", String(model.armHeight));
+    rightArmEl.setAttribute("rx", String(model.armWidth / 2));
+
+    headEl.setAttribute("cx", String(centerX));
+    headEl.setAttribute("cy", String(model.headCenterY));
+    headEl.setAttribute("r", String(model.headRadius));
+
+    torsoEl.setAttribute("d", buildTorsoPath(model));
+
+    glowEl.setAttribute("cx", String(centerX));
+    glowEl.setAttribute("cy", String(model.hipY - 42));
+    glowEl.setAttribute("r", String(model.glowRadius));
+    glowEl.setAttribute("fill", glow);
+
+    [leftArmEl, rightArmEl, headEl, torsoEl].forEach((el) => {
+      el.setAttribute("fill", fill);
+      el.setAttribute("stroke", stroke);
+    });
+  };
+
+  useEffect(() => {
+    if (!visualPanelRef.current || !svgRef.current) return undefined;
+
+    introTimelineRef.current?.cancel();
+    breatheAnimationRef.current?.cancel();
+
+    const chipEls = Array.from(visualPanelRef.current.querySelectorAll(".physique-chip"));
+    const statEls = Array.from(visualPanelRef.current.querySelectorAll(".physique-stat"));
+
+    introTimelineRef.current = createTimeline({
+      defaults: { ease: "outCubic", duration: 360 }
+    })
+      .add(svgRef.current, { opacity: [0.4, 1], scale: [0.95, 1], duration: 460 })
+      .add(
+        chipEls,
+        {
+          opacity: [0, 1],
+          translateY: [8, 0],
+          delay: (_, index) => index * 52,
+          duration: 280
+        },
+        "<<+=80"
+      )
+      .add(
+        statEls,
+        {
+          opacity: [0, 1],
+          translateY: [10, 0],
+          delay: (_, index) => index * 48,
+          duration: 270
+        },
+        "<<+=40"
+      );
+
+    breatheAnimationRef.current = animate(svgRef.current, {
+      scaleX: [1, 0.994, 1],
+      scaleY: [1, 1.012, 1],
+      duration: 4300,
+      delay: 420,
+      ease: "inOutSine",
+      loop: true
+    });
+
+    return () => {
+      introTimelineRef.current?.cancel();
+      breatheAnimationRef.current?.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!svgRef.current) return undefined;
+
+    if (!silhouetteModelRef.current) {
+      silhouetteModelRef.current = { ...targetSilhouetteModel };
+      applySilhouetteModel(silhouetteModelRef.current);
+      return undefined;
+    }
+
+    const workingModel = silhouetteModelRef.current;
+    morphAnimationRef.current?.cancel();
+    morphAnimationRef.current = animate(workingModel, {
+      ...targetSilhouetteModel,
+      duration: 760,
+      ease: "inOutQuart",
+      onUpdate: () => applySilhouetteModel(workingModel)
+    });
+
+    return () => {
+      morphAnimationRef.current?.cancel();
+    };
+  }, [silhouetteModelKey, targetSilhouetteModel]);
+
+  useEffect(() => () => {
+    morphAnimationRef.current?.cancel();
+    breatheAnimationRef.current?.cancel();
+    introTimelineRef.current?.cancel();
+  }, []);
+
+  const bmiCategory = getBmiCategory(bmi);
+  const physiqueType = (() => {
+    if (muscleScore > 0.72 && leannessScore > 0.55) return "Athletic";
+    if (muscleScore > 0.74) return "Power";
+    if (leannessScore > 0.64) return "Lean";
+    if (fatScore > 0.72) return "Mass";
+    return "Balanced";
+  })();
+
+  const hasBodyCompositionDriver = ageValue !== null || explicitBodyFat !== null;
+  const completionChecks = [
+    Boolean(resolvedHeightCm),
+    Boolean(resolvedWeightKg),
+    hasBodyCompositionDriver,
+    Boolean(personal.sex)
+  ];
+  const completionScore = completionChecks.filter(Boolean).length / completionChecks.length;
+
+  const heightDisplay = (() => {
+    if (!resolvedHeightCm) return "--";
+    const cmRounded = Math.round(resolvedHeightCm);
+    const imperial = toFeetInchesFromCm(String(cmRounded));
+    const imperialText = imperial.feet ? `${imperial.feet}'${imperial.inches}"` : "";
+    const metricText = `${cmRounded} cm`;
+    if (!imperialText) return metricText;
+    return heightUnit === "ft"
+      ? `${imperialText} (${metricText})`
+      : `${metricText} (${imperialText})`;
+  })();
+
+  const weightDisplay = (() => {
+    if (!resolvedWeightKg) return "--";
+    const kgRounded = Math.round(resolvedWeightKg);
+    const lbRounded = Math.round(Number(toLb(String(kgRounded), "kg")));
+    const metricText = `${kgRounded} kg`;
+    const imperialText = Number.isFinite(lbRounded) ? `${lbRounded} lb` : "";
+    if (!imperialText) return metricText;
+    return weightUnit === "lb"
+      ? `${imperialText} (${metricText})`
+      : `${metricText} (${imperialText})`;
+  })();
+  const bodyFatLabel = explicitBodyFat !== null ? "Body fat" : "Estimated body fat";
+  const bodyFatDisplay = effectiveBodyFat !== null ? `${effectiveBodyFat}%` : "Add age";
+  const ffmiDisplay = ffmi !== null ? ffmi : "--";
+
+  const visualLabel = bmi !== null
+    ? `Physique silhouette: ${physiqueType.toLowerCase()} profile. BMI ${bmi}, ${bmiCategory.label}.`
+    : "Physique silhouette preview. Add height and weight for a personalized shape.";
 
   return (
     <div className="page home-page" style={gradient}>
@@ -385,11 +827,96 @@ export default function HomePage({
             </form>
           </div>
 
-          <div className="panel body-visual-panel">
-            <h2>Physique</h2>
+          <div className="panel body-visual-panel" ref={visualPanelRef}>
+            <h2>Physique Visualizer</h2>
             <div className="body-visual">
-              <div className="body-frame" aria-hidden="true" />
-              <p className="muted">Body type visual placeholder</p>
+              <div className="body-visual-layout">
+                <div className="visual-stage-shell">
+                  <div className="visual-stage" role="img" aria-label={visualLabel}>
+                    <svg
+                      ref={svgRef}
+                      className="physique-svg"
+                      viewBox="0 0 280 430"
+                      aria-hidden="true"
+                    >
+                      <circle ref={glowRef} className="physique-glow" cx="140" cy="225" r="132" />
+                      <rect
+                        ref={leftArmRef}
+                        className="physique-arm"
+                        x="68"
+                        y="116"
+                        width="16"
+                        height="176"
+                        rx="8"
+                        strokeWidth="1.5"
+                      />
+                      <rect
+                        ref={rightArmRef}
+                        className="physique-arm"
+                        x="196"
+                        y="116"
+                        width="16"
+                        height="176"
+                        rx="8"
+                        strokeWidth="1.5"
+                      />
+                      <circle
+                        ref={headRef}
+                        className="physique-head"
+                        cx="140"
+                        cy="58"
+                        r="20"
+                        strokeWidth="2"
+                      />
+                      <path
+                        ref={torsoRef}
+                        className="physique-torso"
+                        d="M 96 101 C 104 128, 104 153, 104 144 C 120 190, 120 213, 120 220 C 112 248, 118 295, 118 320 C 122 350, 122 376, 122 372 L 128 412 L 152 412 L 158 372 C 158 376, 158 350, 162 320 C 162 295, 168 248, 160 220 C 160 213, 160 190, 176 144 C 176 153, 176 128, 184 101 Q 140 70 96 101 Z"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="physique-info-tab-dock">
+              <aside className="physique-info-tab">
+                <div className="physique-meta">
+                  <span className="physique-chip">{physiqueType} profile</span>
+                  <span className={`physique-chip tone-${bmiCategory.tone}`}>{bmiCategory.label}</span>
+                  <span className="physique-chip">
+                    Profile input {Math.round(completionScore * 100)}%
+                  </span>
+                </div>
+
+                <div className="physique-stats">
+                  <article className="physique-stat">
+                    <span className="physique-stat-label">Height</span>
+                    <strong className="physique-stat-value">{heightDisplay}</strong>
+                  </article>
+                  <article className="physique-stat">
+                    <span className="physique-stat-label">Weight</span>
+                    <strong className="physique-stat-value">{weightDisplay}</strong>
+                  </article>
+                  <article className="physique-stat">
+                    <span className="physique-stat-label">BMI</span>
+                    <strong className="physique-stat-value">{bmi !== null ? bmi : "--"}</strong>
+                  </article>
+                  <article className="physique-stat">
+                    <span className="physique-stat-label">{bodyFatLabel}</span>
+                    <strong className="physique-stat-value">{bodyFatDisplay}</strong>
+                  </article>
+                  <article className="physique-stat">
+                    <span className="physique-stat-label">Lean mass index (FFMI)</span>
+                    <strong className="physique-stat-value">{ffmiDisplay}</strong>
+                  </article>
+                </div>
+
+                <p className="muted physique-footnote">
+                  Preview model uses BMI, body fat, activity, and lean-mass estimation from your profile.
+                </p>
+              </aside>
             </div>
           </div>
         </section>
