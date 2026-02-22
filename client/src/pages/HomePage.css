@@ -12,6 +12,45 @@
   margin-right: auto;
 }
 
+.home-intro-wrap {
+  min-height: calc(100vh - 120px);
+  display: grid;
+  place-items: center;
+}
+
+.home-stage {
+  display: grid;
+  gap: 24px;
+  animation: stage-enter 360ms ease both;
+  width: min(1200px, 100%);
+  margin: 0 auto;
+}
+
+@keyframes stage-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.home-intro-panel {
+  width: min(560px, 100%);
+  min-height: 320px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 24px;
+}
+
+.home-intro-panel .cta {
+  min-width: 180px;
+}
+
 .focus-row {
   display: flex;
   flex-wrap: wrap;
@@ -38,7 +77,7 @@
 .home-page .title {
   width: 100%;
   max-width: 100%;
-  margin: 20px 0 36px;
+  margin: 20px 0 28px;
   margin-left: auto;
   margin-right: auto;
   text-align: center;
@@ -48,34 +87,114 @@
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
+  justify-items: center;
 }
 
 .home-page .header-top {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   text-align: center;
+  gap: 16px;
 }
 
 .home-page .header-left {
+  grid-column: 2;
   justify-items: center;
+  text-align: center;
   margin-left: 0;
 }
 
 .home-page .auth-actions {
+  grid-column: 3;
   justify-content: flex-end;
   justify-self: end;
+}
+
+.home-step-copy {
+  margin-top: 2px;
+}
+
+.stage-panel {
+  display: grid;
+  gap: 18px;
+  align-content: stretch;
+  text-align: left;
+}
+
+.stage-header {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stage-header-main h2 {
+  margin: 0;
+}
+
+.form-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.stage-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-self: center;
+  align-self: end;
+  margin-top: auto;
+}
+
+.stage-actions .cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .split-panel {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 4fr);
   gap: 28px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.visualizer-only-stage {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+}
+
+.visualizer-only-panel {
+  width: min(900px, 100%);
+}
+
+.visualizer-only-panel h2,
+.visualizer-only-panel .physique-footnote {
+  text-align: center;
+}
+
+.visualizer-only-actions {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .personal-panel {
   display: grid;
   gap: 18px;
+}
+
+.personal-panel.stage-panel {
+  grid-template-rows: auto 1fr auto;
 }
 
 .personal-panel-header {
@@ -95,6 +214,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   margin-top: 0;
+  height: 100%;
+  align-content: start;
 }
 
 .personal-form label {
@@ -139,6 +260,19 @@
 
 .personal-form .full {
   grid-column: 1 / -1;
+}
+
+.personal-footer {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.personal-footer .stage-actions {
+  margin-top: 0;
+  align-self: auto;
 }
 
 .day-toggle-grid {
@@ -220,9 +354,71 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.personal-hint {
+  margin: 0;
+  text-align: left;
+}
+
+.visualizer-summary-panel {
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.workout-stage-panel {
+  grid-template-rows: auto 1fr auto auto;
+}
+
+.workout-back-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.workout-generate-row {
+  width: 100%;
+  justify-self: stretch;
+  justify-content: center;
+  align-self: auto;
+  margin-top: 0;
+}
+
+.metric-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-pill {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.metric-pill strong {
+  font-size: 1rem;
+}
+
+.metric-pill.tone-cool {
+  border-color: rgba(126, 176, 255, 0.52);
+}
+
+.metric-pill.tone-good {
+  border-color: rgba(126, 237, 182, 0.55);
+}
+
+.metric-pill.tone-warm {
+  border-color: rgba(255, 197, 105, 0.6);
+}
+
+.metric-pill.tone-alert {
+  border-color: rgba(255, 140, 140, 0.6);
+}
+
 .body-visual-panel h2 {
   margin-bottom: 16px;
-  text-align: center;
+  text-align: left;
 }
 
 .body-visual-panel {
@@ -307,7 +503,7 @@
 }
 
 .physique-footnote {
-  text-align: center;
+  text-align: left;
   margin: 2px 0 0;
   font-size: 0.82rem;
 }
@@ -315,6 +511,10 @@
 @media (max-width: 1180px) {
   .split-panel {
     grid-template-columns: 1fr;
+  }
+
+  .metric-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .body-visual {
@@ -339,6 +539,10 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-top: 20px;
+}
+
+.workout-stage-panel .focus-row {
+  justify-content: flex-start;
 }
 
 .plan-card {
@@ -374,16 +578,67 @@
     width: 100%;
   }
 
-  .personal-panel-header {
-    flex-direction: column;
+  .home-page .header-top {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .home-page .header-left {
+    grid-column: auto;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .home-page .auth-actions {
+    grid-column: auto;
+    justify-self: center;
+    justify-content: center;
+  }
+
+  .home-intro-wrap {
+    min-height: calc(100vh - 88px);
+  }
+
+  .home-intro-panel {
+    min-height: 260px;
+  }
+
+  .stage-header {
+    grid-template-columns: 1fr;
     align-items: flex-start;
+  }
+
+  .form-auth-actions {
+    justify-self: start;
+    justify-content: flex-start;
   }
 
   .split-panel {
     grid-template-columns: 1fr;
   }
 
+  .visualizer-only-actions {
+    justify-content: center;
+  }
+
   .personal-form {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-actions {
+    justify-content: center;
+  }
+
+  .personal-footer {
+    justify-items: center;
+  }
+
+  .personal-footer .stage-actions {
+    align-self: auto;
+  }
+
+  .metric-list {
     grid-template-columns: 1fr;
   }
 

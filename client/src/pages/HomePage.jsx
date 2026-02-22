@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 import PhysiqueSilhouette2D from "../components/PhysiqueSilhouette2D";
 import "./HomePage.css";
@@ -56,6 +56,7 @@ export default function HomePage({
   const visualPanelRef = useRef(null);
   const introTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
+  const [homeStage, setHomeStage] = useState("intro");
 
   const toFiniteNumber = (value) => {
     const parsed = Number(value);
@@ -90,12 +91,19 @@ export default function HomePage({
     return Number((resolvedWeightKg / (heightMeters * heightMeters)).toFixed(1));
   })();
 
-  const getBmiCategory = (value) => {
-    if (value === null) return { label: "No BMI yet", tone: "neutral" };
-    if (value < 18.5) return { label: "Underweight", tone: "cool" };
-    if (value < 25) return { label: "Healthy range", tone: "good" };
-    if (value < 30) return { label: "Overweight", tone: "warm" };
-    return { label: "Obesity range", tone: "alert" };
+  const hasValidName = Boolean(personal.name?.trim());
+  const ageValue = toFiniteNumber(personal.age);
+  const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 99;
+  const isPersonalComplete = hasValidName &&
+    hasValidAge &&
+    resolvedHeightCm !== null &&
+    resolvedWeightKg !== null &&
+    Boolean(personal.sex);
+
+  const onPersonalSubmit = (event) => {
+    event.preventDefault();
+    if (!isPersonalComplete) return;
+    setHomeStage("visualizer");
   };
 
   const explicitBodyFat = (() => {
@@ -216,7 +224,7 @@ export default function HomePage({
   );
 
   useEffect(() => {
-    if (!visualPanelRef.current) return undefined;
+    if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
     introTimelineRef.current?.cancel();
     stagePulseRef.current?.cancel();
@@ -252,73 +260,76 @@ export default function HomePage({
       introTimelineRef.current?.cancel();
       stagePulseRef.current?.cancel();
     };
-  }, []);
+  }, [homeStage]);
 
   const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
 
   return (
     <div className="page home-page" style={gradient}>
-      <header className="title">
-        <div className="header-top">
-          <div className="header-left">
+      {homeStage === "intro" ? (
+        <main className="content home-intro-wrap">
+          <section className="panel home-intro-panel home-stage">
             <h1>Workout Generator</h1>
-          </div>
-          <div className="auth-actions">
-            {user ? (
-              <>
-                <span className="muted">Signed in as {user.email}</span>
-                <button type="button" className="ghost" onClick={onLogout}>
-                  Log out
-                </button>
-              </>
-            ) : (
-              <button type="button" className="ghost" onClick={() => go("/auth")}>
-                Login / Sign up
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="focus-row">
-          {quickFocuses.map((item) => (
             <button
-              key={item}
+              className="cta"
               type="button"
-              className={`pill ${form.focuses.includes(item) ? "active" : ""}`}
-              onClick={() => toggleFocus(item)}
+              onClick={() => setHomeStage("personal")}
             >
-              {item}
+              Get Started
             </button>
-          ))}
-        </div>
-      </header>
+          </section>
+        </main>
+      ) : (
+        <>
+          <main className="content">
+            <div key={homeStage} className={`home-stage home-stage-${homeStage}`}>
+              {homeStage === "personal" && (
+                <section className="panel personal-panel stage-panel">
+                  <header className="stage-header">
+                    <div className="stage-header-main">
+                      <h2>Personal Info</h2>
+                    </div>
+                    <div className="segmented">
+                      <button
+                        type="button"
+                        className={personalMode === "basic" ? "active" : ""}
+                        onClick={() => setPersonalMode("basic")}
+                      >
+                        Basic
+                      </button>
+                      <button
+                        type="button"
+                        className={personalMode === "advanced" ? "active" : ""}
+                        onClick={() => setPersonalMode("advanced")}
+                      >
+                        Advanced
+                      </button>
+                    </div>
+                    <div className="form-auth-actions">
+                      {user ? (
+                        <>
+                          <span className="muted">Signed in as {user.email}</span>
+                          <button type="button" className="ghost" onClick={onLogout}>
+                            Log out
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => go("/auth")}
+                        >
+                          Login / Sign up
+                        </button>
+                      )}
+                    </div>
+                  </header>
 
-      <main className="content">
-        <section className="split-panel">
-          <div className="panel personal-panel">
-            <header className="personal-panel-header">
-              <h2>Personal Info</h2>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={personalMode === "basic" ? "active" : ""}
-                  onClick={() => setPersonalMode("basic")}
-                >
-                  Basic
-                </button>
-                <button
-                  type="button"
-                  className={personalMode === "advanced" ? "active" : ""}
-                  onClick={() => setPersonalMode("advanced")}
-                >
-                  Advanced
-                </button>
-              </div>
-            </header>
-
-            <form
-              className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : "basic-mode"}`}
-            >
-              <label>
+                  <form
+                    className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : "basic-mode"}`}
+                    onSubmit={onPersonalSubmit}
+                  >
+                    <label>
                 Full name
                 <input
                   name="name"
@@ -327,7 +338,7 @@ export default function HomePage({
                   placeholder="Jordan Lee"
                 />
               </label>
-              <label>
+                    <label>
                 Age
                 <input
                   name="age"
@@ -338,8 +349,8 @@ export default function HomePage({
                   max="99"
                   placeholder="28"
                 />
-              </label>
-              <label className="metric-field metric-height">
+                    </label>
+                    <label className="metric-field metric-height">
                 <span className="label-row">
                   Height
                   <span
@@ -588,54 +599,125 @@ export default function HomePage({
                   </label>
                 </>
               )}
-            </form>
-          </div>
+                    <div className="personal-footer full">
+                      {!isPersonalComplete && (
+                        <p className="muted personal-hint">
+                          Enter name, age, height, weight, and sex to continue.
+                        </p>
+                      )}
+                      <div className="stage-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => setHomeStage("intro")}
+                        >
+                          Back
+                        </button>
+                        <button
+                          className="cta"
+                          type="submit"
+                          disabled={!isPersonalComplete}
+                        >
+                          Continue
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </section>
+              )}
 
-          <div className="panel body-visual-panel" ref={visualPanelRef}>
-            <h2>Physique Visualizer</h2>
-            <div className="body-visual">
-              <div className="body-visual-layout">
-                <div className="visual-stage-shell">
-                  <div className="visual-stage" role="img" aria-label={visualLabel}>
-                    <div className="physique-render-surface">
-                      <PhysiqueSilhouette2D shape={silhouetteShape} />
+              {homeStage === "visualizer" && (
+                <section className="visualizer-only-stage">
+                  <div className="panel body-visual-panel stage-panel visualizer-only-panel" ref={visualPanelRef}>
+                    <h2>Physique Visualizer</h2>
+                    <div className="body-visual">
+                      <div className="body-visual-layout">
+                        <div className="visual-stage-shell">
+                          <div className="visual-stage" role="img" aria-label={visualLabel}>
+                            <div className="physique-render-surface">
+                              <PhysiqueSilhouette2D shape={silhouetteShape} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="muted physique-footnote">
+                        T-pose scaffold with detailed finger and joint points, 45 degree leg stance, and torso triangle.
+                      </p>
+                    </div>
+                    <div className="visualizer-only-actions">
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => setHomeStage("personal")}
+                      >
+                        Back
+                      </button>
+                      <button
+                        className="cta"
+                        type="button"
+                        onClick={() => setHomeStage("workout")}
+                      >
+                        Continue
+                      </button>
                     </div>
                   </div>
-                </div>
-              </div>
-              <p className="muted physique-footnote">
-                T-pose scaffold with detailed finger and joint points, 45 degree leg stance, and torso triangle.
-              </p>
+                </section>
+              )}
+
+              {homeStage === "workout" && (
+                <>
+                  <section className="panel center-panel stage-panel workout-stage-panel">
+                    <h2>Workout Generation</h2>
+                    <div className="focus-row">
+                      {quickFocuses.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`pill ${form.focuses.includes(item) ? "active" : ""}`}
+                          onClick={() => toggleFocus(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="workout-back-row">
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => setHomeStage("visualizer")}
+                      >
+                        Back
+                      </button>
+                    </div>
+                    <div className="stage-actions workout-generate-row">
+                      <button className="cta" type="button" onClick={openPlannerFromProfile}>
+                        Generate Workout
+                      </button>
+                    </div>
+                    {error && <p className="error">{error}</p>}
+                  </section>
+
+                  <section className="panel muted-panel stage-panel">
+                    <h2>Sample Weekly Plan</h2>
+                    <div className="grid">
+                      {samplePlan.map((block) => (
+                        <article key={block.day} className="plan-card">
+                          <h3>{block.day}</h3>
+                          <ul>
+                            {block.blocks.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
             </div>
-          </div>
-        </section>
-
-        <section className="panel center-panel">
-          <div>
-            <h2>Design your plan</h2>
-          </div>
-          <button className="cta" type="button" onClick={openPlannerFromProfile}>
-            Create
-          </button>
-          {error && <p className="error">{error}</p>}
-        </section>
-
-        <section className="panel muted-panel">
-          <h2>Sample  weekly plan</h2>
-          <div className="grid">
-            {samplePlan.map((block) => (
-              <article key={block.day} className="plan-card">
-                <h3>{block.day}</h3>
-                <ul>
-                  {block.blocks.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </section>
-      </main>
+          </main>
+        </>
+      )}
 
       {plannerModal}
       {generatedPlanModal}
