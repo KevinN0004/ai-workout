@@ -68,7 +68,7 @@
 
 .split-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(520px, 640px);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 4fr);
   gap: 28px;
   align-items: start;
 }

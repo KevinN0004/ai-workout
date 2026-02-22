@@ -4,6 +4,8 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const mirrorX = (x, centerX) => centerX - (x - centerX);
 
 const CENTER_X = 140;
+const VIEWBOX_WIDTH = 280;
+const VIEWBOX_HEIGHT = 430;
 
 export default function PhysiqueSilhouette2D({ shape }) {
   const { points, torsoTrianglePath } = useMemo(() => {
@@ -163,15 +165,49 @@ export default function PhysiqueSilhouette2D({ shape }) {
     pushMirrorPoint("toe", toeX, footY, "major");
 
     const leftShoulderX = mirrorX(shoulderX, CENTER_X);
-    const torsoTrianglePath = `M ${leftShoulderX} ${shoulderY} L ${shoulderX} ${shoulderY} L ${CENTER_X} ${pelvisY} Z`;
+    const trianglePoints = [
+      { x: leftShoulderX, y: shoulderY },
+      { x: shoulderX, y: shoulderY },
+      { x: CENTER_X, y: pelvisY }
+    ];
 
-    return { points: pointsData, torsoTrianglePath };
+    const allX = pointsData.map((point) => point.x).concat(trianglePoints.map((point) => point.x));
+    const allY = pointsData.map((point) => point.y).concat(trianglePoints.map((point) => point.y));
+
+    const minX = Math.min(...allX);
+    const maxX = Math.max(...allX);
+    const minY = Math.min(...allY);
+    const maxY = Math.max(...allY);
+    const sourceWidth = Math.max(1, maxX - minX);
+    const sourceHeight = Math.max(1, maxY - minY);
+
+    const marginX = 3;
+    const marginY = 4;
+    const targetWidth = VIEWBOX_WIDTH - marginX * 2;
+    const targetHeight = VIEWBOX_HEIGHT - marginY * 2;
+    const scaleX = targetWidth / sourceWidth;
+    const scaleY = targetHeight / sourceHeight;
+    const offsetX = marginX - minX * scaleX;
+    const offsetY = marginY - minY * scaleY;
+
+    const pointsFitted = pointsData.map((point) => ({
+      ...point,
+      x: point.x * scaleX + offsetX,
+      y: point.y * scaleY + offsetY
+    }));
+    const triangleFitted = trianglePoints.map((point) => ({
+      x: point.x * scaleX + offsetX,
+      y: point.y * scaleY + offsetY
+    }));
+    const torsoTrianglePath = `M ${triangleFitted[0].x} ${triangleFitted[0].y} L ${triangleFitted[1].x} ${triangleFitted[1].y} L ${triangleFitted[2].x} ${triangleFitted[2].y} Z`;
+
+    return { points: pointsFitted, torsoTrianglePath };
   }, [shape]);
 
   return (
     <svg
       className="physique-2d-svg"
-      viewBox="0 0 280 430"
+      viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
       role="presentation"
       aria-hidden="true"
     >
@@ -191,7 +227,7 @@ export default function PhysiqueSilhouette2D({ shape }) {
             className={`physique-point ${point.kind}`}
             cx={point.x}
             cy={point.y}
-            r={point.kind === "major" ? 2.9 : 2}
+            r={point.kind === "major" ? 3.2 : 2.3}
           />
         ))}
       </g>
