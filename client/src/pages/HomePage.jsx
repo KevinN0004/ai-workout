@@ -1,16 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { animate, createTimeline } from "animejs";
 import PhysiqueSilhouette2D from "../components/PhysiqueSilhouette2D";
 import "./HomePage.css";
-
-const BODY_PART_SEQUENCE = ["head", "leftArm", "rightArm", "upper", "lower"];
-const ACTIVE_PART_LABELS = {
-  head: "Head and neck",
-  leftArm: "Left arm",
-  rightArm: "Right arm",
-  upper: "Torso",
-  lower: "Lower body"
-};
 
 export default function HomePage({
   gradient,
@@ -65,7 +56,6 @@ export default function HomePage({
   const visualPanelRef = useRef(null);
   const introTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
-  const [activeBodyPart, setActiveBodyPart] = useState("head");
 
   const toFiniteNumber = (value) => {
     const parsed = Number(value);
@@ -94,11 +84,6 @@ export default function HomePage({
     return normalized && normalized > 0 ? normalized : null;
   })();
 
-  const ageValue = (() => {
-    const parsed = toFiniteNumber(personal.age);
-    return parsed && parsed > 0 ? parsed : null;
-  })();
-
   const bmi = (() => {
     if (!resolvedHeightCm || !resolvedWeightKg) return null;
     const heightMeters = resolvedHeightCm / 100;
@@ -113,93 +98,24 @@ export default function HomePage({
     return { label: "Obesity range", tone: "alert" };
   };
 
-  const sexValue = String(personal.sex || "").toLowerCase();
-  const isFemale = sexValue.includes("female");
-  const isMale = sexValue.includes("male") && !isFemale;
-  const sexFactor = isFemale ? 0 : isMale ? 1 : 0.5;
   const explicitBodyFat = (() => {
     const value = toFiniteNumber(personal.bodyFat);
     return value === null ? null : clamp(value, 3, 60);
   })();
 
   const estimatedBodyFat = (() => {
-    if (bmi === null || ageValue === null) return null;
-    const estimate = 1.2 * bmi + 0.23 * ageValue - 10.8 * sexFactor - 5.4;
+    if (bmi === null) return null;
+    const estimate = 1.35 * bmi - 13.5;
     return roundTo(clamp(estimate, 3, 60), 1);
   })();
   const effectiveBodyFat = explicitBodyFat ?? estimatedBodyFat;
-  const fatRange = isFemale
-    ? { lean: 16, high: 44 }
-    : isMale
-      ? { lean: 8, high: 34 }
-      : { lean: 12, high: 39 };
-
-  const activityScoreMap = {
-    Light: 0.25,
-    Moderate: 0.45,
-    High: 0.65,
-    "Very high": 0.8
-  };
-
-  const trainingDaysCount = Array.isArray(personal.trainingDays)
-    ? personal.trainingDays.length
-    : 0;
-  const hasStrengthFocus = form.focuses.includes("Strength");
-  const hasWeightLossFocus = form.focuses.includes("Weight Loss");
-  const hasCardioFocus = form.focuses.includes("Cardio");
-  const activityScore = clamp(
-    (activityScoreMap[personal.activity] ?? 0.45) + trainingDaysCount * 0.03,
-    0,
-    1
-  );
-
-  const bmiMassScore = bmi !== null ? clamp((bmi - 18.5) / (34 - 18.5), 0, 1) : 0.45;
+  const bmiMassScore = bmi !== null ? clamp((bmi - 18.5) / (40 - 18.5), 0, 1) : 0.45;
   const bodyFatMassScore = effectiveBodyFat !== null
-    ? clamp((effectiveBodyFat - fatRange.lean) / (fatRange.high - fatRange.lean), 0, 1)
+    ? clamp((effectiveBodyFat - 8) / (42 - 8), 0, 1)
     : null;
   const fatScore = clamp(
-    (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.78 +
-      bmiMassScore * 0.22,
-    0,
-    1
-  );
-
-  const leanMassKg = resolvedWeightKg && effectiveBodyFat !== null
-    ? resolvedWeightKg * (1 - effectiveBodyFat / 100)
-    : null;
-  const ffmi = (() => {
-    if (!leanMassKg || !resolvedHeightCm) return null;
-    const heightM = resolvedHeightCm / 100;
-    return roundTo(leanMassKg / (heightM * heightM), 1);
-  })();
-  const ffmiRange = isFemale
-    ? { low: 13, high: 21 }
-    : isMale
-      ? { low: 15, high: 25 }
-      : { low: 14, high: 23 };
-  const ffmiScore = ffmi !== null
-    ? clamp((ffmi - ffmiRange.low) / (ffmiRange.high - ffmiRange.low), 0, 1)
-    : null;
-  const experienceBoost = personal.experience === "Advanced"
-    ? 0.08
-    : personal.experience === "Intermediate"
-      ? 0.04
-      : 0;
-  const nutritionBoost = personal.nutrition === "High-protein" ? 0.04 : 0;
-  const muscleScore = clamp(
-    (ffmiScore !== null ? ffmiScore : activityScore) * 0.62 +
-      activityScore * 0.24 +
-      (hasStrengthFocus ? 0.12 : 0) +
-      experienceBoost +
-      nutritionBoost -
-      (hasWeightLossFocus ? 0.05 : 0),
-    0,
-    1
-  );
-  const leannessScore = clamp(
-    (1 - fatScore) * 0.74 +
-      (hasWeightLossFocus || hasCardioFocus ? 0.2 : 0) -
-      (hasStrengthFocus ? 0.04 : 0),
+    (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.72 +
+      bmiMassScore * 0.28,
     0,
     1
   );
@@ -207,24 +123,23 @@ export default function HomePage({
   const heightNorm = resolvedHeightCm
     ? clamp((resolvedHeightCm - 150) / (205 - 150), 0, 1)
     : 0.48;
-  const shoulderFrameOffset = isMale ? 2.5 : isFemale ? -1.5 : 0.5;
   const shoulderHalf = clamp(
-    38 + shoulderFrameOffset + muscleScore * 24 + leannessScore * 3 - fatScore * 2,
-    31,
+    35 + bmiMassScore * 6 + fatScore * 11,
+    30,
     72
   );
-  const chestHalf = clamp(31 + muscleScore * 16 + fatScore * 7, 24, 60);
+  const chestHalf = clamp(28 + bmiMassScore * 7 + fatScore * 12, 22, 62);
   const waistHalf = clamp(
-    17.5 + fatScore * 18 - muscleScore * 3 - leannessScore * 4 + (isFemale ? 1.8 : 0),
-    13,
-    48
+    14 + bmiMassScore * 5 + fatScore * 22,
+    11,
+    52
   );
-  const hipHalf = clamp(27 + fatScore * 10 + (isFemale ? 7 : 2), 22, 55);
-  const thighHalf = clamp(20 + fatScore * 8 + muscleScore * 7 + (isFemale ? 1.5 : 0), 16, 45);
-  const calfHalf = clamp(thighHalf * 0.67 + muscleScore * 1.2, 13, 32);
-  const armWidth = clamp(10.5 + muscleScore * 7 + fatScore * 2.5, 9, 24);
-  const armHeight = clamp(158 + heightNorm * 26, 148, 192);
-  const headRadius = clamp(19 + fatScore * 2 + (isFemale ? 0.7 : 0), 17, 27);
+  const hipHalf = clamp(22 + bmiMassScore * 5 + fatScore * 14, 18, 56);
+  const thighHalf = clamp(15 + bmiMassScore * 3.5 + fatScore * 15, 13, 46);
+  const calfHalf = clamp(11.5 + bmiMassScore * 2 + fatScore * 10, 10, 34);
+  const armWidth = clamp(8.5 + bmiMassScore * 2 + fatScore * 11, 8, 24);
+  const armHeight = clamp(156 + heightNorm * 28, 146, 194);
+  const headRadius = clamp(18 + fatScore * 2.6, 16, 28);
 
   const legBias = (heightNorm - 0.5) * 18;
   const torsoBias = (heightNorm - 0.5) * 8;
@@ -237,13 +152,13 @@ export default function HomePage({
   const ankleY = 412 + legBias;
   const headCenterY = 57 - torsoBias * 0.3;
 
-  const fillHue = 18 + leannessScore * 24 + muscleScore * 5;
-  const fillSaturation = clamp(53 + muscleScore * 18 - fatScore * 8, 40, 88);
-  const fillLightness = clamp(51 + leannessScore * 13 - fatScore * 5, 40, 74);
+  const fillHue = 24 - fatScore * 4;
+  const fillSaturation = clamp(44 + fatScore * 18, 40, 82);
+  const fillLightness = clamp(56 - fatScore * 10, 36, 68);
   const strokeLightness = clamp(fillLightness - 24, 20, 48);
   const glowSaturation = clamp(fillSaturation + 8, 46, 94);
-  const glowAlpha = clamp(0.1 + muscleScore * 0.06 + leannessScore * 0.03, 0.08, 0.24);
-  const glowRadius = clamp(114 + shoulderHalf * 0.6 + hipHalf * 0.3, 118, 170);
+  const glowAlpha = clamp(0.08 + fatScore * 0.12, 0.06, 0.24);
+  const glowRadius = clamp(112 + waistHalf * 0.7 + hipHalf * 0.45, 118, 176);
 
   const silhouetteShape = useMemo(
     () => ({
@@ -339,32 +254,7 @@ export default function HomePage({
     };
   }, []);
 
-  useEffect(() => {
-    let partIndex = 0;
-    setActiveBodyPart(BODY_PART_SEQUENCE[partIndex]);
-    const cycleId = window.setInterval(() => {
-      partIndex = (partIndex + 1) % BODY_PART_SEQUENCE.length;
-      setActiveBodyPart(BODY_PART_SEQUENCE[partIndex]);
-    }, 980);
-
-    return () => {
-      window.clearInterval(cycleId);
-    };
-  }, []);
-
-  const bmiCategory = getBmiCategory(bmi);
-  const physiqueType = (() => {
-    if (muscleScore > 0.72 && leannessScore > 0.55) return "Athletic";
-    if (muscleScore > 0.74) return "Power";
-    if (leannessScore > 0.64) return "Lean";
-    if (fatScore > 0.72) return "Mass";
-    return "Balanced";
-  })();
-  const activePartLabel = ACTIVE_PART_LABELS[activeBodyPart] || "Head and neck";
-
-  const visualLabel = bmi !== null
-    ? `Physique silhouette: ${physiqueType.toLowerCase()} profile. BMI ${bmi}, ${bmiCategory.label}. Active region ${activePartLabel.toLowerCase()}.`
-    : `Physique silhouette preview. Active region ${activePartLabel.toLowerCase()}. Add height and weight for a personalized shape.`;
+  const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
 
   return (
     <div className="page home-page" style={gradient}>
@@ -708,16 +598,13 @@ export default function HomePage({
                 <div className="visual-stage-shell">
                   <div className="visual-stage" role="img" aria-label={visualLabel}>
                     <div className="physique-render-surface">
-                      <PhysiqueSilhouette2D
-                        shape={silhouetteShape}
-                        activePart={activeBodyPart}
-                      />
+                      <PhysiqueSilhouette2D shape={silhouetteShape} />
                     </div>
                   </div>
                 </div>
               </div>
               <p className="muted physique-footnote">
-                {physiqueType} profile preview. Active region: {activePartLabel}.
+                T-pose scaffold with detailed finger and joint points, 45 degree leg stance, and torso triangle.
               </p>
             </div>
           </div>
