@@ -614,14 +614,15 @@ export default function App() {
           <div className="modal-footer">
             <div className="step-indicator">Step {plannerStep} of 3</div>
             <div className="modal-actions">
-              <button
-                type="button"
-                className="ghost back-btn"
-                onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
-                disabled={plannerStep === 1}
-              >
-                Back
-              </button>
+              {plannerStep > 1 && (
+                <button
+                  type="button"
+                  className="ghost back-btn"
+                  onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
+                >
+                  Back
+                </button>
+              )}
               {plannerStep < 3 ? (
                 <button
                   type="button"

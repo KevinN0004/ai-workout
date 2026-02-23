@@ -252,15 +252,34 @@
 
 .home-page button.back-btn,
 .home-page .ghost.back-btn {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f);
-  border-color: rgba(255, 104, 88, 0.94);
-  color: #fff;
-  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38);
+  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
+  border-color: rgba(255, 104, 88, 0.94) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38) !important;
 }
 
 .home-page button.back-btn:hover:not(:disabled),
 .home-page .ghost.back-btn:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46);
+  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
+  border-color: rgba(255, 104, 88, 0.94) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46) !important;
+}
+
+.home-page button.back-btn:active:not(:disabled),
+.home-page .ghost.back-btn:active:not(:disabled),
+.home-page button.back-btn:focus-visible,
+.home-page .ghost.back-btn:focus-visible {
+  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
+  border-color: rgba(255, 104, 88, 0.94) !important;
+  color: #fff !important;
+}
+
+.home-page button.back-btn:disabled,
+.home-page .ghost.back-btn:disabled {
+  opacity: 0.48;
+  box-shadow: none;
 }
 
 .focus-row {
