@@ -608,7 +608,7 @@ export default function HomePage({
                       <div className="stage-actions">
                         <button
                           type="button"
-                          className="ghost"
+                          className="ghost back-btn"
                           onClick={() => setHomeStage("intro")}
                         >
                           Back
@@ -647,7 +647,7 @@ export default function HomePage({
                     <div className="visualizer-only-actions">
                       <button
                         type="button"
-                        className="ghost"
+                        className="ghost back-btn"
                         onClick={() => setHomeStage("personal")}
                       >
                         Back
@@ -667,27 +667,16 @@ export default function HomePage({
               {homeStage === "workout" && (
                 <>
                   <section className="panel center-panel stage-panel workout-stage-panel">
-                    <h2>Workout Generation</h2>
-                    <div className="focus-row">
-                      {quickFocuses.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className={`pill ${form.focuses.includes(item) ? "active" : ""}`}
-                          onClick={() => toggleFocus(item)}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="workout-back-row">
+                    <div className="workout-header">
                       <button
                         type="button"
-                        className="ghost"
+                        className="ghost workout-back-arrow"
+                        aria-label="Back"
                         onClick={() => setHomeStage("visualizer")}
                       >
-                        Back
+                        {"\u2190"}
                       </button>
+                      <h2>Workout Generation</h2>
                     </div>
                     <div className="stage-actions workout-generate-row">
                       <button className="cta" type="button" onClick={openPlannerFromProfile}>

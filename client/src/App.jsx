@@ -471,15 +471,16 @@ export default function App() {
   const plannerModal = plannerOpen && (
     <ModalPortal open={plannerOpen}>
       <div className="modal-backdrop" role="dialog" aria-modal="true">
-        <div className="modal">
+        <div className="modal planner-setup-modal">
           <div className="modal-header">
             <h2>Planner</h2>
             <button
               type="button"
-              className="ghost"
+              className="ghost icon-button planner-close-icon"
+              aria-label="Close planner"
               onClick={() => setPlannerOpen(false)}
             >
-              Close
+              &times;
             </button>
           </div>
           <div className="modal-body">
@@ -526,7 +527,7 @@ export default function App() {
             {plannerStep === 2 && (
               <div className="step-panel">
                 <h3>Step 2 - Schedule & constraints</h3>
-                <form className="form" onSubmit={onSubmit}>
+                <form className="form planner-step-two-form">
                   <label>
                     Days per week
                     <select name="days" value={form.days} onChange={onChange}>
@@ -577,9 +578,27 @@ export default function App() {
                 </form>
               </div>
             )}
+            {plannerStep === 3 && (
+              <div className="step-panel">
+                <h3>Step 3 - Focus priorities</h3>
+                <p className="muted">Select one or more focus areas for this plan.</p>
+                <div className="option-grid focus-option-grid">
+                  {quickFocuses.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`equip-card focus-chip ${form.focuses.includes(item) ? "active" : ""}`}
+                      onClick={() => toggleFocus(item)}
+                    >
+                      <span className="equip-label">{item}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="modal-footer">
-            <div className="step-indicator">Step {plannerStep} of 2</div>
+            <div className="step-indicator">Step {plannerStep} of 3</div>
             <div className="modal-actions">
               <button
                 type="button"
@@ -589,11 +608,11 @@ export default function App() {
               >
                 Back
               </button>
-              {plannerStep < 2 ? (
+              {plannerStep < 3 ? (
                 <button
                   type="button"
                   className="cta"
-                  onClick={() => setPlannerStep((prev) => Math.min(2, prev + 1))}
+                  onClick={() => setPlannerStep((prev) => Math.min(3, prev + 1))}
                 >
                   Next
                 </button>
@@ -1403,3 +1422,8 @@ export default function App() {
     />
   );
 }
+
+
+
+
+

@@ -9,6 +9,10 @@
   padding: 28px 32px;
   text-align: left;
   grid-template-rows: auto 1fr auto;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.18), 0 24px 60px rgba(0, 0, 0, 0.72);
+  color: #fff;
 }
 
 .plan-modal h2 {
@@ -40,18 +44,19 @@
 
 .plan-tabs button {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f4f4;
   padding: 8px 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .plan-tabs button.active {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.55);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.72);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 24px rgba(255, 255, 255, 0.3);
 }
 
 .plan-day {
@@ -112,7 +117,7 @@
 }
 
 .step-indicator {
-  color: #d4d4d4;
+  color: #ffffff;
   font-size: 0.875rem;
 }
 
@@ -123,8 +128,8 @@
 }
 
 .equip-card {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 16px;
   padding: 12px;
   display: grid;
@@ -135,9 +140,10 @@
 }
 
 .equip-card.active {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.55);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.72);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 24px rgba(255, 255, 255, 0.3);
 }
 
 .equip-thumb {
@@ -154,3 +160,49 @@
   font-weight: 600;
   font-size: 1rem;
 }
+
+.focus-option-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.focus-chip {
+  width: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+
+.focus-chip .equip-label {
+  white-space: nowrap;
+}
+
+.planner-close-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.planner-step-two-form {
+  text-align: left !important;
+  justify-items: stretch;
+}
+
+.planner-step-two-form label {
+  color: #fff !important;
+  text-align: left !important;
+  align-items: flex-start;
+  justify-self: stretch;
+}
+
+.planner-step-two-form label select,
+.planner-step-two-form label input {
+  width: 100%;
+}
+
+
+

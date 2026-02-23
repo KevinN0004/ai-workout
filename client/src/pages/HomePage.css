@@ -6,8 +6,10 @@
 }
 
 .home-page {
-  width: 71.428vw;
+  width: 100%;
   max-width: 100%;
+  min-height: 100vh;
+  background: #000 !important;
   margin-left: auto;
   margin-right: auto;
 }
@@ -16,6 +18,7 @@
   min-height: calc(100vh - 120px);
   display: grid;
   place-items: center;
+  background: transparent !important;
 }
 
 .home-stage {
@@ -24,6 +27,11 @@
   animation: stage-enter 360ms ease both;
   width: min(1200px, 100%);
   margin: 0 auto;
+}
+
+.home-stage-personal {
+  min-height: calc(100vh - 120px);
+  align-content: center;
 }
 
 @keyframes stage-enter {
@@ -45,10 +53,65 @@
   place-content: center;
   justify-items: center;
   gap: 24px;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.home-intro-panel.home-stage {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 .home-intro-panel .cta {
   min-width: 180px;
+}
+
+.home-page .panel:not(.home-intro-panel) {
+  background: rgba(110, 110, 110, 0.28);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.home-page .segmented,
+.home-page .unit-toggle {
+  background: transparent;
+  padding: 0;
+  gap: 8px;
+}
+
+.home-page .ghost,
+.home-page .cta {
+  background: #fff;
+  color: #000;
+  border: 1px solid #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.6), 0 0 26px rgba(255, 255, 255, 0.28);
+}
+
+.home-page .ghost:hover:not(:disabled),
+.home-page .cta:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.72), 0 0 34px rgba(255, 255, 255, 0.34);
+}
+
+.home-page .ghost:disabled,
+.home-page .cta:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.home-page button.back-btn,
+.home-page .ghost.back-btn {
+  background: linear-gradient(120deg, #ff9f43, #ff5f6d);
+  border-color: rgba(255, 125, 102, 0.92);
+  color: #1a0f10;
+  box-shadow: 0 0 12px rgba(255, 95, 109, 0.58), 0 0 28px rgba(255, 159, 67, 0.36);
+}
+
+.home-page button.back-btn:hover:not(:disabled),
+.home-page .ghost.back-btn:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(255, 95, 109, 0.68), 0 0 34px rgba(255, 159, 67, 0.44);
 }
 
 .focus-row {
@@ -69,9 +132,10 @@
 }
 
 .pill.active {
-  background: rgba(255, 179, 71, 0.2);
-  border-color: rgba(255, 179, 71, 0.5);
-  color: #ffd9a0;
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 26px rgba(255, 255, 255, 0.28);
 }
 
 .home-page .title {
@@ -195,6 +259,8 @@
 
 .personal-panel.stage-panel {
   grid-template-rows: auto 1fr auto;
+  width: min(980px, 100%);
+  margin: 0 auto;
 }
 
 .personal-panel-header {
@@ -216,6 +282,8 @@
   margin-top: 0;
   height: 100%;
   align-content: start;
+  width: min(920px, 100%);
+  justify-self: center;
 }
 
 .personal-form label {
@@ -294,9 +362,10 @@
 }
 
 .day-toggle-btn.active {
-  background: rgba(255, 179, 71, 0.2);
-  border-color: rgba(255, 179, 71, 0.5);
-  color: #ffd9a0;
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 26px rgba(255, 255, 255, 0.28);
 }
 
 .unit-toggle {
@@ -320,8 +389,17 @@
 }
 
 .unit-toggle button.active {
-  background: rgba(255, 179, 71, 0.2);
-  color: #ffd9a0;
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 26px rgba(255, 255, 255, 0.28);
+}
+
+.home-page .segmented button.active {
+  background: #fff;
+  border-color: #fff;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.58), 0 0 26px rgba(255, 255, 255, 0.28);
 }
 
 .height-split {
@@ -364,13 +442,21 @@
 }
 
 .workout-stage-panel {
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto auto auto auto;
 }
 
-.workout-back-row {
+.workout-header {
   width: 100%;
+  position: relative;
   display: flex;
+  align-items: center;
   justify-content: center;
+  min-height: 44px;
+}
+
+.workout-header h2 {
+  margin: 0;
+  text-align: center;
 }
 
 .workout-generate-row {
@@ -379,6 +465,22 @@
   justify-content: center;
   align-self: auto;
   margin-top: 0;
+}
+
+.workout-back-arrow {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 1.35rem;
+  line-height: 1;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .metric-list {
@@ -541,10 +643,6 @@
   margin-top: 20px;
 }
 
-.workout-stage-panel .focus-row {
-  justify-content: flex-start;
-}
-
 .plan-card {
   padding: 18px;
   border-radius: 18px;
@@ -597,6 +695,10 @@
   }
 
   .home-intro-wrap {
+    min-height: calc(100vh - 88px);
+  }
+
+  .home-stage-personal {
     min-height: calc(100vh - 88px);
   }
 
