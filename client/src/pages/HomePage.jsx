@@ -15,6 +15,7 @@ export default function HomePage({
   setPersonalMode,
   personal,
   onPersonalChange,
+  onResetPersonalFlow,
   heightUnit,
   setHeightUnit,
   toCmFromFeetInches,
@@ -54,10 +55,23 @@ export default function HomePage({
   };
 
   const visualPanelRef = useRef(null);
-  const introTimelineRef = useRef(null);
+  const visualIntroTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
+  const introExitTimelineRef = useRef(null);
+  const introTransitionTimeoutRef = useRef(null);
+  const stageSwapTimelineRef = useRef(null);
+  const stageSwapTimeoutRef = useRef(null);
+  const stageMetricsRef = useRef({});
+  const introPanelRef = useRef(null);
+  const personalPanelRef = useRef(null);
+  const introTitleRef = useRef(null);
+  const introButtonRef = useRef(null);
+  const workoutPanelRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
   const [stageDirection, setStageDirection] = useState("forward");
+  const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
+  const [isStageTransitioning, setIsStageTransitioning] = useState(false);
+  const [suppressStageEnter, setSuppressStageEnter] = useState(false);
   const stageOrder = {
     intro: 0,
     personal: 1,
@@ -67,10 +81,241 @@ export default function HomePage({
 
   const goToStage = (nextStage) => {
     if (nextStage === homeStage) return;
+    if (nextStage === "intro") {
+      onResetPersonalFlow?.();
+    }
     const nextOrder = stageOrder[nextStage] ?? 0;
     const currentOrder = stageOrder[homeStage] ?? 0;
     setStageDirection(nextOrder >= currentOrder ? "forward" : "backward");
     setHomeStage(nextStage);
+  };
+
+  const getMorphStageElement = (stage) => {
+    if (stage === "intro") return introPanelRef.current;
+    if (stage === "personal") return personalPanelRef.current;
+    if (stage === "visualizer") return visualPanelRef.current;
+    if (stage === "workout") return workoutPanelRef.current;
+    return null;
+  };
+
+  const transitionToStageFromTrigger = (nextStage) => {
+    if (nextStage === homeStage || isIntroTransitioning || isStageTransitioning) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setSuppressStageEnter(true);
+      goToStage(nextStage);
+      return;
+    }
+
+    const currentStageEl = homeStage === "intro"
+      ? introPanelRef.current
+      : document.querySelector(`.home-stage-${homeStage}`);
+    const sourceMorphEl = getMorphStageElement(homeStage);
+    const sourceRect = sourceMorphEl?.getBoundingClientRect();
+    if (!sourceMorphEl || !sourceRect?.width || !sourceRect?.height) {
+      setSuppressStageEnter(true);
+      goToStage(nextStage);
+      return;
+    }
+
+    const currentRect = currentStageEl?.getBoundingClientRect();
+    const pageEl = document.querySelector(".home-page");
+    const pageStyles = pageEl ? window.getComputedStyle(pageEl) : null;
+    const pagePaddingX = pageStyles
+      ? parseFloat(pageStyles.paddingLeft || "0") + parseFloat(pageStyles.paddingRight || "0")
+      : 48;
+    const stageWidth = Math.min(1200, Math.max(320, window.innerWidth - pagePaddingX));
+
+    const presets = {
+      intro: { width: Math.min(560, stageWidth), height: 320 },
+      personal: { width: Math.min(980, stageWidth), height: 620 },
+      visualizer: { width: Math.min(900, stageWidth), height: 700 },
+      workout: { width: stageWidth, height: 520 }
+    };
+    const preset = presets[nextStage] || presets.personal;
+    const knownTarget = stageMetricsRef.current[nextStage];
+    const targetWidth = knownTarget?.width || preset.width;
+    const targetHeight = knownTarget?.height || Math.min(preset.height, Math.max(320, window.innerHeight - 180));
+
+    const startCenterX = sourceRect.left + sourceRect.width / 2;
+    const startCenterY = sourceRect.top + sourceRect.height / 2;
+    const contentEl = document.querySelector(".home-page .content");
+    const contentRect = contentEl?.getBoundingClientRect();
+    const fallbackCenterX = contentRect ? contentRect.left + contentRect.width / 2 : window.innerWidth / 2;
+    const fallbackCenterY = nextStage === "personal" || nextStage === "intro"
+      ? window.innerHeight / 2
+      : contentRect
+        ? contentRect.top + targetHeight / 2
+        : window.innerHeight / 2;
+    const targetCenterX = knownTarget?.centerX ||
+      (currentRect ? currentRect.left + currentRect.width / 2 : fallbackCenterX);
+    const targetCenterY = knownTarget?.centerY || fallbackCenterY;
+
+    const sourceStyles = window.getComputedStyle(sourceMorphEl);
+    const sourceContentEls = sourceMorphEl
+      ? Array.from(sourceMorphEl.children)
+      : [];
+    const stageOuterContentEls = currentStageEl
+      ? Array.from(currentStageEl.children).filter(
+          (el) => el !== sourceMorphEl && !el.contains(sourceMorphEl)
+        )
+      : [];
+    const transitionFillColor =
+      homeStage === "visualizer" && nextStage === "workout"
+        ? "rgba(14, 14, 14, 0.95)"
+        : "rgba(28, 28, 28, 0.9)";
+    const targetVisual = nextStage === "intro"
+      ? {
+          bg: "rgba(255, 255, 255, 0)",
+          border: "rgba(255, 255, 255, 0)",
+          color: "rgb(255, 255, 255)",
+          radius: "24px"
+        }
+      : {
+          bg: "rgba(110, 110, 110, 0.28)",
+          border: "rgba(255, 255, 255, 0.16)",
+          color: "rgb(243, 243, 243)",
+          radius: "24px"
+        };
+
+    stageSwapTimelineRef.current?.cancel();
+    if (stageSwapTimeoutRef.current) {
+      window.clearTimeout(stageSwapTimeoutRef.current);
+      stageSwapTimeoutRef.current = null;
+    }
+
+    setIsStageTransitioning(true);
+    setSuppressStageEnter(true);
+
+    const timeline = createTimeline({
+      defaults: { ease: "inOutCubic" }
+    }).add(sourceMorphEl, {
+      width: [`${sourceRect.width}px`, `${targetWidth}px`],
+      height: [`${sourceRect.height}px`, `${targetHeight}px`],
+      translateX: [0, targetCenterX - startCenterX],
+      translateY: [0, targetCenterY - startCenterY],
+      borderRadius: [sourceStyles.borderRadius || "24px", targetVisual.radius],
+      backgroundColor: [sourceStyles.backgroundColor || "rgba(110, 110, 110, 0.28)", transitionFillColor],
+      borderColor: [sourceStyles.borderColor || "rgba(255, 255, 255, 0.16)", targetVisual.border],
+      color: [sourceStyles.color || "rgb(243, 243, 243)", targetVisual.color],
+      duration: 820
+    });
+
+    if (sourceContentEls.length) {
+      timeline.add(
+        sourceContentEls,
+        {
+          opacity: [1, 0],
+          duration: 1,
+          ease: "linear"
+        },
+        0
+      );
+    }
+
+    if (stageOuterContentEls.length) {
+      timeline.add(
+        stageOuterContentEls,
+        {
+          opacity: [1, 0],
+          duration: 1,
+          ease: "linear"
+        },
+        0
+      );
+    }
+
+    stageSwapTimelineRef.current = timeline;
+
+    stageSwapTimeoutRef.current = window.setTimeout(() => {
+      setIsStageTransitioning(false);
+      goToStage(nextStage);
+    }, 860);
+  };
+
+  const onGetStarted = () => {
+    if (isIntroTransitioning || isStageTransitioning) return;
+
+    const panelEl = introPanelRef.current;
+    const titleEl = introTitleRef.current;
+    const buttonEl = introButtonRef.current;
+    if (!panelEl || !titleEl || !buttonEl) {
+      goToStage("personal");
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setSuppressStageEnter(true);
+      goToStage("personal");
+      return;
+    }
+
+    setIsIntroTransitioning(true);
+    setSuppressStageEnter(true);
+
+    const panelRect = panelEl.getBoundingClientRect();
+    const buttonRect = buttonEl.getBoundingClientRect();
+    const pageEl = panelEl.closest(".page");
+    const pageStyles = pageEl ? window.getComputedStyle(pageEl) : null;
+    const pagePaddingX = pageStyles
+      ? parseFloat(pageStyles.paddingLeft || "0") + parseFloat(pageStyles.paddingRight || "0")
+      : 48;
+    const stageWidth = Math.min(1200, Math.max(320, window.innerWidth - pagePaddingX));
+    const expandedWidth = Math.max(buttonRect.width, Math.min(980, stageWidth));
+    const expandedHeight = Math.max(
+      buttonRect.height,
+      Math.min(620, Math.max(460, window.innerHeight - 210))
+    );
+    const startCenterX = buttonRect.left + buttonRect.width / 2;
+    const startCenterY = buttonRect.top + buttonRect.height / 2;
+    const targetCenterX = panelRect.left + panelRect.width / 2;
+    const targetCenterY = panelRect.top + panelRect.height / 2;
+    const translateX = targetCenterX - startCenterX;
+    const translateY = targetCenterY - startCenterY;
+
+    introExitTimelineRef.current?.cancel();
+    if (introTransitionTimeoutRef.current) {
+      window.clearTimeout(introTransitionTimeoutRef.current);
+      introTransitionTimeoutRef.current = null;
+    }
+
+    introExitTimelineRef.current = createTimeline({
+      defaults: { ease: "inOutCubic" }
+    })
+      .add(titleEl, {
+        opacity: [1, 0],
+        duration: 420,
+        ease: "outCubic"
+      })
+      .add(
+        buttonEl,
+        {
+          width: [`${buttonRect.width}px`, `${expandedWidth}px`],
+          height: [`${buttonRect.height}px`, `${expandedHeight}px`],
+          translateX: [0, translateX],
+          translateY: [0, translateY],
+          borderRadius: ["999px", "24px"],
+          backgroundColor: ["rgb(255, 255, 255)", "rgba(110, 110, 110, 0.28)"],
+          borderColor: ["rgb(255, 255, 255)", "rgba(255, 255, 255, 0.16)"],
+          color: ["rgb(0, 0, 0)", "rgb(243, 243, 243)"],
+          letterSpacing: ["0em", "0.04em"],
+          duration: 860
+        },
+        "<<+=40"
+      )
+      .add(
+        panelEl,
+        {
+          opacity: [1, 0],
+          duration: 320
+        },
+        "-=280"
+      );
+
+    introTransitionTimeoutRef.current = window.setTimeout(() => {
+      setIsIntroTransitioning(false);
+      goToStage("personal");
+    }, 930);
   };
 
   const toFiniteNumber = (value) => {
@@ -117,8 +362,8 @@ export default function HomePage({
 
   const onPersonalSubmit = (event) => {
     event.preventDefault();
-    if (!isPersonalComplete) return;
-    goToStage("visualizer");
+    if (!isPersonalComplete || isIntroTransitioning || isStageTransitioning) return;
+    transitionToStageFromTrigger("visualizer");
   };
 
   const explicitBodyFat = (() => {
@@ -241,14 +486,14 @@ export default function HomePage({
   useEffect(() => {
     if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
-    introTimelineRef.current?.cancel();
+    visualIntroTimelineRef.current?.cancel();
     stagePulseRef.current?.cancel();
 
     const stageEl = visualPanelRef.current.querySelector(".visual-stage");
     const renderSurfaceEl = visualPanelRef.current.querySelector(".physique-render-surface");
     if (!stageEl || !renderSurfaceEl) return undefined;
 
-    introTimelineRef.current = createTimeline({
+    visualIntroTimelineRef.current = createTimeline({
       defaults: { ease: "outCubic", duration: 360 }
     })
       .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: 380 })
@@ -272,10 +517,48 @@ export default function HomePage({
     });
 
     return () => {
-      introTimelineRef.current?.cancel();
+      visualIntroTimelineRef.current?.cancel();
       stagePulseRef.current?.cancel();
     };
   }, [homeStage]);
+
+  useEffect(
+    () => () => {
+      introExitTimelineRef.current?.cancel();
+      if (introTransitionTimeoutRef.current) {
+        window.clearTimeout(introTransitionTimeoutRef.current);
+      }
+      stageSwapTimelineRef.current?.cancel();
+      if (stageSwapTimeoutRef.current) {
+        window.clearTimeout(stageSwapTimeoutRef.current);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!suppressStageEnter) return undefined;
+    const rafId = window.requestAnimationFrame(() => {
+      setSuppressStageEnter(false);
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [homeStage, suppressStageEnter]);
+
+  useEffect(() => {
+    const rafId = window.requestAnimationFrame(() => {
+      const activeEl = getMorphStageElement(homeStage);
+      if (!activeEl) return;
+      const rect = activeEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      stageMetricsRef.current[homeStage] = {
+        width: rect.width,
+        height: rect.height,
+        centerX: rect.left + rect.width / 2,
+        centerY: rect.top + rect.height / 2
+      };
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [homeStage, personalMode]);
 
   const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
 
@@ -283,12 +566,19 @@ export default function HomePage({
     <div className="page home-page" style={gradient}>
       {homeStage === "intro" ? (
         <main className="content home-intro-wrap">
-          <section className={`panel home-intro-panel home-stage stage-${stageDirection}`}>
-            <h1>Workout Generator</h1>
+          <section
+            ref={introPanelRef}
+            className={`panel home-intro-panel home-stage stage-${stageDirection} ${
+              isIntroTransitioning ? "intro-transitioning" : ""
+            }`}
+          >
+            <h1 ref={introTitleRef}>Workout Generator</h1>
             <button
+              ref={introButtonRef}
               className="cta"
               type="button"
-              onClick={() => goToStage("personal")}
+              onClick={onGetStarted}
+              disabled={isIntroTransitioning || isStageTransitioning}
             >
               Get Started
             </button>
@@ -297,9 +587,14 @@ export default function HomePage({
       ) : (
         <>
           <main className="content">
-            <div key={homeStage} className={`home-stage home-stage-${homeStage} stage-${stageDirection}`}>
+            <div
+              key={homeStage}
+              className={`home-stage home-stage-${homeStage} stage-${stageDirection} ${
+                suppressStageEnter ? "stage-snap" : ""
+              }`}
+            >
               {homeStage === "personal" && (
-                <section className="panel personal-panel stage-panel">
+                <section className="panel personal-panel stage-panel" ref={personalPanelRef}>
                   <header className="stage-header">
                     <div className="stage-header-main">
                       <h2>Personal Info</h2>
@@ -629,13 +924,14 @@ export default function HomePage({
                           type="button"
                           className="ghost back-btn"
                           onClick={() => goToStage("intro")}
+                          disabled={isIntroTransitioning || isStageTransitioning}
                         >
                           Back
                         </button>
                         <button
                           className="cta"
                           type="submit"
-                          disabled={!isPersonalComplete}
+                          disabled={!isPersonalComplete || isIntroTransitioning || isStageTransitioning}
                         >
                           Continue
                         </button>
@@ -668,13 +964,15 @@ export default function HomePage({
                         type="button"
                         className="ghost back-btn"
                         onClick={() => goToStage("personal")}
+                        disabled={isIntroTransitioning || isStageTransitioning}
                       >
                         Back
                       </button>
                       <button
                         className="cta"
                         type="button"
-                        onClick={() => goToStage("workout")}
+                        onClick={() => transitionToStageFromTrigger("workout")}
+                        disabled={isIntroTransitioning || isStageTransitioning}
                       >
                         Continue
                       </button>
@@ -684,14 +982,15 @@ export default function HomePage({
               )}
 
               {homeStage === "workout" && (
-                <>
-                  <section className="panel center-panel stage-panel workout-stage-panel">
+                <div className="workout-stage-shell">
+                  <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutPanelRef}>
                     <div className="workout-header">
                       <button
                         type="button"
                         className="ghost back-btn workout-back-arrow"
                         aria-label="Back"
                         onClick={() => goToStage("visualizer")}
+                        disabled={isIntroTransitioning || isStageTransitioning}
                       >
                         {"\u2190"}
                       </button>
@@ -720,7 +1019,7 @@ export default function HomePage({
                       ))}
                     </div>
                   </section>
-                </>
+                </div>
               )}
             </div>
           </main>

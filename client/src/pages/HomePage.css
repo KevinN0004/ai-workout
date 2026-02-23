@@ -26,6 +26,8 @@
   gap: 24px;
   width: min(1200px, 100%);
   margin: 0 auto;
+  min-height: calc(100vh - 120px);
+  align-content: center;
   will-change: transform, opacity, filter;
 }
 
@@ -39,29 +41,66 @@
 }
 
 .home-stage.stage-backward {
-  animation: stage-enter-backward 1300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: none;
+  opacity: 1;
+  transform: none;
+  filter: none;
 }
 
-.home-stage.stage-forward > *,
-.home-stage.stage-backward > * {
+.home-stage.stage-forward > * {
   animation: stage-content-rise 1300ms ease both;
 }
 
-.home-stage.stage-forward > *:nth-child(2),
-.home-stage.stage-backward > *:nth-child(2) {
+.home-stage.stage-backward > * {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.home-stage.stage-forward > *:nth-child(2) {
   animation-delay: 120ms;
+}
+
+.home-stage-personal.stage-forward,
+.home-stage-personal.stage-backward {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.home-stage-personal.stage-forward > *,
+.home-stage-personal.stage-backward > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.home-stage.stage-snap,
+.home-stage.stage-snap.stage-forward,
+.home-stage.stage-snap.stage-backward {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.home-stage.stage-snap > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 @keyframes stage-enter-forward {
   from {
     opacity: 0;
-    transform: translate3d(34px, 14px, 0) scale(0.992);
+    transform: scale(0.992);
     filter: blur(4px);
   }
 
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: scale(1);
     filter: blur(0);
   }
 }
@@ -69,13 +108,13 @@
 @keyframes stage-enter-backward {
   from {
     opacity: 0;
-    transform: translate3d(-34px, 14px, 0) scale(0.992);
+    transform: scale(0.992);
     filter: blur(4px);
   }
 
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: scale(1);
     filter: blur(0);
   }
 }
@@ -83,12 +122,12 @@
 @keyframes stage-content-rise {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: scale(0.996);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 
@@ -99,10 +138,33 @@
   place-content: center;
   justify-items: center;
   gap: 24px;
+  position: relative;
+  overflow: visible;
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none;
   backdrop-filter: none;
+}
+
+.home-intro-panel h1,
+.home-intro-panel .cta {
+  will-change: opacity, transform, width, height, border-radius, filter;
+}
+
+.home-intro-panel h1 {
+  transition: opacity 420ms ease;
+}
+
+.home-intro-panel.intro-transitioning {
+  pointer-events: none;
+}
+
+.home-intro-panel.intro-transitioning h1 {
+  opacity: 0;
+}
+
+.home-intro-panel.intro-transitioning .cta {
+  transform-origin: center;
 }
 
 .home-intro-panel.home-stage {
@@ -190,15 +252,15 @@
 
 .home-page button.back-btn,
 .home-page .ghost.back-btn {
-  background: linear-gradient(120deg, #ff9f43, #ff5f6d);
-  border-color: rgba(255, 125, 102, 0.92);
-  color: #1a0f10;
-  box-shadow: 0 0 12px rgba(255, 95, 109, 0.58), 0 0 28px rgba(255, 159, 67, 0.36);
+  background: linear-gradient(120deg, #ff7a3d, #ff465f);
+  border-color: rgba(255, 104, 88, 0.94);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38);
 }
 
 .home-page button.back-btn:hover:not(:disabled),
 .home-page .ghost.back-btn:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(255, 95, 109, 0.68), 0 0 34px rgba(255, 159, 67, 0.44);
+  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46);
 }
 
 .focus-row {
@@ -245,6 +307,8 @@
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
+  min-height: calc(100vh - 120px);
+  align-content: center;
   justify-items: center;
 }
 
@@ -726,6 +790,12 @@
   grid-template-rows: auto auto 1fr auto;
 }
 
+.workout-stage-shell {
+  width: 100%;
+  display: grid;
+  gap: 24px;
+}
+
 .workout-stage-panel {
   grid-template-rows: auto auto auto auto;
 }
@@ -976,6 +1046,11 @@
   .home-page .title,
   .home-page .content {
     width: 100%;
+  }
+
+  .home-page .content,
+  .home-stage {
+    min-height: calc(100vh - 88px);
   }
 
   .home-page .header-top {

@@ -350,14 +350,14 @@
 }
 
 .planner-setup-modal .modal-actions .back-btn {
-  background: linear-gradient(120deg, #ff9f43, #ff5f6d);
-  border-color: rgba(255, 125, 102, 0.92);
-  color: #1a0f10;
-  box-shadow: 0 0 12px rgba(255, 95, 109, 0.58), 0 0 28px rgba(255, 159, 67, 0.36);
+  background: linear-gradient(120deg, #ff7a3d, #ff465f);
+  border-color: rgba(255, 104, 88, 0.94);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38);
 }
 
 .planner-setup-modal .modal-actions .back-btn:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(255, 95, 109, 0.68), 0 0 34px rgba(255, 159, 67, 0.44);
+  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46);
 }
 
 .planner-setup-modal .modal-actions .back-btn:disabled {
@@ -384,48 +384,44 @@
 @keyframes planner-modal-in {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.985);
+    transform: scale(0.985);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
 }
 
 @keyframes planner-chrome-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 @keyframes planner-step-in {
   from {
     opacity: 0;
-    transform: translateY(14px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 @keyframes planner-card-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: scale(0.985);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
 }
 

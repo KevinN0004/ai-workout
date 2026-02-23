@@ -111,6 +111,25 @@ const defaultSignupProfileForm = {
   notes: ""
 };
 
+const defaultPersonalForm = {
+  name: "",
+  age: "",
+  heightCm: "",
+  heightFeet: "",
+  heightInches: "",
+  weight: "",
+  sex: "",
+  bodyFat: "",
+  activity: "Moderate",
+  sleep: "",
+  timeline: "",
+  experience: "",
+  trainingDays: [],
+  nutrition: "",
+  cardio: "",
+  notes: ""
+};
+
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
 
 const getRegionFromLocale = (locale) => {
@@ -224,24 +243,7 @@ export default function App() {
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
-  const [personal, setPersonal] = useState({
-    name: "",
-    age: "",
-    heightCm: "",
-    heightFeet: "",
-    heightInches: "",
-    weight: "",
-    sex: "",
-    bodyFat: "",
-    activity: "Moderate",
-    sleep: "",
-    timeline: "",
-    experience: "",
-    trainingDays: [],
-    nutrition: "",
-    cardio: "",
-    notes: ""
-  });
+  const [personal, setPersonal] = useState({ ...defaultPersonalForm });
   const [form, setForm] = useState({
     goal: "Build lean strength and energy",
     equipment: ["Dumbbells"],
@@ -308,6 +310,14 @@ export default function App() {
   const onPersonalChange = (e) => {
     setPersonal((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
+
+  const resetPersonalFlow = useCallback(() => {
+    const preferredSystem = getPreferredMeasurementSystem();
+    setPersonalMode("basic");
+    setPersonal({ ...defaultPersonalForm });
+    setHeightUnit(preferredSystem === "imperial" ? "ft" : "cm");
+    setWeightUnit(preferredSystem === "imperial" ? "lb" : "kg");
+  }, []);
 
   const onChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -947,34 +957,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const profile = user?.profile;
-    if (!profile) return;
-    const cm = profile.heightCm ? String(profile.heightCm) : "";
-    const nextFeetInches = toFeetInchesFromCm(cm);
-    const fullName =
-      [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
-      profile.name ||
-      "";
-    setPersonal((prev) => ({
-      ...prev,
-      name: fullName,
-      age: profile.age ? String(profile.age) : "",
-      heightCm: cm,
-      heightFeet: nextFeetInches.feet,
-      heightInches: nextFeetInches.inches,
-      weight: profile.weightKg ? String(profile.weightKg) : "",
-      sex: profile.sex || "",
-      bodyFat: profile.bodyFat ? String(profile.bodyFat) : "",
-      activity: profile.activity || "Moderate",
-      sleep: "",
-      timeline: "",
-      experience: "",
-      trainingDays: [],
-      nutrition: "",
-      cardio: "",
-      notes: profile.notes || ""
-    }));
-  }, [user]);
+    if (route !== "/") return;
+    resetPersonalFlow();
+  }, [route, resetPersonalFlow]);
 
   useEffect(() => {
     if (!isDashboardRoute || !user) return;
@@ -1120,9 +1105,10 @@ export default function App() {
     setUser(null);
     setWeatherData(null);
     setWeatherError("");
-    setAirQualityData(null);
-    setAirQualityError("");
-    go("/");
+      setAirQualityData(null);
+      setAirQualityError("");
+      resetPersonalFlow();
+      go("/");
   };
 
   const submitWorkout = async (e) => {
@@ -1409,6 +1395,7 @@ export default function App() {
       setPersonalMode={setPersonalMode}
       personal={personal}
       onPersonalChange={onPersonalChange}
+      onResetPersonalFlow={resetPersonalFlow}
       heightUnit={heightUnit}
       setHeightUnit={setHeightUnit}
       toCmFromFeetInches={toCmFromFeetInches}
