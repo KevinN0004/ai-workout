@@ -470,7 +470,7 @@ export default function App() {
 
   const plannerModal = plannerOpen && (
     <ModalPortal open={plannerOpen}>
-      <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal-backdrop planner-backdrop" role="dialog" aria-modal="true">
         <div className="modal planner-setup-modal">
           <div className="modal-header">
             <h2>Planner</h2>
@@ -485,10 +485,14 @@ export default function App() {
           </div>
           <div className="modal-body">
             {plannerStep === 1 && (
-              <div className="step-panel">
+              <div className="step-panel planner-step-panel">
                 <h3>Step 1 - Environment & equipment</h3>
                 <div className="step-top">
-                  <div className="segmented">
+                  <div
+                    className={`segmented planner-env-toggle ${
+                      form.environment === "Commercial" ? "pos-1" : "pos-0"
+                    }`}
+                  >
                     <button
                       type="button"
                       className={form.environment === "Home" ? "active" : ""}
@@ -525,7 +529,7 @@ export default function App() {
               </div>
             )}
             {plannerStep === 2 && (
-              <div className="step-panel">
+              <div className="step-panel planner-step-panel">
                 <h3>Step 2 - Schedule & constraints</h3>
                 <form className="form planner-step-two-form">
                   <label>
@@ -579,7 +583,7 @@ export default function App() {
               </div>
             )}
             {plannerStep === 3 && (
-              <div className="step-panel">
+              <div className="step-panel planner-step-panel">
                 <h3>Step 3 - Focus priorities</h3>
                 <p className="muted">Select one or more focus areas for this plan.</p>
                 <div className="option-grid focus-option-grid">
@@ -602,7 +606,7 @@ export default function App() {
             <div className="modal-actions">
               <button
                 type="button"
-                className="ghost"
+                className="ghost back-btn"
                 onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
                 disabled={plannerStep === 1}
               >

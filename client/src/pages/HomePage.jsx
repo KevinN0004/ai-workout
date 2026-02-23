@@ -57,6 +57,21 @@ export default function HomePage({
   const introTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
+  const [stageDirection, setStageDirection] = useState("forward");
+  const stageOrder = {
+    intro: 0,
+    personal: 1,
+    visualizer: 2,
+    workout: 3
+  };
+
+  const goToStage = (nextStage) => {
+    if (nextStage === homeStage) return;
+    const nextOrder = stageOrder[nextStage] ?? 0;
+    const currentOrder = stageOrder[homeStage] ?? 0;
+    setStageDirection(nextOrder >= currentOrder ? "forward" : "backward");
+    setHomeStage(nextStage);
+  };
 
   const toFiniteNumber = (value) => {
     const parsed = Number(value);
@@ -103,7 +118,7 @@ export default function HomePage({
   const onPersonalSubmit = (event) => {
     event.preventDefault();
     if (!isPersonalComplete) return;
-    setHomeStage("visualizer");
+    goToStage("visualizer");
   };
 
   const explicitBodyFat = (() => {
@@ -268,12 +283,12 @@ export default function HomePage({
     <div className="page home-page" style={gradient}>
       {homeStage === "intro" ? (
         <main className="content home-intro-wrap">
-          <section className="panel home-intro-panel home-stage">
+          <section className={`panel home-intro-panel home-stage stage-${stageDirection}`}>
             <h1>Workout Generator</h1>
             <button
               className="cta"
               type="button"
-              onClick={() => setHomeStage("personal")}
+              onClick={() => goToStage("personal")}
             >
               Get Started
             </button>
@@ -282,14 +297,14 @@ export default function HomePage({
       ) : (
         <>
           <main className="content">
-            <div key={homeStage} className={`home-stage home-stage-${homeStage}`}>
+            <div key={homeStage} className={`home-stage home-stage-${homeStage} stage-${stageDirection}`}>
               {homeStage === "personal" && (
                 <section className="panel personal-panel stage-panel">
                   <header className="stage-header">
                     <div className="stage-header-main">
                       <h2>Personal Info</h2>
                     </div>
-                    <div className="segmented">
+                    <div className={`segmented ${personalMode === "advanced" ? "pos-1" : "pos-0"}`}>
                       <button
                         type="button"
                         className={personalMode === "basic" ? "active" : ""}
@@ -329,7 +344,7 @@ export default function HomePage({
                     className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : "basic-mode"}`}
                     onSubmit={onPersonalSubmit}
                   >
-                    <label>
+                    <label className="field-name">
                 Full name
                 <input
                   name="name"
@@ -338,7 +353,7 @@ export default function HomePage({
                   placeholder="Jordan Lee"
                 />
               </label>
-                    <label>
+                    <label className="field-age">
                 Age
                 <input
                   name="age"
@@ -350,14 +365,14 @@ export default function HomePage({
                   placeholder="28"
                 />
                     </label>
-                    <label className="metric-field metric-height">
+                    <label className="metric-field metric-height field-height">
                 <span className="label-row">
                   Height
-                  <span
-                    className="unit-toggle"
-                    role="group"
-                    aria-label="Height units"
-                  >
+                    <span
+                      className={`unit-toggle ${heightUnit === "cm" ? "pos-1" : "pos-0"}`}
+                      role="group"
+                      aria-label="Height units"
+                    >
                     <button
                       type="button"
                       className={heightUnit === "ft" ? "active" : ""}
@@ -430,10 +445,14 @@ export default function HomePage({
                   </div>
                 )}
               </label>
-              <label className="metric-field">
+              <label className="metric-field field-weight">
                 <span className="label-row">
                   Weight
-                  <span className="unit-toggle" role="group" aria-label="Weight units">
+                  <span
+                    className={`unit-toggle ${weightUnit === "kg" ? "pos-1" : "pos-0"}`}
+                    role="group"
+                    aria-label="Weight units"
+                  >
                     <button
                       type="button"
                       className={weightUnit === "lb" ? "active" : ""}
@@ -472,7 +491,7 @@ export default function HomePage({
                   placeholder={weightUnit === "kg" ? "72" : "160"}
                 />
               </label>
-              <label>
+              <label className="field-sex">
                 Sex
                 <select name="sex" value={personal.sex} onChange={onPersonalChange}>
                   <option value="">Select</option>
@@ -483,8 +502,8 @@ export default function HomePage({
                 </select>
               </label>
 
-              {personalMode === "advanced" && (
-                <>
+              <div className="advanced-fields-wrap" aria-hidden={personalMode !== "advanced"}>
+                <div className="advanced-fields-inner">
                   <label>
                     Activity level
                     <select
@@ -597,8 +616,8 @@ export default function HomePage({
                       placeholder="Past training, dietary restrictions, illness"
                     />
                   </label>
-                </>
-              )}
+                </div>
+                </div>
                     <div className="personal-footer full">
                       {!isPersonalComplete && (
                         <p className="muted personal-hint">
@@ -609,7 +628,7 @@ export default function HomePage({
                         <button
                           type="button"
                           className="ghost back-btn"
-                          onClick={() => setHomeStage("intro")}
+                          onClick={() => goToStage("intro")}
                         >
                           Back
                         </button>
@@ -648,14 +667,14 @@ export default function HomePage({
                       <button
                         type="button"
                         className="ghost back-btn"
-                        onClick={() => setHomeStage("personal")}
+                        onClick={() => goToStage("personal")}
                       >
                         Back
                       </button>
                       <button
                         className="cta"
                         type="button"
-                        onClick={() => setHomeStage("workout")}
+                        onClick={() => goToStage("workout")}
                       >
                         Continue
                       </button>
@@ -670,9 +689,9 @@ export default function HomePage({
                     <div className="workout-header">
                       <button
                         type="button"
-                        className="ghost workout-back-arrow"
+                        className="ghost back-btn workout-back-arrow"
                         aria-label="Back"
-                        onClick={() => setHomeStage("visualizer")}
+                        onClick={() => goToStage("visualizer")}
                       >
                         {"\u2190"}
                       </button>

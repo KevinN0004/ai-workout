@@ -306,6 +306,31 @@ select:focus {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.back-btn,
+.ghost.back-btn,
+.modal .ghost.back-btn {
+  background: linear-gradient(120deg, #ff9f43, #ff5f6d);
+  border-color: rgba(255, 125, 102, 0.92);
+  color: #1a0f10;
+  box-shadow: 0 0 12px rgba(255, 95, 109, 0.58), 0 0 28px rgba(255, 159, 67, 0.36);
+}
+
+.back-btn:hover:not(:disabled),
+.ghost.back-btn:hover:not(:disabled),
+.modal .ghost.back-btn:hover:not(:disabled) {
+  background: linear-gradient(120deg, #ff9f43, #ff5f6d);
+  border-color: rgba(255, 125, 102, 0.92);
+  color: #1a0f10;
+  box-shadow: 0 0 16px rgba(255, 95, 109, 0.68), 0 0 34px rgba(255, 159, 67, 0.44);
+}
+
+.back-btn:disabled,
+.ghost.back-btn:disabled,
+.modal .ghost.back-btn:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
 .modal .cta {
   background: #ffffff;
   color: #000000;
