@@ -27,296 +27,307 @@ export default function AuthPage({
   const setSignupField = (name, value) => {
     onSignupProfileChange({ target: { name, value } });
   };
+  const isSignupMode = authMode === "signup";
+  const isSignupProfileStep = isSignupMode && signupStep === "profile";
+  const isSignupCredentialsStep = isSignupMode && signupStep === "credentials";
 
   return (
-    <div className="page auth-page" style={gradient}>
+    <div className="page auth-page home-page" style={gradient}>
       <header className="title">
         <h1>Workout Generator</h1>
         <p className="muted">
-          {authMode === "signup" && signupStep === "profile"
+          {isSignupProfileStep
             ? "Step 2 of 2: add your profile details."
+            : isSignupCredentialsStep
+            ? "Step 1 of 2: create your account."
             : "Sign in to enter dashboard."}
         </p>
       </header>
-      <main className="auth-card">
-        <div className="auth-card-top">
-          <div className="segmented">
+      <main className="content auth-content">
+        <section className={`panel auth-card ${isSignupProfileStep ? "auth-card-profile" : ""}`}>
+          <div className="auth-card-top">
+            <div className={`segmented auth-mode-toggle ${isSignupMode ? "pos-1" : "pos-0"}`}>
+              <button
+                type="button"
+                className={authMode === "login" ? "active" : ""}
+                onClick={() => {
+                  onAuthModeChange("login");
+                }}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className={authMode === "signup" ? "active" : ""}
+                onClick={() => {
+                  onAuthModeChange("signup");
+                }}
+              >
+                Sign Up
+              </button>
+            </div>
             <button
               type="button"
-              className={authMode === "login" ? "active" : ""}
-              onClick={() => {
-                onAuthModeChange("login");
-              }}
+              className="ghost icon-button auth-close"
+              onClick={() => go("/")}
+              aria-label="Close"
             >
-              Login
-            </button>
-            <button
-              type="button"
-              className={authMode === "signup" ? "active" : ""}
-              onClick={() => {
-                onAuthModeChange("signup");
-              }}
-            >
-              Sign Up
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
           </div>
-          <button
-            type="button"
-            className="ghost icon-button auth-close"
-            onClick={() => go("/")}
-            aria-label="Close"
+          <form
+            className={`form auth-form ${isSignupProfileStep ? "signup-profile-grid" : ""}`}
+            onSubmit={onAuthSubmit}
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-        <form
-          className={`form auth-form ${
-            authMode === "signup" && signupStep === "profile"
-              ? "signup-profile-grid"
-              : ""
-          }`}
-          onSubmit={onAuthSubmit}
-        >
-          {!(authMode === "signup" && signupStep === "profile") && (
-            <label>
-              Email
-              <input
-                name="email"
-                type="email"
-                value={authForm.email}
-                onChange={onAuthChange}
-                placeholder="you@email.com"
-                required
-              />
-            </label>
-          )}
-          {authMode === "signup" && signupStep === "profile" && (
-            <>
+            {!isSignupProfileStep && (
               <label>
-                First name
+                Email
                 <input
-                  name="firstName"
-                  value={signupProfileForm.firstName}
-                  onChange={onSignupProfileChange}
-                  placeholder="Jordan"
+                  name="email"
+                  type="email"
+                  value={authForm.email}
+                  onChange={onAuthChange}
+                  placeholder="you@email.com"
                   required
                 />
               </label>
-              <label>
-                Last name
-                <input
-                  name="lastName"
-                  value={signupProfileForm.lastName}
-                  onChange={onSignupProfileChange}
-                  placeholder="Lee"
-                  required
-                />
-              </label>
-              <label>
-                Age
-                <input
-                  name="age"
-                  type="number"
-                  min="10"
-                  max="120"
-                  value={signupProfileForm.age}
-                  onChange={onSignupProfileChange}
-                  placeholder="28"
-                  required
-                />
-              </label>
-              <label>
-                <span className="label-row">
-                  Height
-                  <span className="unit-toggle" role="group" aria-label="Height units">
-                    <button
-                      type="button"
-                      className={signupHeightUnit === "cm" ? "active" : ""}
-                      onClick={() => {
-                        setSignupField(
-                          "heightCm",
-                          toCmFromFeetInches(
-                            signupProfileForm.heightFeet,
-                            signupProfileForm.heightInches
-                          )
-                        );
-                        setSignupHeightUnit("cm");
-                      }}
-                    >
-                      cm
-                    </button>
-                    <button
-                      type="button"
-                      className={signupHeightUnit === "ft" ? "active" : ""}
-                      onClick={() => {
-                        const next = toFeetInchesFromCm(signupProfileForm.heightCm);
-                        setSignupField("heightFeet", next.feet);
-                        setSignupField("heightInches", next.inches);
-                        setSignupHeightUnit("ft");
-                      }}
-                    >
-                      ft/in
-                    </button>
-                  </span>
-                </span>
-                {signupHeightUnit === "cm" ? (
+            )}
+            {isSignupProfileStep && (
+              <>
+                <label>
+                  First name
                   <input
-                    name="heightCm"
-                    type="number"
-                    min="100"
-                    max="260"
-                    value={signupProfileForm.heightCm}
+                    name="firstName"
+                    value={signupProfileForm.firstName}
                     onChange={onSignupProfileChange}
-                    placeholder="175"
+                    placeholder="Jordan"
                     required
                   />
-                ) : (
-                  <div className="height-split">
-                    <div className="height-field">
-                      <input
-                        name="heightFeet"
-                        type="number"
-                        min="3"
-                        max="8"
-                        value={signupProfileForm.heightFeet}
-                        onChange={onSignupProfileChange}
-                        placeholder="5"
-                        required
-                      />
-                      <span className="height-unit">ft</span>
+                </label>
+                <label>
+                  Last name
+                  <input
+                    name="lastName"
+                    value={signupProfileForm.lastName}
+                    onChange={onSignupProfileChange}
+                    placeholder="Lee"
+                    required
+                  />
+                </label>
+                <label>
+                  Age
+                  <input
+                    name="age"
+                    type="number"
+                    min="10"
+                    max="120"
+                    value={signupProfileForm.age}
+                    onChange={onSignupProfileChange}
+                    placeholder="28"
+                    required
+                  />
+                </label>
+                <label>
+                  <span className="label-row">
+                    Height
+                    <span
+                      className={`unit-toggle ${signupHeightUnit === "ft" ? "pos-1" : "pos-0"}`}
+                      role="group"
+                      aria-label="Height units"
+                    >
+                      <button
+                        type="button"
+                        className={signupHeightUnit === "cm" ? "active" : ""}
+                        onClick={() => {
+                          setSignupField(
+                            "heightCm",
+                            toCmFromFeetInches(
+                              signupProfileForm.heightFeet,
+                              signupProfileForm.heightInches
+                            )
+                          );
+                          setSignupHeightUnit("cm");
+                        }}
+                      >
+                        cm
+                      </button>
+                      <button
+                        type="button"
+                        className={signupHeightUnit === "ft" ? "active" : ""}
+                        onClick={() => {
+                          const next = toFeetInchesFromCm(signupProfileForm.heightCm);
+                          setSignupField("heightFeet", next.feet);
+                          setSignupField("heightInches", next.inches);
+                          setSignupHeightUnit("ft");
+                        }}
+                      >
+                        ft/in
+                      </button>
+                    </span>
+                  </span>
+                  {signupHeightUnit === "cm" ? (
+                    <input
+                      name="heightCm"
+                      type="number"
+                      min="100"
+                      max="260"
+                      value={signupProfileForm.heightCm}
+                      onChange={onSignupProfileChange}
+                      placeholder="175"
+                      required
+                    />
+                  ) : (
+                    <div className="height-split">
+                      <div className="height-field">
+                        <input
+                          name="heightFeet"
+                          type="number"
+                          min="3"
+                          max="8"
+                          value={signupProfileForm.heightFeet}
+                          onChange={onSignupProfileChange}
+                          placeholder="5"
+                          required
+                        />
+                        <span className="height-unit">ft</span>
+                      </div>
+                      <div className="height-field">
+                        <input
+                          name="heightInches"
+                          type="number"
+                          min="0"
+                          max="11"
+                          value={signupProfileForm.heightInches}
+                          onChange={onSignupProfileChange}
+                          placeholder="9"
+                          required
+                        />
+                        <span className="height-unit">in</span>
+                      </div>
                     </div>
-                    <div className="height-field">
-                      <input
-                        name="heightInches"
-                        type="number"
-                        min="0"
-                        max="11"
-                        value={signupProfileForm.heightInches}
-                        onChange={onSignupProfileChange}
-                        placeholder="9"
-                        required
-                      />
-                      <span className="height-unit">in</span>
-                    </div>
-                  </div>
-                )}
-              </label>
+                  )}
+                </label>
+                <label>
+                  <span className="label-row">
+                    Weight
+                    <span
+                      className={`unit-toggle ${signupWeightUnit === "lb" ? "pos-1" : "pos-0"}`}
+                      role="group"
+                      aria-label="Weight units"
+                    >
+                      <button
+                        type="button"
+                        className={signupWeightUnit === "kg" ? "active" : ""}
+                        onClick={() => {
+                          setSignupField("weight", toKg(signupProfileForm.weight, signupWeightUnit));
+                          setSignupWeightUnit("kg");
+                        }}
+                      >
+                        kg
+                      </button>
+                      <button
+                        type="button"
+                        className={signupWeightUnit === "lb" ? "active" : ""}
+                        onClick={() => {
+                          setSignupField("weight", toLb(signupProfileForm.weight, signupWeightUnit));
+                          setSignupWeightUnit("lb");
+                        }}
+                      >
+                        lb
+                      </button>
+                    </span>
+                  </span>
+                  <input
+                    name="weight"
+                    type="number"
+                    min={signupWeightUnit === "kg" ? "25" : "55"}
+                    max={signupWeightUnit === "kg" ? "400" : "882"}
+                    value={signupProfileForm.weight}
+                    onChange={onSignupProfileChange}
+                    placeholder={signupWeightUnit === "kg" ? "72" : "160"}
+                    required
+                  />
+                </label>
+                <label>
+                  Sex
+                  <select
+                    name="sex"
+                    value={signupProfileForm.sex}
+                    onChange={onSignupProfileChange}
+                    required
+                  >
+                    <option value="">Select</option>
+                    <option>Female</option>
+                    <option>Male</option>
+                    <option>Non-binary</option>
+                    <option>Prefer not to say</option>
+                  </select>
+                </label>
+                <label>
+                  Activity level
+                  <select
+                    name="activity"
+                    value={signupProfileForm.activity}
+                    onChange={onSignupProfileChange}
+                  >
+                    <option>Light</option>
+                    <option>Moderate</option>
+                    <option>High</option>
+                    <option>Very high</option>
+                  </select>
+                </label>
+                <label className="full">
+                  Notes
+                  <input
+                    name="notes"
+                    value={signupProfileForm.notes}
+                    onChange={onSignupProfileChange}
+                    placeholder="Optional training context"
+                  />
+                </label>
+              </>
+            )}
+            {!isSignupProfileStep && (
               <label>
                 <span className="label-row">
-                  Weight
-                  <span className="unit-toggle" role="group" aria-label="Weight units">
-                    <button
-                      type="button"
-                      className={signupWeightUnit === "kg" ? "active" : ""}
-                      onClick={() => {
-                        setSignupField("weight", toKg(signupProfileForm.weight, signupWeightUnit));
-                        setSignupWeightUnit("kg");
-                      }}
-                    >
-                      kg
-                    </button>
-                    <button
-                      type="button"
-                      className={signupWeightUnit === "lb" ? "active" : ""}
-                      onClick={() => {
-                        setSignupField("weight", toLb(signupProfileForm.weight, signupWeightUnit));
-                        setSignupWeightUnit("lb");
-                      }}
-                    >
-                      lb
-                    </button>
-                  </span>
+                  Password
+                  <button
+                    type="button"
+                    className="ghost ghost-inline"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
                 </span>
                 <input
-                  name="weight"
-                  type="number"
-                  min={signupWeightUnit === "kg" ? "25" : "55"}
-                  max={signupWeightUnit === "kg" ? "400" : "882"}
-                  value={signupProfileForm.weight}
-                  onChange={onSignupProfileChange}
-                  placeholder={signupWeightUnit === "kg" ? "72" : "160"}
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={authForm.password}
+                  onChange={onAuthChange}
+                  placeholder="********"
                   required
                 />
               </label>
-              <label>
-                Sex
-                <select
-                  name="sex"
-                  value={signupProfileForm.sex}
-                  onChange={onSignupProfileChange}
-                  required
-                >
-                  <option value="">Select</option>
-                  <option>Female</option>
-                  <option>Male</option>
-                  <option>Non-binary</option>
-                  <option>Prefer not to say</option>
-                </select>
-              </label>
-              <label>
-                Activity level
-                <select
-                  name="activity"
-                  value={signupProfileForm.activity}
-                  onChange={onSignupProfileChange}
-                >
-                  <option>Light</option>
-                  <option>Moderate</option>
-                  <option>High</option>
-                  <option>Very high</option>
-                </select>
-              </label>
-              <label className="full">
-                Notes
-                <input
-                  name="notes"
-                  value={signupProfileForm.notes}
-                  onChange={onSignupProfileChange}
-                  placeholder="Optional training context"
-                />
-              </label>
-            </>
-          )}
-          {!(authMode === "signup" && signupStep === "profile") && (
-            <label>
-              <span className="label-row">
-                Password
-                <button
-                  type="button"
-                  className="ghost ghost-inline"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </span>
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={authForm.password}
-                onChange={onAuthChange}
-                placeholder="********"
-                required
-              />
-            </label>
-          )}
-          <button className="cta" type="submit" disabled={authLoading}>
-            {authLoading
-              ? "Working..."
-              : authMode === "login"
-              ? "Login"
-              : signupStep === "credentials"
-              ? "Continue"
-              : "Save profile"}
-          </button>
-        </form>
-        {authError && <p className="error">{authError}</p>}
+            )}
+            <button className="cta" type="submit" disabled={authLoading}>
+              {authLoading
+                ? "Working..."
+                : authMode === "login"
+                ? "Login"
+                : signupStep === "credentials"
+                ? "Continue"
+                : "Save profile"}
+            </button>
+          </form>
+          {authError && <p className="error">{authError}</p>}
+        </section>
       </main>
     </div>
   );
