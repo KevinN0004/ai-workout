@@ -15,11 +15,11 @@
   text-align: center;
 }
 
-.auth-content {
+.auth-page.home-page .content.auth-content {
   width: 100%;
   min-height: calc(100vh - 120px);
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: center;
 }
 
@@ -35,7 +35,7 @@
 }
 
 .auth-card.auth-card-profile {
-  width: min(980px, 100%);
+  width: min(720px, 100%);
 }
 
 .auth-form {
@@ -49,6 +49,8 @@
 .auth-form label {
   width: 100%;
   color: #fff;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .auth-form label > input,
@@ -60,6 +62,7 @@
   width: 100%;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .auth-form .label-row .unit-toggle {
@@ -67,13 +70,72 @@
   flex-shrink: 0;
 }
 
+.auth-form .password-field-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.auth-form .password-field-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.auth-form .password-visibility-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.auth-form .password-visibility-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.auth-form .password-visibility-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.auth-form .password-visibility-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.auth-form textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+}
+
 .auth-form.signup-profile-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  width: min(920px, 100%);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(720px, 100%);
 }
 
 .auth-form .full {
   grid-column: 1 / -1;
+}
+
+.auth-card,
+.auth-form,
+.auth-form .full,
+.auth-form .label-row,
+.auth-form .password-field-wrap,
+.auth-form .height-split,
+.auth-form .height-field {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .auth-form .cta {
@@ -105,10 +167,16 @@
 }
 
 .auth-page input,
-.auth-page select {
+.auth-page select,
+.auth-page textarea {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+  font-family: inherit;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border-style: solid;
+  border-width: 1px;
 }
 
 .auth-page select option {
@@ -117,7 +185,8 @@
 }
 
 .auth-page input:focus,
-.auth-page select:focus {
+.auth-page select:focus,
+.auth-page textarea:focus {
   outline: 2px solid rgba(255, 255, 255, 0.58);
   outline-offset: 0;
 }
@@ -154,14 +223,8 @@
   color: #ffd4d4;
 }
 
-@media (max-width: 980px) {
-  .auth-form.signup-profile-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 720px) {
-  .auth-content {
+  .auth-page.home-page .content.auth-content {
     min-height: calc(100vh - 88px);
   }
 

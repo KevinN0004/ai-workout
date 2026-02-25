@@ -199,13 +199,8 @@ export default function App() {
   const [signupProfileForm, setSignupProfileForm] = useState({
     ...defaultSignupProfileForm
   });
-  const [signupStep, setSignupStep] = useState("credentials");
-  const [signupHeightUnit, setSignupHeightUnit] = useState(() =>
-    getPreferredMeasurementSystem() === "imperial" ? "ft" : "cm"
-  );
-  const [signupWeightUnit, setSignupWeightUnit] = useState(() =>
-    getPreferredMeasurementSystem() === "imperial" ? "lb" : "kg"
-  );
+  const [signupHeightUnit, setSignupHeightUnit] = useState("ft");
+  const [signupWeightUnit, setSignupWeightUnit] = useState("lb");
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
@@ -1005,13 +1000,12 @@ export default function App() {
   const onAuthModeChange = (mode) => {
     const isSwitchingMode = mode !== authMode;
     setAuthMode(mode);
-    setSignupStep("credentials");
     setAuthError("");
     if (!isSwitchingMode) return;
     setAuthForm({ ...defaultAuthForm });
     setSignupProfileForm({ ...defaultSignupProfileForm });
-    setSignupHeightUnit("cm");
-    setSignupWeightUnit("kg");
+    setSignupHeightUnit("ft");
+    setSignupWeightUnit("lb");
     setShowPassword(false);
   };
 
@@ -1020,12 +1014,7 @@ export default function App() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      if (authMode === "signup" && signupStep === "credentials") {
-        setSignupStep("profile");
-        return;
-      }
-
-      if (authMode === "signup" && signupStep === "profile") {
+      if (authMode === "signup") {
         const normalizedProfile = {
           ...signupProfileForm,
           heightCm:
@@ -1057,9 +1046,8 @@ export default function App() {
         setUser(data.user || null);
         setAuthForm({ ...defaultAuthForm });
         setSignupProfileForm({ ...defaultSignupProfileForm });
-        setSignupHeightUnit("cm");
-        setSignupWeightUnit("kg");
-        setSignupStep("credentials");
+        setSignupHeightUnit("ft");
+        setSignupWeightUnit("lb");
         go("/dashboard");
         return;
       }
@@ -1293,7 +1281,6 @@ export default function App() {
         gradient={gradient}
         authMode={authMode}
         onAuthModeChange={onAuthModeChange}
-        signupStep={signupStep}
         go={go}
         onAuthSubmit={onAuthSubmit}
         authForm={authForm}
