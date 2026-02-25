@@ -350,28 +350,28 @@
 }
 
 .planner-setup-modal .modal-actions .back-btn {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
-  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38) !important;
+  box-shadow: 0 0 12px rgba(255, 61, 88, 0.56), 0 0 28px rgba(255, 135, 58, 0.38) !important;
 }
 
 .planner-setup-modal .modal-actions .back-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
-  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46) !important;
+  box-shadow: 0 0 16px rgba(255, 61, 88, 0.68), 0 0 34px rgba(255, 135, 58, 0.46) !important;
 }
 
 .planner-setup-modal .modal-actions .back-btn:active:not(:disabled),
 .planner-setup-modal .modal-actions .back-btn:focus-visible {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
 }
 
 .planner-setup-modal .modal-actions .back-btn:disabled {
-  opacity: 0.48;
+  opacity: 1;
   box-shadow: none;
 }
 

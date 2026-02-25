@@ -49,7 +49,7 @@ body.no-scroll {
   min-height: 100vh;
   padding: 32px 24px 48px;
   color: #fff;
-  filter: grayscale(1);
+  filter: none;
 }
 
 .title {
@@ -309,26 +309,34 @@ select:focus {
 .back-btn,
 .ghost.back-btn,
 .modal .ghost.back-btn {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 106, 88, 0.94) !important;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   color: #fff !important;
-  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38) !important;
+  box-shadow: 0 0 12px rgba(255, 61, 88, 0.56), 0 0 28px rgba(255, 135, 58, 0.38) !important;
 }
 
 .back-btn:hover:not(:disabled),
 .ghost.back-btn:hover:not(:disabled),
 .modal .ghost.back-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
-  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46) !important;
+  box-shadow: 0 0 16px rgba(255, 61, 88, 0.68), 0 0 34px rgba(255, 135, 58, 0.46) !important;
 }
 
 .back-btn:disabled,
 .ghost.back-btn:disabled,
 .modal .ghost.back-btn:disabled {
-  opacity: 0.55;
+  opacity: 1;
   box-shadow: none;
+  cursor: not-allowed;
 }
 
 .modal .cta {

@@ -60,13 +60,18 @@ export default function HomePage({
   const introExitTimelineRef = useRef(null);
   const introTransitionTimeoutRef = useRef(null);
   const stageSwapTimelineRef = useRef(null);
+  const stageSwapRafRef = useRef(null);
+  const stageSwapRevealTimeoutRef = useRef(null);
   const stageSwapTimeoutRef = useRef(null);
+  const stageMorphCloneRef = useRef(null);
+  const suppressResetPendingRef = useRef(false);
   const stageMetricsRef = useRef({});
   const introPanelRef = useRef(null);
   const personalPanelRef = useRef(null);
   const introTitleRef = useRef(null);
   const introButtonRef = useRef(null);
   const workoutPanelRef = useRef(null);
+  const workoutMeasureRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
   const [stageDirection, setStageDirection] = useState("forward");
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
@@ -77,6 +82,29 @@ export default function HomePage({
     personal: 1,
     visualizer: 2,
     workout: 3
+  };
+
+  const clearStageMorphClone = () => {
+    if (!stageMorphCloneRef.current) return;
+    stageMorphCloneRef.current.remove();
+    stageMorphCloneRef.current = null;
+  };
+
+  const clearStageSwapTimers = () => {
+    if (stageSwapRevealTimeoutRef.current) {
+      window.clearTimeout(stageSwapRevealTimeoutRef.current);
+      stageSwapRevealTimeoutRef.current = null;
+    }
+    if (stageSwapTimeoutRef.current) {
+      window.clearTimeout(stageSwapTimeoutRef.current);
+      stageSwapTimeoutRef.current = null;
+    }
+  };
+
+  const clearStageSwapRaf = () => {
+    if (!stageSwapRafRef.current) return;
+    window.cancelAnimationFrame(stageSwapRafRef.current);
+    stageSwapRafRef.current = null;
   };
 
   const goToStage = (nextStage) => {
@@ -107,9 +135,6 @@ export default function HomePage({
       return;
     }
 
-    const currentStageEl = homeStage === "intro"
-      ? introPanelRef.current
-      : document.querySelector(`.home-stage-${homeStage}`);
     const sourceMorphEl = getMorphStageElement(homeStage);
     const sourceRect = sourceMorphEl?.getBoundingClientRect();
     if (!sourceMorphEl || !sourceRect?.width || !sourceRect?.height) {
@@ -118,7 +143,6 @@ export default function HomePage({
       return;
     }
 
-    const currentRect = currentStageEl?.getBoundingClientRect();
     const pageEl = document.querySelector(".home-page");
     const pageStyles = pageEl ? window.getComputedStyle(pageEl) : null;
     const pagePaddingX = pageStyles
@@ -130,40 +154,46 @@ export default function HomePage({
       intro: { width: Math.min(560, stageWidth), height: 320 },
       personal: { width: Math.min(980, stageWidth), height: 620 },
       visualizer: { width: Math.min(900, stageWidth), height: 700 },
-      workout: { width: stageWidth, height: 520 }
+      workout: {
+        width: Math.min(980, stageWidth),
+        height: Math.max(260, Math.min(420, window.innerHeight - 220))
+      }
     };
     const preset = presets[nextStage] || presets.personal;
-    const knownTarget = stageMetricsRef.current[nextStage];
-    const targetWidth = knownTarget?.width || preset.width;
-    const targetHeight = knownTarget?.height || Math.min(preset.height, Math.max(320, window.innerHeight - 180));
+    const workoutMeasureRect =
+      nextStage === "workout" ? workoutMeasureRef.current?.getBoundingClientRect() : null;
+    const measuredWorkoutTarget =
+      workoutMeasureRect?.width && workoutMeasureRect?.height
+        ? {
+            width: workoutMeasureRect.width,
+            height: workoutMeasureRect.height,
+            centerX: workoutMeasureRect.left + workoutMeasureRect.width / 2,
+            centerY: workoutMeasureRect.top + workoutMeasureRect.height / 2
+          }
+        : null;
+    const knownTarget = measuredWorkoutTarget || stageMetricsRef.current[nextStage];
+    const fallbackWidth = knownTarget?.width || preset.width;
+    const fallbackHeight =
+      knownTarget?.height || Math.min(preset.height, Math.max(320, window.innerHeight - 180));
 
-    const startCenterX = sourceRect.left + sourceRect.width / 2;
-    const startCenterY = sourceRect.top + sourceRect.height / 2;
     const contentEl = document.querySelector(".home-page .content");
     const contentRect = contentEl?.getBoundingClientRect();
     const fallbackCenterX = contentRect ? contentRect.left + contentRect.width / 2 : window.innerWidth / 2;
-    const fallbackCenterY = nextStage === "personal" || nextStage === "intro"
-      ? window.innerHeight / 2
-      : contentRect
-        ? contentRect.top + targetHeight / 2
-        : window.innerHeight / 2;
-    const targetCenterX = knownTarget?.centerX ||
-      (currentRect ? currentRect.left + currentRect.width / 2 : fallbackCenterX);
-    const targetCenterY = knownTarget?.centerY || fallbackCenterY;
+    const fallbackCenterY = contentRect
+      ? contentRect.top + contentRect.height / 2
+      : window.innerHeight / 2;
+    const fallbackTarget = {
+      width: fallbackWidth,
+      height: fallbackHeight,
+      centerX: knownTarget?.centerX || fallbackCenterX,
+      centerY: knownTarget?.centerY || fallbackCenterY
+    };
 
     const sourceStyles = window.getComputedStyle(sourceMorphEl);
-    const sourceContentEls = sourceMorphEl
-      ? Array.from(sourceMorphEl.children)
-      : [];
-    const stageOuterContentEls = currentStageEl
-      ? Array.from(currentStageEl.children).filter(
-          (el) => el !== sourceMorphEl && !el.contains(sourceMorphEl)
-        )
-      : [];
     const transitionFillColor =
       homeStage === "visualizer" && nextStage === "workout"
-        ? "rgba(14, 14, 14, 0.95)"
-        : "rgba(28, 28, 28, 0.9)";
+        ? "rgba(14, 14, 14, 1)"
+        : "rgba(28, 28, 28, 1)";
     const targetVisual = nextStage === "intro"
       ? {
           bg: "rgba(255, 255, 255, 0)",
@@ -179,58 +209,131 @@ export default function HomePage({
         };
 
     stageSwapTimelineRef.current?.cancel();
-    if (stageSwapTimeoutRef.current) {
-      window.clearTimeout(stageSwapTimeoutRef.current);
-      stageSwapTimeoutRef.current = null;
-    }
+    clearStageSwapTimers();
+    clearStageSwapRaf();
+    clearStageMorphClone();
 
     setIsStageTransitioning(true);
+    suppressResetPendingRef.current = false;
     setSuppressStageEnter(true);
 
-    const timeline = createTimeline({
-      defaults: { ease: "inOutCubic" }
-    }).add(sourceMorphEl, {
-      width: [`${sourceRect.width}px`, `${targetWidth}px`],
-      height: [`${sourceRect.height}px`, `${targetHeight}px`],
-      translateX: [0, targetCenterX - startCenterX],
-      translateY: [0, targetCenterY - startCenterY],
-      borderRadius: [sourceStyles.borderRadius || "24px", targetVisual.radius],
-      backgroundColor: [sourceStyles.backgroundColor || "rgba(110, 110, 110, 0.28)", transitionFillColor],
-      borderColor: [sourceStyles.borderColor || "rgba(255, 255, 255, 0.16)", targetVisual.border],
-      color: [sourceStyles.color || "rgb(243, 243, 243)", targetVisual.color],
-      duration: 820
+    const transitionAnchors = {
+      "personal->visualizer": {
+        source: { x: 0.5, y: 0.5 },
+        target: { x: 0.5, y: 0.5 }
+      },
+      "visualizer->workout": {
+        source: { x: 0.5, y: 0.5 },
+        target: { x: 0.5, y: 0.5 }
+      }
+    };
+    const anchorPreset = transitionAnchors[`${homeStage}->${nextStage}`] || {
+      source: { x: 0.5, y: 0.5 },
+      target: { x: 0.5, y: 0.5 }
+    };
+    const clampAnchor = (value, fallback) => {
+      if (!Number.isFinite(value)) return fallback;
+      return Math.min(1, Math.max(0, value));
+    };
+    const sourceAnchorX = clampAnchor(anchorPreset.source?.x, 0.5);
+    const sourceAnchorY = clampAnchor(anchorPreset.source?.y, 0.5);
+    const targetAnchorX = clampAnchor(anchorPreset.target?.x, 0.5);
+    const targetAnchorY = clampAnchor(anchorPreset.target?.y, 0.5);
+    const morphClone = sourceMorphEl.cloneNode(true);
+    morphClone.style.position = "fixed";
+    morphClone.style.left = `${sourceRect.left}px`;
+    morphClone.style.top = `${sourceRect.top}px`;
+    morphClone.style.width = `${sourceRect.width}px`;
+    morphClone.style.height = `${sourceRect.height}px`;
+    morphClone.style.margin = "0";
+    morphClone.style.zIndex = "40";
+    morphClone.style.pointerEvents = "none";
+    morphClone.style.transformOrigin = "top left";
+    morphClone.style.boxSizing = "border-box";
+    morphClone.style.transform = "none";
+    morphClone.style.borderRadius = sourceStyles.borderRadius || "24px";
+    morphClone.style.backgroundColor = transitionFillColor;
+    morphClone.style.borderColor = sourceStyles.borderColor || "rgba(255, 255, 255, 0.16)";
+    morphClone.style.color = sourceStyles.color || "rgb(243, 243, 243)";
+    document.body.appendChild(morphClone);
+    stageMorphCloneRef.current = morphClone;
+    const morphCloneContentEls = Array.from(morphClone.children);
+
+    const completeDelayMs = 860;
+    const crossfadeDurationMs = 160;
+
+    goToStage(nextStage);
+
+    const startMorphTimeline = () => {
+      if (stageMorphCloneRef.current !== morphClone) return;
+
+      const liveTargetEl = getMorphStageElement(nextStage);
+      const liveTargetRect = liveTargetEl?.getBoundingClientRect();
+      const resolvedTarget = liveTargetRect?.width && liveTargetRect?.height
+        ? {
+            width: liveTargetRect.width,
+            height: liveTargetRect.height,
+            centerX: liveTargetRect.left + liveTargetRect.width / 2,
+            centerY: liveTargetRect.top + liveTargetRect.height / 2
+          }
+        : fallbackTarget;
+
+      const targetLeft = resolvedTarget.centerX - resolvedTarget.width / 2;
+      const targetTop = resolvedTarget.centerY - resolvedTarget.height / 2;
+      const finalLeft = targetLeft + resolvedTarget.width * (targetAnchorX - sourceAnchorX);
+      const finalTop = targetTop + resolvedTarget.height * (targetAnchorY - sourceAnchorY);
+      const morphTranslateX = finalLeft - sourceRect.left;
+      const morphTranslateY = finalTop - sourceRect.top;
+
+      const timeline = createTimeline({
+        defaults: { ease: "inOutCubic" }
+      }).add(morphClone, {
+        width: [`${sourceRect.width}px`, `${resolvedTarget.width}px`],
+        height: [`${sourceRect.height}px`, `${resolvedTarget.height}px`],
+        translateX: [0, morphTranslateX],
+        translateY: [0, morphTranslateY],
+        borderRadius: [sourceStyles.borderRadius || "24px", targetVisual.radius],
+        backgroundColor: [transitionFillColor, transitionFillColor],
+        borderColor: [sourceStyles.borderColor || "rgba(255, 255, 255, 0.16)", targetVisual.border],
+        color: [sourceStyles.color || "rgb(243, 243, 243)", targetVisual.color],
+        duration: completeDelayMs
+      });
+
+      if (morphCloneContentEls.length) {
+        timeline.add(
+          morphCloneContentEls,
+          {
+            opacity: [1, 0],
+            duration: 1,
+            ease: "linear"
+          },
+          0
+        );
+      }
+
+      stageSwapTimelineRef.current = timeline;
+
+      stageSwapRevealTimeoutRef.current = window.setTimeout(() => {
+        stageSwapRevealTimeoutRef.current = null;
+        setIsStageTransitioning(false);
+        if (stageMorphCloneRef.current === morphClone) {
+          morphClone.style.transition = `opacity ${crossfadeDurationMs}ms linear`;
+          morphClone.style.opacity = "0";
+        }
+      }, completeDelayMs);
+
+      stageSwapTimeoutRef.current = window.setTimeout(() => {
+        stageSwapTimeoutRef.current = null;
+        clearStageMorphClone();
+      }, completeDelayMs + crossfadeDurationMs + 20);
+    };
+
+    stageSwapRafRef.current = window.requestAnimationFrame(() => {
+      stageSwapRafRef.current = window.requestAnimationFrame(() => {
+        stageSwapRafRef.current = null;
+        startMorphTimeline();
+      });
     });
-
-    if (sourceContentEls.length) {
-      timeline.add(
-        sourceContentEls,
-        {
-          opacity: [1, 0],
-          duration: 1,
-          ease: "linear"
-        },
-        0
-      );
-    }
-
-    if (stageOuterContentEls.length) {
-      timeline.add(
-        stageOuterContentEls,
-        {
-          opacity: [1, 0],
-          duration: 1,
-          ease: "linear"
-        },
-        0
-      );
-    }
-
-    stageSwapTimelineRef.current = timeline;
-
-    stageSwapTimeoutRef.current = window.setTimeout(() => {
-      setIsStageTransitioning(false);
-      goToStage(nextStage);
-    }, 860);
   };
 
   const onGetStarted = () => {
@@ -245,12 +348,14 @@ export default function HomePage({
     }
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      suppressResetPendingRef.current = true;
       setSuppressStageEnter(true);
       goToStage("personal");
       return;
     }
 
     setIsIntroTransitioning(true);
+    suppressResetPendingRef.current = true;
     setSuppressStageEnter(true);
 
     const panelRect = panelEl.getBoundingClientRect();
@@ -284,12 +389,13 @@ export default function HomePage({
     })
       .add(titleEl, {
         opacity: [1, 0],
-        duration: 420,
-        ease: "outCubic"
+        duration: 1,
+        ease: "linear"
       })
       .add(
         buttonEl,
         {
+          color: ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"],
           width: [`${buttonRect.width}px`, `${expandedWidth}px`],
           height: [`${buttonRect.height}px`, `${expandedHeight}px`],
           translateX: [0, translateX],
@@ -297,7 +403,6 @@ export default function HomePage({
           borderRadius: ["999px", "24px"],
           backgroundColor: ["rgb(255, 255, 255)", "rgba(110, 110, 110, 0.28)"],
           borderColor: ["rgb(255, 255, 255)", "rgba(255, 255, 255, 0.16)"],
-          color: ["rgb(0, 0, 0)", "rgb(243, 243, 243)"],
           letterSpacing: ["0em", "0.04em"],
           duration: 860
         },
@@ -529,20 +634,28 @@ export default function HomePage({
         window.clearTimeout(introTransitionTimeoutRef.current);
       }
       stageSwapTimelineRef.current?.cancel();
-      if (stageSwapTimeoutRef.current) {
-        window.clearTimeout(stageSwapTimeoutRef.current);
-      }
+      clearStageSwapTimers();
+      clearStageSwapRaf();
+      clearStageMorphClone();
     },
     []
   );
 
   useEffect(() => {
-    if (!suppressStageEnter) return undefined;
+    if (
+      !suppressStageEnter ||
+      isStageTransitioning ||
+      isIntroTransitioning ||
+      !suppressResetPendingRef.current
+    ) {
+      return undefined;
+    }
     const rafId = window.requestAnimationFrame(() => {
+      suppressResetPendingRef.current = false;
       setSuppressStageEnter(false);
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [homeStage, suppressStageEnter]);
+  }, [homeStage, suppressStageEnter, isStageTransitioning, isIntroTransitioning]);
 
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
@@ -559,6 +672,29 @@ export default function HomePage({
     });
     return () => window.cancelAnimationFrame(rafId);
   }, [homeStage, personalMode]);
+
+  useEffect(() => {
+    const rafId = window.requestAnimationFrame(() => {
+      const measureEl = workoutMeasureRef.current;
+      if (!measureEl) return;
+      const rect = measureEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      stageMetricsRef.current.workout = {
+        width: rect.width,
+        height: rect.height,
+        centerX: rect.left + rect.width / 2,
+        centerY: rect.top + rect.height / 2
+      };
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [homeStage, samplePlan.length]);
+
+  const backBtnStyle = {
+    background: "linear-gradient(120deg, #ff873a, #ff3d58)",
+    border: "1px solid rgba(255, 106, 88, 0.94)",
+    color: "#fff",
+    boxShadow: "0 0 12px rgba(255, 61, 88, 0.56), 0 0 28px rgba(255, 135, 58, 0.38)"
+  };
 
   const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
 
@@ -587,12 +723,12 @@ export default function HomePage({
       ) : (
         <>
           <main className="content">
-            <div
-              key={homeStage}
-              className={`home-stage home-stage-${homeStage} stage-${stageDirection} ${
-                suppressStageEnter ? "stage-snap" : ""
-              }`}
-            >
+              <div
+                key={homeStage}
+                className={`home-stage home-stage-${homeStage} stage-${stageDirection} ${
+                  suppressStageEnter ? "stage-snap" : ""
+                } ${isStageTransitioning ? "stage-transition-hidden" : ""}`}
+              >
               {homeStage === "personal" && (
                 <section className="panel personal-panel stage-panel" ref={personalPanelRef}>
                   <header className="stage-header">
@@ -922,7 +1058,8 @@ export default function HomePage({
                       <div className="stage-actions">
                         <button
                           type="button"
-                          className="ghost back-btn"
+                          className="back-btn"
+                          style={backBtnStyle}
                           onClick={() => goToStage("intro")}
                           disabled={isIntroTransitioning || isStageTransitioning}
                         >
@@ -944,7 +1081,7 @@ export default function HomePage({
               {homeStage === "visualizer" && (
                 <section className="visualizer-only-stage">
                   <div className="panel body-visual-panel stage-panel visualizer-only-panel" ref={visualPanelRef}>
-                    <h2>Physique Visualizer</h2>
+                    <h2>Physique</h2>
                     <div className="body-visual">
                       <div className="body-visual-layout">
                         <div className="visual-stage-shell">
@@ -955,14 +1092,12 @@ export default function HomePage({
                           </div>
                         </div>
                       </div>
-                      <p className="muted physique-footnote">
-                        T-pose scaffold with detailed finger and joint points, 45 degree leg stance, and torso triangle.
-                      </p>
                     </div>
                     <div className="visualizer-only-actions">
                       <button
                         type="button"
-                        className="ghost back-btn"
+                        className="back-btn"
+                        style={backBtnStyle}
                         onClick={() => goToStage("personal")}
                         disabled={isIntroTransitioning || isStageTransitioning}
                       >
@@ -987,7 +1122,8 @@ export default function HomePage({
                     <div className="workout-header">
                       <button
                         type="button"
-                        className="ghost back-btn workout-back-arrow"
+                        className="back-btn workout-back-arrow"
+                        style={backBtnStyle}
                         aria-label="Back"
                         onClick={() => goToStage("visualizer")}
                         disabled={isIntroTransitioning || isStageTransitioning}
@@ -1028,6 +1164,44 @@ export default function HomePage({
 
       {plannerModal}
       {generatedPlanModal}
+
+      <div className="stage-measure" aria-hidden="true">
+        <main className="content">
+          <div className="home-stage">
+            <div className="workout-stage-shell">
+              <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutMeasureRef}>
+                <div className="workout-header">
+                  <button type="button" className="back-btn workout-back-arrow" tabIndex={-1}>
+                    {"\u2190"}
+                  </button>
+                  <h2>Workout Generation</h2>
+                </div>
+                <div className="stage-actions workout-generate-row">
+                  <button className="cta" type="button" tabIndex={-1}>
+                    Generate Workout
+                  </button>
+                </div>
+              </section>
+
+              <section className="panel muted-panel stage-panel">
+                <h2>Sample Weekly Plan</h2>
+                <div className="grid">
+                  {samplePlan.map((block) => (
+                    <article key={`measure-${block.day}`} className="plan-card">
+                      <h3>{block.day}</h3>
+                      <ul>
+                        {block.blocks.map((line) => (
+                          <li key={`${block.day}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
 
     </div>
   );

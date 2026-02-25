@@ -617,7 +617,7 @@ export default function App() {
               {plannerStep > 1 && (
                 <button
                   type="button"
-                  className="ghost back-btn"
+                  className="back-btn"
                   onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
                 >
                   Back

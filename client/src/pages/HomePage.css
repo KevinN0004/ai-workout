@@ -9,6 +9,7 @@
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
+  position: relative;
   background: #000 !important;
   margin-left: auto;
   margin-right: auto;
@@ -29,6 +30,42 @@
   min-height: calc(100vh - 120px);
   align-content: center;
   will-change: transform, opacity, filter;
+}
+
+.home-stage.stage-transition-hidden,
+.home-stage.stage-transition-hidden.stage-forward,
+.home-stage.stage-transition-hidden.stage-backward,
+.home-stage.stage-transition-hidden.stage-snap {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  animation: none !important;
+  transform: none !important;
+  filter: none !important;
+  pointer-events: none !important;
+}
+
+.home-stage.stage-transition-hidden > * {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.stage-measure {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.stage-measure .content {
+  min-height: calc(100vh - 120px);
+  align-content: center;
+  justify-items: center;
+}
+
+.stage-measure .home-stage {
+  min-height: calc(100vh - 120px);
+  align-content: center;
 }
 
 .home-stage-personal {
@@ -181,6 +218,7 @@
 .home-page .panel:not(.home-intro-panel) {
   background: rgba(110, 110, 110, 0.28);
   border-color: rgba(255, 255, 255, 0.16);
+  padding: 20px;
 }
 
 .home-page .segmented,
@@ -233,6 +271,7 @@
   will-change: transform, box-shadow;
 }
 
+
 .home-page .ghost:hover:not(:disabled),
 .home-page .cta:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -250,37 +289,6 @@
   box-shadow: none;
 }
 
-.home-page button.back-btn,
-.home-page .ghost.back-btn {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
-  color: #fff !important;
-  box-shadow: 0 0 12px rgba(255, 70, 95, 0.56), 0 0 28px rgba(255, 122, 61, 0.38) !important;
-}
-
-.home-page button.back-btn:hover:not(:disabled),
-.home-page .ghost.back-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
-  color: #fff !important;
-  transform: translateY(-1px);
-  box-shadow: 0 0 16px rgba(255, 70, 95, 0.68), 0 0 34px rgba(255, 122, 61, 0.46) !important;
-}
-
-.home-page button.back-btn:active:not(:disabled),
-.home-page .ghost.back-btn:active:not(:disabled),
-.home-page button.back-btn:focus-visible,
-.home-page .ghost.back-btn:focus-visible {
-  background: linear-gradient(120deg, #ff7a3d, #ff465f) !important;
-  border-color: rgba(255, 104, 88, 0.94) !important;
-  color: #fff !important;
-}
-
-.home-page button.back-btn:disabled,
-.home-page .ghost.back-btn:disabled {
-  opacity: 0.48;
-  box-shadow: none;
-}
 
 .focus-row {
   display: flex;
@@ -320,6 +328,25 @@
   margin-left: auto;
   margin-right: auto;
   text-align: center;
+}
+
+.home-page,
+.home-page h1,
+.home-page h2,
+.home-page h3,
+.home-page p,
+.home-page label,
+.home-page span,
+.home-page small,
+.home-page li {
+  color: #fff;
+}
+
+.home-page .muted,
+.home-page .personal-hint,
+.home-page .physique-footnote,
+.home-page .height-unit {
+  color: #fff;
 }
 
 .home-page .content {
@@ -414,6 +441,7 @@
 
 .visualizer-only-panel {
   width: min(900px, 100%);
+  min-height: min(700px, calc(100vh - 180px));
 }
 
 .visualizer-only-panel h2,
@@ -438,6 +466,7 @@
   grid-template-rows: auto auto;
   width: min(980px, 100%);
   margin: 0 auto;
+  min-height: min(620px, calc(100vh - 180px));
 }
 
 .personal-panel-header {
@@ -469,6 +498,7 @@
   display: grid;
   gap: 6px;
   align-self: start;
+  color: #fff;
 }
 
 .personal-form label > input,
@@ -810,13 +840,16 @@
 }
 
 .workout-stage-shell {
-  width: 100%;
+  width: min(980px, 100%);
   display: grid;
-  gap: 24px;
+  gap: 16px;
+  justify-self: center;
 }
 
 .workout-stage-panel {
   grid-template-rows: auto auto auto auto;
+  width: 100%;
+  min-height: 0;
 }
 
 .workout-header {
@@ -929,7 +962,7 @@
     ),
     linear-gradient(180deg, rgba(12, 17, 30, 0.88), rgba(6, 10, 20, 0.76));
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.34);
-  padding: 24px;
+  padding: 18px;
   display: grid;
   gap: 14px;
   min-height: 620px;
@@ -1068,7 +1101,9 @@
   }
 
   .home-page .content,
-  .home-stage {
+  .home-stage,
+  .stage-measure .content,
+  .stage-measure .home-stage {
     min-height: calc(100vh - 88px);
   }
 
