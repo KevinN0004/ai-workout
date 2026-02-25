@@ -1295,7 +1295,7 @@ export default function MealView({
                   aria-label="Close"
                   onClick={() => setActiveMealId(null)}
                 >
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                     <path
                       d="M6 6l12 12M18 6L6 18"
                       fill="none"
@@ -1353,3 +1353,4 @@ export default function MealView({
     </section>
   );
 }
+

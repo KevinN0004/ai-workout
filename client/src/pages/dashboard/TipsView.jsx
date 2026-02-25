@@ -499,10 +499,28 @@ export default function TipsView({
         </div>
         <button
           type="button"
-          className="ghost"
+          className="ghost icon-button"
           onClick={() => setRefreshTick((value) => value + 1)}
+          aria-label="Refresh exercise library"
+          title="Refresh library"
         >
-          Refresh library
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path
+              d="M21 12a9 9 0 1 1-2.64-6.36"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M21 3v6h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
       </div>
 
@@ -696,7 +714,7 @@ export default function TipsView({
                   aria-label="Close"
                   onClick={() => setSelectedExercise(null)}
                 >
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                     <path
                       d="M6 6l12 12M18 6L6 18"
                       fill="none"
@@ -794,3 +812,4 @@ export default function TipsView({
     </section>
   );
 }
+

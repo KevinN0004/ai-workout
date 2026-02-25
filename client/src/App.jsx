@@ -1313,7 +1313,6 @@ export default function App() {
   if (isDashboardRoute) {
     return (
       <DashboardPage
-        gradient={gradient}
         user={user}
         personal={personal}
         go={go}

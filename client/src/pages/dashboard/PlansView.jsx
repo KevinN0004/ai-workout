@@ -339,10 +339,20 @@ export default function PlansView({
                 </h2>
                 <button
                   type="button"
-                  className="ghost"
+                  className="ghost icon-button"
+                  aria-label="Close details"
+                  title="Close"
                   onClick={() => setSelectedDetail(null)}
                 >
-                  Close
+                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                    <path
+                      d="M6 6l12 12M18 6L6 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
               <div className="modal-body plan-day-detail-grid">
@@ -393,3 +403,4 @@ export default function PlansView({
     </section>
   );
 }
+
