@@ -139,26 +139,28 @@
   border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 5px;
   background: transparent;
-  display: grid;
-  place-content: center;
+  position: relative;
   cursor: pointer;
   transition: border-color 140ms ease, box-shadow 160ms ease;
 }
 
 .auth-form .auto-signin-toggle input[type="checkbox"]::before {
   content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 7px;
   height: 12px;
   border-right: 3px solid #fff;
   border-bottom: 3px solid #fff;
-  transform: rotate(45deg) scale(0);
+  transform: translate(-50%, -58%) rotate(45deg) scale(0);
   transform-origin: center;
   transition: transform 160ms ease;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5));
 }
 
 .auth-form .auto-signin-toggle input[type="checkbox"]:checked::before {
-  transform: rotate(45deg) scale(1);
+  transform: translate(-50%, -58%) rotate(45deg) scale(1);
 }
 
 .auth-form .auto-signin-toggle input[type="checkbox"]:checked {
