@@ -1128,7 +1128,20 @@ export default function HomePage({
                         onClick={() => goToStage("visualizer")}
                         disabled={isIntroTransitioning || isStageTransitioning}
                       >
-                        {"\u2190"}
+                        <svg
+                          className="workout-back-arrow-icon"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12.75 4.75L7.5 10L12.75 15.25"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
                       </button>
                       <h2>Workout Generation</h2>
                     </div>
@@ -1172,7 +1185,20 @@ export default function HomePage({
               <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutMeasureRef}>
                 <div className="workout-header">
                   <button type="button" className="back-btn workout-back-arrow" tabIndex={-1}>
-                    {"\u2190"}
+                    <svg
+                      className="workout-back-arrow-icon"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12.75 4.75L7.5 10L12.75 15.25"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                   </button>
                   <h2>Workout Generation</h2>
                 </div>
