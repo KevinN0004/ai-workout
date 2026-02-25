@@ -78,205 +78,210 @@ export default function AuthPage({
             </button>
           </div>
           <form
-            className={`form auth-form ${isSignupMode ? "signup-profile-grid" : ""}`}
+            className={`form auth-form ${isSignupMode ? "auth-mode-signup" : "auth-mode-login"}`}
             onSubmit={onAuthSubmit}
           >
-            {isSignupMode && (
-              <>
-                <label>
-                  First name
-                  <input
-                    name="firstName"
-                    value={signupProfileForm.firstName}
-                    onChange={onSignupProfileChange}
-                    placeholder="Jordan"
-                    required
-                  />
-                </label>
-                <label>
-                  Last name
-                  <input
-                    name="lastName"
-                    value={signupProfileForm.lastName}
-                    onChange={onSignupProfileChange}
-                    placeholder="Lee"
-                    required
-                  />
-                </label>
-                <label>
-                  Age
-                  <input
-                    name="age"
-                    type="number"
-                    min="10"
-                    max="120"
-                    value={signupProfileForm.age}
-                    onChange={onSignupProfileChange}
-                    placeholder="28"
-                    required
-                  />
-                </label>
-                <label>
-                  Sex
-                  <select
-                    name="sex"
-                    value={signupProfileForm.sex}
-                    onChange={onSignupProfileChange}
-                    required
-                  >
-                    <option value="">Select</option>
-                    <option>Female</option>
-                    <option>Male</option>
-                    <option>Non-binary</option>
-                    <option>Prefer not to say</option>
-                  </select>
-                </label>
-                <label>
-                  <span className="label-row">
-                    Height
-                    <span
-                      className={`unit-toggle ${signupHeightUnit === "cm" ? "pos-1" : "pos-0"}`}
-                      role="group"
-                      aria-label="Height units"
-                    >
-                      <button
-                        type="button"
-                        className={signupHeightUnit === "ft" ? "active" : ""}
-                        onClick={() => {
-                          const next = toFeetInchesFromCm(signupProfileForm.heightCm);
-                          setSignupField("heightFeet", next.feet);
-                          setSignupField("heightInches", next.inches);
-                          setSignupHeightUnit("ft");
-                        }}
-                      >
-                        ft/in
-                      </button>
-                      <button
-                        type="button"
-                        className={signupHeightUnit === "cm" ? "active" : ""}
-                        onClick={() => {
-                          setSignupField(
-                            "heightCm",
-                            toCmFromFeetInches(
-                              signupProfileForm.heightFeet,
-                              signupProfileForm.heightInches
-                            )
-                          );
-                          setSignupHeightUnit("cm");
-                        }}
-                      >
-                        cm
-                      </button>
-                    </span>
-                  </span>
-                  {signupHeightUnit === "cm" ? (
+            <div
+              className={`auth-signup-fields-wrap ${isSignupMode ? "active" : ""}`}
+              aria-hidden={!isSignupMode}
+            >
+              <div className="auth-signup-fields-inner">
+                <fieldset className="auth-signup-fields-grid" disabled={!isSignupMode}>
+                  <label>
+                    First name
                     <input
-                      name="heightCm"
-                      type="number"
-                      min="100"
-                      max="260"
-                      value={signupProfileForm.heightCm}
+                      name="firstName"
+                      value={signupProfileForm.firstName}
                       onChange={onSignupProfileChange}
-                      placeholder="175"
+                      placeholder="Jordan"
                       required
                     />
-                  ) : (
-                    <div className="height-split">
-                      <div className="height-field">
-                        <input
-                          name="heightFeet"
-                          type="number"
-                          min="3"
-                          max="8"
-                          value={signupProfileForm.heightFeet}
-                          onChange={onSignupProfileChange}
-                          placeholder="5"
-                          required
-                        />
-                        <span className="height-unit">ft</span>
-                      </div>
-                      <div className="height-field">
-                        <input
-                          name="heightInches"
-                          type="number"
-                          min="0"
-                          max="11"
-                          value={signupProfileForm.heightInches}
-                          onChange={onSignupProfileChange}
-                          placeholder="9"
-                          required
-                        />
-                        <span className="height-unit">in</span>
-                      </div>
-                    </div>
-                  )}
-                </label>
-                <label>
-                  <span className="label-row">
-                    Weight
-                    <span
-                      className={`unit-toggle ${signupWeightUnit === "kg" ? "pos-1" : "pos-0"}`}
-                      role="group"
-                      aria-label="Weight units"
+                  </label>
+                  <label>
+                    Last name
+                    <input
+                      name="lastName"
+                      value={signupProfileForm.lastName}
+                      onChange={onSignupProfileChange}
+                      placeholder="Lee"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Age
+                    <input
+                      name="age"
+                      type="number"
+                      min="10"
+                      max="120"
+                      value={signupProfileForm.age}
+                      onChange={onSignupProfileChange}
+                      placeholder="28"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Sex
+                    <select
+                      name="sex"
+                      value={signupProfileForm.sex}
+                      onChange={onSignupProfileChange}
+                      required
                     >
-                      <button
-                        type="button"
-                        className={signupWeightUnit === "lb" ? "active" : ""}
-                        onClick={() => {
-                          setSignupField("weight", toLb(signupProfileForm.weight, signupWeightUnit));
-                          setSignupWeightUnit("lb");
-                        }}
+                      <option value="">Select</option>
+                      <option>Female</option>
+                      <option>Male</option>
+                      <option>Non-binary</option>
+                      <option>Prefer not to say</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="label-row">
+                      Height
+                      <span
+                        className={`unit-toggle ${signupHeightUnit === "cm" ? "pos-1" : "pos-0"}`}
+                        role="group"
+                        aria-label="Height units"
                       >
-                        lb
-                      </button>
-                      <button
-                        type="button"
-                        className={signupWeightUnit === "kg" ? "active" : ""}
-                        onClick={() => {
-                          setSignupField("weight", toKg(signupProfileForm.weight, signupWeightUnit));
-                          setSignupWeightUnit("kg");
-                        }}
-                      >
-                        kg
-                      </button>
+                        <button
+                          type="button"
+                          className={signupHeightUnit === "ft" ? "active" : ""}
+                          onClick={() => {
+                            const next = toFeetInchesFromCm(signupProfileForm.heightCm);
+                            setSignupField("heightFeet", next.feet);
+                            setSignupField("heightInches", next.inches);
+                            setSignupHeightUnit("ft");
+                          }}
+                        >
+                          ft/in
+                        </button>
+                        <button
+                          type="button"
+                          className={signupHeightUnit === "cm" ? "active" : ""}
+                          onClick={() => {
+                            setSignupField(
+                              "heightCm",
+                              toCmFromFeetInches(
+                                signupProfileForm.heightFeet,
+                                signupProfileForm.heightInches
+                              )
+                            );
+                            setSignupHeightUnit("cm");
+                          }}
+                        >
+                          cm
+                        </button>
+                      </span>
                     </span>
-                  </span>
-                  <input
-                    name="weight"
-                    type="number"
-                    min={signupWeightUnit === "kg" ? "25" : "55"}
-                    max={signupWeightUnit === "kg" ? "400" : "882"}
-                    value={signupProfileForm.weight}
-                    onChange={onSignupProfileChange}
-                    placeholder={signupWeightUnit === "kg" ? "72" : "160"}
-                    required
-                  />
-                </label>
-                <label>
-                  Activity level
-                  <select
-                    name="activity"
-                    value={signupProfileForm.activity}
-                    onChange={onSignupProfileChange}
-                  >
-                    <option>Light</option>
-                    <option>Moderate</option>
-                    <option>High</option>
-                    <option>Very high</option>
-                  </select>
-                </label>
-                <label className="full">
-                  Notes
-                  <textarea
-                    name="notes"
-                    value={signupProfileForm.notes}
-                    onChange={onSignupProfileChange}
-                    placeholder="Optional training context"
-                    rows="3"
-                  />
-                </label>
-              </>
-            )}
+                    {signupHeightUnit === "cm" ? (
+                      <input
+                        name="heightCm"
+                        type="number"
+                        min="100"
+                        max="260"
+                        value={signupProfileForm.heightCm}
+                        onChange={onSignupProfileChange}
+                        placeholder="175"
+                        required
+                      />
+                    ) : (
+                      <div className="height-split">
+                        <div className="height-field">
+                          <input
+                            name="heightFeet"
+                            type="number"
+                            min="3"
+                            max="8"
+                            value={signupProfileForm.heightFeet}
+                            onChange={onSignupProfileChange}
+                            placeholder="5"
+                            required
+                          />
+                          <span className="height-unit">ft</span>
+                        </div>
+                        <div className="height-field">
+                          <input
+                            name="heightInches"
+                            type="number"
+                            min="0"
+                            max="11"
+                            value={signupProfileForm.heightInches}
+                            onChange={onSignupProfileChange}
+                            placeholder="9"
+                            required
+                          />
+                          <span className="height-unit">in</span>
+                        </div>
+                      </div>
+                    )}
+                  </label>
+                  <label>
+                    <span className="label-row">
+                      Weight
+                      <span
+                        className={`unit-toggle ${signupWeightUnit === "kg" ? "pos-1" : "pos-0"}`}
+                        role="group"
+                        aria-label="Weight units"
+                      >
+                        <button
+                          type="button"
+                          className={signupWeightUnit === "lb" ? "active" : ""}
+                          onClick={() => {
+                            setSignupField("weight", toLb(signupProfileForm.weight, signupWeightUnit));
+                            setSignupWeightUnit("lb");
+                          }}
+                        >
+                          lb
+                        </button>
+                        <button
+                          type="button"
+                          className={signupWeightUnit === "kg" ? "active" : ""}
+                          onClick={() => {
+                            setSignupField("weight", toKg(signupProfileForm.weight, signupWeightUnit));
+                            setSignupWeightUnit("kg");
+                          }}
+                        >
+                          kg
+                        </button>
+                      </span>
+                    </span>
+                    <input
+                      name="weight"
+                      type="number"
+                      min={signupWeightUnit === "kg" ? "25" : "55"}
+                      max={signupWeightUnit === "kg" ? "400" : "882"}
+                      value={signupProfileForm.weight}
+                      onChange={onSignupProfileChange}
+                      placeholder={signupWeightUnit === "kg" ? "72" : "160"}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Activity level
+                    <select
+                      name="activity"
+                      value={signupProfileForm.activity}
+                      onChange={onSignupProfileChange}
+                    >
+                      <option>Light</option>
+                      <option>Moderate</option>
+                      <option>High</option>
+                      <option>Very high</option>
+                    </select>
+                  </label>
+                  <label className="full">
+                    Notes
+                    <textarea
+                      name="notes"
+                      value={signupProfileForm.notes}
+                      onChange={onSignupProfileChange}
+                      placeholder="Optional training context"
+                      rows="3"
+                    />
+                  </label>
+                </fieldset>
+              </div>
+            </div>
 
             <label className={isSignupMode ? "full" : ""}>
               Email

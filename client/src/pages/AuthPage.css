@@ -39,11 +39,20 @@
 }
 
 .auth-form {
-  grid-template-columns: 1fr;
+  --auth-animation-ms: var(--home-animation-ms, 1400ms);
   width: min(420px, 100%);
   margin: 0 auto;
   align-items: start;
   gap: 18px;
+  transition: width var(--auth-animation-ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auth-page .auth-form {
+  grid-template-columns: 1fr;
+}
+
+.auth-form.auth-mode-signup {
+  width: min(720px, 100%);
 }
 
 .auth-form label {
@@ -111,15 +120,51 @@
   height: 18px;
 }
 
+.auth-signup-fields-wrap {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--auth-animation-ms) cubic-bezier(0.45, 0, 0.2, 1),
+    opacity var(--auth-animation-ms) ease,
+    transform var(--auth-animation-ms) ease;
+}
+
+.auth-signup-fields-wrap.active {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.auth-signup-fields-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.auth-signup-fields-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.auth-signup-fields-grid .full {
+  grid-column: 1 / -1;
+}
+
 .auth-form textarea {
   width: 100%;
   min-height: 96px;
   resize: vertical;
-}
-
-.auth-form.signup-profile-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(720px, 100%);
 }
 
 .auth-form .full {
@@ -237,9 +282,12 @@
     width: 100%;
   }
 
-  .auth-form.signup-profile-grid {
-    grid-template-columns: 1fr;
+  .auth-form.auth-mode-signup {
     width: 100%;
+  }
+
+  .auth-signup-fields-grid {
+    grid-template-columns: 1fr;
   }
 
   .auth-card-top {
@@ -254,5 +302,13 @@
   .auth-close {
     grid-column: auto;
     justify-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-form,
+  .auth-form * {
+    animation: none !important;
+    transition: none !important;
   }
 }
