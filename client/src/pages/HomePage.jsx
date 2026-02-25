@@ -71,7 +71,9 @@ export default function HomePage({
   const introTitleRef = useRef(null);
   const introButtonRef = useRef(null);
   const workoutPanelRef = useRef(null);
+  const workoutShellRef = useRef(null);
   const workoutMeasureRef = useRef(null);
+  const workoutMeasureShellRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
   const [stageDirection, setStageDirection] = useState("forward");
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
@@ -83,6 +85,8 @@ export default function HomePage({
     visualizer: 2,
     workout: 3
   };
+  const unifiedAnimationMs = 1400;
+  const stageCrossfadeMs = 220;
 
   const clearStageMorphClone = () => {
     if (!stageMorphCloneRef.current) return;
@@ -122,7 +126,7 @@ export default function HomePage({
     if (stage === "intro") return introPanelRef.current;
     if (stage === "personal") return personalPanelRef.current;
     if (stage === "visualizer") return visualPanelRef.current;
-    if (stage === "workout") return workoutPanelRef.current;
+    if (stage === "workout") return workoutShellRef.current || workoutPanelRef.current;
     return null;
   };
 
@@ -153,7 +157,10 @@ export default function HomePage({
     const presets = {
       intro: { width: Math.min(560, stageWidth), height: 320 },
       personal: { width: Math.min(980, stageWidth), height: 620 },
-      visualizer: { width: Math.min(900, stageWidth), height: 700 },
+      visualizer: {
+        width: Math.min(560, stageWidth),
+        height: Math.max(620, Math.min(860, window.innerHeight - 120))
+      },
       workout: {
         width: Math.min(980, stageWidth),
         height: Math.max(260, Math.min(420, window.innerHeight - 220))
@@ -161,7 +168,9 @@ export default function HomePage({
     };
     const preset = presets[nextStage] || presets.personal;
     const workoutMeasureRect =
-      nextStage === "workout" ? workoutMeasureRef.current?.getBoundingClientRect() : null;
+      nextStage === "workout"
+        ? (workoutMeasureShellRef.current || workoutMeasureRef.current)?.getBoundingClientRect()
+        : null;
     const measuredWorkoutTarget =
       workoutMeasureRect?.width && workoutMeasureRect?.height
         ? {
@@ -251,6 +260,10 @@ export default function HomePage({
     morphClone.style.transformOrigin = "top left";
     morphClone.style.boxSizing = "border-box";
     morphClone.style.transform = "none";
+    morphClone.style.maxWidth = "none";
+    morphClone.style.minWidth = "0";
+    morphClone.style.maxHeight = "none";
+    morphClone.style.minHeight = "0";
     morphClone.style.borderRadius = sourceStyles.borderRadius || "24px";
     morphClone.style.backgroundColor = transitionFillColor;
     morphClone.style.borderColor = sourceStyles.borderColor || "rgba(255, 255, 255, 0.16)";
@@ -259,24 +272,40 @@ export default function HomePage({
     stageMorphCloneRef.current = morphClone;
     const morphCloneContentEls = Array.from(morphClone.children);
 
-    const completeDelayMs = 860;
-    const crossfadeDurationMs = 160;
+    const completeDelayMs = unifiedAnimationMs;
+    const crossfadeDurationMs = stageCrossfadeMs;
 
     goToStage(nextStage);
 
-    const startMorphTimeline = () => {
+    const startMorphTimeline = (attempt = 0) => {
       if (stageMorphCloneRef.current !== morphClone) return;
 
       const liveTargetEl = getMorphStageElement(nextStage);
       const liveTargetRect = liveTargetEl?.getBoundingClientRect();
-      const resolvedTarget = liveTargetRect?.width && liveTargetRect?.height
+      const hasLiveTargetRect = Boolean(liveTargetRect?.width && liveTargetRect?.height);
+      if (!hasLiveTargetRect && attempt < 8) {
+        stageSwapRafRef.current = window.requestAnimationFrame(() => {
+          stageSwapRafRef.current = null;
+          startMorphTimeline(attempt + 1);
+        });
+        return;
+      }
+
+      const liveTarget = hasLiveTargetRect
         ? {
             width: liveTargetRect.width,
             height: liveTargetRect.height,
             centerX: liveTargetRect.left + liveTargetRect.width / 2,
             centerY: liveTargetRect.top + liveTargetRect.height / 2
           }
-        : fallbackTarget;
+        : null;
+      // Prefer the live mounted target so the morph matches the fully rendered
+      // next stage size; fall back to hidden measure only when live target is
+      // not ready yet.
+      const resolvedTarget =
+        liveTarget ||
+        (homeStage === "visualizer" && nextStage === "workout" ? measuredWorkoutTarget : null) ||
+        fallbackTarget;
 
       const targetLeft = resolvedTarget.centerX - resolvedTarget.width / 2;
       const targetTop = resolvedTarget.centerY - resolvedTarget.height / 2;
@@ -404,7 +433,7 @@ export default function HomePage({
           backgroundColor: ["rgb(255, 255, 255)", "rgba(110, 110, 110, 0.28)"],
           borderColor: ["rgb(255, 255, 255)", "rgba(255, 255, 255, 0.16)"],
           letterSpacing: ["0em", "0.04em"],
-          duration: 860
+          duration: unifiedAnimationMs
         },
         "<<+=40"
       )
@@ -412,15 +441,15 @@ export default function HomePage({
         panelEl,
         {
           opacity: [1, 0],
-          duration: 320
+          duration: unifiedAnimationMs
         },
-        "-=280"
+        "<<"
       );
 
     introTransitionTimeoutRef.current = window.setTimeout(() => {
       setIsIntroTransitioning(false);
       goToStage("personal");
-    }, 930);
+    }, unifiedAnimationMs + 60);
   };
 
   const toFiniteNumber = (value) => {
@@ -599,17 +628,17 @@ export default function HomePage({
     if (!stageEl || !renderSurfaceEl) return undefined;
 
     visualIntroTimelineRef.current = createTimeline({
-      defaults: { ease: "outCubic", duration: 360 }
+      defaults: { ease: "outCubic", duration: unifiedAnimationMs }
     })
-      .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: 380 })
+      .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: unifiedAnimationMs })
       .add(
         renderSurfaceEl,
         {
           opacity: [0.6, 1],
           scale: [0.93, 1],
-          duration: 460
+          duration: unifiedAnimationMs
         },
-        "<<+=50"
+        "<<"
       );
 
     stagePulseRef.current = animate(renderSurfaceEl, {
@@ -675,7 +704,7 @@ export default function HomePage({
 
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
-      const measureEl = workoutMeasureRef.current;
+      const measureEl = workoutMeasureShellRef.current || workoutMeasureRef.current;
       if (!measureEl) return;
       const rect = measureEl.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
@@ -1082,15 +1111,9 @@ export default function HomePage({
                 <section className="visualizer-only-stage">
                   <div className="panel body-visual-panel stage-panel visualizer-only-panel" ref={visualPanelRef}>
                     <h2>Physique</h2>
-                    <div className="body-visual">
-                      <div className="body-visual-layout">
-                        <div className="visual-stage-shell">
-                          <div className="visual-stage" role="img" aria-label={visualLabel}>
-                            <div className="physique-render-surface">
-                              <PhysiqueSilhouette2D shape={silhouetteShape} />
-                            </div>
-                          </div>
-                        </div>
+                    <div className="visual-stage" role="img" aria-label={visualLabel}>
+                      <div className="physique-render-surface">
+                        <PhysiqueSilhouette2D shape={silhouetteShape} />
                       </div>
                     </div>
                     <div className="visualizer-only-actions">
@@ -1117,7 +1140,7 @@ export default function HomePage({
               )}
 
               {homeStage === "workout" && (
-                <div className="workout-stage-shell">
+                <div className="workout-stage-shell" ref={workoutShellRef}>
                   <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutPanelRef}>
                     <div className="workout-header">
                       <button
@@ -1181,7 +1204,7 @@ export default function HomePage({
       <div className="stage-measure" aria-hidden="true">
         <main className="content">
           <div className="home-stage">
-            <div className="workout-stage-shell">
+            <div className="workout-stage-shell" ref={workoutMeasureShellRef}>
               <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutMeasureRef}>
                 <div className="workout-header">
                   <button type="button" className="back-btn workout-back-arrow" tabIndex={-1}>

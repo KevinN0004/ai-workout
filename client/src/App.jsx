@@ -130,6 +130,17 @@ const defaultPersonalForm = {
   notes: ""
 };
 
+const createDefaultPlannerForm = () => ({
+  goal: "Build lean strength and energy",
+  equipment: [],
+  duration: "45",
+  level: "Intermediate",
+  injuries: "None",
+  days: "3",
+  focuses: [],
+  environment: "Home"
+});
+
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
 
 const getRegionFromLocale = (locale) => {
@@ -244,16 +255,7 @@ export default function App() {
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
   const [personal, setPersonal] = useState({ ...defaultPersonalForm });
-  const [form, setForm] = useState({
-    goal: "Build lean strength and energy",
-    equipment: ["Dumbbells"],
-    duration: "45",
-    level: "Intermediate",
-    injuries: "None",
-    days: "3",
-    focuses: [],
-    environment: "Home"
-  });
+  const [form, setForm] = useState(() => createDefaultPlannerForm());
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -319,6 +321,16 @@ export default function App() {
     setWeightUnit(preferredSystem === "imperial" ? "lb" : "kg");
   }, []);
 
+  const resetPlannerFlow = useCallback(() => {
+    setForm(createDefaultPlannerForm());
+    setPlannerStep(1);
+  }, []);
+
+  const closePlanner = useCallback(() => {
+    setPlannerOpen(false);
+    resetPlannerFlow();
+  }, [resetPlannerFlow]);
+
   const onChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -344,7 +356,7 @@ export default function App() {
       return {
         ...prev,
         environment: nextEnv,
-        equipment: filtered.length ? filtered : [nextOptions[0]].filter(Boolean)
+        equipment: filtered
       };
     });
   };
@@ -362,54 +374,7 @@ export default function App() {
   };
 
   const openPlannerFromProfile = () => {
-    const latestPlan = dashboard?.plans?.[0] || null;
-    const profile = user?.profile || {};
-    const activityToLevel = {
-      Light: "Beginner",
-      Moderate: "Intermediate",
-      High: "Advanced",
-      "Very high": "Advanced"
-    };
-
-    const inferInjuryFromNotes = (notes) => {
-      const text = (notes || "").toLowerCase();
-      if (!text) return "";
-      if (text.includes("lower back") || text.includes("back")) return "Lower back";
-      if (text.includes("knee")) return "Knee";
-      if (text.includes("shoulder")) return "Shoulder";
-      if (text.includes("hip")) return "Hip";
-      if (text.includes("wrist") || text.includes("elbow")) return "Wrist/Elbow";
-      return "";
-    };
-
-    setForm((prev) => {
-      const environment = latestPlan?.environment || prev.environment || "Home";
-      const envEquipment = equipmentOptionsByEnv[environment] || [];
-      const nextEquipment = Array.isArray(latestPlan?.equipment)
-        ? latestPlan.equipment.filter((item) => envEquipment.includes(item))
-        : prev.equipment.filter((item) => envEquipment.includes(item));
-      const nextInjuries =
-        latestPlan?.injuries ||
-        inferInjuryFromNotes(profile.notes) ||
-        prev.injuries ||
-        "None";
-
-      return {
-        ...prev,
-        goal: latestPlan?.goal || dashboard?.goals?.goalType || prev.goal,
-        duration: String(latestPlan?.duration || prev.duration || "45"),
-        level: latestPlan?.level || activityToLevel[profile.activity] || prev.level,
-        injuries: nextInjuries,
-        days: String(latestPlan?.days || dashboard?.goals?.weeklyWorkouts || prev.days || "3"),
-        environment,
-        equipment: nextEquipment.length
-          ? nextEquipment
-          : [envEquipment[0]].filter(Boolean),
-        focuses: Array.isArray(latestPlan?.focuses) ? latestPlan.focuses : prev.focuses
-      };
-    });
-
-    setPlannerStep(1);
+    resetPlannerFlow();
     setPlannerOpen(true);
   };
 
@@ -441,7 +406,7 @@ export default function App() {
             : prev
         );
       }
-      setPlannerOpen(false);
+      closePlanner();
       if (isDashboardRoute) {
         setPlanModalOpen(false);
         setDashView("summary");
@@ -478,17 +443,50 @@ export default function App() {
     doc.save("ai-workout-plan.pdf");
   };
 
+  const plannerHeaderTitleByStep = {
+    1: "Step 1 - Environment & equipment",
+    2: "Step 2 - Schedule & constraints",
+    3: "Step 3 - Focus priorities"
+  };
+  const plannerHeaderTitle =
+    plannerHeaderTitleByStep[plannerStep] || plannerHeaderTitleByStep[1];
+
   const plannerModal = plannerOpen && (
     <ModalPortal open={plannerOpen}>
       <div className="modal-backdrop planner-backdrop" role="dialog" aria-modal="true">
         <div className="modal planner-setup-modal">
           <div className="modal-header">
-            <h2>Planner</h2>
+            {plannerStep > 1 ? (
+              <button
+                type="button"
+                className="back-btn planner-back-arrow planner-header-back"
+                aria-label="Back"
+                onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
+              >
+                <svg
+                  className="planner-back-arrow-icon"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12.75 4.75L7.5 10L12.75 15.25"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <span className="planner-header-spacer" aria-hidden="true" />
+            )}
+            <h2>{plannerHeaderTitle}</h2>
             <button
               type="button"
               className="ghost icon-button planner-close-icon"
               aria-label="Close planner"
-              onClick={() => setPlannerOpen(false)}
+              onClick={closePlanner}
             >
               &times;
             </button>
@@ -496,7 +494,6 @@ export default function App() {
           <div className="modal-body">
             {plannerStep === 1 && (
               <div className="step-panel planner-step-panel">
-                <h3>Step 1 - Environment & equipment</h3>
                 <div className="step-top">
                   <div
                     className={`segmented planner-env-toggle ${
@@ -540,7 +537,6 @@ export default function App() {
             )}
             {plannerStep === 2 && (
               <div className="step-panel planner-step-panel">
-                <h3>Step 2 - Schedule & constraints</h3>
                 <form className="form planner-step-two-form">
                   <label>
                     Days per week
@@ -594,7 +590,6 @@ export default function App() {
             )}
             {plannerStep === 3 && (
               <div className="step-panel planner-step-panel">
-                <h3>Step 3 - Focus priorities</h3>
                 <p className="muted">Select one or more focus areas for this plan.</p>
                 <div className="option-grid focus-option-grid">
                   {quickFocuses.map((item) => (
@@ -611,18 +606,8 @@ export default function App() {
               </div>
             )}
           </div>
-          <div className="modal-footer">
-            <div className="step-indicator">Step {plannerStep} of 3</div>
-            <div className="modal-actions">
-              {plannerStep > 1 && (
-                <button
-                  type="button"
-                  className="back-btn"
-                  onClick={() => setPlannerStep((prev) => Math.max(1, prev - 1))}
-                >
-                  Back
-                </button>
-              )}
+          <div className={`modal-footer ${plannerStep === 3 ? "planner-footer-center" : ""}`}>
+            <div className={`modal-actions ${plannerStep === 3 ? "planner-actions-center" : ""}`}>
               {plannerStep < 3 ? (
                 <button
                   type="button"
