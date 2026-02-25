@@ -20,6 +20,8 @@ export default function AuthPage({
   toLb,
   showPassword,
   setShowPassword,
+  authAutoSignIn,
+  setAuthAutoSignIn,
   authLoading,
   authError
 }) {
@@ -362,6 +364,16 @@ export default function AuthPage({
                 </button>
               </div>
             </label>
+            {!isSignupMode && (
+              <label className="auto-signin-toggle">
+                <input
+                  type="checkbox"
+                  checked={authAutoSignIn}
+                  onChange={(e) => setAuthAutoSignIn(e.target.checked)}
+                />
+                <span>Remember me</span>
+              </label>
+            )}
             <button
               className={`cta ${isSignupMode ? "full" : ""}`}
               type="submit"

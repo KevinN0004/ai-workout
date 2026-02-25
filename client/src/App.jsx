@@ -194,6 +194,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authAutoSignIn, setAuthAutoSignIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [authForm, setAuthForm] = useState({ ...defaultAuthForm });
   const [signupProfileForm, setSignupProfileForm] = useState({
@@ -1006,6 +1007,7 @@ export default function App() {
     setSignupProfileForm({ ...defaultSignupProfileForm });
     setSignupHeightUnit("ft");
     setSignupWeightUnit("lb");
+    setAuthAutoSignIn(false);
     setShowPassword(false);
   };
 
@@ -1056,7 +1058,10 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(authForm)
+        body: JSON.stringify({
+          ...authForm,
+          rememberMe: authAutoSignIn
+        })
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -1297,6 +1302,8 @@ export default function App() {
         toLb={toLb}
         showPassword={showPassword}
         setShowPassword={setShowPassword}
+        authAutoSignIn={authAutoSignIn}
+        setAuthAutoSignIn={setAuthAutoSignIn}
         authLoading={authLoading}
         authError={authError}
       />

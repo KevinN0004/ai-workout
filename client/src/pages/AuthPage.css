@@ -62,7 +62,7 @@
   overflow-wrap: anywhere;
 }
 
-.auth-form label > input,
+.auth-form label > input:not([type="checkbox"]),
 .auth-form label > select {
   min-height: 44px;
 }
@@ -118,6 +118,61 @@
 .auth-form .password-visibility-btn svg {
   width: 18px;
   height: 18px;
+}
+
+.auth-form .auto-signin-toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-form .auto-signin-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 5px;
+  background: transparent;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 160ms ease;
+}
+
+.auth-form .auto-signin-toggle input[type="checkbox"]::before {
+  content: "";
+  width: 7px;
+  height: 12px;
+  border-right: 3px solid #fff;
+  border-bottom: 3px solid #fff;
+  transform: rotate(45deg) scale(0);
+  transform-origin: center;
+  transition: transform 160ms ease;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5));
+}
+
+.auth-form .auto-signin-toggle input[type="checkbox"]:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+
+.auth-form .auto-signin-toggle input[type="checkbox"]:checked {
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.auth-form .auto-signin-toggle input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.auth-form .auto-signin-toggle span {
+  line-height: 1.25;
 }
 
 .auth-signup-fields-wrap {
@@ -211,7 +266,7 @@
   padding: 0;
 }
 
-.auth-page input,
+.auth-page input:not([type="checkbox"]),
 .auth-page select,
 .auth-page textarea {
   border-color: rgba(255, 255, 255, 0.16);
@@ -229,7 +284,7 @@
   background: #fff;
 }
 
-.auth-page input:focus,
+.auth-page input:not([type="checkbox"]):focus,
 .auth-page select:focus,
 .auth-page textarea:focus {
   outline: 2px solid rgba(255, 255, 255, 0.58);

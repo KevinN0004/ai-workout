@@ -92,6 +92,17 @@ const toNullableNumber = (value, min, max) => {
   return num;
 };
 
+const toBooleanFlag = (value, fallback = true) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "no") return false;
+  }
+  return fallback;
+};
+
 const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
   (Array.isArray(value) ? value : [value])
     .map((item) => cleanText(item, maxLen))
@@ -869,11 +880,12 @@ const pruneExpiredSessions = () => {
   }
 };
 
-const setSessionCookie = (res, token) => {
+const setSessionCookie = (res, token, persistent = true) => {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
+  const maxAgePart = persistent ? `; Max-Age=${maxAge}` : "";
   res.setHeader(
     "Set-Cookie",
-    `sid=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${cookieSecure}`
+    `sid=${token}; HttpOnly; Path=/; SameSite=Lax${maxAgePart}${cookieSecure}`
   );
 };
 
@@ -1288,7 +1300,8 @@ app.post("/api/profile", requireAuth, async (req, res) => {
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password, profile } = req.body || {};
+    const { email, password, profile, rememberMe: rememberMeInput } = req.body || {};
+    const rememberMe = toBooleanFlag(rememberMeInput, true);
     const normalizedEmail = cleanText(email, 254).toLowerCase();
     if (!normalizedEmail || !password) {
       return res.status(400).json({ error: "Email and password required." });
@@ -1318,7 +1331,7 @@ app.post("/api/auth/signup", async (req, res) => {
     };
     await createUser(newUser);
     const token = createSession(newUser.id);
-    setSessionCookie(res, token);
+    setSessionCookie(res, token, rememberMe);
     res.json({
       user: {
         id: newUser.id,
@@ -1333,7 +1346,8 @@ app.post("/api/auth/signup", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
+    const { email, password, rememberMe: rememberMeInput } = req.body || {};
+    const rememberMe = toBooleanFlag(rememberMeInput, true);
     const normalizedEmail = cleanText(email, 254).toLowerCase();
     if (!normalizedEmail || !password) {
       return res.status(400).json({ error: "Email and password required." });
@@ -1343,7 +1357,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials." });
     }
     const token = createSession(user.id);
-    setSessionCookie(res, token);
+    setSessionCookie(res, token, rememberMe);
     res.json({
       user: {
         id: user.id,
