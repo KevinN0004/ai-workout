@@ -738,6 +738,11 @@ export default function HomePage({
   const firstSampleExcerpt = firstSampleDay
     ? firstSampleDay.blocks.slice(0, 4).join(" | ")
     : "Warmup, main lifts, accessories, and finisher appear here.";
+  const parsedPreviewDays = Number.parseInt(form.days, 10);
+  const previewDaysTarget = Number.isFinite(parsedPreviewDays)
+    ? Math.min(Math.max(parsedPreviewDays, 1), 7)
+    : 3;
+  const generatedPreviewDays = samplePlan.slice(0, Math.max(1, Math.min(previewDaysTarget, samplePlan.length)));
   const previewStepCards = [
     {
       name: "Personal Info form",
@@ -789,6 +794,7 @@ export default function HomePage({
     },
     {
       name: "Generated Plan view",
+      kind: "generated-plan",
       detail: "Review the generated output, then transition into logging and adherence tracking.",
       happening: "The plan output appears and becomes your source for workouts, meals, and dashboard logs.",
       fields: [
@@ -805,6 +811,7 @@ export default function HomePage({
     }
   ];
   const activePreviewStep = previewStepCards[previewStepIndex] || previewStepCards[0];
+  const isGeneratedPlanPreview = activePreviewStep.kind === "generated-plan";
   const previewProgress = previewStepCards.length <= 1
     ? 100
     : ((previewStepIndex + 1) / previewStepCards.length) * 100;
@@ -876,7 +883,7 @@ export default function HomePage({
     <div className="page home-page" style={gradient}>
       <div className="home-sticky-nav">
         <span className="home-nav-spacer" aria-hidden="true" />
-        <button type="button" className="home-nav-title" onClick={() => go("/")}>
+        <button type="button" className="home-nav-title" onClick={() => goToStage("intro")}>
           AI Workout Studio
         </button>
         <button
@@ -927,7 +934,6 @@ export default function HomePage({
                   <header className="preview-stage-header">
                     <p className="preview-stage-kicker">Guided walkthrough</p>
                     <h2>{activePreviewStep.name}</h2>
-                    <p className="muted preview-stage-subtitle">{activePreviewStep.happening}</p>
                   </header>
                   <div className="preview-progress-wrap" aria-hidden="true">
                     <div className="preview-progress-track">
@@ -954,32 +960,45 @@ export default function HomePage({
                       </svg>
                     </button>
                     <article className="setup-snapshot-card setup-snapshot-card-detailed preview-step-card">
-                      <div className="preview-step-layout">
-                        <section className="preview-step-section">
-                          <h4>Screen purpose</h4>
-                          <p className="preview-step-body">{activePreviewStep.detail}</p>
-                          <p className="preview-step-now">{activePreviewStep.happening}</p>
-                        </section>
-                        <section className="preview-step-section">
-                          <h4>Filled view</h4>
-                          <div className="preview-fields-grid">
-                            {activePreviewStep.fields.map((field) => (
-                              <label key={`${activePreviewStep.name}-${field.label}`} className="preview-field-row">
-                                <span>{field.label}</span>
-                                {field.multiline ? (
-                                  <textarea
-                                    value={field.value}
-                                    rows={field.rows || 3}
-                                    readOnly
-                                  />
-                                ) : (
-                                  <input type="text" value={field.value} readOnly />
-                                )}
-                              </label>
+                      {isGeneratedPlanPreview ? (
+                        <div className="preview-generated-shell">
+                          <div className="preview-generated-header">
+                            <h4>Workout Generation</h4>
+                          </div>
+                          <div className="preview-generated-grid">
+                            {generatedPreviewDays.map((block) => (
+                              <article key={`preview-generated-${block.day}`} className="preview-generated-card">
+                                <h5>{block.day}</h5>
+                                <ul>
+                                  {block.blocks.slice(0, 4).map((line) => (
+                                    <li key={`${block.day}-${line}`}>{line}</li>
+                                  ))}
+                                </ul>
+                              </article>
                             ))}
                           </div>
-                        </section>
-                      </div>
+                          <p className="muted preview-generated-footnote">
+                            Generated output appears as day-by-day cards with exercise blocks.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="preview-fields-grid">
+                          {activePreviewStep.fields.map((field) => (
+                            <label key={`${activePreviewStep.name}-${field.label}`} className="preview-field-row">
+                              <span>{field.label}</span>
+                              {field.multiline ? (
+                                <textarea
+                                  value={field.value}
+                                  rows={field.rows || 3}
+                                  readOnly
+                                />
+                              ) : (
+                                <input type="text" value={field.value} readOnly />
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </article>
                     <button
                       type="button"
