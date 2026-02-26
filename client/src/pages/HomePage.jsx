@@ -70,11 +70,13 @@ export default function HomePage({
   const personalPanelRef = useRef(null);
   const introTitleRef = useRef(null);
   const introButtonRef = useRef(null);
+  const previewStageRef = useRef(null);
   const workoutPanelRef = useRef(null);
   const workoutShellRef = useRef(null);
   const workoutMeasureRef = useRef(null);
   const workoutMeasureShellRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
+  const [previewStepIndex, setPreviewStepIndex] = useState(0);
   const [stageDirection, setStageDirection] = useState("forward");
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
   const [isStageTransitioning, setIsStageTransitioning] = useState(false);
@@ -727,6 +729,148 @@ export default function HomePage({
   };
 
   const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
+  const defaultName = personal.name || "Jordan Lee";
+  const defaultAge = personal.age || "28";
+  const defaultSex = personal.sex || "Prefer not to say";
+  const defaultHeight = resolvedHeightCm ? `${Math.round(resolvedHeightCm)} cm` : "175 cm";
+  const defaultWeight = resolvedWeightKg ? `${Math.round(resolvedWeightKg)} kg` : "72 kg";
+  const firstSampleDay = samplePlan[0];
+  const firstSampleExcerpt = firstSampleDay
+    ? firstSampleDay.blocks.slice(0, 4).join(" | ")
+    : "Warmup, main lifts, accessories, and finisher appear here.";
+  const previewStepCards = [
+    {
+      name: "Personal Info form",
+      detail: "Collect required identity and body metrics before moving forward.",
+      happening: "The form validates required fields and blocks progression until profile basics are complete.",
+      fields: [
+        { label: "Full name", value: defaultName },
+        { label: "Age", value: defaultAge },
+        { label: "Height", value: defaultHeight },
+        { label: "Weight", value: defaultWeight },
+        { label: "Sex", value: defaultSex },
+        {
+          label: "Form status",
+          value: isPersonalComplete ? "Ready to continue" : "Missing required fields"
+        }
+      ]
+    },
+    {
+      name: "Physique visualizer",
+      detail: "Transform height/weight inputs into a visual checkpoint before plan generation.",
+      happening: "The physique silhouette updates from your latest resolved body metrics.",
+      fields: [
+        { label: "Height input", value: resolvedHeightCm ? `${Math.round(resolvedHeightCm)} cm` : "Pending" },
+        { label: "Weight input", value: resolvedWeightKg ? `${Math.round(resolvedWeightKg)} kg` : "Pending" },
+        { label: "BMI", value: bmi !== null ? String(bmi) : "Pending" },
+        {
+          label: "Body fat estimate",
+          value: effectiveBodyFat !== null ? `${effectiveBodyFat}%` : "Pending"
+        },
+        { label: "Visualizer status", value: "Rendered from current body inputs" }
+      ]
+    },
+    {
+      name: "Workout Planner form",
+      detail: "Apply constraints so generated workouts match your real schedule and setup.",
+      happening: "Planner settings define goal, training frequency, duration, and equipment context.",
+      fields: [
+        { label: "Goal", value: form.goal || "Build lean strength and energy" },
+        { label: "Days per week", value: `${form.days || "3"}` },
+        { label: "Session duration", value: `${form.duration || "45"} min` },
+        { label: "Environment", value: form.environment || "Home" },
+        {
+          label: "Equipment",
+          value: Array.isArray(form.equipment) && form.equipment.length
+            ? form.equipment.join(", ")
+            : "None selected"
+        }
+      ]
+    },
+    {
+      name: "Generated Plan view",
+      detail: "Review the generated output, then transition into logging and adherence tracking.",
+      happening: "The plan output appears and becomes your source for workouts, meals, and dashboard logs.",
+      fields: [
+        { label: "Generated day", value: firstSampleDay?.day || "Day 1 - Full Body Strength" },
+        { label: "Plan status", value: "Ready" },
+        { label: "Next action", value: "Generate workout and open dashboard logs" },
+        {
+          label: "Plan excerpt",
+          value: firstSampleExcerpt,
+          multiline: true,
+          rows: 4
+        }
+      ]
+    }
+  ];
+  const activePreviewStep = previewStepCards[previewStepIndex] || previewStepCards[0];
+  const previewProgress = previewStepCards.length <= 1
+    ? 100
+    : ((previewStepIndex + 1) / previewStepCards.length) * 100;
+
+  const scrollPreviewIntoView = () => {
+    if (!previewStageRef.current) return;
+    previewStageRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const goToPreviewStep = (targetIndex) => {
+    setPreviewStepIndex((prev) => {
+      const next = Math.max(0, Math.min(targetIndex, previewStepCards.length - 1));
+      if (next !== prev) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(scrollPreviewIntoView);
+        });
+      }
+      return next;
+    });
+  };
+
+  const goToNextPreviewStep = () => {
+    setPreviewStepIndex((prev) => {
+      const next = Math.min(prev + 1, previewStepCards.length - 1);
+      if (next !== prev) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(scrollPreviewIntoView);
+        });
+      }
+      return next;
+    });
+  };
+
+  const goToPreviousPreviewStep = () => {
+    setPreviewStepIndex((prev) => {
+      const next = Math.max(prev - 1, 0);
+      if (next !== prev) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(scrollPreviewIntoView);
+        });
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (homeStage === "preview") {
+      setPreviewStepIndex(0);
+      window.requestAnimationFrame(scrollPreviewIntoView);
+    }
+  }, [homeStage]);
+
+  useEffect(() => {
+    if (homeStage !== "preview") return;
+    const onPreviewKeydown = (event) => {
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goToNextPreviewStep();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goToPreviousPreviewStep();
+      }
+    };
+    window.addEventListener("keydown", onPreviewKeydown);
+    return () => window.removeEventListener("keydown", onPreviewKeydown);
+  }, [homeStage, previewStepCards.length]);
 
   return (
     <div className="page home-page" style={gradient}>
@@ -779,61 +923,96 @@ export default function HomePage({
                 } ${isStageTransitioning ? "stage-transition-hidden" : ""}`}
               >
               {homeStage === "preview" && (
-                <section className="panel preview-stage-panel stage-panel">
-                  <h2>Setup snapshot</h2>
-                  <p className="muted">A quick look at how the full setup flows.</p>
-                  <div className="setup-snapshot-grid">
-                    <article className="setup-snapshot-card">
-                      <h3>1. Intro</h3>
-                      <p>Start from a single prompt and continue into setup.</p>
-                    </article>
-                    <article className="setup-snapshot-card">
-                      <h3>2. Personal profile</h3>
-                      <p>
-                        Name: {personal.name || "Not set"} | Age: {personal.age || "Not set"} | Sex: {personal.sex || "Not set"}
-                      </p>
-                    </article>
-                    <article className="setup-snapshot-card">
-                      <h3>3. Physique map</h3>
-                      <p>Body metrics feed a visual snapshot before plan generation.</p>
-                    </article>
-                    <article className="setup-snapshot-card">
-                      <h3>4. Plan generation</h3>
-                      <p>
-                        Goal: {form.goal || "Build lean strength and energy"} | {form.days || "3"} days | {form.duration || "45"} min
-                      </p>
-                    </article>
+                <section ref={previewStageRef} className="panel preview-stage-panel stage-panel">
+                  <header className="preview-stage-header">
+                    <p className="preview-stage-kicker">Guided walkthrough</p>
+                    <h2>{activePreviewStep.name}</h2>
+                    <p className="muted preview-stage-subtitle">{activePreviewStep.happening}</p>
+                  </header>
+                  <div className="preview-progress-wrap" aria-hidden="true">
+                    <div className="preview-progress-track">
+                      <span style={{ width: `${previewProgress}%` }} />
+                    </div>
                   </div>
-                  <div className="preview-plan-grid">
-                    {samplePlan.map((block) => (
-                      <article key={`preview-${block.day}`} className="plan-card">
-                        <h3>{block.day}</h3>
-                        <ul>
-                          {block.blocks.slice(0, 3).map((line) => (
-                            <li key={`${block.day}-${line}`}>{line}</li>
-                          ))}
-                        </ul>
-                      </article>
+                  <div className="preview-step-shell">
+                    <button
+                      type="button"
+                      className="preview-side-back"
+                      aria-label="Previous preview step"
+                      onClick={goToPreviousPreviewStep}
+                      disabled={previewStepIndex <= 0}
+                    >
+                      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                        <path
+                          d="M12.5 4.75L7.25 10L12.5 15.25"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <article className="setup-snapshot-card setup-snapshot-card-detailed preview-step-card">
+                      <div className="preview-step-layout">
+                        <section className="preview-step-section">
+                          <h4>Screen purpose</h4>
+                          <p className="preview-step-body">{activePreviewStep.detail}</p>
+                          <p className="preview-step-now">{activePreviewStep.happening}</p>
+                        </section>
+                        <section className="preview-step-section">
+                          <h4>Filled view</h4>
+                          <div className="preview-fields-grid">
+                            {activePreviewStep.fields.map((field) => (
+                              <label key={`${activePreviewStep.name}-${field.label}`} className="preview-field-row">
+                                <span>{field.label}</span>
+                                {field.multiline ? (
+                                  <textarea
+                                    value={field.value}
+                                    rows={field.rows || 3}
+                                    readOnly
+                                  />
+                                ) : (
+                                  <input type="text" value={field.value} readOnly />
+                                )}
+                              </label>
+                            ))}
+                          </div>
+                        </section>
+                      </div>
+                    </article>
+                    <button
+                      type="button"
+                      className="preview-side-next"
+                      aria-label="Next preview step"
+                      onClick={goToNextPreviewStep}
+                      disabled={previewStepIndex >= previewStepCards.length - 1}
+                    >
+                      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                        <path
+                          d="M7.5 4.75L12.75 10L7.5 15.25"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="preview-step-jump" role="tablist" aria-label="Preview screens">
+                    {previewStepCards.map((step, index) => (
+                      <button
+                        key={step.name}
+                        type="button"
+                        role="tab"
+                        aria-selected={index === previewStepIndex}
+                        className={`preview-jump-chip ${index === previewStepIndex ? "active" : ""}`}
+                        onClick={() => goToPreviewStep(index)}
+                      >
+                        {step.name}
+                      </button>
                     ))}
-                  </div>
-                  <div className="stage-actions">
-                    <button
-                      type="button"
-                      className="back-btn"
-                      style={backBtnStyle}
-                      onClick={() => goToStage("intro")}
-                      disabled={isIntroTransitioning || isStageTransitioning}
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      className="cta"
-                      onClick={() => goToStage("personal")}
-                      disabled={isIntroTransitioning || isStageTransitioning}
-                    >
-                      Continue
-                    </button>
                   </div>
                 </section>
               )}
