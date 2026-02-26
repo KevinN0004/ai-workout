@@ -81,9 +81,10 @@ export default function HomePage({
   const [suppressStageEnter, setSuppressStageEnter] = useState(false);
   const stageOrder = {
     intro: 0,
-    personal: 1,
-    visualizer: 2,
-    workout: 3
+    preview: 1,
+    personal: 2,
+    visualizer: 3,
+    workout: 4
   };
   const unifiedAnimationMs = 1400;
   const stageCrossfadeMs = 220;
@@ -729,6 +730,21 @@ export default function HomePage({
 
   return (
     <div className="page home-page" style={gradient}>
+      <div className="home-sticky-nav">
+        <span className="home-nav-spacer" aria-hidden="true" />
+        <button type="button" className="home-nav-title" onClick={() => go("/")}>
+          AI Workout Studio
+        </button>
+        <button
+          type="button"
+          className="ghost home-preview-btn"
+          onClick={() => goToStage("preview")}
+          disabled={isIntroTransitioning || isStageTransitioning}
+        >
+          Preview
+        </button>
+      </div>
+
       {homeStage === "intro" ? (
         <main className="content home-intro-wrap">
           <section
@@ -737,16 +753,20 @@ export default function HomePage({
               isIntroTransitioning ? "intro-transitioning" : ""
             }`}
           >
-            <h1 ref={introTitleRef}>Workout Generator</h1>
-            <button
-              ref={introButtonRef}
-              className="cta"
-              type="button"
-              onClick={onGetStarted}
-              disabled={isIntroTransitioning || isStageTransitioning}
-            >
-              Get Started
-            </button>
+            <h1 ref={introTitleRef} className="home-hook-title">
+              An outline for a great adventure.
+            </h1>
+            <div className="home-intro-actions">
+              <button
+                ref={introButtonRef}
+                className="cta"
+                type="button"
+                onClick={onGetStarted}
+                disabled={isIntroTransitioning || isStageTransitioning}
+              >
+                Get Started
+              </button>
+            </div>
           </section>
         </main>
       ) : (
@@ -758,6 +778,66 @@ export default function HomePage({
                   suppressStageEnter ? "stage-snap" : ""
                 } ${isStageTransitioning ? "stage-transition-hidden" : ""}`}
               >
+              {homeStage === "preview" && (
+                <section className="panel preview-stage-panel stage-panel">
+                  <h2>Setup snapshot</h2>
+                  <p className="muted">A quick look at how the full setup flows.</p>
+                  <div className="setup-snapshot-grid">
+                    <article className="setup-snapshot-card">
+                      <h3>1. Intro</h3>
+                      <p>Start from a single prompt and continue into setup.</p>
+                    </article>
+                    <article className="setup-snapshot-card">
+                      <h3>2. Personal profile</h3>
+                      <p>
+                        Name: {personal.name || "Not set"} | Age: {personal.age || "Not set"} | Sex: {personal.sex || "Not set"}
+                      </p>
+                    </article>
+                    <article className="setup-snapshot-card">
+                      <h3>3. Physique map</h3>
+                      <p>Body metrics feed a visual snapshot before plan generation.</p>
+                    </article>
+                    <article className="setup-snapshot-card">
+                      <h3>4. Plan generation</h3>
+                      <p>
+                        Goal: {form.goal || "Build lean strength and energy"} | {form.days || "3"} days | {form.duration || "45"} min
+                      </p>
+                    </article>
+                  </div>
+                  <div className="preview-plan-grid">
+                    {samplePlan.map((block) => (
+                      <article key={`preview-${block.day}`} className="plan-card">
+                        <h3>{block.day}</h3>
+                        <ul>
+                          {block.blocks.slice(0, 3).map((line) => (
+                            <li key={`${block.day}-${line}`}>{line}</li>
+                          ))}
+                        </ul>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="stage-actions">
+                    <button
+                      type="button"
+                      className="back-btn"
+                      style={backBtnStyle}
+                      onClick={() => goToStage("intro")}
+                      disabled={isIntroTransitioning || isStageTransitioning}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="cta"
+                      onClick={() => goToStage("personal")}
+                      disabled={isIntroTransitioning || isStageTransitioning}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </section>
+              )}
+
               {homeStage === "personal" && (
                 <section className="panel personal-panel stage-panel" ref={personalPanelRef}>
                   <header className="stage-header">
