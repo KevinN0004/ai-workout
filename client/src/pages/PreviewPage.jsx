@@ -319,6 +319,14 @@ export default function PreviewPage({
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
+  const previousPreviewChapter =
+    Number.isInteger(previewSwitchFromIndex) &&
+    previewSwitchFromIndex !== previewStepIndex &&
+    previewSwitchFromIndex >= 0 &&
+    previewSwitchFromIndex < previewChapters.length
+      ? previewChapters[previewSwitchFromIndex]
+      : null;
+  const isPreviewTitleSwitching = Boolean(previousPreviewChapter);
 
   const clearPreviewFillTimers = () => {
     if (!previewFillTimeoutsRef.current.length) return;
@@ -876,7 +884,16 @@ export default function PreviewPage({
       <header className="preview-stage-header">
         <p className="preview-stage-kicker">Guided walkthrough</p>
         <div className="preview-stage-title-row">
-          <h2>{activePreviewChapter.title}</h2>
+          <div className="preview-stage-title-stack" aria-live="polite">
+            {previousPreviewChapter ? (
+              <span className="preview-stage-title preview-stage-title-ghost is-leaving" aria-hidden="true">
+                {previousPreviewChapter.title}
+              </span>
+            ) : null}
+            <h2 className={`preview-stage-title ${isPreviewTitleSwitching ? "is-entering" : "is-static"}`}>
+              {activePreviewChapter.title}
+            </h2>
+          </div>
         </div>
       </header>
       <div className="preview-scroll-story">
@@ -911,15 +928,9 @@ export default function PreviewPage({
             }`}
           >
             <div className="preview-card-pages">
-              {previewChapters.map((chapter, chapterIndex) => (
-                <section
-                  key={`preview-card-page-${chapter.id}`}
-                  className={`preview-card-page ${chapterIndex === previewStepIndex ? "active" : ""}`}
-                  aria-hidden={chapterIndex !== previewStepIndex}
-                >
-                  {renderPreviewChapterBody(chapter)}
-                </section>
-              ))}
+              <section className="preview-card-page active is-entering">
+                {renderPreviewChapterBody(activePreviewChapter)}
+              </section>
             </div>
           </article>
         </div>

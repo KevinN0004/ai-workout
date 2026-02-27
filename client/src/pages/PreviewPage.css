@@ -56,12 +56,59 @@ html.preview-smooth-scroll {
   min-height: 32px;
 }
 
-.preview-stage-title-row h2 {
+.preview-stage-title-stack {
+  display: grid;
+  place-items: center;
+  position: relative;
+  min-width: 14ch;
+  min-height: 32px;
+  overflow: hidden;
+}
+
+.preview-stage-title {
+  grid-area: 1 / 1;
   margin: 0;
   color: #fff;
-  min-width: 14ch;
   text-align: center;
   line-height: 1.15;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.preview-stage-title-ghost {
+  pointer-events: none;
+}
+
+.preview-stage-title.is-entering {
+  animation: preview-title-enter-left 420ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)) both;
+}
+
+.preview-stage-title-ghost.is-leaving {
+  animation: preview-title-leave-left 420ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)) both;
+}
+
+@keyframes preview-title-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes preview-title-leave-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
 }
 
 .preview-stage-kicker {
@@ -170,36 +217,62 @@ html.preview-smooth-scroll {
 
 .preview-card-pages {
   width: 100%;
-  min-height: clamp(320px, 48vh, 560px);
+  min-height: clamp(420px, 56vh, 640px);
   margin: 0 auto;
+  display: grid;
+  align-items: start;
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
 }
 
 .preview-step-card.is-personal-collapsed .preview-card-pages {
-  min-height: 120px;
-  display: grid;
-  place-items: center;
+  min-height: clamp(420px, 56vh, 640px);
 }
 
 .preview-card-page {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
+  position: relative;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  transform: translateY(12px) scale(0.996);
+  filter: blur(1.6px);
+  z-index: 1;
   transition:
-    opacity 260ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
-    visibility 0s linear 260ms;
+    opacity 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    transform 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    filter 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    visibility 0s linear 560ms;
+  will-change: opacity, transform, filter;
 }
 
 .preview-card-page.active {
-  position: relative;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  z-index: 3;
   animation: none;
   transition:
-    opacity 260ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    opacity 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    transform 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    filter 560ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
     visibility 0s linear 0s;
+}
+
+.preview-card-page.is-entering {
+  transition-delay: 60ms, 60ms, 60ms, 0s;
+}
+
+.preview-card-page.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  pointer-events: none;
+  transform: translateY(-10px) scale(0.997);
+  filter: blur(1.8px);
+  z-index: 2;
 }
 
 @keyframes preview-card-page-in {
@@ -951,13 +1024,20 @@ html.preview-smooth-scroll {
     scroll-behavior: auto;
   }
 
+  .preview-card-page,
   .preview-card-page.active {
+    transition: none;
     animation: none;
   }
 
   .preview-jump-chip,
   .preview-jump-label {
     transition: none;
+  }
+
+  .preview-stage-title.is-entering,
+  .preview-stage-title-ghost.is-leaving {
+    animation: none;
   }
 
   .preview-personal-form-shell,
