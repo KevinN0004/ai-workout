@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 import PhysiqueSilhouette2D from "../components/PhysiqueSilhouette2D";
-import PreviewPage from "./PreviewPage";
 import "./HomePage.css";
+import PreviewPage from "./PreviewPage";
 
 export default function HomePage({
   gradient,

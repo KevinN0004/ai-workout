@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createTimeline } from "animejs";
 import "./PreviewPage.css";
 
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
@@ -52,6 +51,7 @@ const PREVIEW_MORPH_DURATION_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS - 120);
 const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
+const PREVIEW_TOC_SWITCH_MS = 920;
 
 const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
@@ -89,10 +89,12 @@ export default function PreviewPage({
   resolvedWeightKg,
   effectiveBodyFat
 }) {
-  const previewStepTimelineRef = useRef(null);
   const previewFillTimeoutsRef = useRef([]);
   const previewStageRef = useRef(null);
+  const previewStepIndexRef = useRef(0);
+  const previewSwitchTimeoutRef = useRef(null);
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
+  const [previewSwitchFromIndex, setPreviewSwitchFromIndex] = useState(null);
   const [previewFilledFields, setPreviewFilledFields] = useState({});
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
   const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
@@ -307,8 +309,14 @@ export default function PreviewPage({
         { label: "Training days", value: previewTrainingDaysList, multiline: true, rows: 2 },
         { label: "Additional info", value: activePreviewProfile.notes, multiline: true, rows: 2 }
       ]
+    },
+    {
+      id: "generate",
+      title: "Generate",
+      fields: []
     }
   ];
+  const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
 
@@ -341,7 +349,9 @@ export default function PreviewPage({
   const previewFillStartDelayMs = 420;
   const previewFillStepMs = 220;
 
-  const renderPreviewPersonalInfoChapter = () => {
+  const renderPreviewPersonalInfoChapter = (isGenerateView = false) => {
+    const showCollapsed = previewPersonalCollapsed || isGenerateView;
+    const showBuilder = previewPersonalShifted || isGenerateView;
     const getFieldValue = (fieldKey) => (
       typeof previewFilledFields[fieldKey] === "string" ? previewFilledFields[fieldKey] : ""
     );
@@ -351,10 +361,10 @@ export default function PreviewPage({
 
     return (
       <div
-        className={`preview-personal-sequence ${previewPersonalShifted ? "is-builder-active" : ""} builder-stage-${previewBuilderStage}`}
+        className={`preview-personal-sequence ${isGenerateView ? "is-generate-view" : ""} ${showBuilder ? "is-builder-active" : ""} builder-stage-${previewBuilderStage}`}
       >
         <div
-          className={`preview-personal-form-shell ${previewPersonalCollapsed ? "is-collapsed" : ""}`}
+          className={`preview-personal-form-shell ${showCollapsed ? "is-collapsed" : ""}`}
         >
           <div className="preview-personal-morph-surface" aria-hidden="true" />
           <span className="preview-personal-morph-label" aria-hidden="true">Personal Info</span>
@@ -600,7 +610,7 @@ export default function PreviewPage({
         </div>
           </form>
         </div>
-        <div className={`preview-builder-track ${previewPersonalShifted ? "is-active" : ""}`} aria-hidden={!previewPersonalShifted}>
+        <div className={`preview-builder-track ${showBuilder ? "is-active" : ""}`} aria-hidden={!showBuilder}>
           <div className="preview-builder-spacer" aria-hidden="true" />
           <span className={`preview-builder-plus plus-one from-bottom ${previewBuilderStage >= 1 ? "is-visible" : ""}`}>+</span>
           <div className={`preview-builder-slot env from-top ${previewBuilderStage >= 2 ? "is-visible" : ""}`}>
@@ -610,6 +620,9 @@ export default function PreviewPage({
           <div className={`preview-builder-slot focus from-top ${previewBuilderStage >= 4 ? "is-visible" : ""}`}>
             <span className="preview-builder-btn">Focus</span>
           </div>
+          <span className={`preview-builder-generating ${previewBuilderStage >= 6 ? "is-visible" : ""}`}>
+            Generating
+          </span>
         </div>
       </div>
     );
@@ -617,7 +630,9 @@ export default function PreviewPage({
 
   const renderPreviewChapterBody = (chapter) => (
     chapter.id === "personal-info" ? (
-      renderPreviewPersonalInfoChapter()
+      renderPreviewPersonalInfoChapter(false)
+    ) : chapter.id === "generate" ? (
+      renderPreviewPersonalInfoChapter(true)
     ) : (
       <div className="preview-fields-grid">
         {chapter.fields.map((field, fieldIndex) => {
@@ -645,7 +660,18 @@ export default function PreviewPage({
 
   const scrollToChapter = (targetIndex) => {
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
+    const currentIndex = previewStepIndexRef.current;
+    if (currentIndex === boundedIndex) return;
+    setPreviewSwitchFromIndex(currentIndex);
     setPreviewStepIndex(boundedIndex);
+    previewStepIndexRef.current = boundedIndex;
+    if (previewSwitchTimeoutRef.current) {
+      window.clearTimeout(previewSwitchTimeoutRef.current);
+    }
+    previewSwitchTimeoutRef.current = window.setTimeout(() => {
+      setPreviewSwitchFromIndex(null);
+      previewSwitchTimeoutRef.current = null;
+    }, PREVIEW_TOC_SWITCH_MS + 120);
   };
 
   const pulsePreviewControl = (event) => {
@@ -662,7 +688,13 @@ export default function PreviewPage({
   }, []);
 
   useEffect(() => {
+    previewStepIndexRef.current = previewStepIndex;
+  }, [previewStepIndex]);
+
+  useEffect(() => {
     setPreviewStepIndex(0);
+    previewStepIndexRef.current = 0;
+    setPreviewSwitchFromIndex(null);
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(scrollPreviewIntoView);
     });
@@ -686,10 +718,29 @@ export default function PreviewPage({
       setPreviewFilledFields(nextFilled);
     };
 
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     clearPreviewFillTimers();
-    setPreviewPersonalCollapsed(false);
-    setPreviewPersonalShifted(false);
-    setPreviewBuilderStage(0);
+
+    if (activePreviewChapter.id === "generate") {
+      markAllFilled();
+      setPreviewPersonalCollapsed(true);
+      setPreviewPersonalShifted(true);
+      setPreviewBuilderStage(0);
+
+      if (prefersReducedMotion) {
+        setPreviewBuilderStage(6);
+        return undefined;
+      }
+
+      [1, 2, 3, 4, 5, 6].forEach((stage, idx) => {
+        const builderStepTimeoutId = window.setTimeout(() => {
+          setPreviewBuilderStage(stage);
+        }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
+        previewFillTimeoutsRef.current.push(builderStepTimeoutId);
+      });
+      return undefined;
+    }
 
     if (activePreviewChapter.id !== "personal-info") {
       setPreviewFilledFields({});
@@ -699,12 +750,12 @@ export default function PreviewPage({
       return undefined;
     }
 
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) {
       markAllFilled();
-      setPreviewPersonalCollapsed(false);
-      setPreviewPersonalShifted(false);
-      setPreviewBuilderStage(0);
+      setPreviewPersonalCollapsed(true);
+      if (generateChapterIndex >= 0) {
+        scrollToChapter(generateChapterIndex);
+      }
       return undefined;
     }
 
@@ -785,9 +836,13 @@ export default function PreviewPage({
     const collapseTimeoutId = window.setTimeout(() => {
       setPreviewPersonalCollapsed(true);
       const postMorphShiftTimeoutId = window.setTimeout(() => {
+        if (generateChapterIndex >= 0) {
+          scrollToChapter(generateChapterIndex);
+          return;
+        }
         setPreviewPersonalShifted(true);
         setPreviewBuilderStage(0);
-        [1, 2, 3, 4].forEach((stage, idx) => {
+        [1, 2, 3, 4, 5, 6].forEach((stage, idx) => {
           const builderStepTimeoutId = window.setTimeout(() => {
             setPreviewBuilderStage(stage);
           }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
@@ -802,49 +857,15 @@ export default function PreviewPage({
       clearPreviewFillTimers();
     };
   }, [
-    activePreviewChapter.id
+    activePreviewChapter.id,
+    generateChapterIndex
   ]);
-
-  useEffect(() => {
-    if (!previewStageRef.current) return undefined;
-
-    const stageEl = previewStageRef.current;
-    const activePageEl = stageEl.querySelector(".preview-card-page.active");
-    if (!activePageEl) return undefined;
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    previewStepTimelineRef.current?.cancel();
-
-    if (prefersReducedMotion) return undefined;
-
-    const timeline = createTimeline({
-      defaults: { ease: "inOutSine" }
-    });
-
-    timeline.add(activePageEl, {
-      opacity: [0, 1],
-      translateY: [16, 0],
-      scale: [0.988, 1],
-      duration: PREVIEW_MOTION_DURATION_MS
-    });
-
-    const activeChip = stageEl.querySelector(".preview-jump-chip.active");
-    if (activeChip) {
-      timeline.add(activeChip, {
-        scale: [1, 1.02, 1],
-        duration: PREVIEW_MOTION_DURATION_MS
-      }, "-=320");
-    }
-
-    previewStepTimelineRef.current = timeline;
-    return () => {
-      timeline.cancel();
-    };
-  }, [previewStepIndex, activePreviewChapter.id]);
 
   useEffect(
     () => () => {
-      previewStepTimelineRef.current?.cancel();
+      if (previewSwitchTimeoutRef.current) {
+        window.clearTimeout(previewSwitchTimeoutRef.current);
+      }
       clearPreviewFillTimers();
     },
     []
@@ -867,7 +888,9 @@ export default function PreviewPage({
               role="tab"
               aria-selected={index === previewStepIndex}
               aria-current={index === previewStepIndex ? "step" : undefined}
-              className={`preview-jump-chip ${index === previewStepIndex ? "active" : ""}`}
+              className={`preview-jump-chip ${index === previewStepIndex ? "active is-expanding" : ""} ${
+                index === previewSwitchFromIndex && index !== previewStepIndex ? "is-contracting" : ""
+              }`}
               onClick={(event) => {
                 pulsePreviewControl(event);
                 scrollToChapter(index);
@@ -880,6 +903,8 @@ export default function PreviewPage({
         <div className="preview-step-shell">
           <article
             className={`setup-snapshot-card setup-snapshot-card-detailed preview-step-card ${
+              activePreviewChapter.id === "generate" ? "is-generate-view" : ""
+            } ${
               activePreviewChapter.id === "personal-info" && previewPersonalCollapsed
                 ? "is-personal-collapsed"
                 : ""

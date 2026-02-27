@@ -53,11 +53,15 @@ html.preview-smooth-scroll {
   justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-height: 32px;
 }
 
 .preview-stage-title-row h2 {
   margin: 0;
   color: #fff;
+  min-width: 14ch;
+  text-align: center;
+  line-height: 1.15;
 }
 
 .preview-stage-kicker {
@@ -98,6 +102,9 @@ html.preview-smooth-scroll {
 }
 
 .preview-side-tab {
+  --preview-chip-collapsed: 44px;
+  --preview-chip-expanded: clamp(128px, 14vw, 196px);
+  --preview-toc-width-ms: 900ms;
   position: fixed;
   left: 0;
   top: var(--preview-header-top);
@@ -108,6 +115,7 @@ html.preview-smooth-scroll {
   z-index: 28;
   display: grid;
   grid-auto-rows: min-content;
+  justify-items: start;
   gap: 6px;
   margin: 0;
   padding: 6px 6px 6px 2px;
@@ -136,13 +144,19 @@ html.preview-smooth-scroll {
   width: min(920px, 100%);
   margin: 0 auto;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  border: none;
   padding: 14px 14px 12px;
   transform-origin: center top;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
-  transition: border-color 180ms ease, background-color 180ms ease;
+  box-shadow: none;
+  transition: border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
   will-change: transform, opacity;
+}
+
+.preview-stage-panel .preview-step-card.is-generate-view {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Keep the card hidden only after it collapses into the Personal Info button. */
@@ -167,12 +181,25 @@ html.preview-smooth-scroll {
 }
 
 .preview-card-page {
-  display: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 260ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    visibility 0s linear 260ms;
 }
 
 .preview-card-page.active {
-  display: block;
-  animation: preview-card-page-in 240ms ease both;
+  position: relative;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  animation: none;
+  transition:
+    opacity 260ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    visibility 0s linear 0s;
 }
 
 @keyframes preview-card-page-in {
@@ -213,6 +240,21 @@ html.preview-smooth-scroll {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.preview-generate-page {
+  min-height: clamp(320px, 48vh, 560px);
+  display: grid;
+  place-items: center;
+}
+
+.preview-generate-label {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(0.82rem, 1.26vw, 1rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.24);
 }
 
 .preview-field-row {
@@ -264,43 +306,41 @@ html.preview-smooth-scroll {
   letter-spacing: 0.02em;
   padding: 8px 10px;
   max-height: 0;
-  width: 44px;
+  width: var(--preview-chip-collapsed);
   justify-self: start;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  place-items: center;
+  position: relative;
   text-align: center;
   cursor: pointer;
   overflow: hidden;
-  white-space: normal;
   min-height: 46px;
   line-height: 1.28;
   transition:
     border-color 160ms ease,
     background 160ms ease,
     color 160ms ease,
-    opacity 220ms ease,
-    max-height 220ms ease,
-    padding 220ms ease,
-    border-width 220ms ease;
+    opacity 540ms ease,
+    width var(--preview-toc-width-ms) cubic-bezier(0.22, 0.8, 0.2, 1);
   will-change: transform, opacity;
   opacity: 0;
   transform: none;
   pointer-events: none;
-  border-width: 0;
+  border-width: 1px;
 }
 
 .preview-jump-label {
-  display: block;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--preview-chip-expanded);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
   text-align: center;
   text-shadow: 0 0 6px rgba(255, 255, 255, 0.16);
   opacity: 0;
-  transform: none;
-  transition: opacity 180ms ease;
+  transition: opacity 520ms ease;
+  pointer-events: none;
 }
 
 .preview-jump-chip:hover,
@@ -308,10 +348,7 @@ html.preview-smooth-scroll {
   opacity: 1;
   transform: none;
   pointer-events: auto;
-  max-height: 112px;
-  padding: 8px 12px;
-  border-width: 1px;
-  width: 100%;
+  width: var(--preview-chip-expanded);
 }
 
 .preview-side-tab:hover .preview-jump-chip,
@@ -319,20 +356,29 @@ html.preview-smooth-scroll {
   opacity: 0.86;
   transform: none;
   pointer-events: auto;
-  max-height: 44px;
-  padding: 7px 8px;
-  border-width: 1px;
-  width: 44px;
+  width: var(--preview-chip-collapsed);
 }
 
 .preview-side-tab .preview-jump-chip.active {
   opacity: 1;
   transform: none;
   pointer-events: auto;
-  max-height: 112px;
-  padding: 8px 12px;
-  border-width: 1px;
-  width: 100%;
+  width: var(--preview-chip-expanded);
+}
+
+.preview-jump-chip.is-expanding {
+  width: var(--preview-chip-expanded);
+}
+
+.preview-jump-chip.is-contracting {
+  opacity: 0.86;
+  transform: none;
+  pointer-events: auto;
+  width: var(--preview-chip-collapsed);
+}
+
+.preview-jump-chip.is-contracting .preview-jump-label {
+  opacity: 0;
 }
 
 .preview-jump-chip:hover {
@@ -344,13 +390,16 @@ html.preview-smooth-scroll {
 .preview-jump-chip:focus-visible .preview-jump-label,
 .preview-jump-chip.active .preview-jump-label {
   opacity: 1;
-  transform: none;
 }
 
 .preview-jump-chip.active {
   border-color: rgba(255, 255, 255, 0.75);
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
+}
+
+.preview-jump-chip.active .preview-jump-label {
+  opacity: 1;
 }
 
 .preview-personal-form-shell {
@@ -398,6 +447,10 @@ html.preview-smooth-scroll {
   position: relative;
   width: 100%;
   min-height: clamp(420px, 56vh, 640px);
+}
+
+.preview-personal-sequence.is-generate-view .preview-personal-morph-surface {
+  display: none;
 }
 
 .preview-personal-morph-surface {
@@ -550,6 +603,16 @@ html.preview-smooth-scroll {
   --personal-collapse-shift-x: var(--preview-shift-three-col);
 }
 
+.preview-personal-sequence.builder-stage-5 .preview-personal-form-shell {
+  --personal-button-shift-x: 0px;
+  --personal-collapse-shift-x: 0px;
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-personal-form-shell {
+  --personal-button-shift-x: 0px;
+  --personal-collapse-shift-x: 0px;
+}
+
 .preview-builder-slot {
   width: var(--preview-builder-pill-width);
   display: flex;
@@ -628,6 +691,39 @@ html.preview-smooth-scroll {
   animation: preview-builder-shift-left var(--preview-motion-duration) var(--preview-motion-ease) both;
 }
 
+.preview-personal-sequence.builder-stage-5 .preview-builder-plus.plus-one.is-visible {
+  transform: translate3d(var(--preview-shift-two-col), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-5 .preview-builder-plus.plus-two.is-visible {
+  transform: translate3d(calc(var(--preview-shift-two-col) * -1), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-5 .preview-builder-slot.focus.is-visible {
+  transform: translate3d(calc(var(--preview-shift-three-col) * -1), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-builder-plus.plus-one.is-visible {
+  transform: translate3d(var(--preview-shift-two-col), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-builder-plus.plus-two.is-visible {
+  transform: translate3d(calc(var(--preview-shift-two-col) * -1), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-builder-slot.focus.is-visible {
+  transform: translate3d(calc(var(--preview-shift-three-col) * -1), 0, 0);
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-personal-form-shell.is-collapsed .preview-personal-morph-label {
+  opacity: 0;
+}
+
+.preview-personal-sequence.builder-stage-6 .preview-builder-slot.is-visible,
+.preview-personal-sequence.builder-stage-6 .preview-builder-plus.is-visible {
+  opacity: 0;
+}
+
 .preview-builder-btn {
   width: 100%;
   min-width: 0;
@@ -676,7 +772,7 @@ html.preview-smooth-scroll {
 }
 
 .preview-personal-sequence.builder-stage-1 .preview-builder-plus.plus-one.from-bottom.is-visible,
-.preview-builder-plus.plus-two.from-bottom.is-visible {
+.preview-personal-sequence.builder-stage-3 .preview-builder-plus.plus-two.from-bottom.is-visible {
   animation: preview-builder-rise-up var(--preview-motion-duration) var(--preview-motion-ease) both;
 }
 
@@ -691,6 +787,28 @@ html.preview-smooth-scroll {
 .preview-builder-plus.is-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.preview-builder-generating {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: clamp(0.78rem, 1.2vw, 0.94rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.24);
+  pointer-events: none;
+  z-index: 5;
+  transition: opacity var(--preview-motion-duration) var(--preview-motion-ease);
+}
+
+.preview-builder-generating.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%);
 }
 
 .preview-personal-form input,
@@ -848,13 +966,19 @@ html.preview-smooth-scroll {
   .preview-personal-morph-label,
   .preview-builder-track,
   .preview-builder-slot,
-  .preview-builder-plus {
+  .preview-builder-plus,
+  .preview-builder-generating {
     transition: none;
   }
 
   .preview-personal-sequence.builder-stage-3 .preview-builder-plus.plus-one.is-visible,
   .preview-personal-sequence.builder-stage-3 .preview-builder-slot.env.is-visible,
   .preview-builder-plus.from-bottom.is-visible {
+    animation: none;
+  }
+
+  .preview-side-tab .preview-jump-chip.active,
+  .preview-jump-chip.active .preview-jump-label {
     animation: none;
   }
 }
