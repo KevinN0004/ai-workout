@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { animate, createTimeline } from "animejs";
+import { createTimeline } from "animejs";
 import "./PreviewPage.css";
 
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
@@ -47,6 +47,11 @@ const PREVIEW_TYPING_MIN_MS = 22;
 const PREVIEW_TYPING_MAX_MS = 58;
 const PREVIEW_TRAINING_DAY_STEP_MS = 110;
 const PREVIEW_COLLAPSE_DELAY_MS = 480;
+const PREVIEW_MOTION_DURATION_MS = 1100;
+const PREVIEW_MORPH_DURATION_MS = PREVIEW_MOTION_DURATION_MS;
+const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS - 120);
+const PREVIEW_BUILDER_START_DELAY_MS = 760;
+const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
 
 const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
@@ -90,6 +95,8 @@ export default function PreviewPage({
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
   const [previewFilledFields, setPreviewFilledFields] = useState({});
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
+  const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
+  const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
 
   const previewLocale = (() => {
     if (typeof navigator === "undefined") return "en-US";
@@ -266,6 +273,16 @@ export default function PreviewPage({
     [usesImperialUnits]
   );
 
+  // Keep a stable snapshot so local/parent rerenders do not restart the preview sequence.
+  const previewInitialTargetsRef = useRef(null);
+  const previewInitialFillOrderRef = useRef(null);
+  if (!previewInitialTargetsRef.current) {
+    previewInitialTargetsRef.current = previewPersonalTargets;
+  }
+  if (!previewInitialFillOrderRef.current) {
+    previewInitialFillOrderRef.current = previewFillOrder;
+  }
+
   const previewChapters = [
     {
       id: "personal-info",
@@ -333,11 +350,15 @@ export default function PreviewPage({
       : [];
 
     return (
-      <div className={`preview-personal-form-shell ${previewPersonalCollapsed ? "is-collapsed" : ""}`}>
-        <div className="preview-personal-morph-surface" aria-hidden="true">
-          <span className="preview-personal-morph-label">Personal Info</span>
-        </div>
-        <form className="form personal-form advanced-mode preview-personal-form" onSubmit={(event) => event.preventDefault()}>
+      <div
+        className={`preview-personal-sequence ${previewPersonalShifted ? "is-builder-active" : ""} builder-stage-${previewBuilderStage}`}
+      >
+        <div
+          className={`preview-personal-form-shell ${previewPersonalCollapsed ? "is-collapsed" : ""}`}
+        >
+          <div className="preview-personal-morph-surface" aria-hidden="true" />
+          <span className="preview-personal-morph-label" aria-hidden="true">Personal Info</span>
+          <form className="form personal-form advanced-mode preview-personal-form" onSubmit={(event) => event.preventDefault()}>
         <label className="field-name">
           Full name
           <textarea
@@ -577,7 +598,19 @@ export default function PreviewPage({
             </label>
           </div>
         </div>
-        </form>
+          </form>
+        </div>
+        <div className={`preview-builder-track ${previewPersonalShifted ? "is-active" : ""}`} aria-hidden={!previewPersonalShifted}>
+          <div className="preview-builder-spacer" aria-hidden="true" />
+          <span className={`preview-builder-plus plus-one from-bottom ${previewBuilderStage >= 1 ? "is-visible" : ""}`}>+</span>
+          <div className={`preview-builder-slot env from-top ${previewBuilderStage >= 2 ? "is-visible" : ""}`}>
+            <span className="preview-builder-btn">Environment</span>
+          </div>
+          <span className={`preview-builder-plus plus-two from-bottom ${previewBuilderStage >= 3 ? "is-visible" : ""}`}>+</span>
+          <div className={`preview-builder-slot focus from-top ${previewBuilderStage >= 4 ? "is-visible" : ""}`}>
+            <span className="preview-builder-btn">Focus</span>
+          </div>
+        </div>
       </div>
     );
   };
@@ -616,14 +649,7 @@ export default function PreviewPage({
   };
 
   const pulsePreviewControl = (event) => {
-    const controlEl = event?.currentTarget;
-    if (!controlEl) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    animate(controlEl, {
-      scale: [1, 0.92, 1],
-      duration: 360,
-      ease: "inOutQuad"
-    });
+    void event;
   };
 
   useEffect(() => {
@@ -643,26 +669,33 @@ export default function PreviewPage({
   }, []);
 
   useEffect(() => {
+    const personalTargets = previewInitialTargetsRef.current || previewPersonalTargets;
+    const fillOrder = previewInitialFillOrderRef.current || previewFillOrder;
+
     const markAllFilled = () => {
       const nextFilled = {};
-      previewFillOrder.forEach((fieldKey) => {
+      fillOrder.forEach((fieldKey) => {
         if (fieldKey === "trainingDays") {
-          nextFilled[fieldKey] = Array.isArray(previewPersonalTargets.trainingDays)
-            ? [...previewPersonalTargets.trainingDays]
+          nextFilled[fieldKey] = Array.isArray(personalTargets.trainingDays)
+            ? [...personalTargets.trainingDays]
             : [];
           return;
         }
-        nextFilled[fieldKey] = String(previewPersonalTargets[fieldKey] ?? "");
+        nextFilled[fieldKey] = String(personalTargets[fieldKey] ?? "");
       });
       setPreviewFilledFields(nextFilled);
     };
 
     clearPreviewFillTimers();
     setPreviewPersonalCollapsed(false);
+    setPreviewPersonalShifted(false);
+    setPreviewBuilderStage(0);
 
     if (activePreviewChapter.id !== "personal-info") {
       setPreviewFilledFields({});
       setPreviewPersonalCollapsed(false);
+      setPreviewPersonalShifted(false);
+      setPreviewBuilderStage(0);
       return undefined;
     }
 
@@ -670,19 +703,23 @@ export default function PreviewPage({
     if (prefersReducedMotion) {
       markAllFilled();
       setPreviewPersonalCollapsed(false);
+      setPreviewPersonalShifted(false);
+      setPreviewBuilderStage(0);
       return undefined;
     }
 
     setPreviewFilledFields({});
     setPreviewPersonalCollapsed(false);
+    setPreviewPersonalShifted(false);
+    setPreviewBuilderStage(0);
     let latestCompletionMs = 0;
 
-    previewFillOrder.forEach((fieldKey, index) => {
+    fillOrder.forEach((fieldKey, index) => {
       const fieldStartMs = previewFillStartDelayMs + index * previewFillStepMs;
       const timeoutId = window.setTimeout(() => {
         if (fieldKey === "trainingDays") {
-          const trainingDays = Array.isArray(previewPersonalTargets.trainingDays)
-            ? previewPersonalTargets.trainingDays
+          const trainingDays = Array.isArray(personalTargets.trainingDays)
+            ? personalTargets.trainingDays
             : [];
           setPreviewFilledFields((prev) => ({ ...prev, trainingDays: [] }));
           trainingDays.forEach((day, dayIndex) => {
@@ -698,7 +735,7 @@ export default function PreviewPage({
           return;
         }
 
-        const targetValue = String(previewPersonalTargets[fieldKey] ?? "");
+        const targetValue = String(personalTargets[fieldKey] ?? "");
         if (!targetValue) {
           setPreviewFilledFields((prev) => ({ ...prev, [fieldKey]: "" }));
           return;
@@ -725,8 +762,8 @@ export default function PreviewPage({
       previewFillTimeoutsRef.current.push(timeoutId);
 
       if (fieldKey === "trainingDays") {
-        const trainingDays = Array.isArray(previewPersonalTargets.trainingDays)
-          ? previewPersonalTargets.trainingDays
+        const trainingDays = Array.isArray(personalTargets.trainingDays)
+          ? personalTargets.trainingDays
           : [];
         const revealMs = trainingDays.length > 0
           ? (trainingDays.length - 1) * PREVIEW_TRAINING_DAY_STEP_MS
@@ -735,7 +772,7 @@ export default function PreviewPage({
         return;
       }
 
-      const targetValue = String(previewPersonalTargets[fieldKey] ?? "");
+      const targetValue = String(personalTargets[fieldKey] ?? "");
       if (!targetValue || PREVIEW_INSTANT_FIELDS.has(fieldKey)) {
         latestCompletionMs = Math.max(latestCompletionMs, fieldStartMs);
         return;
@@ -747,6 +784,17 @@ export default function PreviewPage({
 
     const collapseTimeoutId = window.setTimeout(() => {
       setPreviewPersonalCollapsed(true);
+      const postMorphShiftTimeoutId = window.setTimeout(() => {
+        setPreviewPersonalShifted(true);
+        setPreviewBuilderStage(0);
+        [1, 2, 3, 4].forEach((stage, idx) => {
+          const builderStepTimeoutId = window.setTimeout(() => {
+            setPreviewBuilderStage(stage);
+          }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
+          previewFillTimeoutsRef.current.push(builderStepTimeoutId);
+        });
+      }, PREVIEW_POST_MORPH_SHIFT_DELAY_MS);
+      previewFillTimeoutsRef.current.push(postMorphShiftTimeoutId);
     }, latestCompletionMs + PREVIEW_COLLAPSE_DELAY_MS);
     previewFillTimeoutsRef.current.push(collapseTimeoutId);
 
@@ -754,11 +802,7 @@ export default function PreviewPage({
       clearPreviewFillTimers();
     };
   }, [
-    activePreviewChapter.id,
-    previewFillOrder,
-    previewFillStartDelayMs,
-    previewFillStepMs,
-    previewPersonalTargets
+    activePreviewChapter.id
   ]);
 
   useEffect(() => {
@@ -774,22 +818,21 @@ export default function PreviewPage({
     if (prefersReducedMotion) return undefined;
 
     const timeline = createTimeline({
-      defaults: { ease: "outCubic" }
+      defaults: { ease: "inOutSine" }
     });
 
     timeline.add(activePageEl, {
       opacity: [0, 1],
       translateY: [16, 0],
       scale: [0.988, 1],
-      duration: 760
+      duration: PREVIEW_MOTION_DURATION_MS
     });
 
     const activeChip = stageEl.querySelector(".preview-jump-chip.active");
     if (activeChip) {
       timeline.add(activeChip, {
         scale: [1, 1.02, 1],
-        duration: 620,
-        ease: "inOutSine"
+        duration: PREVIEW_MOTION_DURATION_MS
       }, "-=320");
     }
 
