@@ -52,6 +52,16 @@ const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS 
 const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_TOC_SWITCH_MS = 920;
+const PREVIEW_GENERATING_HOLD_MS = 2400;
+const PREVIEW_WEEK_DAY_ORDER = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday"
+];
 
 const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
@@ -195,6 +205,63 @@ export default function PreviewPage({
     Array.isArray(activePreviewProfile.trainingDays) && activePreviewProfile.trainingDays.length
       ? activePreviewProfile.trainingDays.join(", ")
       : "Monday, Tuesday, Thursday, Saturday";
+  const previewWeekPlan = useMemo(() => {
+    const sourceTrainingDays =
+      Array.isArray(activePreviewProfile.trainingDays) && activePreviewProfile.trainingDays.length
+        ? activePreviewProfile.trainingDays
+        : JOHN_DOE_PREVIEW_PROFILE.trainingDays;
+    const trainingDaysSet = new Set(sourceTrainingDays.map((day) => String(day)));
+    const sourceFocuses =
+      Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
+        ? activePreviewProfile.focuses
+        : JOHN_DOE_PREVIEW_PROFILE.focuses;
+    const sessionDuration = Number(activePreviewProfile.duration) > 0
+      ? `${Number(activePreviewProfile.duration)} min`
+      : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
+    const environmentLabel = String(
+      activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment
+    );
+    const trainingTemplates = [
+      "Upper Strength",
+      "Lower Strength",
+      "Conditioning",
+      "Pull + Core",
+      "Power + Stability",
+      "Full Body Session"
+    ];
+    let trainingIndex = 0;
+
+    return PREVIEW_WEEK_DAY_ORDER.map((day) => {
+      const isTrainingDay = trainingDaysSet.has(day);
+      if (!isTrainingDay) {
+        return {
+          day,
+          short: day.slice(0, 3).toUpperCase(),
+          session: "Active Recovery",
+          meta: "20-30 min • Mobility",
+          highlights: ["Zone 2 walk", "Stretch + mobility", "Recovery check-in"],
+          isTraining: false
+        };
+      }
+
+      const session = trainingTemplates[trainingIndex % trainingTemplates.length];
+      const focus = String(sourceFocuses[trainingIndex % sourceFocuses.length] || "Strength");
+      trainingIndex += 1;
+      return {
+        day,
+        short: day.slice(0, 3).toUpperCase(),
+        session,
+        meta: `${sessionDuration} • ${environmentLabel}`,
+        highlights: [`${focus} emphasis`, "Main lift + accessories", "Cooldown + notes"],
+        isTraining: true
+      };
+    });
+  }, [
+    activePreviewProfile.trainingDays,
+    activePreviewProfile.focuses,
+    activePreviewProfile.duration,
+    activePreviewProfile.environment
+  ]);
 
   const previewPersonalTargets = useMemo(
     () => ({
@@ -314,9 +381,15 @@ export default function PreviewPage({
       id: "generate",
       title: "Generate",
       fields: []
+    },
+    {
+      id: "workout-week",
+      title: "Result",
+      fields: []
     }
   ];
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
+  const workoutWeekChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "workout-week");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
   const previousPreviewChapter =
@@ -636,11 +709,38 @@ export default function PreviewPage({
     );
   };
 
+  const renderPreviewWorkoutWeekChapter = () => (
+    <div className="preview-week-plan" aria-label="Generated weekly workout preview">
+      <div className="preview-week-grid">
+        {previewWeekPlan.map((dayPlan) => (
+          <article
+            key={`preview-week-${dayPlan.day}`}
+            className={`preview-week-day ${dayPlan.isTraining ? "is-training" : "is-recovery"}`}
+          >
+            <header className="preview-week-day-header">
+              <p>{dayPlan.short}</p>
+              <h3>{dayPlan.day}</h3>
+            </header>
+            <p className="preview-week-session">{dayPlan.session}</p>
+            <p className="preview-week-meta">{dayPlan.meta}</p>
+            <ul className="preview-week-highlights">
+              {dayPlan.highlights.map((item, itemIndex) => (
+                <li key={`preview-week-${dayPlan.day}-item-${itemIndex}`}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderPreviewChapterBody = (chapter) => (
     chapter.id === "personal-info" ? (
       renderPreviewPersonalInfoChapter(false)
     ) : chapter.id === "generate" ? (
       renderPreviewPersonalInfoChapter(true)
+    ) : chapter.id === "workout-week" ? (
+      renderPreviewWorkoutWeekChapter()
     ) : (
       <div className="preview-fields-grid">
         {chapter.fields.map((field, fieldIndex) => {
@@ -738,6 +838,12 @@ export default function PreviewPage({
 
       if (prefersReducedMotion) {
         setPreviewBuilderStage(6);
+        if (workoutWeekChapterIndex >= 0) {
+          const weekChapterTimeoutId = window.setTimeout(() => {
+            scrollToChapter(workoutWeekChapterIndex);
+          }, PREVIEW_GENERATING_HOLD_MS);
+          previewFillTimeoutsRef.current.push(weekChapterTimeoutId);
+        }
         return undefined;
       }
 
@@ -747,6 +853,13 @@ export default function PreviewPage({
         }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
         previewFillTimeoutsRef.current.push(builderStepTimeoutId);
       });
+
+      if (workoutWeekChapterIndex >= 0) {
+        const weekChapterTimeoutId = window.setTimeout(() => {
+          scrollToChapter(workoutWeekChapterIndex);
+        }, PREVIEW_BUILDER_START_DELAY_MS + (5 * PREVIEW_BUILDER_STEP_MS) + PREVIEW_GENERATING_HOLD_MS);
+        previewFillTimeoutsRef.current.push(weekChapterTimeoutId);
+      }
       return undefined;
     }
 
@@ -866,7 +979,8 @@ export default function PreviewPage({
     };
   }, [
     activePreviewChapter.id,
-    generateChapterIndex
+    generateChapterIndex,
+    workoutWeekChapterIndex
   ]);
 
   useEffect(
