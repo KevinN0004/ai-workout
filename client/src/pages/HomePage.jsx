@@ -71,7 +71,6 @@ export default function HomePage({
   const previewStepCommitTimeoutRef = useRef(null);
   const previewPendingStepIndexRef = useRef(null);
   const previewLastStepChangeRef = useRef(0);
-  const previewRevealTimeoutsRef = useRef([]);
   const suppressResetPendingRef = useRef(false);
   const stageMetricsRef = useRef({});
   const introPanelRef = useRef(null);
@@ -85,7 +84,6 @@ export default function HomePage({
   const workoutMeasureShellRef = useRef(null);
   const [homeStage, setHomeStage] = useState("intro");
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
-  const [previewFieldRevealCounts, setPreviewFieldRevealCounts] = useState({});
   const [stageDirection, setStageDirection] = useState("forward");
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
   const [isStageTransitioning, setIsStageTransitioning] = useState(false);
@@ -682,8 +680,6 @@ export default function HomePage({
         window.clearTimeout(previewStepCommitTimeoutRef.current);
         previewStepCommitTimeoutRef.current = null;
       }
-      previewRevealTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      previewRevealTimeoutsRef.current = [];
       clearStageSwapTimers();
       clearStageSwapRaf();
       clearStageMorphClone();
@@ -859,9 +855,6 @@ export default function HomePage({
   previewChapterRefs.current = previewChapterRefs.current.slice(0, previewChapters.length);
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
-  const isGeneratedPlanPreview = activePreviewChapter.kind === "generated-plan";
-  const isDashboardPreview = activePreviewChapter.kind === "dashboard-view";
-  const isCombinePreview = activePreviewChapter.kind === "combine";
   const previewProgress = previewChapters.length <= 1
     ? 100
     : ((previewStepIndex + 1) / previewChapters.length) * 100;
@@ -874,9 +867,142 @@ export default function HomePage({
     previewEquipmentText
   ];
 
-  const clearPreviewRevealTimers = () => {
-    previewRevealTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    previewRevealTimeoutsRef.current = [];
+  const renderPreviewChapterBody = (chapter) => {
+    if (chapter.kind === "combine") {
+      return (
+        <div className="preview-combine-shell">
+          <div className="preview-combine-lane preview-combine-lane-left">
+            {personalCombineTokens.map((token, tokenIndex) => (
+              <span key={`left-token-${chapter.id}-${tokenIndex}-${token}`} className="preview-combine-token">
+                {token}
+              </span>
+            ))}
+          </div>
+          <div className="preview-combine-center">
+            <span className="preview-combine-stream preview-combine-stream-left" aria-hidden="true" />
+            <div className="preview-combine-core">
+              <strong>Workout Builder</strong>
+              <span>Combining profile and planning inputs</span>
+            </div>
+            <span className="preview-combine-stream preview-combine-stream-right" aria-hidden="true" />
+          </div>
+          <div className="preview-combine-lane preview-combine-lane-right">
+            {plannerCombineTokens.map((token, tokenIndex) => (
+              <span key={`right-token-${chapter.id}-${tokenIndex}-${token}`} className="preview-combine-token">
+                {token}
+              </span>
+            ))}
+          </div>
+          <div className="preview-combine-result">
+            <h4>Workout plan created</h4>
+            <p className="muted">
+              {(form.days || "3") + " days"} | {(form.duration || "45") + " min"} | {form.goal || "Lean strength"}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (chapter.kind === "generated-plan") {
+      return (
+        <div className="preview-generated-shell">
+          <div className="preview-generated-header">
+            <h4>Workout Generation</h4>
+          </div>
+          <div className="preview-generated-grid">
+            {generatedPreviewDays.map((block) => (
+              <article key={`preview-generated-${chapter.id}-${block.day}`} className="preview-generated-card">
+                <h5>{block.day}</h5>
+                <ul>
+                  {block.blocks.slice(0, 4).map((line) => (
+                    <li key={`${chapter.id}-${block.day}-${line}`}>{line}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <p className="muted preview-generated-footnote">
+            Generated output appears as day-by-day cards with exercise blocks.
+          </p>
+        </div>
+      );
+    }
+
+    if (chapter.kind === "dashboard-view") {
+      return (
+        <div className="preview-dashboard-shell">
+          <div className="preview-dashboard-topbar">
+            <h4>Dashboard</h4>
+            <span>{user?.email || defaultName}</span>
+          </div>
+          <div className="preview-dashboard-tabs" role="tablist" aria-label="Dashboard sections">
+            {previewDashboardTabs.map((tab, index) => (
+              <span
+                key={`${chapter.id}-${tab}`}
+                className={`preview-dashboard-tab ${index === 0 ? "active" : ""}`}
+                role="tab"
+                aria-selected={index === 0}
+              >
+                {tab}
+              </span>
+            ))}
+          </div>
+          <div className="preview-dashboard-metrics">
+            <article className="preview-dashboard-metric">
+              <span>Weekly workouts</span>
+              <strong>{form.days || "3"}</strong>
+            </article>
+            <article className="preview-dashboard-metric">
+              <span>Avg session</span>
+              <strong>{form.duration || "45"} min</strong>
+            </article>
+            <article className="preview-dashboard-metric">
+              <span>Target</span>
+              <strong>{form.goal || "Lean strength"}</strong>
+            </article>
+          </div>
+          <div className="preview-dashboard-panels">
+            <article className="preview-dashboard-panel">
+              <h5>{previewTodayPlan?.day || "Today"}</h5>
+              <ul>
+                {(previewTodayPlan?.blocks || []).slice(0, 4).map((line) => (
+                  <li key={`preview-dash-${chapter.id}-${line}`}>{line}</li>
+                ))}
+              </ul>
+            </article>
+            <article className="preview-dashboard-panel">
+              <h5>Plan context</h5>
+              <p className="muted">Focus: {previewFocusText}</p>
+              <p className="muted">Environment: {form.environment || "Home"}</p>
+              <p className="muted">Equipment: {previewEquipmentText}</p>
+            </article>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="preview-fields-grid">
+        {chapter.fields.map((field, fieldIndex) => (
+          <label key={`${chapter.id}-${field.label}-${fieldIndex}`} className="preview-field-row">
+            <span>{field.label}</span>
+            {field.multiline ? (
+              <textarea
+                value={field.value}
+                rows={field.rows || 3}
+                readOnly
+              />
+            ) : (
+              <input
+                type="text"
+                value={field.value}
+                readOnly
+              />
+            )}
+          </label>
+        ))}
+      </div>
+    );
   };
 
   const scrollPreviewIntoView = () => {
@@ -915,11 +1041,6 @@ export default function HomePage({
     });
   };
 
-  const getFieldDisplayValue = (chapterId, fieldIndex, fieldValue) => {
-    const revealedCount = previewFieldRevealCounts[chapterId] ?? 0;
-    return revealedCount > fieldIndex ? fieldValue : "";
-  };
-
   useEffect(() => {
     previewStepIndexRef.current = previewStepIndex;
     previewLastStepChangeRef.current = performance.now();
@@ -946,9 +1067,7 @@ export default function HomePage({
     }
     previewPendingStepIndexRef.current = null;
     setPreviewStepIndex(0);
-    setPreviewFieldRevealCounts({});
     previewProgressValueRef.current = 0;
-    clearPreviewRevealTimers();
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(scrollPreviewIntoView);
     });
@@ -1018,44 +1137,21 @@ export default function HomePage({
 
     const stageEl = previewStageRef.current;
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const headerTargets = Array.from(stageEl.querySelectorAll(".preview-stage-header > *"));
+    const activePageEl = stageEl.querySelector(".preview-card-page.active");
+    if (!activePageEl) return undefined;
+
     const cardEl = stageEl.querySelector(".preview-step-card");
-    const fieldTargets = Array.from(stageEl.querySelectorAll(".preview-field-row"));
-    const generatedTargets = Array.from(stageEl.querySelectorAll(".preview-generated-card"));
+    const generatedTargets = Array.from(activePageEl.querySelectorAll(".preview-generated-card"));
     const dashboardTargets = Array.from(
-      stageEl.querySelectorAll(".preview-dashboard-tab, .preview-dashboard-metric, .preview-dashboard-panel")
+      activePageEl.querySelectorAll(".preview-dashboard-tab, .preview-dashboard-metric, .preview-dashboard-panel")
     );
-    const combineTokenTargets = Array.from(stageEl.querySelectorAll(".preview-combine-token"));
-    const combineStreamTargets = Array.from(stageEl.querySelectorAll(".preview-combine-stream"));
-    const combineCoreEl = stageEl.querySelector(".preview-combine-core");
-    const combineResultEl = stageEl.querySelector(".preview-combine-result");
+    const combineTokenTargets = Array.from(activePageEl.querySelectorAll(".preview-combine-token"));
+    const combineStreamTargets = Array.from(activePageEl.querySelectorAll(".preview-combine-stream"));
+    const combineCoreEl = activePageEl.querySelector(".preview-combine-core");
+    const combineResultEl = activePageEl.querySelector(".preview-combine-result");
     const progressFillEl = stageEl.querySelector(".preview-progress-track span");
 
     previewStepTimelineRef.current?.cancel();
-    clearPreviewRevealTimers();
-
-    if (activePreviewChapter.kind === "fields") {
-      if (prefersReducedMotion) {
-        setPreviewFieldRevealCounts((prev) => ({
-          ...prev,
-          [activePreviewChapter.id]: activePreviewChapter.fields.length
-        }));
-      } else {
-        setPreviewFieldRevealCounts((prev) => ({
-          ...prev,
-          [activePreviewChapter.id]: 0
-        }));
-        activePreviewChapter.fields.forEach((_, index) => {
-          const timeoutId = window.setTimeout(() => {
-            setPreviewFieldRevealCounts((prev) => ({
-              ...prev,
-              [activePreviewChapter.id]: index + 1
-            }));
-          }, 230 + index * 180);
-          previewRevealTimeoutsRef.current.push(timeoutId);
-        });
-      }
-    }
 
     if (progressFillEl) {
       const fromProgress = Number.isFinite(previewProgressValueRef.current)
@@ -1079,16 +1175,7 @@ export default function HomePage({
       defaults: { ease: "inOutSine" }
     });
 
-    if (headerTargets.length) {
-      timeline.add(headerTargets, {
-        opacity: [0, 1],
-        translateY: [8, 0],
-        duration: 540,
-        delay: (_, idx) => idx * 70
-      });
-    }
-
-    if (cardEl) {
+    if (cardEl && activePreviewChapter.kind !== "fields") {
       timeline.add(
         cardEl,
         {
@@ -1096,22 +1183,7 @@ export default function HomePage({
           translateY: [10, 0],
           scale: [0.992, 1],
           duration: 760
-        },
-        headerTargets.length ? "-=220" : 0
-      );
-    }
-
-    if (activePreviewChapter.kind === "fields" && fieldTargets.length) {
-      timeline.add(
-        fieldTargets,
-        {
-          opacity: [0, 1],
-          translateY: [10, 0],
-          scale: [0.992, 1],
-          duration: 620,
-          delay: (_, idx) => idx * 50
-        },
-        "-=300"
+        }
       );
     }
 
@@ -1204,7 +1276,6 @@ export default function HomePage({
     previewStepTimelineRef.current = timeline;
     return () => {
       timeline.cancel();
-      clearPreviewRevealTimers();
     };
   }, [homeStage, previewProgress, previewStepIndex, activePreviewChapter.id, activePreviewChapter.kind]);
 
@@ -1287,129 +1358,17 @@ export default function HomePage({
                       <article
                         className={`setup-snapshot-card setup-snapshot-card-detailed preview-step-card preview-step-kind-${activePreviewChapter.kind}`}
                       >
-                        {isCombinePreview ? (
-                          <div className="preview-combine-shell">
-                            <div className="preview-combine-lane preview-combine-lane-left">
-                              {personalCombineTokens.map((token, tokenIndex) => (
-                                <span key={`left-token-${tokenIndex}-${token}`} className="preview-combine-token">
-                                  {token}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="preview-combine-center">
-                              <span className="preview-combine-stream preview-combine-stream-left" aria-hidden="true" />
-                              <div className="preview-combine-core">
-                                <strong>Workout Builder</strong>
-                                <span>Combining profile and planning inputs</span>
-                              </div>
-                              <span className="preview-combine-stream preview-combine-stream-right" aria-hidden="true" />
-                            </div>
-                            <div className="preview-combine-lane preview-combine-lane-right">
-                              {plannerCombineTokens.map((token, tokenIndex) => (
-                                <span key={`right-token-${tokenIndex}-${token}`} className="preview-combine-token">
-                                  {token}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="preview-combine-result">
-                              <h4>Workout plan created</h4>
-                              <p className="muted">
-                                {(form.days || "3") + " days"} | {(form.duration || "45") + " min"} | {form.goal || "Lean strength"}
-                              </p>
-                            </div>
-                          </div>
-                        ) : isGeneratedPlanPreview ? (
-                          <div className="preview-generated-shell">
-                            <div className="preview-generated-header">
-                              <h4>Workout Generation</h4>
-                            </div>
-                            <div className="preview-generated-grid">
-                              {generatedPreviewDays.map((block) => (
-                                <article key={`preview-generated-${block.day}`} className="preview-generated-card">
-                                  <h5>{block.day}</h5>
-                                  <ul>
-                                    {block.blocks.slice(0, 4).map((line) => (
-                                      <li key={`${block.day}-${line}`}>{line}</li>
-                                    ))}
-                                  </ul>
-                                </article>
-                              ))}
-                            </div>
-                            <p className="muted preview-generated-footnote">
-                              Generated output appears as day-by-day cards with exercise blocks.
-                            </p>
-                          </div>
-                        ) : isDashboardPreview ? (
-                          <div className="preview-dashboard-shell">
-                            <div className="preview-dashboard-topbar">
-                              <h4>Dashboard</h4>
-                              <span>{user?.email || defaultName}</span>
-                            </div>
-                            <div className="preview-dashboard-tabs" role="tablist" aria-label="Dashboard sections">
-                              {previewDashboardTabs.map((tab, index) => (
-                                <span
-                                  key={tab}
-                                  className={`preview-dashboard-tab ${index === 0 ? "active" : ""}`}
-                                  role="tab"
-                                  aria-selected={index === 0}
-                                >
-                                  {tab}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="preview-dashboard-metrics">
-                              <article className="preview-dashboard-metric">
-                                <span>Weekly workouts</span>
-                                <strong>{form.days || "3"}</strong>
-                              </article>
-                              <article className="preview-dashboard-metric">
-                                <span>Avg session</span>
-                                <strong>{form.duration || "45"} min</strong>
-                              </article>
-                              <article className="preview-dashboard-metric">
-                                <span>Target</span>
-                                <strong>{form.goal || "Lean strength"}</strong>
-                              </article>
-                            </div>
-                            <div className="preview-dashboard-panels">
-                              <article className="preview-dashboard-panel">
-                                <h5>{previewTodayPlan?.day || "Today"}</h5>
-                                <ul>
-                                  {(previewTodayPlan?.blocks || []).slice(0, 4).map((line) => (
-                                    <li key={`preview-dash-${line}`}>{line}</li>
-                                  ))}
-                                </ul>
-                              </article>
-                              <article className="preview-dashboard-panel">
-                                <h5>Plan context</h5>
-                                <p className="muted">Focus: {previewFocusText}</p>
-                                <p className="muted">Environment: {form.environment || "Home"}</p>
-                                <p className="muted">Equipment: {previewEquipmentText}</p>
-                              </article>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="preview-fields-grid">
-                            {activePreviewChapter.fields.map((field, fieldIndex) => (
-                              <label key={`${activePreviewChapter.id}-${field.label}`} className="preview-field-row">
-                                <span>{field.label}</span>
-                                {field.multiline ? (
-                                  <textarea
-                                    value={getFieldDisplayValue(activePreviewChapter.id, fieldIndex, field.value)}
-                                    rows={field.rows || 3}
-                                    readOnly
-                                  />
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={getFieldDisplayValue(activePreviewChapter.id, fieldIndex, field.value)}
-                                    readOnly
-                                  />
-                                )}
-                              </label>
-                            ))}
-                          </div>
-                        )}
+                        <div className="preview-card-pages">
+                          {previewChapters.map((chapter, chapterIndex) => (
+                            <section
+                              key={`preview-card-page-${chapter.id}`}
+                              className={`preview-card-page ${chapterIndex === previewStepIndex ? "active" : ""}`}
+                              aria-hidden={chapterIndex !== previewStepIndex}
+                            >
+                              {renderPreviewChapterBody(chapter)}
+                            </section>
+                          ))}
+                        </div>
                       </article>
                     </div>
                     <div className="preview-chapter-track" aria-hidden="true">
