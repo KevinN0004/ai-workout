@@ -1,3 +1,4 @@
+import { createTimeline } from "animejs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./PreviewPage.css";
 
@@ -53,26 +54,39 @@ const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_TOC_SWITCH_MS = 920;
 const PREVIEW_GENERATING_HOLD_MS = 2400;
-const PREVIEW_WEEK_TABLE_ROW_COUNT = 5;
-const PREVIEW_WEEK_TABLE_COL_COUNT = 8;
+const PREVIEW_WEEK_DAY_ORDER = [...TRAINING_DAY_OPTIONS];
+const PREVIEW_WEEK_TEXT_ROW_CONFIG = [
+  { id: "session", label: "Session", valueKey: "session", textClass: "preview-week-session" },
+  { id: "duration", label: "Duration", valueKey: "meta", textClass: "preview-week-meta" },
+  { id: "workout", label: "Workout", valueKey: "workout", textClass: "preview-week-meta" }
+];
+const PREVIEW_WEEK_TABLE_BODY_ROW_COUNT = PREVIEW_WEEK_TEXT_ROW_CONFIG.length + 1; // + highlights row
+const PREVIEW_WEEK_TABLE_ROW_COUNT = PREVIEW_WEEK_TABLE_BODY_ROW_COUNT + 1; // + header row
+const PREVIEW_WEEK_TABLE_COLUMN_COUNT = PREVIEW_WEEK_DAY_ORDER.length + 1; // + row label column
+const PREVIEW_WEEK_HORIZONTAL_LINE_COUNT = PREVIEW_WEEK_TABLE_ROW_COUNT + 1;
+const PREVIEW_WEEK_VERTICAL_LINE_COUNT = PREVIEW_WEEK_TABLE_COLUMN_COUNT + 1;
 const PREVIEW_WEEK_LINE_STAGGER_MS = 120;
 const PREVIEW_WEEK_LINE_DRAW_MS = 520;
 const PREVIEW_WEEK_OUTLINE_START_MS = 180;
 const PREVIEW_WEEK_OUTLINE_DRAW_MS =
-  ((PREVIEW_WEEK_TABLE_ROW_COUNT + 1 + PREVIEW_WEEK_TABLE_COL_COUNT + 1 - 1) * PREVIEW_WEEK_LINE_STAGGER_MS)
+  ((PREVIEW_WEEK_HORIZONTAL_LINE_COUNT + PREVIEW_WEEK_VERTICAL_LINE_COUNT - 1) * PREVIEW_WEEK_LINE_STAGGER_MS)
   + PREVIEW_WEEK_LINE_DRAW_MS;
 const PREVIEW_WEEK_HEADER_REVEAL_MS = 620;
 const PREVIEW_WEEK_ROW_TYPING_MS = 1800;
+const PREVIEW_WEEK_SCAN_DELAY_MS = 1400;
+const PREVIEW_WEEK_SCAN_DURATION_MS = 5000;
+const PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS = PREVIEW_WEEK_SCAN_DURATION_MS + 120;
+const PREVIEW_WEEK_PARTICLE_DENSITY_PX = 820;
+const PREVIEW_WEEK_PARTICLE_MIN_COUNT = 8;
+const PREVIEW_WEEK_PARTICLE_MAX_COUNT = 28;
+const PREVIEW_WEEK_PARTICLE_MIN_SIZE_PX = 1;
+const PREVIEW_WEEK_PARTICLE_MAX_SIZE_PX = 3.4;
+const PREVIEW_WEEK_PARTICLE_MIN_DURATION_MS = 1850;
+const PREVIEW_WEEK_PARTICLE_MAX_DURATION_MS = 2650;
+const PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS = 980;
+const PREVIEW_WEEK_PARTICLE_JITTER_MS = 18;
+const PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS = 3000;
 const PREVIEW_WEEK_MIN_WORKOUT_DAYS = 5;
-const PREVIEW_WEEK_DAY_ORDER = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday"
-];
 const PREVIEW_WEEK_DAY_NORMALIZATION = {
   mon: "Monday",
   monday: "Monday",
@@ -123,6 +137,7 @@ const getPreviewTypingStepMs = (textLength) =>
     PREVIEW_TYPING_MIN_MS,
     Math.min(PREVIEW_TYPING_MAX_MS, Math.round(560 / Math.max(Number(textLength) || 1, 1)))
   );
+const randomBetween = (min, max) => min + (Math.random() * (max - min));
 
 export default function PreviewPage({
   personal,
@@ -137,6 +152,10 @@ export default function PreviewPage({
 }) {
   const previewFillTimeoutsRef = useRef([]);
   const previewStageRef = useRef(null);
+  const previewWeekTableWrapRef = useRef(null);
+  const previewWeekParticleLayerRef = useRef(null);
+  const previewWeekParticlePlayersRef = useRef([]);
+  const previewWeekParticleTargetsRef = useRef([]);
   const previewStepIndexRef = useRef(0);
   const previewSwitchTimeoutRef = useRef(null);
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
@@ -265,7 +284,7 @@ export default function PreviewPage({
       PREVIEW_WEEK_DAY_ORDER.length
     );
     if (trainingDaysSet.size < targetWorkoutDays) {
-      for (const day of TRAINING_DAY_OPTIONS) {
+      for (const day of PREVIEW_WEEK_DAY_ORDER) {
         if (trainingDaysSet.has(day)) continue;
         trainingDaysSet.add(day);
         if (trainingDaysSet.size >= targetWorkoutDays) break;
@@ -290,12 +309,12 @@ export default function PreviewPage({
       "Full Body Session"
     ];
     const trainingExerciseTemplates = [
-      "Bench Press • Incline DB Press • Cable Row",
-      "Back Squat • Romanian Deadlift • Walking Lunge",
-      "Bike Intervals • Kettlebell Swings • Burpees",
-      "Pull-ups • Seated Row • Hanging Knee Raise",
-      "Trap Bar Deadlift • Push Press • Sled Push",
-      "Front Squat • DB Bench Press • Lat Pulldown"
+      "Bench Press - Incline DB Press - Cable Row",
+      "Back Squat - Romanian Deadlift - Walking Lunge",
+      "Bike Intervals - Kettlebell Swings - Burpees",
+      "Pull-ups - Seated Row - Hanging Knee Raise",
+      "Trap Bar Deadlift - Push Press - Sled Push",
+      "Front Squat - DB Bench Press - Lat Pulldown"
     ];
     let trainingIndex = 0;
 
@@ -306,7 +325,7 @@ export default function PreviewPage({
           day,
           session: "Active Recovery",
           workout: "Zone 2 walk - Mobility flow - Stretching",
-          meta: "20-30 min • Mobility",
+          meta: "20-30 min - Mobility",
           highlights: ["Zone 2 walk", "Stretch + mobility", "Recovery check-in"],
           isTraining: false
         };
@@ -321,7 +340,7 @@ export default function PreviewPage({
         day,
         session,
         workout,
-        meta: `${sessionDuration} • ${environmentLabel}`,
+        meta: `${sessionDuration} - ${environmentLabel}`,
         highlights: [`${focus} emphasis`, "Main lift + accessories", "Cooldown + notes"],
         isTraining: true
       };
@@ -476,7 +495,8 @@ export default function PreviewPage({
     0
   );
   const previewStageStyle = {
-    "--preview-chip-expanded": `calc(${Math.max(8, previewMaxChapterTitleLength)}ch + 1.35rem)`
+    "--preview-chip-expanded": `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 4.4rem)`,
+    "--preview-title-width": `calc(${Math.max(16, previewMaxChapterTitleLength)}ch + 3.8rem)`
   };
 
   const clearPreviewFillTimers = () => {
@@ -486,6 +506,29 @@ export default function PreviewPage({
       window.clearInterval(timeoutId);
     });
     previewFillTimeoutsRef.current = [];
+  };
+
+  const clearPreviewWeekParticleAnimation = () => {
+    if (previewWeekParticlePlayersRef.current.length) {
+      previewWeekParticlePlayersRef.current.forEach((player) => {
+        player?.cancel?.();
+      });
+      previewWeekParticlePlayersRef.current = [];
+    }
+
+    if (previewWeekParticleTargetsRef.current.length) {
+      previewWeekParticleTargetsRef.current.forEach((target) => {
+        if (!target) return;
+        target.style.opacity = "";
+        target.style.transform = "";
+        target.style.filter = "";
+      });
+      previewWeekParticleTargetsRef.current = [];
+    }
+
+    if (previewWeekParticleLayerRef.current) {
+      previewWeekParticleLayerRef.current.replaceChildren();
+    }
   };
 
   const getPreviewFieldRows = (field) => {
@@ -803,13 +846,11 @@ export default function PreviewPage({
   };
 
   const renderPreviewWorkoutWeekChapter = () => {
-    const previewWeekHorizontalLineCount = PREVIEW_WEEK_TABLE_ROW_COUNT + 1;
-    const previewWeekVerticalLineCount = previewWeekPlan.length + 2;
-    const horizontalLineOffsets = Array.from({ length: previewWeekHorizontalLineCount }, (_, index) => (
-      `${(index / (previewWeekHorizontalLineCount - 1)) * 100}%`
+    const horizontalLineOffsets = Array.from({ length: PREVIEW_WEEK_HORIZONTAL_LINE_COUNT }, (_, index) => (
+      `${(index / (PREVIEW_WEEK_HORIZONTAL_LINE_COUNT - 1)) * 100}%`
     ));
-    const verticalLineOffsets = Array.from({ length: previewWeekVerticalLineCount }, (_, index) => (
-      `${(index / (previewWeekVerticalLineCount - 1)) * 100}%`
+    const verticalLineOffsets = Array.from({ length: PREVIEW_WEEK_VERTICAL_LINE_COUNT }, (_, index) => (
+      `${(index / (PREVIEW_WEEK_VERTICAL_LINE_COUNT - 1)) * 100}%`
     ));
 
     return (
@@ -818,10 +859,12 @@ export default function PreviewPage({
           previewWeekStage >= 2 ? "is-headers-visible" : ""
         } ${previewWeekStage >= 3 ? "is-rows-visible" : ""} ${
           previewWeekStage >= 3 && previewWeekTypingProgress < 1 ? "is-typing" : ""
+        } ${previewWeekStage >= 5 ? "is-scan-once" : ""} ${
+          previewWeekStage >= 6 ? "is-breaking-apart is-anime-particle-break" : ""
         }`}
         aria-label="Generated weekly workout preview"
       >
-        <div className="preview-week-table-wrap">
+        <div ref={previewWeekTableWrapRef} className="preview-week-table-wrap">
           <div className="preview-week-outline" aria-hidden="true">
             {horizontalLineOffsets.map((offset, index) => (
               <span
@@ -870,60 +913,27 @@ export default function PreviewPage({
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
-                {getPreviewWeekHeaderTypedText("Session") || "\u00A0"}
-              </th>
-              {previewWeekPlan.map((dayPlan) => {
-                const typedSession = getPreviewWeekTypedText(dayPlan.session);
-                return (
-                  <td
-                    key={`preview-week-session-${dayPlan.day}`}
-                    className={`preview-week-day-cell ${
-                      dayPlan.isTraining ? "is-training" : "is-recovery"
-                    } ${previewWeekStage >= 3 ? "is-visible" : ""}`}
-                  >
-                    <p className="preview-week-session">{typedSession || "\u00A0"}</p>
-                  </td>
-                );
-              })}
-            </tr>
-            <tr>
-              <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
-                {getPreviewWeekHeaderTypedText("Duration") || "\u00A0"}
-              </th>
-              {previewWeekPlan.map((dayPlan) => {
-                const typedMeta = getPreviewWeekTypedText(dayPlan.meta);
-                return (
-                  <td
-                    key={`preview-week-meta-${dayPlan.day}`}
-                    className={`preview-week-day-cell ${
-                      dayPlan.isTraining ? "is-training" : "is-recovery"
-                    } ${previewWeekStage >= 3 ? "is-visible" : ""}`}
-                  >
-                    <p className="preview-week-meta">{typedMeta || "\u00A0"}</p>
-                  </td>
-                );
-              })}
-            </tr>
-            <tr>
-              <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
-                {getPreviewWeekHeaderTypedText("Workout") || "\u00A0"}
-              </th>
-              {previewWeekPlan.map((dayPlan) => {
-                const typedWorkout = getPreviewWeekTypedText(dayPlan.workout);
-                return (
-                  <td
-                    key={`preview-week-workout-${dayPlan.day}`}
-                    className={`preview-week-day-cell ${
-                      dayPlan.isTraining ? "is-training" : "is-recovery"
-                    } ${previewWeekStage >= 3 ? "is-visible" : ""}`}
-                  >
-                    <p className="preview-week-meta">{typedWorkout || "\u00A0"}</p>
-                  </td>
-                );
-              })}
-            </tr>
+            {PREVIEW_WEEK_TEXT_ROW_CONFIG.map((rowConfig) => (
+              <tr key={`preview-week-row-${rowConfig.id}`}>
+                <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
+                  {getPreviewWeekHeaderTypedText(rowConfig.label) || "\u00A0"}
+                </th>
+                {previewWeekPlan.map((dayPlan) => {
+                  const rowValue = String(dayPlan[rowConfig.valueKey] ?? "");
+                  const typedRowValue = getPreviewWeekTypedText(rowValue);
+                  return (
+                    <td
+                      key={`preview-week-${rowConfig.id}-${dayPlan.day}`}
+                      className={`preview-week-day-cell ${
+                        dayPlan.isTraining ? "is-training" : "is-recovery"
+                      } ${previewWeekStage >= 3 ? "is-visible" : ""}`}
+                    >
+                      <p className={rowConfig.textClass}>{typedRowValue || "\u00A0"}</p>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
             <tr>
               <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
                 {getPreviewWeekHeaderTypedText("Highlights") || "\u00A0"}
@@ -953,6 +963,7 @@ export default function PreviewPage({
             </tr>
           </tbody>
           </table>
+          <div ref={previewWeekParticleLayerRef} className="preview-week-particle-layer" aria-hidden="true" />
         </div>
       </div>
     );
@@ -1139,6 +1150,14 @@ export default function PreviewPage({
           if (nextProgress >= 1) {
             window.clearInterval(typingIntervalId);
             setPreviewWeekStage(4);
+            const scanTimeoutId = window.setTimeout(() => {
+              setPreviewWeekStage(5);
+              const breakTimeoutId = window.setTimeout(() => {
+                setPreviewWeekStage(6);
+              }, PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS);
+              previewFillTimeoutsRef.current.push(breakTimeoutId);
+            }, PREVIEW_WEEK_SCAN_DELAY_MS);
+            previewFillTimeoutsRef.current.push(scanTimeoutId);
           }
         }, 32);
         previewFillTimeoutsRef.current.push(typingIntervalId);
@@ -1273,12 +1292,176 @@ export default function PreviewPage({
     workoutWeekChapterIndex
   ]);
 
+  useEffect(() => {
+    if (activePreviewChapter.id !== "workout-week" || previewWeekStage < 6) {
+      clearPreviewWeekParticleAnimation();
+      return undefined;
+    }
+    if (previewWeekStage > 6) {
+      return undefined;
+    }
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      clearPreviewWeekParticleAnimation();
+      return undefined;
+    }
+
+    const wrapEl = previewWeekTableWrapRef.current;
+    const layerEl = previewWeekParticleLayerRef.current;
+    const tableEl = wrapEl?.querySelector(".preview-week-table");
+    if (!wrapEl || !layerEl || !tableEl) return undefined;
+
+    clearPreviewWeekParticleAnimation();
+
+    const wrapRect = wrapEl.getBoundingClientRect();
+    if (!wrapRect.width || !wrapRect.height) return undefined;
+
+    const contentEntries = Array.from(tableEl.querySelectorAll("th, td, p, li, h3"))
+      .map((targetEl) => {
+        const rect = targetEl.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+
+        const relativeLeft = rect.left - wrapRect.left;
+        const relativeTop = rect.top - wrapRect.top;
+        if (relativeLeft > wrapRect.width || relativeTop > wrapRect.height) return null;
+        if (relativeLeft + rect.width < 0 || relativeTop + rect.height < 0) return null;
+
+        const centerX = relativeLeft + (rect.width / 2);
+        const centerY = relativeTop + (rect.height / 2);
+        const rowProgress = clamp(centerY / Math.max(wrapRect.height, 1), 0, 1);
+        const colProgress = clamp(centerX / Math.max(wrapRect.width, 1), 0, 1);
+        const targetStyle = window.getComputedStyle(targetEl);
+
+        return {
+          targetEl,
+          rect,
+          relativeLeft,
+          relativeTop,
+          rowProgress,
+          colProgress,
+          particleColor: targetStyle.color || "rgba(255, 255, 255, 0.9)"
+        };
+      })
+      .filter(Boolean);
+    const contentTargets = contentEntries.map((entry) => entry.targetEl);
+    const sourceTargets = [tableEl, ...contentTargets];
+    const particles = [];
+    const particleMeta = [];
+    const contentMeta = [];
+    const fragment = document.createDocumentFragment();
+
+    contentEntries.forEach((entry) => {
+      const {
+        rect,
+        relativeLeft,
+        relativeTop,
+        rowProgress,
+        colProgress,
+        particleColor
+      } = entry;
+      contentMeta.push({
+        delay: Math.round((rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (colProgress * 24)),
+        rise: -18 - (rowProgress * 14)
+      });
+      const particleCount = clamp(
+        Math.round((rect.width * rect.height) / PREVIEW_WEEK_PARTICLE_DENSITY_PX),
+        PREVIEW_WEEK_PARTICLE_MIN_COUNT,
+        PREVIEW_WEEK_PARTICLE_MAX_COUNT
+      );
+
+      for (let index = 0; index < particleCount; index += 1) {
+        const particleEl = document.createElement("span");
+        particleEl.className = "preview-week-particle";
+
+        const size = randomBetween(PREVIEW_WEEK_PARTICLE_MIN_SIZE_PX, PREVIEW_WEEK_PARTICLE_MAX_SIZE_PX);
+        const particleX = relativeLeft + randomBetween(0, rect.width);
+        const particleY = relativeTop + randomBetween(0, rect.height);
+        const localRowProgress = clamp((particleY - relativeTop) / Math.max(rect.height, 1), 0, 1);
+        const particleRowProgress = clamp(
+          rowProgress + ((localRowProgress - 0.5) * 0.09),
+          0,
+          1
+        );
+
+        particleEl.style.left = `${particleX.toFixed(2)}px`;
+        particleEl.style.top = `${particleY.toFixed(2)}px`;
+        particleEl.style.width = `${size.toFixed(2)}px`;
+        particleEl.style.height = `${size.toFixed(2)}px`;
+        particleEl.style.opacity = randomBetween(0.5, 1).toFixed(3);
+        particleEl.style.backgroundColor = particleColor;
+        particleEl.style.borderRadius = Math.random() > 0.75 ? "50%" : "1px";
+
+        fragment.appendChild(particleEl);
+        particles.push(particleEl);
+        particleMeta.push({
+          delay: Math.round(
+            (particleRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) +
+            randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
+          ),
+          duration: Math.round(randomBetween(PREVIEW_WEEK_PARTICLE_MIN_DURATION_MS, PREVIEW_WEEK_PARTICLE_MAX_DURATION_MS)),
+          driftX: randomBetween(-72, 72),
+          driftY: randomBetween(-188, -84),
+          rotate: randomBetween(-110, 110),
+          scale: randomBetween(0.42, 1.36)
+        });
+      }
+    });
+
+    if (!particles.length) return undefined;
+
+    layerEl.appendChild(fragment);
+    previewWeekParticleTargetsRef.current = sourceTargets;
+
+    let keepCompletionFrame = false;
+
+    const dissolveTimeline = createTimeline({
+      defaults: { ease: "inOutSine" },
+      onComplete: () => {
+        keepCompletionFrame = true;
+        setPreviewWeekStage((current) => (current < 7 ? 7 : current));
+      }
+    })
+      .add(tableEl, {
+        translateY: [0, -74],
+        opacity: [1, 0],
+        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS
+      }, Math.round(PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS * 0.18))
+      .add(contentTargets, {
+        opacity: [1, 0],
+        translateY: (_, index) => contentMeta[index]?.rise ?? -24,
+        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 560,
+        delay: (_, index) => contentMeta[index]?.delay ?? 0,
+        ease: "inOutSine"
+      }, 0)
+      .add(particles, {
+        translateX: (_, index) => particleMeta[index].driftX,
+        translateY: (_, index) => particleMeta[index].driftY,
+        rotate: (_, index) => particleMeta[index].rotate,
+        scale: [1, (_, index) => particleMeta[index].scale],
+        opacity: [1, 0],
+        filter: ["blur(0px)", "blur(1.4px)"],
+        delay: (_, index) => particleMeta[index].delay,
+        duration: (_, index) => particleMeta[index].duration,
+        ease: "outSine"
+      }, 0);
+
+    previewWeekParticlePlayersRef.current = [dissolveTimeline];
+
+    return () => {
+      if (!keepCompletionFrame) {
+        clearPreviewWeekParticleAnimation();
+      }
+    };
+  }, [activePreviewChapter.id, previewWeekStage]);
+
   useEffect(
     () => () => {
       if (previewSwitchTimeoutRef.current) {
         window.clearTimeout(previewSwitchTimeoutRef.current);
       }
       clearPreviewFillTimers();
+      clearPreviewWeekParticleAnimation();
     },
     []
   );
@@ -1342,3 +1525,4 @@ export default function PreviewPage({
     </section>
   );
 }
+
