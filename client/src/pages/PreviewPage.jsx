@@ -53,6 +53,8 @@ const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_TOC_SWITCH_MS = 920;
 const PREVIEW_GENERATING_HOLD_MS = 2400;
+const PREVIEW_WEEK_REVEAL_START_MS = 160;
+const PREVIEW_WEEK_REVEAL_STEP_MS = 110;
 const PREVIEW_WEEK_DAY_ORDER = [
   "Sunday",
   "Monday",
@@ -109,6 +111,7 @@ export default function PreviewPage({
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
   const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
   const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
+  const [previewWeekRevealCount, setPreviewWeekRevealCount] = useState(0);
 
   const previewLocale = (() => {
     if (typeof navigator === "undefined") return "en-US";
@@ -236,7 +239,6 @@ export default function PreviewPage({
       if (!isTrainingDay) {
         return {
           day,
-          short: day.slice(0, 3).toUpperCase(),
           session: "Active Recovery",
           meta: "20-30 min • Mobility",
           highlights: ["Zone 2 walk", "Stretch + mobility", "Recovery check-in"],
@@ -249,7 +251,6 @@ export default function PreviewPage({
       trainingIndex += 1;
       return {
         day,
-        short: day.slice(0, 3).toUpperCase(),
         session,
         meta: `${sessionDuration} • ${environmentLabel}`,
         highlights: [`${focus} emphasis`, "Main lift + accessories", "Cooldown + notes"],
@@ -711,25 +712,72 @@ export default function PreviewPage({
 
   const renderPreviewWorkoutWeekChapter = () => (
     <div className="preview-week-plan" aria-label="Generated weekly workout preview">
-      <div className="preview-week-grid">
-        {previewWeekPlan.map((dayPlan) => (
-          <article
-            key={`preview-week-${dayPlan.day}`}
-            className={`preview-week-day ${dayPlan.isTraining ? "is-training" : "is-recovery"}`}
-          >
-            <header className="preview-week-day-header">
-              <p>{dayPlan.short}</p>
-              <h3>{dayPlan.day}</h3>
-            </header>
-            <p className="preview-week-session">{dayPlan.session}</p>
-            <p className="preview-week-meta">{dayPlan.meta}</p>
-            <ul className="preview-week-highlights">
-              {dayPlan.highlights.map((item, itemIndex) => (
-                <li key={`preview-week-${dayPlan.day}-item-${itemIndex}`}>{item}</li>
+      <div className="preview-week-table-wrap">
+        <table className="preview-week-table">
+          <thead>
+            <tr>
+              <th className="preview-week-row-label preview-week-corner-cell">Plan</th>
+              {previewWeekPlan.map((dayPlan, dayIndex) => (
+                <th
+                  key={`preview-week-head-${dayPlan.day}`}
+                  scope="col"
+                  className={`preview-week-day-cell preview-week-day-head ${
+                    dayPlan.isTraining ? "is-training" : "is-recovery"
+                  } ${
+                    dayIndex < previewWeekRevealCount ? "is-visible" : ""
+                  }`}
+                >
+                  <h3 className="preview-week-day-name">{dayPlan.day}</h3>
+                </th>
               ))}
-            </ul>
-          </article>
-        ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" className="preview-week-row-label">Session</th>
+              {previewWeekPlan.map((dayPlan, dayIndex) => (
+                <td
+                  key={`preview-week-session-${dayPlan.day}`}
+                  className={`preview-week-day-cell ${
+                    dayPlan.isTraining ? "is-training" : "is-recovery"
+                  } ${dayIndex < previewWeekRevealCount ? "is-visible" : ""}`}
+                >
+                  <p className="preview-week-session">{dayPlan.session}</p>
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th scope="row" className="preview-week-row-label">Duration</th>
+              {previewWeekPlan.map((dayPlan, dayIndex) => (
+                <td
+                  key={`preview-week-meta-${dayPlan.day}`}
+                  className={`preview-week-day-cell ${
+                    dayPlan.isTraining ? "is-training" : "is-recovery"
+                  } ${dayIndex < previewWeekRevealCount ? "is-visible" : ""}`}
+                >
+                  <p className="preview-week-meta">{dayPlan.meta}</p>
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th scope="row" className="preview-week-row-label">Highlights</th>
+              {previewWeekPlan.map((dayPlan, dayIndex) => (
+                <td
+                  key={`preview-week-highlights-${dayPlan.day}`}
+                  className={`preview-week-day-cell preview-week-highlights-cell ${
+                    dayPlan.isTraining ? "is-training" : "is-recovery"
+                  } ${dayIndex < previewWeekRevealCount ? "is-visible" : ""}`}
+                >
+                  <ul className="preview-week-highlights">
+                    {dayPlan.highlights.map((item, itemIndex) => (
+                      <li key={`preview-week-${dayPlan.day}-item-${itemIndex}`}>{item}</li>
+                    ))}
+                  </ul>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -831,6 +879,7 @@ export default function PreviewPage({
     clearPreviewFillTimers();
 
     if (activePreviewChapter.id === "generate") {
+      setPreviewWeekRevealCount(0);
       markAllFilled();
       setPreviewPersonalCollapsed(true);
       setPreviewPersonalShifted(true);
@@ -863,7 +912,29 @@ export default function PreviewPage({
       return undefined;
     }
 
+    if (activePreviewChapter.id === "workout-week") {
+      setPreviewFilledFields({});
+      setPreviewPersonalCollapsed(false);
+      setPreviewPersonalShifted(false);
+      setPreviewBuilderStage(0);
+
+      if (prefersReducedMotion) {
+        setPreviewWeekRevealCount(PREVIEW_WEEK_DAY_ORDER.length);
+        return undefined;
+      }
+
+      setPreviewWeekRevealCount(0);
+      PREVIEW_WEEK_DAY_ORDER.forEach((_, dayIndex) => {
+        const dayRevealTimeoutId = window.setTimeout(() => {
+          setPreviewWeekRevealCount((prev) => Math.max(prev, dayIndex + 1));
+        }, PREVIEW_WEEK_REVEAL_START_MS + (dayIndex * PREVIEW_WEEK_REVEAL_STEP_MS));
+        previewFillTimeoutsRef.current.push(dayRevealTimeoutId);
+      });
+      return undefined;
+    }
+
     if (activePreviewChapter.id !== "personal-info") {
+      setPreviewWeekRevealCount(0);
       setPreviewFilledFields({});
       setPreviewPersonalCollapsed(false);
       setPreviewPersonalShifted(false);
@@ -881,6 +952,7 @@ export default function PreviewPage({
     }
 
     setPreviewFilledFields({});
+    setPreviewWeekRevealCount(0);
     setPreviewPersonalCollapsed(false);
     setPreviewPersonalShifted(false);
     setPreviewBuilderStage(0);
