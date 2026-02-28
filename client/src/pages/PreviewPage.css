@@ -12,10 +12,12 @@ html.preview-smooth-scroll {
   text-align: center;
   --preview-body-width: clamp(1200px, 90vw, 1760px);
   --preview-body-copy-size: 0.86rem;
-  --preview-toc-reserve: clamp(132px, 16vw, 248px);
+  --preview-chip-expanded: calc(12ch + 1.35rem);
+  --preview-toc-reserve: calc((var(--preview-chip-expanded) * 2) + 20px);
   --preview-header-top: clamp(62px, 9vh, 86px);
   --preview-header-height: clamp(56px, 8vh, 78px);
   --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 10px);
+  --preview-content-height: clamp(420px, 56vh, 640px);
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -152,14 +154,13 @@ html.preview-smooth-scroll {
 
 .preview-side-tab {
   --preview-chip-collapsed: 44px;
-  --preview-chip-expanded: clamp(128px, 14vw, 196px);
   --preview-toc-width-ms: 900ms;
   position: fixed;
   left: 0;
   top: var(--preview-header-top);
-  width: fit-content;
-  min-width: 112px;
-  max-width: clamp(148px, 19vw, 248px);
+  width: max-content;
+  min-width: 0;
+  max-width: max-content;
   max-height: calc(100vh - var(--preview-header-top) - 12px);
   z-index: 28;
   display: grid;
@@ -220,7 +221,7 @@ html.preview-smooth-scroll {
 
 .preview-card-pages {
   width: 100%;
-  min-height: clamp(420px, 56vh, 640px);
+  min-height: var(--preview-content-height);
   margin: 0 auto;
   display: grid;
   align-items: start;
@@ -230,7 +231,7 @@ html.preview-smooth-scroll {
 }
 
 .preview-step-card.is-personal-collapsed .preview-card-pages {
-  min-height: clamp(420px, 56vh, 640px);
+  min-height: var(--preview-content-height);
 }
 
 .preview-card-page {
@@ -497,6 +498,7 @@ html.preview-smooth-scroll {
   --personal-morph-duration: var(--preview-motion-duration, 1100ms);
   --personal-morph-ease: var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1));
   --personal-button-shift-x: 0px;
+  --personal-button-shift-y: 0px;
   --personal-collapse-shift-x: 0px;
   /* Small negative inset avoids clipping near rounded top corners while expanded. */
   --personal-collapse-inset-x: -2px;
@@ -504,7 +506,7 @@ html.preview-smooth-scroll {
   --personal-collapse-radius: 18px;
   position: relative;
   width: 100%;
-  min-height: clamp(420px, 56vh, 640px);
+  min-height: var(--preview-content-height);
   overflow: visible;
   isolation: isolate;
   clip-path: inset(
@@ -536,8 +538,10 @@ html.preview-smooth-scroll {
     + (var(--preview-builder-gap) * 2)
   );
   position: relative;
+  display: grid;
+  align-items: center;
   width: 100%;
-  min-height: clamp(420px, 56vh, 640px);
+  min-height: var(--preview-content-height);
 }
 
 .preview-personal-sequence.is-generate-view .preview-personal-morph-surface {
@@ -575,7 +579,10 @@ html.preview-smooth-scroll {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform: translate(calc(-50% - var(--personal-button-shift-x)), -50%);
+  transform: translate(
+    calc(-50% - var(--personal-button-shift-x)),
+    calc(-50% + var(--personal-button-shift-y))
+  );
   opacity: 0;
   color: #fff;
   border-radius: 999px;
@@ -608,10 +615,15 @@ html.preview-smooth-scroll {
 
 .preview-personal-form-shell.is-collapsed {
   /* Add 1px breathing room around the collapsed pill to prevent bottom trim. */
-  --personal-collapse-inset-x: calc(50% - 117px);
-  --personal-collapse-inset-y: calc(50% - 24px);
+  --personal-collapse-inset-x: calc(50% - ((var(--preview-builder-pill-width) / 2) + 1px));
+  --personal-collapse-inset-y: calc(50% - ((var(--preview-builder-pill-height) / 2) + 1px));
+  --personal-button-shift-y: 0px;
   --personal-collapse-radius: 999px;
   min-height: 120px;
+}
+
+.preview-personal-sequence.is-builder-active .preview-personal-form-shell.is-collapsed {
+  min-height: var(--preview-content-height);
 }
 
 .preview-personal-form-shell.is-collapsed .preview-personal-form {
@@ -623,11 +635,14 @@ html.preview-smooth-scroll {
 }
 
 .preview-personal-form-shell.is-collapsed .preview-personal-morph-surface {
-  width: 232px;
-  height: 46px;
+  width: var(--preview-builder-pill-width);
+  height: var(--preview-builder-pill-height);
   left: 50%;
   top: 50%;
-  transform: translate(calc(-50% - var(--personal-button-shift-x)), -50%);
+  transform: translate(
+    calc(-50% - var(--personal-button-shift-x)),
+    calc(-50% + var(--personal-button-shift-y))
+  );
   border-radius: 999px;
   border-color: transparent;
   background: transparent;
@@ -636,7 +651,10 @@ html.preview-smooth-scroll {
 
 .preview-personal-form-shell.is-collapsed .preview-personal-morph-label {
   opacity: 1;
-  transform: translate(calc(-50% - var(--personal-button-shift-x)), -50%);
+  transform: translate(
+    calc(-50% - var(--personal-button-shift-x)),
+    calc(-50% + var(--personal-button-shift-y))
+  );
   transition-delay: 0ms;
 }
 
@@ -956,15 +974,17 @@ html.preview-smooth-scroll {
 
 .preview-week-plan {
   width: 100%;
-  min-height: max(clamp(420px, 56vh, 640px), calc(100vh - var(--preview-body-top) - 18px));
+  min-height: var(--preview-content-height);
   display: grid;
   align-items: center;
+  position: relative;
   padding-top: 0;
 }
 
 .preview-week-table-wrap {
+  position: relative;
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(12, 12, 12, 0.9), rgba(4, 4, 4, 0.88));
   box-shadow:
@@ -972,6 +992,59 @@ html.preview-smooth-scroll {
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow-x: hidden;
   overflow-y: hidden;
+}
+
+.preview-week-outline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  border-radius: 14px;
+}
+
+.preview-week-outline-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  transition:
+    opacity 220ms ease var(--preview-line-delay, 0ms),
+    transform 520ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1))
+      var(--preview-line-delay, 0ms);
+}
+
+.preview-week-outline-line.horizontal {
+  top: var(--preview-line-offset, 0%);
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.preview-week-outline-line.vertical {
+  top: 0;
+  left: var(--preview-line-offset, 0%);
+  width: 1px;
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line {
+  opacity: 1;
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line.horizontal {
+  transform: scaleX(1);
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line.vertical {
+  transform: scaleY(1);
+}
+
+.preview-week-plan.is-rows-visible .preview-week-outline {
+  opacity: 0;
+  transition: opacity 220ms ease 120ms;
 }
 
 .preview-week-table {
@@ -983,9 +1056,15 @@ html.preview-smooth-scroll {
 
 .preview-week-table th,
 .preview-week-table td {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
   padding: 16px 14px;
   vertical-align: top;
+  transition: border-color 280ms ease;
+}
+
+.preview-week-plan.is-rows-visible .preview-week-table th,
+.preview-week-plan.is-rows-visible .preview-week-table td {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .preview-week-row-label {
@@ -998,6 +1077,16 @@ html.preview-smooth-scroll {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 360ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1)),
+    transform 360ms var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1));
+}
+
+.preview-week-row-label.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .preview-week-corner-cell {
@@ -1108,6 +1197,10 @@ html.preview-smooth-scroll {
   top: 0.52em;
 }
 
+.preview-week-highlights li.is-empty::before {
+  opacity: 0;
+}
+
 .preview-personal-form input,
 .preview-personal-form select,
 .preview-personal-form textarea,
@@ -1184,7 +1277,7 @@ html.preview-smooth-scroll {
 
   .preview-stage-panel {
     width: 100%;
-    --preview-toc-reserve: clamp(124px, 18vw, 228px);
+    --preview-toc-reserve: calc((var(--preview-chip-expanded) * 2) + 16px);
   }
 
   .preview-scroll-story {
@@ -1198,9 +1291,9 @@ html.preview-smooth-scroll {
   }
 
   .preview-side-tab {
-    width: fit-content;
-    min-width: 112px;
-    max-width: clamp(148px, 19vw, 248px);
+    width: max-content;
+    min-width: 0;
+    max-width: max-content;
     padding: 4px 4px 4px 2px;
     box-sizing: border-box;
   }
@@ -1274,9 +1367,9 @@ html.preview-smooth-scroll {
     top: var(--preview-header-top);
     left: 0;
     transform: none;
-    width: fit-content;
-    min-width: 96px;
-    max-width: min(44vw, 180px);
+    width: max-content;
+    min-width: 0;
+    max-width: max-content;
     margin: 0;
     grid-template-columns: 1fr;
     gap: 8px;
@@ -1374,7 +1467,10 @@ html.preview-smooth-scroll {
   .preview-builder-slot,
   .preview-builder-plus,
   .preview-builder-generating,
-  .preview-week-day-cell {
+  .preview-week-day-cell,
+  .preview-week-row-label,
+  .preview-week-outline,
+  .preview-week-outline-line {
     transition: none;
   }
 
