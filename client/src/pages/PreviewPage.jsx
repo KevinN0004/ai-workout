@@ -86,6 +86,7 @@ const PREVIEW_WEEK_PARTICLE_MAX_DURATION_MS = 2650;
 const PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS = 980;
 const PREVIEW_WEEK_PARTICLE_JITTER_MS = 18;
 const PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS = 3000;
+const PREVIEW_DASHBOARD_AUTO_ADVANCE_MS = 820;
 const PREVIEW_WEEK_MIN_WORKOUT_DAYS = 5;
 const PREVIEW_WEEK_DAY_NORMALIZATION = {
   mon: "Monday",
@@ -138,6 +139,12 @@ const getPreviewTypingStepMs = (textLength) =>
     Math.min(PREVIEW_TYPING_MAX_MS, Math.round(560 / Math.max(Number(textLength) || 1, 1)))
   );
 const randomBetween = (min, max) => min + (Math.random() * (max - min));
+const getPreviewWeekdayName = (dateValue) => {
+  const dayIndex = Number(dateValue?.getDay?.());
+  if (!Number.isInteger(dayIndex)) return PREVIEW_WEEK_DAY_ORDER[0];
+  const normalizedDayIndex = (dayIndex + 6) % 7; // Monday-first index
+  return PREVIEW_WEEK_DAY_ORDER[normalizedDayIndex] || PREVIEW_WEEK_DAY_ORDER[0];
+};
 
 export default function PreviewPage({
   personal,
@@ -353,6 +360,109 @@ export default function PreviewPage({
     activePreviewProfile.environment
   ]);
 
+  const previewDashboardSummary = useMemo(() => {
+    const trainingDays = previewWeekPlan.filter((item) => item.isTraining);
+    const requestedGoalDays = Number(activePreviewProfile.days);
+    const weeklyGoal = clamp(
+      Number.isFinite(requestedGoalDays) ? Math.round(requestedGoalDays) : trainingDays.length || 4,
+      1,
+      PREVIEW_WEEK_DAY_ORDER.length
+    );
+    const completedWorkouts = clamp(trainingDays.length, 0, weeklyGoal);
+    const workoutProgress = clamp(Math.round((completedWorkouts / Math.max(weeklyGoal, 1)) * 100), 0, 100);
+
+    const calorieGoal = clamp(Math.round((activeWeightKg * 30) + (weeklyGoal * 18)), 1700, 3400);
+    const avgCalories = clamp(
+      Math.round(calorieGoal * (0.92 + ((workoutProgress / 100) * 0.06))),
+      1500,
+      3600
+    );
+    const calorieProgress = clamp(Math.round((avgCalories / Math.max(calorieGoal, 1)) * 100), 0, 100);
+
+    const goalText = String(activePreviewProfile.goal || JOHN_DOE_PREVIEW_PROFILE.goal);
+    const goalTokens = goalText.toLowerCase();
+    const targetWeightKg = (() => {
+      if (/lose|cut|fat/.test(goalTokens)) return Math.max(activeWeightKg - 3.5, 45);
+      if (/gain|bulk|mass/.test(goalTokens)) return activeWeightKg + 2.2;
+      return Math.max(activeWeightKg - 1.2, 45);
+    })();
+    const targetWeightLabel = usesImperialUnits
+      ? `${Math.round(Number(toLb(String(roundTo(targetWeightKg, 1)), "kg")))} lb`
+      : `${Math.round(targetWeightKg)} kg`;
+
+    const todayName = getPreviewWeekdayName(new Date());
+    const todayPlan = previewWeekPlan.find((item) => item.day === todayName) || previewWeekPlan[0];
+    const todayWorkoutLines = String(todayPlan?.workout || "")
+      .split(" - ")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const todayDuration = String(todayPlan?.meta || "50 min").split(" - ")[0].trim();
+
+    const todayIndex = Math.max(0, PREVIEW_WEEK_DAY_ORDER.indexOf(todayPlan?.day || todayName));
+    let nextTrainingPlan = null;
+    for (let offset = 1; offset <= PREVIEW_WEEK_DAY_ORDER.length; offset += 1) {
+      const nextIndex = (todayIndex + offset) % PREVIEW_WEEK_DAY_ORDER.length;
+      const candidate = previewWeekPlan[nextIndex];
+      if (candidate?.isTraining) {
+        nextTrainingPlan = candidate;
+        break;
+      }
+    }
+    if (!nextTrainingPlan) nextTrainingPlan = trainingDays[0] || previewWeekPlan[0];
+
+    let runningStreak = 0;
+    let bestStreak = 0;
+    previewWeekPlan.forEach((dayPlan) => {
+      if (dayPlan.isTraining) {
+        runningStreak += 1;
+        bestStreak = Math.max(bestStreak, runningStreak);
+      } else {
+        runningStreak = 0;
+      }
+    });
+    const streakDays = Math.max(1, Math.min(bestStreak || completedWorkouts || 1, weeklyGoal));
+
+    const recentActivity = trainingDays.slice(0, 4).map((dayPlan) => ({
+      day: dayPlan.day,
+      session: dayPlan.session,
+      duration: String(dayPlan.meta || "50 min").split(" - ")[0].trim()
+    }));
+    const focusPicks =
+      Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
+        ? activePreviewProfile.focuses.slice(0, 3)
+        : JOHN_DOE_PREVIEW_PROFILE.focuses.slice(0, 3);
+
+    return {
+      weeklyGoal,
+      completedWorkouts,
+      workoutProgress,
+      avgCalories,
+      calorieGoal,
+      calorieProgress,
+      targetWeightLabel,
+      streakDays,
+      goalText,
+      scheduleText: `${weeklyGoal} days - ${Number(activePreviewProfile.duration) || 50} min`,
+      todayName,
+      todaySession: String(todayPlan?.session || "Training Session"),
+      todayDuration,
+      todayWorkoutLines,
+      nextTrainingPlan,
+      recentActivity,
+      focusPicks
+    };
+  }, [
+    previewWeekPlan,
+    activePreviewProfile.days,
+    activePreviewProfile.duration,
+    activePreviewProfile.focuses,
+    activePreviewProfile.goal,
+    activeWeightKg,
+    usesImperialUnits,
+    toLb
+  ]);
+
   const previewPersonalTargets = useMemo(
     () => ({
       name: String(defaultName ?? ""),
@@ -476,10 +586,16 @@ export default function PreviewPage({
       id: "workout-week",
       title: "Result",
       fields: []
+    },
+    {
+      id: "dashboard-preview",
+      title: "Dashboard",
+      fields: []
     }
   ];
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
   const workoutWeekChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "workout-week");
+  const dashboardPreviewChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "dashboard-preview");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
   const previousPreviewChapter =
@@ -969,6 +1085,122 @@ export default function PreviewPage({
     );
   };
 
+  const renderPreviewDashboardChapter = () => {
+    const {
+      weeklyGoal,
+      completedWorkouts,
+      workoutProgress,
+      avgCalories,
+      calorieGoal,
+      calorieProgress,
+      targetWeightLabel,
+      streakDays,
+      goalText,
+      scheduleText,
+      todayName,
+      todaySession,
+      todayDuration,
+      todayWorkoutLines,
+      nextTrainingPlan,
+      recentActivity,
+      focusPicks
+    } = previewDashboardSummary;
+
+    const nextWorkoutDuration = String(nextTrainingPlan?.meta || "50 min").split(" - ")[0].trim();
+    const nextWorkoutNotes = Array.isArray(nextTrainingPlan?.highlights)
+      ? nextTrainingPlan.highlights.slice(0, 2)
+      : [];
+
+    return (
+      <section className="preview-dashboard-summary" aria-label="Dashboard preview snapshot">
+        <header className="preview-dashboard-summary-head">
+          <p className="preview-dashboard-eyebrow">Dashboard Snapshot</p>
+          <h3>Core Metrics</h3>
+          <p className="muted">Most important information from your generated plan.</p>
+        </header>
+
+        <div className="preview-dashboard-kpi-grid">
+          <article className="preview-dashboard-kpi">
+            <span>Workouts</span>
+            <strong>{completedWorkouts}/{weeklyGoal}</strong>
+            <div className="preview-dashboard-progress">
+              <span style={{ width: `${workoutProgress}%` }} />
+            </div>
+            <p>{workoutProgress}% weekly completion</p>
+          </article>
+          <article className="preview-dashboard-kpi">
+            <span>Calories</span>
+            <strong>{avgCalories} / {calorieGoal}</strong>
+            <div className="preview-dashboard-progress">
+              <span style={{ width: `${calorieProgress}%` }} />
+            </div>
+            <p>{calorieProgress}% of target intake</p>
+          </article>
+          <article className="preview-dashboard-kpi">
+            <span>Target Weight</span>
+            <strong>{targetWeightLabel}</strong>
+            <p>{goalText}</p>
+          </article>
+          <article className="preview-dashboard-kpi">
+            <span>Streak</span>
+            <strong>{streakDays} day{streakDays === 1 ? "" : "s"}</strong>
+            <p>{scheduleText}</p>
+          </article>
+        </div>
+
+        <div className="preview-dashboard-panel-grid">
+          <article className="preview-dashboard-panel">
+            <h4>{todayName} focus</h4>
+            <p className="preview-dashboard-session">{todaySession}</p>
+            <p className="muted">{todayDuration}</p>
+            <ul>
+              {todayWorkoutLines.map((line) => (
+                <li key={`dashboard-today-${line}`}>{line}</li>
+              ))}
+              {!todayWorkoutLines.length ? <li>Active recovery and mobility reset</li> : null}
+            </ul>
+          </article>
+
+          <article className="preview-dashboard-panel">
+            <h4>Next workout</h4>
+            <p className="preview-dashboard-session">
+              {nextTrainingPlan?.day || "Next"} - {nextTrainingPlan?.session || "Training Session"}
+            </p>
+            <p className="muted">{nextWorkoutDuration}</p>
+            <ul>
+              {nextWorkoutNotes.map((item) => (
+                <li key={`dashboard-next-${item}`}>{item}</li>
+              ))}
+              {!nextWorkoutNotes.length ? <li>Compound lifts first, accessories second</li> : null}
+            </ul>
+          </article>
+
+          <article className="preview-dashboard-panel">
+            <h4>Recent activity</h4>
+            <ul>
+              {recentActivity.map((item) => (
+                <li key={`dashboard-recent-${item.day}`}>
+                  {item.day}: {item.session} ({item.duration})
+                </li>
+              ))}
+              {!recentActivity.length ? <li>No sessions logged yet</li> : null}
+            </ul>
+          </article>
+
+          <article className="preview-dashboard-panel">
+            <h4>Focus picks</h4>
+            <div className="preview-dashboard-focus-pills">
+              {focusPicks.map((focus) => (
+                <span key={`dashboard-focus-${focus}`}>{focus}</span>
+              ))}
+            </div>
+            <p className="muted">These tags drive your weekly recommendations.</p>
+          </article>
+        </div>
+      </section>
+    );
+  };
+
   const renderPreviewChapterBody = (chapter) => (
     chapter.id === "personal-info" ? (
       renderPreviewPersonalInfoChapter(false)
@@ -976,6 +1208,8 @@ export default function PreviewPage({
       renderPreviewPersonalInfoChapter(true)
     ) : chapter.id === "workout-week" ? (
       renderPreviewWorkoutWeekChapter()
+    ) : chapter.id === "dashboard-preview" ? (
+      renderPreviewDashboardChapter()
     ) : (
       <div className="preview-fields-grid">
         {chapter.fields.map((field, fieldIndex) => {
@@ -1420,6 +1654,12 @@ export default function PreviewPage({
       onComplete: () => {
         keepCompletionFrame = true;
         setPreviewWeekStage((current) => (current < 7 ? 7 : current));
+        if (dashboardPreviewChapterIndex >= 0 && previewStepIndexRef.current === workoutWeekChapterIndex) {
+          const dashboardAdvanceTimeoutId = window.setTimeout(() => {
+            scrollToChapter(dashboardPreviewChapterIndex);
+          }, PREVIEW_DASHBOARD_AUTO_ADVANCE_MS);
+          previewFillTimeoutsRef.current.push(dashboardAdvanceTimeoutId);
+        }
       }
     })
       .add(tableEl, {
