@@ -28,7 +28,7 @@
   z-index: 24;
   padding-top: 12px;
   padding-bottom: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   background: linear-gradient(
     180deg,
     rgba(0, 0, 0, 0.96) 0%,
@@ -36,6 +36,34 @@
     rgba(0, 0, 0, 0.4) 100%
   );
   backdrop-filter: blur(8px);
+}
+
+.dashboard-page .dashboard-header-note {
+  margin: 6px 0 20px;
+  text-align: center;
+}
+
+.dashboard-page > .title .header-top {
+  min-height: 52px;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.dashboard-page > .title .header-center h1 {
+  margin-bottom: 0;
+  line-height: 1;
+}
+
+.dashboard-page > .title .header-left,
+.dashboard-page > .title .auth-actions {
+  min-height: 40px;
+  align-self: center;
+}
+
+.dashboard-page > .title .nav-trigger .icon-button,
+.dashboard-page > .title .profile-icon-button {
+  width: 40px;
+  height: 40px;
 }
 
 :where(.dashboard-page) div {
@@ -632,16 +660,11 @@
 .drawer-links {
   display: grid;
   gap: 12px;
-  align-content: start;
+  justify-items: center;
+  align-content: center;
 }
 
-.drawer-link-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.drawer-link-row > button,
+.drawer-links button,
 .drawer-footer button {
   background: var(--dash-card-bg);
   border: 1px solid var(--dash-card-border);
@@ -668,14 +691,14 @@
   border-color: #eee;
 }
 
-.drawer-link-row > button:hover,
+.drawer-links button:hover,
 .drawer-footer button:hover {
   border-color: var(--dash-card-border-strong);
   background: #313131;
   transform: translateY(-1px);
 }
 
-.drawer-link-row > button.active,
+.drawer-links button.active,
 .drawer-footer button.active {
   background: var(--dash-pill-bg-strong);
   border-color: var(--dash-card-border-strong);
@@ -734,14 +757,43 @@
   }
 
   .dashboard-page > .title {
+    margin-bottom: 0;
+  }
+
+  .dashboard-page .dashboard-header-note {
     margin-bottom: 14px;
   }
 }
 
 @media (max-width: 720px) {
+  .dashboard-page > .title .header-top {
+    grid-template-columns: 1fr auto 1fr;
+    justify-items: stretch;
+    text-align: center;
+  }
+
+  .dashboard-page > .title .header-left {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .dashboard-page > .title .auth-actions {
+    justify-self: end;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .dashboard-page > .title .header-top {
+    min-height: 48px;
+  }
+
   .dashboard-page > .title {
     padding-top: 8px;
     padding-bottom: 8px;
+  }
+
+  .dashboard-page .dashboard-header-note {
+    margin-top: 4px;
   }
 
   .dashboard-workout-form {
@@ -752,7 +804,7 @@
     grid-template-columns: 1fr;
   }
 
-  .drawer-link-row > button,
+  .drawer-links button,
   .drawer-footer button {
     padding: 12px 14px;
     font-size: 15px;

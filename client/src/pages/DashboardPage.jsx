@@ -668,8 +668,8 @@ export default function DashboardPage({
               </div>
             </div>
           </div>
-          <p className="muted">Visual summary of your progress and key metrics.</p>
         </header>
+        <p className="muted dashboard-header-note">Visual summary of your progress and key metrics.</p>
 
         <section className="panel dashboard-at-a-glance">
           <div className="dashboard-at-a-glance-head">
@@ -1019,19 +1019,29 @@ export default function DashboardPage({
               </button>
             </div>
             <div className="drawer-links">
-              {DASH_DRAWER_ITEMS.map((item) => (
-                <div key={item.key} className="drawer-link-row">
-                  <button
-                    type="button"
-                    className={dashView === item.key ? "active" : ""}
-                    onClick={() => {
-                      navigateDashView(item.key, { closeDrawer: true });
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                </div>
+              {DASH_DRAWER_ITEMS.filter((item) => item.key !== "settings").map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={dashView === item.key ? "active" : ""}
+                  onClick={() => {
+                    navigateDashView(item.key, { closeDrawer: true });
+                  }}
+                >
+                  {item.label}
+                </button>
               ))}
+            </div>
+            <div className="drawer-footer">
+              <button
+                type="button"
+                className={dashView === "settings" ? "active" : ""}
+                onClick={() => {
+                  navigateDashView("settings", { closeDrawer: true });
+                }}
+              >
+                Settings
+              </button>
             </div>
           </aside>
         </div>
