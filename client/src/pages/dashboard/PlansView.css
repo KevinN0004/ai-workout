@@ -25,6 +25,10 @@
   gap: 16px;
 }
 
+.plans-view .plan-row-header > * {
+  min-width: 0;
+}
+
 .plans-view .plan-row-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -72,6 +76,8 @@
   font-size: 0.82rem;
   line-height: 1.2;
   text-align: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .plans-view .tips-status-pill {
@@ -83,6 +89,8 @@
   font-size: 0.82rem;
   line-height: 1.2;
   text-align: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .plans-view .meal-day-type {
@@ -166,6 +174,7 @@
   display: flex;
   gap: 8px;
   margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .plans-view .saved-exercise-actions .ghost {
@@ -176,13 +185,30 @@
 }
 
 @media (max-width: 720px) {
+  .plans-view .plan-row {
+    padding: 16px;
+  }
+
   .plans-view .plan-row-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
+  .plans-view .plan-row-grid {
+    grid-template-columns: 1fr;
+  }
+
   .plans-view .plan-row-grid-split {
     grid-template-columns: 1fr;
+  }
+
+  .plans-view .meal-track-pill,
+  .plans-view .tips-status-pill {
+    width: 100%;
+  }
+
+  .plans-view .saved-exercise-actions .ghost {
+    width: 100%;
   }
 
   .plan-day-detail-modal .modal-header {

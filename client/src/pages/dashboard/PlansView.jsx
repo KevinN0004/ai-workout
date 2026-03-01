@@ -182,7 +182,7 @@ export default function PlansView({
             <div>
               <h3>Saved exercise bank</h3>
               <p className="muted">
-                Movements saved from the guides library for quick reference in your weekly plans.
+                Exercises saved from Guides for quick use in your weekly plans.
               </p>
             </div>
             <div className="tips-status-pill">
@@ -193,10 +193,7 @@ export default function PlansView({
             {savedExercises.map((item) => (
               <article key={item.id} className="hub-card saved-exercise-card">
                 <h4>{item.name || "Exercise"}</h4>
-                <p className="muted">
-                  {item.category || "General"}{" "}
-                  {item.source ? `| ${String(item.source).toUpperCase()}` : ""}
-                </p>
+                <p className="muted">{item.category || "General"}</p>
                 {Array.isArray(item.muscles) && item.muscles.length ? (
                   <p className="muted">Muscles: {item.muscles.slice(0, 4).join(", ")}</p>
                 ) : null}
@@ -229,7 +226,7 @@ export default function PlansView({
               <article className="hub-card">
                 <h4>No saved exercises yet</h4>
                 <p className="muted">
-                  Open Guides, browse Wger exercises, and tap Save to add your favorites here.
+                  Open Guides, browse exercises, and tap Save to add your favorites here.
                 </p>
               </article>
             ) : null}

@@ -7,3 +7,19 @@
   align-content: center;
   text-align: center;
 }
+
+.dashboard-home-view .back-btn {
+  min-width: 160px;
+}
+
+@media (max-width: 720px) {
+  .dashboard-home-view {
+    min-height: 200px;
+    align-content: start;
+  }
+
+  .dashboard-home-view .back-btn {
+    width: 100%;
+    min-width: 0;
+  }
+}

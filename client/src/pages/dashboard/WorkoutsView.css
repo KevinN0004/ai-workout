@@ -38,11 +38,41 @@
 .workouts-view .workout-row-copy {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .workouts-view .workout-detail {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workouts-view .log-list-row,
+.workouts-view .workout-list-row {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.workouts-view .log-list-row > span,
+.workouts-view .workout-list-row > span {
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .workouts-view .log-section {
+    padding: 12px;
+  }
+
+  .workouts-view .log-list-row,
+  .workouts-view .workout-list-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .workouts-view .log-list-row > span,
+  .workouts-view .workout-list-row > span {
+    white-space: normal;
+  }
 }
 

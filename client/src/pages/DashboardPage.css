@@ -22,6 +22,22 @@
   background: linear-gradient(150deg, var(--dash-page-bg) 0%, var(--dash-page-bg-alt) 100%);
 }
 
+.dashboard-page > .title {
+  position: sticky;
+  top: 0;
+  z-index: 24;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.96) 0%,
+    rgba(0, 0, 0, 0.88) 72%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  backdrop-filter: blur(8px);
+}
+
 :where(.dashboard-page) div {
   background-color: inherit;
 }
@@ -216,6 +232,27 @@
   border-color: var(--dash-card-border-strong);
 }
 
+.dashboard-page .dashboard-title-button {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.dashboard-page .dashboard-title-button:hover {
+  color: #f5f5f5;
+}
+
+.dashboard-page .dashboard-title-button:focus-visible {
+  outline: 2px solid var(--dash-focus-ring);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
 .dashboard-page .cta,
 .dashboard-page .back-btn {
   background: #fff !important;
@@ -259,6 +296,32 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+}
+
+.dashboard-view-shell {
+  width: 100%;
+}
+
+.dashboard-view-shell.is-hidden {
+  display: none;
+}
+
+.dashboard-loading-card {
+  min-height: 260px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  border-style: dashed;
+}
+
+.dashboard-loading-card h2 {
+  margin: 0;
+}
+
+.dashboard-inline-status {
+  margin-top: 4px;
 }
 
 .dashboard-workout-form {
@@ -423,13 +486,55 @@
   outline: none;
 }
 
+@media (max-width: 960px) {
+  .drawer {
+    width: min(300px, 92vw);
+    padding: 16px;
+  }
+
+  .dashboard-page > .title {
+    margin-bottom: 14px;
+  }
+}
+
 @media (max-width: 720px) {
+  .dashboard-page > .title {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
   .dashboard-workout-form {
     grid-template-columns: 1fr;
   }
 
   .dashboard-workout-grid {
     grid-template-columns: 1fr;
+  }
+
+  .drawer-links button,
+  .drawer-footer button {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+
+  .profile-menu-dropdown {
+    position: fixed;
+    top: 74px;
+    left: 12px;
+    right: 12px;
+    min-width: 0;
+  }
+
+  .dashboard-inline-status {
+    text-align: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .drawer {
+    width: 100%;
+    max-width: 100%;
+    border-right: 0;
   }
 }
 

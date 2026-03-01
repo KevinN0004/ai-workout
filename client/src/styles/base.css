@@ -46,11 +46,29 @@ body.no-scroll {
   overflow: hidden;
 }
 
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
 .page {
   min-height: 100vh;
   padding: 32px 24px 48px;
   color: #fff;
   filter: none;
+}
+
+.page,
+.title,
+.panel,
+.form,
+.modal,
+.header-top,
+.header-left,
+.header-center,
+.auth-actions {
+  min-width: 0;
 }
 
 .title {
@@ -420,5 +438,36 @@ select:focus {
   .modal-header,
   .modal-footer {
     flex-direction: column;
+  }
+
+  .modal-backdrop {
+    padding: 14px;
+  }
+
+  .modal {
+    max-height: calc(100dvh - 28px);
+    border-radius: 18px;
+    padding: 18px 14px;
+    gap: 16px;
+  }
+
+  .modal-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .modal-actions .cta,
+  .modal-actions .ghost,
+  .modal-actions .back-btn {
+    width: 100%;
+  }
+
+  .segmented {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .segmented button {
+    flex: 1 1 120px;
   }
 }

@@ -85,6 +85,13 @@
   color: #b3b3b3;
 }
 
+.goal-view .chart-labels span {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .goal-view .goal-list {
   display: grid;
   gap: 10px;
@@ -98,6 +105,8 @@
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .goal-view .progress-form {
@@ -118,6 +127,15 @@
 }
 
 @media (max-width: 720px) {
+  .goal-view .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .goal-view .goal-stat-row {
+    grid-template-columns: 1fr;
+  }
+
   .goal-view .goal-form,
   .goal-view .progress-form {
     grid-template-columns: 1fr;
@@ -126,5 +144,15 @@
   .goal-view .goal-action-button {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .goal-view .goal-list-row {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .goal-view .chart-card {
+    padding: 12px;
   }
 }

@@ -30,6 +30,17 @@ const toDateKey = (date) => {
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+const DASH_VIEW_TO_ROUTE = {
+  summary: "/dashboard",
+  workouts: "/dashboard/workouts",
+  calories: "/dashboard/calories",
+  plans: "/dashboard/plans",
+  meal: "/dashboard/meal",
+  tips: "/dashboard/tips",
+  settings: "/dashboard/settings",
+  home: "/dashboard/home"
+};
+
 export default function DashboardPage({
   user,
   personal,
@@ -316,7 +327,17 @@ export default function DashboardPage({
           <div className="header-top">
             <div className="header-left" />
             <div className="header-center">
-              <h1>Dashboard</h1>
+              <h1>
+                <button
+                  type="button"
+                  className="dashboard-title-button"
+                  onClick={() => go("/dashboard")}
+                  aria-label="Go to dashboard summary"
+                  title="Go to summary"
+                >
+                  Dashboard
+                </button>
+              </h1>
             </div>
             <div className="auth-actions">
               <button type="button" className="ghost" onClick={() => go("/auth")}>
@@ -347,10 +368,17 @@ export default function DashboardPage({
       .join(" ");
   };
 
-  let activeView = null;
+  const navigateDashView = (nextView, { closeDrawer = false } = {}) => {
+    setDashView(nextView);
+    go(DASH_VIEW_TO_ROUTE[nextView] || "/dashboard");
+    if (closeDrawer) {
+      setDashNavOpen(false);
+    }
+  };
 
-  if (dashView === "summary") {
-    activeView = (
+  const showInitialDashboardLoading = dashLoading && !dashboard;
+  const dashboardViews = {
+    summary: (
       <SummaryView
         form={form}
         openPlannerFromProfile={openPlannerFromProfile}
@@ -374,12 +402,11 @@ export default function DashboardPage({
         airQualityLoading={airQualityLoading}
         airQualityError={airQualityError}
         refreshAirQuality={refreshAirQuality}
-        onOpenPlans={() => setDashView("plans")}
-        onOpenMeal={() => setDashView("meal")}
+        onOpenPlans={() => navigateDashView("plans")}
+        onOpenMeal={() => navigateDashView("meal")}
       />
-    );
-  } else if (dashView === "workouts") {
-    activeView = (
+    ),
+    workouts: (
       <WorkoutsView
         workouts={recentWorkouts}
         calories={calories}
@@ -388,9 +415,8 @@ export default function DashboardPage({
         setWorkoutForm={setWorkoutForm}
         setWorkoutModalOpen={setWorkoutModalOpen}
       />
-    );
-  } else if (dashView === "calories") {
-    activeView = (
+    ),
+    calories: (
       <CaloriesView
         goalForm={goalForm}
         setGoalForm={setGoalForm}
@@ -412,9 +438,8 @@ export default function DashboardPage({
         setProgressForm={setProgressForm}
         submitProgressMetric={submitProgressMetric}
       />
-    );
-  } else if (dashView === "plans") {
-    activeView = (
+    ),
+    plans: (
       <PlansView
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
@@ -423,9 +448,8 @@ export default function DashboardPage({
         fallbackPlan={form}
         onRemoveSavedExercise={onRemoveSavedExercise}
       />
-    );
-  } else if (dashView === "meal") {
-    activeView = (
+    ),
+    meal: (
       <MealView
         dashboard={dashboard}
         fallbackPlan={form}
@@ -434,9 +458,8 @@ export default function DashboardPage({
         submitMealLog={submitMealLog}
         mealLogs={mealLogs}
       />
-    );
-  } else if (dashView === "tips") {
-    activeView = (
+    ),
+    tips: (
       <TipsView
         user={user}
         form={form}
@@ -445,12 +468,21 @@ export default function DashboardPage({
         weatherData={weatherData}
         onSaveExerciseToPlan={onSaveExerciseToPlan}
       />
-    );
-  } else if (dashView === "settings") {
-    activeView = <SettingsView user={user} personal={personal} />;
-  } else if (dashView === "home") {
-    activeView = <DashboardHomeView go={go} />;
-  }
+    ),
+    settings: <SettingsView user={user} personal={personal} />,
+    home: <DashboardHomeView go={go} />
+  };
+  const dashViewOrder = [
+    "summary",
+    "workouts",
+    "calories",
+    "plans",
+    "meal",
+    "tips",
+    "settings",
+    "home"
+  ];
+  const activeDashView = dashViewOrder.includes(dashView) ? dashView : "summary";
 
   return (
     <>
@@ -479,7 +511,17 @@ export default function DashboardPage({
               </div>
             </div>
             <div className="header-center">
-              <h1>Dashboard</h1>
+              <h1>
+                <button
+                  type="button"
+                  className="dashboard-title-button"
+                  onClick={() => navigateDashView("summary")}
+                  aria-label="Go to dashboard summary"
+                  title="Go to summary"
+                >
+                  Dashboard
+                </button>
+              </h1>
             </div>
             <div className="auth-actions">
               <div className="profile-menu" ref={profileMenuRef}>
@@ -518,7 +560,7 @@ export default function DashboardPage({
                       className="profile-menu-item"
                       role="menuitem"
                       onClick={() => {
-                        setDashView("settings");
+                        navigateDashView("settings");
                         setProfileMenuOpen(false);
                       }}
                     >
@@ -543,9 +585,32 @@ export default function DashboardPage({
           <p className="muted">Visual summary of your progress and key metrics.</p>
         </header>
 
-        <main className="dashboard-grid">{activeView}</main>
+        <main className="dashboard-grid">
+          {showInitialDashboardLoading && (
+            <section className="panel dashboard-loading-card" role="status" aria-live="polite">
+              <h2>Loading dashboard</h2>
+              <p className="muted">
+                Fetching your workouts, goals, meal logs, and saved plans.
+              </p>
+            </section>
+          )}
+          {dashViewOrder.map((viewKey) => {
+            const isActive = !showInitialDashboardLoading && viewKey === activeDashView;
+            return (
+              <div
+                key={viewKey}
+                className={`dashboard-view-shell ${isActive ? "is-active" : "is-hidden"}`}
+                aria-hidden={!isActive}
+              >
+                {dashboardViews[viewKey]}
+              </div>
+            );
+          })}
+        </main>
 
-        {dashLoading && <p className="muted">Loading dashboard...</p>}
+        {dashLoading && dashboard && (
+          <p className="muted dashboard-inline-status">Refreshing dashboard data...</p>
+        )}
         {dashError && <p className="error">{dashError}</p>}
 
         {workoutModalOpen && (
@@ -733,8 +798,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "summary" ? "active" : ""}
                 onClick={() => {
-                  setDashView("summary");
-                  setDashNavOpen(false);
+                  navigateDashView("summary", { closeDrawer: true });
                 }}
               >
                 Home
@@ -743,8 +807,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "workouts" ? "active" : ""}
                 onClick={() => {
-                  setDashView("workouts");
-                  setDashNavOpen(false);
+                  navigateDashView("workouts", { closeDrawer: true });
                 }}
               >
                 Logs
@@ -753,8 +816,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "calories" ? "active" : ""}
                 onClick={() => {
-                  setDashView("calories");
-                  setDashNavOpen(false);
+                  navigateDashView("calories", { closeDrawer: true });
                 }}
               >
                 Goal
@@ -763,8 +825,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "plans" ? "active" : ""}
                 onClick={() => {
-                  setDashView("plans");
-                  setDashNavOpen(false);
+                  navigateDashView("plans", { closeDrawer: true });
                 }}
               >
                 Weekly plan
@@ -773,8 +834,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "meal" ? "active" : ""}
                 onClick={() => {
-                  setDashView("meal");
-                  setDashNavOpen(false);
+                  navigateDashView("meal", { closeDrawer: true });
                 }}
               >
                 Meal prep
@@ -783,8 +843,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "tips" ? "active" : ""}
                 onClick={() => {
-                  setDashView("tips");
-                  setDashNavOpen(false);
+                  navigateDashView("tips", { closeDrawer: true });
                 }}
               >
                 Guides
@@ -795,8 +854,7 @@ export default function DashboardPage({
                 type="button"
                 className={dashView === "settings" ? "active" : ""}
                 onClick={() => {
-                  setDashView("settings");
-                  setDashNavOpen(false);
+                  navigateDashView("settings", { closeDrawer: true });
                 }}
               >
                 Settings

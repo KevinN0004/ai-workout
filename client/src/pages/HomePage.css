@@ -1850,6 +1850,11 @@ html.preview-smooth-scroll {
     flex-direction: column;
   }
 
+  .home-hook-title {
+    white-space: normal;
+    text-wrap: balance;
+  }
+
   .home-intro-actions .cta,
   .home-intro-actions .ghost {
     width: 100%;
@@ -2001,6 +2006,7 @@ html.preview-smooth-scroll {
   }
 
   .stage-actions {
+    width: 100%;
     justify-content: center;
   }
 
@@ -2032,5 +2038,38 @@ html.preview-smooth-scroll {
 
   .day-toggle-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .home-sticky-nav {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .home-nav-spacer {
+    display: none;
+  }
+
+  .home-preview-btn {
+    min-width: 0;
+    width: auto;
+    padding-inline: 12px;
+  }
+
+  .stage-actions .cta,
+  .stage-actions .back-btn,
+  .form-auth-actions .ghost {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .day-toggle-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .physique-render-surface {
+    max-width: min(100%, calc(100vw - 44px));
   }
 }

@@ -4,6 +4,32 @@
   gap: 20px;
 }
 
+.tips-view .tips-section-selector {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tips-view .tips-section-selector label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #d8d8d8;
+  justify-items: start;
+}
+
+.tips-view .tips-section-selector select {
+  width: fit-content;
+  min-width: 220px;
+  max-width: 100%;
+  justify-self: start;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.46);
+  color: #f2f2f2;
+  padding: 10px 12px;
+  font: inherit;
+}
+
 .tips-view .tips-filters {
   display: grid;
   grid-template-columns: repeat(4, max-content);
@@ -11,6 +37,8 @@
   column-gap: 12px;
   justify-content: start;
   align-items: end;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tips-view .tips-filters label {
@@ -19,6 +47,7 @@
   font-size: 0.82rem;
   color: #d8d8d8;
   justify-items: start;
+  min-width: 0;
 }
 
 .tips-view .tips-filters input {
@@ -101,6 +130,7 @@
   padding: 12px;
   display: grid;
   gap: 7px;
+  min-width: 0;
 }
 
 .tips-view .exercise-tile h3 {
@@ -247,12 +277,52 @@
     grid-template-columns: repeat(2, max-content);
     justify-content: start;
   }
+
+  .exercise-modal-content {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    row-gap: 16px;
+  }
 }
 
 @media (max-width: 640px) {
+  .tips-view .tips-section-selector {
+    width: 100%;
+  }
+
+  .tips-view .tips-section-selector label {
+    width: 100%;
+  }
+
+  .tips-view .tips-section-selector select {
+    min-width: 0;
+    width: 100%;
+  }
+
   .tips-view .tips-filters,
   .tips-view .exercise-grid,
   .tips-view .training-guide-grid {
     grid-template-columns: 1fr;
+  }
+
+  .tips-view .tips-filters label,
+  .tips-view .tips-filters input,
+  .tips-view .tips-filters select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .tips-view .exercise-tile-actions .save-chip {
+    width: 100%;
+  }
+
+  .exercise-modal .modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .exercise-modal .video-link {
+    width: 100%;
+    overflow-wrap: anywhere;
   }
 }

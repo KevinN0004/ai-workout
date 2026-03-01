@@ -3088,7 +3088,7 @@ html.preview-smooth-scroll {
   }
 
   .preview-jump-chip {
-    font-size: 1rem;
+    font-size: clamp(0.74rem, 2.8vw, 0.88rem);
   }
 
   .preview-builder-btn {
@@ -3098,6 +3098,8 @@ html.preview-smooth-scroll {
     padding: 0 10px;
     font-size: 0.68rem;
     letter-spacing: 0.08em;
+    white-space: normal;
+    text-wrap: balance;
   }
 
   .preview-week-table {
@@ -3150,6 +3152,47 @@ html.preview-smooth-scroll {
 }
 
 @media (max-width: 520px) {
+  .preview-stage-panel {
+    --preview-header-top: 116px;
+    --preview-header-height: 64px;
+    --preview-body-copy-size: 0.58rem;
+  }
+
+  .preview-stage-title-stack {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    padding: 0 4px;
+  }
+
+  .preview-stage-title {
+    position: static;
+    height: auto;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .preview-jump-label {
+    white-space: normal;
+    line-height: 1.1;
+    padding: 0 2px;
+  }
+
+  .preview-week-row-label {
+    width: 56px;
+    min-width: 56px;
+    font-size: 0.52rem;
+    padding: 6px 4px;
+  }
+
+  .preview-week-day-name {
+    white-space: normal;
+    line-height: 1.15;
+  }
+
   .preview-week-table {
     min-width: 0;
   }

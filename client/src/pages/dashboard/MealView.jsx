@@ -793,7 +793,7 @@ const normalizeMealDbMeal = (meal = {}) => {
   const category = typeof meal?.category === "string" ? meal.category.trim() : "";
   const area = typeof meal?.area === "string" ? meal.area.trim() : "";
   const rawBlurb = typeof meal?.blurb === "string" ? meal.blurb.trim() : "";
-  const blurb = rawBlurb || [category, area].filter(Boolean).join(" | ") || "MealDB recipe";
+  const blurb = rawBlurb || [category, area].filter(Boolean).join(" | ") || "Recipe idea";
 
   const ingredients = (Array.isArray(meal?.ingredients) ? meal.ingredients : [])
     .map((item) => (typeof item === "string" ? item.trim() : ""))
@@ -819,14 +819,101 @@ const normalizeMealDbMeal = (meal = {}) => {
   };
 };
 
-const getMealDbSeedQuery = (goalText = "") => {
-  const track = detectTrack(goalText || "Build lean strength and energy");
-  if (track === "fat_loss") return "salad";
-  if (track === "endurance") return "pasta";
-  if (track === "recovery") return "salmon";
-  return "chicken";
-};
 const COURSE_ALL_KEY = "all-courses";
+
+const MEALDB_RECOMMENDATION_QUERIES = {
+  lean_strength: [
+    {
+      key: "protein-focus",
+      title: "Protein-forward meals",
+      subtitle: "Great options to support strength days and recovery.",
+      query: "chicken"
+    },
+    {
+      key: "seafood-focus",
+      title: "Seafood meals",
+      subtitle: "Balanced meals with protein and healthy fats.",
+      query: "salmon"
+    },
+    {
+      key: "hearty-meals",
+      title: "Hearty meal ideas",
+      subtitle: "Filling choices for post-workout meals.",
+      query: "beef"
+    }
+  ],
+  fat_loss: [
+    {
+      key: "lighter-plates",
+      title: "Lighter plate ideas",
+      subtitle: "Lower-calorie options that stay satisfying.",
+      query: "salad"
+    },
+    {
+      key: "soup-options",
+      title: "Soup and stew options",
+      subtitle: "Simple meals that are easy to portion.",
+      query: "soup"
+    },
+    {
+      key: "lean-protein",
+      title: "Lean protein meals",
+      subtitle: "Protein-centered meals with straightforward prep.",
+      query: "chicken"
+    }
+  ],
+  endurance: [
+    {
+      key: "carb-fuel",
+      title: "Carb-fuel meals",
+      subtitle: "Higher-energy meals for longer training sessions.",
+      query: "pasta"
+    },
+    {
+      key: "rice-meals",
+      title: "Rice-based meals",
+      subtitle: "Steady fuel options before or after workouts.",
+      query: "rice"
+    },
+    {
+      key: "breakfast-fuel",
+      title: "Breakfast fuel",
+      subtitle: "Start-your-day meals for stable energy.",
+      query: "breakfast"
+    }
+  ],
+  recovery: [
+    {
+      key: "comfort-recovery",
+      title: "Recovery comfort meals",
+      subtitle: "Warm, easier meals for lighter training days.",
+      query: "soup"
+    },
+    {
+      key: "omega-options",
+      title: "Omega-rich choices",
+      subtitle: "Good options when recovery is your focus.",
+      query: "salmon"
+    },
+    {
+      key: "easy-prep",
+      title: "Easy-prep meals",
+      subtitle: "Lower-effort ideas when you want simple cooking.",
+      query: "stew"
+    }
+  ]
+};
+
+const dedupeMeals = (items, seenKeys = new Set()) => {
+  const unique = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = item?.id || item?.title || "";
+    if (!key || seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    unique.push(item);
+  }
+  return unique;
+};
 
 export default function MealView({
   dashboard,
@@ -843,6 +930,9 @@ export default function MealView({
   const [mealDbMeals, setMealDbMeals] = useState([]);
   const [mealDbLoading, setMealDbLoading] = useState(false);
   const [mealDbError, setMealDbError] = useState("");
+  const [mealDbRecommendations, setMealDbRecommendations] = useState([]);
+  const [mealDbRecommendationsLoading, setMealDbRecommendationsLoading] = useState(false);
+  const [mealDbRecommendationsError, setMealDbRecommendationsError] = useState("");
   const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];
   const safeMealLogForm = mealLogForm || {
     date: "",
@@ -859,18 +949,75 @@ export default function MealView({
   const onSubmitMealLog =
     typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
   const latestPlan = dashboard?.plans?.[0];
-  const goalTextForSearch =
+  const goalTextForMeals =
     latestPlan?.goal ||
     dashboard?.goals?.goalType ||
     fallbackPlan?.goal ||
     "Build lean strength and energy";
+  const mealTrack = detectTrack(goalTextForMeals);
+  const mealDbGoalRecommendations = useMemo(
+    () =>
+      MEALDB_RECOMMENDATION_QUERIES[mealTrack] ||
+      MEALDB_RECOMMENDATION_QUERIES.lean_strength,
+    [mealTrack]
+  );
 
   useEffect(() => {
-    if (mealDbQuery || mealDbInput) return;
-    const seedQuery = getMealDbSeedQuery(goalTextForSearch);
-    setMealDbInput(seedQuery);
-    setMealDbQuery(seedQuery);
-  }, [goalTextForSearch, mealDbInput, mealDbQuery]);
+    let cancelled = false;
+    const controller = new AbortController();
+    const loadRecommendationSections = async () => {
+      setMealDbRecommendationsLoading(true);
+      setMealDbRecommendationsError("");
+      try {
+        const sections = await Promise.all(
+          mealDbGoalRecommendations.map(async (entry) => {
+            const params = new URLSearchParams({
+              query: entry.query,
+              limit: "6"
+            });
+            const res = await fetch(`/api/mealdb/search?${params.toString()}`, {
+              credentials: "include",
+              signal: controller.signal
+            });
+            if (!res.ok) {
+              throw new Error("Couldn't load meal suggestions right now.");
+            }
+            const data = await res.json();
+            const meals = (Array.isArray(data?.meals) ? data.meals : [])
+              .map((item) => normalizeMealDbMeal(item))
+              .filter((item) => item.id && item.title);
+            return {
+              key: `recommend-${entry.key}`,
+              title: entry.title,
+              subtitle: entry.subtitle,
+              meals
+            };
+          })
+        );
+        if (cancelled) return;
+        const seen = new Set();
+        const deduped = sections.map((section) => ({
+          ...section,
+          meals: dedupeMeals(section.meals, seen).slice(0, 6)
+        }));
+        setMealDbRecommendations(deduped);
+      } catch (err) {
+        if (cancelled || err?.name === "AbortError") return;
+        setMealDbRecommendations([]);
+        setMealDbRecommendationsError(
+          err?.message || "Couldn't load meal suggestions right now."
+        );
+      } finally {
+        if (!cancelled) setMealDbRecommendationsLoading(false);
+      }
+    };
+
+    loadRecommendationSections();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [mealDbGoalRecommendations]);
 
   useEffect(() => {
     const query = mealDbQuery.trim();
@@ -896,8 +1043,7 @@ export default function MealView({
           signal: controller.signal
         });
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload?.error || "Unable to load MealDB recipes.");
+          throw new Error("Couldn't load recipes right now.");
         }
         const data = await res.json();
         if (cancelled) return;
@@ -908,7 +1054,7 @@ export default function MealView({
       } catch (err) {
         if (cancelled || err?.name === "AbortError") return;
         setMealDbMeals([]);
-        setMealDbError(err?.message || "Unable to load MealDB recipes.");
+        setMealDbError(err?.message || "Couldn't load recipes right now.");
       } finally {
         if (!cancelled) setMealDbLoading(false);
       }
@@ -931,14 +1077,10 @@ export default function MealView({
       return;
     }
     setMealDbQuery(nextQuery);
+    setMealDbInput("");
   };
 
   const mealContext = useMemo(() => {
-    const goalText =
-      latestPlan?.goal ||
-      dashboard?.goals?.goalType ||
-      fallbackPlan?.goal ||
-      "Build lean strength and energy";
     const targetCalories = Number(dashboard?.goals?.targetCalories || 2200);
     const weeklyDays = Number(
       latestPlan?.days ||
@@ -946,9 +1088,7 @@ export default function MealView({
         fallbackPlan?.days ||
         3
     );
-    const track = detectTrack(goalText);
     const calorieBand = getCalorieBand(targetCalories);
-    const sourceMeals = MEAL_LIBRARY[track] || MEAL_LIBRARY.lean_strength;
     const withPortions = (items) =>
       items.map((meal) => ({
         ...meal,
@@ -958,39 +1098,23 @@ export default function MealView({
           ""
       }));
 
+    const recommendationSections = mealDbRecommendations.map((section) => ({
+      key: section.key,
+      title: section.title,
+      subtitle: section.subtitle,
+      meals: withPortions(section.meals)
+    }));
+
     const sections = [
       {
         key: "mealdb-live",
-        title: "MealDB Recipes",
+        title: "Recipe results",
         subtitle: mealDbQuery
-          ? `Live recipe results for "${mealDbQuery}".`
-          : "Live recipe results from TheMealDB.",
+          ? `Results for "${mealDbQuery}".`
+          : "Search above to see recipe ideas.",
         meals: withPortions(mealDbMeals)
       },
-      {
-        key: "main-courses",
-        title: "Main Courses",
-        subtitle: "Primary meals aligned to your current goal and calories.",
-        meals: withPortions(sourceMeals.slice(0, 6))
-      },
-      {
-        key: "desserts",
-        title: "Desserts",
-        subtitle: "Lighter sweet options for structured meal prep.",
-        meals: withPortions(EXTRA_MEAL_LIBRARY.desserts)
-      },
-      {
-        key: "snacks",
-        title: "Snacks",
-        subtitle: "Simple grab-and-go options between meals.",
-        meals: withPortions(EXTRA_MEAL_LIBRARY.snacks)
-      },
-      {
-        key: "drinks",
-        title: "Drinks",
-        subtitle: "Hydration and recovery-focused beverage ideas.",
-        meals: withPortions(EXTRA_MEAL_LIBRARY.drinks)
-      }
+      ...recommendationSections
     ];
     const allMeals = sections.flatMap((section) => section.meals);
     const courseOptions = [
@@ -1002,8 +1126,23 @@ export default function MealView({
       }))
     ];
 
-    return { goalText, targetCalories, weeklyDays, sections, allMeals, courseOptions };
-  }, [dashboard, fallbackPlan, latestPlan, mealDbMeals, mealDbQuery]);
+    return {
+      goalText: goalTextForMeals,
+      targetCalories,
+      weeklyDays,
+      sections,
+      allMeals,
+      courseOptions
+    };
+  }, [
+    dashboard,
+    fallbackPlan,
+    latestPlan,
+    mealDbMeals,
+    mealDbQuery,
+    mealDbRecommendations,
+    goalTextForMeals
+  ]);
 
   const displayedSections = useMemo(() => {
     if (activeCourseKey === COURSE_ALL_KEY) {
@@ -1062,7 +1201,7 @@ export default function MealView({
       <section className="meal-log-panel">
         <div className="meal-log-header">
           <h3>Meal log history</h3>
-          <p className="muted">Track meals and macros. Saved to your database.</p>
+          <p className="muted">Track meals and macros. Saved to your account.</p>
         </div>
         <form className="form meal-log-form" onSubmit={onSubmitMealLog}>
           <label>
@@ -1189,9 +1328,9 @@ export default function MealView({
 
       <section className="mealdb-panel">
         <div className="meal-log-header">
-          <h3>MealDB recipe finder</h3>
+          <h3>Recipe finder</h3>
           <p className="muted">
-            Search live recipes from TheMealDB and open any card for full ingredients.
+            Search for recipe ideas and open any card for ingredients and quick links.
           </p>
         </div>
         <form className="form mealdb-search-form" onSubmit={onSubmitMealDbSearch}>
@@ -1209,14 +1348,19 @@ export default function MealView({
         </form>
         {mealDbError && <p className="error">{mealDbError}</p>}
         {!mealDbLoading && !mealDbError && mealDbQuery && !mealDbMeals.length && (
-          <p className="muted">No MealDB recipes found for "{mealDbQuery}".</p>
+          <p className="muted">No recipes found for "{mealDbQuery}".</p>
         )}
       </section>
+
+      {mealDbRecommendationsLoading && (
+        <p className="muted">Loading recommended recipes for your current goal...</p>
+      )}
+      {mealDbRecommendationsError && <p className="error">{mealDbRecommendationsError}</p>}
 
       <section className="meal-course-panel">
         <div className="meal-log-header">
           <h3>Course options</h3>
-          <p className="muted">Pick a course to focus your meal browsing.</p>
+          <p className="muted">Pick a section to focus your meal browsing.</p>
         </div>
         <div className="meal-course-controls" role="tablist" aria-label="Meal course options">
           {mealContext.courseOptions.map((option) => (

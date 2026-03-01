@@ -195,7 +195,7 @@ const scoreExercise = (exercise, context) => {
   }
 
   if (score <= 0) {
-    reasons.push("Available in your current library filters.");
+    reasons.push("Fits your current filters.");
   }
 
   return {
@@ -298,6 +298,7 @@ export default function TipsView({
   const [saveFeedback, setSaveFeedback] = useState("");
   const [saveError, setSaveError] = useState("");
   const [savingIds, setSavingIds] = useState({});
+  const [activeGuideSection, setActiveGuideSection] = useState("smart");
 
   useEffect(() => {
     let cancelled = false;
@@ -307,8 +308,7 @@ export default function TipsView({
       try {
         const res = await fetch("/api/wger/meta", { credentials: "include" });
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload?.error || "Unable to load exercise metadata.");
+          throw new Error("Couldn't load filter options.");
         }
         const data = await res.json();
         if (cancelled) return;
@@ -319,7 +319,7 @@ export default function TipsView({
         });
       } catch (err) {
         if (cancelled) return;
-        setMetaError(err?.message || "Unable to load exercise metadata.");
+        setMetaError(err?.message || "Couldn't load filter options.");
       } finally {
         if (!cancelled) setMetaLoading(false);
       }
@@ -350,15 +350,14 @@ export default function TipsView({
           credentials: "include"
         });
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload?.error || "Unable to load exercise library.");
+          throw new Error("Couldn't load exercises right now.");
         }
         const data = await res.json();
         if (cancelled) return;
         setExercises(Array.isArray(data?.exercises) ? data.exercises : []);
       } catch (err) {
         if (cancelled) return;
-        setLibraryError(err?.message || "Unable to load exercise library.");
+        setLibraryError(err?.message || "Couldn't load exercises right now.");
         setExercises([]);
       } finally {
         if (!cancelled) setLibraryLoading(false);
@@ -473,11 +472,11 @@ export default function TipsView({
     try {
       const result = await onSaveExerciseToPlan(buildSavePayload(exercise, recommendation));
       if (!result?.ok) {
-        throw new Error(result?.error || "Unable to save exercise.");
+        throw new Error(result?.error || "Couldn't save this exercise right now.");
       }
       setSaveFeedback(`Saved "${exercise?.name}" to your plan.`);
     } catch (err) {
-      setSaveError(err?.message || "Unable to save exercise.");
+      setSaveError(err?.message || "Couldn't save this exercise right now.");
     } finally {
       setSavingIds((prev) => ({ ...prev, [key]: false }));
     }
@@ -486,23 +485,24 @@ export default function TipsView({
   const openExerciseModal = (payload) => {
     setSelectedExercise(payload);
   };
+  const showExerciseFilters =
+    activeGuideSection === "smart" || activeGuideSection === "library";
 
   return (
     <section className="panel tips-view">
       <div className="panel-header">
         <div>
-          <h2>Guides + exercise library</h2>
+          <h2>Guides + exercise ideas</h2>
           <p className="muted">
-            Live Wger exercise data with personalized ranking based on your plan, equipment,
-            weather mode, and injury notes.
+            Personalized suggestions based on your plan, equipment, weather, and injury notes.
           </p>
         </div>
         <button
           type="button"
           className="ghost icon-button"
           onClick={() => setRefreshTick((value) => value + 1)}
-          aria-label="Refresh exercise library"
-          title="Refresh library"
+          aria-label="Refresh exercise ideas"
+          title="Refresh ideas"
         >
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
             <path
@@ -524,178 +524,198 @@ export default function TipsView({
         </button>
       </div>
 
-      <section className="tips-filters">
+      <section className="tips-section-selector">
         <label>
-          Search
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="e.g. row, squat, plank"
-          />
-        </label>
-        <label>
-          Category
-          <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-            <option value="">All categories</option>
-            {meta.categories.map((item) => (
-              <option key={`category-${item.id}`} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Muscle
-          <select value={muscleId} onChange={(event) => setMuscleId(event.target.value)}>
-            <option value="">All muscles</option>
-            {meta.muscles.map((item) => (
-              <option key={`muscle-${item.id}`} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Equipment
-          <select value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)}>
-            <option value="">All equipment</option>
-            {meta.equipment.map((item) => (
-              <option key={`equipment-${item.id}`} value={item.id}>
-                {item.name}
-              </option>
-            ))}
+          View
+          <select
+            value={activeGuideSection}
+            onChange={(event) => setActiveGuideSection(event.target.value)}
+          >
+            <option value="smart">Smart picks</option>
+            <option value="guides">Training guide</option>
+            <option value="library">Exercise list</option>
           </select>
         </label>
       </section>
 
-      {(metaLoading || libraryLoading) && (
-        <p className="muted">Loading Wger exercise data...</p>
+      {showExerciseFilters && (
+        <section className="tips-filters">
+          <label>
+            Search
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="e.g. row, squat, plank"
+            />
+          </label>
+          <label>
+            Category
+            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+              <option value="">All categories</option>
+              {meta.categories.map((item) => (
+                <option key={`category-${item.id}`} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Muscle
+            <select value={muscleId} onChange={(event) => setMuscleId(event.target.value)}>
+              <option value="">All muscles</option>
+              {meta.muscles.map((item) => (
+                <option key={`muscle-${item.id}`} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Equipment
+            <select value={equipmentId} onChange={(event) => setEquipmentId(event.target.value)}>
+              <option value="">All equipment</option>
+              {meta.equipment.map((item) => (
+                <option key={`equipment-${item.id}`} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
       )}
+
+      {(metaLoading || libraryLoading) && <p className="muted">Loading exercise options...</p>}
       {metaError && <p className="error">{metaError}</p>}
       {libraryError && <p className="error">{libraryError}</p>}
       {saveError && <p className="error">{saveError}</p>}
       {saveFeedback && <p className="muted save-feedback">{saveFeedback}</p>}
 
-      <section className="tips-block">
-        <div className="tips-block-header">
-          <h3>Smart picks for you</h3>
-          <p className="muted">
-            Ranking algorithm favors your goal track ({track.replace("_", " ")}), available
-            equipment, and today&apos;s training context.
-          </p>
-        </div>
-        <div className="exercise-grid">
-          {recommendations.map((entry) => {
-            const exercise = entry.exercise;
-            const imageUrl = getExerciseImage(exercise);
-            const equipmentText = (exercise.equipment || [])
-              .map((item) => item?.name)
-              .filter(Boolean)
-              .slice(0, 2)
-              .join(", ");
-            const key = toExerciseKey(exercise);
-            const saved = isSaved(exercise);
-            const isSaving = Boolean(savingIds[key]);
-            return (
-              <article key={`smart-${exercise.id}`} className="exercise-tile">
-                <button
-                  type="button"
-                  className="exercise-tile-open"
-                  onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
-                >
-                  <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                  <div className="exercise-tile-meta">
-                    <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                    <h3>{exercise.name}</h3>
-                    <p className="muted">{equipmentText || "No equipment metadata"}</p>
-                    <p className="muted">{entry.reasons[0]}</p>
-                  </div>
-                </button>
-                <div className="exercise-tile-actions">
+      {activeGuideSection === "smart" && (
+        <section className="tips-block">
+          <div className="tips-block-header">
+            <h3>Smart picks for you</h3>
+            <p className="muted">
+              Suggestions are sorted by your goal track ({track.replace("_", " ")}), available
+              equipment, and today&apos;s training focus.
+            </p>
+          </div>
+          <div className="exercise-grid">
+            {recommendations.map((entry) => {
+              const exercise = entry.exercise;
+              const imageUrl = getExerciseImage(exercise);
+              const equipmentText = (exercise.equipment || [])
+                .map((item) => item?.name)
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(", ");
+              const key = toExerciseKey(exercise);
+              const saved = isSaved(exercise);
+              const isSaving = Boolean(savingIds[key]);
+              return (
+                <article key={`smart-${exercise.id}`} className="exercise-tile">
                   <button
                     type="button"
-                    className="ghost save-chip"
-                    disabled={saved || isSaving}
-                    onClick={() => saveExercise(exercise, entry)}
+                    className="exercise-tile-open"
+                    onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
                   >
-                    {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                    <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                    <div className="exercise-tile-meta">
+                      <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                      <h3>{exercise.name}</h3>
+                      <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
+                      <p className="muted">{entry.reasons[0]}</p>
+                    </div>
                   </button>
-                </div>
-              </article>
-            );
-          })}
-          {!recommendations.length && (
-            <p className="muted">No exercises available for current filters.</p>
-          )}
-        </div>
-      </section>
-
-      <section className="tips-block">
-        <div className="tips-block-header">
-          <h3>Algorithm-backed guide upgrades</h3>
-          <p className="muted">
-            Tactical planning cues generated from your weekly settings and live conditions.
-          </p>
-        </div>
-        <div className="training-guide-grid">
-          {guideCards.map((card) => (
-            <article key={card.title} className="training-card">
-              <h4>{card.title}</h4>
-              <p>{card.text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="tips-block">
-        <div className="tips-block-header">
-          <h3>Exercise library</h3>
-          <p className="muted">Browse and open any movement for details, cues, and media links.</p>
-        </div>
-        <div className="exercise-grid">
-          {exercises.map((exercise) => {
-            const imageUrl = getExerciseImage(exercise);
-            const equipmentText = (exercise.equipment || [])
-              .map((item) => item?.name)
-              .filter(Boolean)
-              .slice(0, 2)
-              .join(", ");
-            const key = toExerciseKey(exercise);
-            const saved = isSaved(exercise);
-            const isSaving = Boolean(savingIds[key]);
-            return (
-              <article key={`library-${exercise.id}`} className="exercise-tile">
-                <button
-                  type="button"
-                  className="exercise-tile-open"
-                  onClick={() => openExerciseModal(exercise)}
-                >
-                  <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                  <div className="exercise-tile-meta">
-                    <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                    <h3>{exercise.name}</h3>
-                    <p className="muted">{equipmentText || "No equipment metadata"}</p>
+                  <div className="exercise-tile-actions">
+                    <button
+                      type="button"
+                      className="ghost save-chip"
+                      disabled={saved || isSaving}
+                      onClick={() => saveExercise(exercise, entry)}
+                    >
+                      {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                    </button>
                   </div>
-                </button>
-                <div className="exercise-tile-actions">
+                </article>
+              );
+            })}
+            {!recommendations.length && (
+              <p className="muted">No exercises available for current filters.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeGuideSection === "guides" && (
+        <section className="tips-block">
+          <div className="tips-block-header">
+            <h3>Training guide upgrades</h3>
+            <p className="muted">
+              Straightforward planning cues based on your weekly settings and current conditions.
+            </p>
+          </div>
+          <div className="training-guide-grid">
+            {guideCards.map((card) => (
+              <article key={card.title} className="training-card">
+                <h4>{card.title}</h4>
+                <p>{card.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeGuideSection === "library" && (
+        <section className="tips-block">
+          <div className="tips-block-header">
+            <h3>Exercise list</h3>
+            <p className="muted">Browse and open any movement for details, cues, and videos.</p>
+          </div>
+          <div className="exercise-grid">
+            {exercises.map((exercise) => {
+              const imageUrl = getExerciseImage(exercise);
+              const equipmentText = (exercise.equipment || [])
+                .map((item) => item?.name)
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(", ");
+              const key = toExerciseKey(exercise);
+              const saved = isSaved(exercise);
+              const isSaving = Boolean(savingIds[key]);
+              return (
+                <article key={`library-${exercise.id}`} className="exercise-tile">
                   <button
                     type="button"
-                    className="ghost save-chip"
-                    disabled={saved || isSaving}
-                    onClick={() => saveExercise(exercise)}
+                    className="exercise-tile-open"
+                    onClick={() => openExerciseModal(exercise)}
                   >
-                    {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                    <img src={imageUrl} alt={exercise.name} loading="lazy" />
+                    <div className="exercise-tile-meta">
+                      <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                      <h3>{exercise.name}</h3>
+                      <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
+                    </div>
                   </button>
-                </div>
-              </article>
-            );
-          })}
-          {!exercises.length && !libraryLoading && (
-            <p className="muted">No exercises found for this filter set.</p>
-          )}
-        </div>
-      </section>
+                  <div className="exercise-tile-actions">
+                    <button
+                      type="button"
+                      className="ghost save-chip"
+                      disabled={saved || isSaving}
+                      onClick={() => saveExercise(exercise)}
+                    >
+                      {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+            {!exercises.length && !libraryLoading && (
+              <p className="muted">No exercises match these filters.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {selectedExercise && (
         <ModalPortal open={Boolean(selectedExercise)}>

@@ -179,6 +179,29 @@ const getLocalDateKey = () => {
   return `${year}-${month}-${day}`;
 };
 
+const DASHBOARD_ROUTE_VIEW_MAP = {
+  "": "summary",
+  summary: "summary",
+  workouts: "workouts",
+  calories: "calories",
+  plans: "plans",
+  meal: "meal",
+  tips: "tips",
+  settings: "settings",
+  home: "home"
+};
+
+const resolveDashViewFromPath = (path) => {
+  if (path === "/dashboard" || path === "/dashboard/") {
+    return "summary";
+  }
+  if (!path.startsWith("/dashboard/")) {
+    return null;
+  }
+  const slug = path.slice("/dashboard/".length).split("/")[0];
+  return DASHBOARD_ROUTE_VIEW_MAP[slug] || null;
+};
+
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
   const [heightUnit, setHeightUnit] = useState(() =>
@@ -247,7 +270,9 @@ export default function App() {
     targetCalories: "2200",
     weeklyWorkouts: "3"
   });
-  const [dashView, setDashView] = useState("summary");
+  const [dashView, setDashView] = useState(
+    () => resolveDashViewFromPath(window.location.pathname) || "summary"
+  );
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
   const [personal, setPersonal] = useState({ ...defaultPersonalForm });
@@ -925,6 +950,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const routeDashView = resolveDashViewFromPath(route);
+    if (!routeDashView) return;
+    setDashView((current) => (current === routeDashView ? current : routeDashView));
+  }, [route]);
+
+  useEffect(() => {
     const loadSession = async () => {
       try {
         const res = await fetch("/api/auth/me", { credentials: "include" });
@@ -979,10 +1010,7 @@ export default function App() {
   }, [isDashboardRoute, user, loadWeatherRecommendation, loadAirQuality]);
 
   const go = (path) => {
-    const normalizedPath =
-      path === "/dashboard/" || path.startsWith("/dashboard/")
-        ? "/dashboard"
-        : path;
+    const normalizedPath = path === "/dashboard/" ? "/dashboard" : path;
     window.history.pushState({}, "", normalizedPath);
     setRoute(normalizedPath);
   };
@@ -1392,7 +1420,6 @@ export default function App() {
     />
   );
 }
-
 
 
 
