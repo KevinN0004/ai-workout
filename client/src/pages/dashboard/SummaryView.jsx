@@ -232,8 +232,9 @@ export default function SummaryView({
                   type="button"
                   className="ghost icon-button"
                   onClick={refreshWeatherRecommendation}
-                  aria-label="Refresh weather"
-                  title="Refresh weather"
+                  aria-label={weatherLoading ? "Retrying weather" : "Refresh weather"}
+                  title={weatherLoading ? "Retrying..." : "Refresh weather"}
+                  disabled={weatherLoading}
                 >
                   <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                     <path
@@ -255,10 +256,8 @@ export default function SummaryView({
                 </button>
               </div>
               <div className="card-section-body">
-                {weatherLoading ? (
+                {weatherLoading && !weatherRecommendation ? (
                   <p className="muted">Checking local conditions...</p>
-                ) : weatherError ? (
-                  <p className="muted">{weatherError}</p>
                 ) : weatherRecommendation ? (
                   <>
                     <p className="weather-badge">
@@ -290,7 +289,10 @@ export default function SummaryView({
                         ))}
                       </div>
                     ) : null}
+                    {weatherError ? <p className="muted">{weatherError}</p> : null}
                   </>
+                ) : weatherError ? (
+                  <p className="muted">{weatherError}</p>
                 ) : (
                   <p className="muted">No weather recommendation loaded yet.</p>
                 )}
@@ -303,8 +305,9 @@ export default function SummaryView({
                   type="button"
                   className="ghost icon-button"
                   onClick={refreshAirQuality}
-                  aria-label="Refresh air quality"
-                  title="Refresh air quality"
+                  aria-label={airQualityLoading ? "Retrying air quality" : "Refresh air quality"}
+                  title={airQualityLoading ? "Retrying..." : "Refresh air quality"}
+                  disabled={airQualityLoading}
                 >
                   <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                     <path
@@ -326,10 +329,8 @@ export default function SummaryView({
                 </button>
               </div>
               <div className="card-section-body">
-                {airQualityLoading ? (
+                {airQualityLoading && !airSummary ? (
                   <p className="muted">Checking local air quality...</p>
-                ) : airQualityError ? (
-                  <p className="muted">{airQualityError}</p>
                 ) : airSummary ? (
                   <>
                     <p className={`air-quality-badge air-quality-${airLevelClass}`}>
@@ -358,7 +359,10 @@ export default function SummaryView({
                         ))}
                       </ul>
                     ) : null}
+                    {airQualityError ? <p className="muted">{airQualityError}</p> : null}
                   </>
+                ) : airQualityError ? (
+                  <p className="muted">{airQualityError}</p>
                 ) : (
                   <p className="muted">No air quality data loaded yet.</p>
                 )}

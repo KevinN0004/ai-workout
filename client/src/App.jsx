@@ -202,6 +202,66 @@ const resolveDashViewFromPath = (path) => {
   return DASHBOARD_ROUTE_VIEW_MAP[slug] || null;
 };
 
+const defaultDashboardData = () => ({
+  workouts: [],
+  workoutSessions: [],
+  calories: [],
+  mealLogs: [],
+  progressMetrics: [],
+  plans: [],
+  savedExercises: [],
+  goals: {
+    targetWeight: 160,
+    targetCalories: 2200,
+    weeklyWorkouts: 3
+  }
+});
+
+const DASHBOARD_CACHE_PREFIX = "ai-workout-dashboard-cache-v1";
+const WEATHER_CACHE_PREFIX = "ai-workout-weather-cache-v1";
+const AIR_QUALITY_CACHE_PREFIX = "ai-workout-air-cache-v1";
+const OPTIMISTIC_UNDO_WINDOW_MS = 4500;
+
+const buildScopedCacheKey = (prefix, user) => {
+  const scope = user?.userId || user?.email || "anonymous";
+  return `${prefix}:${scope}`;
+};
+
+const readJsonCache = (key) => {
+  if (!key || typeof window === "undefined" || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const writeJsonCache = (key, value) => {
+  if (!key || typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore cache write failures (private mode, quota, etc.)
+  }
+};
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 15000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Request timed out. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");
   const [heightUnit, setHeightUnit] = useState(() =>
@@ -231,9 +291,12 @@ export default function App() {
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
+  const [weatherLastUpdatedAt, setWeatherLastUpdatedAt] = useState(null);
   const [airQualityData, setAirQualityData] = useState(null);
   const [airQualityLoading, setAirQualityLoading] = useState(false);
   const [airQualityError, setAirQualityError] = useState("");
+  const [airQualityLastUpdatedAt, setAirQualityLastUpdatedAt] = useState(null);
+  const [optimisticLogEntries, setOptimisticLogEntries] = useState([]);
   const [workoutForm, setWorkoutForm] = useState({
     date: getLocalDateKey(),
     focus: "",
@@ -284,8 +347,26 @@ export default function App() {
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [dashboardToast, setDashboardToast] = useState(null);
   const dashboardToastTimeoutRef = useRef(null);
+  const optimisticOpRef = useRef(new Map());
+  const weatherDataRef = useRef(null);
+  const airQualityDataRef = useRef(null);
+  const dashboardRequestRef = useRef(0);
+  const weatherRequestRef = useRef(0);
+  const airRequestRef = useRef(0);
   const isDashboardRoute =
     route === "/dashboard" || route.startsWith("/dashboard/");
+  const dashboardCacheKey = useMemo(
+    () => (user ? buildScopedCacheKey(DASHBOARD_CACHE_PREFIX, user) : ""),
+    [user]
+  );
+  const weatherCacheKey = useMemo(
+    () => (user ? buildScopedCacheKey(WEATHER_CACHE_PREFIX, user) : ""),
+    [user]
+  );
+  const airCacheKey = useMemo(
+    () => (user ? buildScopedCacheKey(AIR_QUALITY_CACHE_PREFIX, user) : ""),
+    [user]
+  );
 
   const gradient = useMemo(
     () => ({
@@ -294,6 +375,49 @@ export default function App() {
     }),
     []
   );
+
+  useEffect(() => {
+    weatherDataRef.current = weatherData;
+  }, [weatherData]);
+
+  useEffect(() => {
+    airQualityDataRef.current = airQualityData;
+  }, [airQualityData]);
+
+  const mergedDashboard = useMemo(() => {
+    if (!dashboard && !optimisticLogEntries.length) return null;
+    const base = dashboard ? { ...dashboard } : defaultDashboardData();
+    if (!optimisticLogEntries.length) return base;
+
+    const nextWorkoutSessions = Array.isArray(base.workoutSessions)
+      ? [...base.workoutSessions]
+      : [];
+    const nextWorkouts = Array.isArray(base.workouts) ? [...base.workouts] : [];
+    const nextCalories = Array.isArray(base.calories) ? [...base.calories] : [];
+    const nextMealLogs = Array.isArray(base.mealLogs) ? [...base.mealLogs] : [];
+
+    const ordered = [...optimisticLogEntries].sort(
+      (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+    );
+    for (const entry of ordered) {
+      if (entry.type === "workout") {
+        nextWorkoutSessions.unshift(entry.item);
+        nextWorkouts.unshift(entry.item);
+      } else if (entry.type === "calorie") {
+        nextCalories.unshift(entry.item);
+      } else if (entry.type === "meal") {
+        nextMealLogs.unshift(entry.item);
+      }
+    }
+
+    return {
+      ...base,
+      workoutSessions: nextWorkoutSessions,
+      workouts: nextWorkouts,
+      calories: nextCalories,
+      mealLogs: nextMealLogs
+    };
+  }, [dashboard, optimisticLogEntries]);
 
   const toCmFromFeetInches = (feetValue, inchesValue) => {
     const feetNum = Number(feetValue);
@@ -868,6 +992,8 @@ export default function App() {
   }, []);
 
   const loadWeatherRecommendation = useCallback(async () => {
+    const requestId = weatherRequestRef.current + 1;
+    weatherRequestRef.current = requestId;
     setWeatherLoading(true);
     setWeatherError("");
     try {
@@ -876,16 +1002,26 @@ export default function App() {
         latitude: String(latitude),
         longitude: String(longitude)
       });
-      const res = await fetch(`/api/weather/recommendation?${query.toString()}`, {
-        credentials: "include"
-      });
+      const res = await fetchWithTimeout(
+        `/api/weather/recommendation?${query.toString()}`,
+        { credentials: "include" },
+        12000
+      );
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
         throw new Error(payload?.error || "Unable to load weather recommendation.");
       }
       const data = await res.json();
+      if (weatherRequestRef.current !== requestId) return;
       setWeatherData(data || null);
+      const now = Date.now();
+      setWeatherLastUpdatedAt(now);
+      writeJsonCache(weatherCacheKey, {
+        data: data || null,
+        updatedAt: now
+      });
     } catch (err) {
+      if (weatherRequestRef.current !== requestId) return;
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setWeatherError("Location permission was denied.");
@@ -897,15 +1033,21 @@ export default function App() {
           setWeatherError("Unable to access location.");
         }
       } else {
-        setWeatherError(err?.message || "Unable to load weather recommendation.");
+        setWeatherError(
+          weatherDataRef.current
+            ? "Unable to refresh weather. Showing the last update."
+            : err?.message || "Unable to load weather recommendation."
+        );
       }
-      setWeatherData(null);
     } finally {
+      if (weatherRequestRef.current !== requestId) return;
       setWeatherLoading(false);
     }
-  }, [getCurrentCoordinates]);
+  }, [getCurrentCoordinates, weatherCacheKey]);
 
   const loadAirQuality = useCallback(async () => {
+    const requestId = airRequestRef.current + 1;
+    airRequestRef.current = requestId;
     setAirQualityLoading(true);
     setAirQualityError("");
     try {
@@ -914,16 +1056,26 @@ export default function App() {
         latitude: String(latitude),
         longitude: String(longitude)
       });
-      const res = await fetch(`/api/air-quality/current?${query.toString()}`, {
-        credentials: "include"
-      });
+      const res = await fetchWithTimeout(
+        `/api/air-quality/current?${query.toString()}`,
+        { credentials: "include" },
+        12000
+      );
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
         throw new Error(payload?.error || "Unable to load air quality.");
       }
       const data = await res.json();
+      if (airRequestRef.current !== requestId) return;
       setAirQualityData(data || null);
+      const now = Date.now();
+      setAirQualityLastUpdatedAt(now);
+      writeJsonCache(airCacheKey, {
+        data: data || null,
+        updatedAt: now
+      });
     } catch (err) {
+      if (airRequestRef.current !== requestId) return;
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setAirQualityError("Location permission was denied.");
@@ -937,13 +1089,17 @@ export default function App() {
       } else if (err?.code === "GEO_NOT_AVAILABLE") {
         setAirQualityError(err.message);
       } else {
-        setAirQualityError(err?.message || "Unable to load air quality.");
+        setAirQualityError(
+          airQualityDataRef.current
+            ? "Unable to refresh air quality. Showing the last update."
+            : err?.message || "Unable to load air quality."
+        );
       }
-      setAirQualityData(null);
     } finally {
+      if (airRequestRef.current !== requestId) return;
       setAirQualityLoading(false);
     }
-  }, [getCurrentCoordinates]);
+  }, [airCacheKey, getCurrentCoordinates]);
 
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
@@ -977,17 +1133,81 @@ export default function App() {
   }, [route, resetPersonalFlow]);
 
   useEffect(() => {
-    if (!isDashboardRoute || !user) return;
+    if (!user || !dashboardCacheKey) return;
+    const cached = readJsonCache(dashboardCacheKey);
+    const cachedDashboard = cached?.dashboard;
+    if (!cachedDashboard) return;
+    setDashboard((current) => current || cachedDashboard);
+    if (cachedDashboard?.goals) {
+      setGoalForm({
+        targetWeight: String(cachedDashboard.goals.targetWeight || 160),
+        targetCalories: String(cachedDashboard.goals.targetCalories || 2200),
+        weeklyWorkouts: String(cachedDashboard.goals.weeklyWorkouts || 3)
+      });
+    }
+  }, [dashboardCacheKey, user]);
+
+  useEffect(() => {
+    if (!user || !weatherCacheKey) return;
+    const cached = readJsonCache(weatherCacheKey);
+    if (!cached?.data) return;
+    setWeatherData((current) => current || cached.data);
+    if (cached.updatedAt) {
+      setWeatherLastUpdatedAt((current) => current || cached.updatedAt);
+    }
+  }, [user, weatherCacheKey]);
+
+  useEffect(() => {
+    if (!user || !airCacheKey) return;
+    const cached = readJsonCache(airCacheKey);
+    if (!cached?.data) return;
+    setAirQualityData((current) => current || cached.data);
+    if (cached.updatedAt) {
+      setAirQualityLastUpdatedAt((current) => current || cached.updatedAt);
+    }
+  }, [airCacheKey, user]);
+
+  useEffect(() => {
+    if (!dashboardCacheKey || !dashboard) return;
+    writeJsonCache(dashboardCacheKey, {
+      dashboard,
+      updatedAt: Date.now()
+    });
+  }, [dashboard, dashboardCacheKey]);
+
+  useEffect(() => {
+    if (!isDashboardRoute || !user || !dashboardCacheKey) return;
+    const requestId = dashboardRequestRef.current + 1;
+    dashboardRequestRef.current = requestId;
+    let cancelled = false;
     const loadDashboard = async () => {
+      const cachedDashboard = readJsonCache(dashboardCacheKey)?.dashboard || null;
+      const hasCachedFallback = Boolean(cachedDashboard);
+      if (cachedDashboard) {
+        setDashboard((current) => current || cachedDashboard);
+        if (cachedDashboard?.goals) {
+          setGoalForm({
+            targetWeight: String(cachedDashboard.goals.targetWeight || 160),
+            targetCalories: String(cachedDashboard.goals.targetCalories || 2200),
+            weeklyWorkouts: String(cachedDashboard.goals.weeklyWorkouts || 3)
+          });
+        }
+      }
+
       setDashLoading(true);
       setDashError("");
       try {
-        const res = await fetch("/api/dashboard", { credentials: "include" });
+        const res = await fetchWithTimeout(
+          "/api/dashboard",
+          { credentials: "include" },
+          12000
+        );
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
           throw new Error(payload?.error || "Unable to load dashboard.");
         }
         const data = await res.json();
+        if (cancelled || dashboardRequestRef.current !== requestId) return;
         setDashboard(data.dashboard);
         if (data.dashboard?.goals) {
           setGoalForm({
@@ -996,20 +1216,36 @@ export default function App() {
             weeklyWorkouts: String(data.dashboard.goals.weeklyWorkouts || 3)
           });
         }
+        setDashError("");
       } catch (err) {
-        setDashError(err.message || "Unable to load dashboard.");
+        if (cancelled || dashboardRequestRef.current !== requestId) return;
+        const message = err?.message || "Unable to load dashboard.";
+        setDashError(
+          hasCachedFallback
+            ? "Unable to refresh dashboard right now. Showing saved data."
+            : message
+        );
       } finally {
+        if (cancelled || dashboardRequestRef.current !== requestId) return;
         setDashLoading(false);
       }
     };
     loadDashboard();
-  }, [isDashboardRoute, user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [dashboardCacheKey, isDashboardRoute, user]);
 
   useEffect(() => {
     if (!isDashboardRoute || !user) return;
     loadWeatherRecommendation();
     loadAirQuality();
   }, [isDashboardRoute, user, loadWeatherRecommendation, loadAirQuality]);
+
+  useEffect(() => {
+    if (isDashboardRoute && user) return;
+    setDashLoading(false);
+  }, [isDashboardRoute, user]);
 
   const go = (path) => {
     const normalizedPath = path === "/dashboard/" ? "/dashboard" : path;
@@ -1025,24 +1261,33 @@ export default function App() {
     setDashboardToast(null);
   }, []);
 
-  const showDashboardToast = useCallback((message, tone = "success") => {
-    if (!message) return;
-    if (dashboardToastTimeoutRef.current) {
-      clearTimeout(dashboardToastTimeoutRef.current);
-    }
-    const nextToast = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      tone,
-      message
-    };
-    setDashboardToast(nextToast);
-    dashboardToastTimeoutRef.current = setTimeout(() => {
-      setDashboardToast((current) =>
-        current?.id === nextToast.id ? null : current
-      );
-      dashboardToastTimeoutRef.current = null;
-    }, 3200);
-  }, []);
+  const showDashboardToast = useCallback(
+    (message, tone = "success", options = {}) => {
+      if (!message) return;
+      if (dashboardToastTimeoutRef.current) {
+        clearTimeout(dashboardToastTimeoutRef.current);
+      }
+      const nextToast = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        tone,
+        message,
+        actionLabel: options?.actionLabel || "",
+        onAction: typeof options?.onAction === "function" ? options.onAction : null
+      };
+      const timeoutMs =
+        Number(options?.durationMs) > 0
+          ? Number(options.durationMs)
+          : nextToast.onAction
+          ? 5200
+          : 3200;
+      setDashboardToast(nextToast);
+      dashboardToastTimeoutRef.current = setTimeout(() => {
+        setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
+        dashboardToastTimeoutRef.current = null;
+      }, timeoutMs);
+    },
+    []
+  );
 
   useEffect(() => {
     return () => {
@@ -1051,6 +1296,96 @@ export default function App() {
       }
     };
   }, []);
+
+  const removeOptimisticEntry = useCallback((operationId) => {
+    setOptimisticLogEntries((current) =>
+      current.filter((entry) => entry.operationId !== operationId)
+    );
+  }, []);
+
+  const clearOptimisticOperations = useCallback(() => {
+    optimisticOpRef.current.forEach((operation) => {
+      if (operation?.timerId) {
+        clearTimeout(operation.timerId);
+      }
+    });
+    optimisticOpRef.current.clear();
+    setOptimisticLogEntries([]);
+  }, []);
+
+  const undoOptimisticOperation = useCallback(
+    (operationId, { showToast = true } = {}) => {
+      const operation = optimisticOpRef.current.get(operationId);
+      if (!operation || operation.committing) return false;
+      if (operation.timerId) {
+        clearTimeout(operation.timerId);
+      }
+      optimisticOpRef.current.delete(operationId);
+      removeOptimisticEntry(operationId);
+      if (showToast) {
+        showDashboardToast(operation.undoMessage || "Update undone.", "success");
+      }
+      return true;
+    },
+    [removeOptimisticEntry, showDashboardToast]
+  );
+
+  const queueOptimisticLogCommit = useCallback(
+    ({ type, item, request, pendingMessage, successMessage, undoMessage }) => {
+      const operationId = item.id;
+      setDashError("");
+      setOptimisticLogEntries((current) => [
+        {
+          operationId,
+          type,
+          item: { ...item, isOptimistic: true },
+          createdAt: Date.now()
+        },
+        ...current
+      ]);
+
+      const commit = async () => {
+        const operation = optimisticOpRef.current.get(operationId);
+        if (!operation) return;
+        operation.committing = true;
+        try {
+          const data = await request();
+          optimisticOpRef.current.delete(operationId);
+          removeOptimisticEntry(operationId);
+          setDashboard(data.dashboard);
+          showDashboardToast(successMessage || "Saved.");
+        } catch (err) {
+          optimisticOpRef.current.delete(operationId);
+          removeOptimisticEntry(operationId);
+          const message = err?.message || `Unable to save ${type}.`;
+          setDashError(message);
+          showDashboardToast(message, "error");
+        }
+      };
+
+      const timerId = setTimeout(commit, OPTIMISTIC_UNDO_WINDOW_MS);
+      optimisticOpRef.current.set(operationId, {
+        type,
+        timerId,
+        committing: false,
+        undoMessage
+      });
+      showDashboardToast(pendingMessage || "Saved locally.", "success", {
+        actionLabel: "Undo",
+        onAction: () => {
+          undoOptimisticOperation(operationId, { showToast: true });
+        },
+        durationMs: OPTIMISTIC_UNDO_WINDOW_MS + 1000
+      });
+    },
+    [removeOptimisticEntry, showDashboardToast, undoOptimisticOperation]
+  );
+
+  useEffect(() => {
+    return () => {
+      clearOptimisticOperations();
+    };
+  }, [clearOptimisticOperations]);
 
   const onAuthChange = (e) => {
     setAuthForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -1147,84 +1482,116 @@ export default function App() {
   const onLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
+    setDashboard(null);
+    clearOptimisticOperations();
     setWeatherData(null);
     setWeatherError("");
-      setAirQualityData(null);
-      setAirQualityError("");
-      clearDashboardToast();
-      resetPersonalFlow();
-      go("/");
+    setWeatherLastUpdatedAt(null);
+    setAirQualityData(null);
+    setAirQualityError("");
+    setAirQualityLastUpdatedAt(null);
+    clearDashboardToast();
+    resetPersonalFlow();
+    go("/");
   };
 
   const submitWorkout = async (e) => {
     e.preventDefault();
-    setDashError("");
-    try {
-      const payload = {
-        ...workoutForm,
-        exercises: workoutForm.exercises
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
-      };
-      const res = await fetch("/api/dashboard/workout-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || "Unable to save workout.");
-      }
-      const data = await res.json();
-      setDashboard(data.dashboard);
-      setWorkoutForm({
-        date: getLocalDateKey(),
-        focus: "",
-        duration: "",
-        exercises: "",
-        sets: "",
-        reps: "",
-        intensityRpe: "",
-        notes: ""
-      });
-      setWorkoutModalOpen(false);
-      showDashboardToast("Workout saved.");
-    } catch (err) {
-      const message = err.message || "Unable to save workout.";
-      setDashError(message);
-      showDashboardToast(message, "error");
-    }
+    const normalizedExercises = workoutForm.exercises
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const payload = {
+      ...workoutForm,
+      exercises: normalizedExercises
+    };
+    const operationId = `optimistic-workout-${Date.now()}-${Math.random()
+      .toString(16)
+      .slice(2)}`;
+    const optimisticWorkout = {
+      id: operationId,
+      date: workoutForm.date || getLocalDateKey(),
+      focus: workoutForm.focus || "General",
+      duration: workoutForm.duration ? Number(workoutForm.duration) : null,
+      exercises: normalizedExercises,
+      sets: workoutForm.sets ? Number(workoutForm.sets) : null,
+      reps: workoutForm.reps ? Number(workoutForm.reps) : null,
+      intensityRpe: workoutForm.intensityRpe ? Number(workoutForm.intensityRpe) : null,
+      notes: workoutForm.notes || "",
+      createdAt: new Date().toISOString()
+    };
+
+    queueOptimisticLogCommit({
+      type: "workout",
+      item: optimisticWorkout,
+      request: async () => {
+        const res = await fetch("/api/dashboard/workout-sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errorPayload = await res.json().catch(() => ({}));
+          throw new Error(errorPayload?.error || "Unable to save workout.");
+        }
+        return res.json();
+      },
+      pendingMessage: "Workout added. Undo?",
+      successMessage: "Workout saved.",
+      undoMessage: "Workout entry removed."
+    });
+
+    setWorkoutForm({
+      date: getLocalDateKey(),
+      focus: "",
+      duration: "",
+      exercises: "",
+      sets: "",
+      reps: "",
+      intensityRpe: "",
+      notes: ""
+    });
+    setWorkoutModalOpen(false);
   };
 
   const submitCalories = async (e) => {
     e.preventDefault();
-    setDashError("");
-    try {
-      const payload = {
-        ...calorieForm,
-        date: getLocalDateKey()
-      };
-      const res = await fetch("/api/dashboard/calories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || "Unable to save calories.");
-      }
-      const data = await res.json();
-      setDashboard(data.dashboard);
-      setCalorieForm({ calories: "" });
-      showDashboardToast("Calories logged.");
-    } catch (err) {
-      const message = err.message || "Unable to save calories.";
-      setDashError(message);
-      showDashboardToast(message, "error");
-    }
+    const operationId = `optimistic-calories-${Date.now()}-${Math.random()
+      .toString(16)
+      .slice(2)}`;
+    const payload = {
+      ...calorieForm,
+      date: getLocalDateKey()
+    };
+
+    queueOptimisticLogCommit({
+      type: "calorie",
+      item: {
+        id: operationId,
+        date: payload.date,
+        calories: Number(calorieForm.calories || 0),
+        createdAt: new Date().toISOString()
+      },
+      request: async () => {
+        const res = await fetch("/api/dashboard/calories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errorPayload = await res.json().catch(() => ({}));
+          throw new Error(errorPayload?.error || "Unable to save calories.");
+        }
+        return res.json();
+      },
+      pendingMessage: "Calories added. Undo?",
+      successMessage: "Calories logged.",
+      undoMessage: "Calorie entry removed."
+    });
+
+    setCalorieForm({ calories: "" });
   };
 
   const submitGoals = async (e) => {
@@ -1253,36 +1620,53 @@ export default function App() {
 
   const submitMealLog = async (e) => {
     e.preventDefault();
-    setDashError("");
-    try {
-      const res = await fetch("/api/dashboard/meal-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(mealLogForm)
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || "Unable to save meal log.");
-      }
-      const data = await res.json();
-      setDashboard(data.dashboard);
-      setMealLogForm({
-        date: getLocalDateKey(),
-        mealType: "breakfast",
-        name: "",
-        calories: "",
-        proteinG: "",
-        carbsG: "",
-        fatG: "",
-        notes: ""
-      });
-      showDashboardToast("Meal logged.");
-    } catch (err) {
-      const message = err.message || "Unable to save meal log.";
-      setDashError(message);
-      showDashboardToast(message, "error");
-    }
+    const operationId = `optimistic-meal-${Date.now()}-${Math.random()
+      .toString(16)
+      .slice(2)}`;
+    const payload = { ...mealLogForm };
+
+    queueOptimisticLogCommit({
+      type: "meal",
+      item: {
+        id: operationId,
+        date: mealLogForm.date || getLocalDateKey(),
+        mealType: mealLogForm.mealType || "other",
+        name: mealLogForm.name || "",
+        calories: mealLogForm.calories ? Number(mealLogForm.calories) : null,
+        proteinG: mealLogForm.proteinG ? Number(mealLogForm.proteinG) : null,
+        carbsG: mealLogForm.carbsG ? Number(mealLogForm.carbsG) : null,
+        fatG: mealLogForm.fatG ? Number(mealLogForm.fatG) : null,
+        notes: mealLogForm.notes || "",
+        loggedAt: new Date().toISOString()
+      },
+      request: async () => {
+        const res = await fetch("/api/dashboard/meal-logs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errorPayload = await res.json().catch(() => ({}));
+          throw new Error(errorPayload?.error || "Unable to save meal log.");
+        }
+        return res.json();
+      },
+      pendingMessage: "Meal added. Undo?",
+      successMessage: "Meal logged.",
+      undoMessage: "Meal entry removed."
+    });
+
+    setMealLogForm({
+      date: getLocalDateKey(),
+      mealType: "breakfast",
+      name: "",
+      calories: "",
+      proteinG: "",
+      carbsG: "",
+      fatG: "",
+      notes: ""
+    });
   };
 
   const submitProgressMetric = async (e) => {
@@ -1402,7 +1786,7 @@ export default function App() {
         personal={personal}
         go={go}
         onLogout={onLogout}
-        dashboard={dashboard}
+        dashboard={mergedDashboard}
         goalForm={goalForm}
         setGoalForm={setGoalForm}
         dashView={dashView}
@@ -1433,10 +1817,12 @@ export default function App() {
         weatherData={weatherData}
         weatherLoading={weatherLoading}
         weatherError={weatherError}
+        weatherLastUpdatedAt={weatherLastUpdatedAt}
         refreshWeatherRecommendation={loadWeatherRecommendation}
         airQualityData={airQualityData}
         airQualityLoading={airQualityLoading}
         airQualityError={airQualityError}
+        airQualityLastUpdatedAt={airQualityLastUpdatedAt}
         refreshAirQuality={loadAirQuality}
         onSaveExerciseToPlan={saveExerciseToPlan}
         onRemoveSavedExercise={removeSavedExercise}
@@ -1479,6 +1865,3 @@ export default function App() {
     />
   );
 }
-
-
-

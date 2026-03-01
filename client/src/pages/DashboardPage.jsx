@@ -7,28 +7,20 @@ import MealView from "./dashboard/MealView";
 import TipsView from "./dashboard/TipsView";
 import SettingsView from "./dashboard/SettingsView";
 import DashboardHomeView from "./dashboard/DashboardHomeView";
-import { buildWeeklyMealPlan } from "./dashboard/planUtils";
+import DashboardHeader from "./dashboard/DashboardHeader";
+import DashboardDrawer from "./dashboard/DashboardDrawer";
+import DashboardBottomNav from "./dashboard/DashboardBottomNav";
+import useDashboardMetrics from "./dashboard/useDashboardMetrics";
 import ModalPortal from "../components/ModalPortal";
 import "./DashboardPage.css";
 
-const parseDateValue = (value) => {
-  if (!value) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
-  if (match) {
-    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const toDateKey = (date) => {
+const getLocalDateKey = () => {
+  const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const DASH_VIEW_TO_ROUTE = {
   summary: "/dashboard",
@@ -87,10 +79,12 @@ export default function DashboardPage({
   weatherData,
   weatherLoading,
   weatherError,
+  weatherLastUpdatedAt,
   refreshWeatherRecommendation,
   airQualityData,
   airQualityLoading,
   airQualityError,
+  airQualityLastUpdatedAt,
   refreshAirQuality,
   onSaveExerciseToPlan,
   onRemoveSavedExercise,
@@ -101,15 +95,34 @@ export default function DashboardPage({
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
-  const workouts = Array.isArray(dashboard?.workoutSessions) && dashboard.workoutSessions.length
-    ? dashboard.workoutSessions
-    : dashboard?.workouts || [];
-  const calories = dashboard?.calories || [];
-  const mealLogs = Array.isArray(dashboard?.mealLogs) ? dashboard.mealLogs : [];
-  const progressMetrics = Array.isArray(dashboard?.progressMetrics)
-    ? dashboard.progressMetrics
-    : [];
-  const goals = dashboard?.goals || goalForm;
+  const {
+    calories,
+    mealLogs,
+    progressMetrics,
+    goals,
+    buildLinePath,
+    last7Workouts,
+    avgCalories,
+    weeklyGoal,
+    workoutProgress,
+    calorieGoal,
+    calorieProgress,
+    trendRanges,
+    calorieSeries,
+    workoutSeries,
+    last7Keys,
+    recentWorkouts,
+    goalPaceText,
+    calorieDelta,
+    todayRecommendation,
+    weeklyTrends
+  } = useDashboardMetrics({
+    dashboard,
+    goalForm,
+    formGoal: form?.goal,
+    weekDays,
+    latestPlanByWeekday
+  });
 
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
@@ -132,304 +145,18 @@ export default function DashboardPage({
       document.removeEventListener("keydown", closeProfileMenuOnEscape);
     };
   }, [profileMenuOpen]);
-  const {
-    last7Workouts,
-    avgCalories,
-    weeklyGoal,
-    workoutProgress,
-    calorieGoal,
-    calorieProgress,
-    trendRanges,
-    calorieSeries,
-    workoutSeries,
-    last7Keys,
-    recentWorkouts,
-    goalPaceText,
-    calorieDelta,
-    todayRecommendation,
-    weeklyTrends
-  } = useMemo(() => {
-    const today = new Date();
-    const todayDate = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    const last7Cutoff = new Date(todayDate);
-    last7Cutoff.setDate(last7Cutoff.getDate() - 6);
-    const previous7Start = new Date(last7Cutoff);
-    previous7Start.setDate(previous7Start.getDate() - 7);
-    const previous7End = new Date(last7Cutoff);
-    previous7End.setDate(previous7End.getDate() - 1);
-    const inLast7Days = (value) =>
-      Boolean(value && value >= last7Cutoff && value <= todayDate);
-    const inPrevious7Days = (value) =>
-      Boolean(value && value >= previous7Start && value <= previous7End);
-
-    const caloriesByDate = {};
-    const last7Calories = [];
-    const previous7Calories = [];
-    for (const item of calories) {
-      const parsedDate = parseDateValue(item?.date);
-      if (!parsedDate) continue;
-      const key = toDateKey(parsedDate);
-      const nextCalories = Number(item?.calories || 0);
-      if (!Number.isNaN(nextCalories)) {
-        caloriesByDate[key] = (caloriesByDate[key] || 0) + nextCalories;
-      }
-      if (inLast7Days(parsedDate)) {
-        last7Calories.push(item);
-      } else if (inPrevious7Days(parsedDate)) {
-        previous7Calories.push(item);
-      }
-    }
-
-    const workoutsByDate = {};
-    const workoutMinutesByDate = {};
-    const last7Workouts = [];
-    const previous7Workouts = [];
-    for (const item of workouts) {
-      const parsedDate = parseDateValue(item?.date);
-      if (!parsedDate) continue;
-      const key = toDateKey(parsedDate);
-      workoutsByDate[key] = (workoutsByDate[key] || 0) + 1;
-      const minutes = Number(item?.duration || 0);
-      if (!Number.isNaN(minutes)) {
-        workoutMinutesByDate[key] = (workoutMinutesByDate[key] || 0) + minutes;
-      }
-      if (inLast7Days(parsedDate)) {
-        last7Workouts.push(item);
-      } else if (inPrevious7Days(parsedDate)) {
-        previous7Workouts.push(item);
-      }
-    }
-
-    const avgCalories =
-      last7Calories.reduce((sum, item) => sum + Number(item?.calories || 0), 0) /
-      (last7Calories.length || 1);
-    const previousAvgCalories =
-      previous7Calories.reduce(
-        (sum, item) => sum + Number(item?.calories || 0),
-        0
-      ) / (previous7Calories.length || 1);
-    const weeklyGoal = Math.max(Number(goals.weeklyWorkouts || 3), 1);
-    const workoutProgress = Math.min(
-      100,
-      Math.round((last7Workouts.length / weeklyGoal) * 100)
-    );
-    const calorieGoal = Math.max(Number(goals.targetCalories || 2200), 1);
-    const calorieProgress = Math.min(
-      100,
-      Math.round((avgCalories / calorieGoal) * 100)
-    );
-
-    const buildRangeKeys = (days) =>
-      Array.from({ length: days }, (_, index) => {
-        const date = new Date(todayDate);
-        date.setDate(date.getDate() - (days - 1 - index));
-        return toDateKey(date);
-      });
-
-    const formatRangeLabel = (key) => {
-      const parsedDate = parseDateValue(key);
-      return parsedDate
-        ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-        : key;
-    };
-
-    const buildRecoveryScore = (key) => {
-      const dailyCalories = caloriesByDate[key] || calorieGoal;
-      const caloriePenalty = Math.min(
-        (Math.abs(dailyCalories - calorieGoal) / calorieGoal) * 55,
-        40
-      );
-      const minutes = workoutMinutesByDate[key] || 0;
-      const loadPenalty = Math.min((minutes / 90) * 30, 30);
-      const restBonus = workoutsByDate[key] ? 0 : 8;
-      return Math.round(
-        clamp(78 - caloriePenalty - loadPenalty + restBonus, 30, 95)
-      );
-    };
-
-    const buildTrendSet = (keys) => {
-      const caloriesSeries = keys.map((key) => caloriesByDate[key] || 0);
-      const workoutSeries = keys.map((key) => workoutsByDate[key] || 0);
-      const recoverySeries = keys.map((key) => buildRecoveryScore(key));
-      return {
-        keys,
-        caloriesSeries,
-        workoutSeries,
-        recoverySeries,
-        startLabel: formatRangeLabel(keys[0]),
-        endLabel: formatRangeLabel(keys[keys.length - 1]),
-        activeDays: workoutSeries.filter((value) => value > 0).length,
-        avgCalories:
-          caloriesSeries.reduce((sum, value) => sum + value, 0) /
-          (keys.length || 1),
-        avgRecovery:
-          recoverySeries.reduce((sum, value) => sum + value, 0) /
-          (keys.length || 1)
-      };
-    };
-
-    const trendRanges = {
-      week: buildTrendSet(buildRangeKeys(7)),
-      month: buildTrendSet(buildRangeKeys(30))
-    };
-    const calorieSeries = trendRanges.week.caloriesSeries;
-    const workoutSeries = trendRanges.week.workoutSeries;
-    const last7Keys = trendRanges.week.keys;
-
-    const recentWorkouts = [...workouts].sort((a, b) => {
-      const dateA = parseDateValue(a?.date)?.getTime() || 0;
-      const dateB = parseDateValue(b?.date)?.getTime() || 0;
-      return dateB - dateA;
-    });
-
-    const avgDailyWorkouts = last7Workouts.length / 7;
-    const remainingWorkouts = Math.max(weeklyGoal - last7Workouts.length, 0);
-    const daysToGoal =
-      avgDailyWorkouts > 0
-        ? Math.ceil(remainingWorkouts / avgDailyWorkouts)
-        : null;
-    const goalPaceText =
-      remainingWorkouts === 0
-        ? "Weekly workout goal reached."
-        : avgDailyWorkouts > 0
-        ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
-        : "Log a workout to start your pace estimate.";
-    const calorieDelta = Math.round(avgCalories - calorieGoal);
-    const workoutDeltaVsLastWeek = last7Workouts.length - previous7Workouts.length;
-    const calorieDeltaVsLastWeek = Math.round(avgCalories - previousAvgCalories);
-
-    const weightTrendCandidates = [...progressMetrics]
-      .filter((item) => Number.isFinite(Number(item?.weightLb)))
-      .sort((a, b) => {
-        const dateA = parseDateValue(a?.date)?.getTime() || 0;
-        const dateB = parseDateValue(b?.date)?.getTime() || 0;
-        return dateB - dateA;
-      });
-    const latestWeight =
-      weightTrendCandidates.length > 0
-        ? Number(weightTrendCandidates[0]?.weightLb)
-        : null;
-    const previousWeight =
-      weightTrendCandidates.length > 1
-        ? Number(weightTrendCandidates[1]?.weightLb)
-        : null;
-    const weightDeltaVsLastLog =
-      latestWeight !== null &&
-      previousWeight !== null &&
-      Number.isFinite(latestWeight) &&
-      Number.isFinite(previousWeight)
-        ? Number((latestWeight - previousWeight).toFixed(1))
-        : null;
-
-    const latestPlan = dashboard?.plans?.[0];
-    const weeklyMealPlan = buildWeeklyMealPlan({
-      weekDays,
-      latestPlanByWeekday,
-      goalText:
-        latestPlan?.goal ||
-        dashboard?.goals?.goalType ||
-        form?.goal ||
-        "Build lean strength and energy",
-      targetCalories: goals.targetCalories
-    });
-    const todayWeekday = todayDate.toLocaleDateString("en-US", {
-      weekday: "long"
-    });
-    const todayMealPlan =
-      weeklyMealPlan.days.find((day) => day.key === todayWeekday) ||
-      weeklyMealPlan.days[0] ||
-      null;
-    const todayRecommendation = {
-      weekday: todayWeekday,
-      workoutLines: latestPlanByWeekday?.[todayWeekday] || [],
-      mealPlan: todayMealPlan
-    };
-    const weeklyTrends = {
-      workouts: workoutDeltaVsLastWeek,
-      calories: calorieDeltaVsLastWeek,
-      latestWeight,
-      weightDelta: weightDeltaVsLastLog
-    };
-
-    return {
-      last7Workouts,
-      avgCalories,
-      weeklyGoal,
-      workoutProgress,
-      calorieGoal,
-      calorieProgress,
-      trendRanges,
-      calorieSeries,
-      workoutSeries,
-      last7Keys,
-      recentWorkouts,
-      goalPaceText,
-      calorieDelta,
-      todayRecommendation,
-      weeklyTrends
-    };
-  }, [
-    calories,
-    workouts,
-    goals,
-    dashboard,
-    progressMetrics,
-    form?.goal,
-    weekDays,
-    latestPlanByWeekday
-  ]);
 
   if (!user) {
     return (
       <div className="page dashboard-page">
-        <header className="title">
-          <div className="header-top">
-            <div className="header-left" />
-            <div className="header-center">
-              <h1>
-                <button
-                  type="button"
-                  className="dashboard-title-button"
-                  onClick={() => go("/dashboard")}
-                  aria-label="Go to dashboard summary"
-                  title="Go to summary"
-                >
-                  Dashboard
-                </button>
-              </h1>
-            </div>
-            <div className="auth-actions">
-              <button type="button" className="ghost" onClick={() => go("/auth")}>
-                Login / Sign up
-              </button>
-            </div>
-          </div>
-          <p className="muted">Please sign in to access your dashboard.</p>
-        </header>
+        <DashboardHeader
+          user={user}
+          go={go}
+          onNavigateSummary={() => go("/dashboard")}
+        />
       </div>
     );
   }
-
-  const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
-    const safeValues = values.length ? values : [0];
-    const max = Math.max(...safeValues, 1);
-    const min = Math.min(...safeValues, 0);
-    const range = max - min || 1;
-    const stepX = (width - padding * 2) / Math.max(safeValues.length - 1, 1);
-
-    return safeValues
-      .map((value, index) => {
-        const x = padding + stepX * index;
-        const y =
-          height - padding - ((value - min) / range) * (height - padding * 2);
-        return `${index === 0 ? "M" : "L"}${x},${y}`;
-      })
-      .join(" ");
-  };
 
   const navigateDashView = (nextView, { closeDrawer = false } = {}) => {
     setDashView(nextView);
@@ -442,7 +169,27 @@ export default function DashboardPage({
   const weatherRecommendation = weatherData?.recommendation || null;
   const airSummary = airQualityData?.summary || null;
   const caloriesGap = Math.round(calorieGoal - avgCalories);
+  const formatRelativeUpdatedAt = (timestamp) => {
+    if (!timestamp) return "Not updated yet";
+    const diffMs = Math.max(Date.now() - Number(timestamp), 0);
+    const diffMinutes = Math.round(diffMs / 60000);
+    if (diffMinutes < 1) return "Last updated just now";
+    if (diffMinutes === 1) return "Last updated 1m ago";
+    if (diffMinutes < 60) return `Last updated ${diffMinutes}m ago`;
+    const diffHours = Math.round(diffMinutes / 60);
+    if (diffHours === 1) return "Last updated 1h ago";
+    if (diffHours < 24) return `Last updated ${diffHours}h ago`;
+    return `Last updated on ${new Date(Number(timestamp)).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
+    })}`;
+  };
   const nextWorkout = useMemo(() => {
+    const parseDateAsTime = (value) => {
+      if (!value) return 0;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    };
     const today = new Date();
     const todayStart = new Date(
       today.getFullYear(),
@@ -450,9 +197,9 @@ export default function DashboardPage({
       today.getDate()
     );
     const upcoming = recentWorkouts
-      .map((item) => ({ ...item, parsedDate: parseDateValue(item?.date) }))
-      .filter((item) => item.parsedDate && item.parsedDate >= todayStart)
-      .sort((a, b) => a.parsedDate - b.parsedDate);
+      .map((item) => ({ ...item, parsedDate: new Date(parseDateAsTime(item?.date)) }))
+      .filter((item) => item.parsedDate.getTime() >= todayStart.getTime())
+      .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
     if (upcoming.length) return { ...upcoming[0], context: "Upcoming" };
     if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
     return null;
@@ -480,10 +227,12 @@ export default function DashboardPage({
         weatherData={weatherData}
         weatherLoading={weatherLoading}
         weatherError={weatherError}
+        weatherLastUpdatedAt={weatherLastUpdatedAt}
         refreshWeatherRecommendation={refreshWeatherRecommendation}
         airQualityData={airQualityData}
         airQualityLoading={airQualityLoading}
         airQualityError={airQualityError}
+        airQualityLastUpdatedAt={airQualityLastUpdatedAt}
         refreshAirQuality={refreshAirQuality}
         onOpenPlans={() => navigateDashView("plans")}
         onOpenMeal={() => navigateDashView("meal")}
@@ -573,102 +322,23 @@ export default function DashboardPage({
   return (
     <>
       <div className="page dashboard-page">
-        <header className="title">
-          <div className="header-top">
-            <div className="header-left">
-              <div className="nav-trigger">
-                <button
-                  type="button"
-                  className="ghost icon-button"
-                  onClick={() => setDashNavOpen(true)}
-                  aria-label="Open dashboard menu"
-                  title="Open menu"
-                >
-                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                    <path
-                      d="M4 7h16M4 12h16M4 17h16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="header-center">
-              <h1>
-                <button
-                  type="button"
-                  className="dashboard-title-button"
-                  onClick={() => navigateDashView("summary")}
-                  aria-label="Go to dashboard summary"
-                  title="Go to summary"
-                >
-                  Dashboard
-                </button>
-              </h1>
-            </div>
-            <div className="auth-actions">
-              <div className="profile-menu" ref={profileMenuRef}>
-                <button
-                  type="button"
-                  className="ghost icon-button profile-icon-button"
-                  onClick={() => setProfileMenuOpen((prev) => !prev)}
-                  aria-label="Open profile menu"
-                  aria-haspopup="menu"
-                  aria-expanded={profileMenuOpen}
-                  aria-controls="profile-menu-dropdown"
-                  title={user.email}
-                >
-                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                    <circle
-                      cx="12"
-                      cy="8"
-                      r="4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    />
-                    <path
-                      d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-                {profileMenuOpen && (
-                  <div id="profile-menu-dropdown" className="profile-menu-dropdown" role="menu">
-                    <button
-                      type="button"
-                      className="profile-menu-item"
-                      role="menuitem"
-                      onClick={() => {
-                        navigateDashView("settings");
-                        setProfileMenuOpen(false);
-                      }}
-                    >
-                      View profile
-                    </button>
-                    <button
-                      type="button"
-                      className="profile-menu-item"
-                      role="menuitem"
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        onLogout();
-                      }}
-                    >
-                      Log out
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader
+          user={user}
+          go={go}
+          onOpenMenu={() => setDashNavOpen(true)}
+          onNavigateSummary={() => navigateDashView("summary")}
+          profileMenuRef={profileMenuRef}
+          profileMenuOpen={profileMenuOpen}
+          onToggleProfileMenu={() => setProfileMenuOpen((prev) => !prev)}
+          onOpenSettings={() => {
+            navigateDashView("settings");
+            setProfileMenuOpen(false);
+          }}
+          onLogout={() => {
+            setProfileMenuOpen(false);
+            onLogout();
+          }}
+        />
         <p className="muted dashboard-header-note">Visual summary of your progress and key metrics.</p>
 
         <section className="panel dashboard-at-a-glance">
@@ -718,16 +388,23 @@ export default function DashboardPage({
               <div className="card-section-body">
                 <p className="dashboard-glance-value">
                   {weatherLoading
-                    ? "Checking..."
-                    : weatherError
-                    ? "Unavailable"
+                    ? weatherRecommendation
+                      ? "Refreshing..."
+                      : "Checking..."
                     : weatherRecommendation?.workoutType === "outdoor"
                     ? "Outdoor friendly"
                     : weatherRecommendation?.workoutType === "indoor"
                     ? "Indoor suggested"
+                    : weatherError
+                    ? "Unavailable"
                     : "Unavailable"}
                 </p>
-                <p className="muted">{weatherRecommendation?.summary || "No weather update yet."}</p>
+                <p className="muted">
+                  {weatherRecommendation?.summary || weatherError || "No weather update yet."}
+                </p>
+                <p className="muted dashboard-glance-updated">
+                  {formatRelativeUpdatedAt(weatherLastUpdatedAt)}
+                </p>
               </div>
             </article>
             <article className="dashboard-glance-card card-shell">
@@ -737,13 +414,16 @@ export default function DashboardPage({
               <div className="card-section-body">
                 <p className="dashboard-glance-value">
                   {airQualityLoading
-                    ? "Checking..."
-                    : airQualityError
-                    ? "Unavailable"
-                    : airSummary?.level || "Unavailable"}
+                    ? airSummary
+                      ? "Refreshing..."
+                      : "Checking..."
+                    : airSummary?.level || (airQualityError ? "Unavailable" : "Unavailable")}
                 </p>
                 <p className="muted">
-                  {airSummary?.guidance || "No air quality guidance available."}
+                  {airSummary?.guidance || airQualityError || "No air quality guidance available."}
+                </p>
+                <p className="muted dashboard-glance-updated">
+                  {formatRelativeUpdatedAt(airQualityLastUpdatedAt)}
                 </p>
               </div>
             </article>
@@ -753,7 +433,7 @@ export default function DashboardPage({
               type="button"
               className="ghost"
               onClick={() => {
-                setWorkoutForm((prev) => ({ ...prev, date: toDateKey(new Date()) }));
+                setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
                 setWorkoutModalOpen(true);
               }}
             >
@@ -772,13 +452,6 @@ export default function DashboardPage({
               onClick={() => navigateDashView("tips")}
             >
               Open guides
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={openPlannerFromProfile}
-            >
-              Update plan
             </button>
           </div>
         </section>
@@ -799,18 +472,11 @@ export default function DashboardPage({
               </div>
             </section>
           )}
-          {dashViewOrder.map((viewKey) => {
-            const isActive = !showInitialDashboardLoading && viewKey === activeDashView;
-            return (
-              <div
-                key={viewKey}
-                className={`dashboard-view-shell ${isActive ? "is-active" : "is-hidden"}`}
-                aria-hidden={!isActive}
-              >
-                {dashboardViews[viewKey]}
-              </div>
-            );
-          })}
+          {!showInitialDashboardLoading && (
+            <div className="dashboard-view-shell is-active" aria-hidden="false">
+              {dashboardViews[activeDashView]}
+            </div>
+          )}
         </main>
 
         {dashLoading && dashboard && (
@@ -823,7 +489,20 @@ export default function DashboardPage({
             role="status"
             aria-live="polite"
           >
-            <span>{dashboardToast.message}</span>
+            <span className="dashboard-toast-message">{dashboardToast.message}</span>
+            {dashboardToast.actionLabel && typeof dashboardToast.onAction === "function" && (
+              <button
+                type="button"
+                className="ghost dashboard-toast-action"
+                onClick={() => {
+                  const action = dashboardToast.onAction;
+                  clearDashboardToast();
+                  action();
+                }}
+              >
+                {dashboardToast.actionLabel}
+              </button>
+            )}
             <button
               type="button"
               className="ghost dashboard-toast-close"
@@ -847,8 +526,11 @@ export default function DashboardPage({
                 className="modal dashboard-modal dashboard-workout-modal"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="modal-header">
-                  <h2>Add workout</h2>
+                <div className="modal-header dashboard-workout-modal-header">
+                  <div className="dashboard-workout-heading">
+                    <h2>Log workout</h2>
+                    <p className="muted">Save your session details and notes.</p>
+                  </div>
                   <button
                     type="button"
                     className="ghost icon-button"
@@ -868,125 +550,150 @@ export default function DashboardPage({
                   </button>
                 </div>
                 <form className="form dashboard-workout-form" onSubmit={submitWorkout}>
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={workoutForm.date}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Focus
-                  <input
-                    value={workoutForm.focus}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
-                    }
-                    placeholder="Strength, conditioning..."
-                  />
-                </label>
-                <label>
-                  Duration (minutes)
-                  <input
-                    type="number"
-                    min="10"
-                    max="180"
-                    value={workoutForm.duration}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({
-                        ...prev,
-                        duration: e.target.value
-                      }))
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  Exercises (comma-separated)
-                  <input
-                    value={workoutForm.exercises}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({
-                        ...prev,
-                        exercises: e.target.value
-                      }))
-                    }
-                    placeholder="Squat, bench press, row"
-                  />
-                </label>
-                <div className="dashboard-workout-grid">
-                  <label>
-                    Sets
-                    <input
-                      type="number"
-                      min="1"
-                      max="80"
-                      value={workoutForm.sets}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({
-                          ...prev,
-                          sets: e.target.value
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Reps
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={workoutForm.reps}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({
-                          ...prev,
-                          reps: e.target.value
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Intensity (RPE 1-10)
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      step="0.5"
-                      value={workoutForm.intensityRpe}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({
-                          ...prev,
-                          intensityRpe: e.target.value
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-                <label>
-                  Session notes
-                  <textarea
-                    value={workoutForm.notes}
-                    onChange={(e) =>
-                      setWorkoutForm((prev) => ({
-                        ...prev,
-                        notes: e.target.value
-                      }))
-                    }
-                    rows={3}
-                    placeholder="How did the session feel?"
-                  />
-                </label>
-                <div className="modal-submit">
-                  <button className="cta" type="submit">
-                    Save workout
-                  </button>
-                </div>
-              </form>
-            </div>
+                  <div className="dashboard-workout-layout">
+                    <section className="dashboard-workout-section dashboard-workout-section-session">
+                      <h3>Session details</h3>
+                      <div className="dashboard-workout-grid dashboard-workout-grid-basics">
+                        <label className="dashboard-workout-field dashboard-workout-field-half">
+                          <span className="dashboard-workout-label">Date</span>
+                          <input
+                            type="date"
+                            value={workoutForm.date}
+                            onChange={(e) =>
+                              setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
+                            }
+                            required
+                          />
+                        </label>
+                        <label className="dashboard-workout-field dashboard-workout-field-half">
+                          <span className="dashboard-workout-label">Duration (minutes)</span>
+                          <input
+                            type="number"
+                            min="10"
+                            max="180"
+                            value={workoutForm.duration}
+                            onChange={(e) =>
+                              setWorkoutForm((prev) => ({
+                                ...prev,
+                                duration: e.target.value
+                              }))
+                            }
+                            required
+                          />
+                        </label>
+                        <label className="dashboard-workout-field dashboard-workout-field-full">
+                          <span className="dashboard-workout-label">Focus</span>
+                          <input
+                            value={workoutForm.focus}
+                            onChange={(e) =>
+                              setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
+                            }
+                            placeholder="Strength, conditioning..."
+                          />
+                        </label>
+                      </div>
+                    </section>
+
+                    <section className="dashboard-workout-section dashboard-workout-section-exercise">
+                      <h3>Exercise details</h3>
+                      <div className="dashboard-workout-grid dashboard-workout-grid-exercise">
+                        <label className="dashboard-workout-field dashboard-workout-field-full">
+                          <span className="dashboard-workout-label">Exercises (comma-separated)</span>
+                          <input
+                            value={workoutForm.exercises}
+                            onChange={(e) =>
+                              setWorkoutForm((prev) => ({
+                                ...prev,
+                                exercises: e.target.value
+                              }))
+                            }
+                            placeholder="Squat, bench press, row"
+                          />
+                        </label>
+                        <div className="dashboard-workout-grid dashboard-workout-grid-metrics">
+                          <label className="dashboard-workout-field dashboard-workout-field-half">
+                            <span className="dashboard-workout-label">Sets</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="80"
+                              value={workoutForm.sets}
+                              onChange={(e) =>
+                                setWorkoutForm((prev) => ({
+                                  ...prev,
+                                  sets: e.target.value
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="dashboard-workout-field dashboard-workout-field-half">
+                            <span className="dashboard-workout-label">Reps</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="120"
+                              value={workoutForm.reps}
+                              onChange={(e) =>
+                                setWorkoutForm((prev) => ({
+                                  ...prev,
+                                  reps: e.target.value
+                                }))
+                              }
+                            />
+                          </label>
+                          <label className="dashboard-workout-field dashboard-workout-field-full">
+                            <span className="dashboard-workout-label">Intensity (RPE 1-10)</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              step="0.5"
+                              value={workoutForm.intensityRpe}
+                              onChange={(e) =>
+                                setWorkoutForm((prev) => ({
+                                  ...prev,
+                                  intensityRpe: e.target.value
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="dashboard-workout-section dashboard-workout-section-notes">
+                      <h3>Session notes</h3>
+                      <label className="dashboard-workout-field dashboard-workout-field-full">
+                        <span className="dashboard-workout-label">Notes</span>
+                        <textarea
+                          value={workoutForm.notes}
+                          onChange={(e) =>
+                            setWorkoutForm((prev) => ({
+                              ...prev,
+                              notes: e.target.value
+                            }))
+                          }
+                          rows={3}
+                          placeholder="How did the session feel?"
+                        />
+                      </label>
+                    </section>
+                  </div>
+
+                  <div className="modal-submit dashboard-workout-actions">
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => setWorkoutModalOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button className="cta" type="submit">
+                      Save workout
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </ModalPortal>
         )}
@@ -995,57 +702,17 @@ export default function DashboardPage({
         {generatedPlanModal}
       </div>
 
-      {dashNavOpen && (
-        <div className="drawer-backdrop" onClick={() => setDashNavOpen(false)}>
-          <aside className="drawer" onClick={(e) => e.stopPropagation()} role="navigation">
-            <div className="drawer-header">
-              <h3>Dashboard menu</h3>
-              <button
-                type="button"
-                className="ghost icon-button"
-                aria-label="Close dashboard menu"
-                title="Close menu"
-                onClick={() => setDashNavOpen(false)}
-              >
-                <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                  <path
-                    d="M6 6l12 12M18 6L6 18"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="drawer-links">
-              {DASH_DRAWER_ITEMS.filter((item) => item.key !== "settings").map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={dashView === item.key ? "active" : ""}
-                  onClick={() => {
-                    navigateDashView(item.key, { closeDrawer: true });
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="drawer-footer">
-              <button
-                type="button"
-                className={dashView === "settings" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("settings", { closeDrawer: true });
-                }}
-              >
-                Settings
-              </button>
-            </div>
-          </aside>
-        </div>
-      )}
+      <DashboardDrawer
+        open={dashNavOpen}
+        dashView={dashView}
+        items={DASH_DRAWER_ITEMS}
+        onClose={() => setDashNavOpen(false)}
+        onNavigate={(nextView) => navigateDashView(nextView, { closeDrawer: true })}
+      />
+      <DashboardBottomNav
+        dashView={dashView}
+        onNavigate={(nextView) => navigateDashView(nextView)}
+      />
     </>
   );
 }
