@@ -1,5 +1,6 @@
 import { createTimeline } from "animejs";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import "./PreviewPage.css";
 
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
@@ -52,7 +53,6 @@ const PREVIEW_MORPH_DURATION_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS - 120);
 const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
-const PREVIEW_TOC_SWITCH_MS = 920;
 const PREVIEW_GENERATING_HOLD_MS = 2400;
 const PREVIEW_WEEK_DAY_ORDER = [...TRAINING_DAY_OPTIONS];
 const PREVIEW_WEEK_TEXT_ROW_CONFIG = [
@@ -73,12 +73,14 @@ const PREVIEW_WEEK_OUTLINE_DRAW_MS =
   + PREVIEW_WEEK_LINE_DRAW_MS;
 const PREVIEW_WEEK_HEADER_REVEAL_MS = 620;
 const PREVIEW_WEEK_ROW_TYPING_MS = 1800;
-const PREVIEW_WEEK_SCAN_DELAY_MS = 1400;
+const PREVIEW_WEEK_SCAN_DELAY_MS = 400;
 const PREVIEW_WEEK_SCAN_DURATION_MS = 5000;
-const PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS = PREVIEW_WEEK_SCAN_DURATION_MS + 120;
-const PREVIEW_WEEK_PARTICLE_DENSITY_PX = 820;
-const PREVIEW_WEEK_PARTICLE_MIN_COUNT = 8;
-const PREVIEW_WEEK_PARTICLE_MAX_COUNT = 28;
+const PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS = PREVIEW_WEEK_SCAN_DURATION_MS;
+const PREVIEW_WEEK_PARTICLE_DENSITY_PX = 1500;
+const PREVIEW_WEEK_PARTICLE_MIN_COUNT = 4;
+const PREVIEW_WEEK_PARTICLE_MAX_COUNT = 14;
+const PREVIEW_WEEK_PARTICLE_MAX_TOTAL = 260;
+const PREVIEW_WEEK_CHUNK_MAX_TOTAL = 110;
 const PREVIEW_WEEK_PARTICLE_MIN_SIZE_PX = 1;
 const PREVIEW_WEEK_PARTICLE_MAX_SIZE_PX = 3.4;
 const PREVIEW_WEEK_PARTICLE_MIN_DURATION_MS = 1850;
@@ -87,6 +89,9 @@ const PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS = 980;
 const PREVIEW_WEEK_PARTICLE_JITTER_MS = 18;
 const PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS = 3000;
 const PREVIEW_DASHBOARD_AUTO_ADVANCE_MS = 820;
+const PREVIEW_DASHBOARD_STAGE_START_MS = 280;
+const PREVIEW_DASHBOARD_STAGE_STEP_MS = 480;
+const PREVIEW_DASHBOARD_FINAL_STAGE = 8;
 const PREVIEW_WEEK_MIN_WORKOUT_DAYS = 5;
 const PREVIEW_WEEK_DAY_NORMALIZATION = {
   mon: "Monday",
@@ -139,6 +144,21 @@ const getPreviewTypingStepMs = (textLength) =>
     Math.min(PREVIEW_TYPING_MAX_MS, Math.round(560 / Math.max(Number(textLength) || 1, 1)))
   );
 const randomBetween = (min, max) => min + (Math.random() * (max - min));
+const buildPreviewLinePath = (values, width = 260, height = 110, padding = 10) => {
+  const safeValues = values.length ? values : [0];
+  const max = Math.max(...safeValues, 1);
+  const min = Math.min(...safeValues, 0);
+  const range = max - min || 1;
+  const stepX = (width - padding * 2) / Math.max(safeValues.length - 1, 1);
+
+  return safeValues
+    .map((value, index) => {
+      const x = padding + stepX * index;
+      const y = height - padding - (((value - min) / range) * (height - padding * 2));
+      return `${index === 0 ? "M" : "L"}${x},${y}`;
+    })
+    .join(" ");
+};
 const getPreviewWeekdayName = (dateValue) => {
   const dayIndex = Number(dateValue?.getDay?.());
   if (!Number.isInteger(dayIndex)) return PREVIEW_WEEK_DAY_ORDER[0];
@@ -164,14 +184,14 @@ export default function PreviewPage({
   const previewWeekParticlePlayersRef = useRef([]);
   const previewWeekParticleTargetsRef = useRef([]);
   const previewStepIndexRef = useRef(0);
-  const previewSwitchTimeoutRef = useRef(null);
+  const [previewTocPortalRoot, setPreviewTocPortalRoot] = useState(null);
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
-  const [previewSwitchFromIndex, setPreviewSwitchFromIndex] = useState(null);
   const [previewFilledFields, setPreviewFilledFields] = useState({});
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
   const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
   const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
   const [previewWeekStage, setPreviewWeekStage] = useState(0);
+  const [previewDashboardStage, setPreviewDashboardStage] = useState(0);
   const [previewWeekHeaderTypingProgress, setPreviewWeekHeaderTypingProgress] = useState(0);
   const [previewWeekTypingProgress, setPreviewWeekTypingProgress] = useState(0);
 
@@ -378,6 +398,7 @@ export default function PreviewPage({
       3600
     );
     const calorieProgress = clamp(Math.round((avgCalories / Math.max(calorieGoal, 1)) * 100), 0, 100);
+    const calorieDelta = Math.round(avgCalories - calorieGoal);
 
     const goalText = String(activePreviewProfile.goal || JOHN_DOE_PREVIEW_PROFILE.goal);
     const goalTokens = goalText.toLowerCase();
@@ -411,6 +432,24 @@ export default function PreviewPage({
     }
     if (!nextTrainingPlan) nextTrainingPlan = trainingDays[0] || previewWeekPlan[0];
 
+    const calorieSeries = previewWeekPlan.map((dayPlan, index) => {
+      const base = dayPlan.isTraining ? calorieGoal * 1.02 : calorieGoal * 0.9;
+      const wave = Math.sin((index / Math.max(previewWeekPlan.length - 1, 1)) * Math.PI * 2) * 70;
+      return Math.max(1200, Math.round(base + wave));
+    });
+    const workoutSeries = previewWeekPlan.map((dayPlan) => (dayPlan.isTraining ? 1 : 0));
+    const recoverySeries = previewWeekPlan.map((dayPlan, index) => {
+      const loadPenalty = dayPlan.isTraining ? 18 : 3;
+      const wave = Math.cos((index / Math.max(previewWeekPlan.length - 1, 1)) * Math.PI * 2) * 6;
+      return Math.round(clamp(82 - loadPenalty + wave, 45, 95));
+    });
+    const activeDays = workoutSeries.filter((value) => value > 0).length;
+    const avgRecovery = Math.round(
+      recoverySeries.reduce((sum, value) => sum + value, 0) / Math.max(recoverySeries.length, 1)
+    );
+    const trendStartLabel = PREVIEW_WEEK_DAY_ORDER[0].slice(0, 3);
+    const trendEndLabel = PREVIEW_WEEK_DAY_ORDER[PREVIEW_WEEK_DAY_ORDER.length - 1].slice(0, 3);
+
     let runningStreak = 0;
     let bestStreak = 0;
     previewWeekPlan.forEach((dayPlan) => {
@@ -432,25 +471,68 @@ export default function PreviewPage({
       Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
         ? activePreviewProfile.focuses.slice(0, 3)
         : JOHN_DOE_PREVIEW_PROFILE.focuses.slice(0, 3);
+    const environmentText = String(activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment);
+    const equipmentList =
+      Array.isArray(activePreviewProfile.equipment) && activePreviewProfile.equipment.length
+        ? activePreviewProfile.equipment.slice(0, 3)
+        : JOHN_DOE_PREVIEW_PROFILE.equipment.slice(0, 3);
+    const scheduleText = `${weeklyGoal} days - ${Number(activePreviewProfile.duration) || 50} min`;
+    const avgDailyWorkouts = completedWorkouts / 7;
+    const remainingWorkouts = Math.max(weeklyGoal - completedWorkouts, 0);
+    const daysToGoal =
+      avgDailyWorkouts > 0 ? Math.ceil(remainingWorkouts / avgDailyWorkouts) : null;
+    const goalPaceText =
+      remainingWorkouts === 0
+        ? "Weekly workout goal reached."
+        : avgDailyWorkouts > 0
+        ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
+        : "Log a workout to start your pace estimate.";
+    const mealPlan = todayPlan?.isTraining
+      ? {
+          breakfast: "Greek yogurt + oats + berries",
+          lunch: "Chicken rice bowl with mixed greens",
+          dinner: "Salmon, potato, and vegetables",
+          snack: "Protein shake + banana",
+          calories: Math.round(calorieGoal * 0.32)
+        }
+      : {
+          breakfast: "Egg scramble + fruit",
+          lunch: "Turkey salad wrap",
+          dinner: "Lean beef stir fry + veggies",
+          snack: "Cottage cheese + nuts",
+          calories: Math.round(calorieGoal * 0.27)
+        };
 
     return {
+      goalText,
+      scheduleText,
+      environmentText,
+      equipmentList,
+      focusPicks,
+      todayName,
+      todaySession: String(todayPlan?.session || "Training Session"),
+      todayDuration,
+      todayWorkoutLines,
+      todayMealPlan: mealPlan,
+      nextTrainingPlan,
+      goalPaceText,
       weeklyGoal,
       completedWorkouts,
       workoutProgress,
       avgCalories,
       calorieGoal,
       calorieProgress,
+      calorieDelta,
       targetWeightLabel,
+      activeDays,
+      avgRecovery,
+      calorieSeries,
+      workoutSeries,
+      recoverySeries,
+      trendStartLabel,
+      trendEndLabel,
       streakDays,
-      goalText,
-      scheduleText: `${weeklyGoal} days - ${Number(activePreviewProfile.duration) || 50} min`,
-      todayName,
-      todaySession: String(todayPlan?.session || "Training Session"),
-      todayDuration,
-      todayWorkoutLines,
-      nextTrainingPlan,
-      recentActivity,
-      focusPicks
+      recentActivity
     };
   }, [
     previewWeekPlan,
@@ -458,6 +540,8 @@ export default function PreviewPage({
     activePreviewProfile.duration,
     activePreviewProfile.focuses,
     activePreviewProfile.goal,
+    activePreviewProfile.environment,
+    activePreviewProfile.equipment,
     activeWeightKg,
     usesImperialUnits,
     toLb
@@ -598,21 +682,24 @@ export default function PreviewPage({
   const dashboardPreviewChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "dashboard-preview");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
-  const previousPreviewChapter =
-    Number.isInteger(previewSwitchFromIndex) &&
-    previewSwitchFromIndex !== previewStepIndex &&
-    previewSwitchFromIndex >= 0 &&
-    previewSwitchFromIndex < previewChapters.length
-      ? previewChapters[previewSwitchFromIndex]
-      : null;
-  const isPreviewTitleSwitching = Boolean(previousPreviewChapter);
+  const isWidePreviewBodyChapter =
+    activePreviewChapter.id === "workout-week" || activePreviewChapter.id === "dashboard-preview";
   const previewMaxChapterTitleLength = previewChapters.reduce(
     (maxLength, chapter) => Math.max(maxLength, chapter.title.length),
     0
   );
+  const previewChipExpandedWidth = `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 4.4rem)`;
+  const previewTitleWidth = `calc(${Math.max(16, previewMaxChapterTitleLength)}ch + 3.8rem)`;
   const previewStageStyle = {
-    "--preview-chip-expanded": `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 4.4rem)`,
-    "--preview-title-width": `calc(${Math.max(16, previewMaxChapterTitleLength)}ch + 3.8rem)`
+    "--preview-chip-expanded": previewChipExpandedWidth,
+    "--preview-title-width": previewTitleWidth,
+    "--preview-step-width-scale": isWidePreviewBodyChapter ? "1.1" : "1",
+    "--preview-step-card-width-scale": isWidePreviewBodyChapter ? "1.1" : "1",
+    "--preview-step-toc-reserve-scale": isWidePreviewBodyChapter ? "0.7" : "1"
+  };
+  const previewTocStyle = {
+    "--preview-chip-expanded": previewChipExpandedWidth,
+    "--preview-chip-collapsed": "44px"
   };
 
   const clearPreviewFillTimers = () => {
@@ -638,6 +725,9 @@ export default function PreviewPage({
         target.style.opacity = "";
         target.style.transform = "";
         target.style.filter = "";
+        target.style.clipPath = "";
+        target.style.willChange = "";
+        target.style.transformOrigin = "";
       });
       previewWeekParticleTargetsRef.current = [];
     }
@@ -1087,116 +1177,250 @@ export default function PreviewPage({
 
   const renderPreviewDashboardChapter = () => {
     const {
+      goalText,
+      scheduleText,
+      environmentText,
+      equipmentList,
+      focusPicks,
+      todayName,
+      todaySession,
+      todayDuration,
+      todayWorkoutLines,
+      todayMealPlan,
+      nextTrainingPlan,
+      goalPaceText,
       weeklyGoal,
       completedWorkouts,
       workoutProgress,
       avgCalories,
       calorieGoal,
       calorieProgress,
+      calorieDelta,
       targetWeightLabel,
+      activeDays,
+      avgRecovery,
+      calorieSeries,
+      workoutSeries,
+      recoverySeries,
+      trendStartLabel,
+      trendEndLabel,
       streakDays,
-      goalText,
-      scheduleText,
-      todayName,
-      todaySession,
-      todayDuration,
-      todayWorkoutLines,
-      nextTrainingPlan,
       recentActivity,
-      focusPicks
     } = previewDashboardSummary;
 
     const nextWorkoutDuration = String(nextTrainingPlan?.meta || "50 min").split(" - ")[0].trim();
     const nextWorkoutNotes = Array.isArray(nextTrainingPlan?.highlights)
       ? nextTrainingPlan.highlights.slice(0, 2)
       : [];
+    const calorieDeltaLabel = calorieDelta === 0
+      ? "on target"
+      : calorieDelta > 0
+      ? `+${calorieDelta} kcal vs target`
+      : `${calorieDelta} kcal vs target`;
+    const renderTrendChart = ({ title, subtitle, series, lineClassName, revealStage }) => (
+      <section
+        key={`preview-chart-${title}`}
+        className={`preview-dashboard-card preview-dashboard-chart-card ${
+          previewDashboardStage >= revealStage ? "is-visible" : ""
+        }`}
+      >
+        <div className="preview-dashboard-chart-head">
+          <h4>{title}</h4>
+          <span className="muted">{subtitle}</span>
+        </div>
+        <svg
+          className="preview-dashboard-chart"
+          viewBox="0 0 260 110"
+          role="img"
+          aria-label={`${title} trend`}
+        >
+          <path className={`preview-dashboard-chart-line ${lineClassName}`} d={buildPreviewLinePath(series)} />
+        </svg>
+        <div className="preview-dashboard-chart-labels">
+          <span>{trendStartLabel}</span>
+          <span>{trendEndLabel}</span>
+        </div>
+      </section>
+    );
 
     return (
-      <section className="preview-dashboard-summary" aria-label="Dashboard preview snapshot">
-        <header className="preview-dashboard-summary-head">
-          <p className="preview-dashboard-eyebrow">Dashboard Snapshot</p>
-          <h3>Core Metrics</h3>
-          <p className="muted">Most important information from your generated plan.</p>
-        </header>
-
-        <div className="preview-dashboard-kpi-grid">
-          <article className="preview-dashboard-kpi">
-            <span>Workouts</span>
-            <strong>{completedWorkouts}/{weeklyGoal}</strong>
-            <div className="preview-dashboard-progress">
-              <span style={{ width: `${workoutProgress}%` }} />
+      <section className="preview-dashboard-view" aria-label="Dashboard preview snapshot">
+        <div className="preview-dashboard-main">
+          <section className={`preview-dashboard-card preview-dashboard-overview-panel ${
+            previewDashboardStage >= 1 ? "is-visible" : ""
+          }`}>
+            <div className="preview-dashboard-overview-head">
+              <div>
+                <p className="preview-dashboard-eyebrow">Overview</p>
+                <h3>Today's training snapshot</h3>
+                <p className="muted">A quick read on your current plan settings and priorities.</p>
+              </div>
+              <span className="preview-dashboard-link-chip">Update plan</span>
             </div>
-            <p>{workoutProgress}% weekly completion</p>
-          </article>
-          <article className="preview-dashboard-kpi">
-            <span>Calories</span>
-            <strong>{avgCalories} / {calorieGoal}</strong>
-            <div className="preview-dashboard-progress">
-              <span style={{ width: `${calorieProgress}%` }} />
+            <div className="preview-dashboard-overview-grid">
+              <article className="preview-dashboard-overview-card">
+                <h4>Goal</h4>
+                <p className="preview-dashboard-overview-value">{goalText}</p>
+                <p className="muted">Primary outcome you are chasing.</p>
+              </article>
+              <article className="preview-dashboard-overview-card">
+                <h4>Schedule</h4>
+                <p className="preview-dashboard-overview-value">{scheduleText}</p>
+                <p className="muted">Weekly cadence and session length.</p>
+              </article>
+              <article className="preview-dashboard-overview-card">
+                <h4>Environment</h4>
+                <p className="preview-dashboard-overview-value">{environmentText}</p>
+                <p className="muted">{equipmentList.join(", ")}</p>
+              </article>
+              <article className="preview-dashboard-overview-card">
+                <h4>Focus picks</h4>
+                <p className="preview-dashboard-overview-value">{focusPicks.join(", ")}</p>
+                <p className="muted">Quick focus tags to steer the plan.</p>
+              </article>
             </div>
-            <p>{calorieProgress}% of target intake</p>
-          </article>
-          <article className="preview-dashboard-kpi">
-            <span>Target Weight</span>
-            <strong>{targetWeightLabel}</strong>
-            <p>{goalText}</p>
-          </article>
-          <article className="preview-dashboard-kpi">
-            <span>Streak</span>
-            <strong>{streakDays} day{streakDays === 1 ? "" : "s"}</strong>
-            <p>{scheduleText}</p>
-          </article>
-        </div>
+          </section>
 
-        <div className="preview-dashboard-panel-grid">
-          <article className="preview-dashboard-panel">
-            <h4>{todayName} focus</h4>
-            <p className="preview-dashboard-session">{todaySession}</p>
-            <p className="muted">{todayDuration}</p>
-            <ul>
-              {todayWorkoutLines.map((line) => (
-                <li key={`dashboard-today-${line}`}>{line}</li>
-              ))}
-              {!todayWorkoutLines.length ? <li>Active recovery and mobility reset</li> : null}
-            </ul>
-          </article>
+          <section className={`preview-dashboard-card ${previewDashboardStage >= 2 ? "is-visible" : ""}`}>
+            <div className="preview-dashboard-overview-head">
+              <div>
+                <h3>{todayName} recommendations</h3>
+                <p className="muted">Daily workout and meal picks aligned to your weekly plan.</p>
+              </div>
+            </div>
+            <div className="preview-dashboard-hub-grid">
+              <article className="preview-dashboard-hub-card">
+                <h4>Workout</h4>
+                <ul>
+                  {todayWorkoutLines.map((line) => (
+                    <li key={`dashboard-today-${line}`}>{line}</li>
+                  ))}
+                  {!todayWorkoutLines.length ? <li>Active recovery and mobility reset</li> : null}
+                </ul>
+                <span className="preview-dashboard-link-chip">Open weekly plan</span>
+              </article>
+              <article className="preview-dashboard-hub-card">
+                <h4>Meal plan</h4>
+                <ul>
+                  <li><strong>Breakfast:</strong> {todayMealPlan.breakfast}</li>
+                  <li><strong>Lunch:</strong> {todayMealPlan.lunch}</li>
+                  <li><strong>Dinner:</strong> {todayMealPlan.dinner}</li>
+                  <li><strong>Snack:</strong> {todayMealPlan.snack}</li>
+                </ul>
+                <p className="muted">Daily target: ~{todayMealPlan.calories} kcal</p>
+              </article>
+            </div>
+          </section>
 
-          <article className="preview-dashboard-panel">
-            <h4>Next workout</h4>
-            <p className="preview-dashboard-session">
-              {nextTrainingPlan?.day || "Next"} - {nextTrainingPlan?.session || "Training Session"}
-            </p>
-            <p className="muted">{nextWorkoutDuration}</p>
-            <ul>
-              {nextWorkoutNotes.map((item) => (
-                <li key={`dashboard-next-${item}`}>{item}</li>
-              ))}
-              {!nextWorkoutNotes.length ? <li>Compound lifts first, accessories second</li> : null}
-            </ul>
-          </article>
+          <section className={`preview-dashboard-card ${previewDashboardStage >= 3 ? "is-visible" : ""}`}>
+            <h3>Weekly progress</h3>
+            <div className="preview-dashboard-stat-row">
+              <div>
+                <p className="muted">Workouts this week</p>
+                <h4>{completedWorkouts}</h4>
+              </div>
+              <div>
+                <p className="muted">Avg calories</p>
+                <h4>{avgCalories}</h4>
+              </div>
+              <div>
+                <p className="muted">Target weight</p>
+                <h4>{targetWeightLabel}</h4>
+              </div>
+            </div>
+            <div className="preview-dashboard-progress-block">
+              <div className="preview-dashboard-progress-label">
+                Workouts ({completedWorkouts}/{weeklyGoal})
+              </div>
+              <div className="preview-dashboard-progress">
+                <span style={{ width: `${workoutProgress}%` }} />
+              </div>
+            </div>
+            <div className="preview-dashboard-progress-block">
+              <div className="preview-dashboard-progress-label">
+                Calories ({avgCalories}/{calorieGoal}) | {calorieDeltaLabel}
+              </div>
+              <div className="preview-dashboard-progress">
+                <span style={{ width: `${calorieProgress}%` }} />
+              </div>
+            </div>
+            <p className="muted">{goalPaceText}</p>
+          </section>
 
-          <article className="preview-dashboard-panel">
-            <h4>Recent activity</h4>
-            <ul>
+          <section className={`preview-dashboard-card ${previewDashboardStage >= 4 ? "is-visible" : ""}`}>
+            <h3>Recent activity</h3>
+            <div className="preview-dashboard-activity-list">
               {recentActivity.map((item) => (
-                <li key={`dashboard-recent-${item.day}`}>
-                  {item.day}: {item.session} ({item.duration})
-                </li>
+                <div key={`dashboard-recent-${item.day}`} className="preview-dashboard-activity-row">
+                  <div>
+                    <strong>{item.day}</strong>
+                    <span className="muted"> - {item.session}</span>
+                  </div>
+                  <span>{item.duration}</span>
+                </div>
               ))}
-              {!recentActivity.length ? <li>No sessions logged yet</li> : null}
-            </ul>
-          </article>
-
-          <article className="preview-dashboard-panel">
-            <h4>Focus picks</h4>
-            <div className="preview-dashboard-focus-pills">
-              {focusPicks.map((focus) => (
-                <span key={`dashboard-focus-${focus}`}>{focus}</span>
-              ))}
+              {!recentActivity.length ? <p className="muted">No workouts logged yet.</p> : null}
             </div>
-            <p className="muted">These tags drive your weekly recommendations.</p>
-          </article>
+          </section>
         </div>
+
+        <aside className="preview-dashboard-side">
+          <section className={`preview-dashboard-card ${previewDashboardStage >= 5 ? "is-visible" : ""}`}>
+            <div className="preview-dashboard-range-head">
+              <h3>Trend window</h3>
+              <div className="preview-dashboard-range-pills" role="group" aria-label="Trend range">
+                <span className="active">Week</span>
+                <span>Month</span>
+              </div>
+            </div>
+            <p className="muted">Last 7 days of trend data.</p>
+            <div className="preview-dashboard-stat-row">
+              <div>
+                <p className="muted">Active days</p>
+                <h4>{activeDays}</h4>
+              </div>
+              <div>
+                <p className="muted">Avg calories</p>
+                <h4>{Math.round(avgCalories)}</h4>
+              </div>
+              <div>
+                <p className="muted">Recovery score</p>
+                <h4>{avgRecovery}</h4>
+              </div>
+            </div>
+            <p className="muted">{streakDays} day streak | {todaySession} ({todayDuration})</p>
+            <p className="muted">
+              Next: {nextTrainingPlan?.day || "Next"} - {nextTrainingPlan?.session || "Training Session"} ({nextWorkoutDuration})
+            </p>
+            <ul className="preview-dashboard-compact-list">
+              {nextWorkoutNotes.map((item) => (
+                <li key={`dashboard-next-note-${item}`}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          {renderTrendChart({
+            title: "Calories",
+            subtitle: "Daily calories (7 days)",
+            series: calorieSeries,
+            lineClassName: "is-calories",
+            revealStage: 6
+          })}
+          {renderTrendChart({
+            title: "Activity",
+            subtitle: "Workouts per day (7 days)",
+            series: workoutSeries,
+            lineClassName: "is-activity",
+            revealStage: 7
+          })}
+          {renderTrendChart({
+            title: "Recovery",
+            subtitle: "Recovery readiness (7 days)",
+            series: recoverySeries,
+            lineClassName: "is-recovery",
+            revealStage: 8
+          })}
+        </aside>
       </section>
     );
   };
@@ -1239,16 +1463,8 @@ export default function PreviewPage({
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
     const currentIndex = previewStepIndexRef.current;
     if (currentIndex === boundedIndex) return;
-    setPreviewSwitchFromIndex(currentIndex);
     setPreviewStepIndex(boundedIndex);
     previewStepIndexRef.current = boundedIndex;
-    if (previewSwitchTimeoutRef.current) {
-      window.clearTimeout(previewSwitchTimeoutRef.current);
-    }
-    previewSwitchTimeoutRef.current = window.setTimeout(() => {
-      setPreviewSwitchFromIndex(null);
-      previewSwitchTimeoutRef.current = null;
-    }, PREVIEW_TOC_SWITCH_MS + 120);
   };
 
   const pulsePreviewControl = (event) => {
@@ -1271,7 +1487,6 @@ export default function PreviewPage({
   useEffect(() => {
     setPreviewStepIndex(0);
     previewStepIndexRef.current = 0;
-    setPreviewSwitchFromIndex(null);
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(scrollPreviewIntoView);
     });
@@ -1301,6 +1516,7 @@ export default function PreviewPage({
 
     if (activePreviewChapter.id === "generate") {
       setPreviewWeekStage(0);
+      setPreviewDashboardStage(0);
       setPreviewWeekHeaderTypingProgress(0);
       setPreviewWeekTypingProgress(0);
       markAllFilled();
@@ -1341,6 +1557,7 @@ export default function PreviewPage({
       setPreviewPersonalShifted(false);
       setPreviewBuilderStage(0);
       setPreviewWeekStage(0);
+      setPreviewDashboardStage(0);
       setPreviewWeekHeaderTypingProgress(0);
       setPreviewWeekTypingProgress(0);
 
@@ -1400,8 +1617,37 @@ export default function PreviewPage({
       return undefined;
     }
 
+    if (activePreviewChapter.id === "dashboard-preview") {
+      setPreviewFilledFields({});
+      setPreviewPersonalCollapsed(false);
+      setPreviewPersonalShifted(false);
+      setPreviewBuilderStage(0);
+      setPreviewWeekStage(0);
+      setPreviewWeekHeaderTypingProgress(0);
+      setPreviewWeekTypingProgress(0);
+      setPreviewDashboardStage(0);
+
+      if (prefersReducedMotion) {
+        setPreviewDashboardStage(PREVIEW_DASHBOARD_FINAL_STAGE);
+        return undefined;
+      }
+
+      const dashboardStageSteps = Array.from(
+        { length: PREVIEW_DASHBOARD_FINAL_STAGE },
+        (_, index) => index + 1
+      );
+      dashboardStageSteps.forEach((stage, index) => {
+        const dashboardStepTimeoutId = window.setTimeout(() => {
+          setPreviewDashboardStage(stage);
+        }, PREVIEW_DASHBOARD_STAGE_START_MS + (index * PREVIEW_DASHBOARD_STAGE_STEP_MS));
+        previewFillTimeoutsRef.current.push(dashboardStepTimeoutId);
+      });
+      return undefined;
+    }
+
     if (activePreviewChapter.id !== "personal-info") {
       setPreviewWeekStage(0);
+      setPreviewDashboardStage(0);
       setPreviewWeekHeaderTypingProgress(0);
       setPreviewWeekTypingProgress(0);
       setPreviewFilledFields({});
@@ -1422,6 +1668,7 @@ export default function PreviewPage({
 
     setPreviewFilledFields({});
     setPreviewWeekStage(0);
+    setPreviewDashboardStage(0);
     setPreviewWeekHeaderTypingProgress(0);
     setPreviewWeekTypingProgress(0);
     setPreviewPersonalCollapsed(false);
@@ -1501,7 +1748,12 @@ export default function PreviewPage({
       setPreviewPersonalCollapsed(true);
       const postMorphShiftTimeoutId = window.setTimeout(() => {
         if (generateChapterIndex >= 0) {
-          scrollToChapter(generateChapterIndex);
+          setPreviewPersonalShifted(true);
+          setPreviewBuilderStage(0);
+          const generateAdvanceTimeoutId = window.setTimeout(() => {
+            scrollToChapter(generateChapterIndex);
+          }, 42);
+          previewFillTimeoutsRef.current.push(generateAdvanceTimeoutId);
           return;
         }
         setPreviewPersonalShifted(true);
@@ -1578,11 +1830,18 @@ export default function PreviewPage({
         };
       })
       .filter(Boolean);
+    const cellEntries = contentEntries.filter((entry) => entry.targetEl.matches("th, td"));
+    const textEntries = contentEntries.filter((entry) => !entry.targetEl.matches("th, td"));
     const contentTargets = contentEntries.map((entry) => entry.targetEl);
+    const cellTargets = cellEntries.map((entry) => entry.targetEl);
+    const textTargets = textEntries.map((entry) => entry.targetEl);
     const sourceTargets = [tableEl, ...contentTargets];
     const particles = [];
     const particleMeta = [];
-    const contentMeta = [];
+    const chunks = [];
+    const chunkMeta = [];
+    const cellMeta = [];
+    const textMeta = [];
     const fragment = document.createDocumentFragment();
 
     contentEntries.forEach((entry) => {
@@ -1594,15 +1853,15 @@ export default function PreviewPage({
         colProgress,
         particleColor
       } = entry;
-      contentMeta.push({
-        delay: Math.round((rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (colProgress * 24)),
-        rise: -18 - (rowProgress * 14)
-      });
-      const particleCount = clamp(
-        Math.round((rect.width * rect.height) / PREVIEW_WEEK_PARTICLE_DENSITY_PX),
-        PREVIEW_WEEK_PARTICLE_MIN_COUNT,
-        PREVIEW_WEEK_PARTICLE_MAX_COUNT
+      const particleCount = Math.min(
+        PREVIEW_WEEK_PARTICLE_MAX_TOTAL - particles.length,
+        clamp(
+          Math.round((rect.width * rect.height) / PREVIEW_WEEK_PARTICLE_DENSITY_PX),
+          PREVIEW_WEEK_PARTICLE_MIN_COUNT,
+          PREVIEW_WEEK_PARTICLE_MAX_COUNT
+        )
       );
+      if (particleCount <= 0) return;
 
       for (let index = 0; index < particleCount; index += 1) {
         const particleEl = document.createElement("span");
@@ -1642,10 +1901,98 @@ export default function PreviewPage({
       }
     });
 
-    if (!particles.length) return undefined;
+    cellEntries.forEach((entry) => {
+      const {
+        targetEl,
+        rect,
+        relativeLeft,
+        relativeTop,
+        rowProgress,
+        colProgress
+      } = entry;
+
+      const targetStyle = window.getComputedStyle(targetEl);
+      const chunkBaseColor =
+        targetStyle.backgroundColor && targetStyle.backgroundColor !== "rgba(0, 0, 0, 0)"
+          ? targetStyle.backgroundColor
+          : (targetEl.tagName === "TH" ? "rgba(255, 255, 255, 0.13)" : "rgba(255, 255, 255, 0.08)");
+      const chunkBorderColor = targetStyle.borderTopColor || "rgba(255, 255, 255, 0.16)";
+      const chunkCount = Math.min(
+        PREVIEW_WEEK_CHUNK_MAX_TOTAL - chunks.length,
+        clamp(
+          Math.round((rect.width * rect.height) / 2600),
+          4,
+          10
+        )
+      );
+      if (chunkCount <= 0) return;
+      const baseDelay = Math.round((rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (colProgress * 24));
+
+      cellMeta.push({
+        delay: baseDelay,
+        duration: Math.round(randomBetween(1250, 1820)),
+        driftX: randomBetween(-14, 14),
+        driftY: randomBetween(-28, -12),
+        rotate: randomBetween(-6, 6),
+        scale: randomBetween(0.88, 0.98),
+        clipTop: randomBetween(14, 42),
+        clipBottom: randomBetween(30, 68),
+        clipSide: randomBetween(4, 24)
+      });
+
+      for (let index = 0; index < chunkCount; index += 1) {
+        const chunkEl = document.createElement("span");
+        chunkEl.className = "preview-week-chunk";
+
+        const chunkWidth = randomBetween(6, Math.max(9, Math.min(22, rect.width * 0.34)));
+        const chunkHeight = randomBetween(5, Math.max(8, Math.min(18, rect.height * 0.32)));
+        const chunkX = relativeLeft + randomBetween(0, Math.max(rect.width - chunkWidth, 0));
+        const chunkY = relativeTop + randomBetween(0, Math.max(rect.height - chunkHeight, 0));
+        const chunkLocalProgress = clamp((chunkY - relativeTop) / Math.max(rect.height, 1), 0, 1);
+        const chunkRowProgress = clamp(rowProgress + ((chunkLocalProgress - 0.5) * 0.12), 0, 1);
+
+        chunkEl.style.left = `${chunkX.toFixed(2)}px`;
+        chunkEl.style.top = `${chunkY.toFixed(2)}px`;
+        chunkEl.style.width = `${chunkWidth.toFixed(2)}px`;
+        chunkEl.style.height = `${chunkHeight.toFixed(2)}px`;
+        chunkEl.style.backgroundColor = chunkBaseColor;
+        chunkEl.style.border = Math.random() > 0.48 ? `1px solid ${chunkBorderColor}` : "none";
+        chunkEl.style.opacity = randomBetween(0.52, 0.9).toFixed(3);
+
+        fragment.appendChild(chunkEl);
+        chunks.push(chunkEl);
+        chunkMeta.push({
+          delay: Math.round(
+            (chunkRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
+          ),
+          duration: Math.round(randomBetween(1380, 2480)),
+          driftX: randomBetween(-64, 64),
+          driftY: randomBetween(-196, -86),
+          rotate: randomBetween(-48, 48),
+          scale: randomBetween(0.18, 1.18)
+        });
+      }
+    });
+
+    textEntries.forEach((entry) => {
+      textMeta.push({
+        delay: Math.round((entry.rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (entry.colProgress * 20)),
+        rise: -16 - (entry.rowProgress * 12)
+      });
+    });
+
+    if (!particles.length && !chunks.length) return undefined;
 
     layerEl.appendChild(fragment);
     previewWeekParticleTargetsRef.current = sourceTargets;
+    tableEl.style.transformOrigin = "center top";
+    cellTargets.forEach((target) => {
+      target.style.transformOrigin = "center center";
+      target.style.willChange = "transform, opacity, clip-path";
+    });
+    textTargets.forEach((target) => {
+      target.style.willChange = "transform, opacity";
+    });
 
     let keepCompletionFrame = false;
 
@@ -1663,16 +2010,39 @@ export default function PreviewPage({
       }
     })
       .add(tableEl, {
-        translateY: [0, -74],
+        translateY: [0, -46],
         opacity: [1, 0],
         duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS
       }, Math.round(PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS * 0.18))
-      .add(contentTargets, {
+      .add(cellTargets, {
         opacity: [1, 0],
-        translateY: (_, index) => contentMeta[index]?.rise ?? -24,
-        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 560,
-        delay: (_, index) => contentMeta[index]?.delay ?? 0,
+        translateY: (_, index) => cellMeta[index]?.driftY ?? -18,
+        translateX: (_, index) => cellMeta[index]?.driftX ?? 0,
+        rotate: (_, index) => cellMeta[index]?.rotate ?? 0,
+        scale: (_, index) => cellMeta[index]?.scale ?? 0.95,
+        clipPath: (_, index) => (
+          `inset(${(cellMeta[index]?.clipTop ?? 26).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}% ${(cellMeta[index]?.clipBottom ?? 48).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}%)`
+        ),
+        duration: (_, index) => cellMeta[index]?.duration ?? 1500,
+        delay: (_, index) => cellMeta[index]?.delay ?? 0,
+        ease: "outSine"
+      }, 0)
+      .add(textTargets, {
+        opacity: [1, 0],
+        translateY: (_, index) => textMeta[index]?.rise ?? -20,
+        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 680,
+        delay: (_, index) => textMeta[index]?.delay ?? 0,
         ease: "inOutSine"
+      }, 0)
+      .add(chunks, {
+        translateX: (_, index) => chunkMeta[index].driftX,
+        translateY: (_, index) => chunkMeta[index].driftY,
+        rotate: (_, index) => chunkMeta[index].rotate,
+        scale: [1, (_, index) => chunkMeta[index].scale],
+        opacity: [1, 0],
+        delay: (_, index) => chunkMeta[index].delay,
+        duration: (_, index) => chunkMeta[index].duration,
+        ease: "outSine"
       }, 0)
       .add(particles, {
         translateX: (_, index) => particleMeta[index].driftX,
@@ -1680,7 +2050,6 @@ export default function PreviewPage({
         rotate: (_, index) => particleMeta[index].rotate,
         scale: [1, (_, index) => particleMeta[index].scale],
         opacity: [1, 0],
-        filter: ["blur(0px)", "blur(1.4px)"],
         delay: (_, index) => particleMeta[index].delay,
         duration: (_, index) => particleMeta[index].duration,
         ease: "outSine"
@@ -1697,59 +2066,85 @@ export default function PreviewPage({
 
   useEffect(
     () => () => {
-      if (previewSwitchTimeoutRef.current) {
-        window.clearTimeout(previewSwitchTimeoutRef.current);
-      }
       clearPreviewFillTimers();
       clearPreviewWeekParticleAnimation();
     },
     []
   );
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    let portalRoot = document.getElementById("preview-toc-portal-root");
+    let createdPortalRoot = false;
+    if (!portalRoot) {
+      portalRoot = document.createElement("div");
+      portalRoot.id = "preview-toc-portal-root";
+      document.body.appendChild(portalRoot);
+      createdPortalRoot = true;
+    }
+    setPreviewTocPortalRoot(portalRoot);
+    return () => {
+      setPreviewTocPortalRoot(null);
+      if (createdPortalRoot && portalRoot?.parentNode) {
+        portalRoot.parentNode.removeChild(portalRoot);
+      }
+    };
+  }, []);
+
+  const previewToc = (
+    <aside
+      className="preview-side-tab preview-side-tab-portal"
+      role="tablist"
+      aria-label="Preview sections"
+      style={previewTocStyle}
+    >
+      {previewChapters.map((chapter, index) => (
+        <button
+          key={chapter.id}
+          type="button"
+          role="tab"
+          aria-selected={index === previewStepIndex}
+          aria-current={index === previewStepIndex ? "step" : undefined}
+          className={`preview-jump-chip ${index === previewStepIndex ? "active" : ""}`}
+          onClick={(event) => {
+            pulsePreviewControl(event);
+            scrollToChapter(index);
+          }}
+        >
+          <span className="preview-jump-label">{chapter.title}</span>
+        </button>
+      ))}
+    </aside>
+  );
+
   return (
-    <section ref={previewStageRef} className="panel preview-stage-panel stage-panel" style={previewStageStyle}>
-      <header className="preview-stage-header">
+    <section
+      ref={previewStageRef}
+      className="panel preview-stage-panel stage-panel"
+      style={previewStageStyle}
+    >
+      <header
+        key={`preview-header-${activePreviewChapter.id}`}
+        className="preview-stage-header is-entering"
+      >
         <p className="preview-stage-kicker">Guided walkthrough</p>
         <div className="preview-stage-title-row">
           <div className="preview-stage-title-stack" aria-live="polite">
-            {previousPreviewChapter ? (
-              <span className="preview-stage-title preview-stage-title-ghost is-leaving" aria-hidden="true">
-                {previousPreviewChapter.title}
-              </span>
-            ) : null}
-            <h2 className={`preview-stage-title ${isPreviewTitleSwitching ? "is-entering" : "is-static"}`}>
+            <h2 className="preview-stage-title is-entering">
               {activePreviewChapter.title}
             </h2>
           </div>
         </div>
       </header>
+      {previewTocPortalRoot ? createPortal(previewToc, previewTocPortalRoot) : null}
       <div className="preview-scroll-story">
-        <aside className="preview-side-tab" role="tablist" aria-label="Preview sections">
-          {previewChapters.map((chapter, index) => (
-            <button
-              key={chapter.id}
-              type="button"
-              role="tab"
-              aria-selected={index === previewStepIndex}
-              aria-current={index === previewStepIndex ? "step" : undefined}
-              className={`preview-jump-chip ${index === previewStepIndex ? "active is-expanding" : ""} ${
-                index === previewSwitchFromIndex && index !== previewStepIndex ? "is-contracting" : ""
-              }`}
-              onClick={(event) => {
-                pulsePreviewControl(event);
-                scrollToChapter(index);
-              }}
-            >
-              <span className="preview-jump-label">{chapter.title}</span>
-            </button>
-          ))}
-        </aside>
         <div className="preview-step-shell">
           <article
             className={`setup-snapshot-card setup-snapshot-card-detailed preview-step-card ${
               activePreviewChapter.id === "generate" ? "is-generate-view" : ""
             } ${
-              activePreviewChapter.id === "personal-info" && previewPersonalCollapsed
+              (activePreviewChapter.id === "personal-info" && previewPersonalCollapsed) ||
+              activePreviewChapter.id === "generate"
                 ? "is-personal-collapsed"
                 : ""
             }`}

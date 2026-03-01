@@ -183,6 +183,29 @@ html.preview-smooth-scroll {
   transform: none !important;
 }
 
+/* Keep preview stage untransformed so PreviewPage fixed header/TOC anchor to viewport. */
+.home-stage-preview,
+.home-stage-preview.stage-forward,
+.home-stage-preview.stage-backward,
+.home-stage-preview.stage-snap {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  will-change: auto !important;
+}
+
+.home-stage-preview > *,
+.home-stage-preview.stage-forward > *,
+.home-stage-preview.stage-backward > *,
+.home-stage-preview.stage-snap > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  will-change: auto !important;
+}
+
 .home-stage.stage-snap,
 .home-stage.stage-snap.stage-forward,
 .home-stage.stage-snap.stage-backward {
