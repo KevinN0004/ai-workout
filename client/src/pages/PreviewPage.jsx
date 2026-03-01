@@ -1,6 +1,5 @@
 import { createTimeline } from "animejs";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import "./PreviewPage.css";
 
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
@@ -50,7 +49,7 @@ const PREVIEW_TRAINING_DAY_STEP_MS = 110;
 const PREVIEW_COLLAPSE_DELAY_MS = 480;
 const PREVIEW_MOTION_DURATION_MS = 1100;
 const PREVIEW_MORPH_DURATION_MS = PREVIEW_MOTION_DURATION_MS;
-const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS - 120);
+const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS + 40);
 const PREVIEW_BUILDER_START_DELAY_MS = 760;
 const PREVIEW_BUILDER_STEP_MS = PREVIEW_MOTION_DURATION_MS;
 const PREVIEW_GENERATING_HOLD_MS = 2400;
@@ -65,6 +64,18 @@ const PREVIEW_WEEK_TABLE_ROW_COUNT = PREVIEW_WEEK_TABLE_BODY_ROW_COUNT + 1; // +
 const PREVIEW_WEEK_TABLE_COLUMN_COUNT = PREVIEW_WEEK_DAY_ORDER.length + 1; // + row label column
 const PREVIEW_WEEK_HORIZONTAL_LINE_COUNT = PREVIEW_WEEK_TABLE_ROW_COUNT + 1;
 const PREVIEW_WEEK_VERTICAL_LINE_COUNT = PREVIEW_WEEK_TABLE_COLUMN_COUNT + 1;
+const DEFAULT_PREVIEW_WEEK_HORIZONTAL_LINE_OFFSETS = Array.from(
+  { length: PREVIEW_WEEK_HORIZONTAL_LINE_COUNT },
+  (_, index) => `${(index / Math.max(PREVIEW_WEEK_HORIZONTAL_LINE_COUNT - 1, 1)) * 100}%`
+);
+const DEFAULT_PREVIEW_WEEK_VERTICAL_LINE_OFFSETS = Array.from(
+  { length: PREVIEW_WEEK_VERTICAL_LINE_COUNT },
+  (_, index) => `${(index / Math.max(PREVIEW_WEEK_VERTICAL_LINE_COUNT - 1, 1)) * 100}%`
+);
+const createDefaultPreviewWeekLineOffsets = () => ({
+  horizontal: [...DEFAULT_PREVIEW_WEEK_HORIZONTAL_LINE_OFFSETS],
+  vertical: [...DEFAULT_PREVIEW_WEEK_VERTICAL_LINE_OFFSETS]
+});
 const PREVIEW_WEEK_LINE_STAGGER_MS = 120;
 const PREVIEW_WEEK_LINE_DRAW_MS = 520;
 const PREVIEW_WEEK_OUTLINE_START_MS = 180;
@@ -92,6 +103,7 @@ const PREVIEW_DASHBOARD_AUTO_ADVANCE_MS = 820;
 const PREVIEW_DASHBOARD_STAGE_START_MS = 280;
 const PREVIEW_DASHBOARD_STAGE_STEP_MS = 480;
 const PREVIEW_DASHBOARD_FINAL_STAGE = 8;
+const PREVIEW_TOC_SWITCH_MS = 760;
 const PREVIEW_WEEK_MIN_WORKOUT_DAYS = 5;
 const PREVIEW_WEEK_DAY_NORMALIZATION = {
   mon: "Monday",
@@ -183,15 +195,18 @@ export default function PreviewPage({
   const previewWeekParticleLayerRef = useRef(null);
   const previewWeekParticlePlayersRef = useRef([]);
   const previewWeekParticleTargetsRef = useRef([]);
+  const previewTocSwitchTimeoutRef = useRef(null);
   const previewStepIndexRef = useRef(0);
-  const [previewTocPortalRoot, setPreviewTocPortalRoot] = useState(null);
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
+  const [previewTocExpandingIndex, setPreviewTocExpandingIndex] = useState(null);
+  const [previewTocContractingIndex, setPreviewTocContractingIndex] = useState(null);
   const [previewFilledFields, setPreviewFilledFields] = useState({});
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
   const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
   const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
   const [previewWeekStage, setPreviewWeekStage] = useState(0);
   const [previewDashboardStage, setPreviewDashboardStage] = useState(0);
+  const [previewWeekLineOffsets, setPreviewWeekLineOffsets] = useState(createDefaultPreviewWeekLineOffsets);
   const [previewWeekHeaderTypingProgress, setPreviewWeekHeaderTypingProgress] = useState(0);
   const [previewWeekTypingProgress, setPreviewWeekTypingProgress] = useState(0);
 
@@ -682,20 +697,22 @@ export default function PreviewPage({
   const dashboardPreviewChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "dashboard-preview");
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
-  const isWidePreviewBodyChapter =
-    activePreviewChapter.id === "workout-week" || activePreviewChapter.id === "dashboard-preview";
+  const isCenteredBodyChapter =
+    activePreviewChapter.id === "personal-info" || activePreviewChapter.id === "generate";
   const previewMaxChapterTitleLength = previewChapters.reduce(
     (maxLength, chapter) => Math.max(maxLength, chapter.title.length),
     0
   );
-  const previewChipExpandedWidth = `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 4.4rem)`;
+  const previewChipExpandedWidth = `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 2rem)`;
   const previewTitleWidth = `calc(${Math.max(16, previewMaxChapterTitleLength)}ch + 3.8rem)`;
   const previewStageStyle = {
+    "--preview-body-width": "clamp(1480px, 99vw, 2140px)",
     "--preview-chip-expanded": previewChipExpandedWidth,
     "--preview-title-width": previewTitleWidth,
-    "--preview-step-width-scale": isWidePreviewBodyChapter ? "1.1" : "1",
-    "--preview-step-card-width-scale": isWidePreviewBodyChapter ? "1.1" : "1",
-    "--preview-step-toc-reserve-scale": isWidePreviewBodyChapter ? "0.7" : "1"
+    "--preview-body-right-pad": isCenteredBodyChapter ? "calc(var(--preview-toc-lane-width) + 8px)" : "0px",
+    "--preview-step-width-scale": "1.18",
+    "--preview-step-card-width-scale": "1.18",
+    "--preview-step-toc-reserve-scale": "1"
   };
   const previewTocStyle = {
     "--preview-chip-expanded": previewChipExpandedWidth,
@@ -735,6 +752,12 @@ export default function PreviewPage({
     if (previewWeekParticleLayerRef.current) {
       previewWeekParticleLayerRef.current.replaceChildren();
     }
+  };
+
+  const clearPreviewTocSwitchTimer = () => {
+    if (!previewTocSwitchTimeoutRef.current) return;
+    window.clearTimeout(previewTocSwitchTimeoutRef.current);
+    previewTocSwitchTimeoutRef.current = null;
   };
 
   const getPreviewFieldRows = (field) => {
@@ -1052,12 +1075,8 @@ export default function PreviewPage({
   };
 
   const renderPreviewWorkoutWeekChapter = () => {
-    const horizontalLineOffsets = Array.from({ length: PREVIEW_WEEK_HORIZONTAL_LINE_COUNT }, (_, index) => (
-      `${(index / (PREVIEW_WEEK_HORIZONTAL_LINE_COUNT - 1)) * 100}%`
-    ));
-    const verticalLineOffsets = Array.from({ length: PREVIEW_WEEK_VERTICAL_LINE_COUNT }, (_, index) => (
-      `${(index / (PREVIEW_WEEK_VERTICAL_LINE_COUNT - 1)) * 100}%`
-    ));
+    const horizontalLineOffsets = previewWeekLineOffsets.horizontal;
+    const verticalLineOffsets = previewWeekLineOffsets.vertical;
 
     return (
       <div
@@ -1075,7 +1094,11 @@ export default function PreviewPage({
             {horizontalLineOffsets.map((offset, index) => (
               <span
                 key={`preview-week-outline-h-${index}`}
-                className="preview-week-outline-line horizontal"
+                className={`preview-week-outline-line horizontal ${
+                  index === 0 ? "is-top-edge" : ""
+                } ${
+                  index === horizontalLineOffsets.length - 1 ? "is-bottom-edge" : ""
+                }`}
                 style={{
                   "--preview-line-offset": offset,
                   "--preview-line-delay": `${index * PREVIEW_WEEK_LINE_STAGGER_MS}ms`
@@ -1085,7 +1108,11 @@ export default function PreviewPage({
             {verticalLineOffsets.map((offset, index) => (
               <span
                 key={`preview-week-outline-v-${index}`}
-                className="preview-week-outline-line vertical"
+                className={`preview-week-outline-line vertical ${
+                  index === 0 ? "is-left-edge" : ""
+                } ${
+                  index === verticalLineOffsets.length - 1 ? "is-right-edge" : ""
+                }`}
                 style={{
                   "--preview-line-offset": offset,
                   "--preview-line-delay": `${
@@ -1094,6 +1121,30 @@ export default function PreviewPage({
                 }}
               />
             ))}
+            <span
+              className="preview-week-outline-corner top-left"
+              style={{ "--preview-line-delay": "0ms" }}
+            />
+            <span
+              className="preview-week-outline-corner top-right"
+              style={{ "--preview-line-delay": `${PREVIEW_WEEK_LINE_STAGGER_MS}ms` }}
+            />
+            <span
+              className="preview-week-outline-corner bottom-right"
+              style={{
+                "--preview-line-delay": `${
+                  (horizontalLineOffsets.length + verticalLineOffsets.length - 2) * PREVIEW_WEEK_LINE_STAGGER_MS
+                }ms`
+              }}
+            />
+            <span
+              className="preview-week-outline-corner bottom-left"
+              style={{
+                "--preview-line-delay": `${
+                  (horizontalLineOffsets.length + verticalLineOffsets.length - 1) * PREVIEW_WEEK_LINE_STAGGER_MS
+                }ms`
+              }}
+            />
           </div>
           <table className="preview-week-table">
           <thead>
@@ -1463,8 +1514,16 @@ export default function PreviewPage({
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
     const currentIndex = previewStepIndexRef.current;
     if (currentIndex === boundedIndex) return;
+    clearPreviewTocSwitchTimer();
+    setPreviewTocContractingIndex(currentIndex);
+    setPreviewTocExpandingIndex(boundedIndex);
     setPreviewStepIndex(boundedIndex);
     previewStepIndexRef.current = boundedIndex;
+    previewTocSwitchTimeoutRef.current = window.setTimeout(() => {
+      setPreviewTocContractingIndex(null);
+      setPreviewTocExpandingIndex(null);
+      previewTocSwitchTimeoutRef.current = null;
+    }, PREVIEW_TOC_SWITCH_MS);
   };
 
   const pulsePreviewControl = (event) => {
@@ -1491,6 +1550,80 @@ export default function PreviewPage({
       window.requestAnimationFrame(scrollPreviewIntoView);
     });
   }, []);
+
+  useEffect(() => {
+    if (activePreviewChapter.id !== "workout-week") return undefined;
+    if (typeof window === "undefined") return undefined;
+    const wrapEl = previewWeekTableWrapRef.current;
+    const tableEl = wrapEl?.querySelector(".preview-week-table");
+    if (!wrapEl || !tableEl) return undefined;
+
+    let frameId = 0;
+
+    const areOffsetsEqual = (currentOffsets, nextOffsets) => (
+      currentOffsets.horizontal.length === nextOffsets.horizontal.length &&
+      currentOffsets.vertical.length === nextOffsets.vertical.length &&
+      currentOffsets.horizontal.every((value, index) => value === nextOffsets.horizontal[index]) &&
+      currentOffsets.vertical.every((value, index) => value === nextOffsets.vertical[index])
+    );
+
+    const measureOutlineOffsets = () => {
+      const wrapRect = wrapEl.getBoundingClientRect();
+      const tableRect = tableEl.getBoundingClientRect();
+      if (wrapRect.width <= 0 || wrapRect.height <= 0 || tableRect.width <= 0 || tableRect.height <= 0) return;
+
+      const tableRows = Array.from(tableEl.querySelectorAll("tr"));
+      const headerCells = tableRows[0] ? Array.from(tableRows[0].children) : [];
+      if (!tableRows.length || !headerCells.length) return;
+
+      const horizontalPx = [tableRect.top - wrapRect.top];
+      tableRows.forEach((rowEl) => {
+        horizontalPx.push(rowEl.getBoundingClientRect().bottom - wrapRect.top);
+      });
+
+      const verticalPx = [tableRect.left - wrapRect.left];
+      headerCells.forEach((cellEl) => {
+        verticalPx.push(cellEl.getBoundingClientRect().right - wrapRect.left);
+      });
+
+      const toPercent = (pixelValue, containerSize) => (
+        `${clamp((pixelValue / Math.max(containerSize, 1)) * 100, 0, 100).toFixed(3)}%`
+      );
+
+      const nextOffsets = {
+        horizontal: horizontalPx.map((pixelValue) => toPercent(pixelValue, wrapRect.height)),
+        vertical: verticalPx.map((pixelValue) => toPercent(pixelValue, wrapRect.width))
+      };
+
+      setPreviewWeekLineOffsets((currentOffsets) => (
+        areOffsetsEqual(currentOffsets, nextOffsets) ? currentOffsets : nextOffsets
+      ));
+    };
+
+    const scheduleMeasure = () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      frameId = window.requestAnimationFrame(measureOutlineOffsets);
+    };
+
+    const resizeObserver = typeof ResizeObserver === "function"
+      ? new ResizeObserver(scheduleMeasure)
+      : null;
+
+    resizeObserver?.observe(wrapEl);
+    resizeObserver?.observe(tableEl);
+    window.addEventListener("resize", scheduleMeasure);
+    scheduleMeasure();
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, [activePreviewChapter.id, previewWeekPlan]);
 
   useEffect(() => {
     const personalTargets = previewInitialTargetsRef.current || previewPersonalTargets;
@@ -1748,7 +1881,7 @@ export default function PreviewPage({
       setPreviewPersonalCollapsed(true);
       const postMorphShiftTimeoutId = window.setTimeout(() => {
         if (generateChapterIndex >= 0) {
-          setPreviewPersonalShifted(true);
+          setPreviewPersonalShifted(false);
           setPreviewBuilderStage(0);
           const generateAdvanceTimeoutId = window.setTimeout(() => {
             scrollToChapter(generateChapterIndex);
@@ -2068,52 +2201,41 @@ export default function PreviewPage({
     () => () => {
       clearPreviewFillTimers();
       clearPreviewWeekParticleAnimation();
+      clearPreviewTocSwitchTimer();
     },
     []
   );
 
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    let portalRoot = document.getElementById("preview-toc-portal-root");
-    let createdPortalRoot = false;
-    if (!portalRoot) {
-      portalRoot = document.createElement("div");
-      portalRoot.id = "preview-toc-portal-root";
-      document.body.appendChild(portalRoot);
-      createdPortalRoot = true;
-    }
-    setPreviewTocPortalRoot(portalRoot);
-    return () => {
-      setPreviewTocPortalRoot(null);
-      if (createdPortalRoot && portalRoot?.parentNode) {
-        portalRoot.parentNode.removeChild(portalRoot);
-      }
-    };
-  }, []);
-
   const previewToc = (
     <aside
-      className="preview-side-tab preview-side-tab-portal"
+      className="preview-side-tab"
       role="tablist"
       aria-label="Preview sections"
       style={previewTocStyle}
     >
-      {previewChapters.map((chapter, index) => (
-        <button
-          key={chapter.id}
-          type="button"
-          role="tab"
-          aria-selected={index === previewStepIndex}
-          aria-current={index === previewStepIndex ? "step" : undefined}
-          className={`preview-jump-chip ${index === previewStepIndex ? "active" : ""}`}
-          onClick={(event) => {
-            pulsePreviewControl(event);
-            scrollToChapter(index);
-          }}
-        >
-          <span className="preview-jump-label">{chapter.title}</span>
-        </button>
-      ))}
+      {previewChapters.map((chapter, index) => {
+        const isActive = index === previewStepIndex;
+        const isExpanding = index === previewTocExpandingIndex;
+        const isContracting = index === previewTocContractingIndex && !isActive;
+        return (
+          <button
+            key={chapter.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            aria-current={isActive ? "step" : undefined}
+            className={`preview-jump-chip ${isActive ? "active" : ""} ${isExpanding ? "is-expanding" : ""} ${
+              isContracting ? "is-contracting" : ""
+            }`}
+            onClick={(event) => {
+              pulsePreviewControl(event);
+              scrollToChapter(index);
+            }}
+          >
+            <span className="preview-jump-label">{chapter.title}</span>
+          </button>
+        );
+      })}
     </aside>
   );
 
@@ -2123,41 +2245,46 @@ export default function PreviewPage({
       className="panel preview-stage-panel stage-panel"
       style={previewStageStyle}
     >
-      <header
-        key={`preview-header-${activePreviewChapter.id}`}
-        className="preview-stage-header is-entering"
-      >
-        <p className="preview-stage-kicker">Guided walkthrough</p>
-        <div className="preview-stage-title-row">
-          <div className="preview-stage-title-stack" aria-live="polite">
-            <h2 className="preview-stage-title is-entering">
-              {activePreviewChapter.title}
-            </h2>
-          </div>
-        </div>
-      </header>
-      {previewTocPortalRoot ? createPortal(previewToc, previewTocPortalRoot) : null}
-      <div className="preview-scroll-story">
-        <div className="preview-step-shell">
-          <article
-            className={`setup-snapshot-card setup-snapshot-card-detailed preview-step-card ${
-              activePreviewChapter.id === "generate" ? "is-generate-view" : ""
-            } ${
-              (activePreviewChapter.id === "personal-info" && previewPersonalCollapsed) ||
-              activePreviewChapter.id === "generate"
-                ? "is-personal-collapsed"
-                : ""
-            }`}
-          >
-            <div className="preview-card-pages">
-              <section className="preview-card-page active is-entering">
-                {renderPreviewChapterBody(activePreviewChapter)}
-              </section>
+      <div className="preview-view-header-section">
+        <header className="preview-stage-header">
+          <p className="preview-stage-kicker">Guided walkthrough</p>
+          <div className="preview-stage-title-row">
+            <div className="preview-stage-title-stack" aria-live="polite">
+              <h2
+                key={`preview-title-${activePreviewChapter.id}`}
+                className="preview-stage-title is-sliding-in-right"
+              >
+                {activePreviewChapter.title}
+              </h2>
             </div>
-          </article>
+          </div>
+        </header>
+      </div>
+      <div className="preview-view-body-section">
+        <div className="preview-layout-frame">
+          {previewToc}
+          <div className="preview-scroll-story">
+            <div className="preview-step-shell">
+              <article
+                className={`setup-snapshot-card setup-snapshot-card-detailed preview-step-card ${
+                  activePreviewChapter.id === "generate" ? "is-generate-view" : ""
+                } ${
+                  (activePreviewChapter.id === "personal-info" && previewPersonalCollapsed) ||
+                  activePreviewChapter.id === "generate"
+                    ? "is-personal-collapsed"
+                    : ""
+                }`}
+              >
+                <div className="preview-card-pages">
+                  <section className="preview-card-page active">
+                    {renderPreviewChapterBody(activePreviewChapter)}
+                  </section>
+                </div>
+              </article>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
-
