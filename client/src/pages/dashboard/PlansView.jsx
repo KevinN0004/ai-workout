@@ -9,7 +9,8 @@ export default function PlansView({
   openPlannerFromProfile,
   dashboard,
   fallbackPlan,
-  onRemoveSavedExercise
+  onRemoveSavedExercise,
+  onOpenGuides
 }) {
   const [selectedDetail, setSelectedDetail] = useState(null);
 
@@ -138,6 +139,9 @@ export default function PlansView({
   const savedExercises = Array.isArray(dashboard?.savedExercises)
     ? dashboard.savedExercises
     : [];
+  const hasWeeklyWorkoutPlan = weekDays.some(
+    ({ key }) => (latestPlanByWeekday[key] || []).length > 0
+  );
 
   return (
     <section className="panel plans-view">
@@ -154,24 +158,47 @@ export default function PlansView({
             </button>
           </div>
           <div className="plan-row-grid">
+            {!hasWeeklyWorkoutPlan ? (
+              <article className="hub-card plan-empty-state-card card-shell">
+                <div className="card-section-head">
+                  <h4>No weekly workout plan yet</h4>
+                </div>
+                <div className="card-section-body">
+                  <p className="muted">
+                    Build your weekly training block to unlock daily workout guidance.
+                  </p>
+                </div>
+                <div className="card-section-foot">
+                  <button type="button" className="ghost" onClick={openPlannerFromProfile}>
+                    Create weekly plan
+                  </button>
+                </div>
+              </article>
+            ) : null}
             {weekDays.map(({ label, key }) => (
               <button
                 key={key}
                 type="button"
-                className="hub-card hub-card-button"
+                className="hub-card hub-card-button card-shell"
                 onClick={() => setSelectedDetail({ dayKey: key, mode: "workout" })}
               >
-                <h4>{label}</h4>
-                {latestPlanByWeekday[key]?.length ? (
-                  <ul className="hub-list">
-                    {latestPlanByWeekday[key].slice(0, 4).map((line) => (
-                      <li key={`${key}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted">Generate a weekly plan to populate this day.</p>
-                )}
-                <p className="hub-card-hint">View day details</p>
+                <div className="card-section-head">
+                  <h4>{label}</h4>
+                </div>
+                <div className="card-section-body">
+                  {latestPlanByWeekday[key]?.length ? (
+                    <ul className="hub-list">
+                      {latestPlanByWeekday[key].slice(0, 4).map((line) => (
+                        <li key={`${key}-${line}`}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">Generate a weekly plan to populate this day.</p>
+                  )}
+                </div>
+                <div className="card-section-foot">
+                  <p className="hub-card-hint">View day details</p>
+                </div>
               </button>
             ))}
           </div>
@@ -191,17 +218,21 @@ export default function PlansView({
           </div>
           <div className="plan-row-grid">
             {savedExercises.map((item) => (
-              <article key={item.id} className="hub-card saved-exercise-card">
-                <h4>{item.name || "Exercise"}</h4>
-                <p className="muted">{item.category || "General"}</p>
-                {Array.isArray(item.muscles) && item.muscles.length ? (
-                  <p className="muted">Muscles: {item.muscles.slice(0, 4).join(", ")}</p>
-                ) : null}
-                {Array.isArray(item.equipment) && item.equipment.length ? (
-                  <p className="muted">Equipment: {item.equipment.slice(0, 3).join(", ")}</p>
-                ) : null}
-                {item.reason ? <p className="muted">Why saved: {item.reason}</p> : null}
-                <div className="saved-exercise-actions">
+              <article key={item.id} className="hub-card saved-exercise-card card-shell">
+                <div className="card-section-head">
+                  <h4>{item.name || "Exercise"}</h4>
+                </div>
+                <div className="card-section-body">
+                  <p className="muted">{item.category || "General"}</p>
+                  {Array.isArray(item.muscles) && item.muscles.length ? (
+                    <p className="muted">Muscles: {item.muscles.slice(0, 4).join(", ")}</p>
+                  ) : null}
+                  {Array.isArray(item.equipment) && item.equipment.length ? (
+                    <p className="muted">Equipment: {item.equipment.slice(0, 3).join(", ")}</p>
+                  ) : null}
+                  {item.reason ? <p className="muted">Why saved: {item.reason}</p> : null}
+                </div>
+                <div className="card-section-foot saved-exercise-actions">
                   {item.videoUrl ? (
                     <a
                       href={item.videoUrl}
@@ -223,11 +254,20 @@ export default function PlansView({
               </article>
             ))}
             {!savedExercises.length ? (
-              <article className="hub-card">
-                <h4>No saved exercises yet</h4>
-                <p className="muted">
-                  Open Guides, browse exercises, and tap Save to add your favorites here.
-                </p>
+              <article className="hub-card plan-empty-state-card card-shell">
+                <div className="card-section-head">
+                  <h4>No saved exercises yet</h4>
+                </div>
+                <div className="card-section-body">
+                  <p className="muted">
+                    Open Guides, browse exercises, and tap Save to add your favorites here.
+                  </p>
+                </div>
+                <div className="card-section-foot">
+                  <button type="button" className="ghost" onClick={onOpenGuides}>
+                    Open guides
+                  </button>
+                </div>
               </article>
             ) : null}
           </div>
@@ -250,33 +290,39 @@ export default function PlansView({
               <button
                 key={day.key}
                 type="button"
-                className="hub-card hub-card-button"
+                className="hub-card hub-card-button card-shell"
                 onClick={() => setSelectedDetail({ dayKey: day.key, mode: "meal" })}
               >
-                <h4>{day.label}</h4>
-                <p className="meal-day-type">
-                  {day.trainingDay ? "Training day fuel" : "Recovery day fuel"}
-                </p>
-                <ul className="hub-list meal-week-list">
-                  <li>
-                    <strong>Breakfast:</strong> {day.breakfast}
-                  </li>
-                  <li>
-                    <strong>Lunch:</strong> {day.lunch}
-                  </li>
-                  <li>
-                    <strong>Dinner:</strong> {day.dinner}
-                  </li>
-                  <li>
-                    <strong>Snack:</strong> {day.snack}
-                  </li>
-                  <li>
-                    <strong>Drink:</strong> {day.drink}
-                  </li>
-                </ul>
-                <p className="muted">Calories: ~{day.calories}</p>
-                <p className="muted">Prep note: {day.prepNote}</p>
-                <p className="hub-card-hint">View day details</p>
+                <div className="card-section-head">
+                  <h4>{day.label}</h4>
+                  <p className="meal-day-type">
+                    {day.trainingDay ? "Training day fuel" : "Recovery day fuel"}
+                  </p>
+                </div>
+                <div className="card-section-body">
+                  <ul className="hub-list meal-week-list">
+                    <li>
+                      <strong>Breakfast:</strong> {day.breakfast}
+                    </li>
+                    <li>
+                      <strong>Lunch:</strong> {day.lunch}
+                    </li>
+                    <li>
+                      <strong>Dinner:</strong> {day.dinner}
+                    </li>
+                    <li>
+                      <strong>Snack:</strong> {day.snack}
+                    </li>
+                    <li>
+                      <strong>Drink:</strong> {day.drink}
+                    </li>
+                  </ul>
+                  <p className="muted">Calories: ~{day.calories}</p>
+                  <p className="muted">Prep note: {day.prepNote}</p>
+                </div>
+                <div className="card-section-foot">
+                  <p className="hub-card-hint">View day details</p>
+                </div>
               </button>
             ))}
           </div>
@@ -294,23 +340,31 @@ export default function PlansView({
             </div>
           </div>
           <div className="plan-row-grid plan-row-grid-split">
-            <div className="hub-card">
-              <h4>Daily cues</h4>
-              <ul className="hub-list tips-day-list">
-                {dailyTips.map((tip) => (
-                  <li key={`tip-${tip.label}`}>
-                    <strong>{tip.label}:</strong> {tip.text}
-                  </li>
-                ))}
-              </ul>
+            <div className="hub-card card-shell">
+              <div className="card-section-head">
+                <h4>Daily cues</h4>
+              </div>
+              <div className="card-section-body">
+                <ul className="hub-list tips-day-list">
+                  {dailyTips.map((tip) => (
+                    <li key={`tip-${tip.label}`}>
+                      <strong>{tip.label}:</strong> {tip.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <div className="hub-card">
-              <h4>Weekly principles</h4>
-              <ul className="hub-list tips-week-list">
-                {weeklyTips.map((tip) => (
-                  <li key={`weekly-${tip}`}>{tip}</li>
-                ))}
-              </ul>
+            <div className="hub-card card-shell">
+              <div className="card-section-head">
+                <h4>Weekly principles</h4>
+              </div>
+              <div className="card-section-body">
+                <ul className="hub-list tips-week-list">
+                  {weeklyTips.map((tip) => (
+                    <li key={`weekly-${tip}`}>{tip}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </section>
@@ -319,14 +373,14 @@ export default function PlansView({
       {selectedDay && (
         <ModalPortal open={Boolean(selectedDay)}>
           <div
-            className="modal-backdrop"
+            className="modal-backdrop dashboard-modal-backdrop"
             role="dialog"
             aria-modal="true"
             aria-label={`${selectedDay.key} ${selectedDetail?.mode || "day"} details`}
             onClick={() => setSelectedDetail(null)}
           >
             <div
-              className="modal plan-day-detail-modal"
+              className="modal dashboard-modal plan-day-detail-modal"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="modal-header">

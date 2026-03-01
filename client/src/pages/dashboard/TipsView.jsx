@@ -585,7 +585,13 @@ export default function TipsView({
         </section>
       )}
 
-      {(metaLoading || libraryLoading) && <p className="muted">Loading exercise options...</p>}
+      {(metaLoading || libraryLoading) && (
+        <div className="tips-skeleton-grid" aria-hidden="true">
+          <div className="tips-skeleton-card" />
+          <div className="tips-skeleton-card" />
+          <div className="tips-skeleton-card" />
+        </div>
+      )}
       {metaError && <p className="error">{metaError}</p>}
       {libraryError && <p className="error">{libraryError}</p>}
       {saveError && <p className="error">{saveError}</p>}
@@ -620,11 +626,15 @@ export default function TipsView({
                     onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
                   >
                     <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                    <div className="exercise-tile-meta">
-                      <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                      <h3>{exercise.name}</h3>
-                      <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
-                      <p className="muted">{entry.reasons[0]}</p>
+                    <div className="exercise-tile-meta card-shell">
+                      <div className="card-section-head">
+                        <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                        <h3>{exercise.name}</h3>
+                      </div>
+                      <div className="card-section-body">
+                        <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
+                        <p className="muted">{entry.reasons[0]}</p>
+                      </div>
                     </div>
                   </button>
                   <div className="exercise-tile-actions">
@@ -657,9 +667,13 @@ export default function TipsView({
           </div>
           <div className="training-guide-grid">
             {guideCards.map((card) => (
-              <article key={card.title} className="training-card">
-                <h4>{card.title}</h4>
-                <p>{card.text}</p>
+              <article key={card.title} className="training-card card-shell">
+                <div className="card-section-head">
+                  <h4>{card.title}</h4>
+                </div>
+                <div className="card-section-body">
+                  <p>{card.text}</p>
+                </div>
               </article>
             ))}
           </div>
@@ -691,10 +705,14 @@ export default function TipsView({
                     onClick={() => openExerciseModal(exercise)}
                   >
                     <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                    <div className="exercise-tile-meta">
-                      <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                      <h3>{exercise.name}</h3>
-                      <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
+                    <div className="exercise-tile-meta card-shell">
+                      <div className="card-section-head">
+                        <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
+                        <h3>{exercise.name}</h3>
+                      </div>
+                      <div className="card-section-body">
+                        <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
+                      </div>
                     </div>
                   </button>
                   <div className="exercise-tile-actions">
@@ -720,12 +738,12 @@ export default function TipsView({
       {selectedExercise && (
         <ModalPortal open={Boolean(selectedExercise)}>
           <div
-            className="modal-backdrop"
+            className="modal-backdrop dashboard-modal-backdrop"
             role="dialog"
             aria-modal="true"
             onClick={() => setSelectedExercise(null)}
           >
-            <div className="modal exercise-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal dashboard-modal exercise-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
                 <h3>{selectedExercise.name}</h3>
                 <button

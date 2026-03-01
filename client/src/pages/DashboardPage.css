@@ -125,6 +125,37 @@
   background: var(--dash-card-bg);
 }
 
+.dashboard-page .card-shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.dashboard-page .card-section-head,
+.dashboard-page .card-section-body,
+.dashboard-page .card-section-foot {
+  min-width: 0;
+}
+
+.dashboard-page .card-section-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.dashboard-page .card-section-foot {
+  margin-top: auto;
+}
+
+.dashboard-page .equal-card-grid {
+  align-items: stretch;
+}
+
+.dashboard-page .equal-card-grid > * {
+  height: 100%;
+}
+
 .dashboard-page .summary-view .eyebrow {
   color: #ececec;
 }
@@ -273,6 +304,81 @@
   opacity: 0.6 !important;
 }
 
+.modal-backdrop.dashboard-modal-backdrop {
+  background: rgba(0, 0, 0, 0.86);
+  backdrop-filter: blur(4px);
+}
+
+.modal.dashboard-modal {
+  background: linear-gradient(180deg, #121212 0%, #0c0c0c 100%);
+  border: 1px solid #4a4a4a;
+  color: #fff;
+  box-shadow: 0 0 0 1px #2a2a2a, 0 22px 48px #000;
+}
+
+.modal.dashboard-modal .muted {
+  color: #cfcfcf;
+}
+
+.modal.dashboard-modal .error {
+  color: #f3f3f3;
+}
+
+.modal.dashboard-modal input,
+.modal.dashboard-modal select,
+.modal.dashboard-modal textarea {
+  background: #0f0f0f;
+  border: 1px solid #4a4a4a;
+  color: #fff;
+}
+
+.modal.dashboard-modal select option {
+  background: #111;
+  color: #f5f5f5;
+}
+
+.modal.dashboard-modal input:focus,
+.modal.dashboard-modal select:focus,
+.modal.dashboard-modal textarea:focus {
+  outline: 2px solid #f2f2f2;
+  outline-offset: 1px;
+}
+
+.modal.dashboard-modal .ghost {
+  border-color: #7d7d7d;
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.modal.dashboard-modal .ghost:hover {
+  background: #3a3a3a;
+  border-color: #eee;
+}
+
+.modal.dashboard-modal .cta,
+.modal.dashboard-modal .back-btn {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #fff !important;
+  box-shadow: none !important;
+}
+
+.modal.dashboard-modal .cta:hover:not(:disabled),
+.modal.dashboard-modal .back-btn:hover:not(:disabled) {
+  background: #e5e5e5 !important;
+  color: #000 !important;
+  border-color: #e5e5e5 !important;
+}
+
+.modal.dashboard-modal a {
+  color: #f5f5f5;
+  text-underline-offset: 2px;
+}
+
+.modal.dashboard-modal a:hover {
+  color: #ffffff;
+}
+
 .dashboard-page .summary-view .weather-badge,
 .dashboard-page .summary-view .air-quality-badge {
   background: #303030;
@@ -288,6 +394,48 @@
 .dashboard-page .summary-view .air-quality-hazardous,
 .dashboard-page .summary-view .air-quality-unknown {
   background: #303030;
+}
+
+.dashboard-at-a-glance {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.dashboard-at-a-glance-head {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-at-a-glance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-glance-card {
+  border: 1px solid var(--dash-card-border);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--dash-card-bg);
+  display: grid;
+  gap: 10px;
+  height: 100%;
+}
+
+.dashboard-glance-card h3 {
+  font-size: 0.9rem;
+}
+
+.dashboard-glance-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dashboard-glance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .dashboard-grid {
@@ -320,8 +468,96 @@
   margin: 0;
 }
 
+.dashboard-loading-skeleton {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-skeleton-bar,
+.dashboard-skeleton-chip,
+.dashboard-skeleton-block {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 75%
+  );
+  background-size: 220% 100%;
+  animation: dash-skeleton-shimmer 1.15s infinite linear;
+}
+
+.dashboard-skeleton-title {
+  width: min(360px, 100%);
+  height: 18px;
+  border-radius: 10px;
+}
+
+.dashboard-skeleton-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dashboard-skeleton-chip {
+  width: 90px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.dashboard-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-skeleton-block {
+  height: 120px;
+  border-radius: 14px;
+}
+
+@keyframes dash-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .dashboard-inline-status {
   margin-top: 4px;
+}
+
+.dashboard-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+  max-width: min(420px, calc(100vw - 24px));
+  border-radius: 12px;
+  border: 1px solid var(--dash-card-border-strong);
+  padding: 10px 12px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.6);
+}
+
+.dashboard-toast-success {
+  background: rgba(23, 78, 45, 0.94);
+}
+
+.dashboard-toast-error {
+  background: rgba(106, 28, 35, 0.94);
+}
+
+.dashboard-toast-close {
+  margin-left: auto;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
 }
 
 .dashboard-workout-form {
@@ -395,12 +631,17 @@
 
 .drawer-links {
   display: grid;
-  gap: 10px;
-  justify-items: center;
-  align-content: center;
+  gap: 12px;
+  align-content: start;
 }
 
-.drawer-links button,
+.drawer-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.drawer-link-row > button,
 .drawer-footer button {
   background: var(--dash-card-bg);
   border: 1px solid var(--dash-card-border);
@@ -427,14 +668,14 @@
   border-color: #eee;
 }
 
-.drawer-links button:hover,
+.drawer-link-row > button:hover,
 .drawer-footer button:hover {
   border-color: var(--dash-card-border-strong);
   background: #313131;
   transform: translateY(-1px);
 }
 
-.drawer-links button.active,
+.drawer-link-row > button.active,
 .drawer-footer button.active {
   background: var(--dash-pill-bg-strong);
   border-color: var(--dash-card-border-strong);
@@ -511,7 +752,7 @@
     grid-template-columns: 1fr;
   }
 
-  .drawer-links button,
+  .drawer-link-row > button,
   .drawer-footer button {
     padding: 12px 14px;
     font-size: 15px;
@@ -527,6 +768,17 @@
 
   .dashboard-inline-status {
     text-align: center;
+  }
+
+  .dashboard-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
   }
 }
 

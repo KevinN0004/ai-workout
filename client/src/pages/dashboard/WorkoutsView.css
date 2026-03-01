@@ -59,6 +59,13 @@
   flex-shrink: 0;
 }
 
+.workouts-view .log-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 8px 0;
+}
+
 @media (max-width: 720px) {
   .workouts-view .log-section {
     padding: 12px;

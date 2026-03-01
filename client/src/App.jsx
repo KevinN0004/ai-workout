@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -282,6 +282,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const [dashboardToast, setDashboardToast] = useState(null);
+  const dashboardToastTimeoutRef = useRef(null);
   const isDashboardRoute =
     route === "/dashboard" || route.startsWith("/dashboard/");
 
@@ -1015,6 +1017,41 @@ export default function App() {
     setRoute(normalizedPath);
   };
 
+  const clearDashboardToast = useCallback(() => {
+    if (dashboardToastTimeoutRef.current) {
+      clearTimeout(dashboardToastTimeoutRef.current);
+      dashboardToastTimeoutRef.current = null;
+    }
+    setDashboardToast(null);
+  }, []);
+
+  const showDashboardToast = useCallback((message, tone = "success") => {
+    if (!message) return;
+    if (dashboardToastTimeoutRef.current) {
+      clearTimeout(dashboardToastTimeoutRef.current);
+    }
+    const nextToast = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      tone,
+      message
+    };
+    setDashboardToast(nextToast);
+    dashboardToastTimeoutRef.current = setTimeout(() => {
+      setDashboardToast((current) =>
+        current?.id === nextToast.id ? null : current
+      );
+      dashboardToastTimeoutRef.current = null;
+    }, 3200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (dashboardToastTimeoutRef.current) {
+        clearTimeout(dashboardToastTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const onAuthChange = (e) => {
     setAuthForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -1114,6 +1151,7 @@ export default function App() {
     setWeatherError("");
       setAirQualityData(null);
       setAirQualityError("");
+      clearDashboardToast();
       resetPersonalFlow();
       go("/");
   };
@@ -1152,8 +1190,11 @@ export default function App() {
         notes: ""
       });
       setWorkoutModalOpen(false);
+      showDashboardToast("Workout saved.");
     } catch (err) {
-      setDashError(err.message || "Unable to save workout.");
+      const message = err.message || "Unable to save workout.";
+      setDashError(message);
+      showDashboardToast(message, "error");
     }
   };
 
@@ -1178,8 +1219,11 @@ export default function App() {
       const data = await res.json();
       setDashboard(data.dashboard);
       setCalorieForm({ calories: "" });
+      showDashboardToast("Calories logged.");
     } catch (err) {
-      setDashError(err.message || "Unable to save calories.");
+      const message = err.message || "Unable to save calories.";
+      setDashError(message);
+      showDashboardToast(message, "error");
     }
   };
 
@@ -1199,8 +1243,11 @@ export default function App() {
       }
       const data = await res.json();
       setDashboard(data.dashboard);
+      showDashboardToast("Goals updated.");
     } catch (err) {
-      setDashError(err.message || "Unable to save goals.");
+      const message = err.message || "Unable to save goals.";
+      setDashError(message);
+      showDashboardToast(message, "error");
     }
   };
 
@@ -1230,8 +1277,11 @@ export default function App() {
         fatG: "",
         notes: ""
       });
+      showDashboardToast("Meal logged.");
     } catch (err) {
-      setDashError(err.message || "Unable to save meal log.");
+      const message = err.message || "Unable to save meal log.";
+      setDashError(message);
+      showDashboardToast(message, "error");
     }
   };
 
@@ -1259,8 +1309,11 @@ export default function App() {
         restingHr: "",
         notes: ""
       });
+      showDashboardToast("Progress metric saved.");
     } catch (err) {
-      setDashError(err.message || "Unable to save progress metric.");
+      const message = err.message || "Unable to save progress metric.";
+      setDashError(message);
+      showDashboardToast(message, "error");
     }
   };
 
@@ -1279,10 +1332,12 @@ export default function App() {
       }
       const data = await res.json();
       setDashboard(data.dashboard);
+      showDashboardToast("Exercise saved to your plan.");
       return { ok: true, data };
     } catch (err) {
       const message = err.message || "Unable to save exercise.";
       setDashError(message);
+      showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
   };
@@ -1300,10 +1355,12 @@ export default function App() {
       }
       const data = await res.json();
       setDashboard(data.dashboard);
+      showDashboardToast("Saved exercise removed.");
       return { ok: true, data };
     } catch (err) {
       const message = err.message || "Unable to remove saved exercise.";
       setDashError(message);
+      showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
   };
@@ -1385,6 +1442,8 @@ export default function App() {
         onRemoveSavedExercise={removeSavedExercise}
         plannerModal={plannerModal}
         generatedPlanModal={generatedPlanModal}
+        dashboardToast={dashboardToast}
+        clearDashboardToast={clearDashboardToast}
       />
     );
   }
@@ -1420,7 +1479,6 @@ export default function App() {
     />
   );
 }
-
 
 
 

@@ -41,6 +41,16 @@ const DASH_VIEW_TO_ROUTE = {
   home: "/dashboard/home"
 };
 
+const DASH_DRAWER_ITEMS = [
+  { key: "summary", label: "Home" },
+  { key: "workouts", label: "Logs" },
+  { key: "calories", label: "Goal" },
+  { key: "plans", label: "Weekly plan" },
+  { key: "meal", label: "Meal prep" },
+  { key: "tips", label: "Guides" },
+  { key: "settings", label: "Settings" }
+];
+
 export default function DashboardPage({
   user,
   personal,
@@ -85,7 +95,9 @@ export default function DashboardPage({
   onSaveExerciseToPlan,
   onRemoveSavedExercise,
   plannerModal,
-  generatedPlanModal
+  generatedPlanModal,
+  dashboardToast,
+  clearDashboardToast
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
@@ -134,7 +146,8 @@ export default function DashboardPage({
     recentWorkouts,
     goalPaceText,
     calorieDelta,
-    todayRecommendation
+    todayRecommendation,
+    weeklyTrends
   } = useMemo(() => {
     const today = new Date();
     const todayDate = new Date(
@@ -144,11 +157,18 @@ export default function DashboardPage({
     );
     const last7Cutoff = new Date(todayDate);
     last7Cutoff.setDate(last7Cutoff.getDate() - 6);
+    const previous7Start = new Date(last7Cutoff);
+    previous7Start.setDate(previous7Start.getDate() - 7);
+    const previous7End = new Date(last7Cutoff);
+    previous7End.setDate(previous7End.getDate() - 1);
     const inLast7Days = (value) =>
       Boolean(value && value >= last7Cutoff && value <= todayDate);
+    const inPrevious7Days = (value) =>
+      Boolean(value && value >= previous7Start && value <= previous7End);
 
     const caloriesByDate = {};
     const last7Calories = [];
+    const previous7Calories = [];
     for (const item of calories) {
       const parsedDate = parseDateValue(item?.date);
       if (!parsedDate) continue;
@@ -159,12 +179,15 @@ export default function DashboardPage({
       }
       if (inLast7Days(parsedDate)) {
         last7Calories.push(item);
+      } else if (inPrevious7Days(parsedDate)) {
+        previous7Calories.push(item);
       }
     }
 
     const workoutsByDate = {};
     const workoutMinutesByDate = {};
     const last7Workouts = [];
+    const previous7Workouts = [];
     for (const item of workouts) {
       const parsedDate = parseDateValue(item?.date);
       if (!parsedDate) continue;
@@ -176,12 +199,19 @@ export default function DashboardPage({
       }
       if (inLast7Days(parsedDate)) {
         last7Workouts.push(item);
+      } else if (inPrevious7Days(parsedDate)) {
+        previous7Workouts.push(item);
       }
     }
 
     const avgCalories =
       last7Calories.reduce((sum, item) => sum + Number(item?.calories || 0), 0) /
       (last7Calories.length || 1);
+    const previousAvgCalories =
+      previous7Calories.reduce(
+        (sum, item) => sum + Number(item?.calories || 0),
+        0
+      ) / (previous7Calories.length || 1);
     const weeklyGoal = Math.max(Number(goals.weeklyWorkouts || 3), 1);
     const workoutProgress = Math.min(
       100,
@@ -269,6 +299,31 @@ export default function DashboardPage({
         ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
         : "Log a workout to start your pace estimate.";
     const calorieDelta = Math.round(avgCalories - calorieGoal);
+    const workoutDeltaVsLastWeek = last7Workouts.length - previous7Workouts.length;
+    const calorieDeltaVsLastWeek = Math.round(avgCalories - previousAvgCalories);
+
+    const weightTrendCandidates = [...progressMetrics]
+      .filter((item) => Number.isFinite(Number(item?.weightLb)))
+      .sort((a, b) => {
+        const dateA = parseDateValue(a?.date)?.getTime() || 0;
+        const dateB = parseDateValue(b?.date)?.getTime() || 0;
+        return dateB - dateA;
+      });
+    const latestWeight =
+      weightTrendCandidates.length > 0
+        ? Number(weightTrendCandidates[0]?.weightLb)
+        : null;
+    const previousWeight =
+      weightTrendCandidates.length > 1
+        ? Number(weightTrendCandidates[1]?.weightLb)
+        : null;
+    const weightDeltaVsLastLog =
+      latestWeight !== null &&
+      previousWeight !== null &&
+      Number.isFinite(latestWeight) &&
+      Number.isFinite(previousWeight)
+        ? Number((latestWeight - previousWeight).toFixed(1))
+        : null;
 
     const latestPlan = dashboard?.plans?.[0];
     const weeklyMealPlan = buildWeeklyMealPlan({
@@ -293,6 +348,12 @@ export default function DashboardPage({
       workoutLines: latestPlanByWeekday?.[todayWeekday] || [],
       mealPlan: todayMealPlan
     };
+    const weeklyTrends = {
+      workouts: workoutDeltaVsLastWeek,
+      calories: calorieDeltaVsLastWeek,
+      latestWeight,
+      weightDelta: weightDeltaVsLastLog
+    };
 
     return {
       last7Workouts,
@@ -308,13 +369,15 @@ export default function DashboardPage({
       recentWorkouts,
       goalPaceText,
       calorieDelta,
-      todayRecommendation
+      todayRecommendation,
+      weeklyTrends
     };
   }, [
     calories,
     workouts,
     goals,
     dashboard,
+    progressMetrics,
     form?.goal,
     weekDays,
     latestPlanByWeekday
@@ -376,6 +439,25 @@ export default function DashboardPage({
     }
   };
 
+  const weatherRecommendation = weatherData?.recommendation || null;
+  const airSummary = airQualityData?.summary || null;
+  const caloriesGap = Math.round(calorieGoal - avgCalories);
+  const nextWorkout = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const upcoming = recentWorkouts
+      .map((item) => ({ ...item, parsedDate: parseDateValue(item?.date) }))
+      .filter((item) => item.parsedDate && item.parsedDate >= todayStart)
+      .sort((a, b) => a.parsedDate - b.parsedDate);
+    if (upcoming.length) return { ...upcoming[0], context: "Upcoming" };
+    if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
+    return null;
+  }, [recentWorkouts]);
+
   const showInitialDashboardLoading = dashLoading && !dashboard;
   const dashboardViews = {
     summary: (
@@ -391,6 +473,7 @@ export default function DashboardPage({
         calorieGoal={calorieGoal}
         calorieProgress={calorieProgress}
         workouts={recentWorkouts}
+        weeklyTrends={weeklyTrends}
         buildLinePath={buildLinePath}
         trendRanges={trendRanges}
         todayRecommendation={todayRecommendation}
@@ -414,6 +497,8 @@ export default function DashboardPage({
         progressMetrics={progressMetrics}
         setWorkoutForm={setWorkoutForm}
         setWorkoutModalOpen={setWorkoutModalOpen}
+        onOpenCalories={() => navigateDashView("calories")}
+        onOpenMeal={() => navigateDashView("meal")}
       />
     ),
     calories: (
@@ -447,6 +532,7 @@ export default function DashboardPage({
         dashboard={dashboard}
         fallbackPlan={form}
         onRemoveSavedExercise={onRemoveSavedExercise}
+        onOpenGuides={() => navigateDashView("tips")}
       />
     ),
     meal: (
@@ -585,13 +671,132 @@ export default function DashboardPage({
           <p className="muted">Visual summary of your progress and key metrics.</p>
         </header>
 
+        <section className="panel dashboard-at-a-glance">
+          <div className="dashboard-at-a-glance-head">
+            <h2>Today at a glance</h2>
+            <p className="muted">Quick status and shortcuts for your day.</p>
+          </div>
+          <div className="dashboard-at-a-glance-grid equal-card-grid">
+            <article className="dashboard-glance-card card-shell">
+              <div className="card-section-head">
+                <h3>{nextWorkout ? `${nextWorkout.context} workout` : "Workout status"}</h3>
+              </div>
+              <div className="card-section-body">
+                {nextWorkout ? (
+                  <>
+                    <p className="dashboard-glance-value">
+                      {nextWorkout.date || "Date pending"} - {nextWorkout.focus || "General"}
+                    </p>
+                    <p className="muted">{nextWorkout.duration || "--"} min planned</p>
+                  </>
+                ) : (
+                  <p className="muted">No workout logged yet. Add one to get started.</p>
+                )}
+              </div>
+            </article>
+            <article className="dashboard-glance-card card-shell">
+              <div className="card-section-head">
+                <h3>Calories gap</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="dashboard-glance-value">
+                  {caloriesGap === 0
+                    ? "On target"
+                    : caloriesGap > 0
+                    ? `${caloriesGap} under target`
+                    : `${Math.abs(caloriesGap)} over target`}
+                </p>
+                <p className="muted">
+                  Avg {Math.round(avgCalories)} / goal {calorieGoal} kcal
+                </p>
+              </div>
+            </article>
+            <article className="dashboard-glance-card card-shell">
+              <div className="card-section-head">
+                <h3>Weather</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="dashboard-glance-value">
+                  {weatherLoading
+                    ? "Checking..."
+                    : weatherError
+                    ? "Unavailable"
+                    : weatherRecommendation?.workoutType === "outdoor"
+                    ? "Outdoor friendly"
+                    : weatherRecommendation?.workoutType === "indoor"
+                    ? "Indoor suggested"
+                    : "Unavailable"}
+                </p>
+                <p className="muted">{weatherRecommendation?.summary || "No weather update yet."}</p>
+              </div>
+            </article>
+            <article className="dashboard-glance-card card-shell">
+              <div className="card-section-head">
+                <h3>Air quality</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="dashboard-glance-value">
+                  {airQualityLoading
+                    ? "Checking..."
+                    : airQualityError
+                    ? "Unavailable"
+                    : airSummary?.level || "Unavailable"}
+                </p>
+                <p className="muted">
+                  {airSummary?.guidance || "No air quality guidance available."}
+                </p>
+              </div>
+            </article>
+          </div>
+          <div className="dashboard-glance-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setWorkoutForm((prev) => ({ ...prev, date: toDateKey(new Date()) }));
+                setWorkoutModalOpen(true);
+              }}
+            >
+              Add workout
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => navigateDashView("meal")}
+            >
+              Log meal
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => navigateDashView("tips")}
+            >
+              Open guides
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={openPlannerFromProfile}
+            >
+              Update plan
+            </button>
+          </div>
+        </section>
+
         <main className="dashboard-grid">
           {showInitialDashboardLoading && (
-            <section className="panel dashboard-loading-card" role="status" aria-live="polite">
-              <h2>Loading dashboard</h2>
-              <p className="muted">
-                Fetching your workouts, goals, meal logs, and saved plans.
-              </p>
+            <section className="panel dashboard-loading-card dashboard-loading-skeleton" role="status" aria-live="polite">
+              <div className="dashboard-skeleton-bar dashboard-skeleton-title" />
+              <div className="dashboard-skeleton-row">
+                <span className="dashboard-skeleton-chip" />
+                <span className="dashboard-skeleton-chip" />
+                <span className="dashboard-skeleton-chip" />
+              </div>
+              <div className="dashboard-skeleton-grid">
+                <div className="dashboard-skeleton-block" />
+                <div className="dashboard-skeleton-block" />
+                <div className="dashboard-skeleton-block" />
+              </div>
             </section>
           )}
           {dashViewOrder.map((viewKey) => {
@@ -612,37 +817,57 @@ export default function DashboardPage({
           <p className="muted dashboard-inline-status">Refreshing dashboard data...</p>
         )}
         {dashError && <p className="error">{dashError}</p>}
+        {dashboardToast && (
+          <div
+            className={`dashboard-toast dashboard-toast-${dashboardToast.tone || "success"}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span>{dashboardToast.message}</span>
+            <button
+              type="button"
+              className="ghost dashboard-toast-close"
+              aria-label="Dismiss message"
+              onClick={clearDashboardToast}
+            >
+              x
+            </button>
+          </div>
+        )}
 
         {workoutModalOpen && (
           <ModalPortal open={workoutModalOpen}>
             <div
-              className="modal-backdrop"
+              className="modal-backdrop dashboard-modal-backdrop"
               role="dialog"
               aria-modal="true"
               onClick={() => setWorkoutModalOpen(false)}
             >
-              <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Add workout</h2>
-                <button
-                  type="button"
-                  className="ghost icon-button"
-                  aria-label="Close workout modal"
-                  title="Close"
-                  onClick={() => setWorkoutModalOpen(false)}
-                >
-                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                    <path
-                      d="M6 6l12 12M18 6L6 18"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <form className="form dashboard-workout-form" onSubmit={submitWorkout}>
+              <div
+                className="modal dashboard-modal dashboard-workout-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="modal-header">
+                  <h2>Add workout</h2>
+                  <button
+                    type="button"
+                    className="ghost icon-button"
+                    aria-label="Close workout modal"
+                    title="Close"
+                    onClick={() => setWorkoutModalOpen(false)}
+                  >
+                    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                      <path
+                        d="M6 6l12 12M18 6L6 18"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <form className="form dashboard-workout-form" onSubmit={submitWorkout}>
                 <label>
                   Date
                   <input
@@ -794,71 +1019,19 @@ export default function DashboardPage({
               </button>
             </div>
             <div className="drawer-links">
-              <button
-                type="button"
-                className={dashView === "summary" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("summary", { closeDrawer: true });
-                }}
-              >
-                Home
-              </button>
-              <button
-                type="button"
-                className={dashView === "workouts" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("workouts", { closeDrawer: true });
-                }}
-              >
-                Logs
-              </button>
-              <button
-                type="button"
-                className={dashView === "calories" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("calories", { closeDrawer: true });
-                }}
-              >
-                Goal
-              </button>
-              <button
-                type="button"
-                className={dashView === "plans" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("plans", { closeDrawer: true });
-                }}
-              >
-                Weekly plan
-              </button>
-              <button
-                type="button"
-                className={dashView === "meal" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("meal", { closeDrawer: true });
-                }}
-              >
-                Meal prep
-              </button>
-              <button
-                type="button"
-                className={dashView === "tips" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("tips", { closeDrawer: true });
-                }}
-              >
-                Guides
-              </button>
-            </div>
-            <div className="drawer-footer">
-              <button
-                type="button"
-                className={dashView === "settings" ? "active" : ""}
-                onClick={() => {
-                  navigateDashView("settings", { closeDrawer: true });
-                }}
-              >
-                Settings
-              </button>
+              {DASH_DRAWER_ITEMS.map((item) => (
+                <div key={item.key} className="drawer-link-row">
+                  <button
+                    type="button"
+                    className={dashView === item.key ? "active" : ""}
+                    onClick={() => {
+                      navigateDashView(item.key, { closeDrawer: true });
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                </div>
+              ))}
             </div>
           </aside>
         </div>
@@ -866,4 +1039,7 @@ export default function DashboardPage({
     </>
   );
 }
+
+
+
 

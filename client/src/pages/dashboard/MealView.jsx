@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { detectTrack } from "./planUtils";
 import ModalPortal from "../../components/ModalPortal";
 import "./MealView.css";
@@ -933,6 +933,7 @@ export default function MealView({
   const [mealDbRecommendations, setMealDbRecommendations] = useState([]);
   const [mealDbRecommendationsLoading, setMealDbRecommendationsLoading] = useState(false);
   const [mealDbRecommendationsError, setMealDbRecommendationsError] = useState("");
+  const mealLogNameInputRef = useRef(null);
   const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];
   const safeMealLogForm = mealLogForm || {
     date: "",
@@ -1234,6 +1235,7 @@ export default function MealView({
           <label>
             Meal name
             <input
+              ref={mealLogNameInputRef}
               value={safeMealLogForm.name}
               onChange={(event) =>
                 updateMealLogForm((prev) => ({ ...prev, name: event.target.value }))
@@ -1322,7 +1324,25 @@ export default function MealView({
               </div>
             </div>
           ))}
-          {!safeMealLogs.length && <p className="muted">No meal logs yet.</p>}
+          {!safeMealLogs.length && (
+            <div className="meal-empty-state">
+              <p className="muted">No meal logs yet.</p>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  updateMealLogForm((prev) => ({
+                    ...prev,
+                    date: prev?.date || new Date().toISOString().slice(0, 10),
+                    mealType: prev?.mealType || "breakfast"
+                  }));
+                  mealLogNameInputRef.current?.focus();
+                }}
+              >
+                Log first meal
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1346,14 +1366,37 @@ export default function MealView({
             {mealDbLoading ? "Searching..." : "Search"}
           </button>
         </form>
+        {mealDbLoading && (
+          <div className="meal-skeleton-grid" aria-hidden="true">
+            <div className="meal-skeleton-card" />
+            <div className="meal-skeleton-card" />
+            <div className="meal-skeleton-card" />
+          </div>
+        )}
         {mealDbError && <p className="error">{mealDbError}</p>}
         {!mealDbLoading && !mealDbError && mealDbQuery && !mealDbMeals.length && (
-          <p className="muted">No recipes found for "{mealDbQuery}".</p>
+          <div className="meal-empty-state">
+            <p className="muted">No recipes found for "{mealDbQuery}".</p>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setMealDbInput("chicken");
+                setMealDbQuery("chicken");
+              }}
+            >
+              Try "chicken"
+            </button>
+          </div>
         )}
       </section>
 
       {mealDbRecommendationsLoading && (
-        <p className="muted">Loading recommended recipes for your current goal...</p>
+        <div className="meal-skeleton-grid" aria-hidden="true">
+          <div className="meal-skeleton-card" />
+          <div className="meal-skeleton-card" />
+          <div className="meal-skeleton-card" />
+        </div>
       )}
       {mealDbRecommendationsError && <p className="error">{mealDbRecommendationsError}</p>}
 
@@ -1400,14 +1443,22 @@ export default function MealView({
                       loading="lazy"
                       onError={handleImageError}
                     />
-                    <div className="meal-card-copy">
-                      <h3>{meal.title}</h3>
-                      <p className="muted">{meal.blurb}</p>
-                      <p className="meal-card-meta">
-                        {meal.calories === null || meal.calories === undefined || meal.calories === ""
-                          ? "Calories not provided"
-                          : `Approx. ${meal.calories} calories`}
-                      </p>
+                    <div className="meal-card-copy card-shell">
+                      <div className="card-section-head">
+                        <h3>{meal.title}</h3>
+                      </div>
+                      <div className="card-section-body">
+                        <p className="muted">{meal.blurb}</p>
+                      </div>
+                      <div className="card-section-foot">
+                        <p className="meal-card-meta">
+                          {meal.calories === null ||
+                          meal.calories === undefined ||
+                          meal.calories === ""
+                            ? "Calories not provided"
+                            : `Approx. ${meal.calories} calories`}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -1425,13 +1476,13 @@ export default function MealView({
       {activeMeal && (
         <ModalPortal open={Boolean(activeMeal)}>
           <div
-            className="modal-backdrop"
+            className="modal-backdrop dashboard-modal-backdrop"
             role="dialog"
             aria-modal="true"
             aria-label={`Meal details for ${activeMeal.title}`}
             onClick={() => setActiveMealId(null)}
           >
-            <div className="modal meal-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal dashboard-modal meal-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header meal-modal-header">
                 <button
                   type="button"

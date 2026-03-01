@@ -42,6 +42,7 @@ export default function SummaryView({
   buildLinePath,
   trendRanges,
   todayRecommendation,
+  weeklyTrends,
   weatherData,
   weatherLoading,
   weatherError,
@@ -73,6 +74,22 @@ export default function SummaryView({
   const airLevelClass = String(airSummary?.level || "unknown")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-");
+  const renderTrendBadge = (value, { suffix, unit = "", decimals = 0 } = {}) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+    const numeric = Number(value);
+    const tone = numeric > 0 ? "up" : numeric < 0 ? "down" : "flat";
+    const absolute = Math.abs(numeric);
+    const formatted =
+      decimals > 0 ? absolute.toFixed(decimals) : String(Math.round(absolute));
+    const sign = numeric > 0 ? "+" : numeric < 0 ? "-" : "";
+    return (
+      <span className={`trend-badge trend-${tone}`}>
+        {sign}
+        {formatted}
+        {unit ? ` ${unit}` : ""} {suffix}
+      </span>
+    );
+  };
 
   return (
     <section className="summary-view">
@@ -90,34 +107,50 @@ export default function SummaryView({
               Update plan
             </button>
           </div>
-          <div className="overview-grid">
-            <article className="overview-card">
-              <h3>Goal</h3>
-              <p className="overview-value">{form.goal}</p>
-              <p className="muted">Primary outcome you are chasing.</p>
+          <div className="overview-grid equal-card-grid">
+            <article className="overview-card card-shell">
+              <div className="card-section-head">
+                <h3>Goal</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="overview-value">{form.goal}</p>
+                <p className="muted">Primary outcome you are chasing.</p>
+              </div>
             </article>
-            <article className="overview-card">
-              <h3>Schedule</h3>
-              <p className="overview-value">
-                {form.days} days - {form.duration} min
-              </p>
-              <p className="muted">Weekly cadence and session length.</p>
+            <article className="overview-card card-shell">
+              <div className="card-section-head">
+                <h3>Schedule</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="overview-value">
+                  {form.days} days - {form.duration} min
+                </p>
+                <p className="muted">Weekly cadence and session length.</p>
+              </div>
             </article>
-            <article className="overview-card">
-              <h3>Environment</h3>
-              <p className="overview-value">{form.environment}</p>
-              <p className="muted">
-                {form.equipment.length
-                  ? form.equipment.join(", ")
-                  : "No equipment selected yet."}
-              </p>
+            <article className="overview-card card-shell">
+              <div className="card-section-head">
+                <h3>Environment</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="overview-value">{form.environment}</p>
+                <p className="muted">
+                  {form.equipment.length
+                    ? form.equipment.join(", ")
+                    : "No equipment selected yet."}
+                </p>
+              </div>
             </article>
-            <article className="overview-card">
-              <h3>Focus picks</h3>
-              <p className="overview-value">
-                {form.focuses.length ? form.focuses.join(", ") : "Pick a focus"}
-              </p>
-              <p className="muted">Quick focus tags to steer the plan.</p>
+            <article className="overview-card card-shell">
+              <div className="card-section-head">
+                <h3>Focus picks</h3>
+              </div>
+              <div className="card-section-body">
+                <p className="overview-value">
+                  {form.focuses.length ? form.focuses.join(", ") : "Pick a focus"}
+                </p>
+                <p className="muted">Quick focus tags to steer the plan.</p>
+              </div>
             </article>
           </div>
         </section>
@@ -131,57 +164,69 @@ export default function SummaryView({
               </p>
             </div>
           </div>
-          <div className="hub-grid">
-            <article className="hub-card">
-              <h3>Workout</h3>
-              {workoutLines.length ? (
-                <ul className="hub-list">
-                  {workoutLines.slice(0, 4).map((line, index) => (
-                    <li key={`today-workout-${index}-${line}`}>{line}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">No workout assigned for today. Use this as a recovery day.</p>
-              )}
-              <button type="button" className="ghost" onClick={onOpenPlans}>
-                Open weekly plan
-              </button>
-            </article>
-            <article className="hub-card">
-              <h3>Meal plan</h3>
-              {selectedMeal ? (
-                <>
-                  <p className="muted">
-                    {selectedMeal.trainingDay ? "Training day fuel" : "Recovery day fuel"}
-                  </p>
+          <div className="hub-grid equal-card-grid">
+            <article className="hub-card card-shell">
+              <div className="card-section-head">
+                <h3>Workout</h3>
+              </div>
+              <div className="card-section-body">
+                {workoutLines.length ? (
                   <ul className="hub-list">
-                    <li>
-                      <strong>Breakfast:</strong> {selectedMeal.breakfast}
-                    </li>
-                    <li>
-                      <strong>Lunch:</strong> {selectedMeal.lunch}
-                    </li>
-                    <li>
-                      <strong>Dinner:</strong> {selectedMeal.dinner}
-                    </li>
-                    <li>
-                      <strong>Snack:</strong> {selectedMeal.snack}
-                    </li>
-                    <li>
-                      <strong>Drink:</strong> {selectedMeal.drink}
-                    </li>
+                    {workoutLines.slice(0, 4).map((line, index) => (
+                      <li key={`today-workout-${index}-${line}`}>{line}</li>
+                    ))}
                   </ul>
-                  <p className="muted">Daily target: ~{selectedMeal.calories} kcal</p>
-                </>
-              ) : (
-                <p className="muted">Meal recommendation not available yet.</p>
-              )}
-              <button type="button" className="ghost" onClick={onOpenMeal}>
-                Open meal prep
-              </button>
+                ) : (
+                  <p className="muted">No workout assigned for today. Use this as a recovery day.</p>
+                )}
+              </div>
+              <div className="card-section-foot">
+                <button type="button" className="ghost" onClick={onOpenPlans}>
+                  Open weekly plan
+                </button>
+              </div>
             </article>
-            <article className="hub-card">
-              <div className="weather-card-header">
+            <article className="hub-card card-shell">
+              <div className="card-section-head">
+                <h3>Meal plan</h3>
+              </div>
+              <div className="card-section-body">
+                {selectedMeal ? (
+                  <>
+                    <p className="muted">
+                      {selectedMeal.trainingDay ? "Training day fuel" : "Recovery day fuel"}
+                    </p>
+                    <ul className="hub-list">
+                      <li>
+                        <strong>Breakfast:</strong> {selectedMeal.breakfast}
+                      </li>
+                      <li>
+                        <strong>Lunch:</strong> {selectedMeal.lunch}
+                      </li>
+                      <li>
+                        <strong>Dinner:</strong> {selectedMeal.dinner}
+                      </li>
+                      <li>
+                        <strong>Snack:</strong> {selectedMeal.snack}
+                      </li>
+                      <li>
+                        <strong>Drink:</strong> {selectedMeal.drink}
+                      </li>
+                    </ul>
+                    <p className="muted">Daily target: ~{selectedMeal.calories} kcal</p>
+                  </>
+                ) : (
+                  <p className="muted">Meal recommendation not available yet.</p>
+                )}
+              </div>
+              <div className="card-section-foot">
+                <button type="button" className="ghost" onClick={onOpenMeal}>
+                  Open meal prep
+                </button>
+              </div>
+            </article>
+            <article className="hub-card card-shell">
+              <div className="card-section-head weather-card-header">
                 <h3>Weather mode</h3>
                 <button
                   type="button"
@@ -209,48 +254,50 @@ export default function SummaryView({
                   </svg>
                 </button>
               </div>
-              {weatherLoading ? (
-                <p className="muted">Checking local conditions...</p>
-              ) : weatherError ? (
-                <p className="muted">{weatherError}</p>
-              ) : weatherRecommendation ? (
-                <>
-                  <p className="weather-badge">
-                    {weatherRecommendation.workoutType === "outdoor"
-                      ? "Outdoor day"
-                      : "Indoor day"}
-                  </p>
-                  <p>{weatherRecommendation.summary}</p>
-                  <p className="muted">
-                    {weatherCurrent?.temperatureC ?? "--"} C,{" "}
-                    {weatherCurrent?.weatherText || weatherRecommendation.weatherText}
-                  </p>
-                  {weatherReasons.length ? (
-                    <ul className="hub-list weather-reasons">
-                      {weatherReasons.slice(0, 3).map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {nextForecast.length ? (
-                    <div className="weather-forecast">
-                      {nextForecast.map((day) => (
-                        <div key={day.date} className="weather-forecast-row">
-                          <span>{day.date}</span>
-                          <span>
-                            {day.tempMinC ?? "--"}-{day.tempMaxC ?? "--"} C
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <p className="muted">No weather recommendation loaded yet.</p>
-              )}
+              <div className="card-section-body">
+                {weatherLoading ? (
+                  <p className="muted">Checking local conditions...</p>
+                ) : weatherError ? (
+                  <p className="muted">{weatherError}</p>
+                ) : weatherRecommendation ? (
+                  <>
+                    <p className="weather-badge">
+                      {weatherRecommendation.workoutType === "outdoor"
+                        ? "Outdoor day"
+                        : "Indoor day"}
+                    </p>
+                    <p>{weatherRecommendation.summary}</p>
+                    <p className="muted">
+                      {weatherCurrent?.temperatureC ?? "--"} C,{" "}
+                      {weatherCurrent?.weatherText || weatherRecommendation.weatherText}
+                    </p>
+                    {weatherReasons.length ? (
+                      <ul className="hub-list weather-reasons">
+                        {weatherReasons.slice(0, 3).map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {nextForecast.length ? (
+                      <div className="weather-forecast">
+                        {nextForecast.map((day) => (
+                          <div key={day.date} className="weather-forecast-row">
+                            <span>{day.date}</span>
+                            <span>
+                              {day.tempMinC ?? "--"}-{day.tempMaxC ?? "--"} C
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="muted">No weather recommendation loaded yet.</p>
+                )}
+              </div>
             </article>
-            <article className="hub-card">
-              <div className="weather-card-header">
+            <article className="hub-card card-shell">
+              <div className="card-section-head weather-card-header">
                 <h3>Air quality</h3>
                 <button
                   type="button"
@@ -278,42 +325,44 @@ export default function SummaryView({
                   </svg>
                 </button>
               </div>
-              {airQualityLoading ? (
-                <p className="muted">Checking local air quality...</p>
-              ) : airQualityError ? (
-                <p className="muted">{airQualityError}</p>
-              ) : airSummary ? (
-                <>
-                  <p className={`air-quality-badge air-quality-${airLevelClass}`}>
-                    {airSummary.level || "Unknown"}
-                  </p>
-                  <p>{airSummary.guidance}</p>
-                  <p className="muted">
-                    {airSummary.primaryPollutant || "PM2.5"}:{" "}
-                    {airSummary.pm25 ?? "--"} ug/m3
-                    {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
-                      ? ` | US AQI ${airSummary.aqiUs}`
-                      : ""}
-                  </p>
-                  {airLocation?.name ? (
-                    <p className="muted">
-                      Station: {airLocation.name}
-                      {airLocation.city ? ` (${airLocation.city})` : ""}
+              <div className="card-section-body">
+                {airQualityLoading ? (
+                  <p className="muted">Checking local air quality...</p>
+                ) : airQualityError ? (
+                  <p className="muted">{airQualityError}</p>
+                ) : airSummary ? (
+                  <>
+                    <p className={`air-quality-badge air-quality-${airLevelClass}`}>
+                      {airSummary.level || "Unknown"}
                     </p>
-                  ) : null}
-                  {topPollutants.length ? (
-                    <ul className="hub-list weather-reasons">
-                      {topPollutants.map((item) => (
-                        <li key={`${item.code}-${item.measuredAt}`}>
-                          {item.label || item.code}: {item.value} {item.unit}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              ) : (
-                <p className="muted">No air quality data loaded yet.</p>
-              )}
+                    <p>{airSummary.guidance}</p>
+                    <p className="muted">
+                      {airSummary.primaryPollutant || "PM2.5"}:{" "}
+                      {airSummary.pm25 ?? "--"} ug/m3
+                      {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
+                        ? ` | US AQI ${airSummary.aqiUs}`
+                        : ""}
+                    </p>
+                    {airLocation?.name ? (
+                      <p className="muted">
+                        Station: {airLocation.name}
+                        {airLocation.city ? ` (${airLocation.city})` : ""}
+                      </p>
+                    ) : null}
+                    {topPollutants.length ? (
+                      <ul className="hub-list weather-reasons">
+                        {topPollutants.map((item) => (
+                          <li key={`${item.code}-${item.measuredAt}`}>
+                            {item.label || item.code}: {item.value} {item.unit}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="muted">No air quality data loaded yet.</p>
+                )}
+              </div>
             </article>
           </div>
         </section>
@@ -323,15 +372,38 @@ export default function SummaryView({
           <div className="stat-row">
             <div>
               <p className="muted">Workouts this week</p>
-              <h3>{last7Workouts.length}</h3>
+              <div className="summary-stat-main">
+                <h3>{last7Workouts.length}</h3>
+                {renderTrendBadge(weeklyTrends?.workouts, { suffix: "vs last week" })}
+              </div>
             </div>
             <div>
               <p className="muted">Avg calories</p>
-              <h3>{Math.round(avgCalories)}</h3>
+              <div className="summary-stat-main">
+                <h3>{Math.round(avgCalories)}</h3>
+                {renderTrendBadge(weeklyTrends?.calories, {
+                  suffix: "vs last week",
+                  unit: "kcal"
+                })}
+              </div>
             </div>
             <div>
-              <p className="muted">Target weight</p>
-              <h3>{goals.targetWeight || goalForm.targetWeight} lb</h3>
+              <p className="muted">
+                {weeklyTrends?.latestWeight !== null && weeklyTrends?.latestWeight !== undefined
+                  ? "Latest weight"
+                  : "Target weight"}
+              </p>
+              <div className="summary-stat-main">
+                <h3>
+                  {(weeklyTrends?.latestWeight ??
+                    Number(goals.targetWeight || goalForm.targetWeight)) || 0} lb
+                </h3>
+                {renderTrendBadge(weeklyTrends?.weightDelta, {
+                  suffix: "vs last log",
+                  unit: "lb",
+                  decimals: 1
+                })}
+              </div>
             </div>
           </div>
           <div className="progress-block">

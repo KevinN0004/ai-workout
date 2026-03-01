@@ -23,7 +23,9 @@ export default function WorkoutsView({
   mealLogs,
   progressMetrics,
   setWorkoutForm,
-  setWorkoutModalOpen
+  setWorkoutModalOpen,
+  onOpenCalories,
+  onOpenMeal
 }) {
   const workoutLogs = sortByDateDesc(Array.isArray(workouts) ? workouts : []);
   const calorieLogs = sortByDateDesc(Array.isArray(calories) ? calories : []);
@@ -82,7 +84,24 @@ export default function WorkoutsView({
                 </div>
               );
             })}
-            {!workoutLogs.length && <p className="muted">No workouts logged yet.</p>}
+            {!workoutLogs.length && (
+              <div className="log-empty-state">
+                <p className="muted">No workouts logged yet.</p>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => {
+                    setWorkoutForm((prev) => ({
+                      ...prev,
+                      date: getLocalDateKey()
+                    }));
+                    setWorkoutModalOpen(true);
+                  }}
+                >
+                  Add workout now
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -100,7 +119,14 @@ export default function WorkoutsView({
                 </div>
               </div>
             ))}
-            {!calorieLogs.length && <p className="muted">No calories logged yet.</p>}
+            {!calorieLogs.length && (
+              <div className="log-empty-state">
+                <p className="muted">No calories logged yet.</p>
+                <button type="button" className="ghost" onClick={onOpenCalories}>
+                  Open goal page
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -127,7 +153,14 @@ export default function WorkoutsView({
                 </div>
               </div>
             ))}
-            {!mealLogItems.length && <p className="muted">No meal logs yet.</p>}
+            {!mealLogItems.length && (
+              <div className="log-empty-state">
+                <p className="muted">No meal logs yet.</p>
+                <button type="button" className="ghost" onClick={onOpenMeal}>
+                  Open meal prep
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -149,7 +182,14 @@ export default function WorkoutsView({
                 </div>
               </div>
             ))}
-            {!progressLogs.length && <p className="muted">No progress metrics logged yet.</p>}
+            {!progressLogs.length && (
+              <div className="log-empty-state">
+                <p className="muted">No progress metrics logged yet.</p>
+                <button type="button" className="ghost" onClick={onOpenCalories}>
+                  Log progress in goal page
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </div>

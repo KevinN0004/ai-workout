@@ -45,6 +45,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  align-items: stretch;
+}
+
+.summary-view .overview-grid > * {
+  height: 100%;
 }
 
 .summary-view .overview-card {
@@ -98,6 +103,36 @@
   font-size: 1.4rem;
 }
 
+.summary-view .summary-stat-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-view .trend-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: #f2f2f2;
+}
+
+.summary-view .trend-up {
+  border-color: rgba(94, 234, 212, 0.5);
+  background: rgba(45, 212, 191, 0.16);
+}
+
+.summary-view .trend-down {
+  border-color: rgba(251, 146, 60, 0.5);
+  background: rgba(251, 146, 60, 0.14);
+}
+
 .summary-view .progress-block {
   display: grid;
   gap: 6px;
@@ -127,6 +162,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+  align-items: stretch;
+}
+
+.summary-view .hub-grid > * {
+  height: 100%;
 }
 
 .summary-view .hub-card {
@@ -135,6 +175,11 @@
   background: rgba(255, 255, 255, 0.05);
   display: grid;
   gap: 10px;
+}
+
+.summary-view .hub-card .card-section-foot {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .summary-view .weather-card-header {
