@@ -698,7 +698,9 @@ export default function PreviewPage({
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
   const isCenteredBodyChapter =
-    activePreviewChapter.id === "personal-info" || activePreviewChapter.id === "generate";
+    activePreviewChapter.id === "personal-info"
+    || activePreviewChapter.id === "generate"
+    || activePreviewChapter.id === "workout-week";
   const previewMaxChapterTitleLength = previewChapters.reduce(
     (maxLength, chapter) => Math.max(maxLength, chapter.title.length),
     0

@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import HomePage from "./pages/HomePage";
+import WorkoutResultPage from "./pages/WorkoutResultPage";
 import ModalPortal from "./components/ModalPortal";
 import "./App.css";
 
@@ -128,6 +129,20 @@ const defaultPersonalForm = {
   nutrition: "",
   cardio: "",
   notes: ""
+};
+
+const splitFullName = (nameValue) => {
+  const nameParts = String(nameValue || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!nameParts.length) {
+    return { firstName: "", lastName: "" };
+  }
+  return {
+    firstName: nameParts[0],
+    lastName: nameParts.slice(1).join(" ")
+  };
 };
 
 const createDefaultPlannerForm = () => ({
@@ -622,13 +637,56 @@ export default function App() {
         setDashView("summary");
         go("/dashboard");
       } else {
-        setPlanModalOpen(true);
+        setPlanModalOpen(false);
+        go("/plan");
       }
     } catch (err) {
       setError(err.message || "Unable to generate plan.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const openSignupWithPrefilledProfile = () => {
+    const { firstName, lastName } = splitFullName(personal.name);
+    const fallbackHeightCm = String(personal.heightCm || "").trim();
+    const computedHeightCm = heightUnit === "ft"
+      ? (toCmFromFeetInches(personal.heightFeet, personal.heightInches) || fallbackHeightCm)
+      : fallbackHeightCm;
+    const computedHeightSplit = heightUnit === "ft"
+      ? {
+          feet: String(personal.heightFeet || "").trim(),
+          inches: String(personal.heightInches || "").trim()
+        }
+      : toFeetInchesFromCm(computedHeightCm);
+    const normalizedWeight = String(personal.weight || "").trim();
+    const computedWeightKg = weightUnit === "lb"
+      ? toKg(normalizedWeight, "lb")
+      : normalizedWeight;
+
+    setAuthForm({ ...defaultAuthForm });
+    setAuthMode("signup");
+    setAuthError("");
+    setShowPassword(false);
+    setAuthAutoSignIn(false);
+    setSignupHeightUnit(heightUnit === "ft" ? "ft" : "cm");
+    setSignupWeightUnit(weightUnit === "lb" ? "lb" : "kg");
+    setSignupProfileForm({
+      ...defaultSignupProfileForm,
+      firstName,
+      lastName,
+      age: String(personal.age || "").trim(),
+      heightCm: String(computedHeightCm || "").trim(),
+      heightFeet: String(computedHeightSplit.feet || "").trim(),
+      heightInches: String(computedHeightSplit.inches || "").trim(),
+      weight: normalizedWeight,
+      weightKg: String(computedWeightKg || "").trim(),
+      sex: String(personal.sex || "").trim(),
+      bodyFat: String(personal.bodyFat || "").trim(),
+      activity: String(personal.activity || "").trim() || defaultSignupProfileForm.activity,
+      notes: String(personal.notes || "").trim()
+    });
+    go("/auth");
   };
 
   const downloadPlanPdf = () => {
@@ -1816,7 +1874,7 @@ export default function App() {
     }
   };
 
-  if (route === "/auth") {
+  if (route === "/auth" || route === "/auth/") {
     return (
       <AuthPage
         gradient={gradient}
@@ -1842,6 +1900,20 @@ export default function App() {
         setAuthAutoSignIn={setAuthAutoSignIn}
         authLoading={authLoading}
         authError={authError}
+      />
+    );
+  }
+
+  if (route === "/plan" || route === "/plan/") {
+    return (
+      <WorkoutResultPage
+        gradient={gradient}
+        user={user}
+        go={go}
+        planSections={planSections}
+        hasResult={Boolean(result)}
+        onDownloadPlanPdf={downloadPlanPdf}
+        onSignupWithPrefilledProfile={openSignupWithPrefilledProfile}
       />
     );
   }

@@ -13,6 +13,10 @@ vi.mock("./pages/DashboardPage", () => ({
   default: () => <div data-testid="dashboard-page">Dashboard page</div>
 }));
 
+vi.mock("./pages/WorkoutResultPage", () => ({
+  default: () => <div data-testid="workout-result-page">Workout result page</div>
+}));
+
 import App from "./App";
 
 const setPath = (path) => {
@@ -51,5 +55,11 @@ describe("App route rendering", () => {
     setPath("/dashboard");
     render(<App />);
     expect(screen.getByTestId("dashboard-page")).toBeInTheDocument();
+  });
+
+  test("renders WorkoutResultPage on /plan route", () => {
+    setPath("/plan");
+    render(<App />);
+    expect(screen.getByTestId("workout-result-page")).toBeInTheDocument();
   });
 });

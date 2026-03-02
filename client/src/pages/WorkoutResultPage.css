@@ -1,0 +1,189 @@
+.plan-result-page .plan-result-content {
+  width: min(1440px, calc(100vw - (var(--home-shell-gutter) * 2)));
+  margin: 0 auto;
+}
+
+.plan-result-page .plan-result-content.is-horizontal-layout {
+  width: min(1940px, calc(100vw - var(--home-shell-gutter)));
+}
+
+.plan-result-panel {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+}
+
+.plan-result-empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.plan-result-table-controls {
+  display: inline-flex;
+  justify-self: end;
+  margin-left: auto;
+  gap: 8px;
+  width: fit-content;
+}
+
+.plan-result-table-controls .ghost {
+  min-width: 0;
+  width: auto;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.74);
+  white-space: nowrap;
+  transition:
+    color 200ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.plan-result-table-controls .ghost:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.plan-result-table-controls .ghost.active {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.22);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.22);
+}
+
+.plan-result-table-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.38);
+  width: 100%;
+}
+
+.plan-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.plan-result-table-wrap.is-horizontal .plan-result-table-horizontal {
+  min-width: max(100%, calc((var(--plan-day-count, 1) * 170px) + 170px));
+}
+
+.plan-result-table th,
+.plan-result-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 14px 16px;
+  vertical-align: top;
+}
+
+.plan-result-table thead th {
+  text-align: left;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.plan-result-table tbody th {
+  width: clamp(130px, 18%, 220px);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.plan-result-table tbody td ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.plan-result-table:not(.plan-result-table-horizontal) tbody td ul {
+  grid-template-columns: repeat(var(--plan-vertical-line-cols, 1), minmax(0, 1fr));
+  column-gap: 14px;
+}
+
+.plan-result-table-horizontal thead th:first-child,
+.plan-result-table-horizontal tbody th {
+  width: 130px;
+  white-space: nowrap;
+}
+
+.plan-result-table-horizontal tbody td {
+  min-width: clamp(150px, 11vw, 210px);
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.plan-result-table tbody tr:last-child th,
+.plan-result-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.plan-result-notes {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.plan-result-notes h3 {
+  margin: 0 0 8px;
+}
+
+.plan-result-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.plan-result-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .plan-result-page .plan-result-content {
+    width: 100%;
+  }
+
+  .plan-result-panel {
+    padding: 16px;
+  }
+
+  .plan-result-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .plan-result-table-controls {
+    justify-self: end;
+  }
+
+  .plan-result-table-wrap.is-horizontal .plan-result-table-horizontal {
+    min-width: max(860px, calc((var(--plan-day-count, 1) * 140px) + 130px));
+  }
+
+  .plan-result-table:not(.plan-result-table-horizontal) tbody td ul {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+
+  .plan-result-table-horizontal tbody td {
+    min-width: 180px;
+  }
+}

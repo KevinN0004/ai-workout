@@ -561,44 +561,62 @@
 
 .dashboard-toast {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
   z-index: 90;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 240px;
-  max-width: min(420px, calc(100vw - 24px));
+  gap: 8px;
+  width: min(420px, calc(100vw - 24px));
   border-radius: 12px;
   border: 1px solid var(--dash-card-border-strong);
-  padding: 10px 12px;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.6);
+  background: var(--dash-card-bg-soft);
+  color: var(--dash-text);
+  padding: 8px 10px;
+  box-shadow: var(--dash-panel-shadow);
 }
 
 .dashboard-toast-message {
+  flex: 1;
   min-width: 0;
+  font-size: 0.94rem;
+  line-height: 1.35;
 }
 
 .dashboard-toast-success {
-  background: rgba(23, 78, 45, 0.94);
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 62%),
+    var(--dash-card-bg-soft);
 }
 
 .dashboard-toast-error {
-  background: rgba(106, 28, 35, 0.94);
+  background:
+    linear-gradient(140deg, rgba(255, 122, 122, 0.2), rgba(255, 255, 255, 0) 62%),
+    var(--dash-card-bg-soft);
+  border-color: #956565;
 }
 
-.dashboard-toast-close {
-  margin-left: auto;
-  min-width: 28px;
-  height: 28px;
+.dashboard-page .dashboard-toast .dashboard-toast-action,
+.dashboard-page .dashboard-toast .dashboard-toast-close {
+  flex-shrink: 0;
+  min-height: 32px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  line-height: 1;
+}
+
+.dashboard-page .dashboard-toast .dashboard-toast-action {
+  padding: 6px 12px;
+}
+
+.dashboard-page .dashboard-toast .dashboard-toast-close {
+  width: 32px;
+  min-width: 32px;
   padding: 0;
-  border-radius: 8px;
-}
-
-.dashboard-toast-action {
-  min-height: 28px;
-  padding: 4px 10px;
-  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 1rem;
 }
 
 .dashboard-glance-updated {
@@ -1125,10 +1143,10 @@
   }
 
   .dashboard-toast {
-    left: 12px;
-    right: 12px;
+    left: 50%;
+    right: auto;
     bottom: 84px;
-    max-width: none;
+    width: min(420px, calc(100vw - 24px));
   }
 
   .dashboard-bottom-nav {
