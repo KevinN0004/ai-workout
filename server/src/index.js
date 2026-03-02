@@ -6,15 +6,23 @@ import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";
 import rateLimit from "express-rate-limit";
+import pino from "pino";
 import { createClient } from "redis";
 import { z } from "zod";
 import { connectDatabase } from "./db.js";
+import MealLog from "./models/MealLog.js";
+import ProgressMetric from "./models/ProgressMetric.js";
 import User from "./models/User.js";
+import WorkoutSession from "./models/WorkoutSession.js";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+const serverBootAtMs = Date.now();
+
+const toShortText = (value, maxLen = 160) =>
+  typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
 const parseCsvEnv = (value) =>
   String(value || "")
@@ -35,10 +43,53 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "X-CSRF-Token"]
 };
+const logLevel = toShortText(process.env.LOG_LEVEL || "info", 20).toLowerCase() || "info";
+const logger = pino({
+  level: logLevel,
+  base: undefined,
+  timestamp: pino.stdTimeFunctions.isoTime
+});
+const metrics = {
+  requestsTotal: 0,
+  authFailures: 0,
+  rateLimited: 0,
+  externalApiFailures: {
+    openMeteo: 0,
+    openAq: 0,
+    wger: 0,
+    mealDb: 0
+  },
+  externalApiRetries: {
+    openMeteo: 0,
+    openAq: 0,
+    wger: 0,
+    mealDb: 0
+  }
+};
 
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
+
+app.use((req, res, next) => {
+  const incomingId = toShortText(req.headers["x-request-id"], 128);
+  const requestId = incomingId || crypto.randomUUID();
+  const startedAt = Date.now();
+  req.requestId = requestId;
+  req.log = logger.child({ requestId });
+  res.setHeader("X-Request-Id", requestId);
+  metrics.requestsTotal += 1;
+  res.on("finish", () => {
+    req.log.info({
+      event: "http_request",
+      method: req.method,
+      path: req.originalUrl || req.url,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt
+    });
+  });
+  next();
+});
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
@@ -51,6 +102,8 @@ const csrfHeaderName = "x-csrf-token";
 const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 let redisClient = null;
 let redisSessionsEnabled = false;
+let redisConfigured = false;
+let redisLastError = "";
 const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
@@ -72,6 +125,19 @@ const generateRateLimitWindowMs = toPositiveInt(
   10 * 60 * 1000
 );
 const generateRateLimitMax = toPositiveInt(process.env.GENERATE_RATE_LIMIT_MAX, 20);
+const dashboardCollectionDefaultLimit = toPositiveInt(
+  process.env.DASHBOARD_COLLECTION_DEFAULT_LIMIT,
+  50
+);
+const dashboardCollectionMaxLimit = toPositiveInt(
+  process.env.DASHBOARD_COLLECTION_MAX_LIMIT,
+  200
+);
+const externalApiRetries = toPositiveInt(process.env.EXTERNAL_API_RETRIES, 2);
+const externalApiRetryBaseDelayMs = toPositiveInt(
+  process.env.EXTERNAL_API_RETRY_BASE_DELAY_MS,
+  250
+);
 const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
@@ -529,110 +595,155 @@ const buildWorkoutRecommendation = (current = {}) => {
   };
 };
 
+const delayMs = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const isRetriableExternalError = (err) => {
+  const status = Number(err?.status);
+  if (err?.name === "AbortError") return true;
+  if (!Number.isInteger(status)) return true;
+  return status >= 500;
+};
+
+const runExternalRequestWithRetry = async (serviceName, requestFn) => {
+  let attempt = 0;
+  let lastError = null;
+  while (attempt <= externalApiRetries) {
+    try {
+      return await requestFn();
+    } catch (err) {
+      lastError = err;
+      const canRetry = attempt < externalApiRetries && isRetriableExternalError(err);
+      if (!canRetry) break;
+      metrics.externalApiRetries[serviceName] =
+        (metrics.externalApiRetries[serviceName] || 0) + 1;
+      const waitTime = externalApiRetryBaseDelayMs * 2 ** attempt;
+      logger.warn({
+        event: "external_api_retry",
+        service: serviceName,
+        attempt: attempt + 1,
+        waitTimeMs: waitTime,
+        status: Number.isInteger(err?.status) ? err.status : null,
+        message: toShortText(err?.message, 220)
+      });
+      await delayMs(waitTime);
+      attempt += 1;
+    }
+  }
+  metrics.externalApiFailures[serviceName] = (metrics.externalApiFailures[serviceName] || 0) + 1;
+  throw lastError || new Error("External request failed.");
+};
+
 const fetchOpenMeteo = async (query) => {
-  if (typeof fetch !== "function") {
-    const err = new Error("This Node runtime does not support fetch.");
-    err.status = 500;
-    throw err;
-  }
-
-  const url = new URL(openMeteoBaseUrl);
-  for (const [key, value] of Object.entries(query || {})) {
-    if (value === undefined || value === null || value === "") continue;
-    url.searchParams.set(key, String(value));
-  }
-  url.searchParams.set("timezone", "auto");
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
-      err.status = response.status >= 500 ? 502 : response.status;
+  return runExternalRequestWithRetry("openMeteo", async () => {
+    if (typeof fetch !== "function") {
+      const err = new Error("This Node runtime does not support fetch.");
+      err.status = 500;
       throw err;
     }
-    return data;
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      const timeoutErr = new Error("Open-Meteo request timed out.");
-      timeoutErr.status = 504;
-      throw timeoutErr;
+
+    const url = new URL(openMeteoBaseUrl);
+    for (const [key, value] of Object.entries(query || {})) {
+      if (value === undefined || value === null || value === "") continue;
+      url.searchParams.set(key, String(value));
     }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+    url.searchParams.set("timezone", "auto");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
+        err.status = response.status >= 500 ? 502 : response.status;
+        throw err;
+      }
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const timeoutErr = new Error("Open-Meteo request timed out.");
+        timeoutErr.status = 504;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 };
 
 const openAqRequest = async (endpoint, query = {}) => {
-  if (!openAqApiKey) {
-    const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
-    err.status = 503;
-    throw err;
-  }
-  if (typeof fetch !== "function") {
-    const err = new Error("This Node runtime does not support fetch.");
-    err.status = 500;
-    throw err;
-  }
-
-  const base = openAqBaseUrl.replace(/\/+$/, "");
-  const path = String(endpoint || "").replace(/^\/+/, "");
-  const url = new URL(`${base}/${path}`);
-  for (const [key, value] of Object.entries(query || {})) {
-    if (value === undefined || value === null || value === "") continue;
-    url.searchParams.set(key, String(value));
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "X-API-Key": openAqApiKey
-      },
-      signal: controller.signal
-    });
-    const rawBody = await response.text();
-    let data = {};
-    try {
-      data = rawBody ? JSON.parse(rawBody) : {};
-    } catch {
-      data = rawBody;
-    }
-    if (!response.ok) {
-      const stringBody = cleanText(typeof data === "string" ? data : "", 220);
-      const firstError =
-        Array.isArray(data) && data.length
-          ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
-          : "";
-      const err = new Error(
-        cleanText(
-          firstError ||
-            (typeof data === "object" && data
-              ? data?.message || data?.detail || data?.error
-              : "") ||
-            stringBody ||
-            "OpenAQ request failed.",
-          220
-        )
-      );
-      err.status = response.status >= 500 ? 502 : response.status;
+  return runExternalRequestWithRetry("openAq", async () => {
+    if (!openAqApiKey) {
+      const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
+      err.status = 503;
       throw err;
     }
-    return data;
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      const timeoutErr = new Error("OpenAQ request timed out.");
-      timeoutErr.status = 504;
-      throw timeoutErr;
+    if (typeof fetch !== "function") {
+      const err = new Error("This Node runtime does not support fetch.");
+      err.status = 500;
+      throw err;
     }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+
+    const base = openAqBaseUrl.replace(/\/+$/, "");
+    const path = String(endpoint || "").replace(/^\/+/, "");
+    const url = new URL(`${base}/${path}`);
+    for (const [key, value] of Object.entries(query || {})) {
+      if (value === undefined || value === null || value === "") continue;
+      url.searchParams.set(key, String(value));
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "X-API-Key": openAqApiKey
+        },
+        signal: controller.signal
+      });
+      const rawBody = await response.text();
+      let data = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        data = rawBody;
+      }
+      if (!response.ok) {
+        const stringBody = cleanText(typeof data === "string" ? data : "", 220);
+        const firstError =
+          Array.isArray(data) && data.length
+            ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
+            : "";
+        const err = new Error(
+          cleanText(
+            firstError ||
+              (typeof data === "object" && data
+                ? data?.message || data?.detail || data?.error
+                : "") ||
+              stringBody ||
+              "OpenAQ request failed.",
+            220
+          )
+        );
+        err.status = response.status >= 500 ? 502 : response.status;
+        throw err;
+      }
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const timeoutErr = new Error("OpenAQ request timed out.");
+        timeoutErr.status = 504;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 };
 
 const openAqParameterLabel = (code = "") => {
@@ -811,108 +922,112 @@ const parseMultiNumberQuery = (input, min, max, maxItems = 8) => {
 };
 
 const wgerRequest = async (endpoint, options = {}) => {
-  if (typeof fetch !== "function") {
-    const err = new Error("This Node runtime does not support fetch.");
-    err.status = 500;
-    throw err;
-  }
-
-  const { query = {} } = options;
-  const base = wgerBaseUrl.replace(/\/+$/, "");
-  const path = String(endpoint || "").replace(/^\/+/, "");
-  const url = new URL(`${base}/${path}`);
-
-  for (const [key, value] of Object.entries(query || {})) {
-    if (value === undefined || value === null || value === "") continue;
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item === undefined || item === null || item === "") continue;
-        url.searchParams.append(key, String(item));
-      }
-      continue;
-    }
-    url.searchParams.set(key, String(value));
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
-  try {
-    const response = await fetch(url, {
-      headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
-      signal: controller.signal
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = cleanText(
-        data?.detail || data?.reason || data?.message || "Wger request failed.",
-        220
-      );
-      const err = new Error(message);
-      err.status = response.status >= 500 ? 502 : response.status;
+  return runExternalRequestWithRetry("wger", async () => {
+    if (typeof fetch !== "function") {
+      const err = new Error("This Node runtime does not support fetch.");
+      err.status = 500;
       throw err;
     }
-    return data;
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      const timeoutErr = new Error("Wger request timed out.");
-      timeoutErr.status = 504;
-      throw timeoutErr;
+
+    const { query = {} } = options;
+    const base = wgerBaseUrl.replace(/\/+$/, "");
+    const path = String(endpoint || "").replace(/^\/+/, "");
+    const url = new URL(`${base}/${path}`);
+
+    for (const [key, value] of Object.entries(query || {})) {
+      if (value === undefined || value === null || value === "") continue;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item === undefined || item === null || item === "") continue;
+          url.searchParams.append(key, String(item));
+        }
+        continue;
+      }
+      url.searchParams.set(key, String(value));
     }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
+    try {
+      const response = await fetch(url, {
+        headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = cleanText(
+          data?.detail || data?.reason || data?.message || "Wger request failed.",
+          220
+        );
+        const err = new Error(message);
+        err.status = response.status >= 500 ? 502 : response.status;
+        throw err;
+      }
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const timeoutErr = new Error("Wger request timed out.");
+        timeoutErr.status = 504;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 };
 
 const mealDbRequest = async (endpoint, query = {}) => {
-  if (typeof fetch !== "function") {
-    const err = new Error("This Node runtime does not support fetch.");
-    err.status = 500;
-    throw err;
-  }
-
-  const base = mealDbBaseUrl.replace(/\/+$/, "");
-  const path = String(endpoint || "").replace(/^\/+/, "");
-  const url = new URL(`${base}/${path}`);
-  for (const [key, value] of Object.entries(query || {})) {
-    if (value === undefined || value === null || value === "") continue;
-    url.searchParams.set(key, String(value));
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    const rawBody = await response.text();
-    let data = {};
-    try {
-      data = rawBody ? JSON.parse(rawBody) : {};
-    } catch {
-      data = {};
-    }
-
-    if (!response.ok) {
-      const err = new Error(
-        cleanText(
-          data?.message || data?.detail || data?.error || "MealDB request failed.",
-          220
-        )
-      );
-      err.status = response.status >= 500 ? 502 : response.status;
+  return runExternalRequestWithRetry("mealDb", async () => {
+    if (typeof fetch !== "function") {
+      const err = new Error("This Node runtime does not support fetch.");
+      err.status = 500;
       throw err;
     }
 
-    return data;
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      const timeoutErr = new Error("MealDB request timed out.");
-      timeoutErr.status = 504;
-      throw timeoutErr;
+    const base = mealDbBaseUrl.replace(/\/+$/, "");
+    const path = String(endpoint || "").replace(/^\/+/, "");
+    const url = new URL(`${base}/${path}`);
+    for (const [key, value] of Object.entries(query || {})) {
+      if (value === undefined || value === null || value === "") continue;
+      url.searchParams.set(key, String(value));
     }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      const rawBody = await response.text();
+      let data = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        const err = new Error(
+          cleanText(
+            data?.message || data?.detail || data?.error || "MealDB request failed.",
+            220
+          )
+        );
+        err.status = response.status >= 500 ? 502 : response.status;
+        throw err;
+      }
+
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const timeoutErr = new Error("MealDB request timed out.");
+        timeoutErr.status = 504;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 };
 
 const mapMealDbIngredients = (meal = {}) => {
@@ -1190,9 +1305,11 @@ const initSessionStore = async () => {
   const redisPassword = cleanText(process.env.REDIS_PASSWORD || "", 500);
   const redisTls = parseEnvBoolean(process.env.REDIS_TLS, false);
   const hasSocketConfig = Boolean(redisHost && redisPort !== null);
+  redisConfigured = Boolean(redisUrl || hasSocketConfig);
+  redisLastError = "";
 
-  if (!redisUrl && !hasSocketConfig) {
-    console.warn("Redis config not set. Using in-memory sessions.");
+  if (!redisConfigured) {
+    logger.warn({ event: "redis_config_missing" }, "Redis config not set. Using in-memory sessions.");
     redisSessionsEnabled = false;
     return;
   }
@@ -1211,16 +1328,25 @@ const initSessionStore = async () => {
       : createClient({ url: redisUrl });
 
     client.on("error", (err) => {
-      console.error("Redis session store error:", err?.message || err);
+      redisLastError = cleanText(err?.message || String(err), 260);
+      logger.error(
+        { event: "redis_session_store_error", error: redisLastError },
+        "Redis session store error."
+      );
     });
     await client.connect();
     redisClient = client;
     redisSessionsEnabled = true;
-    console.log("Redis session store connected.");
+    redisLastError = "";
+    logger.info({ event: "redis_connected" }, "Redis session store connected.");
   } catch (err) {
-    console.error(
-      "Failed to connect Redis session store. Falling back to in-memory sessions:",
-      err?.message || err
+    redisLastError = cleanText(err?.message || String(err), 260);
+    logger.error(
+      {
+        event: "redis_connect_failed",
+        error: redisLastError
+      },
+      "Failed to connect Redis session store. Falling back to in-memory sessions."
     );
     redisClient = null;
     redisSessionsEnabled = false;
@@ -1265,9 +1391,14 @@ const createSession = async (userId) => {
       await redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
         EX: Math.floor(SESSION_TTL_MS / 1000)
       });
+      redisLastError = "";
       return token;
     } catch (err) {
-      console.error("Redis create session failed:", err?.message || err);
+      redisLastError = cleanText(err?.message || String(err), 260);
+      logger.error(
+        { event: "redis_session_create_failed", error: redisLastError },
+        "Redis create session failed."
+      );
     }
   }
   pruneExpiredInMemorySessions();
@@ -1286,9 +1417,14 @@ const getSessionByToken = async (token) => {
         await redisClient.del(sessionRedisKey(token));
         return null;
       }
+      redisLastError = "";
       return parsed;
     } catch (err) {
-      console.error("Redis get session failed:", err?.message || err);
+      redisLastError = cleanText(err?.message || String(err), 260);
+      logger.error(
+        { event: "redis_session_get_failed", error: redisLastError },
+        "Redis get session failed."
+      );
       try {
         await redisClient.del(sessionRedisKey(token));
       } catch {
@@ -1306,8 +1442,13 @@ const deleteSession = async (token) => {
   if (redisSessionsEnabled && redisClient) {
     try {
       await redisClient.del(sessionRedisKey(token));
+      redisLastError = "";
     } catch (err) {
-      console.error("Redis delete session failed:", err?.message || err);
+      redisLastError = cleanText(err?.message || String(err), 260);
+      logger.error(
+        { event: "redis_session_delete_failed", error: redisLastError },
+        "Redis delete session failed."
+      );
     }
     return;
   }
@@ -1335,6 +1476,167 @@ const requireAuth = async (req, res, next) => {
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });
   }
+};
+
+const parseDashboardPagination = (query = {}, defaultLimit = dashboardCollectionDefaultLimit) => {
+  const parsedLimit =
+    toNullableNumber(query?.limit, 1, dashboardCollectionMaxLimit) ?? defaultLimit;
+  const parsedOffset = toNullableNumber(query?.offset, 0, 100000) ?? 0;
+  return {
+    limit: Math.trunc(parsedLimit),
+    offset: Math.trunc(parsedOffset)
+  };
+};
+
+const sliceLegacyItems = (items, limit, offset) => {
+  if (!Array.isArray(items) || !items.length) return [];
+  return items.slice(offset, offset + limit);
+};
+
+const stripUserIdField = (doc = {}) => {
+  if (!doc || typeof doc !== "object") return doc;
+  const { userId, ...rest } = doc;
+  return rest;
+};
+
+const loadCollectionPageWithFallback = async ({
+  model,
+  userId,
+  sortField,
+  limit,
+  offset,
+  legacyItems
+}) => {
+  const [items, total] = await Promise.all([
+    model
+      .find({ userId })
+      .sort({ [sortField]: -1, _id: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean(),
+    model.countDocuments({ userId })
+  ]);
+
+  if (total > 0) {
+    return {
+      items: items.map(stripUserIdField),
+      total,
+      limit,
+      offset,
+      source: "collection"
+    };
+  }
+
+  const fallback = sliceLegacyItems(legacyItems, limit, offset);
+  if (!fallback.length) {
+    return {
+      items: [],
+      total: 0,
+      limit,
+      offset,
+      source: "collection"
+    };
+  }
+
+  return {
+    items: fallback,
+    total: Array.isArray(legacyItems) ? legacyItems.length : 0,
+    limit,
+    offset,
+    source: "legacy"
+  };
+};
+
+const getDashboardCollections = async (user, pagination = {}) => {
+  const userId = cleanText(user?.id, 120);
+  if (!userId) {
+    return {
+      workoutSessions: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
+      mealLogs: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
+      progressMetrics: { items: [], total: 0, limit: 0, offset: 0, source: "collection" }
+    };
+  }
+
+  const workoutPagination = {
+    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
+    ...(pagination.workoutSessions || {})
+  };
+  const mealPagination = {
+    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
+    ...(pagination.mealLogs || {})
+  };
+  const metricPagination = {
+    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
+    ...(pagination.progressMetrics || {})
+  };
+
+  const legacyDashboard = buildDashboard(user?.dashboard);
+  const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
+    loadCollectionPageWithFallback({
+      model: WorkoutSession,
+      userId,
+      sortField: "createdAt",
+      limit: workoutPagination.limit,
+      offset: workoutPagination.offset,
+      legacyItems: legacyDashboard.workoutSessions
+    }),
+    loadCollectionPageWithFallback({
+      model: MealLog,
+      userId,
+      sortField: "loggedAt",
+      limit: mealPagination.limit,
+      offset: mealPagination.offset,
+      legacyItems: legacyDashboard.mealLogs
+    }),
+    loadCollectionPageWithFallback({
+      model: ProgressMetric,
+      userId,
+      sortField: "loggedAt",
+      limit: metricPagination.limit,
+      offset: metricPagination.offset,
+      legacyItems: legacyDashboard.progressMetrics
+    })
+  ]);
+
+  return {
+    workoutSessions,
+    mealLogs,
+    progressMetrics
+  };
+};
+
+const buildDashboardResponse = async (user, pagination = {}) => {
+  const baseDashboard = buildDashboard(user?.dashboard);
+  const collections = await getDashboardCollections(user, pagination);
+
+  return {
+    dashboard: {
+      ...baseDashboard,
+      workoutSessions: collections.workoutSessions.items,
+      mealLogs: collections.mealLogs.items,
+      progressMetrics: collections.progressMetrics.items
+    },
+    pagination: {
+      workoutSessions: {
+        total: collections.workoutSessions.total,
+        limit: collections.workoutSessions.limit,
+        offset: collections.workoutSessions.offset,
+        source: collections.workoutSessions.source
+      },
+      mealLogs: {
+        total: collections.mealLogs.total,
+        limit: collections.mealLogs.limit,
+        offset: collections.mealLogs.offset,
+        source: collections.mealLogs.source
+      },
+      progressMetrics: {
+        total: collections.progressMetrics.total,
+        limit: collections.progressMetrics.limit,
+        offset: collections.progressMetrics.offset,
+        source: collections.progressMetrics.source
+      }
+    }
+  };
 };
 
 const tokensMatch = (a, b) => {
@@ -1367,6 +1669,14 @@ const requireCsrfToken = (req, res, next) => {
   const headerToken = cleanText(req.headers[csrfHeaderName], 128);
 
   if (!cookieToken || !headerToken || !tokensMatch(cookieToken, headerToken)) {
+    req.log?.warn(
+      {
+        event: "csrf_check_failed",
+        method,
+        path: req.originalUrl || req.url
+      },
+      "CSRF validation failed."
+    );
     return res.status(403).json({ error: "Invalid or missing CSRF token." });
   }
   return next();
@@ -1377,7 +1687,19 @@ const apiLimiter = rateLimit({
   max: apiRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests. Please try again shortly." }
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "api_global",
+        method: req.method,
+        path: req.originalUrl || req.url
+      },
+      "Request rate limited."
+    );
+    res.status(429).json({ error: "Too many requests. Please try again shortly." });
+  }
 });
 
 const authLimiter = rateLimit({
@@ -1385,7 +1707,19 @@ const authLimiter = rateLimit({
   max: authRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many sign-in attempts. Please try again later." }
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "auth",
+        method: req.method,
+        path: req.originalUrl || req.url
+      },
+      "Auth request rate limited."
+    );
+    res.status(429).json({ error: "Too many sign-in attempts. Please try again later." });
+  }
 });
 
 const generateLimiter = rateLimit({
@@ -1393,7 +1727,19 @@ const generateLimiter = rateLimit({
   max: generateRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Workout generation rate limit reached. Please wait and retry." }
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "generate",
+        method: req.method,
+        path: req.originalUrl || req.url
+      },
+      "Generate request rate limited."
+    );
+    res.status(429).json({ error: "Workout generation rate limit reached. Please wait and retry." });
+  }
 });
 
 app.use("/api", apiLimiter);
@@ -1403,8 +1749,61 @@ app.use("/api/generate", generateLimiter);
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
 
+const isUpstreamFailureStatus = (status) =>
+  Number.isInteger(status) && [500, 502, 503, 504].includes(status);
+const mongoReadyStateToText = (state) => {
+  if (state === 0) return "disconnected";
+  if (state === 1) return "connected";
+  if (state === 2) return "connecting";
+  if (state === 3) return "disconnecting";
+  return "unknown";
+};
+
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    requestId: req.requestId || "",
+    uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000)
+  });
+});
+
+app.get("/api/ready", (req, res) => {
+  const mongoStateCode = Number(User?.db?.readyState ?? 0);
+  const mongoConnected = mongoStateCode === 1;
+  const redisConnected = redisSessionsEnabled && Boolean(redisClient?.isOpen);
+  const ready = mongoConnected && (!redisConfigured || redisConnected);
+  const payload = {
+    status: ready ? "ready" : "not_ready",
+    requestId: req.requestId || "",
+    dependencies: {
+      mongodb: {
+        connected: mongoConnected,
+        stateCode: mongoStateCode,
+        state: mongoReadyStateToText(mongoStateCode)
+      },
+      redis: {
+        configured: redisConfigured,
+        connected: redisConnected,
+        mode: redisConnected ? "redis" : "in_memory_fallback",
+        lastError: redisLastError || ""
+      }
+    },
+    uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000)
+  };
+  if (ready) return res.json(payload);
+  return res.status(503).json(payload);
+});
+
+app.get("/api/metrics", (req, res) => {
+  res.json({
+    requestId: req.requestId || "",
+    uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000),
+    requestsTotal: metrics.requestsTotal,
+    authFailures: metrics.authFailures,
+    rateLimited: metrics.rateLimited,
+    externalApiFailures: { ...metrics.externalApiFailures },
+    externalApiRetries: { ...metrics.externalApiRetries }
+  });
 });
 
 app.get("/api/csrf-token", (req, res) => {
@@ -1447,7 +1846,30 @@ app.get("/api/weather/current", async (req, res) => {
     });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      return res.json({
+        fallback: true,
+        service: "open-meteo",
+        error: err?.message || "Weather service unavailable.",
+        location: {
+          latitude: toNullableNumber(req.query.latitude, -90, 90),
+          longitude: toNullableNumber(req.query.longitude, -180, 180),
+          timezone: ""
+        },
+        current: {
+          time: "",
+          temperatureC: null,
+          apparentTemperatureC: null,
+          precipitationMm: null,
+          windSpeedKmh: null,
+          humidityPct: null,
+          isDay: null,
+          weatherCode: null,
+          weatherText: "Unknown"
+        }
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1504,7 +1926,37 @@ app.get("/api/weather/recommendation", async (req, res) => {
     });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      return res.json({
+        fallback: true,
+        service: "open-meteo",
+        error: err?.message || "Weather recommendation unavailable.",
+        location: {
+          latitude: toNullableNumber(req.query.latitude, -90, 90),
+          longitude: toNullableNumber(req.query.longitude, -180, 180),
+          timezone: ""
+        },
+        current: {
+          time: "",
+          temperatureC: null,
+          apparentTemperatureC: null,
+          precipitationMm: null,
+          windSpeedKmh: null,
+          humidityPct: null,
+          isDay: null,
+          weatherCode: null,
+          weatherText: "Unknown"
+        },
+        recommendation: {
+          workoutType: "indoor",
+          summary: "Weather service is unavailable. Indoor session is recommended.",
+          reasons: ["Weather data unavailable."],
+          weatherText: "Unknown"
+        },
+        daily: []
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1590,7 +2042,30 @@ app.get("/api/air-quality/current", async (req, res) => {
     });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      return res.json({
+        fallback: true,
+        service: "openaq",
+        error: err?.message || "Air quality service unavailable.",
+        location: {
+          id: null,
+          name: "",
+          city: "",
+          country: "",
+          latitude: toNullableNumber(req.query.latitude, -90, 90),
+          longitude: toNullableNumber(req.query.longitude, -180, 180)
+        },
+        summary: {
+          aqiUs: null,
+          pm25: null,
+          level: "Unknown",
+          workoutType: "indoor",
+          guidance: "Air quality data is unavailable. Prefer indoor training."
+        },
+        pollutants: []
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1624,7 +2099,17 @@ app.get("/api/wger/meta", async (req, res) => {
     res.json({ categories, muscles, equipment });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      return res.json({
+        fallback: true,
+        service: "wger",
+        error: err?.message || "Exercise metadata unavailable.",
+        categories: [],
+        muscles: [],
+        equipment: []
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1676,7 +2161,24 @@ app.get("/api/wger/exercises", async (req, res) => {
     });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      const limit = toNullableNumber(req.query.limit, 1, 80) ?? 15;
+      const offset = toNullableNumber(req.query.offset, 0, 5000) ?? 0;
+      const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
+      return res.json({
+        fallback: true,
+        service: "wger",
+        error: err?.message || "Exercise search unavailable.",
+        count: 0,
+        next: "",
+        previous: "",
+        limit,
+        offset,
+        language,
+        exercises: []
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1706,7 +2208,15 @@ app.get("/api/wger/exercises/:id", async (req, res) => {
     res.json({ exercise: mapWgerExercise(source, language) });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      return res.json({
+        fallback: true,
+        service: "wger",
+        error: err?.message || "Exercise details unavailable.",
+        exercise: null
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1727,7 +2237,18 @@ app.get("/api/mealdb/search", async (req, res) => {
     res.json({ query, count: meals.length, meals });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
-    res.status(status).json({ error: err?.message || "Server error." });
+    if (isUpstreamFailureStatus(status)) {
+      const query = cleanText(req.query.query ?? req.query.q, 100);
+      return res.json({
+        fallback: true,
+        service: "mealdb",
+        error: err?.message || "Meal search unavailable.",
+        query,
+        count: 0,
+        meals: []
+      });
+    }
+    return res.status(status).json({ error: err?.message || "Server error." });
   }
 });
 
@@ -1829,18 +2350,26 @@ app.post("/api/auth/login", async (req, res) => {
     const normalizedEmail = cleanText(email, 254).toLowerCase();
     const user = await findUserByEmail(normalizedEmail);
     if (!user) {
+      metrics.authFailures += 1;
       const dummyPasswordRecord = await getDummyPasswordRecord();
       await verifyPassword(password, dummyPasswordRecord);
       return res.status(401).json({ error: "Invalid credentials." });
     }
     if (!(await verifyPassword(password, user))) {
+      metrics.authFailures += 1;
       return res.status(401).json({ error: "Invalid credentials." });
     }
     if (shouldUpgradePasswordToArgon2id(user)) {
       try {
         await upgradeUserPasswordToArgon2id(user.id, password);
       } catch (upgradeErr) {
-        console.error("Password hash upgrade failed:", upgradeErr?.message || upgradeErr);
+        req.log?.error(
+          {
+            event: "password_upgrade_failed",
+            error: toShortText(upgradeErr?.message || String(upgradeErr), 240)
+          },
+          "Password hash upgrade failed."
+        );
       }
     }
     const token = await createSession(user.id);
@@ -1872,411 +2401,497 @@ app.post("/api/auth/logout", async (req, res) => {
 });
 
 app.get("/api/dashboard", requireAuth, async (req, res) => {
-  const user = req.user;
-  if (!user.dashboard) {
-    return res.json({ dashboard: defaultDashboard() });
+  try {
+    const response = await buildDashboardResponse(req.user);
+    return res.json(response);
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
   }
-  res.json({ dashboard: buildDashboard(user.dashboard) });
+});
+
+app.get("/api/dashboard/workout-sessions", requireAuth, async (req, res) => {
+  try {
+    const pagination = parseDashboardPagination(req.query);
+    const collections = await getDashboardCollections(req.user, {
+      workoutSessions: pagination
+    });
+    return res.json({
+      workoutSessions: collections.workoutSessions.items,
+      pagination: {
+        total: collections.workoutSessions.total,
+        limit: collections.workoutSessions.limit,
+        offset: collections.workoutSessions.offset,
+        source: collections.workoutSessions.source
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
+  try {
+    const pagination = parseDashboardPagination(req.query);
+    const collections = await getDashboardCollections(req.user, {
+      mealLogs: pagination
+    });
+    return res.json({
+      mealLogs: collections.mealLogs.items,
+      pagination: {
+        total: collections.mealLogs.total,
+        limit: collections.mealLogs.limit,
+        offset: collections.mealLogs.offset,
+        source: collections.mealLogs.source
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.get("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
+  try {
+    const pagination = parseDashboardPagination(req.query);
+    const collections = await getDashboardCollections(req.user, {
+      progressMetrics: pagination
+    });
+    return res.json({
+      progressMetrics: collections.progressMetrics.items,
+      pagination: {
+        total: collections.progressMetrics.total,
+        limit: collections.progressMetrics.limit,
+        offset: collections.progressMetrics.offset,
+        source: collections.progressMetrics.source
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.post(["/api/dashboard/workouts", "/api/dashboard/workout-sessions"], requireAuth, async (req, res) => {
-  const body = validateBody(req, res, workoutSessionBodySchema);
-  if (!body) return;
+  try {
+    const body = validateBody(req, res, workoutSessionBodySchema);
+    if (!body) return;
 
-  const session = buildWorkoutSessionEntry(body);
-  if (!session.date || session.duration === null) {
-    return res.status(400).json({ error: "Date and duration are required." });
-  }
+    const session = buildWorkoutSessionEntry(body);
+    if (!session.date || session.duration === null) {
+      return res.status(400).json({ error: "Date and duration are required." });
+    }
 
-  const workoutSummary = toWorkoutSummaryEntry(session);
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    {
-      $pull: {
-        "dashboard.workouts": {
-          id: workoutSummary.id
-        }
-      },
-      $push: {
-        "dashboard.workoutSessions": {
-          $each: [session],
-          $position: 0,
-          $slice: 500
-        },
-        "dashboard.workouts": {
-          $each: [workoutSummary],
-          $position: 0,
-          $slice: 500
-        }
-      }
-    },
-    { new: true }
-  );
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({
-    dashboard: buildDashboard(updated?.dashboard),
-    workoutSession: updated.dashboard?.workoutSessions?.[0] || session
-  });
-});
-
-app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
-  const body = validateBody(req, res, caloriesBodySchema);
-  if (!body) return;
-
-  const { date, calories } = body;
-  const parsedCalories = toNullableNumber(calories, 800, 10000);
-  if (!cleanText(date, 20) || parsedCalories === null) {
-    return res.status(400).json({ error: "Date and calories are required." });
-  }
-
-  const entry = {
-    id: crypto.randomUUID(),
-    date: cleanText(date, 20),
-    calories: parsedCalories,
-    source: "manual",
-    updatedAt: new Date().toISOString()
-  };
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    {
-      $push: {
-        "dashboard.calories": {
-          $each: [entry],
-          $position: 0,
-          $slice: 1000
-        }
-      }
-    },
-    { new: true }
-  );
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({ dashboard: buildDashboard(updated?.dashboard) });
-});
-
-app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
-  const body = validateBody(req, res, goalsBodySchema);
-  if (!body) return;
-
-  const { targetWeight, targetCalories, weeklyWorkouts } = body;
-  const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
-  const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
-  const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
-  const setFields = {};
-  if (parsedTargetWeight !== null) {
-    setFields["dashboard.goals.targetWeight"] = parsedTargetWeight;
-  }
-  if (parsedTargetCalories !== null) {
-    setFields["dashboard.goals.targetCalories"] = parsedTargetCalories;
-  }
-  if (parsedWeeklyWorkouts !== null) {
-    setFields["dashboard.goals.weeklyWorkouts"] = parsedWeeklyWorkouts;
-  }
-
-  let updatedDoc = null;
-  if (Object.keys(setFields).length) {
-    updatedDoc = await User.findOneAndUpdate(
-      { userId: req.user.id },
-      { $set: setFields },
-      { new: true }
-    );
-  } else {
-    updatedDoc = await User.findOne({ userId: req.user.id });
-  }
-
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({ dashboard: buildDashboard(updated?.dashboard) });
-});
-
-app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
-  const body = validateBody(req, res, mealLogBodySchema);
-  if (!body) return;
-
-  const mealLog = buildMealLogEntry(body);
-  if (!mealLog.date || !mealLog.name) {
-    return res.status(400).json({ error: "Date and meal name are required." });
-  }
-  if (
-    mealLog.calories === null &&
-    mealLog.proteinG === null &&
-    mealLog.carbsG === null &&
-    mealLog.fatG === null
-  ) {
-    return res
-      .status(400)
-      .json({ error: "Add calories or at least one macro value for the meal." });
-  }
-
-  const mealLogDate = mealLog.date;
-  const mealLogCaloriesId = `meal-logs-${mealLogDate}`;
-  const mealLogCaloriesUpdatedAt = new Date().toISOString();
-
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    [
+    await WorkoutSession.findOneAndUpdate(
+      { userId: req.user.id, id: session.id },
       {
         $set: {
-          "dashboard.mealLogs": {
-            $slice: [
-              {
-                $concatArrays: [[mealLog], { $ifNull: ["$dashboard.mealLogs", []] }]
-              },
-              800
-            ]
+          userId: req.user.id,
+          ...session
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const workoutSummary = toWorkoutSummaryEntry(session);
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      {
+        $pull: {
+          "dashboard.workouts": {
+            id: workoutSummary.id
+          }
+        },
+        $push: {
+          "dashboard.workouts": {
+            $each: [workoutSummary],
+            $position: 0,
+            $slice: 500
           }
         }
       },
+      { new: true }
+    );
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json({
+      ...response,
+      workoutSession: session
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
+  try {
+    const body = validateBody(req, res, caloriesBodySchema);
+    if (!body) return;
+
+    const { date, calories } = body;
+    const parsedCalories = toNullableNumber(calories, 800, 10000);
+    if (!cleanText(date, 20) || parsedCalories === null) {
+      return res.status(400).json({ error: "Date and calories are required." });
+    }
+
+    const entry = {
+      id: crypto.randomUUID(),
+      date: cleanText(date, 20),
+      calories: parsedCalories,
+      source: "manual",
+      updatedAt: new Date().toISOString()
+    };
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      {
+        $push: {
+          "dashboard.calories": {
+            $each: [entry],
+            $position: 0,
+            $slice: 1000
+          }
+        }
+      },
+      { new: true }
+    );
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json(response);
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
+  try {
+    const body = validateBody(req, res, goalsBodySchema);
+    if (!body) return;
+
+    const { targetWeight, targetCalories, weeklyWorkouts } = body;
+    const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
+    const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
+    const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
+    const setFields = {};
+    if (parsedTargetWeight !== null) {
+      setFields["dashboard.goals.targetWeight"] = parsedTargetWeight;
+    }
+    if (parsedTargetCalories !== null) {
+      setFields["dashboard.goals.targetCalories"] = parsedTargetCalories;
+    }
+    if (parsedWeeklyWorkouts !== null) {
+      setFields["dashboard.goals.weeklyWorkouts"] = parsedWeeklyWorkouts;
+    }
+
+    let updatedDoc = null;
+    if (Object.keys(setFields).length) {
+      updatedDoc = await User.findOneAndUpdate(
+        { userId: req.user.id },
+        { $set: setFields },
+        { new: true }
+      );
+    } else {
+      updatedDoc = await User.findOne({ userId: req.user.id });
+    }
+
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json(response);
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
+});
+
+app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
+  try {
+    const body = validateBody(req, res, mealLogBodySchema);
+    if (!body) return;
+
+    const mealLog = buildMealLogEntry(body);
+    if (!mealLog.date || !mealLog.name) {
+      return res.status(400).json({ error: "Date and meal name are required." });
+    }
+    if (
+      mealLog.calories === null &&
+      mealLog.proteinG === null &&
+      mealLog.carbsG === null &&
+      mealLog.fatG === null
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Add calories or at least one macro value for the meal." });
+    }
+
+    await MealLog.findOneAndUpdate(
+      { userId: req.user.id, id: mealLog.id },
       {
         $set: {
-          "dashboard.calories": {
-            $let: {
-              vars: {
-                currentCalories: { $ifNull: ["$dashboard.calories", []] },
-                updatedMealLogs: "$dashboard.mealLogs"
-              },
-              in: {
-                $let: {
-                  vars: {
-                    hasManualCaloriesForDay: {
-                      $gt: [
-                        {
-                          $size: {
-                            $filter: {
-                              input: "$$currentCalories",
-                              as: "entry",
-                              cond: {
+          userId: req.user.id,
+          ...mealLog
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const mealLogDate = mealLog.date;
+    const mealLogCaloriesId = `meal-logs-${mealLogDate}`;
+    const mealLogCaloriesUpdatedAt = new Date().toISOString();
+    const aggregate = await MealLog.aggregate([
+      { $match: { userId: req.user.id, date: mealLogDate } },
+      {
+        $group: {
+          _id: null,
+          calories: { $sum: { $ifNull: ["$calories", 0] } }
+        }
+      }
+    ]);
+    const dayCalories = Math.round(toFiniteNumber(aggregate?.[0]?.calories) ?? 0);
+
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      [
+        {
+          $set: {
+            "dashboard.calories": {
+              $let: {
+                vars: {
+                  currentCalories: { $ifNull: ["$dashboard.calories", []] }
+                },
+                in: {
+                  $let: {
+                    vars: {
+                      hasManualCaloriesForDay: {
+                        $gt: [
+                          {
+                            $size: {
+                              $filter: {
+                                input: "$$currentCalories",
+                                as: "entry",
+                                cond: {
+                                  $and: [
+                                    {
+                                      $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
+                                    },
+                                    {
+                                      $ne: [
+                                        { $ifNull: ["$$entry.source", "manual"] },
+                                        "meal_logs"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          0
+                        ]
+                      },
+                      caloriesWithoutMealLogSource: {
+                        $filter: {
+                          input: "$$currentCalories",
+                          as: "entry",
+                          cond: {
+                            $not: [
+                              {
                                 $and: [
                                   {
                                     $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
                                   },
                                   {
-                                    $ne: [
-                                      { $ifNull: ["$$entry.source", "manual"] },
-                                      "meal_logs"
-                                    ]
+                                    $eq: [{ $ifNull: ["$$entry.source", ""] }, "meal_logs"]
                                   }
                                 ]
                               }
-                            }
-                          }
-                        },
-                        0
-                      ]
-                    },
-                    caloriesWithoutMealLogSource: {
-                      $filter: {
-                        input: "$$currentCalories",
-                        as: "entry",
-                        cond: {
-                          $not: [
-                            {
-                              $and: [
-                                {
-                                  $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
-                                },
-                                {
-                                  $eq: [{ $ifNull: ["$$entry.source", ""] }, "meal_logs"]
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  },
-                  in: {
-                    $cond: [
-                      "$$hasManualCaloriesForDay",
-                      { $slice: ["$$currentCalories", 1000] },
-                      {
-                        $let: {
-                          vars: {
-                            dayCalories: {
-                              $sum: {
-                                $map: {
-                                  input: {
-                                    $filter: {
-                                      input: "$$updatedMealLogs",
-                                      as: "log",
-                                      cond: {
-                                        $eq: [{ $ifNull: ["$$log.date", ""] }, mealLogDate]
-                                      }
-                                    }
-                                  },
-                                  as: "log",
-                                  in: { $ifNull: ["$$log.calories", 0] }
-                                }
-                              }
-                            }
-                          },
-                          in: {
-                            $slice: [
-                              {
-                                $cond: [
-                                  { $gt: ["$$dayCalories", 0] },
-                                  {
-                                    $concatArrays: [
-                                      [
-                                        {
-                                          id: mealLogCaloriesId,
-                                          date: mealLogDate,
-                                          calories: { $round: ["$$dayCalories", 0] },
-                                          source: "meal_logs",
-                                          updatedAt: mealLogCaloriesUpdatedAt
-                                        }
-                                      ],
-                                      "$$caloriesWithoutMealLogSource"
-                                    ]
-                                  },
-                                  "$$caloriesWithoutMealLogSource"
-                                ]
-                              },
-                              1000
                             ]
                           }
                         }
                       }
-                    ]
+                    },
+                    in: {
+                      $cond: [
+                        "$$hasManualCaloriesForDay",
+                        { $slice: ["$$currentCalories", 1000] },
+                        {
+                          $slice: [
+                            {
+                              $cond: [
+                                { $gt: [dayCalories, 0] },
+                                {
+                                  $concatArrays: [
+                                    [
+                                      {
+                                        id: mealLogCaloriesId,
+                                        date: mealLogDate,
+                                        calories: dayCalories,
+                                        source: "meal_logs",
+                                        updatedAt: mealLogCaloriesUpdatedAt
+                                      }
+                                    ],
+                                    "$$caloriesWithoutMealLogSource"
+                                  ]
+                                },
+                                "$$caloriesWithoutMealLogSource"
+                              ]
+                            },
+                            1000
+                          ]
+                        }
+                      ]
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
-    ],
-    { new: true }
-  );
+      ],
+      { new: true }
+    );
 
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({
-    dashboard: buildDashboard(updated?.dashboard),
-    mealLog: updated.dashboard?.mealLogs?.[0] || mealLog
-  });
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json({
+      ...response,
+      mealLog
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.post("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
-  const body = validateBody(req, res, progressMetricBodySchema);
-  if (!body) return;
+  try {
+    const body = validateBody(req, res, progressMetricBodySchema);
+    if (!body) return;
 
-  const metric = buildProgressMetricEntry(body);
-  if (!metric.date) {
-    return res.status(400).json({ error: "Date is required." });
-  }
-  if (
-    metric.weightLb === null &&
-    metric.bodyFatPct === null &&
-    metric.waistCm === null &&
-    metric.restingHr === null
-  ) {
-    return res
-      .status(400)
-      .json({ error: "Add at least one metric: weight, body fat, waist, or resting heart rate." });
-  }
+    const metric = buildProgressMetricEntry(body);
+    if (!metric.date) {
+      return res.status(400).json({ error: "Date is required." });
+    }
+    if (
+      metric.weightLb === null &&
+      metric.bodyFatPct === null &&
+      metric.waistCm === null &&
+      metric.restingHr === null
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Add at least one metric: weight, body fat, waist, or resting heart rate." });
+    }
 
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    {
-      $push: {
-        "dashboard.progressMetrics": {
-          $each: [metric],
-          $position: 0,
-          $slice: 400
+    await ProgressMetric.findOneAndUpdate(
+      { userId: req.user.id, id: metric.id },
+      {
+        $set: {
+          userId: req.user.id,
+          ...metric
         }
-      }
-    },
-    { new: true }
-  );
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({
-    dashboard: buildDashboard(updated?.dashboard),
-    progressMetric: updated.dashboard?.progressMetrics?.[0] || metric
-  });
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const updatedDoc = await User.findOne({ userId: req.user.id });
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json({
+      ...response,
+      progressMetric: metric
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.post("/api/dashboard/saved-exercises", requireAuth, async (req, res) => {
-  const payload = validateBody(req, res, savedExerciseBodySchema);
-  if (!payload) return;
+  try {
+    const payload = validateBody(req, res, savedExerciseBodySchema);
+    if (!payload) return;
 
-  const entry = buildSavedExerciseEntry(payload);
-  if (!entry.name) {
-    return res.status(400).json({ error: "Exercise name is required." });
-  }
+    const entry = buildSavedExerciseEntry(payload);
+    if (!entry.name) {
+      return res.status(400).json({ error: "Exercise name is required." });
+    }
 
-  const savedName = entry.name.toLowerCase();
-  const exerciseIdCondition =
-    entry.exerciseId === null ? true : { $ne: ["$$item.exerciseId", entry.exerciseId] };
+    const savedName = entry.name.toLowerCase();
+    const exerciseIdCondition =
+      entry.exerciseId === null ? true : { $ne: ["$$item.exerciseId", entry.exerciseId] };
 
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    [
-      {
-        $set: {
-          "dashboard.savedExercises": {
-            $slice: [
-              {
-                $concatArrays: [
-                  [entry],
-                  {
-                    $filter: {
-                      input: { $ifNull: ["$dashboard.savedExercises", []] },
-                      as: "item",
-                      cond: {
-                        $and: [
-                          exerciseIdCondition,
-                          {
-                            $ne: [
-                              {
-                                $toLower: {
-                                  $toString: { $ifNull: ["$$item.name", ""] }
-                                }
-                              },
-                              savedName
-                            ]
-                          }
-                        ]
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      [
+        {
+          $set: {
+            "dashboard.savedExercises": {
+              $slice: [
+                {
+                  $concatArrays: [
+                    [entry],
+                    {
+                      $filter: {
+                        input: { $ifNull: ["$dashboard.savedExercises", []] },
+                        as: "item",
+                        cond: {
+                          $and: [
+                            exerciseIdCondition,
+                            {
+                              $ne: [
+                                {
+                                  $toLower: {
+                                    $toString: { $ifNull: ["$$item.name", ""] }
+                                  }
+                                },
+                                savedName
+                              ]
+                            }
+                          ]
+                        }
                       }
                     }
-                  }
-                ]
-              },
-              200
-            ]
+                  ]
+                },
+                200
+              ]
+            }
           }
         }
-      }
-    ],
-    { new: true }
-  );
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({
-    dashboard: buildDashboard(updated?.dashboard),
-    savedExercise: updated.dashboard?.savedExercises?.[0] || entry
-  });
+      ],
+      { new: true }
+    );
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json({
+      ...response,
+      savedExercise: updated.dashboard?.savedExercises?.[0] || entry
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.delete("/api/dashboard/saved-exercises/:id", requireAuth, async (req, res) => {
-  const entryId = cleanText(req.params.id, 64);
-  if (!entryId) return res.status(400).json({ error: "Exercise id is required." });
+  try {
+    const entryId = cleanText(req.params.id, 64);
+    if (!entryId) return res.status(400).json({ error: "Exercise id is required." });
 
-  const updatedDoc = await User.findOneAndUpdate(
-    { userId: req.user.id },
-    {
-      $pull: {
-        "dashboard.savedExercises": { id: entryId }
-      }
-    },
-    { new: true }
-  );
-  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-  const updated = mapMongoDocToUser(updatedDoc);
-  res.json({ dashboard: buildDashboard(updated?.dashboard), ok: true });
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      {
+        $pull: {
+          "dashboard.savedExercises": { id: entryId }
+        }
+      },
+      { new: true }
+    );
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+    const updated = mapMongoDocToUser(updatedDoc);
+    const response = await buildDashboardResponse(updated);
+    return res.json({ ...response, ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.post("/api/generate", async (req, res) => {
@@ -2353,16 +2968,44 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
+app.use((err, req, res, next) => {
+  const status = Number.isInteger(err?.status) ? err.status : 500;
+  const isServerError = status >= 500;
+  const message = err?.message || "Server error.";
+  const requestId = req?.requestId || "";
+
+  logger.error(
+    {
+      event: "unhandled_error",
+      requestId,
+      method: req?.method,
+      path: req?.originalUrl || req?.url,
+      status,
+      error: toShortText(message, 300)
+    },
+    "Unhandled application error."
+  );
+
+  if (res.headersSent) return next(err);
+  return res.status(status).json({
+    error: isServerError ? "Server error." : message,
+    requestId
+  });
+});
+
 const startServer = async () => {
   try {
     const { mongoUri } = await connectDatabase();
-    console.log(`MongoDB connected: ${mongoUri}`);
+    logger.info({ event: "mongodb_connected", mongoUri }, "MongoDB connected.");
     await initSessionStore();
     app.listen(port, () => {
-      console.log(`Server listening on http://localhost:${port}`);
+      logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
     });
   } catch (err) {
-    console.error("Failed to start server:", err);
+    logger.fatal(
+      { event: "server_start_failed", error: toShortText(err?.message || String(err), 300) },
+      "Failed to start server."
+    );
     process.exit(1);
   }
 };

@@ -150,7 +150,9 @@ describe("server routes", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ status: "ok" });
+    expect(body.status).toBe("ok");
+    expect(typeof body.requestId).toBe("string");
+    expect(body.requestId.length).toBeGreaterThan(10);
   });
 
   test("GET /api/dashboard returns 401 when unauthenticated", async () => {
@@ -173,9 +175,19 @@ describe("server routes", () => {
     const previousApiKey = process.env.GEMINI_API_KEY;
     process.env.GEMINI_API_KEY = "";
 
+    const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
+    const csrfPayload = await csrfResponse.json();
+    const csrfToken = String(csrfPayload?.csrfToken || "");
+    const csrfCookieRaw = csrfResponse.headers.get("set-cookie") || "";
+    const csrfCookie = csrfCookieRaw.split(";")[0];
+
     const response = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        Cookie: csrfCookie
+      },
       body: JSON.stringify({})
     });
     const body = await response.json();
