@@ -7,8 +7,17 @@ export const registerSystemRoutes = (app, deps) => {
     redisSessionsEnabled,
     redisClient,
     redisLastErrorRef,
-    mongoReadyStateToText
+    mongoReadyStateToText,
+    errorTrackingConfigured,
+    errorTrackingEnabled
   } = deps;
+  const toAvg = (totalMs, count) => (count > 0 ? Number((totalMs / count).toFixed(2)) : 0);
+  const summarizeLatencyBucket = (bucket = {}) => ({
+    count: bucket.count || 0,
+    avgMs: toAvg(bucket.totalMs || 0, bucket.count || 0),
+    maxMs: Number((bucket.maxMs || 0).toFixed(2)),
+    lastMs: Number((bucket.lastMs || 0).toFixed(2))
+  });
 
   app.get("/api/health", (req, res) => {
     res.json({
@@ -37,6 +46,11 @@ export const registerSystemRoutes = (app, deps) => {
           connected: redisConnected,
           mode: redisConnected ? "redis" : "in_memory_fallback",
           lastError: redisLastErrorRef() || ""
+        },
+        errorTracking: {
+          configured: errorTrackingConfigured(),
+          enabled: errorTrackingEnabled(),
+          provider: errorTrackingConfigured() ? "sentry" : "none"
         }
       },
       uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000)
@@ -46,15 +60,39 @@ export const registerSystemRoutes = (app, deps) => {
   });
 
   app.get("/api/metrics", (req, res) => {
+    const cacheLookups = (metrics.externalCache?.hits || 0) + (metrics.externalCache?.misses || 0);
+    const cacheHitRatio = cacheLookups > 0 ? Number(((metrics.externalCache?.hits || 0) / cacheLookups).toFixed(4)) : null;
+    const routeLatency = Object.fromEntries(
+      Object.entries(metrics.routeLatencyMs || {}).map(([routeKey, bucket]) => [
+        routeKey,
+        summarizeLatencyBucket(bucket)
+      ])
+    );
+    const externalApiLatency = Object.fromEntries(
+      Object.entries(metrics.externalApiLatencyMs || {}).map(([serviceName, bucket]) => [
+        serviceName,
+        summarizeLatencyBucket(bucket)
+      ])
+    );
+
     res.json({
       requestId: req.requestId || "",
       uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000),
       requestsTotal: metrics.requestsTotal,
       authFailures: metrics.authFailures,
       rateLimited: metrics.rateLimited,
-      externalCache: { ...metrics.externalCache },
+      requestLatencyMs: {
+        ...summarizeLatencyBucket(metrics.requestLatencyMs),
+        byRoute: routeLatency
+      },
+      externalCache: {
+        ...metrics.externalCache,
+        lookups: cacheLookups,
+        hitRatio: cacheHitRatio
+      },
       externalApiFailures: { ...metrics.externalApiFailures },
-      externalApiRetries: { ...metrics.externalApiRetries }
+      externalApiRetries: { ...metrics.externalApiRetries },
+      externalApiLatencyMs: externalApiLatency
     });
   });
 
@@ -62,4 +100,3 @@ export const registerSystemRoutes = (app, deps) => {
     res.json({ csrfToken: req.csrfToken || "" });
   });
 };
-

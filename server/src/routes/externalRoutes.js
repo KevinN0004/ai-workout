@@ -1,3 +1,75 @@
+import { z } from "zod";
+import { validateSchemaInput } from "../services/requestValidationService.js";
+
+const coordinateQuerySchema = z
+  .object({
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180)
+  })
+  .passthrough();
+
+const airQualityQuerySchema = coordinateQuerySchema
+  .extend({
+    radiusKm: z.coerce.number().min(1).max(100).optional()
+  })
+  .passthrough();
+
+const queryMultiValueSchema = z.union([
+  z.string().trim().min(1),
+  z.number(),
+  z.array(z.union([z.string().trim().min(1), z.number()])).min(1)
+]);
+
+const wgerExercisesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(80).optional(),
+    offset: z.coerce.number().int().min(0).max(5000).optional(),
+    language: z.coerce.number().int().min(1).max(100).optional(),
+    category: queryMultiValueSchema.optional(),
+    muscle: queryMultiValueSchema.optional(),
+    equipment: queryMultiValueSchema.optional(),
+    q: z.string().trim().max(120).optional()
+  })
+  .passthrough();
+
+const wgerExerciseIdParamsSchema = z.object({
+  id: z.coerce.number().int().min(1).max(1000000)
+});
+
+const wgerExerciseDetailsQuerySchema = z
+  .object({
+    language: z.coerce.number().int().min(1).max(100).optional()
+  })
+  .passthrough();
+
+const mealDbSearchQuerySchema = z
+  .object({
+    query: z.string().trim().min(1).max(100).optional(),
+    q: z.string().trim().min(1).max(100).optional(),
+    limit: z.coerce.number().int().min(1).max(20).optional()
+  })
+  .passthrough()
+  .refine((value) => Boolean(value.query || value.q), {
+    message: "query or q is required",
+    path: ["query"]
+  });
+
+const validateQuery = (req, res, schema, options = {}) => {
+  const { fallbackPath = "query", message = "" } = options;
+  const { data, error } = validateSchemaInput(schema, req.query || {}, fallbackPath);
+  if (!error) return data;
+  res.status(400).json({ error: message || error });
+  return null;
+};
+
+const validateParams = (req, res, schema, options = {}) => {
+  const { fallbackPath = "params", message = "" } = options;
+  const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);
+  if (!error) return data;
+  res.status(400).json({ error: message || error });
+  return null;
+};
+
 export const registerExternalRoutes = (app, deps) => {
   const {
     toNullableNumber,
@@ -23,11 +95,11 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/weather/current", async (req, res) => {
     try {
-      const latitude = toNullableNumber(req.query.latitude, -90, 90);
-      const longitude = toNullableNumber(req.query.longitude, -180, 180);
-      if (latitude === null || longitude === null) {
-        return res.status(400).json({ error: "Valid latitude and longitude are required." });
-      }
+      const query = validateQuery(req, res, coordinateQuerySchema, {
+        message: "Valid latitude and longitude are required."
+      });
+      if (!query) return;
+      const { latitude, longitude } = query;
 
       const { data, cache } = await fetchOpenMeteo({
         latitude,
@@ -87,11 +159,11 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/weather/recommendation", async (req, res) => {
     try {
-      const latitude = toNullableNumber(req.query.latitude, -90, 90);
-      const longitude = toNullableNumber(req.query.longitude, -180, 180);
-      if (latitude === null || longitude === null) {
-        return res.status(400).json({ error: "Valid latitude and longitude are required." });
-      }
+      const query = validateQuery(req, res, coordinateQuerySchema, {
+        message: "Valid latitude and longitude are required."
+      });
+      if (!query) return;
+      const { latitude, longitude } = query;
 
       const { data, cache } = await fetchOpenMeteo({
         latitude,
@@ -175,13 +247,11 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/air-quality/current", async (req, res) => {
     try {
-      const latitude = toNullableNumber(req.query.latitude, -90, 90);
-      const longitude = toNullableNumber(req.query.longitude, -180, 180);
-      if (latitude === null || longitude === null) {
-        return res.status(400).json({ error: "Valid latitude and longitude are required." });
-      }
-
-      const radiusKm = toNullableNumber(req.query.radiusKm, 1, 100) ?? 25;
+      const query = validateQuery(req, res, airQualityQuerySchema, {
+        message: "Valid latitude and longitude are required."
+      });
+      if (!query) return;
+      const { latitude, longitude, radiusKm = 25 } = query;
       const locationResponse = await openAqRequest("locations", {
         coordinates: `${latitude},${longitude}`,
         radius: Math.round(radiusKm * 1000),
@@ -352,13 +422,15 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/wger/exercises", async (req, res) => {
     try {
-      const limit = toNullableNumber(req.query.limit, 1, 80) ?? 15;
-      const offset = toNullableNumber(req.query.offset, 0, 5000) ?? 0;
-      const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
-      const categories = parseMultiNumberQuery(req.query.category, 1, 10000);
-      const muscles = parseMultiNumberQuery(req.query.muscle, 1, 10000);
-      const equipment = parseMultiNumberQuery(req.query.equipment, 1, 10000);
-      const q = cleanText(req.query.q, 120).toLowerCase();
+      const queryInput = validateQuery(req, res, wgerExercisesQuerySchema);
+      if (!queryInput) return;
+      const limit = queryInput.limit ?? 15;
+      const offset = queryInput.offset ?? 0;
+      const language = queryInput.language ?? wgerDefaultLanguage;
+      const categories = parseMultiNumberQuery(queryInput.category, 1, 10000);
+      const muscles = parseMultiNumberQuery(queryInput.muscle, 1, 10000);
+      const equipment = parseMultiNumberQuery(queryInput.equipment, 1, 10000);
+      const q = cleanText(queryInput.q, 120).toLowerCase();
       const upstreamLimit = q ? Math.min(Math.max(limit * 4, 100), 200) : limit;
 
       const query = {
@@ -400,9 +472,11 @@ export const registerExternalRoutes = (app, deps) => {
     } catch (err) {
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
-        const limit = toNullableNumber(req.query.limit, 1, 80) ?? 15;
-        const offset = toNullableNumber(req.query.offset, 0, 5000) ?? 0;
-        const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
+        const queryInput = validateSchemaInput(wgerExercisesQuerySchema, req.query || {}, "query")
+          .data || {};
+        const limit = queryInput.limit ?? 15;
+        const offset = queryInput.offset ?? 0;
+        const language = queryInput.language ?? wgerDefaultLanguage;
         return res.json({
           fallback: true,
           service: "wger",
@@ -422,11 +496,14 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/wger/exercises/:id", async (req, res) => {
     try {
-      const id = toNullableNumber(req.params.id, 1, 1000000);
-      if (id === null) {
-        return res.status(400).json({ error: "Valid exercise id is required." });
-      }
-      const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
+      const params = validateParams(req, res, wgerExerciseIdParamsSchema, {
+        message: "Valid exercise id is required."
+      });
+      if (!params) return;
+      const queryInput = validateQuery(req, res, wgerExerciseDetailsQuerySchema);
+      if (!queryInput) return;
+      const { id } = params;
+      const language = queryInput.language ?? wgerDefaultLanguage;
       let response = await wgerRequest("exerciseinfo/", {
         query: {
           id: Math.trunc(id),
@@ -470,11 +547,12 @@ export const registerExternalRoutes = (app, deps) => {
 
   app.get("/api/mealdb/search", async (req, res) => {
     try {
-      const query = cleanText(req.query.query ?? req.query.q, 100);
-      if (!query) {
-        return res.status(400).json({ error: "Query is required." });
-      }
-      const limit = toNullableNumber(req.query.limit, 1, 20) ?? 8;
+      const queryInput = validateQuery(req, res, mealDbSearchQuerySchema, {
+        message: "Query is required."
+      });
+      if (!queryInput) return;
+      const query = cleanText(queryInput.query ?? queryInput.q, 100);
+      const limit = queryInput.limit ?? 8;
 
       const { data, cache } = await mealDbRequest("search.php", { s: query });
       const meals = (Array.isArray(data?.meals) ? data.meals : [])
@@ -486,7 +564,9 @@ export const registerExternalRoutes = (app, deps) => {
     } catch (err) {
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
-        const query = cleanText(req.query.query ?? req.query.q, 100);
+        const queryInput = validateSchemaInput(mealDbSearchQuerySchema, req.query || {}, "query")
+          .data || {};
+        const query = cleanText(queryInput.query ?? queryInput.q, 100);
         return res.json({
           fallback: true,
           service: "mealdb",
@@ -500,4 +580,3 @@ export const registerExternalRoutes = (app, deps) => {
     }
   });
 };
-

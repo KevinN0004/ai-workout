@@ -33,6 +33,12 @@ const extractCookieFromHeader = (headerValue, cookieName) => {
   return `${cookieName}=${match[1]}`;
 };
 
+const toRequestUrl = (input) => {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return String(input?.url || "");
+};
+
 const createFindChain = (items = []) => {
   const state = {
     rows: Array.isArray(items) ? items.map((item) => ({ ...item })) : []
@@ -238,6 +244,26 @@ describe("server routes", () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/latitude and longitude/i);
+  });
+
+  test("POST /api/auth/logout rejects request with missing CSRF token", async () => {
+    const response = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/csrf/i);
+  });
+
+  test("GET /api/ready reports redis fallback mode", async () => {
+    const response = await fetch(`${baseUrl}/api/ready`);
+    const body = await response.json();
+
+    expect([200, 503]).toContain(response.status);
+    expect(body.dependencies.redis.mode).toBe("in_memory_fallback");
+    expect(body.dependencies.redis.connected).toBe(false);
+    expect(typeof body.dependencies.errorTracking.provider).toBe("string");
   });
 
   test("POST /api/generate fails fast when GEMINI_API_KEY is missing", async () => {
@@ -477,7 +503,7 @@ describe("server routes", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input, init) => {
-        const url = typeof input === "string" ? input : String(input?.url || "");
+        const url = toRequestUrl(input);
         if (url.startsWith(baseUrl)) {
           return realFetch(input, init);
         }
@@ -489,11 +515,117 @@ describe("server routes", () => {
       })
     );
 
-    const response = await fetch(`${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`);
+    const response = await fetch(`${baseUrl}/api/weather/current?latitude=38.1111&longitude=-122.5555`);
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.fallback).toBe(true);
     expect(body.service).toBe("open-meteo");
+  });
+
+  test("weather current serves stale cached payload when upstream fails after cache expiry", async () => {
+    const realFetch = global.fetch;
+    let upstreamCallCount = 0;
+    const initialNow = Date.now();
+    let nowOffset = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => initialNow + nowOffset);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        const url = toRequestUrl(input);
+        if (url.startsWith(baseUrl)) {
+          return realFetch(input, init);
+        }
+
+        upstreamCallCount += 1;
+        if (upstreamCallCount === 1) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              latitude: 37.7749,
+              longitude: -122.4194,
+              timezone: "UTC",
+              current: {
+                time: "2026-03-02T00:00",
+                temperature_2m: 18,
+                apparent_temperature: 18,
+                precipitation: 0,
+                weather_code: 1,
+                wind_speed_10m: 8,
+                relative_humidity_2m: 55,
+                is_day: 1
+              }
+            })
+          };
+        }
+
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({ reason: "upstream unavailable" })
+        };
+      })
+    );
+
+    const firstResponse = await fetch(
+      `${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`
+    );
+    const firstBody = await firstResponse.json();
+    expect(firstResponse.status).toBe(200);
+    expect(firstBody.cache).toBe("miss");
+
+    nowOffset = 301000;
+    const staleResponse = await fetch(
+      `${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`
+    );
+    const staleBody = await staleResponse.json();
+    expect(staleResponse.status).toBe(200);
+    expect(staleBody.cache).toBe("stale");
+    expect(staleBody.fallback).not.toBe(true);
+  });
+
+  test("generate endpoint is rate-limited after repeated requests", async () => {
+    const previousApiKey = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "";
+    try {
+      const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
+      const csrfPayload = await csrfResponse.json();
+      const csrfToken = String(csrfPayload?.csrfToken || "");
+      const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
+
+      let sawRateLimit = false;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const response = await fetch(`${baseUrl}/api/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+            Cookie: csrfCookie
+          },
+          body: JSON.stringify({})
+        });
+        if (response.status === 429) {
+          sawRateLimit = true;
+          break;
+        }
+      }
+
+      expect(sawRateLimit).toBe(true);
+    } finally {
+      process.env.GEMINI_API_KEY = previousApiKey;
+    }
+  });
+
+  test("GET /api/metrics exposes latency and cache ratio fields", async () => {
+    const response = await fetch(`${baseUrl}/api/metrics`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(typeof body.requestLatencyMs.avgMs).toBe("number");
+    expect(body.requestLatencyMs.byRoute).toBeTruthy();
+    expect(body.externalCache).toHaveProperty("hitRatio");
+    expect(body.externalApiLatencyMs).toBeTruthy();
+    expect(body.externalApiLatencyMs).toHaveProperty("openMeteo");
   });
 });

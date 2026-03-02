@@ -7,13 +7,20 @@ import crypto from "crypto";
 import { promisify } from "util";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
-import { createClient } from "redis";
 import { z } from "zod";
 import { connectDatabase } from "./db.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
+import { initErrorTracking } from "./services/errorTrackingService.js";
+import { createHttpCacheService } from "./services/httpCacheService.js";
 import { isUpstreamFailureStatus, mongoReadyStateToText } from "./services/platformHealthService.js";
+import {
+  createSessionService,
+  parseCookies,
+  parseEnvBoolean,
+  parseRedisPort
+} from "./services/sessionService.js";
 import MealLog from "./models/MealLog.js";
 import ProgressMetric from "./models/ProgressMetric.js";
 import User from "./models/User.js";
@@ -48,15 +55,43 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "X-CSRF-Token"]
 };
 const logLevel = toShortText(process.env.LOG_LEVEL || "info", 20).toLowerCase() || "info";
+const defaultRedactedLogPaths = [
+  "req.headers.authorization",
+  "req.headers.cookie",
+  "req.headers.x-csrf-token",
+  "authorization",
+  "cookie",
+  "set-cookie",
+  "password",
+  "hash",
+  "salt",
+  "redisPassword",
+  "token"
+];
+const redactedLogPaths = Array.from(
+  new Set([...defaultRedactedLogPaths, ...parseCsvEnv(process.env.LOG_REDACT_PATHS)])
+);
 const logger = pino({
   level: logLevel,
   base: undefined,
-  timestamp: pino.stdTimeFunctions.isoTime
+  timestamp: pino.stdTimeFunctions.isoTime,
+  redact: {
+    paths: redactedLogPaths,
+    censor: "[Redacted]"
+  }
+});
+const initLatencyStats = () => ({
+  count: 0,
+  totalMs: 0,
+  maxMs: 0,
+  lastMs: 0
 });
 const metrics = {
   requestsTotal: 0,
   authFailures: 0,
   rateLimited: 0,
+  requestLatencyMs: initLatencyStats(),
+  routeLatencyMs: {},
   externalCache: {
     hits: 0,
     misses: 0,
@@ -75,7 +110,19 @@ const metrics = {
     openAq: 0,
     wger: 0,
     mealDb: 0
+  },
+  externalApiLatencyMs: {
+    openMeteo: initLatencyStats(),
+    openAq: initLatencyStats(),
+    wger: initLatencyStats(),
+    mealDb: initLatencyStats()
   }
+};
+let errorTracker = {
+  enabled: false,
+  configured: false,
+  captureException: () => {},
+  flush: async () => {}
 };
 
 if (process.env.NODE_ENV === "production") {
@@ -94,15 +141,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const inMemorySessions = new Map();
 const redisSessionKeyPrefix = "session:sid:";
 const csrfCookieName = "csrfToken";
 const csrfHeaderName = "x-csrf-token";
 const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-let redisClient = null;
-let redisSessionsEnabled = false;
-let redisConfigured = false;
-let redisLastError = "";
 const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
@@ -110,6 +152,23 @@ const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 const toPositiveInt = (value, fallback) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const recordLatencyStats = (bucket, durationMs) => {
+  if (!bucket || !Number.isFinite(durationMs) || durationMs < 0) return;
+  bucket.count = (bucket.count || 0) + 1;
+  bucket.totalMs = (bucket.totalMs || 0) + durationMs;
+  bucket.maxMs = Math.max(bucket.maxMs || 0, durationMs);
+  bucket.lastMs = durationMs;
+};
+
+const recordExternalApiLatency = (serviceName, durationMs) => {
+  const key = cleanText(serviceName, 32);
+  if (!key) return;
+  if (!metrics.externalApiLatencyMs[key]) {
+    metrics.externalApiLatencyMs[key] = initLatencyStats();
+  }
+  recordLatencyStats(metrics.externalApiLatencyMs[key], durationMs);
 };
 
 const apiRateLimitWindowMs = toPositiveInt(process.env.API_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
@@ -146,6 +205,7 @@ const openMeteoCacheTtlSec = toPositiveInt(process.env.OPEN_METEO_CACHE_TTL_SEC,
 const openAqCacheTtlSec = toPositiveInt(process.env.OPENAQ_CACHE_TTL_SEC, 180);
 const wgerCacheTtlSec = toPositiveInt(process.env.WGER_CACHE_TTL_SEC, 900);
 const mealDbCacheTtlSec = toPositiveInt(process.env.MEALDB_CACHE_TTL_SEC, 900);
+const sentryShutdownTimeoutMs = toPositiveInt(process.env.SENTRY_SHUTDOWN_TIMEOUT_MS, 2000);
 const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
@@ -325,129 +385,19 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
-const externalResponseCache = new Map();
-
-const cloneForCache = (value) => {
-  try {
-    if (typeof structuredClone === "function") return structuredClone(value);
-    return JSON.parse(JSON.stringify(value));
-  } catch {
-    return value;
-  }
-};
-
-const serializeCacheKeyPart = (value) => {
-  if (value === null) return "null";
-  if (value === undefined) return "undefined";
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => serializeCacheKeyPart(item)).join(",")}]`;
-  }
-  if (typeof value === "object") {
-    const keys = Object.keys(value).sort();
-    const pairs = keys.map((key) => `${key}:${serializeCacheKeyPart(value[key])}`);
-    return `{${pairs.join(",")}}`;
-  }
-  return JSON.stringify(value);
-};
-
-const buildExternalCacheKey = (serviceName, parts = {}) =>
-  `${serviceName}:${serializeCacheKeyPart(parts)}`;
-
-const pruneExternalCache = (now = Date.now()) => {
-  for (const [key, entry] of externalResponseCache.entries()) {
-    if (now <= entry.staleUntilMs) continue;
-    externalResponseCache.delete(key);
-    metrics.externalCache.evictions += 1;
-  }
-  while (externalResponseCache.size > externalCacheMaxEntries) {
-    const oldestKey = externalResponseCache.keys().next().value;
-    if (!oldestKey) break;
-    externalResponseCache.delete(oldestKey);
-    metrics.externalCache.evictions += 1;
-  }
-};
-
-const readExternalCache = (cacheKey, now = Date.now()) => {
-  const entry = externalResponseCache.get(cacheKey);
-  if (!entry) return null;
-  if (now > entry.staleUntilMs) {
-    externalResponseCache.delete(cacheKey);
-    metrics.externalCache.evictions += 1;
-    return null;
-  }
-  return {
-    payload: cloneForCache(entry.payload),
-    fresh: now <= entry.expiresAtMs,
-    staleAgeMs: Math.max(0, now - entry.expiresAtMs)
-  };
-};
-
-const writeExternalCache = (
-  cacheKey,
-  payload,
-  ttlSec,
-  staleTtlSec = externalCacheDefaultStaleTtlSec
-) => {
-  const now = Date.now();
-  const ttlMs = Math.max(1, toPositiveInt(ttlSec, 1)) * 1000;
-  const staleMs = Math.max(1, toPositiveInt(staleTtlSec, 1)) * 1000;
-  pruneExternalCache(now);
-  if (externalResponseCache.has(cacheKey)) {
-    externalResponseCache.delete(cacheKey);
-  }
-  externalResponseCache.set(cacheKey, {
-    payload: cloneForCache(payload),
-    createdAtMs: now,
-    expiresAtMs: now + ttlMs,
-    staleUntilMs: now + ttlMs + staleMs
-  });
-  metrics.externalCache.writes += 1;
-};
-
-const readThroughExternalCache = async ({
-  serviceName,
-  cacheKey,
-  ttlSec,
-  staleTtlSec = externalCacheDefaultStaleTtlSec,
-  requestFn
-}) => {
-  const cached = readExternalCache(cacheKey);
-  if (cached?.fresh) {
-    metrics.externalCache.hits += 1;
-    return { data: cached.payload, cache: "hit" };
-  }
-
-  metrics.externalCache.misses += 1;
-  try {
-    const data = await requestFn();
-    writeExternalCache(cacheKey, data, ttlSec, staleTtlSec);
-    return { data, cache: "miss" };
-  } catch (err) {
-    if (cached) {
-      metrics.externalCache.staleHits += 1;
-      logger.warn({
-        event: "external_api_stale_cache_served",
-        service: serviceName,
-        cacheKey: cacheKey.slice(0, 220),
-        staleAgeMs: cached.staleAgeMs,
-        message: toShortText(err?.message || String(err), 220)
-      });
-      return { data: cached.payload, cache: "stale" };
-    }
-    throw err;
-  }
-};
-
-const mergeCacheStatuses = (...statuses) => {
-  const clean = statuses
-    .map((status) => cleanText(status, 20).toLowerCase())
-    .filter(Boolean);
-  if (!clean.length) return "";
-  if (clean.includes("stale")) return "stale";
-  if (clean.every((status) => status === "hit")) return "hit";
-  if (clean.includes("miss")) return "miss";
-  return clean[0];
-};
+const {
+  serializeCacheKeyPart,
+  buildExternalCacheKey,
+  readThroughExternalCache,
+  mergeCacheStatuses
+} = createHttpCacheService({
+  metrics,
+  logger,
+  toShortText,
+  toPositiveInt,
+  maxEntries: externalCacheMaxEntries,
+  defaultStaleTtlSec: externalCacheDefaultStaleTtlSec
+});
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -742,9 +692,13 @@ const runExternalRequestWithRetry = async (serviceName, requestFn) => {
   let attempt = 0;
   let lastError = null;
   while (attempt <= externalApiRetries) {
+    const startedAt = Date.now();
     try {
-      return await requestFn();
+      const result = await requestFn();
+      recordExternalApiLatency(serviceName, Date.now() - startedAt);
+      return result;
     } catch (err) {
+      recordExternalApiLatency(serviceName, Date.now() - startedAt);
       lastError = err;
       const canRetry = attempt < externalApiRetries && isRetriableExternalError(err);
       if (!canRetry) break;
@@ -1421,236 +1375,32 @@ const upgradeUserPasswordToArgon2id = async (userId, plainPassword) => {
   );
   return next;
 };
+const sessionService = createSessionService({
+  cleanText,
+  logger,
+  toShortText,
+  findUserById,
+  sessionTtlMs: SESSION_TTL_MS,
+  cookieSecure,
+  csrfCookieName,
+  csrfHeaderName,
+  csrfUnsafeMethods,
+  redisSessionKeyPrefix
+});
 
-const parseCookies = (cookieHeader = "") =>
-  cookieHeader.split(";").reduce((acc, pair) => {
-    const [key, ...rest] = pair.trim().split("=");
-    if (!key) return acc;
-    const rawValue = rest.join("=");
-    try {
-      acc[key] = decodeURIComponent(rawValue);
-    } catch {
-      acc[key] = rawValue;
-    }
-    return acc;
-  }, {});
-
-const appendSetCookieHeader = (res, cookieValue) => {
-  const current = res.getHeader("Set-Cookie");
-  if (!current) {
-    res.setHeader("Set-Cookie", cookieValue);
-    return;
-  }
-  const list = Array.isArray(current) ? current : [current];
-  res.setHeader("Set-Cookie", [...list, cookieValue]);
-};
-
-const sessionRedisKey = (token) => `${redisSessionKeyPrefix}${token}`;
-
-const pruneExpiredInMemorySessions = () => {
-  const now = Date.now();
-  for (const [token, session] of inMemorySessions) {
-    if (now - session.createdAt > SESSION_TTL_MS) {
-      inMemorySessions.delete(token);
-    }
-  }
-};
-
-const parseRedisPort = (value) => {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) return null;
-  if (parsed < 1 || parsed > 65535) return null;
-  return parsed;
-};
-
-const parseEnvBoolean = (value, fallback = false) => {
-  const normalized = cleanText(value, 12).toLowerCase();
-  if (!normalized) return fallback;
-  if (["true", "1", "yes", "on"].includes(normalized)) return true;
-  if (["false", "0", "no", "off"].includes(normalized)) return false;
-  return fallback;
-};
-
-const initSessionStore = async () => {
-  const redisUrl = cleanText(process.env.REDIS_URL || "", 500);
-  const redisHost = cleanText(process.env.REDIS_HOST || "", 255);
-  const redisPort = parseRedisPort(process.env.REDIS_PORT);
-  const redisUsername = cleanText(process.env.REDIS_USERNAME || "default", 120) || "default";
-  const redisPassword = cleanText(process.env.REDIS_PASSWORD || "", 500);
-  const redisTls = parseEnvBoolean(process.env.REDIS_TLS, false);
-  const hasSocketConfig = Boolean(redisHost && redisPort !== null);
-  redisConfigured = Boolean(redisUrl || hasSocketConfig);
-  redisLastError = "";
-
-  if (!redisConfigured) {
-    logger.warn({ event: "redis_config_missing" }, "Redis config not set. Using in-memory sessions.");
-    redisSessionsEnabled = false;
-    return;
-  }
-
-  try {
-    const client = hasSocketConfig
-      ? createClient({
-          username: redisUsername,
-          password: redisPassword || undefined,
-          socket: {
-            host: redisHost,
-            port: redisPort,
-            tls: redisTls
-          }
-        })
-      : createClient({ url: redisUrl });
-
-    client.on("error", (err) => {
-      redisLastError = cleanText(err?.message || String(err), 260);
-      logger.error(
-        { event: "redis_session_store_error", error: redisLastError },
-        "Redis session store error."
-      );
-    });
-    await client.connect();
-    redisClient = client;
-    redisSessionsEnabled = true;
-    redisLastError = "";
-    logger.info({ event: "redis_connected" }, "Redis session store connected.");
-  } catch (err) {
-    redisLastError = cleanText(err?.message || String(err), 260);
-    logger.error(
-      {
-        event: "redis_connect_failed",
-        error: redisLastError
-      },
-      "Failed to connect Redis session store. Falling back to in-memory sessions."
-    );
-    redisClient = null;
-    redisSessionsEnabled = false;
-  }
-};
-
-const setSessionCookie = (res, token, persistent = true) => {
-  const maxAge = Math.floor(SESSION_TTL_MS / 1000);
-  const maxAgePart = persistent ? `; Max-Age=${maxAge}` : "";
-  appendSetCookieHeader(
-    res,
-    `sid=${token}; HttpOnly; Path=/; SameSite=Lax${maxAgePart}${cookieSecure}`
-  );
-};
-
-const clearSessionCookie = (res) => {
-  appendSetCookieHeader(
-    res,
-    `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
-  );
-};
-
-const setCsrfCookie = (res, token) => {
-  appendSetCookieHeader(
-    res,
-    `${csrfCookieName}=${token}; Path=/; SameSite=Lax${cookieSecure}; Max-Age=86400`
-  );
-};
-
-const clearCsrfCookie = (res) => {
-  appendSetCookieHeader(
-    res,
-    `${csrfCookieName}=; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
-  );
-};
-
-const createSession = async (userId) => {
-  const token = crypto.randomBytes(24).toString("hex");
-  const session = { userId, createdAt: Date.now() };
-  if (redisSessionsEnabled && redisClient) {
-    try {
-      await redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
-        EX: Math.floor(SESSION_TTL_MS / 1000)
-      });
-      redisLastError = "";
-      return token;
-    } catch (err) {
-      redisLastError = cleanText(err?.message || String(err), 260);
-      logger.error(
-        { event: "redis_session_create_failed", error: redisLastError },
-        "Redis create session failed."
-      );
-    }
-  }
-  pruneExpiredInMemorySessions();
-  inMemorySessions.set(token, session);
-  return token;
-};
-
-const getSessionByToken = async (token) => {
-  if (!token) return null;
-  if (redisSessionsEnabled && redisClient) {
-    try {
-      const raw = await redisClient.get(sessionRedisKey(token));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || !cleanText(parsed.userId, 120)) {
-        await redisClient.del(sessionRedisKey(token));
-        return null;
-      }
-      redisLastError = "";
-      return parsed;
-    } catch (err) {
-      redisLastError = cleanText(err?.message || String(err), 260);
-      logger.error(
-        { event: "redis_session_get_failed", error: redisLastError },
-        "Redis get session failed."
-      );
-      try {
-        await redisClient.del(sessionRedisKey(token));
-      } catch {
-        // Ignore cleanup failures.
-      }
-      return null;
-    }
-  }
-  pruneExpiredInMemorySessions();
-  return inMemorySessions.get(token) || null;
-};
-
-const deleteSession = async (token) => {
-  if (!token) return;
-  if (redisSessionsEnabled && redisClient) {
-    try {
-      await redisClient.del(sessionRedisKey(token));
-      redisLastError = "";
-    } catch (err) {
-      redisLastError = cleanText(err?.message || String(err), 260);
-      logger.error(
-        { event: "redis_session_delete_failed", error: redisLastError },
-        "Redis delete session failed."
-      );
-    }
-    return;
-  }
-  inMemorySessions.delete(token);
-};
-
-const getSessionUser = async (req) => {
-  const cookies = parseCookies(req.headers.cookie || "");
-  const token = cookies.sid;
-  const session = await getSessionByToken(token);
-  if (!session) return null;
-  if (Date.now() - session.createdAt > SESSION_TTL_MS) {
-    await deleteSession(token);
-    return null;
-  }
-  return findUserById(session.userId);
-};
-
-const requireAuth = async (req, res, next) => {
-  try {
-    const user = await getSessionUser(req);
-    if (!user) return res.status(401).json({ error: "Not signed in." });
-    req.user = user;
-    next();
-  } catch (err) {
-    res.status(500).json({ error: err?.message || "Server error." });
-  }
-};
+const {
+  initSessionStore,
+  setSessionCookie,
+  clearSessionCookie,
+  setCsrfCookie,
+  clearCsrfCookie,
+  createSession,
+  deleteSession,
+  getSessionUser,
+  requireAuth,
+  ensureCsrfTokenCookie,
+  requireCsrfToken
+} = sessionService;
 
 const parseDashboardPagination = (query = {}, defaultLimit = dashboardCollectionDefaultLimit) => {
   const parsedLimit =
@@ -1782,49 +1532,6 @@ const buildDashboardResponse = async (user, pagination = {}) => {
   };
 };
 
-const tokensMatch = (a, b) => {
-  const left = Buffer.from(String(a || ""), "utf8");
-  const right = Buffer.from(String(b || ""), "utf8");
-  if (left.length === 0 || right.length === 0) return false;
-  if (left.length !== right.length) return false;
-  return crypto.timingSafeEqual(left, right);
-};
-
-const ensureCsrfTokenCookie = (req, res, next) => {
-  const cookies = parseCookies(req.headers.cookie || "");
-  const current = cleanText(cookies[csrfCookieName], 128);
-  if (current) {
-    req.csrfToken = current;
-    return next();
-  }
-  const token = crypto.randomBytes(24).toString("hex");
-  req.csrfToken = token;
-  setCsrfCookie(res, token);
-  next();
-};
-
-const requireCsrfToken = (req, res, next) => {
-  const method = String(req.method || "GET").toUpperCase();
-  if (!csrfUnsafeMethods.has(method)) return next();
-
-  const cookies = parseCookies(req.headers.cookie || "");
-  const cookieToken = cleanText(cookies[csrfCookieName], 128);
-  const headerToken = cleanText(req.headers[csrfHeaderName], 128);
-
-  if (!cookieToken || !headerToken || !tokensMatch(cookieToken, headerToken)) {
-    req.log?.warn(
-      {
-        event: "csrf_check_failed",
-        method,
-        path: req.originalUrl || req.url
-      },
-      "CSRF validation failed."
-    );
-    return res.status(403).json({ error: "Invalid or missing CSRF token." });
-  }
-  return next();
-};
-
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
   max: apiRateLimitMax,
@@ -1896,10 +1603,12 @@ registerApiRoutes(app, {
   User,
   metrics,
   serverBootAtMs,
-  redisConfigured: () => redisConfigured,
-  redisSessionsEnabled: () => redisSessionsEnabled,
-  redisClient: () => redisClient,
-  redisLastErrorRef: () => redisLastError,
+  redisConfigured: sessionService.isRedisConfigured,
+  redisSessionsEnabled: sessionService.isRedisSessionsEnabled,
+  redisClient: sessionService.getRedisClient,
+  redisLastErrorRef: sessionService.getRedisLastError,
+  errorTrackingConfigured: () => Boolean(cleanText(process.env.SENTRY_DSN || "", 500)),
+  errorTrackingEnabled: () => Boolean(errorTracker?.enabled),
   mongoReadyStateToText,
   isUpstreamFailureStatus,
   toNullableNumber,
@@ -1970,12 +1679,16 @@ registerApiRoutes(app, {
 app.use(
   createErrorHandler({
     logger,
-    toShortText
+    toShortText,
+    captureException: (error, context = {}) => {
+      errorTracker.captureException(error, context);
+    }
   })
 );
 
 const startServer = async () => {
   try {
+    errorTracker = await initErrorTracking({ logger, toShortText });
     const { mongoUri } = await connectDatabase();
     logger.info({ event: "mongodb_connected", mongoUri }, "MongoDB connected.");
     await initSessionStore();
@@ -1987,6 +1700,11 @@ const startServer = async () => {
       { event: "server_start_failed", error: toShortText(err?.message || String(err), 300) },
       "Failed to start server."
     );
+    try {
+      await errorTracker.flush(sentryShutdownTimeoutMs);
+    } catch {
+      // Ignore tracking flush failures during startup failure.
+    }
     process.exit(1);
   }
 };

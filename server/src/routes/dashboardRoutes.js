@@ -1,4 +1,31 @@
 import crypto from "crypto";
+import { z } from "zod";
+import { validateSchemaInput } from "../services/requestValidationService.js";
+
+const dashboardPaginationQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(200).optional(),
+    offset: z.coerce.number().int().min(0).max(100000).optional()
+  })
+  .passthrough();
+
+const savedExerciseParamsSchema = z.object({
+  id: z.string().trim().min(1).max(64)
+});
+
+const validateQuery = (req, res, schema, fallbackPath = "query") => {
+  const { data, error } = validateSchemaInput(schema, req.query || {}, fallbackPath);
+  if (!error) return data;
+  res.status(400).json({ error });
+  return null;
+};
+
+const validateParams = (req, res, schema, fallbackPath = "params") => {
+  const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);
+  if (!error) return data;
+  res.status(400).json({ error });
+  return null;
+};
 
 export const registerDashboardRoutes = (app, deps) => {
   const {
@@ -39,7 +66,9 @@ export const registerDashboardRoutes = (app, deps) => {
 
   app.get("/api/dashboard/workout-sessions", requireAuth, async (req, res) => {
     try {
-      const pagination = parseDashboardPagination(req.query);
+      const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
+      if (!queryInput) return;
+      const pagination = parseDashboardPagination(queryInput);
       const collections = await getDashboardCollections(req.user, {
         workoutSessions: pagination
       });
@@ -59,7 +88,9 @@ export const registerDashboardRoutes = (app, deps) => {
 
   app.get("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
     try {
-      const pagination = parseDashboardPagination(req.query);
+      const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
+      if (!queryInput) return;
+      const pagination = parseDashboardPagination(queryInput);
       const collections = await getDashboardCollections(req.user, {
         mealLogs: pagination
       });
@@ -79,7 +110,9 @@ export const registerDashboardRoutes = (app, deps) => {
 
   app.get("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
     try {
-      const pagination = parseDashboardPagination(req.query);
+      const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
+      if (!queryInput) return;
+      const pagination = parseDashboardPagination(queryInput);
       const collections = await getDashboardCollections(req.user, {
         progressMetrics: pagination
       });
@@ -124,20 +157,36 @@ export const registerDashboardRoutes = (app, deps) => {
         const workoutSummary = toWorkoutSummaryEntry(session);
         const updatedDoc = await User.findOneAndUpdate(
           { userId: req.user.id },
-          {
-            $pull: {
-              "dashboard.workouts": {
-                id: workoutSummary.id
-              }
-            },
-            $push: {
-              "dashboard.workouts": {
-                $each: [workoutSummary],
-                $position: 0,
-                $slice: 500
+          [
+            {
+              $set: {
+                "dashboard.workouts": {
+                  $slice: [
+                    {
+                      $concatArrays: [
+                        [workoutSummary],
+                        {
+                          $filter: {
+                            input: { $ifNull: ["$dashboard.workouts", []] },
+                            as: "item",
+                            cond: {
+                              $ne: [
+                                {
+                                  $toString: { $ifNull: ["$$item.id", ""] }
+                                },
+                                workoutSummary.id
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    500
+                  ]
+                }
               }
             }
-          },
+          ],
           { new: true }
         );
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
@@ -505,8 +554,9 @@ export const registerDashboardRoutes = (app, deps) => {
 
   app.delete("/api/dashboard/saved-exercises/:id", requireAuth, async (req, res) => {
     try {
-      const entryId = cleanText(req.params.id, 64);
-      if (!entryId) return res.status(400).json({ error: "Exercise id is required." });
+      const params = validateParams(req, res, savedExerciseParamsSchema);
+      if (!params) return;
+      const entryId = cleanText(params.id, 64);
 
       const updatedDoc = await User.findOneAndUpdate(
         { userId: req.user.id },
@@ -526,4 +576,3 @@ export const registerDashboardRoutes = (app, deps) => {
     }
   });
 };
-

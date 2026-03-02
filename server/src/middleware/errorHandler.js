@@ -1,9 +1,21 @@
-export const createErrorHandler = ({ logger, toShortText }) =>
+export const createErrorHandler = ({ logger, toShortText, captureException = () => {} }) =>
   (err, req, res, next) => {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     const isServerError = status >= 500;
     const message = err?.message || "Server error.";
     const requestId = req?.requestId || "";
+    if (isServerError) {
+      try {
+        captureException(err, {
+          requestId,
+          method: req?.method,
+          path: req?.originalUrl || req?.url,
+          status
+        });
+      } catch {
+        // Error tracking must never break request flow.
+      }
+    }
 
     logger.error(
       {
@@ -23,4 +35,3 @@ export const createErrorHandler = ({ logger, toShortText }) =>
       requestId
     });
   };
-
