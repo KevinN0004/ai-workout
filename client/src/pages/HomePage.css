@@ -18,6 +18,7 @@ html.preview-smooth-scroll {
   background: #000 !important;
   --home-animation-ms: 1400ms;
   --home-shell-max: 1060px;
+  --home-visualizer-shell-max: 1360px;
   --home-shell-gutter: clamp(10px, 1.8vw, 18px);
   margin-left: auto;
   margin-right: auto;
@@ -100,6 +101,10 @@ html.preview-smooth-scroll {
   align-content: center;
   justify-items: center;
   will-change: transform, opacity, filter;
+}
+
+.home-stage-visualizer {
+  width: min(var(--home-visualizer-shell-max), calc(100% - clamp(12px, 1.5vw, 22px)));
 }
 
 .home-stage.stage-transition-hidden,
@@ -1093,15 +1098,15 @@ html.preview-smooth-scroll {
 }
 
 .visualizer-only-panel {
-  width: fit-content;
-  max-width: min(560px, 100%);
+  width: 100%;
+  max-width: min(var(--home-visualizer-shell-max), calc(100vw - 20px));
   min-height: 0;
   justify-self: center;
 }
 
 .visualizer-only-panel.stage-panel {
   grid-template-rows: auto auto auto;
-  gap: 12px;
+  gap: 10px;
 }
 
 .visualizer-only-panel h2,
@@ -1690,6 +1695,10 @@ html.preview-smooth-scroll {
   overflow: visible;
 }
 
+.home-page .panel.body-visual-panel {
+  padding: clamp(8px, 0.8vw, 12px);
+}
+
 .visual-stage {
   width: fit-content;
   max-width: 100%;
@@ -1705,10 +1714,10 @@ html.preview-smooth-scroll {
 }
 
 .physique-render-surface {
-  width: 460px;
-  max-width: min(100%, calc(100vw - 120px));
+  width: clamp(760px, 80vw, 1220px);
+  max-width: min(100%, calc(100vw - 36px));
   height: auto;
-  aspect-ratio: 7 / 11;
+  aspect-ratio: 280 / 430;
   transform-origin: 50% 56%;
   will-change: transform, opacity;
 }
@@ -1719,8 +1728,70 @@ html.preview-smooth-scroll {
   display: block;
 }
 
+.physique-outline {
+  fill: var(--silhouette-fill, rgba(255, 255, 255, 0.2));
+  stroke: var(--silhouette-stroke, rgba(255, 255, 255, 0.9));
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter:
+    drop-shadow(
+      0 0 calc(var(--silhouette-glow-radius, 136px) * 0.22)
+      var(--silhouette-glow-color, rgba(255, 255, 255, 0.18))
+    )
+    drop-shadow(0 0 16px rgba(255, 255, 255, 0.14));
+}
+
 .physique-point-layer {
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.22));
+}
+
+.physique-guide-layer {
+  pointer-events: none;
+}
+
+.physique-guide {
+  fill: none;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.physique-guide.bone {
+  stroke: var(--guide-bone, rgba(160, 214, 255, 0.92));
+  stroke-width: 1.45;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 4px var(--guide-bone-glow, rgba(160, 214, 255, 0.22)));
+}
+
+.physique-guide.muscle {
+  stroke: var(--guide-muscle, rgba(255, 148, 132, 0.88));
+  stroke-width: 1.2;
+  opacity: 0.88;
+  filter: drop-shadow(0 0 4px var(--guide-muscle-glow, rgba(255, 148, 132, 0.2)));
+}
+
+.physique-outline-line {
+  fill: none;
+  stroke: var(--outline-stroke, rgba(255, 255, 255, 0.9));
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.92;
+  filter:
+    drop-shadow(0 0 4px var(--outline-glow, rgba(255, 255, 255, 0.22)))
+    drop-shadow(0 0 10px var(--outline-glow, rgba(255, 255, 255, 0.14)));
+}
+
+.physique-anchor-layer {
+  filter:
+    drop-shadow(0 0 3px var(--anchor-glow, rgba(255, 255, 255, 0.26)))
+    drop-shadow(0 0 9px var(--anchor-glow, rgba(255, 255, 255, 0.22)));
+}
+
+.physique-outline-anchor-layer {
+  filter: drop-shadow(0 0 3px var(--outline-glow, rgba(255, 255, 255, 0.2)));
 }
 
 .physique-guide-triangle {
@@ -1734,11 +1805,16 @@ html.preview-smooth-scroll {
 }
 
 .physique-point.major {
-  fill: rgba(255, 255, 255, 0.95);
+  fill: var(--anchor-major, rgba(255, 255, 255, 0.95));
 }
 
 .physique-point.minor {
-  fill: rgba(255, 255, 255, 0.72);
+  fill: var(--anchor-minor, rgba(255, 255, 255, 0.72));
+}
+
+.physique-point.outline {
+  fill: var(--outline-stroke, rgba(255, 255, 255, 0.9));
+  opacity: 0.68;
 }
 
 .physique-footnote {
@@ -1789,8 +1865,8 @@ html.preview-smooth-scroll {
   }
 
   .physique-render-surface {
-    width: 430px;
-    max-width: min(100%, calc(100vw - 96px));
+    width: clamp(620px, 82vw, 980px);
+    max-width: min(100%, calc(100vw - 28px));
   }
 }
 
@@ -2028,8 +2104,8 @@ html.preview-smooth-scroll {
   }
 
   .physique-render-surface {
-    width: 360px;
-    max-width: min(100%, calc(100vw - 64px));
+    width: clamp(470px, 90vw, 760px);
+    max-width: min(100%, calc(100vw - 24px));
   }
 
   .physique-footnote {
@@ -2070,6 +2146,7 @@ html.preview-smooth-scroll {
   }
 
   .physique-render-surface {
-    max-width: min(100%, calc(100vw - 44px));
+    width: clamp(360px, 94vw, 620px);
+    max-width: min(100%, calc(100vw - 16px));
   }
 }

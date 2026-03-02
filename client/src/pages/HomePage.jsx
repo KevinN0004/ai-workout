@@ -87,6 +87,7 @@ export default function HomePage({
     visualizer: 3,
     workout: 4
   };
+  const isDevEnvironment = import.meta.env.DEV;
   const unifiedAnimationMs = 1400;
   const stageCrossfadeMs = 220;
 
@@ -160,7 +161,7 @@ export default function HomePage({
       intro: { width: Math.min(560, stageWidth), height: 320 },
       personal: { width: Math.min(980, stageWidth), height: 620 },
       visualizer: {
-        width: Math.min(560, stageWidth),
+        width: Math.min(900, stageWidth),
         height: Math.max(620, Math.min(860, window.innerHeight - 120))
       },
       workout: {
@@ -454,6 +455,23 @@ export default function HomePage({
     }, unifiedAnimationMs + 60);
   };
 
+  const onDevOpenVisualizer = () => {
+    if (!isDevEnvironment || isIntroTransitioning || isStageTransitioning) return;
+    setHeightUnit("cm");
+    setWeightUnit("kg");
+    setPersonal((prev) => ({
+      ...prev,
+      name: "Dev User",
+      age: "30",
+      sex: "Male",
+      heightCm: "178",
+      heightFeet: "5",
+      heightInches: "10",
+      weight: "78"
+    }));
+    goToStage("visualizer");
+  };
+
   const toFiniteNumber = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
@@ -545,16 +563,59 @@ export default function HomePage({
   const armHeight = clamp(156 + heightNorm * 28, 146, 194);
   const headRadius = clamp(18 + fatScore * 2.6, 16, 28);
 
+  const sexLabel = String(personal.sex || "").trim().toLowerCase();
+  // Ratios are from measured U.S. anthropometric dimensions
+  // (Hsiao et al., Hum Factors, table of acromion/waist/crotch/knee/ankle heights vs. stature).
+  const anthropometry = sexLabel === "male"
+    ? {
+        acromionHeight: 0.824,
+        waistHeight: 0.583,
+        crotchHeight: 0.444,
+        kneeHeight: 0.27,
+        ankleHeight: 0.041
+      }
+    : sexLabel === "female"
+      ? {
+          acromionHeight: 0.824,
+          waistHeight: 0.596,
+          crotchHeight: 0.445,
+          kneeHeight: 0.269,
+          ankleHeight: 0.04
+        }
+      : {
+          acromionHeight: 0.824,
+          waistHeight: 0.5895,
+          crotchHeight: 0.4445,
+          kneeHeight: 0.2695,
+          ankleHeight: 0.0405
+        };
+
   const legBias = (heightNorm - 0.5) * 18;
-  const torsoBias = (heightNorm - 0.5) * 8;
-  const shoulderY = 100 - torsoBias * 0.4;
-  const chestY = 143 + torsoBias * 0.2;
-  const waistY = 218 + torsoBias + legBias * 0.1;
-  const hipY = 266 + torsoBias + legBias * 0.24;
-  const thighY = 319 + legBias * 0.55;
-  const calfY = 372 + legBias * 0.84;
+  const upperBodyLift = 6 + ((1 - heightNorm) * 1.4);
   const ankleY = 412 + legBias;
-  const headCenterY = 57 - torsoBias * 0.3;
+  const headCenterY = 57 - upperBodyLift;
+  const headTopY = headCenterY - headRadius;
+  const statureSpan = Math.max(330, ankleY - headTopY);
+  const yFromHeightRatio = (heightRatioFromFloor) => {
+    const progressFromTop = (1 - heightRatioFromFloor) / (1 - anthropometry.ankleHeight);
+    return headTopY + (statureSpan * clamp(progressFromTop, 0, 1));
+  };
+
+  const shoulderYRaw = yFromHeightRatio(anthropometry.acromionHeight);
+  const waistYRaw = yFromHeightRatio(anthropometry.waistHeight);
+  const groinTargetY = yFromHeightRatio(anthropometry.crotchHeight);
+  const kneeTargetY = yFromHeightRatio(anthropometry.kneeHeight);
+  const chestYRaw = shoulderYRaw + ((waistYRaw - shoulderYRaw) * 0.34);
+  const thighYRaw = groinTargetY + ((kneeTargetY - groinTargetY) * 0.52);
+  const hipYRaw = (groinTargetY - (0.13 * thighYRaw)) / 0.87;
+  const calfYRaw = (kneeTargetY - (0.62 * thighYRaw)) / 0.38;
+
+  const shoulderY = clamp(shoulderYRaw, 84, 132);
+  const chestY = clamp(chestYRaw, shoulderY + 18, shoulderY + 82);
+  const waistY = clamp(waistYRaw, chestY + 28, chestY + 122);
+  const hipY = clamp(hipYRaw, waistY + 20, waistY + 82);
+  const thighY = clamp(thighYRaw, hipY + 30, hipY + 96);
+  const calfY = clamp(calfYRaw, thighY + 26, ankleY - 20);
 
   const fillHue = 24 - fatScore * 4;
   const fillSaturation = clamp(44 + fatScore * 18, 40, 82);
@@ -563,6 +624,8 @@ export default function HomePage({
   const glowSaturation = clamp(fillSaturation + 8, 46, 94);
   const glowAlpha = clamp(0.08 + fatScore * 0.12, 0.06, 0.24);
   const glowRadius = clamp(112 + waistHalf * 0.7 + hipHalf * 0.45, 118, 176);
+  const sideFat = clamp(fatScore * 0.9 + bmiMassScore * 0.1, 0, 1);
+  const shoulderFat = clamp(fatScore * 0.72 + bmiMassScore * 0.28, 0, 1);
 
   const silhouetteShape = useMemo(
     () => ({
@@ -589,7 +652,9 @@ export default function HomePage({
       strokeLightness,
       glowSaturation,
       glowAlpha,
-      glowRadius
+      glowRadius,
+      sideFat,
+      shoulderFat
     }),
     [
       shoulderHalf,
@@ -615,7 +680,9 @@ export default function HomePage({
       strokeLightness,
       glowSaturation,
       glowAlpha,
-      glowRadius
+      glowRadius,
+      sideFat,
+      shoulderFat
     ]
   );
 
@@ -727,7 +794,7 @@ export default function HomePage({
     boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
   };
 
-  const visualLabel = "T-pose contact points with finger joints, limb joints, 45 degree leg stance, and shoulder-to-pelvis torso triangle guide.";
+  const visualLabel = "Star-pose anchor points with limb centers, joint centers, and top and bottom joint markers generated from your profile measurements.";
 
   return (
     <div className="page home-page" style={gradient}>
@@ -767,6 +834,16 @@ export default function HomePage({
               >
                 Get Started
               </button>
+              {isDevEnvironment && (
+                <button
+                  className="ghost"
+                  type="button"
+                  onClick={onDevOpenVisualizer}
+                  disabled={isIntroTransitioning || isStageTransitioning}
+                >
+                  Dev: Visualizer
+                </button>
+              )}
             </div>
           </section>
         </main>
