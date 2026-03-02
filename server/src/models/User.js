@@ -142,8 +142,20 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
-    salt: { type: String, required: true },
+    salt: {
+      type: String,
+      default: "",
+      required() {
+        return (this.passwordAlgo || "pbkdf2") === "pbkdf2";
+      }
+    },
     hash: { type: String, required: true },
+    passwordAlgo: {
+      type: String,
+      required: true,
+      enum: ["pbkdf2", "argon2id"],
+      default: "pbkdf2"
+    },
     createdAt: { type: String, required: true },
     profile: { type: profileSchema, default: undefined },
     dashboard: { type: dashboardSchema, default: undefined }

@@ -2,8 +2,10 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";
+import rateLimit from "express-rate-limit";
 import { createClient } from "redis";
 import { z } from "zod";
 import { connectDatabase } from "./db.js";
@@ -14,17 +16,66 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors({ origin: true, credentials: true }));
+const parseCsvEnv = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const configuredClientOrigins = parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS);
+const allowAnyCorsOrigin = configuredClientOrigins.length === 0;
+const allowedCorsOrigins = new Set(configuredClientOrigins);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowAnyCorsOrigin || allowedCorsOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("Origin not allowed by CORS."));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "X-CSRF-Token"]
+};
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const inMemorySessions = new Map();
 const redisSessionKeyPrefix = "session:sid:";
+const csrfCookieName = "csrfToken";
+const csrfHeaderName = "x-csrf-token";
+const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 let redisClient = null;
 let redisSessionsEnabled = false;
 const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+
+const toPositiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const apiRateLimitWindowMs = toPositiveInt(process.env.API_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
+const apiRateLimitMax = toPositiveInt(process.env.API_RATE_LIMIT_MAX, 300);
+const authRateLimitWindowMs = toPositiveInt(
+  process.env.AUTH_RATE_LIMIT_WINDOW_MS,
+  10 * 60 * 1000
+);
+const authRateLimitMax = toPositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 25);
+const generateRateLimitWindowMs = toPositiveInt(
+  process.env.GENERATE_RATE_LIMIT_WINDOW_MS,
+  10 * 60 * 1000
+);
+const generateRateLimitMax = toPositiveInt(process.env.GENERATE_RATE_LIMIT_MAX, 20);
+const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
+const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
+const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
+const argon2HashLength = toPositiveInt(process.env.ARGON2_HASH_LENGTH, 32);
 const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
 const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
 const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
@@ -969,11 +1020,15 @@ const mapWgerExercise = (exercise, preferredLanguage = wgerDefaultLanguage) => {
 const mapMongoDocToUser = (doc) => {
   if (!doc) return null;
   const source = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const inferredAlgo =
+    cleanText(source.passwordAlgo, 24) ||
+    (cleanText(source.hash, 260).startsWith("$argon2") ? "argon2id" : "pbkdf2");
   return {
     id: source.userId,
     email: source.email,
     salt: source.salt,
     hash: source.hash,
+    passwordAlgo: inferredAlgo,
     createdAt: source.createdAt,
     profile: source.profile,
     dashboard: source.dashboard
@@ -984,8 +1039,9 @@ const mapUserToMongoDoc = (user) => {
   const doc = {
     userId: user.id,
     email: cleanText(user.email, 254).toLowerCase(),
-    salt: user.salt,
+    salt: user.salt ?? "",
     hash: user.hash,
+    passwordAlgo: cleanText(user.passwordAlgo, 24) || "pbkdf2",
     createdAt: user.createdAt || new Date().toISOString()
   };
   if (user.profile !== undefined) doc.profile = user.profile;
@@ -1010,17 +1066,71 @@ const createUser = async (user) => {
   return mapMongoDocToUser(doc);
 };
 
-const hashPassword = async (password, salt = crypto.randomBytes(16).toString("hex")) => {
-  const hash = await pbkdf2Async(password, salt, 120000, 64, "sha512");
-  return { salt, hash: hash.toString("hex") };
+const hashPasswordArgon2id = async (password) => {
+  const hash = await argon2.hash(password, {
+    type: argon2.argon2id,
+    timeCost: argon2TimeCost,
+    memoryCost: argon2MemoryCost,
+    parallelism: argon2Parallelism,
+    hashLength: argon2HashLength
+  });
+  return { salt: "", hash, passwordAlgo: "argon2id" };
 };
 
-const verifyPassword = async (password, user) => {
+const hashPassword = async (password) => hashPasswordArgon2id(password);
+
+const isArgon2Hash = (value) => cleanText(value, 260).startsWith("$argon2");
+
+const resolvePasswordAlgo = (user = {}) => {
+  const raw = cleanText(user.passwordAlgo, 24);
+  if (raw === "argon2id" || raw === "pbkdf2") return raw;
+  return isArgon2Hash(user.hash) ? "argon2id" : "pbkdf2";
+};
+
+const verifyPasswordPbkdf2 = async (password, user) => {
   if (!user?.salt || !user?.hash) return false;
   const hash = await pbkdf2Async(password, user.salt, 120000, 64, "sha512");
   const storedHash = Buffer.from(user.hash, "hex");
   if (storedHash.length !== hash.length) return false;
   return crypto.timingSafeEqual(storedHash, hash);
+};
+
+const verifyPassword = async (password, user) => {
+  const algo = resolvePasswordAlgo(user);
+  if (algo === "argon2id") {
+    if (!user?.hash) return false;
+    try {
+      return await argon2.verify(user.hash, password);
+    } catch {
+      return false;
+    }
+  }
+  return verifyPasswordPbkdf2(password, user);
+};
+
+let dummyPasswordRecordPromise = null;
+const getDummyPasswordRecord = async () => {
+  if (!dummyPasswordRecordPromise) {
+    dummyPasswordRecordPromise = hashPasswordArgon2id("invalid-password");
+  }
+  return dummyPasswordRecordPromise;
+};
+
+const shouldUpgradePasswordToArgon2id = (user) => resolvePasswordAlgo(user) !== "argon2id";
+
+const upgradeUserPasswordToArgon2id = async (userId, plainPassword) => {
+  const next = await hashPasswordArgon2id(plainPassword);
+  await User.updateOne(
+    { userId },
+    {
+      $set: {
+        salt: next.salt,
+        hash: next.hash,
+        passwordAlgo: next.passwordAlgo
+      }
+    }
+  );
+  return next;
 };
 
 const parseCookies = (cookieHeader = "") =>
@@ -1035,6 +1145,16 @@ const parseCookies = (cookieHeader = "") =>
     }
     return acc;
   }, {});
+
+const appendSetCookieHeader = (res, cookieValue) => {
+  const current = res.getHeader("Set-Cookie");
+  if (!current) {
+    res.setHeader("Set-Cookie", cookieValue);
+    return;
+  }
+  const list = Array.isArray(current) ? current : [current];
+  res.setHeader("Set-Cookie", [...list, cookieValue]);
+};
 
 const sessionRedisKey = (token) => `${redisSessionKeyPrefix}${token}`;
 
@@ -1110,16 +1230,30 @@ const initSessionStore = async () => {
 const setSessionCookie = (res, token, persistent = true) => {
   const maxAge = Math.floor(SESSION_TTL_MS / 1000);
   const maxAgePart = persistent ? `; Max-Age=${maxAge}` : "";
-  res.setHeader(
-    "Set-Cookie",
+  appendSetCookieHeader(
+    res,
     `sid=${token}; HttpOnly; Path=/; SameSite=Lax${maxAgePart}${cookieSecure}`
   );
 };
 
 const clearSessionCookie = (res) => {
-  res.setHeader(
-    "Set-Cookie",
+  appendSetCookieHeader(
+    res,
     `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
+  );
+};
+
+const setCsrfCookie = (res, token) => {
+  appendSetCookieHeader(
+    res,
+    `${csrfCookieName}=${token}; Path=/; SameSite=Lax${cookieSecure}; Max-Age=86400`
+  );
+};
+
+const clearCsrfCookie = (res) => {
+  appendSetCookieHeader(
+    res,
+    `${csrfCookieName}=; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
   );
 };
 
@@ -1203,8 +1337,78 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
+const tokensMatch = (a, b) => {
+  const left = Buffer.from(String(a || ""), "utf8");
+  const right = Buffer.from(String(b || ""), "utf8");
+  if (left.length === 0 || right.length === 0) return false;
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+};
+
+const ensureCsrfTokenCookie = (req, res, next) => {
+  const cookies = parseCookies(req.headers.cookie || "");
+  const current = cleanText(cookies[csrfCookieName], 128);
+  if (current) {
+    req.csrfToken = current;
+    return next();
+  }
+  const token = crypto.randomBytes(24).toString("hex");
+  req.csrfToken = token;
+  setCsrfCookie(res, token);
+  next();
+};
+
+const requireCsrfToken = (req, res, next) => {
+  const method = String(req.method || "GET").toUpperCase();
+  if (!csrfUnsafeMethods.has(method)) return next();
+
+  const cookies = parseCookies(req.headers.cookie || "");
+  const cookieToken = cleanText(cookies[csrfCookieName], 128);
+  const headerToken = cleanText(req.headers[csrfHeaderName], 128);
+
+  if (!cookieToken || !headerToken || !tokensMatch(cookieToken, headerToken)) {
+    return res.status(403).json({ error: "Invalid or missing CSRF token." });
+  }
+  return next();
+};
+
+const apiLimiter = rateLimit({
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again shortly." }
+});
+
+const authLimiter = rateLimit({
+  windowMs: authRateLimitWindowMs,
+  max: authRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many sign-in attempts. Please try again later." }
+});
+
+const generateLimiter = rateLimit({
+  windowMs: generateRateLimitWindowMs,
+  max: generateRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Workout generation rate limit reached. Please wait and retry." }
+});
+
+app.use("/api", apiLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/signup", authLimiter);
+app.use("/api/generate", generateLimiter);
+app.use("/api", ensureCsrfTokenCookie);
+app.use("/api", requireCsrfToken);
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrfToken || "" });
 });
 
 app.get("/api/weather/current", async (req, res) => {
@@ -1588,12 +1792,13 @@ app.post("/api/auth/signup", async (req, res) => {
         error: "Complete profile details are required to create an account."
       });
     }
-    const { salt, hash } = await hashPassword(password);
+    const { salt, hash, passwordAlgo } = await hashPassword(password);
     const newUser = {
       id: crypto.randomUUID(),
       email: normalizedEmail,
       salt,
       hash,
+      passwordAlgo,
       createdAt: new Date().toISOString(),
       profile: builtProfile,
       dashboard: defaultDashboard()
@@ -1601,6 +1806,7 @@ app.post("/api/auth/signup", async (req, res) => {
     await createUser(newUser);
     const token = await createSession(newUser.id);
     setSessionCookie(res, token, rememberMe);
+    setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
     res.json({
       user: {
         id: newUser.id,
@@ -1622,11 +1828,24 @@ app.post("/api/auth/login", async (req, res) => {
     const rememberMe = body.rememberMe ?? true;
     const normalizedEmail = cleanText(email, 254).toLowerCase();
     const user = await findUserByEmail(normalizedEmail);
-    if (!user || !(await verifyPassword(password, user))) {
+    if (!user) {
+      const dummyPasswordRecord = await getDummyPasswordRecord();
+      await verifyPassword(password, dummyPasswordRecord);
       return res.status(401).json({ error: "Invalid credentials." });
+    }
+    if (!(await verifyPassword(password, user))) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+    if (shouldUpgradePasswordToArgon2id(user)) {
+      try {
+        await upgradeUserPasswordToArgon2id(user.id, password);
+      } catch (upgradeErr) {
+        console.error("Password hash upgrade failed:", upgradeErr?.message || upgradeErr);
+      }
     }
     const token = await createSession(user.id);
     setSessionCookie(res, token, rememberMe);
+    setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
     res.json({
       user: {
         id: user.id,
@@ -1645,6 +1864,7 @@ app.post("/api/auth/logout", async (req, res) => {
     const token = cookies.sid;
     if (token) await deleteSession(token);
     clearSessionCookie(res);
+    clearCsrfCookie(res);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });

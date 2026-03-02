@@ -221,6 +221,8 @@ const DASHBOARD_CACHE_PREFIX = "ai-workout-dashboard-cache-v1";
 const WEATHER_CACHE_PREFIX = "ai-workout-weather-cache-v1";
 const AIR_QUALITY_CACHE_PREFIX = "ai-workout-air-cache-v1";
 const OPTIMISTIC_UNDO_WINDOW_MS = 4500;
+const CSRF_COOKIE_NAME = "csrfToken";
+const CSRF_HEADER_NAME = "x-csrf-token";
 
 const buildScopedCacheKey = (prefix, user) => {
   const scope = user?.userId || user?.email || "anonymous";
@@ -245,6 +247,22 @@ const writeJsonCache = (key, value) => {
   } catch {
     // Ignore cache write failures (private mode, quota, etc.)
   }
+};
+
+const readCookie = (name) => {
+  if (!name || typeof document === "undefined") return "";
+  const key = `${name}=`;
+  const pairs = document.cookie ? document.cookie.split(";") : [];
+  for (const pair of pairs) {
+    const trimmed = pair.trim();
+    if (!trimmed.startsWith(key)) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(key.length));
+    } catch {
+      return trimmed.slice(key.length);
+    }
+  }
+  return "";
 };
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = 15000) => {
@@ -353,6 +371,7 @@ export default function App() {
   const dashboardRequestRef = useRef(0);
   const weatherRequestRef = useRef(0);
   const airRequestRef = useRef(0);
+  const csrfTokenRef = useRef("");
   const isDashboardRoute =
     route === "/dashboard" || route.startsWith("/dashboard/");
   const dashboardCacheKey = useMemo(
@@ -374,6 +393,51 @@ export default function App() {
         "radial-gradient(circle at center, rgba(189, 189, 189, 0.34) 0%, rgba(151, 151, 151, 0.16) 20%, rgba(110, 110, 110, 0.06) 36%, rgba(0, 0, 0, 0.96) 58%, #000 78%)"
     }),
     []
+  );
+
+  const ensureCsrfToken = useCallback(async () => {
+    const existingToken = readCookie(CSRF_COOKIE_NAME);
+    if (existingToken) {
+      csrfTokenRef.current = existingToken;
+      return existingToken;
+    }
+    const response = await fetch("/api/csrf-token", {
+      credentials: "include"
+    });
+    if (!response.ok) {
+      throw new Error("Unable to initialize security token.");
+    }
+    const payload = await response.json().catch(() => ({}));
+    const issuedToken =
+      readCookie(CSRF_COOKIE_NAME) ||
+      (typeof payload?.csrfToken === "string" ? payload.csrfToken.trim() : "");
+    csrfTokenRef.current = issuedToken;
+    return issuedToken;
+  }, []);
+
+  const apiFetch = useCallback(
+    async (url, options = {}) => {
+      const method = String(options?.method || "GET").toUpperCase();
+      const headers = new Headers(options?.headers || {});
+      const nextOptions = {
+        ...options,
+        credentials: options?.credentials || "include",
+        headers
+      };
+
+      if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        const csrfToken =
+          (await ensureCsrfToken()) ||
+          csrfTokenRef.current ||
+          readCookie(CSRF_COOKIE_NAME);
+        if (!csrfToken) {
+          throw new Error("Security token unavailable. Refresh and try again.");
+        }
+        headers.set(CSRF_HEADER_NAME, csrfToken);
+      }
+      return fetch(url, nextOptions);
+    },
+    [ensureCsrfToken]
   );
 
   useEffect(() => {
@@ -532,10 +596,9 @@ export default function App() {
     setResult("");
 
     try {
-      const res = await fetch("/api/generate", {
+      const res = await apiFetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(form)
       });
 
@@ -1128,6 +1191,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    ensureCsrfToken().catch(() => {
+      // CSRF token is lazily retried before unsafe requests.
+    });
+  }, [ensureCsrfToken]);
+
+  useEffect(() => {
     if (route !== "/") return;
     resetPersonalFlow();
   }, [route, resetPersonalFlow]);
@@ -1438,10 +1507,9 @@ export default function App() {
               ? toKg(signupProfileForm.weight, "lb")
               : signupProfileForm.weight || signupProfileForm.weightKg
         };
-        const res = await fetch("/api/auth/signup", {
+        const res = await apiFetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({
             ...authForm,
             profile: normalizedProfile
@@ -1461,10 +1529,9 @@ export default function App() {
         return;
       }
 
-      const res = await fetch(`/api/auth/${authMode}`, {
+      const res = await apiFetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           ...authForm,
           rememberMe: authAutoSignIn
@@ -1487,7 +1554,7 @@ export default function App() {
   };
 
   const onLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setDashboard(null);
     clearOptimisticOperations();
@@ -1532,10 +1599,9 @@ export default function App() {
       type: "workout",
       item: optimisticWorkout,
       request: async () => {
-        const res = await fetch("/api/dashboard/workout-sessions", {
+        const res = await apiFetch("/api/dashboard/workout-sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
@@ -1581,10 +1647,9 @@ export default function App() {
         createdAt: new Date().toISOString()
       },
       request: async () => {
-        const res = await fetch("/api/dashboard/calories", {
+        const res = await apiFetch("/api/dashboard/calories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
@@ -1605,10 +1670,9 @@ export default function App() {
     e.preventDefault();
     setDashError("");
     try {
-      const res = await fetch("/api/dashboard/goals", {
+      const res = await apiFetch("/api/dashboard/goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(goalForm)
       });
       if (!res.ok) {
@@ -1647,10 +1711,9 @@ export default function App() {
         loggedAt: new Date().toISOString()
       },
       request: async () => {
-        const res = await fetch("/api/dashboard/meal-logs", {
+        const res = await apiFetch("/api/dashboard/meal-logs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
@@ -1680,10 +1743,9 @@ export default function App() {
     e.preventDefault();
     setDashError("");
     try {
-      const res = await fetch("/api/dashboard/progress-metrics", {
+      const res = await apiFetch("/api/dashboard/progress-metrics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(progressForm)
       });
       if (!res.ok) {
@@ -1711,10 +1773,9 @@ export default function App() {
   const saveExerciseToPlan = async (exercisePayload) => {
     setDashError("");
     try {
-      const res = await fetch("/api/dashboard/saved-exercises", {
+      const res = await apiFetch("/api/dashboard/saved-exercises", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(exercisePayload || {})
       });
       if (!res.ok) {
@@ -1736,9 +1797,8 @@ export default function App() {
   const removeSavedExercise = async (entryId) => {
     setDashError("");
     try {
-      const res = await fetch(`/api/dashboard/saved-exercises/${entryId}`, {
-        method: "DELETE",
-        credentials: "include"
+      const res = await apiFetch(`/api/dashboard/saved-exercises/${entryId}`, {
+        method: "DELETE"
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
