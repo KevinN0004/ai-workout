@@ -1247,11 +1247,18 @@ export default function App() {
     setDashLoading(false);
   }, [isDashboardRoute, user]);
 
-  const go = (path) => {
+  const go = useCallback((path) => {
     const normalizedPath = path === "/dashboard/" ? "/dashboard" : path;
     window.history.pushState({}, "", normalizedPath);
     setRoute(normalizedPath);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    if (route === "/" || route === "/auth" || route === "/auth/") {
+      go("/dashboard");
+    }
+  }, [go, route, user]);
 
   const clearDashboardToast = useCallback(() => {
     if (dashboardToastTimeoutRef.current) {

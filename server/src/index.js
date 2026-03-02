@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
 import { promisify } from "util";
+import { createClient } from "redis";
+import { z } from "zod";
 import { connectDatabase } from "./db.js";
 import User from "./models/User.js";
 
@@ -16,10 +18,16 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const sessions = new Map();
+const inMemorySessions = new Map();
+const redisSessionKeyPrefix = "session:sid:";
+let redisClient = null;
+let redisSessionsEnabled = false;
 const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
+const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
+const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
 const defaultProfile = () => ({
   firstName: "",
   lastName: "",
@@ -33,8 +41,8 @@ const defaultProfile = () => ({
   notes: "",
   updatedAt: new Date().toISOString()
 });
-const allowedSexes = new Set(["Female", "Male", "Non-binary", "Prefer not to say"]);
-const allowedActivities = new Set(["Light", "Moderate", "High", "Very high"]);
+const allowedSexes = new Set(allowedSexValues);
+const allowedActivities = new Set(allowedActivityValues);
 const defaultGoals = () => ({
   targetWeight: 160,
   targetCalories: 2200,
@@ -92,17 +100,6 @@ const toNullableNumber = (value, min, max) => {
   return num;
 };
 
-const toBooleanFlag = (value, fallback = true) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
-    if (normalized === "false" || normalized === "0" || normalized === "no") return false;
-  }
-  return fallback;
-};
-
 const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
   (Array.isArray(value) ? value : [value])
     .map((item) => cleanText(item, maxLen))
@@ -117,14 +114,7 @@ const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
     .filter(Boolean)
     .slice(0, maxItems);
 
-const allowedMealTypes = new Set([
-  "breakfast",
-  "lunch",
-  "dinner",
-  "snack",
-  "drink",
-  "other"
-]);
+const allowedMealTypes = new Set(allowedMealTypeValues);
 
 const buildWorkoutSessionEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
@@ -245,6 +235,181 @@ const isCompleteSignupProfile = (profile) =>
       profile?.weightKg !== null &&
       cleanText(profile?.sex, 40)
   );
+
+const toNumberInput = (value) => {
+  if (value === "") return null;
+  if (value === undefined || value === null) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const requiredStringField = (maxLen) => z.string().trim().min(1).max(maxLen);
+const optionalStringField = (maxLen) => z.string().trim().max(maxLen).optional();
+const optionalBooleanField = z
+  .preprocess((value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes"].includes(normalized)) return true;
+      if (["false", "0", "no"].includes(normalized)) return false;
+    }
+    return value;
+  }, z.boolean())
+  .optional();
+const optionalNullableNumberField = (min, max) =>
+  z.preprocess(
+    toNumberInput,
+    z.union([z.number().min(min).max(max), z.null()]).optional()
+  );
+const requiredNumberField = (min, max) =>
+  z.preprocess(toNumberInput, z.number().min(min).max(max));
+const optionalStringArrayField = (maxItems, maxLen) =>
+  z.preprocess((value) => {
+    if (value === undefined || value === null) return undefined;
+    const list = Array.isArray(value) ? value : [value];
+    return list
+      .map((item) => cleanText(item, maxLen))
+      .filter(Boolean)
+      .slice(0, maxItems);
+  }, z.array(z.string().max(maxLen)).max(maxItems).optional());
+
+const profileInputSchema = z
+  .object({
+    firstName: optionalStringField(40),
+    lastName: optionalStringField(60),
+    name: optionalStringField(80),
+    age: optionalNullableNumberField(10, 120),
+    heightCm: optionalNullableNumberField(100, 260),
+    weightKg: optionalNullableNumberField(25, 400),
+    sex: z.union([z.enum(allowedSexValues), z.literal("")]).optional(),
+    bodyFat: optionalNullableNumberField(3, 70),
+    activity: z.union([z.enum(allowedActivityValues), z.literal("")]).optional(),
+    notes: optionalStringField(500)
+  })
+  .passthrough();
+
+const signupBodySchema = z
+  .object({
+    email: requiredStringField(254),
+    password: z.string().min(8).max(256),
+    profile: profileInputSchema,
+    rememberMe: optionalBooleanField
+  })
+  .passthrough();
+
+const loginBodySchema = z
+  .object({
+    email: requiredStringField(254),
+    password: z.string().min(1).max(256),
+    rememberMe: optionalBooleanField
+  })
+  .passthrough();
+
+const profileBodySchema = profileInputSchema;
+
+const workoutSessionBodySchema = z
+  .object({
+    id: optionalStringField(64),
+    date: requiredStringField(20),
+    focus: optionalStringField(80),
+    duration: requiredNumberField(5, 360),
+    exercises: optionalStringArrayField(18, 140),
+    sets: optionalNullableNumberField(1, 80),
+    reps: optionalNullableNumberField(1, 120),
+    intensityRpe: optionalNullableNumberField(1, 10),
+    rpe: optionalNullableNumberField(1, 10),
+    notes: optionalStringField(500)
+  })
+  .passthrough();
+
+const caloriesBodySchema = z
+  .object({
+    date: requiredStringField(20),
+    calories: requiredNumberField(800, 10000)
+  })
+  .passthrough();
+
+const goalsBodySchema = z
+  .object({
+    targetWeight: optionalNullableNumberField(80, 400),
+    targetCalories: optionalNullableNumberField(1200, 4500),
+    weeklyWorkouts: optionalNullableNumberField(1, 7)
+  })
+  .passthrough();
+
+const mealLogBodySchema = z
+  .object({
+    id: optionalStringField(64),
+    date: requiredStringField(20),
+    mealType: optionalStringField(40),
+    name: requiredStringField(140),
+    calories: optionalNullableNumberField(0, 5000),
+    proteinG: optionalNullableNumberField(0, 400),
+    carbsG: optionalNullableNumberField(0, 700),
+    fatG: optionalNullableNumberField(0, 300),
+    notes: optionalStringField(300)
+  })
+  .passthrough();
+
+const progressMetricBodySchema = z
+  .object({
+    id: optionalStringField(64),
+    date: requiredStringField(20),
+    weightLb: optionalNullableNumberField(50, 700),
+    bodyFatPct: optionalNullableNumberField(2, 70),
+    waistCm: optionalNullableNumberField(30, 250),
+    restingHr: optionalNullableNumberField(30, 220),
+    notes: optionalStringField(320)
+  })
+  .passthrough();
+
+const namedValueSchema = z
+  .object({
+    name: requiredStringField(120)
+  })
+  .passthrough();
+
+const savedExerciseBodySchema = z
+  .object({
+    id: optionalStringField(64),
+    exerciseId: optionalNullableNumberField(1, 10000000),
+    name: requiredStringField(180),
+    category: optionalStringField(120),
+    muscles: z.array(z.union([z.string().trim().min(1).max(120), namedValueSchema])).max(10).optional(),
+    equipment: z.array(z.union([z.string().trim().min(1).max(120), namedValueSchema])).max(10).optional(),
+    imageUrl: optionalStringField(320),
+    videoUrl: optionalStringField(320),
+    reason: optionalStringField(260)
+  })
+  .passthrough();
+
+const generatePlanBodySchema = z
+  .object({
+    goal: optionalStringField(120),
+    equipment: optionalStringArrayField(10, 80),
+    duration: optionalNullableNumberField(15, 180),
+    level: optionalStringField(40),
+    injuries: optionalStringField(140),
+    days: optionalNullableNumberField(1, 7),
+    environment: optionalStringField(40),
+    focuses: optionalStringArrayField(8, 60)
+  })
+  .passthrough();
+
+const getValidationMessage = (error) => {
+  const issue = error?.issues?.[0];
+  if (!issue) return "Invalid request body.";
+  const path = Array.isArray(issue.path) && issue.path.length ? issue.path.join(".") : "request";
+  return cleanText(`${path}: ${issue.message}`, 240) || "Invalid request body.";
+};
+
+const validateBody = (req, res, schema) => {
+  const result = schema.safeParse(req.body || {});
+  if (result.success) return result.data;
+  res.status(400).json({ error: getValidationMessage(result.error) });
+  return null;
+};
 
 const toFiniteNumber = (value) => {
   const num = Number(value);
@@ -871,12 +1036,74 @@ const parseCookies = (cookieHeader = "") =>
     return acc;
   }, {});
 
-const pruneExpiredSessions = () => {
+const sessionRedisKey = (token) => `${redisSessionKeyPrefix}${token}`;
+
+const pruneExpiredInMemorySessions = () => {
   const now = Date.now();
-  for (const [token, session] of sessions) {
+  for (const [token, session] of inMemorySessions) {
     if (now - session.createdAt > SESSION_TTL_MS) {
-      sessions.delete(token);
+      inMemorySessions.delete(token);
     }
+  }
+};
+
+const parseRedisPort = (value) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed < 1 || parsed > 65535) return null;
+  return parsed;
+};
+
+const parseEnvBoolean = (value, fallback = false) => {
+  const normalized = cleanText(value, 12).toLowerCase();
+  if (!normalized) return fallback;
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return fallback;
+};
+
+const initSessionStore = async () => {
+  const redisUrl = cleanText(process.env.REDIS_URL || "", 500);
+  const redisHost = cleanText(process.env.REDIS_HOST || "", 255);
+  const redisPort = parseRedisPort(process.env.REDIS_PORT);
+  const redisUsername = cleanText(process.env.REDIS_USERNAME || "default", 120) || "default";
+  const redisPassword = cleanText(process.env.REDIS_PASSWORD || "", 500);
+  const redisTls = parseEnvBoolean(process.env.REDIS_TLS, false);
+  const hasSocketConfig = Boolean(redisHost && redisPort !== null);
+
+  if (!redisUrl && !hasSocketConfig) {
+    console.warn("Redis config not set. Using in-memory sessions.");
+    redisSessionsEnabled = false;
+    return;
+  }
+
+  try {
+    const client = hasSocketConfig
+      ? createClient({
+          username: redisUsername,
+          password: redisPassword || undefined,
+          socket: {
+            host: redisHost,
+            port: redisPort,
+            tls: redisTls
+          }
+        })
+      : createClient({ url: redisUrl });
+
+    client.on("error", (err) => {
+      console.error("Redis session store error:", err?.message || err);
+    });
+    await client.connect();
+    redisClient = client;
+    redisSessionsEnabled = true;
+    console.log("Redis session store connected.");
+  } catch (err) {
+    console.error(
+      "Failed to connect Redis session store. Falling back to in-memory sessions:",
+      err?.message || err
+    );
+    redisClient = null;
+    redisSessionsEnabled = false;
   }
 };
 
@@ -896,49 +1123,84 @@ const clearSessionCookie = (res) => {
   );
 };
 
-const createSession = (userId) => {
-  pruneExpiredSessions();
+const createSession = async (userId) => {
   const token = crypto.randomBytes(24).toString("hex");
-  sessions.set(token, { userId, createdAt: Date.now() });
+  const session = { userId, createdAt: Date.now() };
+  if (redisSessionsEnabled && redisClient) {
+    try {
+      await redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
+        EX: Math.floor(SESSION_TTL_MS / 1000)
+      });
+      return token;
+    } catch (err) {
+      console.error("Redis create session failed:", err?.message || err);
+    }
+  }
+  pruneExpiredInMemorySessions();
+  inMemorySessions.set(token, session);
   return token;
 };
 
+const getSessionByToken = async (token) => {
+  if (!token) return null;
+  if (redisSessionsEnabled && redisClient) {
+    try {
+      const raw = await redisClient.get(sessionRedisKey(token));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !cleanText(parsed.userId, 120)) {
+        await redisClient.del(sessionRedisKey(token));
+        return null;
+      }
+      return parsed;
+    } catch (err) {
+      console.error("Redis get session failed:", err?.message || err);
+      try {
+        await redisClient.del(sessionRedisKey(token));
+      } catch {
+        // Ignore cleanup failures.
+      }
+      return null;
+    }
+  }
+  pruneExpiredInMemorySessions();
+  return inMemorySessions.get(token) || null;
+};
+
+const deleteSession = async (token) => {
+  if (!token) return;
+  if (redisSessionsEnabled && redisClient) {
+    try {
+      await redisClient.del(sessionRedisKey(token));
+    } catch (err) {
+      console.error("Redis delete session failed:", err?.message || err);
+    }
+    return;
+  }
+  inMemorySessions.delete(token);
+};
+
 const getSessionUser = async (req) => {
-  pruneExpiredSessions();
   const cookies = parseCookies(req.headers.cookie || "");
   const token = cookies.sid;
-  if (!token || !sessions.has(token)) return null;
-  const session = sessions.get(token);
+  const session = await getSessionByToken(token);
+  if (!session) return null;
   if (Date.now() - session.createdAt > SESSION_TTL_MS) {
-    sessions.delete(token);
+    await deleteSession(token);
     return null;
   }
   return findUserById(session.userId);
 };
 
 const requireAuth = async (req, res, next) => {
-  const user = await getSessionUser(req);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
-  req.user = user;
-  next();
-};
-
-const updateUser = async (userId, updater) => {
-  const current = await findUserById(userId);
-  if (!current) return null;
-
-  const next = updater({
-    ...current,
-    profile: current.profile ? structuredClone(current.profile) : current.profile,
-    dashboard: current.dashboard ? structuredClone(current.dashboard) : current.dashboard
-  });
-  if (!next) return null;
-
-  const replacement = mapUserToMongoDoc(next);
-  const updatedDoc = await User.findOneAndReplace({ userId }, replacement, {
-    new: true
-  });
-  return mapMongoDocToUser(updatedDoc);
+  try {
+    const user = await getSessionUser(req);
+    if (!user) return res.status(401).json({ error: "Not signed in." });
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: err?.message || "Server error." });
+  }
 };
 
 app.get("/api/health", (req, res) => {
@@ -1266,15 +1528,19 @@ app.get("/api/mealdb/search", async (req, res) => {
 });
 
 app.get("/api/auth/me", async (req, res) => {
-  const user = await getSessionUser(req);
-  if (!user) return res.status(401).json({ error: "Not signed in." });
-  res.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      profile: user.profile || defaultProfile()
-    }
-  });
+  try {
+    const user = await getSessionUser(req);
+    if (!user) return res.status(401).json({ error: "Not signed in." });
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        profile: user.profile || defaultProfile()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.get("/api/profile", requireAuth, (req, res) => {
@@ -1283,16 +1549,22 @@ app.get("/api/profile", requireAuth, (req, res) => {
 
 app.post("/api/profile", requireAuth, async (req, res) => {
   try {
-    const profileInput = req.body || {};
-    const updated = await updateUser(req.user.id, (user) => ({
-      ...user,
-      profile: buildProfile({
-        ...(user.profile || defaultProfile()),
-        ...profileInput
-      })
-    }));
-    if (!updated) return res.status(404).json({ error: "User not found." });
-    res.json({ profile: updated.profile || defaultProfile() });
+    const profileInput = validateBody(req, res, profileBodySchema);
+    if (!profileInput) return;
+
+    const nextProfile = buildProfile({
+      ...(req.user.profile || defaultProfile()),
+      ...profileInput
+    });
+    const updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      { $set: { profile: nextProfile } },
+      { new: true }
+    );
+    if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+
+    const updated = mapMongoDocToUser(updatedDoc);
+    res.json({ profile: updated?.profile || defaultProfile() });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Server error." });
   }
@@ -1300,15 +1572,12 @@ app.post("/api/profile", requireAuth, async (req, res) => {
 
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password, profile, rememberMe: rememberMeInput } = req.body || {};
-    const rememberMe = toBooleanFlag(rememberMeInput, true);
+    const body = validateBody(req, res, signupBodySchema);
+    if (!body) return;
+
+    const { email, password, profile } = body;
+    const rememberMe = body.rememberMe ?? true;
     const normalizedEmail = cleanText(email, 254).toLowerCase();
-    if (!normalizedEmail || !password) {
-      return res.status(400).json({ error: "Email and password required." });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters." });
-    }
     const exists = await findUserByEmail(normalizedEmail);
     if (exists) {
       return res.status(409).json({ error: "Account already exists." });
@@ -1330,7 +1599,7 @@ app.post("/api/auth/signup", async (req, res) => {
       dashboard: defaultDashboard()
     };
     await createUser(newUser);
-    const token = createSession(newUser.id);
+    const token = await createSession(newUser.id);
     setSessionCookie(res, token, rememberMe);
     res.json({
       user: {
@@ -1346,17 +1615,17 @@ app.post("/api/auth/signup", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const { email, password, rememberMe: rememberMeInput } = req.body || {};
-    const rememberMe = toBooleanFlag(rememberMeInput, true);
+    const body = validateBody(req, res, loginBodySchema);
+    if (!body) return;
+
+    const { email, password } = body;
+    const rememberMe = body.rememberMe ?? true;
     const normalizedEmail = cleanText(email, 254).toLowerCase();
-    if (!normalizedEmail || !password) {
-      return res.status(400).json({ error: "Email and password required." });
-    }
     const user = await findUserByEmail(normalizedEmail);
     if (!user || !(await verifyPassword(password, user))) {
       return res.status(401).json({ error: "Invalid credentials." });
     }
-    const token = createSession(user.id);
+    const token = await createSession(user.id);
     setSessionCookie(res, token, rememberMe);
     res.json({
       user: {
@@ -1370,12 +1639,16 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.post("/api/auth/logout", (req, res) => {
-  const cookies = parseCookies(req.headers.cookie || "");
-  const token = cookies.sid;
-  if (token) sessions.delete(token);
-  clearSessionCookie(res);
-  res.json({ ok: true });
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const token = cookies.sid;
+    if (token) await deleteSession(token);
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || "Server error." });
+  }
 });
 
 app.get("/api/dashboard", requireAuth, async (req, res) => {
@@ -1387,88 +1660,122 @@ app.get("/api/dashboard", requireAuth, async (req, res) => {
 });
 
 app.post(["/api/dashboard/workouts", "/api/dashboard/workout-sessions"], requireAuth, async (req, res) => {
-  const session = buildWorkoutSessionEntry(req.body || {});
+  const body = validateBody(req, res, workoutSessionBodySchema);
+  if (!body) return;
+
+  const session = buildWorkoutSessionEntry(body);
   if (!session.date || session.duration === null) {
     return res.status(400).json({ error: "Date and duration are required." });
   }
 
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    const workoutSummary = toWorkoutSummaryEntry(session);
-    const nextSessions = [session, ...dashboard.workoutSessions].slice(0, 500);
-    const nextWorkouts = [
-      workoutSummary,
-      ...dashboard.workouts.filter((item) => cleanText(item?.id, 64) !== workoutSummary.id)
-    ].slice(0, 500);
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        workoutSessions: nextSessions,
-        workouts: nextWorkouts
+  const workoutSummary = toWorkoutSummaryEntry(session);
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    {
+      $pull: {
+        "dashboard.workouts": {
+          id: workoutSummary.id
+        }
+      },
+      $push: {
+        "dashboard.workoutSessions": {
+          $each: [session],
+          $position: 0,
+          $slice: 500
+        },
+        "dashboard.workouts": {
+          $each: [workoutSummary],
+          $position: 0,
+          $slice: 500
+        }
       }
-    };
-  });
+    },
+    { new: true }
+  );
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
-  if (!updated) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
   res.json({
-    dashboard: updated.dashboard,
+    dashboard: buildDashboard(updated?.dashboard),
     workoutSession: updated.dashboard?.workoutSessions?.[0] || session
   });
 });
 
 app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
-  const { date, calories } = req.body || {};
+  const body = validateBody(req, res, caloriesBodySchema);
+  if (!body) return;
+
+  const { date, calories } = body;
   const parsedCalories = toNullableNumber(calories, 800, 10000);
   if (!cleanText(date, 20) || parsedCalories === null) {
     return res.status(400).json({ error: "Date and calories are required." });
   }
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    const entry = {
-      id: crypto.randomUUID(),
-      date: cleanText(date, 20),
-      calories: parsedCalories,
-      source: "manual",
-      updatedAt: new Date().toISOString()
-    };
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        calories: [entry, ...dashboard.calories]
+
+  const entry = {
+    id: crypto.randomUUID(),
+    date: cleanText(date, 20),
+    calories: parsedCalories,
+    source: "manual",
+    updatedAt: new Date().toISOString()
+  };
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    {
+      $push: {
+        "dashboard.calories": {
+          $each: [entry],
+          $position: 0,
+          $slice: 1000
+        }
       }
-    };
-  });
-  if (!updated) return res.status(404).json({ error: "User not found." });
-  res.json({ dashboard: updated.dashboard });
+    },
+    { new: true }
+  );
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
+  res.json({ dashboard: buildDashboard(updated?.dashboard) });
 });
 
 app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
-  const { targetWeight, targetCalories, weeklyWorkouts } = req.body || {};
+  const body = validateBody(req, res, goalsBodySchema);
+  if (!body) return;
+
+  const { targetWeight, targetCalories, weeklyWorkouts } = body;
   const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
   const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
   const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        goals: {
-          targetWeight: parsedTargetWeight ?? dashboard.goals.targetWeight,
-          targetCalories: parsedTargetCalories ?? dashboard.goals.targetCalories,
-          weeklyWorkouts: parsedWeeklyWorkouts ?? dashboard.goals.weeklyWorkouts
-        }
-      }
-    };
-  });
-  if (!updated) return res.status(404).json({ error: "User not found." });
-  res.json({ dashboard: updated.dashboard });
+  const setFields = {};
+  if (parsedTargetWeight !== null) {
+    setFields["dashboard.goals.targetWeight"] = parsedTargetWeight;
+  }
+  if (parsedTargetCalories !== null) {
+    setFields["dashboard.goals.targetCalories"] = parsedTargetCalories;
+  }
+  if (parsedWeeklyWorkouts !== null) {
+    setFields["dashboard.goals.weeklyWorkouts"] = parsedWeeklyWorkouts;
+  }
+
+  let updatedDoc = null;
+  if (Object.keys(setFields).length) {
+    updatedDoc = await User.findOneAndUpdate(
+      { userId: req.user.id },
+      { $set: setFields },
+      { new: true }
+    );
+  } else {
+    updatedDoc = await User.findOne({ userId: req.user.id });
+  }
+
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
+  res.json({ dashboard: buildDashboard(updated?.dashboard) });
 });
 
 app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
-  const mealLog = buildMealLogEntry(req.body || {});
+  const body = validateBody(req, res, mealLogBodySchema);
+  if (!body) return;
+
+  const mealLog = buildMealLogEntry(body);
   if (!mealLog.date || !mealLog.name) {
     return res.status(400).json({ error: "Date and meal name are required." });
   }
@@ -1483,61 +1790,160 @@ app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
       .json({ error: "Add calories or at least one macro value for the meal." });
   }
 
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    const mealLogs = [mealLog, ...dashboard.mealLogs].slice(0, 800);
-    const hasManualCaloriesForDay = dashboard.calories.some(
-      (item) =>
-        cleanText(item?.date, 20) === mealLog.date &&
-        cleanText(item?.source || "manual", 20) !== "meal_logs"
-    );
+  const mealLogDate = mealLog.date;
+  const mealLogCaloriesId = `meal-logs-${mealLogDate}`;
+  const mealLogCaloriesUpdatedAt = new Date().toISOString();
 
-    let calories = dashboard.calories;
-    if (!hasManualCaloriesForDay) {
-      const dayCalories = mealLogs.reduce((sum, item) => {
-        if (cleanText(item?.date, 20) !== mealLog.date) return sum;
-        return sum + (toNullableNumber(item?.calories, 0, 5000) ?? 0);
-      }, 0);
-      calories = dashboard.calories.filter(
-        (item) =>
-          !(
-            cleanText(item?.date, 20) === mealLog.date &&
-            cleanText(item?.source || "", 20) === "meal_logs"
-          )
-      );
-      if (dayCalories > 0) {
-        calories = [
-          {
-            id: `meal-logs-${mealLog.date}`,
-            date: mealLog.date,
-            calories: Math.round(dayCalories),
-            source: "meal_logs",
-            updatedAt: new Date().toISOString()
-          },
-          ...calories
-        ];
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    [
+      {
+        $set: {
+          "dashboard.mealLogs": {
+            $slice: [
+              {
+                $concatArrays: [[mealLog], { $ifNull: ["$dashboard.mealLogs", []] }]
+              },
+              800
+            ]
+          }
+        }
+      },
+      {
+        $set: {
+          "dashboard.calories": {
+            $let: {
+              vars: {
+                currentCalories: { $ifNull: ["$dashboard.calories", []] },
+                updatedMealLogs: "$dashboard.mealLogs"
+              },
+              in: {
+                $let: {
+                  vars: {
+                    hasManualCaloriesForDay: {
+                      $gt: [
+                        {
+                          $size: {
+                            $filter: {
+                              input: "$$currentCalories",
+                              as: "entry",
+                              cond: {
+                                $and: [
+                                  {
+                                    $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
+                                  },
+                                  {
+                                    $ne: [
+                                      { $ifNull: ["$$entry.source", "manual"] },
+                                      "meal_logs"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        0
+                      ]
+                    },
+                    caloriesWithoutMealLogSource: {
+                      $filter: {
+                        input: "$$currentCalories",
+                        as: "entry",
+                        cond: {
+                          $not: [
+                            {
+                              $and: [
+                                {
+                                  $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
+                                },
+                                {
+                                  $eq: [{ $ifNull: ["$$entry.source", ""] }, "meal_logs"]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  in: {
+                    $cond: [
+                      "$$hasManualCaloriesForDay",
+                      { $slice: ["$$currentCalories", 1000] },
+                      {
+                        $let: {
+                          vars: {
+                            dayCalories: {
+                              $sum: {
+                                $map: {
+                                  input: {
+                                    $filter: {
+                                      input: "$$updatedMealLogs",
+                                      as: "log",
+                                      cond: {
+                                        $eq: [{ $ifNull: ["$$log.date", ""] }, mealLogDate]
+                                      }
+                                    }
+                                  },
+                                  as: "log",
+                                  in: { $ifNull: ["$$log.calories", 0] }
+                                }
+                              }
+                            }
+                          },
+                          in: {
+                            $slice: [
+                              {
+                                $cond: [
+                                  { $gt: ["$$dayCalories", 0] },
+                                  {
+                                    $concatArrays: [
+                                      [
+                                        {
+                                          id: mealLogCaloriesId,
+                                          date: mealLogDate,
+                                          calories: { $round: ["$$dayCalories", 0] },
+                                          source: "meal_logs",
+                                          updatedAt: mealLogCaloriesUpdatedAt
+                                        }
+                                      ],
+                                      "$$caloriesWithoutMealLogSource"
+                                    ]
+                                  },
+                                  "$$caloriesWithoutMealLogSource"
+                                ]
+                              },
+                              1000
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    }
+    ],
+    { new: true }
+  );
 
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        mealLogs,
-        calories: calories.slice(0, 1000)
-      }
-    };
-  });
-
-  if (!updated) return res.status(404).json({ error: "User not found." });
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
   res.json({
-    dashboard: updated.dashboard,
+    dashboard: buildDashboard(updated?.dashboard),
     mealLog: updated.dashboard?.mealLogs?.[0] || mealLog
   });
 });
 
 app.post("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
-  const metric = buildProgressMetricEntry(req.body || {});
+  const body = validateBody(req, res, progressMetricBodySchema);
+  if (!body) return;
+
+  const metric = buildProgressMetricEntry(body);
   if (!metric.date) {
     return res.status(400).json({ error: "Date is required." });
   }
@@ -1552,56 +1958,85 @@ app.post("/api/dashboard/progress-metrics", requireAuth, async (req, res) => {
       .json({ error: "Add at least one metric: weight, body fat, waist, or resting heart rate." });
   }
 
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        progressMetrics: [metric, ...dashboard.progressMetrics].slice(0, 400)
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    {
+      $push: {
+        "dashboard.progressMetrics": {
+          $each: [metric],
+          $position: 0,
+          $slice: 400
+        }
       }
-    };
-  });
-  if (!updated) return res.status(404).json({ error: "User not found." });
+    },
+    { new: true }
+  );
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
   res.json({
-    dashboard: updated.dashboard,
+    dashboard: buildDashboard(updated?.dashboard),
     progressMetric: updated.dashboard?.progressMetrics?.[0] || metric
   });
 });
 
 app.post("/api/dashboard/saved-exercises", requireAuth, async (req, res) => {
-  const payload = req.body || {};
+  const payload = validateBody(req, res, savedExerciseBodySchema);
+  if (!payload) return;
+
   const entry = buildSavedExerciseEntry(payload);
   if (!entry.name) {
     return res.status(400).json({ error: "Exercise name is required." });
   }
 
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    const existing = Array.isArray(dashboard.savedExercises)
-      ? dashboard.savedExercises
-      : [];
-    const next = existing.filter((item) => {
-      if (entry.exerciseId !== null && item?.exerciseId === entry.exerciseId) return false;
-      if (
-        cleanText(item?.name, 180).toLowerCase() ===
-        entry.name.toLowerCase()
-      ) {
-        return false;
+  const savedName = entry.name.toLowerCase();
+  const exerciseIdCondition =
+    entry.exerciseId === null ? true : { $ne: ["$$item.exerciseId", entry.exerciseId] };
+
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    [
+      {
+        $set: {
+          "dashboard.savedExercises": {
+            $slice: [
+              {
+                $concatArrays: [
+                  [entry],
+                  {
+                    $filter: {
+                      input: { $ifNull: ["$dashboard.savedExercises", []] },
+                      as: "item",
+                      cond: {
+                        $and: [
+                          exerciseIdCondition,
+                          {
+                            $ne: [
+                              {
+                                $toLower: {
+                                  $toString: { $ifNull: ["$$item.name", ""] }
+                                }
+                              },
+                              savedName
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              200
+            ]
+          }
+        }
       }
-      return true;
-    });
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        savedExercises: [entry, ...next].slice(0, 200)
-      }
-    };
-  });
-  if (!updated) return res.status(404).json({ error: "User not found." });
+    ],
+    { new: true }
+  );
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
   res.json({
-    dashboard: updated.dashboard,
+    dashboard: buildDashboard(updated?.dashboard),
     savedExercise: updated.dashboard?.savedExercises?.[0] || entry
   });
 });
@@ -1610,21 +2045,18 @@ app.delete("/api/dashboard/saved-exercises/:id", requireAuth, async (req, res) =
   const entryId = cleanText(req.params.id, 64);
   if (!entryId) return res.status(400).json({ error: "Exercise id is required." });
 
-  const updated = await updateUser(req.user.id, (user) => {
-    const dashboard = buildDashboard(user.dashboard);
-    const next = (Array.isArray(dashboard.savedExercises) ? dashboard.savedExercises : []).filter(
-      (item) => cleanText(item?.id, 64) !== entryId
-    );
-    return {
-      ...user,
-      dashboard: {
-        ...dashboard,
-        savedExercises: next
+  const updatedDoc = await User.findOneAndUpdate(
+    { userId: req.user.id },
+    {
+      $pull: {
+        "dashboard.savedExercises": { id: entryId }
       }
-    };
-  });
-  if (!updated) return res.status(404).json({ error: "User not found." });
-  res.json({ dashboard: updated.dashboard, ok: true });
+    },
+    { new: true }
+  );
+  if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+  const updated = mapMongoDocToUser(updatedDoc);
+  res.json({ dashboard: buildDashboard(updated?.dashboard), ok: true });
 });
 
 app.post("/api/generate", async (req, res) => {
@@ -1633,7 +2065,9 @@ app.post("/api/generate", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
     }
 
-    const body = req.body || {};
+    const body = validateBody(req, res, generatePlanBodySchema);
+    if (!body) return;
+
     const goal = cleanText(body.goal, 120) || "Build strength and energy";
     const equipment = toCleanArray(body.equipment, 10, 80);
     const duration = toNullableNumber(body.duration, 15, 180) ?? 45;
@@ -1676,16 +2110,20 @@ app.post("/api/generate", async (req, res) => {
         plan
       };
 
-      const updated = await updateUser(sessionUser.id, (user) => {
-        const dashboard = buildDashboard(user.dashboard);
-        return {
-          ...user,
-          dashboard: {
-            ...dashboard,
-            plans: [planEntry, ...(dashboard.plans || [])]
+      const updatedDoc = await User.findOneAndUpdate(
+        { userId: sessionUser.id },
+        {
+          $push: {
+            "dashboard.plans": {
+              $each: [planEntry],
+              $position: 0,
+              $slice: 200
+            }
           }
-        };
-      });
+        },
+        { new: true }
+      );
+      const updated = mapMongoDocToUser(updatedDoc);
       savedPlan = updated?.dashboard?.plans?.[0] || planEntry;
     }
 
@@ -1699,6 +2137,7 @@ const startServer = async () => {
   try {
     const { mongoUri } = await connectDatabase();
     console.log(`MongoDB connected: ${mongoUri}`);
+    await initSessionStore();
     app.listen(port, () => {
       console.log(`Server listening on http://localhost:${port}`);
     });
