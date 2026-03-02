@@ -2147,4 +2147,40 @@ const startServer = async () => {
   }
 };
 
-startServer();
+export {
+  app,
+  startServer
+};
+
+export const __testables = {
+  defaultProfile,
+  defaultGoals,
+  defaultDashboard,
+  buildDashboard,
+  cleanText,
+  toNullableNumber,
+  toCleanArray,
+  toCleanNameArray,
+  buildWorkoutSessionEntry,
+  toWorkoutSummaryEntry,
+  buildMealLogEntry,
+  buildProgressMetricEntry,
+  buildSavedExerciseEntry,
+  buildProfile,
+  isCompleteSignupProfile,
+  getValidationMessage,
+  toFiniteNumber,
+  weatherCodeToText,
+  isSevereWeatherCode,
+  isOutdoorFriendlyNow,
+  buildWorkoutRecommendation,
+  normalizePlainText,
+  parseMultiNumberQuery,
+  parseCookies,
+  parseRedisPort,
+  parseEnvBoolean
+};
+
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  startServer();
+}
