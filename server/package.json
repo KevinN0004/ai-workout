@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "migrate:dashboard-activities": "node scripts/migrate-dashboard-activities.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

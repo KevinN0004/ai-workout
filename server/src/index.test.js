@@ -6,11 +6,14 @@ const {
   buildMealLogEntry,
   buildProfile,
   buildWorkoutSessionEntry,
+  buildExternalCacheKey,
   cleanText,
   isCompleteSignupProfile,
+  mergeCacheStatuses,
   parseCookies,
   parseEnvBoolean,
   parseRedisPort,
+  serializeCacheKeyPart,
   toNullableNumber,
   weatherCodeToText
 } = __testables;
@@ -135,6 +138,26 @@ describe("server utilities", () => {
     expect(parseEnvBoolean("true", false)).toBe(true);
     expect(parseEnvBoolean("off", true)).toBe(false);
     expect(parseEnvBoolean("unknown", true)).toBe(true);
+  });
+
+  test("cache key serializer is stable across object key order", () => {
+    const keyA = buildExternalCacheKey("wger", {
+      endpoint: "exerciseinfo/",
+      query: { limit: 20, offset: 0, muscles: [4, 2] }
+    });
+    const keyB = buildExternalCacheKey("wger", {
+      query: { muscles: [4, 2], offset: 0, limit: 20 },
+      endpoint: "exerciseinfo/"
+    });
+
+    expect(keyA).toBe(keyB);
+    expect(serializeCacheKeyPart({ b: 2, a: 1 })).toBe("{a:1,b:2}");
+  });
+
+  test("mergeCacheStatuses prioritizes stale over hit and miss", () => {
+    expect(mergeCacheStatuses("hit", "hit")).toBe("hit");
+    expect(mergeCacheStatuses("miss", "hit")).toBe("miss");
+    expect(mergeCacheStatuses("hit", "stale", "miss")).toBe("stale");
   });
 
   test("weatherCodeToText maps known weather codes", () => {

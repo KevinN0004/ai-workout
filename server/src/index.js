@@ -53,6 +53,13 @@ const metrics = {
   requestsTotal: 0,
   authFailures: 0,
   rateLimited: 0,
+  externalCache: {
+    hits: 0,
+    misses: 0,
+    staleHits: 0,
+    writes: 0,
+    evictions: 0
+  },
   externalApiFailures: {
     openMeteo: 0,
     openAq: 0,
@@ -138,6 +145,15 @@ const externalApiRetryBaseDelayMs = toPositiveInt(
   process.env.EXTERNAL_API_RETRY_BASE_DELAY_MS,
   250
 );
+const externalCacheMaxEntries = toPositiveInt(process.env.EXTERNAL_CACHE_MAX_ENTRIES, 500);
+const externalCacheDefaultStaleTtlSec = toPositiveInt(
+  process.env.EXTERNAL_CACHE_STALE_TTL_SEC,
+  60 * 60 * 6
+);
+const openMeteoCacheTtlSec = toPositiveInt(process.env.OPEN_METEO_CACHE_TTL_SEC, 300);
+const openAqCacheTtlSec = toPositiveInt(process.env.OPENAQ_CACHE_TTL_SEC, 180);
+const wgerCacheTtlSec = toPositiveInt(process.env.WGER_CACHE_TTL_SEC, 900);
+const mealDbCacheTtlSec = toPositiveInt(process.env.MEALDB_CACHE_TTL_SEC, 900);
 const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
@@ -317,6 +333,129 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
+const externalResponseCache = new Map();
+
+const cloneForCache = (value) => {
+  try {
+    if (typeof structuredClone === "function") return structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
+};
+
+const serializeCacheKeyPart = (value) => {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => serializeCacheKeyPart(item)).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    const pairs = keys.map((key) => `${key}:${serializeCacheKeyPart(value[key])}`);
+    return `{${pairs.join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const buildExternalCacheKey = (serviceName, parts = {}) =>
+  `${serviceName}:${serializeCacheKeyPart(parts)}`;
+
+const pruneExternalCache = (now = Date.now()) => {
+  for (const [key, entry] of externalResponseCache.entries()) {
+    if (now <= entry.staleUntilMs) continue;
+    externalResponseCache.delete(key);
+    metrics.externalCache.evictions += 1;
+  }
+  while (externalResponseCache.size > externalCacheMaxEntries) {
+    const oldestKey = externalResponseCache.keys().next().value;
+    if (!oldestKey) break;
+    externalResponseCache.delete(oldestKey);
+    metrics.externalCache.evictions += 1;
+  }
+};
+
+const readExternalCache = (cacheKey, now = Date.now()) => {
+  const entry = externalResponseCache.get(cacheKey);
+  if (!entry) return null;
+  if (now > entry.staleUntilMs) {
+    externalResponseCache.delete(cacheKey);
+    metrics.externalCache.evictions += 1;
+    return null;
+  }
+  return {
+    payload: cloneForCache(entry.payload),
+    fresh: now <= entry.expiresAtMs,
+    staleAgeMs: Math.max(0, now - entry.expiresAtMs)
+  };
+};
+
+const writeExternalCache = (
+  cacheKey,
+  payload,
+  ttlSec,
+  staleTtlSec = externalCacheDefaultStaleTtlSec
+) => {
+  const now = Date.now();
+  const ttlMs = Math.max(1, toPositiveInt(ttlSec, 1)) * 1000;
+  const staleMs = Math.max(1, toPositiveInt(staleTtlSec, 1)) * 1000;
+  pruneExternalCache(now);
+  if (externalResponseCache.has(cacheKey)) {
+    externalResponseCache.delete(cacheKey);
+  }
+  externalResponseCache.set(cacheKey, {
+    payload: cloneForCache(payload),
+    createdAtMs: now,
+    expiresAtMs: now + ttlMs,
+    staleUntilMs: now + ttlMs + staleMs
+  });
+  metrics.externalCache.writes += 1;
+};
+
+const readThroughExternalCache = async ({
+  serviceName,
+  cacheKey,
+  ttlSec,
+  staleTtlSec = externalCacheDefaultStaleTtlSec,
+  requestFn
+}) => {
+  const cached = readExternalCache(cacheKey);
+  if (cached?.fresh) {
+    metrics.externalCache.hits += 1;
+    return { data: cached.payload, cache: "hit" };
+  }
+
+  metrics.externalCache.misses += 1;
+  try {
+    const data = await requestFn();
+    writeExternalCache(cacheKey, data, ttlSec, staleTtlSec);
+    return { data, cache: "miss" };
+  } catch (err) {
+    if (cached) {
+      metrics.externalCache.staleHits += 1;
+      logger.warn({
+        event: "external_api_stale_cache_served",
+        service: serviceName,
+        cacheKey: cacheKey.slice(0, 220),
+        staleAgeMs: cached.staleAgeMs,
+        message: toShortText(err?.message || String(err), 220)
+      });
+      return { data: cached.payload, cache: "stale" };
+    }
+    throw err;
+  }
+};
+
+const mergeCacheStatuses = (...statuses) => {
+  const clean = statuses
+    .map((status) => cleanText(status, 20).toLowerCase())
+    .filter(Boolean);
+  if (!clean.length) return "";
+  if (clean.includes("stale")) return "stale";
+  if (clean.every((status) => status === "hit")) return "hit";
+  if (clean.includes("miss")) return "miss";
+  return clean[0];
+};
 
 const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -637,112 +776,133 @@ const runExternalRequestWithRetry = async (serviceName, requestFn) => {
 };
 
 const fetchOpenMeteo = async (query) => {
-  return runExternalRequestWithRetry("openMeteo", async () => {
-    if (typeof fetch !== "function") {
-      const err = new Error("This Node runtime does not support fetch.");
-      err.status = 500;
-      throw err;
-    }
+  const cacheKey = buildExternalCacheKey("openMeteo", {
+    baseUrl: openMeteoBaseUrl,
+    query
+  });
+  return readThroughExternalCache({
+    serviceName: "openMeteo",
+    cacheKey,
+    ttlSec: openMeteoCacheTtlSec,
+    requestFn: async () =>
+      runExternalRequestWithRetry("openMeteo", async () => {
+        if (typeof fetch !== "function") {
+          const err = new Error("This Node runtime does not support fetch.");
+          err.status = 500;
+          throw err;
+        }
 
-    const url = new URL(openMeteoBaseUrl);
-    for (const [key, value] of Object.entries(query || {})) {
-      if (value === undefined || value === null || value === "") continue;
-      url.searchParams.set(key, String(value));
-    }
-    url.searchParams.set("timezone", "auto");
+        const url = new URL(openMeteoBaseUrl);
+        for (const [key, value] of Object.entries(query || {})) {
+          if (value === undefined || value === null || value === "") continue;
+          url.searchParams.set(key, String(value));
+        }
+        url.searchParams.set("timezone", "auto");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
-        err.status = response.status >= 500 ? 502 : response.status;
-        throw err;
-      }
-      return data;
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        const timeoutErr = new Error("Open-Meteo request timed out.");
-        timeoutErr.status = 504;
-        throw timeoutErr;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
-    }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
+            err.status = response.status >= 500 ? 502 : response.status;
+            throw err;
+          }
+          return data;
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            const timeoutErr = new Error("Open-Meteo request timed out.");
+            timeoutErr.status = 504;
+            throw timeoutErr;
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeout);
+        }
+      })
   });
 };
 
 const openAqRequest = async (endpoint, query = {}) => {
-  return runExternalRequestWithRetry("openAq", async () => {
-    if (!openAqApiKey) {
-      const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
-      err.status = 503;
-      throw err;
-    }
-    if (typeof fetch !== "function") {
-      const err = new Error("This Node runtime does not support fetch.");
-      err.status = 500;
-      throw err;
-    }
+  const cacheKey = buildExternalCacheKey("openAq", {
+    baseUrl: openAqBaseUrl,
+    endpoint,
+    query
+  });
+  return readThroughExternalCache({
+    serviceName: "openAq",
+    cacheKey,
+    ttlSec: openAqCacheTtlSec,
+    requestFn: async () =>
+      runExternalRequestWithRetry("openAq", async () => {
+        if (!openAqApiKey) {
+          const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
+          err.status = 503;
+          throw err;
+        }
+        if (typeof fetch !== "function") {
+          const err = new Error("This Node runtime does not support fetch.");
+          err.status = 500;
+          throw err;
+        }
 
-    const base = openAqBaseUrl.replace(/\/+$/, "");
-    const path = String(endpoint || "").replace(/^\/+/, "");
-    const url = new URL(`${base}/${path}`);
-    for (const [key, value] of Object.entries(query || {})) {
-      if (value === undefined || value === null || value === "") continue;
-      url.searchParams.set(key, String(value));
-    }
+        const base = openAqBaseUrl.replace(/\/+$/, "");
+        const path = String(endpoint || "").replace(/^\/+/, "");
+        const url = new URL(`${base}/${path}`);
+        for (const [key, value] of Object.entries(query || {})) {
+          if (value === undefined || value === null || value === "") continue;
+          url.searchParams.set(key, String(value));
+        }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "X-API-Key": openAqApiKey
-        },
-        signal: controller.signal
-      });
-      const rawBody = await response.text();
-      let data = {};
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {};
-      } catch {
-        data = rawBody;
-      }
-      if (!response.ok) {
-        const stringBody = cleanText(typeof data === "string" ? data : "", 220);
-        const firstError =
-          Array.isArray(data) && data.length
-            ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
-            : "";
-        const err = new Error(
-          cleanText(
-            firstError ||
-              (typeof data === "object" && data
-                ? data?.message || data?.detail || data?.error
-                : "") ||
-              stringBody ||
-              "OpenAQ request failed.",
-            220
-          )
-        );
-        err.status = response.status >= 500 ? 502 : response.status;
-        throw err;
-      }
-      return data;
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        const timeoutErr = new Error("OpenAQ request timed out.");
-        timeoutErr.status = 504;
-        throw timeoutErr;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
-    }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
+        try {
+          const response = await fetch(url, {
+            headers: {
+              "X-API-Key": openAqApiKey
+            },
+            signal: controller.signal
+          });
+          const rawBody = await response.text();
+          let data = {};
+          try {
+            data = rawBody ? JSON.parse(rawBody) : {};
+          } catch {
+            data = rawBody;
+          }
+          if (!response.ok) {
+            const stringBody = cleanText(typeof data === "string" ? data : "", 220);
+            const firstError =
+              Array.isArray(data) && data.length
+                ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
+                : "";
+            const err = new Error(
+              cleanText(
+                firstError ||
+                  (typeof data === "object" && data
+                    ? data?.message || data?.detail || data?.error
+                    : "") ||
+                  stringBody ||
+                  "OpenAQ request failed.",
+                220
+              )
+            );
+            err.status = response.status >= 500 ? 502 : response.status;
+            throw err;
+          }
+          return data;
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            const timeoutErr = new Error("OpenAQ request timed out.");
+            timeoutErr.status = 504;
+            throw timeoutErr;
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeout);
+        }
+      })
   });
 };
 
@@ -922,111 +1082,133 @@ const parseMultiNumberQuery = (input, min, max, maxItems = 8) => {
 };
 
 const wgerRequest = async (endpoint, options = {}) => {
-  return runExternalRequestWithRetry("wger", async () => {
-    if (typeof fetch !== "function") {
-      const err = new Error("This Node runtime does not support fetch.");
-      err.status = 500;
-      throw err;
-    }
-
-    const { query = {} } = options;
-    const base = wgerBaseUrl.replace(/\/+$/, "");
-    const path = String(endpoint || "").replace(/^\/+/, "");
-    const url = new URL(`${base}/${path}`);
-
-    for (const [key, value] of Object.entries(query || {})) {
-      if (value === undefined || value === null || value === "") continue;
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (item === undefined || item === null || item === "") continue;
-          url.searchParams.append(key, String(item));
+  const query = options?.query || {};
+  const cacheKey = buildExternalCacheKey("wger", {
+    baseUrl: wgerBaseUrl,
+    endpoint,
+    query
+  });
+  return readThroughExternalCache({
+    serviceName: "wger",
+    cacheKey,
+    ttlSec: wgerCacheTtlSec,
+    requestFn: async () =>
+      runExternalRequestWithRetry("wger", async () => {
+        if (typeof fetch !== "function") {
+          const err = new Error("This Node runtime does not support fetch.");
+          err.status = 500;
+          throw err;
         }
-        continue;
-      }
-      url.searchParams.set(key, String(value));
-    }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
-    try {
-      const response = await fetch(url, {
-        headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
-        signal: controller.signal
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const message = cleanText(
-          data?.detail || data?.reason || data?.message || "Wger request failed.",
-          220
-        );
-        const err = new Error(message);
-        err.status = response.status >= 500 ? 502 : response.status;
-        throw err;
-      }
-      return data;
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        const timeoutErr = new Error("Wger request timed out.");
-        timeoutErr.status = 504;
-        throw timeoutErr;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
-    }
+        const base = wgerBaseUrl.replace(/\/+$/, "");
+        const path = String(endpoint || "").replace(/^\/+/, "");
+        const url = new URL(`${base}/${path}`);
+
+        for (const [key, value] of Object.entries(query || {})) {
+          if (value === undefined || value === null || value === "") continue;
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              if (item === undefined || item === null || item === "") continue;
+              url.searchParams.append(key, String(item));
+            }
+            continue;
+          }
+          url.searchParams.set(key, String(value));
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
+        try {
+          const response = await fetch(url, {
+            headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
+            signal: controller.signal
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = cleanText(
+              data?.detail || data?.reason || data?.message || "Wger request failed.",
+              220
+            );
+            const err = new Error(message);
+            err.status = response.status >= 500 ? 502 : response.status;
+            throw err;
+          }
+          return data;
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            const timeoutErr = new Error("Wger request timed out.");
+            timeoutErr.status = 504;
+            throw timeoutErr;
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeout);
+        }
+      })
   });
 };
 
 const mealDbRequest = async (endpoint, query = {}) => {
-  return runExternalRequestWithRetry("mealDb", async () => {
-    if (typeof fetch !== "function") {
-      const err = new Error("This Node runtime does not support fetch.");
-      err.status = 500;
-      throw err;
-    }
+  const cacheKey = buildExternalCacheKey("mealDb", {
+    baseUrl: mealDbBaseUrl,
+    endpoint,
+    query
+  });
+  return readThroughExternalCache({
+    serviceName: "mealDb",
+    cacheKey,
+    ttlSec: mealDbCacheTtlSec,
+    requestFn: async () =>
+      runExternalRequestWithRetry("mealDb", async () => {
+        if (typeof fetch !== "function") {
+          const err = new Error("This Node runtime does not support fetch.");
+          err.status = 500;
+          throw err;
+        }
 
-    const base = mealDbBaseUrl.replace(/\/+$/, "");
-    const path = String(endpoint || "").replace(/^\/+/, "");
-    const url = new URL(`${base}/${path}`);
-    for (const [key, value] of Object.entries(query || {})) {
-      if (value === undefined || value === null || value === "") continue;
-      url.searchParams.set(key, String(value));
-    }
+        const base = mealDbBaseUrl.replace(/\/+$/, "");
+        const path = String(endpoint || "").replace(/^\/+/, "");
+        const url = new URL(`${base}/${path}`);
+        for (const [key, value] of Object.entries(query || {})) {
+          if (value === undefined || value === null || value === "") continue;
+          url.searchParams.set(key, String(value));
+        }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      const rawBody = await response.text();
-      let data = {};
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {};
-      } catch {
-        data = {};
-      }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          const rawBody = await response.text();
+          let data = {};
+          try {
+            data = rawBody ? JSON.parse(rawBody) : {};
+          } catch {
+            data = {};
+          }
 
-      if (!response.ok) {
-        const err = new Error(
-          cleanText(
-            data?.message || data?.detail || data?.error || "MealDB request failed.",
-            220
-          )
-        );
-        err.status = response.status >= 500 ? 502 : response.status;
-        throw err;
-      }
+          if (!response.ok) {
+            const err = new Error(
+              cleanText(
+                data?.message || data?.detail || data?.error || "MealDB request failed.",
+                220
+              )
+            );
+            err.status = response.status >= 500 ? 502 : response.status;
+            throw err;
+          }
 
-      return data;
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        const timeoutErr = new Error("MealDB request timed out.");
-        timeoutErr.status = 504;
-        throw timeoutErr;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
-    }
+          return data;
+        } catch (err) {
+          if (err?.name === "AbortError") {
+            const timeoutErr = new Error("MealDB request timed out.");
+            timeoutErr.status = 504;
+            throw timeoutErr;
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeout);
+        }
+      })
   });
 };
 
@@ -1488,24 +1670,18 @@ const parseDashboardPagination = (query = {}, defaultLimit = dashboardCollection
   };
 };
 
-const sliceLegacyItems = (items, limit, offset) => {
-  if (!Array.isArray(items) || !items.length) return [];
-  return items.slice(offset, offset + limit);
-};
-
 const stripUserIdField = (doc = {}) => {
   if (!doc || typeof doc !== "object") return doc;
   const { userId, ...rest } = doc;
   return rest;
 };
 
-const loadCollectionPageWithFallback = async ({
+const loadCollectionPage = async ({
   model,
   userId,
   sortField,
   limit,
-  offset,
-  legacyItems
+  offset
 }) => {
   const [items, total] = await Promise.all([
     model
@@ -1517,33 +1693,12 @@ const loadCollectionPageWithFallback = async ({
     model.countDocuments({ userId })
   ]);
 
-  if (total > 0) {
-    return {
-      items: items.map(stripUserIdField),
-      total,
-      limit,
-      offset,
-      source: "collection"
-    };
-  }
-
-  const fallback = sliceLegacyItems(legacyItems, limit, offset);
-  if (!fallback.length) {
-    return {
-      items: [],
-      total: 0,
-      limit,
-      offset,
-      source: "collection"
-    };
-  }
-
   return {
-    items: fallback,
-    total: Array.isArray(legacyItems) ? legacyItems.length : 0,
+    items: items.map(stripUserIdField),
+    total,
     limit,
     offset,
-    source: "legacy"
+    source: "collection"
   };
 };
 
@@ -1570,31 +1725,27 @@ const getDashboardCollections = async (user, pagination = {}) => {
     ...(pagination.progressMetrics || {})
   };
 
-  const legacyDashboard = buildDashboard(user?.dashboard);
   const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
-    loadCollectionPageWithFallback({
+    loadCollectionPage({
       model: WorkoutSession,
       userId,
       sortField: "createdAt",
       limit: workoutPagination.limit,
-      offset: workoutPagination.offset,
-      legacyItems: legacyDashboard.workoutSessions
+      offset: workoutPagination.offset
     }),
-    loadCollectionPageWithFallback({
+    loadCollectionPage({
       model: MealLog,
       userId,
       sortField: "loggedAt",
       limit: mealPagination.limit,
-      offset: mealPagination.offset,
-      legacyItems: legacyDashboard.mealLogs
+      offset: mealPagination.offset
     }),
-    loadCollectionPageWithFallback({
+    loadCollectionPage({
       model: ProgressMetric,
       userId,
       sortField: "loggedAt",
       limit: metricPagination.limit,
-      offset: metricPagination.offset,
-      legacyItems: legacyDashboard.progressMetrics
+      offset: metricPagination.offset
     })
   ]);
 
@@ -1801,6 +1952,7 @@ app.get("/api/metrics", (req, res) => {
     requestsTotal: metrics.requestsTotal,
     authFailures: metrics.authFailures,
     rateLimited: metrics.rateLimited,
+    externalCache: { ...metrics.externalCache },
     externalApiFailures: { ...metrics.externalApiFailures },
     externalApiRetries: { ...metrics.externalApiRetries }
   });
@@ -1818,7 +1970,7 @@ app.get("/api/weather/current", async (req, res) => {
       return res.status(400).json({ error: "Valid latitude and longitude are required." });
     }
 
-    const data = await fetchOpenMeteo({
+    const { data, cache } = await fetchOpenMeteo({
       latitude,
       longitude,
       current:
@@ -1827,6 +1979,7 @@ app.get("/api/weather/current", async (req, res) => {
 
     const current = data?.current || {};
     res.json({
+      cache,
       location: {
         latitude: toFiniteNumber(data?.latitude),
         longitude: toFiniteNumber(data?.longitude),
@@ -1881,7 +2034,7 @@ app.get("/api/weather/recommendation", async (req, res) => {
       return res.status(400).json({ error: "Valid latitude and longitude are required." });
     }
 
-    const data = await fetchOpenMeteo({
+    const { data, cache } = await fetchOpenMeteo({
       latitude,
       longitude,
       current:
@@ -1905,6 +2058,7 @@ app.get("/api/weather/recommendation", async (req, res) => {
     }
 
     res.json({
+      cache,
       location: {
         latitude: toFiniteNumber(data?.latitude),
         longitude: toFiniteNumber(data?.longitude),
@@ -1969,11 +2123,12 @@ app.get("/api/air-quality/current", async (req, res) => {
     }
 
     const radiusKm = toNullableNumber(req.query.radiusKm, 1, 100) ?? 25;
-    const locationData = await openAqRequest("locations", {
+    const locationResponse = await openAqRequest("locations", {
       coordinates: `${latitude},${longitude}`,
       radius: Math.round(radiusKm * 1000),
       limit: 1
     });
+    const locationData = locationResponse.data;
     const location = Array.isArray(locationData?.results) ? locationData.results[0] : null;
     if (!location) {
       return res.status(404).json({ error: "No nearby air quality station found." });
@@ -1984,7 +2139,8 @@ app.get("/api/air-quality/current", async (req, res) => {
       return res.status(502).json({ error: "OpenAQ response missing location id." });
     }
 
-    const latestData = await openAqRequest(`locations/${Math.trunc(locationId)}/latest`);
+    const latestResponse = await openAqRequest(`locations/${Math.trunc(locationId)}/latest`);
+    const latestData = latestResponse.data;
     const rawReadings = Array.isArray(latestData?.results) ? latestData.results : [];
     const sensorMap = new Map(
       (Array.isArray(location?.sensors) ? location.sensors : []).map((sensor) => [
@@ -2011,6 +2167,11 @@ app.get("/api/air-quality/current", async (req, res) => {
     const recommendation = aqiBand(aqiUs);
 
     res.json({
+      cache: {
+        status: mergeCacheStatuses(locationResponse.cache, latestResponse.cache),
+        locations: locationResponse.cache,
+        latest: latestResponse.cache
+      },
       location: {
         id: toFiniteNumber(location?.id),
         name: cleanText(location?.name, 120),
@@ -2071,11 +2232,14 @@ app.get("/api/air-quality/current", async (req, res) => {
 
 app.get("/api/wger/meta", async (req, res) => {
   try {
-    const [categoriesData, musclesData, equipmentData] = await Promise.all([
+    const [categoriesResponse, musclesResponse, equipmentResponse] = await Promise.all([
       wgerRequest("exercisecategory/", { query: { limit: 200 } }),
       wgerRequest("muscle/", { query: { limit: 200 } }),
       wgerRequest("equipment/", { query: { limit: 200 } })
     ]);
+    const categoriesData = categoriesResponse.data;
+    const musclesData = musclesResponse.data;
+    const equipmentData = equipmentResponse.data;
 
     const categories = (Array.isArray(categoriesData?.results) ? categoriesData.results : []).map(
       (item) => ({
@@ -2096,7 +2260,21 @@ app.get("/api/wger/meta", async (req, res) => {
       })
     );
 
-    res.json({ categories, muscles, equipment });
+    res.json({
+      cache: {
+        status: mergeCacheStatuses(
+          categoriesResponse.cache,
+          musclesResponse.cache,
+          equipmentResponse.cache
+        ),
+        categories: categoriesResponse.cache,
+        muscles: musclesResponse.cache,
+        equipment: equipmentResponse.cache
+      },
+      categories,
+      muscles,
+      equipment
+    });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     if (isUpstreamFailureStatus(status)) {
@@ -2133,7 +2311,7 @@ app.get("/api/wger/exercises", async (req, res) => {
     if (muscles.length) query.muscles = muscles;
     if (equipment.length) query.equipment = equipment;
 
-    const data = await wgerRequest("exerciseinfo/", { query });
+    const { data, cache } = await wgerRequest("exerciseinfo/", { query });
     const exercises = (Array.isArray(data?.results) ? data.results : [])
       .map((item) => mapWgerExercise(item, language))
       .filter((item) => {
@@ -2151,6 +2329,7 @@ app.get("/api/wger/exercises", async (req, res) => {
       .slice(0, limit);
 
     res.json({
+      cache,
       count: q ? exercises.length : toFiniteNumber(data?.count) ?? exercises.length,
       next: cleanText(data?.next, 300),
       previous: cleanText(data?.previous, 300),
@@ -2189,23 +2368,33 @@ app.get("/api/wger/exercises/:id", async (req, res) => {
       return res.status(400).json({ error: "Valid exercise id is required." });
     }
     const language = toNullableNumber(req.query.language, 1, 100) ?? wgerDefaultLanguage;
-    let data = await wgerRequest("exerciseinfo/", {
+    let response = await wgerRequest("exerciseinfo/", {
       query: {
         id: Math.trunc(id),
         language
       }
     });
+    let data = response.data;
+    const cacheStatuses = [response.cache];
     let source = Array.isArray(data?.results) ? data.results[0] : null;
     if (!source) {
-      data = await wgerRequest("exerciseinfo/", {
+      response = await wgerRequest("exerciseinfo/", {
         query: {
           id: Math.trunc(id)
         }
       });
+      data = response.data;
+      cacheStatuses.push(response.cache);
       source = Array.isArray(data?.results) ? data.results[0] : null;
     }
     if (!source) return res.status(404).json({ error: "Exercise not found." });
-    res.json({ exercise: mapWgerExercise(source, language) });
+    res.json({
+      cache: {
+        status: mergeCacheStatuses(...cacheStatuses),
+        attempts: cacheStatuses
+      },
+      exercise: mapWgerExercise(source, language)
+    });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     if (isUpstreamFailureStatus(status)) {
@@ -2228,13 +2417,13 @@ app.get("/api/mealdb/search", async (req, res) => {
     }
     const limit = toNullableNumber(req.query.limit, 1, 20) ?? 8;
 
-    const data = await mealDbRequest("search.php", { s: query });
+    const { data, cache } = await mealDbRequest("search.php", { s: query });
     const meals = (Array.isArray(data?.meals) ? data.meals : [])
       .map((item) => mapMealDbMeal(item))
       .filter((item) => item.id && item.title)
       .slice(0, limit);
 
-    res.json({ query, count: meals.length, meals });
+    res.json({ cache, query, count: meals.length, meals });
   } catch (err) {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     if (isUpstreamFailureStatus(status)) {
@@ -3038,6 +3227,9 @@ export const __testables = {
   isOutdoorFriendlyNow,
   buildWorkoutRecommendation,
   normalizePlainText,
+  serializeCacheKeyPart,
+  buildExternalCacheKey,
+  mergeCacheStatuses,
   parseMultiNumberQuery,
   parseCookies,
   parseRedisPort,
