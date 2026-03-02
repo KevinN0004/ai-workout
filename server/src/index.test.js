@@ -1,8 +1,13 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { app, __testables } from "./index.js";
+import MealLog from "./models/MealLog.js";
+import ProgressMetric from "./models/ProgressMetric.js";
+import User from "./models/User.js";
+import WorkoutSession from "./models/WorkoutSession.js";
 
 const {
   buildDashboard,
+  defaultDashboard,
   buildMealLogEntry,
   buildProfile,
   buildWorkoutSessionEntry,
@@ -20,6 +25,47 @@ const {
 
 let server;
 let baseUrl = "";
+
+const extractCookieFromHeader = (headerValue, cookieName) => {
+  const raw = String(headerValue || "");
+  const match = raw.match(new RegExp(`${cookieName}=([^;,\\s]+)`));
+  if (!match) return "";
+  return `${cookieName}=${match[1]}`;
+};
+
+const createFindChain = (items = []) => {
+  const state = {
+    rows: Array.isArray(items) ? items.map((item) => ({ ...item })) : []
+  };
+  return {
+    sort(sortSpec = {}) {
+      const [sortField, sortDir] = Object.entries(sortSpec)[0] || [];
+      if (!sortField) return this;
+      state.rows.sort((a, b) => {
+        const left = String(a?.[sortField] || "");
+        const right = String(b?.[sortField] || "");
+        return sortDir === -1 ? right.localeCompare(left) : left.localeCompare(right);
+      });
+      return this;
+    },
+    skip(value) {
+      const count = Number.isFinite(Number(value)) ? Number(value) : 0;
+      state.rows = state.rows.slice(Math.max(0, count));
+      return this;
+    },
+    limit(value) {
+      const count = Number.isFinite(Number(value)) ? Number(value) : state.rows.length;
+      state.rows = state.rows.slice(0, Math.max(0, count));
+      return this;
+    },
+    lean: async () => state.rows.map((item) => ({ ...item }))
+  };
+};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 beforeAll(async () => {
   server = app.listen(0);
@@ -219,5 +265,235 @@ describe("server routes", () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toMatch(/missing gemini_api_key/i);
+  });
+
+  test("auth flow supports signup -> session me -> logout", async () => {
+    const usersById = new Map();
+
+    vi.spyOn(User, "findOne").mockImplementation(async (query = {}) => {
+      if (query.userId) return usersById.get(query.userId) || null;
+      if (query.email) {
+        for (const user of usersById.values()) {
+          if (user.email === query.email) return user;
+        }
+      }
+      return null;
+    });
+    vi.spyOn(User, "create").mockImplementation(async (doc) => {
+      usersById.set(doc.userId, { ...doc });
+      return doc;
+    });
+
+    const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
+    const csrfPayload = await csrfResponse.json();
+    const csrfToken = String(csrfPayload?.csrfToken || "");
+    const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
+
+    const signupResponse = await fetch(`${baseUrl}/api/auth/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        Cookie: csrfCookie
+      },
+      body: JSON.stringify({
+        email: "integration-auth@example.com",
+        password: "StrongPass123!",
+        rememberMe: true,
+        profile: {
+          firstName: "Taylor",
+          lastName: "Nguyen",
+          age: 30,
+          heightCm: 172,
+          weightKg: 70,
+          sex: "Male",
+          activity: "Moderate"
+        }
+      })
+    });
+    expect(signupResponse.status).toBe(200);
+
+    const signupSetCookie = signupResponse.headers.get("set-cookie") || "";
+    const sidCookie = extractCookieFromHeader(signupSetCookie, "sid");
+    expect(sidCookie).toMatch(/^sid=/);
+
+    const meResponse = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Cookie: sidCookie }
+    });
+    const meBody = await meResponse.json();
+    expect(meResponse.status).toBe(200);
+    expect(meBody.user.email).toBe("integration-auth@example.com");
+
+    const logoutCsrfResponse = await fetch(`${baseUrl}/api/csrf-token`, {
+      headers: { Cookie: sidCookie }
+    });
+    const logoutCsrfPayload = await logoutCsrfResponse.json();
+    const logoutCsrfToken = String(logoutCsrfPayload?.csrfToken || "");
+    const logoutCsrfCookie = extractCookieFromHeader(
+      logoutCsrfResponse.headers.get("set-cookie"),
+      "csrfToken"
+    );
+
+    const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": logoutCsrfToken,
+        Cookie: [sidCookie, logoutCsrfCookie].filter(Boolean).join("; ")
+      }
+    });
+    expect(logoutResponse.status).toBe(200);
+
+    const afterLogout = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Cookie: sidCookie }
+    });
+    expect(afterLogout.status).toBe(401);
+  });
+
+  test("dashboard workout mutation returns updated payload for signed-in user", async () => {
+    const usersById = new Map();
+    const workoutsByUser = new Map();
+    const toUserDoc = (doc) => (doc ? { ...doc, toObject: () => ({ ...doc }) } : null);
+
+    vi.spyOn(User, "findOne").mockImplementation(async (query = {}) => {
+      if (query.userId) return toUserDoc(usersById.get(query.userId) || null);
+      if (query.email) {
+        for (const user of usersById.values()) {
+          if (user.email === query.email) return toUserDoc(user);
+        }
+      }
+      return null;
+    });
+    vi.spyOn(User, "create").mockImplementation(async (doc) => {
+      usersById.set(doc.userId, { ...doc, dashboard: doc.dashboard || defaultDashboard() });
+      return toUserDoc(doc);
+    });
+    vi.spyOn(User, "findOneAndUpdate").mockImplementation(async (query = {}, update = {}) => {
+      const user = usersById.get(query.userId);
+      if (!user) return null;
+      if (update.$pull?.["dashboard.workouts"]?.id) {
+        const removeId = update.$pull["dashboard.workouts"].id;
+        user.dashboard.workouts = (user.dashboard.workouts || []).filter((item) => item.id !== removeId);
+      }
+      const pushCfg = update.$push?.["dashboard.workouts"];
+      if (pushCfg?.$each) {
+        const existing = Array.isArray(user.dashboard.workouts) ? user.dashboard.workouts : [];
+        user.dashboard.workouts = [...pushCfg.$each, ...existing].slice(0, pushCfg.$slice || 500);
+      }
+      usersById.set(query.userId, user);
+      return toUserDoc(user);
+    });
+
+    vi.spyOn(WorkoutSession, "findOneAndUpdate").mockImplementation(async (query = {}, update = {}) => {
+      const list = workoutsByUser.get(query.userId) || [];
+      const next = {
+        ...(update.$set || {})
+      };
+      const withoutId = list.filter((item) => item.id !== next.id);
+      workoutsByUser.set(query.userId, [next, ...withoutId]);
+      return next;
+    });
+    vi.spyOn(WorkoutSession, "countDocuments").mockImplementation(async (query = {}) => {
+      const list = workoutsByUser.get(query.userId) || [];
+      return list.length;
+    });
+    vi.spyOn(WorkoutSession, "find").mockImplementation((query = {}) => {
+      return createFindChain(workoutsByUser.get(query.userId) || []);
+    });
+
+    vi.spyOn(MealLog, "countDocuments").mockResolvedValue(0);
+    vi.spyOn(MealLog, "find").mockImplementation(() => createFindChain([]));
+    vi.spyOn(ProgressMetric, "countDocuments").mockResolvedValue(0);
+    vi.spyOn(ProgressMetric, "find").mockImplementation(() => createFindChain([]));
+
+    const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
+    const csrfPayload = await csrfResponse.json();
+    const csrfToken = String(csrfPayload?.csrfToken || "");
+    const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
+
+    const signupResponse = await fetch(`${baseUrl}/api/auth/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+        Cookie: csrfCookie
+      },
+      body: JSON.stringify({
+        email: "integration-workout@example.com",
+        password: "StrongPass123!",
+        profile: {
+          firstName: "Casey",
+          lastName: "Tran",
+          age: 31,
+          heightCm: 176,
+          weightKg: 74,
+          sex: "Female",
+          activity: "High"
+        }
+      })
+    });
+    expect(signupResponse.status).toBe(200);
+
+    const sidCookie = extractCookieFromHeader(signupResponse.headers.get("set-cookie"), "sid");
+    expect(sidCookie).toMatch(/^sid=/);
+
+    const csrfAuthedResponse = await fetch(`${baseUrl}/api/csrf-token`, {
+      headers: { Cookie: sidCookie }
+    });
+    const csrfAuthedPayload = await csrfAuthedResponse.json();
+    const csrfAuthedToken = String(csrfAuthedPayload?.csrfToken || "");
+    const csrfAuthedCookie = extractCookieFromHeader(
+      csrfAuthedResponse.headers.get("set-cookie"),
+      "csrfToken"
+    );
+    const authCookie = [sidCookie, csrfAuthedCookie].filter(Boolean).join("; ");
+
+    const workoutResponse = await fetch(`${baseUrl}/api/dashboard/workout-sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfAuthedToken,
+        Cookie: authCookie
+      },
+      body: JSON.stringify({
+        date: "2026-03-02",
+        focus: "Lower Body",
+        duration: 52,
+        exercises: ["Squat", "Lunge"],
+        sets: 4,
+        reps: 8,
+        intensityRpe: 7
+      })
+    });
+    const workoutBody = await workoutResponse.json();
+
+    expect(workoutResponse.status).toBe(200);
+    expect(workoutBody.workoutSession.focus).toBe("Lower Body");
+    expect(Array.isArray(workoutBody.dashboard.workoutSessions)).toBe(true);
+    expect(workoutBody.dashboard.workoutSessions.length).toBeGreaterThan(0);
+  });
+
+  test("weather current returns fallback payload on upstream failure", async () => {
+    const realFetch = global.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        const url = typeof input === "string" ? input : String(input?.url || "");
+        if (url.startsWith(baseUrl)) {
+          return realFetch(input, init);
+        }
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ reason: "simulated outage" })
+        };
+      })
+    );
+
+    const response = await fetch(`${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.fallback).toBe(true);
+    expect(body.service).toBe("open-meteo");
   });
 });
