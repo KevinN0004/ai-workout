@@ -43,19 +43,92 @@ const pointsToPath = (points) => {
   return commands.join(" ");
 };
 
+const smoothClosedContour = (points, options = {}) => {
+  if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
+  const iterations = Math.max(0, Math.min(2, Math.round(toFiniteNumber(options.iterations, 1))));
+  const ratio = clamp(toFiniteNumber(options.ratio, 0.22), 0.12, 0.38);
+  const maxPoints = Math.max(24, Math.round(toFiniteNumber(options.maxPoints, 360)));
+
+  let current = points.map((point, index) => ({
+    id: point.id || `smooth-${index + 1}`,
+    x: point.x,
+    y: point.y
+  }));
+
+  for (let pass = 0; pass < iterations; pass += 1) {
+    if (current.length * 2 > maxPoints) break;
+    const next = [];
+    for (let index = 0; index < current.length; index += 1) {
+      const point = current[index];
+      const following = current[(index + 1) % current.length];
+      next.push({
+        id: `${point.id}-q${pass + 1}`,
+        x: (point.x * (1 - ratio)) + (following.x * ratio),
+        y: (point.y * (1 - ratio)) + (following.y * ratio)
+      });
+      next.push({
+        id: `${point.id}-r${pass + 1}`,
+        x: (point.x * ratio) + (following.x * (1 - ratio)),
+        y: (point.y * ratio) + (following.y * (1 - ratio))
+      });
+    }
+    current = next;
+  }
+
+  return current;
+};
+
 const buildCurvedPath = (points) => {
   if (!Array.isArray(points) || points.length < 3) return pointsToPath(points);
   const reduced = selectImportantSegmentPoints(points, {
-    minSpacing: 2,
-    minDeviation: 0.2,
-    minTurn: 0.02,
-    maxStride: 2
+    minSpacing: 2.2,
+    minDeviation: 0.24,
+    minTurn: 0.024,
+    maxStride: 3
   });
   const controlPoints = reduced.length >= 3 ? reduced : points;
-  return buildSmoothClosedPath(controlPoints, {
-    smoothness: 0.9,
-    maxHandleRatio: 0.42,
-    minCornerFactor: 0.18
+  const smoothedPoints = smoothClosedContour(controlPoints, {
+    iterations: 1,
+    ratio: 0.22,
+    maxPoints: 320
+  });
+  return buildSmoothClosedPath(smoothedPoints, {
+    smoothness: 1.02,
+    maxHandleRatio: 0.5,
+    minCornerFactor: 0.24
+  });
+};
+
+const softenDistalArmTips = (points, options = {}) => {
+  if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
+
+  const centerX = toFiniteNumber(options.centerX, 0);
+  const armZoneTop = toFiniteNumber(options.armZoneTop, 0);
+  const armZoneBottom = toFiniteNumber(options.armZoneBottom, 0);
+  const handStart = toFiniteNumber(options.handStart, 0);
+  const armSpan = clamp(toFiniteNumber(options.armSpan, 28), 14, 64);
+
+  return points.map((point, index, allPoints) => {
+    const absDx = Math.abs(point.x - centerX);
+    const inArmBand = point.y >= (armZoneTop - 2) && point.y <= (armZoneBottom + 2);
+    const distalBlend = clamp(
+      smoothstep(handStart - 12, handStart + 6, absDx) *
+      (1 - smoothstep(handStart + armSpan, handStart + armSpan + 20, absDx)) * 1.4,
+      0,
+      1
+    );
+    if (!inArmBand || distalBlend <= 0) return point;
+
+    const previous = allPoints[(index - 1 + allPoints.length) % allPoints.length];
+    const next = allPoints[(index + 1) % allPoints.length];
+    const averageX = (previous.x + next.x) / 2;
+    const averageY = (previous.y + next.y) / 2;
+
+    return {
+      ...point,
+      x: point.x + ((averageX - point.x) * distalBlend * 0.52),
+      y: point.y + ((averageY - point.y) * distalBlend * 0.66)
+    };
   });
 };
 
@@ -406,6 +479,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     );
 
     let xScale = interpolateScale(bands, baseY);
+    let yOffset = 0;
 
     const neckInfluence = bellCurve(
       baseY,
@@ -510,6 +584,8 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
       const armYBlend = clamp(Math.max(topBlend * bottomBlend * 1.75, shoulderBandInfluence * 0.88), 0, 1);
       const edgeBlend = smoothstep(armStart * 0.78, armStart + 58, absDx);
       const handBlend = smoothstep(handBoostStart, handBoostStart + 42, absDx);
+      const wristTransition = smoothstep(handBoostStart - 8, handBoostStart + 16, absDx);
+      const handInfluence = handBlend * (1 - (wristTransition * 0.72));
       const upperArmBlend = clamp(
         smoothstep(armStart * 0.9, upperArmSplit, absDx) *
         (1 - smoothstep(upperArmSplit, upperArmSplit + 22, absDx)) * 1.95,
@@ -529,15 +605,52 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
         0.44
       );
       xScale *= 1 + ((armReachScale - 1) * armYBlend * edgeBlend);
-      xScale *= 1 + ((armThicknessScale - 1) * armAdiposeBoost * armYBlend * ((upperArmBlend * MEDICAL_REGION_CURVE_WEIGHTS.upperArm) + (forearmBlend * MEDICAL_REGION_CURVE_WEIGHTS.forearm) + (handBlend * 0.28)));
-      xScale *= 1 + (armFatSpread * armYBlend * ((upperArmBlend * 0.9) + (forearmBlend * 0.72) + (handBlend * 0.32) + (edgeBlend * 0.18)));
+      xScale *= 1 + ((armThicknessScale - 1) * armAdiposeBoost * armYBlend * ((upperArmBlend * MEDICAL_REGION_CURVE_WEIGHTS.upperArm) + (forearmBlend * MEDICAL_REGION_CURVE_WEIGHTS.forearm) + (handInfluence * 0.2)));
+      xScale *= 1 + (armFatSpread * armYBlend * ((upperArmBlend * 0.9) + (forearmBlend * 0.72) + (handInfluence * 0.16) + (edgeBlend * 0.18)));
       xScale *= 1 + ((chestFat * 0.08) * armYBlend * (1 - edgeBlend) * shoulderContourBlend);
+
+      // Add convex contour on upper/lower arm edge so bicep/tricep/forearm read as rounded masses.
+      const armHalfHeight = Math.max(1, (armZoneBottom - armZoneTop) / 2);
+      const armCenterOffset = Math.abs(baseY - metrics.shoulderY);
+      const armEdgeProfile = clamp(
+        smoothstep(armHalfHeight * 0.2, armHalfHeight * 0.74, armCenterOffset) *
+        (1 - smoothstep(armHalfHeight * 0.92, armHalfHeight * 1.14, armCenterOffset)) * 2,
+        0,
+        1
+      );
+      const armZoneFade = clamp(
+        smoothstep(armZoneTop, armZoneTop + 4, baseY) *
+        (1 - smoothstep(armZoneBottom - 4, armZoneBottom, baseY)) * 1.25,
+        0,
+        1
+      );
+      const bicepBlend = clamp(upperArmBlend * (0.98 + ((1 - armFat) * 0.12)), 0, 1.3);
+      const tricepBlend = clamp(upperArmBlend * (0.88 + (armFat * 0.26)), 0, 1.3);
+      const forearmContourBlend = clamp(forearmBlend * (0.92 + (armInflation * 0.16)), 0, 1.35);
+      const armConvexity = clamp(
+        0.18 + (armInflation * 0.34) + (armFat * 0.22) + ((armThicknessScale - 1) * 0.32),
+        0.12,
+        0.78
+      );
+      const armContourAmplitude = clamp(metrics.armWidth * 0.26, 1.6, 6.4);
+      const armContourOffset = (
+        armContourAmplitude *
+        armConvexity *
+        armEdgeProfile *
+        edgeBlend *
+        armZoneFade *
+        ((bicepBlend * 0.52) + (tricepBlend * 0.32) + (forearmContourBlend * 0.44))
+      );
+      const armSideSign = baseY >= metrics.shoulderY ? 1 : -1;
+      const lowerArmBias = armSideSign > 0 ? 1.08 : 0.94;
+      const wristContourFade = 1 - (wristTransition * 0.86);
+      yOffset += armSideSign * armContourOffset * lowerArmBias * wristContourFade;
     }
 
     return {
       id: `template-${index + 1}`,
       x: centerX + (dx * xScale),
-      y: baseY
+      y: baseY + yOffset
     };
   });
 
@@ -546,12 +659,19 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     paddingX: 12,
     centerX
   });
+  const distalArmSmoothedPoints = softenDistalArmTips(fittedPoints, {
+    centerX,
+    armZoneTop,
+    armZoneBottom,
+    handStart: handBoostStart,
+    armSpan: clamp(metrics.armWidth * 3.2, 16, 44)
+  });
 
-  const path = buildCurvedPath(fittedPoints);
+  const path = buildCurvedPath(distalArmSmoothedPoints);
   if (!path) return null;
 
   return {
     path,
-    outlineMarkers: fittedPoints
+    outlineMarkers: distalArmSmoothedPoints
   };
 };

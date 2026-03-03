@@ -19,7 +19,7 @@ const FINGER_CONFIGS = [
   { id: "ring", profile: 1.0, yOffsetScale: 0.1, jointCurve: 0.08, xSplayScale: 0.16 },
   { id: "pinky", profile: 0.86, yOffsetScale: 0.2, jointCurve: 0.16, xSplayScale: 0.28 }
 ];
-export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r20";
+export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r23";
 let devHotReloadTick = 0;
 if (import.meta.hot) {
   devHotReloadTick = (import.meta.hot.data?.silhouetteHotReloadTick || 0) + 1;
