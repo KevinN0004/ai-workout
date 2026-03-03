@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4b8079"/>
+      <stop offset="100%" stop-color="#224741"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="220" width="400" height="80" fill="#14322f"/>
+  <rect x="80" y="152" width="240" height="18" rx="9" fill="#8bc8c0"/>
+  <rect x="96" y="130" width="208" height="24" rx="12" fill="#b8ece4"/>
+  <rect x="118" y="170" width="12" height="54" rx="6" fill="#6ca19b"/>
+  <rect x="270" y="170" width="12" height="54" rx="6" fill="#6ca19b"/>
+  <circle cx="172" cy="106" r="12" fill="#f3c5a8"/>
+  <path d="M154 124c7-7 12-10 18-10s11 3 18 10l-8 7c-3-3-6-5-10-5s-7 2-10 5Z" fill="#e9f5f3"/>
+  <rect x="238" y="178" width="84" height="16" rx="8" fill="#9fdcd4"/>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#e6fbf8">
+    RECOVERY &amp; MOBILITY ZONE
+  </text>
+</svg>

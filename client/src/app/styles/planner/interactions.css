@@ -37,6 +37,10 @@
 .planner-setup-modal .planner-env-toggle button {
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   border: none;
   border-radius: 999px;
   background: transparent;

@@ -39,8 +39,21 @@ const equipmentKeywordMap = {
     "bench",
     "cable",
     "kettlebell",
-    "bodyweight"
+    "bodyweight",
+    "cardio",
+    "treadmill",
+    "elliptical",
+    "bike",
+    "row"
   ],
+  "strength floor": ["barbell", "dumbbell", "kettlebell", "bench", "machine"],
+  "cardio deck": ["cardio", "bike", "row", "elliptical", "treadmill", "ergometer"],
+  "functional training zone": ["bodyweight", "kettlebell", "dumbbell", "band", "cable"],
+  "group class studio": ["bodyweight", "mat", "dumbbell", "kettlebell", "band", "cardio"],
+  "pool / aquatic center": ["swim", "aquatic", "cardio", "bodyweight"],
+  "court sports area": ["cardio", "conditioning", "agility", "jump", "plyometric"],
+  "recovery & mobility zone": ["mobility", "stretch", "bodyweight", "mat", "band"],
+  // Backward compatibility with older commercial labels.
   "barbell + plates": ["barbell"],
   "cable machine": ["cable"],
   "smith machine": ["barbell", "smith"],

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b5f9c"/>
+      <stop offset="100%" stop-color="#1a2c4d"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="216" width="400" height="84" fill="#12203a"/>
+  <path d="M160 130a40 40 0 1 1 80 0" fill="none" stroke="#d4e5ff" stroke-width="14" stroke-linecap="round"/>
+  <path d="M118 146h164l-24 88H142Z" fill="#6e92ca"/>
+  <circle cx="200" cy="190" r="20" fill="#97b7e7"/>
+  <text x="24" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#e4efff">
+    KETTLEBELL
+  </text>
+</svg>

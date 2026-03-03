@@ -62,17 +62,19 @@
   }
 
   .focus-option-grid {
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .focus-chip {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: center;
     border-radius: 14px;
+    text-align: center;
   }
 
   .focus-chip .equip-label {
     white-space: normal;
+    text-align: center;
   }
 }
 

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3274a2"/>
+      <stop offset="100%" stop-color="#163956"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="30" y="76" width="340" height="178" rx="12" fill="#1f618b"/>
+  <rect x="42" y="88" width="316" height="154" rx="8" fill="#3ea2de"/>
+  <g stroke="#e4f8ff" stroke-width="4" fill="none">
+    <path d="M52 122c12 0 12 10 24 10s12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10"/>
+    <path d="M52 154c12 0 12 10 24 10s12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10"/>
+    <path d="M52 186c12 0 12 10 24 10s12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10 12-10 24-10 12 10 24 10"/>
+  </g>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#e7f9ff">
+    POOL / AQUATIC CENTER
+  </text>
+</svg>

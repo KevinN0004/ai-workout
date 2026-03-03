@@ -1,10 +1,59 @@
 import ModalPortal from "../../components/ModalPortal";
 import { equipmentOptionsByEnv, injuryOptions, quickFocuses } from "../constants";
+import thumbHomeBodyweight from "../../assets/planner-thumbs/home-bodyweight.svg";
+import thumbHomeDumbbells from "../../assets/planner-thumbs/home-dumbbells.svg";
+import thumbHomeKettlebell from "../../assets/planner-thumbs/home-kettlebell.svg";
+import thumbHomePullup from "../../assets/planner-thumbs/home-pullup.svg";
+import thumbHomeBands from "../../assets/planner-thumbs/home-bands.svg";
+import thumbHomeBench from "../../assets/planner-thumbs/home-bench.svg";
+import thumbHomeYogaMat from "../../assets/planner-thumbs/home-yoga-mat.svg";
+import thumbCommercialFullGym from "../../assets/planner-thumbs/commercial-full-gym.svg";
+import thumbCommercialStrengthFloor from "../../assets/planner-thumbs/commercial-strength-floor.svg";
+import thumbCommercialCardioDeck from "../../assets/planner-thumbs/commercial-cardio-deck.svg";
+import thumbCommercialFunctionalZone from "../../assets/planner-thumbs/commercial-functional-zone.svg";
+import thumbCommercialGroupStudio from "../../assets/planner-thumbs/commercial-group-studio.svg";
+import thumbCommercialPool from "../../assets/planner-thumbs/commercial-pool.svg";
+import thumbCommercialCourt from "../../assets/planner-thumbs/commercial-court.svg";
+import thumbCommercialRecovery from "../../assets/planner-thumbs/commercial-recovery.svg";
 
 const plannerHeaderTitleByStep = {
-  1: "Step 1 - Environment & equipment",
-  2: "Step 2 - Schedule & constraints",
-  3: "Step 3 - Focus priorities"
+  1: "Enviroment",
+  2: "Schedule",
+  3: "Focus"
+};
+
+const equipmentThumbByLabel = {
+  "bodyweight only": { image: thumbHomeBodyweight, tone: "tone-mobility" },
+  dumbbells: { image: thumbHomeDumbbells, tone: "tone-strength" },
+  kettlebell: { image: thumbHomeKettlebell, tone: "tone-strength" },
+  "pull-up bar": { image: thumbHomePullup, tone: "tone-strength" },
+  "resistance bands": { image: thumbHomeBands, tone: "tone-mobility" },
+  "adjustable bench": { image: thumbHomeBench, tone: "tone-strength" },
+  "yoga mat": { image: thumbHomeYogaMat, tone: "tone-mobility" },
+  "full gym access": { image: thumbCommercialFullGym, tone: "tone-studio" },
+  "strength floor": { image: thumbCommercialStrengthFloor, tone: "tone-strength" },
+  "cardio deck": { image: thumbCommercialCardioDeck, tone: "tone-endurance" },
+  "functional training zone": { image: thumbCommercialFunctionalZone, tone: "tone-mobility" },
+  "group class studio": { image: thumbCommercialGroupStudio, tone: "tone-studio" },
+  "pool / aquatic center": { image: thumbCommercialPool, tone: "tone-endurance" },
+  "court sports area": { image: thumbCommercialCourt, tone: "tone-endurance" },
+  "recovery & mobility zone": { image: thumbCommercialRecovery, tone: "tone-mobility" },
+  // Backward compatibility with older commercial labels.
+  "barbell + plates": { image: thumbCommercialStrengthFloor, tone: "tone-strength" },
+  "cable machine": { image: thumbCommercialStrengthFloor, tone: "tone-machine" },
+  "smith machine": { image: thumbCommercialStrengthFloor, tone: "tone-machine" },
+  "cardio machines": { image: thumbCommercialCardioDeck, tone: "tone-endurance" },
+  "free weights": { image: thumbCommercialStrengthFloor, tone: "tone-strength" }
+};
+
+const resolveEquipmentThumb = (label) => {
+  const key = String(label || "").trim().toLowerCase();
+  return (
+    equipmentThumbByLabel[key] || {
+      image: thumbCommercialFullGym,
+      tone: "tone-studio"
+    }
+  );
 };
 
 export default function PlannerSetupModal({
@@ -23,6 +72,8 @@ export default function PlannerSetupModal({
   if (!plannerOpen) return null;
   const plannerHeaderTitle =
     plannerHeaderTitleByStep[plannerStep] || plannerHeaderTitleByStep[1];
+  const isCommercialEnvironment = form.environment === "Commercial";
+  const hasFullGymAccess = isCommercialEnvironment && form.equipment.includes("Full gym access");
 
   return (
     <ModalPortal open={plannerOpen}>
@@ -91,20 +142,41 @@ export default function PlannerSetupModal({
                     </button>
                   </div>
                 </div>
+                <p className="muted planner-step-copy">
+                  {isCommercialEnvironment
+                    ? "Select the rooms and operations your gym offers."
+                    : "Select the equipment available in your home setup."}
+                </p>
+                {hasFullGymAccess && (
+                  <p className="muted planner-step-copy">
+                    Full gym access selected: all commercial rooms and operations are included.
+                  </p>
+                )}
                 <div className="option-grid">
-                  {equipmentOptionsByEnv[form.environment].map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`equip-card ${
-                        form.equipment.includes(item) ? "active" : ""
-                      }`}
-                      onClick={() => toggleEquipment(item)}
-                    >
-                      <span className="equip-thumb" aria-hidden="true" />
-                      <span className="equip-label">{item}</span>
-                    </button>
-                  ))}
+                  {equipmentOptionsByEnv[form.environment].map((item) => {
+                    const thumb = resolveEquipmentThumb(item);
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`equip-card ${
+                          form.equipment.includes(item) ? "active" : ""
+                        }`}
+                        onClick={() => toggleEquipment(item)}
+                      >
+                        <span className={`equip-thumb ${thumb.tone}`} aria-hidden="true">
+                          <img
+                            className="equip-thumb-image"
+                            src={thumb.image}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </span>
+                        <span className="equip-label">{item}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4e5f8f"/>
+      <stop offset="100%" stop-color="#202d4f"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="216" width="400" height="84" fill="#151d34"/>
+  <rect x="72" y="64" width="16" height="170" rx="8" fill="#6f86ad"/>
+  <rect x="312" y="64" width="16" height="170" rx="8" fill="#6f86ad"/>
+  <rect x="86" y="60" width="228" height="16" rx="8" fill="#9bb8e2"/>
+  <circle cx="200" cy="120" r="16" fill="#f5c6aa"/>
+  <path d="M174 152c8-10 16-14 26-14s18 4 26 14l-12 10c-4-5-9-7-14-7s-10 2-14 7Z" fill="#f3f6fc"/>
+  <path d="M166 162h68l16 52h-24l-12-34h-28l-12 34h-24Z" fill="#f3f6fc"/>
+  <path d="M176 112l-40-42M224 112l40-42" stroke="#dce9ff" stroke-width="10" stroke-linecap="round"/>
+  <text x="24" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#e8f1ff">
+    PULL-UP BAR
+  </text>
+</svg>

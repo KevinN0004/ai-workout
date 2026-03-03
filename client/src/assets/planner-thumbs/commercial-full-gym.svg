@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#50555d"/>
+      <stop offset="100%" stop-color="#232830"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="220" width="400" height="80" fill="#151922"/>
+  <rect x="24" y="78" width="108" height="118" rx="10" fill="#2c3646"/>
+  <rect x="146" y="78" width="108" height="118" rx="10" fill="#35435a"/>
+  <rect x="268" y="78" width="108" height="118" rx="10" fill="#2f3948"/>
+  <rect x="36" y="102" width="84" height="10" rx="5" fill="#99b6e0"/>
+  <rect x="162" y="96" width="76" height="12" rx="6" fill="#d4e2f6"/>
+  <path d="M286 158c16-14 32-14 48 0" stroke="#97d7ff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M286 142c16-14 32-14 48 0" stroke="#97d7ff" stroke-width="7" stroke-linecap="round" opacity="0.8"/>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#edf3ff">
+    FULL GYM ACCESS
+  </text>
+</svg>

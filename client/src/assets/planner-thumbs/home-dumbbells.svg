@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f3e76"/>
+      <stop offset="100%" stop-color="#221b38"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="218" width="400" height="82" fill="#141028"/>
+  <g fill="#7ea6dd">
+    <rect x="70" y="148" width="26" height="58" rx="8"/>
+    <rect x="150" y="148" width="26" height="58" rx="8"/>
+    <rect x="230" y="148" width="26" height="58" rx="8"/>
+    <rect x="310" y="148" width="26" height="58" rx="8"/>
+  </g>
+  <rect x="96" y="170" width="54" height="14" rx="7" fill="#d8e5f8"/>
+  <rect x="256" y="170" width="54" height="14" rx="7" fill="#d8e5f8"/>
+  <rect x="104" y="132" width="194" height="12" rx="6" fill="#5f7faf"/>
+  <text x="24" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#efe7ff">
+    DUMBBELLS
+  </text>
+</svg>

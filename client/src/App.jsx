@@ -206,12 +206,56 @@ export default function App() {
 
   const toggleEquipment = (item) => {
     setForm((prev) => {
-      const exists = prev.equipment.includes(item);
+      const options = equipmentOptionsByEnv[prev.environment] || [];
+      const fullAccessLabel = "Full gym access";
+      const isCommercialEnv = prev.environment === "Commercial" && options.includes(fullAccessLabel);
+      const currentSelection = prev.equipment.filter((value) => options.includes(value));
+
+      if (!isCommercialEnv) {
+        const exists = prev.equipment.includes(item);
+        return {
+          ...prev,
+          equipment: exists
+            ? prev.equipment.filter((equip) => equip !== item)
+            : [...prev.equipment, item]
+        };
+      }
+
+      if (item === fullAccessLabel) {
+        const hasFullAccess = currentSelection.includes(fullAccessLabel);
+        return {
+          ...prev,
+          equipment: hasFullAccess ? [] : [...options]
+        };
+      }
+
+      const nextSelection = new Set(currentSelection);
+      if (nextSelection.has(fullAccessLabel)) {
+        nextSelection.delete(fullAccessLabel);
+        options.forEach((option) => {
+          if (option !== fullAccessLabel) nextSelection.add(option);
+        });
+      }
+
+      if (nextSelection.has(item)) {
+        nextSelection.delete(item);
+      } else {
+        nextSelection.add(item);
+      }
+
+      const specificCommercialOptions = options.filter((option) => option !== fullAccessLabel);
+      const hasAllSpecificOptions = specificCommercialOptions.every((option) =>
+        nextSelection.has(option)
+      );
+      if (hasAllSpecificOptions) {
+        nextSelection.add(fullAccessLabel);
+      } else {
+        nextSelection.delete(fullAccessLabel);
+      }
+
       return {
         ...prev,
-        equipment: exists
-          ? prev.equipment.filter((equip) => equip !== item)
-          : [...prev.equipment, item]
+        equipment: options.filter((option) => nextSelection.has(option))
       };
     });
   };

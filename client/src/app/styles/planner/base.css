@@ -133,8 +133,9 @@
   border-radius: 16px;
   padding: 12px;
   display: grid;
+  justify-items: center;
   gap: 10px;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   color: inherit;
 }
@@ -147,18 +148,63 @@
 }
 
 .equip-thumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(140deg, rgba(41, 48, 64, 0.7), rgba(17, 21, 34, 0.74));
+}
+
+.equip-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)),
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.22), transparent 55%);
+    radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.12), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 66%);
+  pointer-events: none;
+}
+
+.equip-thumb .equip-thumb-image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05) contrast(1.02);
+}
+
+.equip-thumb.tone-strength {
+  background: linear-gradient(140deg, rgba(63, 84, 152, 0.78), rgba(25, 33, 70, 0.82));
+}
+
+.equip-thumb.tone-mobility {
+  background: linear-gradient(140deg, rgba(70, 108, 108, 0.78), rgba(28, 62, 67, 0.8));
+}
+
+.equip-thumb.tone-machine {
+  background: linear-gradient(140deg, rgba(83, 78, 105, 0.78), rgba(40, 37, 62, 0.82));
+}
+
+.equip-thumb.tone-endurance {
+  background: linear-gradient(140deg, rgba(121, 78, 58, 0.78), rgba(64, 35, 25, 0.82));
+}
+
+.equip-thumb.tone-studio {
+  background: linear-gradient(140deg, rgba(84, 88, 92, 0.76), rgba(32, 35, 41, 0.84));
 }
 
 .equip-label {
+  display: block;
+  width: 100%;
   font-weight: 600;
   font-size: 1rem;
+  text-align: center;
 }
 
 .focus-option-grid {
@@ -176,10 +222,12 @@
   justify-content: center;
   padding: 10px 14px;
   border-radius: 999px;
+  text-align: center;
 }
 
 .focus-chip .equip-label {
   white-space: nowrap;
+  text-align: center;
 }
 
 .planner-close-icon {

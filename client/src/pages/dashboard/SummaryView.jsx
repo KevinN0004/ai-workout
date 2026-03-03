@@ -63,6 +63,11 @@ export default function SummaryView({
   const weatherReasons = Array.isArray(weatherRecommendation?.reasons)
     ? weatherRecommendation.reasons
     : [];
+  const isCommercialEnvironment = form?.environment === "Commercial";
+  const environmentSelections = Array.isArray(form?.equipment) ? form.equipment : [];
+  const emptyEnvironmentSelectionLabel = isCommercialEnvironment
+    ? "No rooms or operations selected yet."
+    : "No equipment selected yet.";
   const nextForecast = Array.isArray(weatherData?.daily)
     ? weatherData.daily.slice(0, 3)
     : [];
@@ -135,9 +140,9 @@ export default function SummaryView({
               <div className="card-section-body">
                 <p className="overview-value">{form.environment}</p>
                 <p className="muted">
-                  {form.equipment.length
-                    ? form.equipment.join(", ")
-                    : "No equipment selected yet."}
+                  {environmentSelections.length
+                    ? environmentSelections.join(", ")
+                    : emptyEnvironmentSelectionLabel}
                 </p>
               </div>
             </article>

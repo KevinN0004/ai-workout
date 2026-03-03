@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a6069"/>
+      <stop offset="100%" stop-color="#2b3038"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="220" width="400" height="80" fill="#1d2228"/>
+  <rect x="36" y="82" width="328" height="114" rx="12" fill="#3a4656"/>
+  <rect x="56" y="98" width="288" height="80" rx="8" fill="#62738c"/>
+  <g fill="#f3cdb4">
+    <circle cx="126" cy="122" r="12"/>
+    <circle cx="200" cy="112" r="12"/>
+    <circle cx="274" cy="122" r="12"/>
+  </g>
+  <g stroke="#edf5ff" stroke-width="8" stroke-linecap="round" fill="none">
+    <path d="M126 138v38"/>
+    <path d="M200 128v48"/>
+    <path d="M274 138v38"/>
+    <path d="M108 160l18-14 18 14"/>
+    <path d="M182 146l18-14 18 14"/>
+    <path d="M256 160l18-14 18 14"/>
+  </g>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f2f6ff">
+    GROUP CLASS STUDIO
+  </text>
+</svg>

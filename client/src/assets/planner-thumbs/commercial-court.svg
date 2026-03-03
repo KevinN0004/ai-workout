@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b623d"/>
+      <stop offset="100%" stop-color="#412a1b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="40" y="56" width="320" height="188" rx="10" fill="#b98655"/>
+  <rect x="56" y="72" width="288" height="156" rx="6" fill="#d5a26b"/>
+  <g stroke="#f5e3c9" stroke-width="5" fill="none">
+    <rect x="56" y="72" width="288" height="156" rx="6"/>
+    <path d="M200 72v156"/>
+    <path d="M56 150h288"/>
+    <path d="M128 72c-26 22-26 134 0 156"/>
+    <path d="M272 72c26 22 26 134 0 156"/>
+  </g>
+  <circle cx="100" cy="102" r="14" fill="#ec7f46"/>
+  <path d="M88 102h24M100 90v24" stroke="#f8d4b5" stroke-width="3"/>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#ffedd8">
+    COURT SPORTS AREA
+  </text>
+</svg>

@@ -28,7 +28,7 @@ export const JOHN_DOE_PREVIEW_PROFILE = {
   days: "4",
   duration: "50",
   environment: "Commercial",
-  equipment: ["Barbell + plates", "Cable machine", "Cardio machines"],
+  equipment: ["Full gym access"],
   focuses: ["Strength", "Conditioning", "Core"],
   personalComplete: true
 };

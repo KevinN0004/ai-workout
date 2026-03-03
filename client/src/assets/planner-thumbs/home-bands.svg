@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3e756d"/>
+      <stop offset="100%" stop-color="#1b3f3b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="218" width="400" height="82" fill="#12312c"/>
+  <g fill="none" stroke="#bdeee5" stroke-width="12" stroke-linecap="round">
+    <path d="M120 210c-28-34-28-86 0-120s72-34 100 0 28 86 0 120-72 34-100 0Z"/>
+    <path d="M210 216c-22-28-22-70 0-98s56-28 78 0 22 70 0 98-56 28-78 0Z"/>
+  </g>
+  <circle cx="120" cy="150" r="12" fill="#7abcb1"/>
+  <circle cx="210" cy="167" r="12" fill="#7abcb1"/>
+  <text x="24" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#defaf5">
+    RESISTANCE BANDS
+  </text>
+</svg>

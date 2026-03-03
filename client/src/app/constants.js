@@ -30,11 +30,13 @@ export const equipmentOptionsByEnv = {
   ],
   Commercial: [
     "Full gym access",
-    "Barbell + plates",
-    "Cable machine",
-    "Smith machine",
-    "Cardio machines",
-    "Free weights"
+    "Strength floor",
+    "Cardio deck",
+    "Functional training zone",
+    "Group class studio",
+    "Pool / aquatic center",
+    "Court sports area",
+    "Recovery & mobility zone"
   ]
 };
 

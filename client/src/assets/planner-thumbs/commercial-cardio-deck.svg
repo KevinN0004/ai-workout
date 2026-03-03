@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8a573f"/>
+      <stop offset="100%" stop-color="#3d2418"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="220" width="400" height="80" fill="#28160f"/>
+  <g stroke="#9eb8de" stroke-width="10" stroke-linecap="round" fill="none">
+    <path d="M36 188h80l20-34h22"/>
+    <path d="M166 188h80l20-34h22"/>
+    <path d="M296 188h80l20-34h22"/>
+  </g>
+  <g fill="#5c7295">
+    <circle cx="52" cy="202" r="14"/>
+    <circle cx="182" cy="202" r="14"/>
+    <circle cx="312" cy="202" r="14"/>
+  </g>
+  <text x="20" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffe6d7">
+    CARDIO DECK
+  </text>
+</svg>

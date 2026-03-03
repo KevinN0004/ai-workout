@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#44756e"/>
+      <stop offset="100%" stop-color="#1d3e3a"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect x="0" y="220" width="400" height="80" fill="#142f2c"/>
+  <rect x="70" y="188" width="260" height="22" rx="11" fill="#6fb8ae"/>
+  <rect x="86" y="192" width="228" height="14" rx="7" fill="#a4e1d8"/>
+  <circle cx="200" cy="126" r="14" fill="#f5c6ab"/>
+  <path d="M174 150c8-8 16-12 26-12s18 4 26 12l-10 8c-4-4-9-6-16-6s-12 2-16 6Z" fill="#ecf9f6"/>
+  <path d="M146 190h108" stroke="#e3f6f2" stroke-width="12" stroke-linecap="round"/>
+  <path d="M254 158l36-28" stroke="#b9efe7" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="298" cy="122" r="10" fill="#b9efe7"/>
+  <text x="24" y="36" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#e3fbf7">
+    YOGA MAT
+  </text>
+</svg>
