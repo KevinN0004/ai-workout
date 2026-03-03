@@ -1,0 +1,200 @@
+﻿.planner-setup-modal .muted {
+  color: #ececec;
+}
+
+.planner-setup-modal .planner-env-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.planner-setup-modal .planner-env-toggle::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25), 0 0 20px rgba(255, 255, 255, 0.12);
+  transform: translateX(0%);
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 0;
+}
+
+.planner-setup-modal .planner-env-toggle.pos-1::before {
+  transform: translateX(100%);
+}
+
+.planner-setup-modal .planner-env-toggle button {
+  position: relative;
+  z-index: 1;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
+.planner-setup-modal .planner-env-toggle button.active {
+  background: transparent;
+  border-color: transparent;
+  color: #fff;
+  box-shadow: none;
+  animation: planner-toggle-pop 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.planner-backdrop {
+  animation: planner-backdrop-in 380ms ease both;
+}
+
+.planner-setup-modal {
+  transform-origin: 50% 24%;
+  animation: planner-modal-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.planner-setup-modal .modal-header,
+.planner-setup-modal .modal-footer {
+  animation: planner-chrome-in 420ms ease both;
+}
+
+.planner-setup-modal .modal-footer {
+  justify-content: flex-end;
+}
+
+.planner-setup-modal .modal-footer .modal-actions {
+  margin-right: -8px;
+}
+
+.planner-setup-modal .modal-footer.planner-footer-center {
+  justify-content: center;
+}
+
+.planner-setup-modal .modal-footer.planner-footer-center .modal-actions {
+  margin-right: 0;
+}
+
+.planner-setup-modal .planner-step-panel {
+  animation: planner-step-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > * {
+  animation: planner-card-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(7) {
+  animation-delay: 240ms;
+}
+
+.planner-setup-modal .planner-step-panel .option-grid > *:nth-child(8) {
+  animation-delay: 280ms;
+}
+
+.planner-setup-modal .segmented button,
+.planner-setup-modal .equip-card,
+.planner-setup-modal .focus-chip,
+.planner-setup-modal .modal-actions .ghost,
+.planner-setup-modal .modal-actions .cta,
+.planner-setup-modal .planner-close-icon {
+  transition:
+    transform 220ms ease,
+    box-shadow 260ms ease,
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    opacity 220ms ease;
+}
+
+.planner-setup-modal .segmented button:hover,
+.planner-setup-modal .equip-card:hover,
+.planner-setup-modal .focus-chip:hover,
+.planner-setup-modal .modal-actions .ghost:hover,
+.planner-setup-modal .modal-actions .cta:hover,
+.planner-setup-modal .planner-close-icon:hover {
+  transform: translateY(-1px);
+}
+
+.planner-setup-modal .segmented button:active,
+.planner-setup-modal .equip-card:active,
+.planner-setup-modal .focus-chip:active,
+.planner-setup-modal .modal-actions .ghost:active,
+.planner-setup-modal .modal-actions .cta:active,
+.planner-setup-modal .planner-close-icon:active {
+  transform: scale(0.97);
+}
+
+.planner-setup-modal .modal-actions .back-btn {
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(255, 61, 88, 0.56), 0 0 28px rgba(255, 135, 58, 0.38) !important;
+}
+
+.planner-setup-modal .modal-actions .back-btn:hover:not(:disabled) {
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
+  color: #fff !important;
+  box-shadow: 0 0 16px rgba(255, 61, 88, 0.68), 0 0 34px rgba(255, 135, 58, 0.46) !important;
+}
+
+.planner-setup-modal .modal-actions .back-btn:active:not(:disabled),
+.planner-setup-modal .modal-actions .back-btn:focus-visible {
+  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
+  border-color: rgba(255, 106, 88, 0.94) !important;
+  color: #fff !important;
+}
+
+.planner-setup-modal .modal-actions .back-btn:disabled {
+  opacity: 1;
+  box-shadow: none;
+}
+
+.planner-setup-modal .planner-back-arrow {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0 !important;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+}
+
+.planner-setup-modal .planner-back-arrow .planner-back-arrow-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  pointer-events: none;
+}
+

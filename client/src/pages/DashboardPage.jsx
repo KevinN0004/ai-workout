@@ -10,8 +10,9 @@ import DashboardHomeView from "./dashboard/DashboardHomeView";
 import DashboardHeader from "./dashboard/DashboardHeader";
 import DashboardDrawer from "./dashboard/DashboardDrawer";
 import DashboardBottomNav from "./dashboard/DashboardBottomNav";
+import DashboardAtAGlance from "./dashboard/DashboardAtAGlance";
+import DashboardWorkoutModal from "./dashboard/DashboardWorkoutModal";
 import useDashboardMetrics from "./dashboard/useDashboardMetrics";
-import ModalPortal from "../components/ModalPortal";
 import "./DashboardPage.css";
 
 const getLocalDateKey = () => {
@@ -341,120 +342,27 @@ export default function DashboardPage({
         />
         <p className="muted dashboard-header-note">Visual summary of your progress and key metrics.</p>
 
-        <section className="panel dashboard-at-a-glance">
-          <div className="dashboard-at-a-glance-head">
-            <h2>Today at a glance</h2>
-            <p className="muted">Quick status and shortcuts for your day.</p>
-          </div>
-          <div className="dashboard-at-a-glance-grid equal-card-grid">
-            <article className="dashboard-glance-card card-shell">
-              <div className="card-section-head">
-                <h3>{nextWorkout ? `${nextWorkout.context} workout` : "Workout status"}</h3>
-              </div>
-              <div className="card-section-body">
-                {nextWorkout ? (
-                  <>
-                    <p className="dashboard-glance-value">
-                      {nextWorkout.date || "Date pending"} - {nextWorkout.focus || "General"}
-                    </p>
-                    <p className="muted">{nextWorkout.duration || "--"} min planned</p>
-                  </>
-                ) : (
-                  <p className="muted">No workout logged yet. Add one to get started.</p>
-                )}
-              </div>
-            </article>
-            <article className="dashboard-glance-card card-shell">
-              <div className="card-section-head">
-                <h3>Calories gap</h3>
-              </div>
-              <div className="card-section-body">
-                <p className="dashboard-glance-value">
-                  {caloriesGap === 0
-                    ? "On target"
-                    : caloriesGap > 0
-                    ? `${caloriesGap} under target`
-                    : `${Math.abs(caloriesGap)} over target`}
-                </p>
-                <p className="muted">
-                  Avg {Math.round(avgCalories)} / goal {calorieGoal} kcal
-                </p>
-              </div>
-            </article>
-            <article className="dashboard-glance-card card-shell">
-              <div className="card-section-head">
-                <h3>Weather</h3>
-              </div>
-              <div className="card-section-body">
-                <p className="dashboard-glance-value">
-                  {weatherLoading
-                    ? weatherRecommendation
-                      ? "Refreshing..."
-                      : "Checking..."
-                    : weatherRecommendation?.workoutType === "outdoor"
-                    ? "Outdoor friendly"
-                    : weatherRecommendation?.workoutType === "indoor"
-                    ? "Indoor suggested"
-                    : weatherError
-                    ? "Unavailable"
-                    : "Unavailable"}
-                </p>
-                <p className="muted">
-                  {weatherRecommendation?.summary || weatherError || "No weather update yet."}
-                </p>
-                <p className="muted dashboard-glance-updated">
-                  {formatRelativeUpdatedAt(weatherLastUpdatedAt)}
-                </p>
-              </div>
-            </article>
-            <article className="dashboard-glance-card card-shell">
-              <div className="card-section-head">
-                <h3>Air quality</h3>
-              </div>
-              <div className="card-section-body">
-                <p className="dashboard-glance-value">
-                  {airQualityLoading
-                    ? airSummary
-                      ? "Refreshing..."
-                      : "Checking..."
-                    : airSummary?.level || (airQualityError ? "Unavailable" : "Unavailable")}
-                </p>
-                <p className="muted">
-                  {airSummary?.guidance || airQualityError || "No air quality guidance available."}
-                </p>
-                <p className="muted dashboard-glance-updated">
-                  {formatRelativeUpdatedAt(airQualityLastUpdatedAt)}
-                </p>
-              </div>
-            </article>
-          </div>
-          <div className="dashboard-glance-actions">
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => {
-                setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
-                setWorkoutModalOpen(true);
-              }}
-            >
-              Add workout
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => navigateDashView("meal")}
-            >
-              Log meal
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => navigateDashView("tips")}
-            >
-              Open guides
-            </button>
-          </div>
-        </section>
+        <DashboardAtAGlance
+          nextWorkout={nextWorkout}
+          caloriesGap={caloriesGap}
+          avgCalories={avgCalories}
+          calorieGoal={calorieGoal}
+          weatherLoading={weatherLoading}
+          weatherRecommendation={weatherRecommendation}
+          weatherError={weatherError}
+          weatherLastUpdatedAt={weatherLastUpdatedAt}
+          airQualityLoading={airQualityLoading}
+          airSummary={airSummary}
+          airQualityError={airQualityError}
+          airQualityLastUpdatedAt={airQualityLastUpdatedAt}
+          formatRelativeUpdatedAt={formatRelativeUpdatedAt}
+          onAddWorkout={() => {
+            setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
+            setWorkoutModalOpen(true);
+          }}
+          onOpenMeal={() => navigateDashView("meal")}
+          onOpenTips={() => navigateDashView("tips")}
+        />
 
         <main className="dashboard-grid">
           {showInitialDashboardLoading && (
@@ -514,189 +422,13 @@ export default function DashboardPage({
           </div>
         )}
 
-        {workoutModalOpen && (
-          <ModalPortal open={workoutModalOpen}>
-            <div
-              className="modal-backdrop dashboard-modal-backdrop"
-              role="dialog"
-              aria-modal="true"
-              onClick={() => setWorkoutModalOpen(false)}
-            >
-              <div
-                className="modal dashboard-modal dashboard-workout-modal"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="modal-header dashboard-workout-modal-header">
-                  <div className="dashboard-workout-heading">
-                    <h2>Log workout</h2>
-                    <p className="muted">Save your session details and notes.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="ghost icon-button"
-                    aria-label="Close workout modal"
-                    title="Close"
-                    onClick={() => setWorkoutModalOpen(false)}
-                  >
-                    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                      <path
-                        d="M6 6l12 12M18 6L6 18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <form className="form dashboard-workout-form" onSubmit={submitWorkout}>
-                  <div className="dashboard-workout-layout">
-                    <section className="dashboard-workout-section dashboard-workout-section-session">
-                      <h3>Session details</h3>
-                      <div className="dashboard-workout-grid dashboard-workout-grid-basics">
-                        <label className="dashboard-workout-field dashboard-workout-field-half">
-                          <span className="dashboard-workout-label">Date</span>
-                          <input
-                            type="date"
-                            value={workoutForm.date}
-                            onChange={(e) =>
-                              setWorkoutForm((prev) => ({ ...prev, date: e.target.value }))
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="dashboard-workout-field dashboard-workout-field-half">
-                          <span className="dashboard-workout-label">Duration (minutes)</span>
-                          <input
-                            type="number"
-                            min="10"
-                            max="180"
-                            value={workoutForm.duration}
-                            onChange={(e) =>
-                              setWorkoutForm((prev) => ({
-                                ...prev,
-                                duration: e.target.value
-                              }))
-                            }
-                            required
-                          />
-                        </label>
-                        <label className="dashboard-workout-field dashboard-workout-field-full">
-                          <span className="dashboard-workout-label">Focus</span>
-                          <input
-                            value={workoutForm.focus}
-                            onChange={(e) =>
-                              setWorkoutForm((prev) => ({ ...prev, focus: e.target.value }))
-                            }
-                            placeholder="Strength, conditioning..."
-                          />
-                        </label>
-                      </div>
-                    </section>
-
-                    <section className="dashboard-workout-section dashboard-workout-section-exercise">
-                      <h3>Exercise details</h3>
-                      <div className="dashboard-workout-grid dashboard-workout-grid-exercise">
-                        <label className="dashboard-workout-field dashboard-workout-field-full">
-                          <span className="dashboard-workout-label">Exercises (comma-separated)</span>
-                          <input
-                            value={workoutForm.exercises}
-                            onChange={(e) =>
-                              setWorkoutForm((prev) => ({
-                                ...prev,
-                                exercises: e.target.value
-                              }))
-                            }
-                            placeholder="Squat, bench press, row"
-                          />
-                        </label>
-                        <div className="dashboard-workout-grid dashboard-workout-grid-metrics">
-                          <label className="dashboard-workout-field dashboard-workout-field-half">
-                            <span className="dashboard-workout-label">Sets</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="80"
-                              value={workoutForm.sets}
-                              onChange={(e) =>
-                                setWorkoutForm((prev) => ({
-                                  ...prev,
-                                  sets: e.target.value
-                                }))
-                              }
-                            />
-                          </label>
-                          <label className="dashboard-workout-field dashboard-workout-field-half">
-                            <span className="dashboard-workout-label">Reps</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="120"
-                              value={workoutForm.reps}
-                              onChange={(e) =>
-                                setWorkoutForm((prev) => ({
-                                  ...prev,
-                                  reps: e.target.value
-                                }))
-                              }
-                            />
-                          </label>
-                          <label className="dashboard-workout-field dashboard-workout-field-full">
-                            <span className="dashboard-workout-label">Intensity (RPE 1-10)</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="10"
-                              step="0.5"
-                              value={workoutForm.intensityRpe}
-                              onChange={(e) =>
-                                setWorkoutForm((prev) => ({
-                                  ...prev,
-                                  intensityRpe: e.target.value
-                                }))
-                              }
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="dashboard-workout-section dashboard-workout-section-notes">
-                      <h3>Session notes</h3>
-                      <label className="dashboard-workout-field dashboard-workout-field-full">
-                        <span className="dashboard-workout-label">Notes</span>
-                        <textarea
-                          value={workoutForm.notes}
-                          onChange={(e) =>
-                            setWorkoutForm((prev) => ({
-                              ...prev,
-                              notes: e.target.value
-                            }))
-                          }
-                          rows={3}
-                          placeholder="How did the session feel?"
-                        />
-                      </label>
-                    </section>
-                  </div>
-
-                  <div className="modal-submit dashboard-workout-actions">
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => setWorkoutModalOpen(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button className="cta" type="submit">
-                      Save workout
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </ModalPortal>
-        )}
+        <DashboardWorkoutModal
+          open={workoutModalOpen}
+          workoutForm={workoutForm}
+          setWorkoutForm={setWorkoutForm}
+          onClose={() => setWorkoutModalOpen(false)}
+          onSubmit={submitWorkout}
+        />
 
         {plannerModal}
         {generatedPlanModal}

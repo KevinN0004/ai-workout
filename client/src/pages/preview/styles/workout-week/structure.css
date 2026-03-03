@@ -1,0 +1,236 @@
+.preview-week-plan {
+  width: 100%;
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+  display: grid;
+  align-items: center;
+  position: relative;
+  padding-top: 0;
+}
+
+.preview-week-table-wrap {
+  --preview-week-table-radius: 14px;
+  --preview-week-outline-corner-offset: calc(var(--preview-week-table-radius) - 1px);
+  position: relative;
+  top: -120px;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--preview-week-table-radius);
+  background: linear-gradient(180deg, rgba(12, 12, 12, 0.9), rgba(4, 4, 4, 0.88));
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.preview-week-table-wrap::before,
+.preview-week-table-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 6;
+}
+
+.preview-week-table-wrap::before {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+  mix-blend-mode: screen;
+}
+
+.preview-week-table-wrap::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 62%,
+    transparent 100%
+  );
+  transform: translateY(-115%);
+  mix-blend-mode: screen;
+}
+
+.preview-week-particle-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  overflow: visible;
+}
+
+.preview-week-particle-layer:empty {
+  display: none;
+}
+
+.preview-week-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate3d(0, 0, 0);
+  mix-blend-mode: screen;
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.28);
+  will-change: transform, opacity;
+}
+
+.preview-week-chunk {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate3d(0, 0, 0);
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.16);
+  will-change: transform, opacity;
+}
+
+.preview-week-outline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  border-radius: var(--preview-week-table-radius);
+  overflow: hidden;
+}
+
+.preview-week-outline-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  transition:
+    opacity var(--preview-motion-fast) ease var(--preview-line-delay, 0ms),
+    transform calc(var(--preview-motion-medium) + 120ms) var(--preview-motion-ease)
+      var(--preview-line-delay, 0ms);
+}
+
+.preview-week-outline-line.horizontal {
+  top: var(--preview-line-offset, 0%);
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.preview-week-outline-line.vertical {
+  top: 0;
+  left: var(--preview-line-offset, 0%);
+  width: 1px;
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+
+.preview-week-outline-line.horizontal.is-top-edge,
+.preview-week-outline-line.horizontal.is-bottom-edge {
+  left: var(--preview-week-outline-corner-offset);
+  width: calc(100% - (var(--preview-week-outline-corner-offset) * 2));
+}
+
+.preview-week-outline-line.vertical.is-left-edge,
+.preview-week-outline-line.vertical.is-right-edge {
+  top: var(--preview-week-outline-corner-offset);
+  height: calc(100% - (var(--preview-week-outline-corner-offset) * 2));
+}
+
+.preview-week-outline-corner {
+  position: absolute;
+  width: var(--preview-week-outline-corner-offset);
+  height: var(--preview-week-outline-corner-offset);
+  box-sizing: border-box;
+  opacity: 0;
+  transform: scale(0.08);
+  transition:
+    opacity var(--preview-motion-fast) ease var(--preview-line-delay, 0ms),
+    transform calc(var(--preview-motion-medium) + 120ms) var(--preview-motion-ease)
+      var(--preview-line-delay, 0ms);
+}
+
+.preview-week-outline-corner.top-left {
+  top: 0;
+  left: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-top-left-radius: var(--preview-week-outline-corner-offset);
+  transform-origin: 100% 100%;
+}
+
+.preview-week-outline-corner.top-right {
+  top: 0;
+  right: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  border-top-right-radius: var(--preview-week-outline-corner-offset);
+  transform-origin: 0 100%;
+}
+
+.preview-week-outline-corner.bottom-right {
+  right: 0;
+  bottom: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom-right-radius: var(--preview-week-outline-corner-offset);
+  transform-origin: 0 0;
+}
+
+.preview-week-outline-corner.bottom-left {
+  left: 0;
+  bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom-left-radius: var(--preview-week-outline-corner-offset);
+  transform-origin: 100% 0;
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line {
+  opacity: 1;
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line.horizontal {
+  transform: scaleX(1);
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-line.vertical {
+  transform: scaleY(1);
+}
+
+.preview-week-plan.is-outline-active .preview-week-outline-corner {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.preview-week-plan.is-rows-visible .preview-week-outline {
+  opacity: 0;
+  transition: opacity var(--preview-motion-fast) ease 120ms;
+}
+
+.preview-week-plan.is-scan-once .preview-week-table-wrap::after {
+  animation: preview-week-live-scan-once 5000ms linear 1 both;
+}
+
+.preview-week-plan.is-digitizing .preview-week-table-wrap {
+  animation: preview-week-digitize-shell 1480ms steps(16, end) both;
+}
+
+.preview-week-plan.is-digitizing .preview-week-table-wrap::before {
+  animation: preview-week-digitize-static 1480ms steps(20, end) both;
+}
+
+.preview-week-plan.is-digitizing .preview-week-table-wrap::after {
+  animation: preview-week-digitize-scan 1480ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.preview-week-plan.is-digitizing .preview-week-table :is(th, td, p, li) {
+  animation: preview-week-digitize-content 1480ms steps(18, end) both;
+}
+

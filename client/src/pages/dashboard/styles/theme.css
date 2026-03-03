@@ -1,0 +1,429 @@
+﻿.dashboard-page,
+.drawer {
+  --dash-page-bg: #000;
+  --dash-page-bg-alt: #101010;
+  --dash-panel-bg: #141414;
+  --dash-panel-border: #444;
+  --dash-panel-shadow: 0 0 0 1px #2a2a2a, 0 22px 48px #000;
+  --dash-card-bg: #1c1c1c;
+  --dash-card-bg-soft: #242424;
+  --dash-card-border: #4a4a4a;
+  --dash-card-border-strong: #7d7d7d;
+  --dash-text: #fff;
+  --dash-text-soft: #cfcfcf;
+  --dash-pill-bg: #2a2a2a;
+  --dash-pill-bg-strong: #3a3a3a;
+  --dash-focus-ring: #f2f2f2;
+}
+
+.dashboard-page {
+  color: var(--dash-text);
+  background-color: var(--dash-page-bg);
+  background: linear-gradient(150deg, var(--dash-page-bg) 0%, var(--dash-page-bg-alt) 100%);
+}
+
+.dashboard-page > .title {
+  position: sticky;
+  top: 0;
+  z-index: 24;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.96) 0%,
+    rgba(0, 0, 0, 0.88) 72%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  backdrop-filter: blur(8px);
+}
+
+.dashboard-page .dashboard-header-note {
+  margin: 6px 0 20px;
+  text-align: center;
+}
+
+.dashboard-page > .title .header-top {
+  min-height: 52px;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.dashboard-page > .title .header-center h1 {
+  margin: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-page > .title .header-left,
+.dashboard-page > .title .auth-actions {
+  min-height: 40px;
+  align-self: center;
+}
+
+.dashboard-page > .title .nav-trigger .icon-button,
+.dashboard-page > .title .profile-icon-button {
+  width: 40px;
+  height: 40px;
+}
+
+:where(.dashboard-page) div {
+  background-color: inherit;
+}
+
+.dashboard-page .panel {
+  background: var(--dash-panel-bg);
+  border-color: var(--dash-panel-border);
+  box-shadow: var(--dash-panel-shadow);
+}
+
+.dashboard-page .panel .panel {
+  background: var(--dash-card-bg-soft);
+  border-color: var(--dash-card-border);
+  box-shadow: none;
+}
+
+.dashboard-page h2,
+.dashboard-page h3,
+.dashboard-page h4,
+.dashboard-page strong {
+  color: var(--dash-text);
+}
+
+.dashboard-page .muted {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .error {
+  color: #f3f3f3;
+}
+
+.dashboard-page label {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page input,
+.dashboard-page select,
+.dashboard-page textarea {
+  background: #0f0f0f;
+  border-color: var(--dash-card-border);
+  color: var(--dash-text);
+}
+
+.dashboard-page input:focus,
+.dashboard-page select:focus,
+.dashboard-page textarea:focus {
+  outline: 2px solid var(--dash-focus-ring);
+}
+
+.dashboard-page .ghost {
+  border-color: var(--dash-card-border-strong);
+  background: var(--dash-pill-bg);
+  color: var(--dash-text);
+}
+
+.dashboard-page .ghost:hover {
+  background: var(--dash-pill-bg-strong);
+  border-color: #eee;
+}
+
+.dashboard-page .ghost:focus-visible {
+  outline: 2px solid var(--dash-focus-ring);
+  outline-offset: 2px;
+}
+
+.dashboard-page .overview-card,
+.dashboard-page .summary-list-row,
+.dashboard-page .hub-card,
+.dashboard-page .chart-card,
+.dashboard-page .goal-list-row,
+.dashboard-page .log-section,
+.dashboard-page .log-list-row,
+.dashboard-page .workout-list-row,
+.dashboard-page .meal-context,
+.dashboard-page .meal-log-panel,
+.dashboard-page .mealdb-panel,
+.dashboard-page .meal-log-row,
+.dashboard-page .meal-card,
+.dashboard-page .plan-row,
+.dashboard-page .exercise-tile,
+.dashboard-page .training-card,
+.dashboard-page .settings-tab,
+.dashboard-page .settings-list-row {
+  border: 1px solid var(--dash-card-border);
+  background: var(--dash-card-bg);
+}
+
+.dashboard-page .card-shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.dashboard-page .card-section-head,
+.dashboard-page .card-section-body,
+.dashboard-page .card-section-foot {
+  min-width: 0;
+}
+
+.dashboard-page .card-section-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.dashboard-page .card-section-foot {
+  margin-top: auto;
+}
+
+.dashboard-page .equal-card-grid {
+  align-items: stretch;
+}
+
+.dashboard-page .equal-card-grid > * {
+  height: 100%;
+}
+
+.dashboard-page .summary-view .eyebrow {
+  color: #ececec;
+}
+
+.dashboard-page .summary-view .overview-card h3 {
+  color: #e8e8e8;
+}
+
+.dashboard-page .summary-view .overview-value {
+  color: #fff;
+}
+
+.dashboard-page .summary-view .progress-label,
+.dashboard-page .summary-view .hub-list,
+.dashboard-page .summary-view .weather-forecast-row {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .summary-view .progress-bar {
+  background: #2a2a2a;
+}
+
+.dashboard-page .summary-view .progress-bar span {
+  background: linear-gradient(120deg, #fff, #bcbcbc);
+}
+
+.dashboard-page .summary-view .summary-range-toggle button {
+  border-color: var(--dash-card-border);
+  background: #202020;
+  color: var(--dash-text);
+}
+
+.dashboard-page .summary-view .summary-range-toggle button.active {
+  border-color: var(--dash-card-border-strong);
+  background: var(--dash-pill-bg-strong);
+  color: #fff;
+}
+
+.dashboard-page .summary-view .summary-chart-line {
+  stroke: #fff;
+}
+
+.dashboard-page .summary-view .summary-chart-line-alt {
+  stroke: #d8d8d8;
+}
+
+.dashboard-page .summary-view .summary-chart-line-recovery {
+  stroke: #bcbcbc;
+}
+
+.dashboard-page .goal-view .chart-line {
+  stroke: #fff;
+  filter: drop-shadow(0 6px 12px #000);
+}
+
+.dashboard-page .goal-view .chart-line-alt {
+  stroke: #cfcfcf;
+  filter: drop-shadow(0 6px 12px #000);
+}
+
+.dashboard-page .goal-view .chart-labels {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .plans-view .hub-card-hint,
+.dashboard-page .plans-view .meal-day-type,
+.dashboard-page .plans-view .hub-list,
+.dashboard-page .plans-view .tips-week-list li {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .plans-view .meal-track-pill,
+.dashboard-page .plans-view .tips-status-pill,
+.dashboard-page .meal-view .meal-course-pill {
+  border-color: var(--dash-card-border-strong);
+  background: var(--dash-pill-bg);
+  color: var(--dash-text);
+}
+
+.dashboard-page .meal-view .meal-course-pill.active {
+  background: var(--dash-pill-bg-strong);
+}
+
+.dashboard-page .meal-view .meal-card-meta,
+.dashboard-page .meal-view .meal-context p {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .tips-view .tips-filters label,
+.dashboard-page .tips-view .save-feedback,
+.dashboard-page .tips-view .exercise-group,
+.dashboard-page .tips-view .training-card p {
+  color: var(--dash-text-soft);
+}
+
+.dashboard-page .tips-view .tips-filters input,
+.dashboard-page .tips-view .tips-filters select {
+  border-color: var(--dash-card-border);
+  background: #0f0f0f;
+  color: var(--dash-text);
+}
+
+.dashboard-page .settings-view .settings-tab.active {
+  background: var(--dash-pill-bg-strong);
+  border-color: var(--dash-card-border-strong);
+}
+
+.dashboard-page .dashboard-title-button {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.dashboard-page .dashboard-title-button:hover {
+  color: #f5f5f5;
+}
+
+.dashboard-page .dashboard-title-button:focus-visible {
+  outline: 2px solid var(--dash-focus-ring);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.dashboard-page .cta,
+.dashboard-page .back-btn {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #fff !important;
+  box-shadow: none !important;
+}
+
+.dashboard-page .cta:hover:not(:disabled),
+.dashboard-page .back-btn:hover:not(:disabled) {
+  background: #e5e5e5 !important;
+  color: #000 !important;
+  border-color: #e5e5e5 !important;
+}
+
+.dashboard-page .cta:disabled,
+.dashboard-page .back-btn:disabled {
+  opacity: 0.6 !important;
+}
+
+.modal-backdrop.dashboard-modal-backdrop {
+  background: rgba(0, 0, 0, 0.86);
+  backdrop-filter: blur(4px);
+}
+
+.modal.dashboard-modal {
+  background: linear-gradient(180deg, #121212 0%, #0c0c0c 100%);
+  border: 1px solid #4a4a4a;
+  color: #fff;
+  box-shadow: 0 0 0 1px #2a2a2a, 0 22px 48px #000;
+}
+
+.modal.dashboard-modal .muted {
+  color: #cfcfcf;
+}
+
+.modal.dashboard-modal .error {
+  color: #f3f3f3;
+}
+
+.modal.dashboard-modal input,
+.modal.dashboard-modal select,
+.modal.dashboard-modal textarea {
+  background: #0f0f0f;
+  border: 1px solid #4a4a4a;
+  color: #fff;
+}
+
+.modal.dashboard-modal select option {
+  background: #111;
+  color: #f5f5f5;
+}
+
+.modal.dashboard-modal input:focus,
+.modal.dashboard-modal select:focus,
+.modal.dashboard-modal textarea:focus {
+  outline: 2px solid #f2f2f2;
+  outline-offset: 1px;
+}
+
+.modal.dashboard-modal .ghost {
+  border-color: #7d7d7d;
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.modal.dashboard-modal .ghost:hover {
+  background: #3a3a3a;
+  border-color: #eee;
+}
+
+.modal.dashboard-modal .cta,
+.modal.dashboard-modal .back-btn {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #fff !important;
+  box-shadow: none !important;
+}
+
+.modal.dashboard-modal .cta:hover:not(:disabled),
+.modal.dashboard-modal .back-btn:hover:not(:disabled) {
+  background: #e5e5e5 !important;
+  color: #000 !important;
+  border-color: #e5e5e5 !important;
+}
+
+.modal.dashboard-modal a {
+  color: #f5f5f5;
+  text-underline-offset: 2px;
+}
+
+.modal.dashboard-modal a:hover {
+  color: #ffffff;
+}
+
+.dashboard-page .summary-view .weather-badge,
+.dashboard-page .summary-view .air-quality-badge {
+  background: #303030;
+  color: #fff;
+  border: 1px solid #6a6a6a;
+}
+
+.dashboard-page .summary-view .air-quality-good,
+.dashboard-page .summary-view .air-quality-moderate,
+.dashboard-page .summary-view .air-quality-unhealthy-for-sensitive-groups,
+.dashboard-page .summary-view .air-quality-unhealthy,
+.dashboard-page .summary-view .air-quality-very-unhealthy,
+.dashboard-page .summary-view .air-quality-hazardous,
+.dashboard-page .summary-view .air-quality-unknown {
+  background: #303030;
+}
+

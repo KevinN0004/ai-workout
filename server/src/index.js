@@ -2,19 +2,48 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import argon2 from "argon2";
-import crypto from "crypto";
-import { promisify } from "util";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
-import { z } from "zod";
 import { connectDatabase } from "./db.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
+import { createAuthUserService } from "./services/authUserService.js";
+import {
+  caloriesBodySchema,
+  generatePlanBodySchema,
+  getValidationMessage,
+  goalsBodySchema,
+  loginBodySchema,
+  mealLogBodySchema,
+  profileBodySchema,
+  progressMetricBodySchema,
+  savedExerciseBodySchema,
+  signupBodySchema,
+  validateBody,
+  workoutSessionBodySchema
+} from "./services/apiSchemaService.js";
 import { initErrorTracking } from "./services/errorTrackingService.js";
 import { createHttpCacheService } from "./services/httpCacheService.js";
 import { isUpstreamFailureStatus, mongoReadyStateToText } from "./services/platformHealthService.js";
+import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
+import {
+  buildDashboard,
+  buildMealLogEntry,
+  buildProfile,
+  buildProgressMetricEntry,
+  buildSavedExerciseEntry,
+  buildWorkoutSessionEntry,
+  cleanText,
+  defaultDashboard,
+  defaultGoals,
+  defaultProfile,
+  isCompleteSignupProfile,
+  toCleanArray,
+  toCleanNameArray,
+  toNullableNumber,
+  toWorkoutSummaryEntry
+} from "./services/dashboardDataBuildersService.js";
 import {
   createSessionService,
   parseCookies,
@@ -145,7 +174,6 @@ const redisSessionKeyPrefix = "session:sid:";
 const csrfCookieName = "csrfToken";
 const csrfHeaderName = "x-csrf-token";
 const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const pbkdf2Async = promisify(crypto.pbkdf2);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
@@ -210,163 +238,6 @@ const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
 const argon2HashLength = toPositiveInt(process.env.ARGON2_HASH_LENGTH, 32);
-const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
-const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
-const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
-const defaultProfile = () => ({
-  firstName: "",
-  lastName: "",
-  name: "",
-  age: null,
-  heightCm: null,
-  weightKg: null,
-  sex: "",
-  bodyFat: null,
-  activity: "Moderate",
-  notes: "",
-  updatedAt: new Date().toISOString()
-});
-const allowedSexes = new Set(allowedSexValues);
-const allowedActivities = new Set(allowedActivityValues);
-const defaultGoals = () => ({
-  targetWeight: 160,
-  targetCalories: 2200,
-  weeklyWorkouts: 3
-});
-const defaultDashboard = () => ({
-  workouts: [],
-  workoutSessions: [],
-  calories: [],
-  mealLogs: [],
-  progressMetrics: [],
-  plans: [],
-  savedExercises: [],
-  goals: defaultGoals()
-});
-const buildDashboard = (input = {}) => {
-  const base = defaultDashboard();
-  const goals = input.goals || {};
-  return {
-    ...base,
-    workouts: Array.isArray(input.workouts) ? input.workouts.slice(0, 500) : [],
-    workoutSessions: Array.isArray(input.workoutSessions)
-      ? input.workoutSessions.slice(0, 500)
-      : [],
-    calories: Array.isArray(input.calories) ? input.calories : [],
-    mealLogs: Array.isArray(input.mealLogs) ? input.mealLogs.slice(0, 800) : [],
-    progressMetrics: Array.isArray(input.progressMetrics)
-      ? input.progressMetrics.slice(0, 400)
-      : [],
-    plans: Array.isArray(input.plans) ? input.plans : [],
-    savedExercises: Array.isArray(input.savedExercises)
-      ? input.savedExercises.slice(0, 200)
-      : [],
-    goals: {
-      ...base.goals,
-      targetWeight:
-        toNullableNumber(goals.targetWeight, 80, 400) ?? base.goals.targetWeight,
-      targetCalories:
-        toNullableNumber(goals.targetCalories, 1200, 4500) ??
-        base.goals.targetCalories,
-      weeklyWorkouts:
-        toNullableNumber(goals.weeklyWorkouts, 1, 7) ?? base.goals.weeklyWorkouts
-    }
-  };
-};
-
-const cleanText = (value, maxLen = 120) =>
-  typeof value === "string" ? value.trim().slice(0, maxLen) : "";
-
-const toNullableNumber = (value, min, max) => {
-  if (value === null || value === undefined || value === "") return null;
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  if (num < min || num > max) return null;
-  return num;
-};
-
-const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
-  (Array.isArray(value) ? value : [value])
-    .map((item) => cleanText(item, maxLen))
-    .filter(Boolean)
-    .slice(0, maxItems);
-
-const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
-  (Array.isArray(value) ? value : [])
-    .map((item) =>
-      cleanText(typeof item === "string" ? item : item?.name, maxLen)
-    )
-    .filter(Boolean)
-    .slice(0, maxItems);
-
-const allowedMealTypes = new Set(allowedMealTypeValues);
-
-const buildWorkoutSessionEntry = (input = {}) => ({
-  id: cleanText(input.id, 64) || crypto.randomUUID(),
-  date: cleanText(input.date, 20),
-  focus: cleanText(input.focus, 80) || "General",
-  duration: toNullableNumber(input.duration, 5, 360),
-  exercises: toCleanArray(input.exercises, 18, 140),
-  sets: toNullableNumber(input.sets, 1, 80),
-  reps: toNullableNumber(input.reps, 1, 120),
-  intensityRpe: toNullableNumber(input.intensityRpe ?? input.rpe, 1, 10),
-  notes: cleanText(input.notes, 500),
-  createdAt: new Date().toISOString()
-});
-
-const toWorkoutSummaryEntry = (session) => ({
-  id: cleanText(session?.id, 64) || crypto.randomUUID(),
-  date: cleanText(session?.date, 20),
-  focus: cleanText(session?.focus, 80) || "General",
-  duration: toNullableNumber(session?.duration, 5, 360),
-  exercises: toCleanArray(session?.exercises, 18, 140),
-  sets: toNullableNumber(session?.sets, 1, 80),
-  reps: toNullableNumber(session?.reps, 1, 120),
-  intensityRpe: toNullableNumber(session?.intensityRpe, 1, 10),
-  notes: cleanText(session?.notes, 500),
-  createdAt: cleanText(session?.createdAt, 40) || new Date().toISOString()
-});
-
-const buildMealLogEntry = (input = {}) => {
-  const mealTypeRaw = cleanText(input.mealType, 40).toLowerCase();
-  return {
-    id: cleanText(input.id, 64) || crypto.randomUUID(),
-    date: cleanText(input.date, 20),
-    mealType: allowedMealTypes.has(mealTypeRaw) ? mealTypeRaw : "other",
-    name: cleanText(input.name, 140),
-    calories: toNullableNumber(input.calories, 0, 5000),
-    proteinG: toNullableNumber(input.proteinG, 0, 400),
-    carbsG: toNullableNumber(input.carbsG, 0, 700),
-    fatG: toNullableNumber(input.fatG, 0, 300),
-    notes: cleanText(input.notes, 300),
-    loggedAt: new Date().toISOString()
-  };
-};
-
-const buildProgressMetricEntry = (input = {}) => ({
-  id: cleanText(input.id, 64) || crypto.randomUUID(),
-  date: cleanText(input.date, 20),
-  weightLb: toNullableNumber(input.weightLb, 50, 700),
-  bodyFatPct: toNullableNumber(input.bodyFatPct, 2, 70),
-  waistCm: toNullableNumber(input.waistCm, 30, 250),
-  restingHr: toNullableNumber(input.restingHr, 30, 220),
-  notes: cleanText(input.notes, 320),
-  loggedAt: new Date().toISOString()
-});
-
-const buildSavedExerciseEntry = (input = {}) => ({
-  id: cleanText(input.id, 64) || crypto.randomUUID(),
-  exerciseId: toNullableNumber(input.exerciseId, 1, 10000000),
-  name: cleanText(input.name, 180),
-  category: cleanText(input.category, 120),
-  muscles: toCleanNameArray(input.muscles, 10, 120),
-  equipment: toCleanNameArray(input.equipment, 10, 120),
-  imageUrl: cleanText(input.imageUrl, 320),
-  videoUrl: cleanText(input.videoUrl, 320),
-  reason: cleanText(input.reason, 260),
-  source: "wger",
-  savedAt: new Date().toISOString()
-});
 
 const openMeteoBaseUrl = cleanText(
   process.env.OPEN_METEO_BASE_URL || "https://api.open-meteo.com/v1/forecast",
@@ -398,216 +269,6 @@ const {
   maxEntries: externalCacheMaxEntries,
   defaultStaleTtlSec: externalCacheDefaultStaleTtlSec
 });
-
-const buildProfile = (input = {}) => {
-  const base = defaultProfile();
-  const rawName = cleanText(input.name, 80);
-  const rawFirst = cleanText(input.firstName, 40);
-  const rawLast = cleanText(input.lastName, 60);
-  const nameParts = rawName.split(/\s+/).filter(Boolean);
-  const firstName = rawFirst || nameParts[0] || "";
-  const lastName = rawLast || nameParts.slice(1).join(" ") || "";
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  return {
-    ...base,
-    firstName,
-    lastName,
-    name: fullName || rawName,
-    age: toNullableNumber(input.age, 10, 120),
-    heightCm: toNullableNumber(input.heightCm, 100, 260),
-    weightKg: toNullableNumber(input.weightKg, 25, 400),
-    sex: allowedSexes.has(input.sex) ? input.sex : "",
-    bodyFat: toNullableNumber(input.bodyFat, 3, 70),
-    activity: allowedActivities.has(input.activity) ? input.activity : base.activity,
-    notes: cleanText(input.notes, 500),
-    updatedAt: new Date().toISOString()
-  };
-};
-
-const isCompleteSignupProfile = (profile) =>
-  Boolean(
-    cleanText(profile?.firstName, 40) &&
-      cleanText(profile?.lastName, 60) &&
-      profile?.age !== null &&
-      profile?.heightCm !== null &&
-      profile?.weightKg !== null &&
-      cleanText(profile?.sex, 40)
-  );
-
-const toNumberInput = (value) => {
-  if (value === "") return null;
-  if (value === undefined || value === null) return value;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : value;
-};
-
-const requiredStringField = (maxLen) => z.string().trim().min(1).max(maxLen);
-const optionalStringField = (maxLen) => z.string().trim().max(maxLen).optional();
-const optionalBooleanField = z
-  .preprocess((value) => {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value !== 0;
-    if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
-      if (["true", "1", "yes"].includes(normalized)) return true;
-      if (["false", "0", "no"].includes(normalized)) return false;
-    }
-    return value;
-  }, z.boolean())
-  .optional();
-const optionalNullableNumberField = (min, max) =>
-  z.preprocess(
-    toNumberInput,
-    z.union([z.number().min(min).max(max), z.null()]).optional()
-  );
-const requiredNumberField = (min, max) =>
-  z.preprocess(toNumberInput, z.number().min(min).max(max));
-const optionalStringArrayField = (maxItems, maxLen) =>
-  z.preprocess((value) => {
-    if (value === undefined || value === null) return undefined;
-    const list = Array.isArray(value) ? value : [value];
-    return list
-      .map((item) => cleanText(item, maxLen))
-      .filter(Boolean)
-      .slice(0, maxItems);
-  }, z.array(z.string().max(maxLen)).max(maxItems).optional());
-
-const profileInputSchema = z
-  .object({
-    firstName: optionalStringField(40),
-    lastName: optionalStringField(60),
-    name: optionalStringField(80),
-    age: optionalNullableNumberField(10, 120),
-    heightCm: optionalNullableNumberField(100, 260),
-    weightKg: optionalNullableNumberField(25, 400),
-    sex: z.union([z.enum(allowedSexValues), z.literal("")]).optional(),
-    bodyFat: optionalNullableNumberField(3, 70),
-    activity: z.union([z.enum(allowedActivityValues), z.literal("")]).optional(),
-    notes: optionalStringField(500)
-  })
-  .passthrough();
-
-const signupBodySchema = z
-  .object({
-    email: requiredStringField(254),
-    password: z.string().min(8).max(256),
-    profile: profileInputSchema,
-    rememberMe: optionalBooleanField
-  })
-  .passthrough();
-
-const loginBodySchema = z
-  .object({
-    email: requiredStringField(254),
-    password: z.string().min(1).max(256),
-    rememberMe: optionalBooleanField
-  })
-  .passthrough();
-
-const profileBodySchema = profileInputSchema;
-
-const workoutSessionBodySchema = z
-  .object({
-    id: optionalStringField(64),
-    date: requiredStringField(20),
-    focus: optionalStringField(80),
-    duration: requiredNumberField(5, 360),
-    exercises: optionalStringArrayField(18, 140),
-    sets: optionalNullableNumberField(1, 80),
-    reps: optionalNullableNumberField(1, 120),
-    intensityRpe: optionalNullableNumberField(1, 10),
-    rpe: optionalNullableNumberField(1, 10),
-    notes: optionalStringField(500)
-  })
-  .passthrough();
-
-const caloriesBodySchema = z
-  .object({
-    date: requiredStringField(20),
-    calories: requiredNumberField(800, 10000)
-  })
-  .passthrough();
-
-const goalsBodySchema = z
-  .object({
-    targetWeight: optionalNullableNumberField(80, 400),
-    targetCalories: optionalNullableNumberField(1200, 4500),
-    weeklyWorkouts: optionalNullableNumberField(1, 7)
-  })
-  .passthrough();
-
-const mealLogBodySchema = z
-  .object({
-    id: optionalStringField(64),
-    date: requiredStringField(20),
-    mealType: optionalStringField(40),
-    name: requiredStringField(140),
-    calories: optionalNullableNumberField(0, 5000),
-    proteinG: optionalNullableNumberField(0, 400),
-    carbsG: optionalNullableNumberField(0, 700),
-    fatG: optionalNullableNumberField(0, 300),
-    notes: optionalStringField(300)
-  })
-  .passthrough();
-
-const progressMetricBodySchema = z
-  .object({
-    id: optionalStringField(64),
-    date: requiredStringField(20),
-    weightLb: optionalNullableNumberField(50, 700),
-    bodyFatPct: optionalNullableNumberField(2, 70),
-    waistCm: optionalNullableNumberField(30, 250),
-    restingHr: optionalNullableNumberField(30, 220),
-    notes: optionalStringField(320)
-  })
-  .passthrough();
-
-const namedValueSchema = z
-  .object({
-    name: requiredStringField(120)
-  })
-  .passthrough();
-
-const savedExerciseBodySchema = z
-  .object({
-    id: optionalStringField(64),
-    exerciseId: optionalNullableNumberField(1, 10000000),
-    name: requiredStringField(180),
-    category: optionalStringField(120),
-    muscles: z.array(z.union([z.string().trim().min(1).max(120), namedValueSchema])).max(10).optional(),
-    equipment: z.array(z.union([z.string().trim().min(1).max(120), namedValueSchema])).max(10).optional(),
-    imageUrl: optionalStringField(320),
-    videoUrl: optionalStringField(320),
-    reason: optionalStringField(260)
-  })
-  .passthrough();
-
-const generatePlanBodySchema = z
-  .object({
-    goal: optionalStringField(120),
-    equipment: optionalStringArrayField(10, 80),
-    duration: optionalNullableNumberField(15, 180),
-    level: optionalStringField(40),
-    injuries: optionalStringField(140),
-    days: optionalNullableNumberField(1, 7),
-    environment: optionalStringField(40),
-    focuses: optionalStringArrayField(8, 60)
-  })
-  .passthrough();
-
-const getValidationMessage = (error) => {
-  const issue = error?.issues?.[0];
-  if (!issue) return "Invalid request body.";
-  const path = Array.isArray(issue.path) && issue.path.length ? issue.path.join(".") : "request";
-  return cleanText(`${path}: ${issue.message}`, 240) || "Invalid request body.";
-};
-
-const validateBody = (req, res, schema) => {
-  const result = schema.safeParse(req.body || {});
-  if (result.success) return result.data;
-  res.status(400).json({ error: getValidationMessage(result.error) });
-  return null;
-};
 
 const toFiniteNumber = (value) => {
   const num = Number(value);
@@ -1260,121 +921,27 @@ const mapWgerExercise = (exercise, preferredLanguage = wgerDefaultLanguage) => {
   };
 };
 
-const mapMongoDocToUser = (doc) => {
-  if (!doc) return null;
-  const source = typeof doc.toObject === "function" ? doc.toObject() : doc;
-  const inferredAlgo =
-    cleanText(source.passwordAlgo, 24) ||
-    (cleanText(source.hash, 260).startsWith("$argon2") ? "argon2id" : "pbkdf2");
-  return {
-    id: source.userId,
-    email: source.email,
-    salt: source.salt,
-    hash: source.hash,
-    passwordAlgo: inferredAlgo,
-    createdAt: source.createdAt,
-    profile: source.profile,
-    dashboard: source.dashboard
-  };
-};
-
-const mapUserToMongoDoc = (user) => {
-  const doc = {
-    userId: user.id,
-    email: cleanText(user.email, 254).toLowerCase(),
-    salt: user.salt ?? "",
-    hash: user.hash,
-    passwordAlgo: cleanText(user.passwordAlgo, 24) || "pbkdf2",
-    createdAt: user.createdAt || new Date().toISOString()
-  };
-  if (user.profile !== undefined) doc.profile = user.profile;
-  if (user.dashboard !== undefined) doc.dashboard = user.dashboard;
-  return doc;
-};
-
-const findUserById = async (userId) => {
-  const doc = await User.findOne({ userId });
-  return mapMongoDocToUser(doc);
-};
-
-const findUserByEmail = async (email) => {
-  const doc = await User.findOne({
-    email: cleanText(email, 254).toLowerCase()
-  });
-  return mapMongoDocToUser(doc);
-};
-
-const createUser = async (user) => {
-  const doc = await User.create(mapUserToMongoDoc(user));
-  return mapMongoDocToUser(doc);
-};
-
-const hashPasswordArgon2id = async (password) => {
-  const hash = await argon2.hash(password, {
-    type: argon2.argon2id,
+const authUserService = createAuthUserService({
+  User,
+  cleanText,
+  argon2Options: {
     timeCost: argon2TimeCost,
     memoryCost: argon2MemoryCost,
     parallelism: argon2Parallelism,
     hashLength: argon2HashLength
-  });
-  return { salt: "", hash, passwordAlgo: "argon2id" };
-};
-
-const hashPassword = async (password) => hashPasswordArgon2id(password);
-
-const isArgon2Hash = (value) => cleanText(value, 260).startsWith("$argon2");
-
-const resolvePasswordAlgo = (user = {}) => {
-  const raw = cleanText(user.passwordAlgo, 24);
-  if (raw === "argon2id" || raw === "pbkdf2") return raw;
-  return isArgon2Hash(user.hash) ? "argon2id" : "pbkdf2";
-};
-
-const verifyPasswordPbkdf2 = async (password, user) => {
-  if (!user?.salt || !user?.hash) return false;
-  const hash = await pbkdf2Async(password, user.salt, 120000, 64, "sha512");
-  const storedHash = Buffer.from(user.hash, "hex");
-  if (storedHash.length !== hash.length) return false;
-  return crypto.timingSafeEqual(storedHash, hash);
-};
-
-const verifyPassword = async (password, user) => {
-  const algo = resolvePasswordAlgo(user);
-  if (algo === "argon2id") {
-    if (!user?.hash) return false;
-    try {
-      return await argon2.verify(user.hash, password);
-    } catch {
-      return false;
-    }
   }
-  return verifyPasswordPbkdf2(password, user);
-};
-
-let dummyPasswordRecordPromise = null;
-const getDummyPasswordRecord = async () => {
-  if (!dummyPasswordRecordPromise) {
-    dummyPasswordRecordPromise = hashPasswordArgon2id("invalid-password");
-  }
-  return dummyPasswordRecordPromise;
-};
-
-const shouldUpgradePasswordToArgon2id = (user) => resolvePasswordAlgo(user) !== "argon2id";
-
-const upgradeUserPasswordToArgon2id = async (userId, plainPassword) => {
-  const next = await hashPasswordArgon2id(plainPassword);
-  await User.updateOne(
-    { userId },
-    {
-      $set: {
-        salt: next.salt,
-        hash: next.hash,
-        passwordAlgo: next.passwordAlgo
-      }
-    }
-  );
-  return next;
-};
+});
+const {
+  mapMongoDocToUser,
+  findUserById,
+  findUserByEmail,
+  createUser,
+  hashPassword,
+  getDummyPasswordRecord,
+  verifyPassword,
+  shouldUpgradePasswordToArgon2id,
+  upgradeUserPasswordToArgon2id
+} = authUserService;
 const sessionService = createSessionService({
   cleanText,
   logger,
@@ -1401,136 +968,21 @@ const {
   ensureCsrfTokenCookie,
   requireCsrfToken
 } = sessionService;
-
-const parseDashboardPagination = (query = {}, defaultLimit = dashboardCollectionDefaultLimit) => {
-  const parsedLimit =
-    toNullableNumber(query?.limit, 1, dashboardCollectionMaxLimit) ?? defaultLimit;
-  const parsedOffset = toNullableNumber(query?.offset, 0, 100000) ?? 0;
-  return {
-    limit: Math.trunc(parsedLimit),
-    offset: Math.trunc(parsedOffset)
-  };
-};
-
-const stripUserIdField = (doc = {}) => {
-  if (!doc || typeof doc !== "object") return doc;
-  const { userId, ...rest } = doc;
-  return rest;
-};
-
-const loadCollectionPage = async ({
-  model,
-  userId,
-  sortField,
-  limit,
-  offset
-}) => {
-  const [items, total] = await Promise.all([
-    model
-      .find({ userId })
-      .sort({ [sortField]: -1, _id: -1 })
-      .skip(offset)
-      .limit(limit)
-      .lean(),
-    model.countDocuments({ userId })
-  ]);
-
-  return {
-    items: items.map(stripUserIdField),
-    total,
-    limit,
-    offset,
-    source: "collection"
-  };
-};
-
-const getDashboardCollections = async (user, pagination = {}) => {
-  const userId = cleanText(user?.id, 120);
-  if (!userId) {
-    return {
-      workoutSessions: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
-      mealLogs: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
-      progressMetrics: { items: [], total: 0, limit: 0, offset: 0, source: "collection" }
-    };
-  }
-
-  const workoutPagination = {
-    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
-    ...(pagination.workoutSessions || {})
-  };
-  const mealPagination = {
-    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
-    ...(pagination.mealLogs || {})
-  };
-  const metricPagination = {
-    ...parseDashboardPagination({}, dashboardCollectionDefaultLimit),
-    ...(pagination.progressMetrics || {})
-  };
-
-  const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
-    loadCollectionPage({
-      model: WorkoutSession,
-      userId,
-      sortField: "createdAt",
-      limit: workoutPagination.limit,
-      offset: workoutPagination.offset
-    }),
-    loadCollectionPage({
-      model: MealLog,
-      userId,
-      sortField: "loggedAt",
-      limit: mealPagination.limit,
-      offset: mealPagination.offset
-    }),
-    loadCollectionPage({
-      model: ProgressMetric,
-      userId,
-      sortField: "loggedAt",
-      limit: metricPagination.limit,
-      offset: metricPagination.offset
-    })
-  ]);
-
-  return {
-    workoutSessions,
-    mealLogs,
-    progressMetrics
-  };
-};
-
-const buildDashboardResponse = async (user, pagination = {}) => {
-  const baseDashboard = buildDashboard(user?.dashboard);
-  const collections = await getDashboardCollections(user, pagination);
-
-  return {
-    dashboard: {
-      ...baseDashboard,
-      workoutSessions: collections.workoutSessions.items,
-      mealLogs: collections.mealLogs.items,
-      progressMetrics: collections.progressMetrics.items
-    },
-    pagination: {
-      workoutSessions: {
-        total: collections.workoutSessions.total,
-        limit: collections.workoutSessions.limit,
-        offset: collections.workoutSessions.offset,
-        source: collections.workoutSessions.source
-      },
-      mealLogs: {
-        total: collections.mealLogs.total,
-        limit: collections.mealLogs.limit,
-        offset: collections.mealLogs.offset,
-        source: collections.mealLogs.source
-      },
-      progressMetrics: {
-        total: collections.progressMetrics.total,
-        limit: collections.progressMetrics.limit,
-        offset: collections.progressMetrics.offset,
-        source: collections.progressMetrics.source
-      }
-    }
-  };
-};
+const dashboardCollectionService = createDashboardCollectionService({
+  cleanText,
+  toNullableNumber,
+  defaultLimit: dashboardCollectionDefaultLimit,
+  maxLimit: dashboardCollectionMaxLimit,
+  WorkoutSession,
+  MealLog,
+  ProgressMetric,
+  buildDashboard
+});
+const {
+  parseDashboardPagination,
+  getDashboardCollections,
+  buildDashboardResponse
+} = dashboardCollectionService;
 
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,

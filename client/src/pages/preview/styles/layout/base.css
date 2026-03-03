@@ -1,0 +1,122 @@
+﻿html.preview-smooth-scroll {
+  scroll-behavior: smooth;
+  scroll-padding-top: clamp(130px, 18vh, 182px);
+}
+
+.preview-stage-panel {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  align-content: start;
+  gap: 10px;
+  text-align: center;
+  --preview-body-width: clamp(1320px, 99vw, 1936px);
+  --preview-motion-ease: cubic-bezier(0.22, 0.8, 0.2, 1);
+  --preview-motion-fast: 160ms;
+  --preview-motion-medium: 280ms;
+  --preview-motion-slow: 440ms;
+  --preview-toc-expand-ms: 520ms;
+  --preview-toc-collapse-ms: 420ms;
+  --preview-toc-label-ms: 260ms;
+  --preview-body-copy-size: 0.86rem;
+  --preview-chip-expanded: calc(12ch + 1.35rem);
+  --preview-toc-lane-width: calc(var(--preview-chip-expanded) + 4px);
+  --preview-view-frame-width: min(
+    var(--preview-body-width),
+    calc(100% - (var(--home-shell-gutter) * 2) - var(--preview-toc-lane-width) - 8px)
+  );
+  --preview-toc-reserve: calc((var(--preview-chip-expanded) * 2) + 20px);
+  --preview-header-top: 125px;
+  --preview-header-height: 70px;
+  --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 10px);
+  --preview-scrollbar-size: 10px;
+  --preview-scrollbar-track: rgba(0, 0, 0, 0.92);
+  --preview-scrollbar-thumb: rgba(255, 255, 255, 0.78);
+  --preview-scrollbar-thumb-hover: rgba(255, 255, 255, 0.94);
+  --preview-scrollbar-border: rgba(255, 255, 255, 0.22);
+  --preview-content-height: clamp(
+    540px,
+    calc(100vh - var(--preview-header-top) - var(--preview-header-height) - 36px),
+    840px
+  );
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Prevent generic .panel styling from drawing a container around preview. */
+.home-page .preview-stage-panel.panel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar {
+  width: var(--preview-scrollbar-size);
+  height: var(--preview-scrollbar-size);
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-track {
+  background: var(--preview-scrollbar-track);
+  border: 1px solid var(--preview-scrollbar-border);
+  border-radius: 999px;
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--preview-scrollbar-thumb), rgba(220, 220, 220, 0.88));
+  border: 1px solid rgba(0, 0, 0, 0.72);
+  border-radius: 999px;
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--preview-scrollbar-thumb-hover), rgba(238, 238, 238, 0.95));
+}
+
+.preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-corner {
+  background: var(--preview-scrollbar-track);
+}
+
+.preview-view-header-section,
+.preview-view-body-section {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+  padding-left: var(--preview-toc-lane-width);
+  padding-right: var(--home-shell-gutter);
+}
+
+.preview-view-header-section {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-items: start;
+  column-gap: 0;
+  min-height: calc(var(--preview-header-height) + 18px);
+}
+
+.preview-view-body-section {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding-right: var(--preview-body-right-pad, calc(var(--preview-toc-lane-width) + 8px));
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+}
+

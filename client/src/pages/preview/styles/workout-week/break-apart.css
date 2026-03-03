@@ -1,0 +1,390 @@
+.preview-week-plan.is-breaking-apart {
+  --preview-break-duration: 1500ms;
+  --preview-break-total-duration: 3000ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table-wrap {
+  overflow: visible;
+  perspective: 1100px;
+  transform-style: preserve-3d;
+  animation: preview-week-break-shell var(--preview-break-total-duration) cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table-wrap::before {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.2) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.12) 0 3px,
+      transparent 3px 10px
+    );
+  animation: preview-week-break-noise var(--preview-break-total-duration) steps(34, end) both;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table-wrap::after {
+  left: 50%;
+  top: 52%;
+  inset: auto;
+  width: 2px;
+  height: 2px;
+  opacity: 0;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    -380px -170px rgba(255, 255, 255, 0.28),
+    -320px -150px rgba(255, 255, 255, 0.3),
+    -270px -135px rgba(255, 255, 255, 0.3),
+    -220px -124px rgba(255, 255, 255, 0.28),
+    -168px -112px rgba(255, 255, 255, 0.3),
+    -120px -102px rgba(255, 255, 255, 0.28),
+    -68px -88px rgba(255, 255, 255, 0.26),
+    -24px -72px rgba(255, 255, 255, 0.3),
+    24px -60px rgba(255, 255, 255, 0.28),
+    68px -88px rgba(255, 255, 255, 0.28),
+    118px -104px rgba(255, 255, 255, 0.3),
+    170px -118px rgba(255, 255, 255, 0.28),
+    218px -128px rgba(255, 255, 255, 0.3),
+    268px -140px rgba(255, 255, 255, 0.28),
+    318px -154px rgba(255, 255, 255, 0.28),
+    370px -168px rgba(255, 255, 255, 0.26),
+    -380px -110px rgba(255, 255, 255, 0.28),
+    -325px -96px rgba(255, 255, 255, 0.32),
+    -272px -84px rgba(255, 255, 255, 0.3),
+    -222px -72px rgba(255, 255, 255, 0.26),
+    -170px -64px rgba(255, 255, 255, 0.28),
+    -120px -52px rgba(255, 255, 255, 0.28),
+    -70px -46px rgba(255, 255, 255, 0.28),
+    -20px -36px rgba(255, 255, 255, 0.3),
+    26px -28px rgba(255, 255, 255, 0.3),
+    72px -44px rgba(255, 255, 255, 0.3),
+    122px -52px rgba(255, 255, 255, 0.28),
+    172px -64px rgba(255, 255, 255, 0.3),
+    224px -74px rgba(255, 255, 255, 0.28),
+    276px -88px rgba(255, 255, 255, 0.3),
+    326px -100px rgba(255, 255, 255, 0.28),
+    378px -114px rgba(255, 255, 255, 0.28),
+    -382px -52px rgba(255, 255, 255, 0.3),
+    -330px -40px rgba(255, 255, 255, 0.3),
+    -276px -28px rgba(255, 255, 255, 0.28),
+    -224px -18px rgba(255, 255, 255, 0.3),
+    -170px -8px rgba(255, 255, 255, 0.26),
+    -118px 2px rgba(255, 255, 255, 0.28),
+    -66px 10px rgba(255, 255, 255, 0.3),
+    -14px 20px rgba(255, 255, 255, 0.3),
+    38px 30px rgba(255, 255, 255, 0.28),
+    86px 16px rgba(255, 255, 255, 0.28),
+    136px 8px rgba(255, 255, 255, 0.28),
+    186px -2px rgba(255, 255, 255, 0.3),
+    238px -14px rgba(255, 255, 255, 0.28),
+    288px -28px rgba(255, 255, 255, 0.3),
+    338px -38px rgba(255, 255, 255, 0.28),
+    386px -52px rgba(255, 255, 255, 0.26),
+    -382px 8px rgba(255, 255, 255, 0.3),
+    -330px 20px rgba(255, 255, 255, 0.3),
+    -278px 32px rgba(255, 255, 255, 0.28),
+    -224px 44px rgba(255, 255, 255, 0.3),
+    -172px 54px rgba(255, 255, 255, 0.28),
+    -122px 64px rgba(255, 255, 255, 0.28),
+    -70px 76px rgba(255, 255, 255, 0.26),
+    -16px 86px rgba(255, 255, 255, 0.3),
+    34px 98px rgba(255, 255, 255, 0.28),
+    86px 82px rgba(255, 255, 255, 0.3),
+    138px 72px rgba(255, 255, 255, 0.28),
+    188px 60px rgba(255, 255, 255, 0.28),
+    238px 48px rgba(255, 255, 255, 0.3),
+    286px 34px rgba(255, 255, 255, 0.28),
+    336px 22px rgba(255, 255, 255, 0.3),
+    386px 10px rgba(255, 255, 255, 0.26),
+    -382px 64px rgba(255, 255, 255, 0.28),
+    -332px 78px rgba(255, 255, 255, 0.28),
+    -282px 90px rgba(255, 255, 255, 0.26),
+    -232px 102px rgba(255, 255, 255, 0.3),
+    -178px 114px rgba(255, 255, 255, 0.28),
+    -126px 126px rgba(255, 255, 255, 0.26),
+    -74px 138px rgba(255, 255, 255, 0.28),
+    -20px 150px rgba(255, 255, 255, 0.26),
+    34px 164px rgba(255, 255, 255, 0.28),
+    88px 144px rgba(255, 255, 255, 0.28),
+    142px 134px rgba(255, 255, 255, 0.28),
+    192px 122px rgba(255, 255, 255, 0.26),
+    246px 108px rgba(255, 255, 255, 0.28),
+    298px 94px rgba(255, 255, 255, 0.26),
+    346px 80px rgba(255, 255, 255, 0.26),
+    390px 66px rgba(255, 255, 255, 0.24);
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  animation: preview-week-break-shell-particles var(--preview-break-total-duration) steps(36, end) both;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td) {
+  --preview-break-x: -10px;
+  --preview-break-y: -14px;
+  --preview-break-rot: -1.3deg;
+  --preview-row-break-delay: 0ms;
+  --preview-col-break-delay: 0ms;
+  --preview-pixel-drift-x: 8px;
+  --preview-pixel-drift-y: -20px;
+  --preview-pixel-drift-x-end: 16px;
+  --preview-pixel-drift-y-end: -44px;
+  --preview-pixel-spin: -6deg;
+  --preview-pixel-alpha-a: 0.86;
+  --preview-pixel-alpha-b: 0.72;
+  --preview-pixel-scale-mid: 1.08;
+  --preview-pixel-scale-end: 1.16;
+  --preview-pixel-z-end: 20px;
+  --preview-pixel-wobble: 4px;
+  --preview-pixel-wobble-end: 10px;
+  position: relative;
+  overflow: visible;
+  border-color: rgba(255, 255, 255, 0.18);
+  animation: preview-week-break-cell var(--preview-break-duration) cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--preview-row-break-delay) + var(--preview-col-break-delay));
+  will-change: transform, opacity, filter, clip-path;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td)::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 2px;
+  height: 2px;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(255, 255, 255, var(--preview-pixel-alpha-a));
+  box-shadow:
+    -34px -7px rgba(255, 255, 255, 0.68),
+    -26px 2px rgba(255, 255, 255, 0.72),
+    -20px -15px rgba(255, 255, 255, 0.58),
+    -12px 6px rgba(255, 255, 255, 0.64),
+    -6px -10px rgba(255, 255, 255, 0.66),
+    2px -4px rgba(255, 255, 255, 0.74),
+    8px 8px rgba(255, 255, 255, 0.7),
+    14px -18px rgba(255, 255, 255, 0.62),
+    18px 4px rgba(255, 255, 255, 0.64),
+    24px -9px rgba(255, 255, 255, 0.6),
+    30px 3px rgba(255, 255, 255, 0.56),
+    36px -13px rgba(255, 255, 255, 0.52),
+    -28px 12px rgba(255, 255, 255, 0.54),
+    -14px 15px rgba(255, 255, 255, 0.5),
+    6px 15px rgba(255, 255, 255, 0.52),
+    20px 14px rgba(255, 255, 255, 0.48);
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.24));
+  transform: translate(-50%, -50%);
+  animation: preview-week-break-pixel-cloud-a calc(var(--preview-break-duration) + 160ms) steps(20, end) both;
+  animation-delay: calc(var(--preview-row-break-delay) + var(--preview-col-break-delay));
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(255, 255, 255, var(--preview-pixel-alpha-b));
+  box-shadow:
+    -38px -3px rgba(255, 255, 255, 0.54),
+    -31px -12px rgba(255, 255, 255, 0.5),
+    -23px 6px rgba(255, 255, 255, 0.56),
+    -17px -19px rgba(255, 255, 255, 0.48),
+    -9px 10px rgba(255, 255, 255, 0.52),
+    -2px -8px rgba(255, 255, 255, 0.6),
+    5px 12px rgba(255, 255, 255, 0.58),
+    11px -16px rgba(255, 255, 255, 0.5),
+    17px 6px rgba(255, 255, 255, 0.56),
+    23px -5px rgba(255, 255, 255, 0.5),
+    29px 9px rgba(255, 255, 255, 0.48),
+    35px -14px rgba(255, 255, 255, 0.46),
+    -26px 14px rgba(255, 255, 255, 0.44),
+    -7px 16px rgba(255, 255, 255, 0.42),
+    13px 15px rgba(255, 255, 255, 0.44),
+    27px 14px rgba(255, 255, 255, 0.4);
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.22));
+  transform: translate(-50%, -50%);
+  animation: preview-week-break-pixel-cloud-b calc(var(--preview-break-duration) + 220ms) steps(24, end) both;
+  animation-delay: calc(var(--preview-row-break-delay) + var(--preview-col-break-delay) + 40ms);
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table thead tr :is(th, td) {
+  --preview-row-break-delay: 0ms;
+  --preview-break-y: -12px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table tbody tr:nth-child(1) :is(th, td) {
+  --preview-row-break-delay: 300ms;
+  --preview-break-y: -18px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table tbody tr:nth-child(2) :is(th, td) {
+  --preview-row-break-delay: 600ms;
+  --preview-break-y: -24px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table tbody tr:nth-child(3) :is(th, td) {
+  --preview-row-break-delay: 900ms;
+  --preview-break-y: -30px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table tbody tr:nth-child(4) :is(th, td) {
+  --preview-row-break-delay: 1200ms;
+  --preview-break-y: -36px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(2n) {
+  --preview-break-x: 12px;
+  --preview-break-rot: 1.4deg;
+  --preview-pixel-drift-x: 12px;
+  --preview-pixel-drift-x-end: 20px;
+  --preview-pixel-spin: 7deg;
+  --preview-pixel-alpha-a: 0.92;
+  --preview-pixel-alpha-b: 0.78;
+  --preview-pixel-scale-mid: 1.1;
+  --preview-pixel-scale-end: 1.2;
+  --preview-pixel-wobble: 6px;
+  --preview-pixel-wobble-end: 14px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(3n) {
+  --preview-break-x: -17px;
+  --preview-break-rot: -1.9deg;
+  --preview-pixel-drift-x: -14px;
+  --preview-pixel-drift-x-end: -22px;
+  --preview-pixel-spin: -8deg;
+  --preview-pixel-alpha-a: 0.8;
+  --preview-pixel-alpha-b: 0.66;
+  --preview-pixel-scale-mid: 1.04;
+  --preview-pixel-scale-end: 1.14;
+  --preview-pixel-z-end: 26px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(4n) {
+  --preview-break-x: 19px;
+  --preview-break-rot: 2.3deg;
+  --preview-pixel-drift-x: 16px;
+  --preview-pixel-drift-x-end: 24px;
+  --preview-pixel-spin: 9deg;
+  --preview-pixel-alpha-a: 0.9;
+  --preview-pixel-alpha-b: 0.74;
+  --preview-pixel-scale-mid: 1.12;
+  --preview-pixel-scale-end: 1.22;
+  --preview-pixel-z-end: 28px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(5n) {
+  --preview-break-x: -14px;
+  --preview-break-rot: -1.6deg;
+  --preview-pixel-drift-x: -12px;
+  --preview-pixel-drift-x-end: -20px;
+  --preview-pixel-spin: -7deg;
+  --preview-pixel-alpha-a: 0.78;
+  --preview-pixel-alpha-b: 0.6;
+  --preview-pixel-scale-mid: 1.02;
+  --preview-pixel-scale-end: 1.1;
+  --preview-pixel-z-end: 22px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table tbody tr:nth-child(2n) :is(th, td) {
+  --preview-pixel-z-end: 30px;
+  --preview-pixel-wobble-end: 15px;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(1) {
+  --preview-col-break-delay: 0ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(2) {
+  --preview-col-break-delay: 30ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(3) {
+  --preview-col-break-delay: 60ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(4) {
+  --preview-col-break-delay: 90ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(5) {
+  --preview-col-break-delay: 120ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(6) {
+  --preview-col-break-delay: 150ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(7) {
+  --preview-col-break-delay: 180ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(th, td):nth-child(8) {
+  --preview-col-break-delay: 210ms;
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table :is(p, li, h3) {
+  animation: preview-week-break-content calc(var(--preview-break-duration) - 80ms) steps(20, end) both;
+  animation-delay: calc(var(--preview-row-break-delay, 0ms) + var(--preview-col-break-delay, 0ms) + 60ms);
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-highlights li::before {
+  animation: preview-week-break-content calc(var(--preview-break-duration) - 80ms) steps(20, end) both;
+  animation-delay: calc(var(--preview-row-break-delay, 0ms) + var(--preview-col-break-delay, 0ms) + 60ms);
+}
+
+.preview-week-plan.is-breaking-apart .preview-week-table {
+  border-radius: var(--preview-week-table-radius);
+  clip-path: inset(0 round var(--preview-week-table-radius));
+  transform-origin: center top;
+  animation: preview-week-break-table-rise var(--preview-break-total-duration) cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table-wrap {
+  animation: none !important;
+  overflow: visible;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table-wrap::before,
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table-wrap::after {
+  animation: none !important;
+  opacity: 0 !important;
+  transform: none !important;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table {
+  animation: none !important;
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table :is(th, td, p, li, h3) {
+  animation: none !important;
+  transform: none;
+  opacity: 1;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+  will-change: transform, opacity, clip-path;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table :is(th, td)::before,
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table :is(th, td)::after {
+  content: none;
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+.preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-highlights li::before {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+}
+

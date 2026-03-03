@@ -1,0 +1,262 @@
+﻿.preview-layout-frame {
+  width: min(
+    calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)),
+    100%
+  );
+  max-width: calc(var(--preview-body-width) * var(--preview-step-width-scale, 1));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0;
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+}
+
+.preview-scroll-story {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  display: block;
+  position: relative;
+  padding: 0;
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+  overflow: hidden;
+}
+
+.preview-layout-frame .preview-scroll-story {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.preview-step-shell {
+  width: 100%;
+  max-width: calc(var(--preview-body-width) * var(--preview-step-width-scale, 1));
+  margin: 0 auto;
+  position: relative;
+  top: auto;
+  z-index: 20;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  pointer-events: auto;
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+  overflow: hidden;
+}
+
+.preview-step-shell .preview-step-card {
+  pointer-events: auto;
+  max-width: calc(1500px * var(--preview-step-card-width-scale, 1));
+}
+
+.preview-side-tab {
+  --preview-chip-collapsed: 44px;
+  --preview-toc-width-ms: 900ms;
+  position: fixed;
+  left: 0;
+  top: clamp(47px, 11.1vh, 128px);
+  width: var(--preview-toc-lane-width);
+  min-width: var(--preview-toc-lane-width);
+  max-width: var(--preview-toc-lane-width);
+  max-height: calc(100vh - clamp(47px, 11.1vh, 128px) - 12px);
+  z-index: 28;
+  display: grid;
+  grid-auto-rows: min-content;
+  justify-items: start;
+  gap: 3px;
+  margin: 0;
+  padding: 2px 2px 2px 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0));
+}
+
+/* Hard-lock header + TOC geometry so chapter transitions cannot shift them. */
+.preview-stage-panel .preview-stage-header {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+}
+
+.preview-stage-panel .preview-side-tab {
+  position: fixed !important;
+  left: 0 !important;
+  width: var(--preview-toc-lane-width) !important;
+  min-width: var(--preview-toc-lane-width) !important;
+  max-width: var(--preview-toc-lane-width) !important;
+  top: clamp(47px, 11.1vh, 128px) !important;
+  max-height: calc(100vh - clamp(47px, 11.1vh, 128px) - 12px) !important;
+  z-index: 28;
+}
+
+.preview-stage-panel .preview-jump-chip {
+  pointer-events: auto !important;
+}
+
+.preview-stage-panel .preview-jump-label,
+.preview-stage-panel .preview-side-tab .preview-jump-chip .preview-jump-label {
+  transition:
+    opacity var(--preview-motion-fast) var(--preview-motion-ease),
+    transform 220ms var(--preview-motion-ease) !important;
+}
+
+.setup-snapshot-card {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.setup-snapshot-card-detailed {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.preview-step-card {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  border-radius: 16px;
+  background: transparent;
+  border: none;
+  padding: 14px 14px 12px;
+  transform-origin: center top;
+  box-shadow: none;
+  height: var(--preview-content-height);
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+  overflow: hidden;
+  transition:
+    border-color var(--preview-motion-fast) ease,
+    background-color var(--preview-motion-fast) ease,
+    box-shadow var(--preview-motion-fast) ease;
+  will-change: transform, opacity;
+}
+
+.preview-stage-panel .preview-step-card.is-generate-view {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the card hidden only after it collapses into the Personal Info button. */
+.preview-stage-panel .preview-step-card.is-personal-collapsed {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.preview-card-pages {
+  width: 100%;
+  height: 100%;
+  min-height: var(--preview-content-height);
+  max-height: var(--preview-content-height);
+  margin: 0 auto;
+  display: grid;
+  align-items: start;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.preview-step-card.is-personal-collapsed .preview-card-pages {
+  min-height: var(--preview-content-height);
+}
+
+.preview-card-page {
+  grid-area: 1 / 1;
+  position: relative;
+  height: 100%;
+  max-height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: none;
+  filter: none;
+  z-index: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition:
+    opacity var(--preview-motion-medium) var(--preview-motion-ease),
+    visibility 0s linear var(--preview-motion-medium);
+  will-change: opacity;
+  backface-visibility: hidden;
+}
+
+.preview-card-page.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  filter: none;
+  z-index: 3;
+  animation: none;
+  transition:
+    opacity var(--preview-motion-medium) var(--preview-motion-ease),
+    visibility 0s linear 0s;
+}
+
+.preview-card-page.is-entering {
+  animation: preview-card-page-in var(--preview-motion-medium) var(--preview-motion-ease) both;
+}
+
+.preview-card-page.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  pointer-events: none;
+  transform: none;
+  filter: none;
+  z-index: 2;
+}
+
+@keyframes preview-card-page-in {
+  from {
+    opacity: 0;
+    transform: none;
+    filter: none;
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes preview-builder-shift-left {
+  from {
+    transform: translateX(var(--preview-shift-x, 0px));
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes preview-builder-rise-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--preview-icon-rise, 28px));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

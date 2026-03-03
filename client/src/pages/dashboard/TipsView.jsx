@@ -1,279 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { detectTrack } from "./planUtils";
-import ModalPortal from "../../components/ModalPortal";
+import ExerciseTile from "./tips/ExerciseTile";
+import ExerciseDetailsModal from "./tips/ExerciseDetailsModal";
+import {
+  normalizeText,
+  uniqueList,
+  resolveMediaUrl,
+  getExerciseImage,
+  buildContextCategories,
+  buildEquipmentKeywords,
+  detectInjuryFlags,
+  scoreExercise,
+  buildGuideCards
+} from "./tips/recommendationUtils";
 import "./TipsView.css";
 
 const DEFAULT_LIMIT = 48;
-
-const normalizeText = (value) =>
-  typeof value === "string" ? value.toLowerCase().trim() : "";
-
-const uniqueList = (items) => [...new Set(items.filter(Boolean))];
-
-const resolveMediaUrl = (url) => {
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/")) return `https://wger.de${url}`;
-  return url;
-};
-
-const getExerciseImage = (exercise) => {
-  const images = Array.isArray(exercise?.images) ? exercise.images : [];
-  const mainImage = images.find((item) => item?.isMain && item?.url);
-  const fallback = mainImage?.url || images[0]?.url;
-  const resolved = resolveMediaUrl(fallback);
-  if (resolved) return resolved;
-  return `https://placehold.co/640x420?text=${encodeURIComponent(exercise?.name || "Exercise")}`;
-};
-
-const trackCategoryMap = {
-  lean_strength: ["Chest", "Back", "Legs", "Shoulders", "Arms"],
-  fat_loss: ["Cardio", "Legs", "Abs", "Back"],
-  endurance: ["Cardio", "Legs", "Back", "Abs"],
-  recovery: ["Abs", "Back", "Shoulders", "Legs"]
-};
-
-const keywordCategoryMap = [
-  { keyword: "push", categories: ["Chest", "Shoulders", "Arms"] },
-  { keyword: "pull", categories: ["Back", "Arms", "Shoulders"] },
-  { keyword: "chest", categories: ["Chest", "Shoulders"] },
-  { keyword: "back", categories: ["Back"] },
-  { keyword: "shoulder", categories: ["Shoulders"] },
-  { keyword: "arm", categories: ["Arms"] },
-  { keyword: "bicep", categories: ["Arms"] },
-  { keyword: "tricep", categories: ["Arms"] },
-  { keyword: "leg", categories: ["Legs", "Calves"] },
-  { keyword: "quad", categories: ["Legs"] },
-  { keyword: "hamstring", categories: ["Legs"] },
-  { keyword: "glute", categories: ["Legs"] },
-  { keyword: "core", categories: ["Abs"] },
-  { keyword: "ab", categories: ["Abs"] },
-  { keyword: "cardio", categories: ["Cardio"] },
-  { keyword: "conditioning", categories: ["Cardio"] },
-  { keyword: "run", categories: ["Cardio", "Legs"] }
-];
-
-const equipmentKeywordMap = {
-  "bodyweight only": ["bodyweight", "none (bodyweight exercise)"],
-  dumbbells: ["dumbbell", "kettlebell"],
-  kettlebell: ["kettlebell", "dumbbell"],
-  "resistance bands": ["band", "resistance"],
-  "adjustable bench": ["bench", "incline bench"],
-  "yoga mat": ["mat", "bodyweight"],
-  "full gym access": [
-    "barbell",
-    "dumbbell",
-    "machine",
-    "bench",
-    "cable",
-    "kettlebell",
-    "bodyweight"
-  ],
-  "barbell + plates": ["barbell"],
-  "cable machine": ["cable"],
-  "smith machine": ["barbell", "smith"],
-  "cardio machines": ["cardio", "bike", "row", "elliptical", "treadmill"],
-  "free weights": ["barbell", "dumbbell", "kettlebell"]
-};
-
-const injuryKeywordRules = {
-  "lower back": ["deadlift", "good morning", "hyperextension", "bent-over"],
-  back: ["deadlift", "good morning", "hyperextension", "bent-over"],
-  knee: ["jump", "lunge", "pistol", "squat", "step-up"],
-  shoulder: ["press", "snatch", "jerk", "dip", "raise", "pulldown"],
-  hip: ["lunge", "squat", "deadlift", "kickback"],
-  wrist: ["push-up", "curl", "press", "dip", "extension"],
-  elbow: ["curl", "press", "extension", "dip"]
-};
-
-const buildContextCategories = ({ track, goalText, todayLines }) => {
-  const categories = [...(trackCategoryMap[track] || trackCategoryMap.lean_strength)];
-  const sourceText = normalizeText(`${goalText} ${todayLines.join(" ")}`);
-  for (const rule of keywordCategoryMap) {
-    if (sourceText.includes(rule.keyword)) categories.push(...rule.categories);
-  }
-  return uniqueList(categories);
-};
-
-const buildEquipmentKeywords = ({ form }) => {
-  const selected = Array.isArray(form?.equipment) ? form.equipment : [];
-  const keywords = [];
-  for (const item of selected) {
-    const key = normalizeText(item);
-    keywords.push(...(equipmentKeywordMap[key] || []));
-  }
-  if (!keywords.length && normalizeText(form?.environment) === "home") {
-    keywords.push("bodyweight", "none (bodyweight exercise)", "dumbbell", "band");
-  }
-  return uniqueList(keywords);
-};
-
-const detectInjuryFlags = (injuryText) => {
-  const source = normalizeText(injuryText);
-  const active = [];
-  for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
-    if (source.includes(injury)) active.push({ injury, keywords });
-  }
-  return active;
-};
-
-const scoreExercise = (exercise, context) => {
-  const reasons = [];
-  let score = 0;
-  const categoryName = exercise?.category?.name || "";
-  const categoryLower = normalizeText(categoryName);
-  const nameLower = normalizeText(exercise?.name);
-  const descriptionLower = normalizeText(exercise?.description);
-  const equipmentNames = (Array.isArray(exercise?.equipment) ? exercise.equipment : [])
-    .map((item) => normalizeText(item?.name))
-    .filter(Boolean);
-  const muscleNames = (Array.isArray(exercise?.muscles) ? exercise.muscles : [])
-    .map((item) => normalizeText(item?.name))
-    .filter(Boolean);
-
-  if (context.preferredCategories.some((name) => normalizeText(name) === categoryLower)) {
-    score += 5;
-    reasons.push(`Matches your ${categoryName || "current"} focus.`);
-  }
-
-  if (context.weatherMode === "outdoor" && categoryLower === "cardio") {
-    score += 2;
-    reasons.push("Good fit for an outdoor-focused day.");
-  }
-
-  if (context.weatherMode === "indoor" && categoryLower !== "cardio") {
-    score += 1;
-    reasons.push("Works well as an indoor training option.");
-  }
-
-  if (context.equipmentKeywords.length) {
-    const equipmentMatch = context.equipmentKeywords.some((keyword) =>
-      equipmentNames.some((name) => name.includes(keyword))
-    );
-    const bodyweightFriendly = equipmentNames.some((name) =>
-      name.includes("bodyweight") || name.includes("none (bodyweight")
-    );
-    if (equipmentMatch) {
-      score += 3;
-      reasons.push("Fits your available equipment.");
-    } else if (context.homeMode && bodyweightFriendly) {
-      score += 2;
-      reasons.push("Bodyweight-friendly for home setup.");
-    }
-  }
-
-  for (const token of context.goalTokens) {
-    if (!token || token.length < 4) continue;
-    if (nameLower.includes(token) || descriptionLower.includes(token)) {
-      score += 1;
-      reasons.push("Aligns with your current goal wording.");
-      break;
-    }
-  }
-
-  for (const token of context.todayTokens) {
-    if (!token || token.length < 4) continue;
-    if (
-      nameLower.includes(token) ||
-      descriptionLower.includes(token) ||
-      muscleNames.some((muscle) => muscle.includes(token))
-    ) {
-      score += 2;
-      reasons.push("Supports today's planned training emphasis.");
-      break;
-    }
-  }
-
-  for (const flag of context.injuryFlags) {
-    const conflict = flag.keywords.some(
-      (keyword) => nameLower.includes(keyword) || descriptionLower.includes(keyword)
-    );
-    if (conflict) {
-      score -= 7;
-      reasons.push(`Potentially high stress for ${flag.injury}.`);
-    }
-  }
-
-  if (score <= 0) {
-    reasons.push("Fits your current filters.");
-  }
-
-  return {
-    exercise,
-    score,
-    reasons: uniqueList(reasons)
-  };
-};
-
-const buildGuideCards = ({
-  track,
-  weeklyWorkouts,
-  duration,
-  activity,
-  weatherMode,
-  injuryText
-}) => {
-  const splitText =
-    weeklyWorkouts >= 5
-      ? "Use a 5-day split: push, pull, legs, upper, lower with 1-2 recovery days."
-      : weeklyWorkouts === 4
-      ? "Use an upper/lower split with one conditioning day and one full recovery day."
-      : weeklyWorkouts <= 2
-      ? "Use full-body sessions each workout day and keep a mobility block on off days."
-      : "Use push/pull/legs or full-body rotation based on available days.";
-
-  const intensityText =
-    track === "fat_loss"
-      ? "Keep compounds at 6-10 reps and add short finishers; keep 1-2 reps in reserve."
-      : track === "endurance"
-      ? "Prioritize sustainable pacing and controlled intervals before adding load."
-      : track === "recovery"
-      ? "Use submax loads, slower eccentrics, and higher movement quality focus."
-      : "Progress top sets gradually and add load only after clean reps across all sets.";
-
-  const volumeText =
-    activity === "Very high" || activity === "High"
-      ? "Target 14-20 quality sets per major muscle weekly, then deload every 4-6 weeks."
-      : "Target 10-16 quality sets per major muscle weekly and deload every 6-8 weeks.";
-
-  const weatherText =
-    weatherMode === "outdoor"
-      ? "Weather favors outdoor work: place cardio blocks before sunset and hydrate early."
-      : weatherMode === "indoor"
-      ? "Weather favors indoor work: bias strength circuits, machines, and controlled conditioning."
-      : "Weather mode unavailable: default to your planned split and adjust by RPE.";
-
-  const injuryGuidance = normalizeText(injuryText)
-    ? "Injury note detected: use controlled tempo, pain-free ranges, and swap high-risk patterns."
-    : "No injury note detected: maintain warm-up sets and full range where technique stays stable.";
-
-  return [
-    {
-      title: "Split Strategy",
-      text: splitText
-    },
-    {
-      title: "Load Progression",
-      text: intensityText
-    },
-    {
-      title: "Volume Target",
-      text: volumeText
-    },
-    {
-      title: "Session Budget",
-      text: `With ${duration} minute sessions, keep 1-2 main lifts and 2-4 accessories per day.`
-    },
-    {
-      title: "Weather Adjustment",
-      text: weatherText
-    },
-    {
-      title: "Injury Guardrails",
-      text: injuryGuidance
-    }
-  ];
-};
 
 export default function TipsView({
   user,
@@ -609,45 +351,19 @@ export default function TipsView({
           <div className="exercise-grid">
             {recommendations.map((entry) => {
               const exercise = entry.exercise;
-              const imageUrl = getExerciseImage(exercise);
-              const equipmentText = (exercise.equipment || [])
-                .map((item) => item?.name)
-                .filter(Boolean)
-                .slice(0, 2)
-                .join(", ");
               const key = toExerciseKey(exercise);
               const saved = isSaved(exercise);
               const isSaving = Boolean(savingIds[key]);
               return (
-                <article key={`smart-${exercise.id}`} className="exercise-tile">
-                  <button
-                    type="button"
-                    className="exercise-tile-open"
-                    onClick={() => openExerciseModal({ ...exercise, recommendation: entry })}
-                  >
-                    <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                    <div className="exercise-tile-meta card-shell">
-                      <div className="card-section-head">
-                        <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                        <h3>{exercise.name}</h3>
-                      </div>
-                      <div className="card-section-body">
-                        <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
-                        <p className="muted">{entry.reasons[0]}</p>
-                      </div>
-                    </div>
-                  </button>
-                  <div className="exercise-tile-actions">
-                    <button
-                      type="button"
-                      className="ghost save-chip"
-                      disabled={saved || isSaving}
-                      onClick={() => saveExercise(exercise, entry)}
-                    >
-                      {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
-                    </button>
-                  </div>
-                </article>
+                <ExerciseTile
+                  key={`smart-${exercise.id}`}
+                  exercise={exercise}
+                  recommendation={entry}
+                  onOpen={openExerciseModal}
+                  onSave={saveExercise}
+                  saved={saved}
+                  isSaving={isSaving}
+                />
               );
             })}
             {!recommendations.length && (
@@ -688,44 +404,18 @@ export default function TipsView({
           </div>
           <div className="exercise-grid">
             {exercises.map((exercise) => {
-              const imageUrl = getExerciseImage(exercise);
-              const equipmentText = (exercise.equipment || [])
-                .map((item) => item?.name)
-                .filter(Boolean)
-                .slice(0, 2)
-                .join(", ");
               const key = toExerciseKey(exercise);
               const saved = isSaved(exercise);
               const isSaving = Boolean(savingIds[key]);
               return (
-                <article key={`library-${exercise.id}`} className="exercise-tile">
-                  <button
-                    type="button"
-                    className="exercise-tile-open"
-                    onClick={() => openExerciseModal(exercise)}
-                  >
-                    <img src={imageUrl} alt={exercise.name} loading="lazy" />
-                    <div className="exercise-tile-meta card-shell">
-                      <div className="card-section-head">
-                        <p className="exercise-group">{exercise.category?.name || "Exercise"}</p>
-                        <h3>{exercise.name}</h3>
-                      </div>
-                      <div className="card-section-body">
-                        <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
-                      </div>
-                    </div>
-                  </button>
-                  <div className="exercise-tile-actions">
-                    <button
-                      type="button"
-                      className="ghost save-chip"
-                      disabled={saved || isSaving}
-                      onClick={() => saveExercise(exercise)}
-                    >
-                      {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
-                    </button>
-                  </div>
-                </article>
+                <ExerciseTile
+                  key={`library-${exercise.id}`}
+                  exercise={exercise}
+                  onOpen={openExerciseModal}
+                  onSave={saveExercise}
+                  saved={saved}
+                  isSaving={isSaving}
+                />
               );
             })}
             {!exercises.length && !libraryLoading && (
@@ -735,118 +425,15 @@ export default function TipsView({
         </section>
       )}
 
-      {selectedExercise && (
-        <ModalPortal open={Boolean(selectedExercise)}>
-          <div
-            className="modal-backdrop dashboard-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setSelectedExercise(null)}
-          >
-            <div className="modal dashboard-modal exercise-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="modal-header">
-                <h3>{selectedExercise.name}</h3>
-                <button
-                  type="button"
-                  className="ghost icon-button"
-                  aria-label="Close"
-                  onClick={() => setSelectedExercise(null)}
-                >
-                  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                    <path
-                      d="M6 6l12 12M18 6L6 18"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <div className="exercise-modal-content">
-                <img
-                  className="exercise-modal-image"
-                  src={getExerciseImage(selectedExercise)}
-                  alt={selectedExercise.name}
-                />
-                <div className="exercise-modal-body">
-                  <p className="exercise-target">
-                    <strong>Category:</strong> {selectedExercise.category?.name || "Unknown"}
-                  </p>
-                  <p className="exercise-focus">
-                    <strong>Primary muscles:</strong>{" "}
-                    {(selectedExercise.muscles || [])
-                      .map((item) => item.name)
-                      .filter(Boolean)
-                      .slice(0, 4)
-                      .join(", ") || "Not specified"}
-                  </p>
-                  <p className="exercise-focus">
-                    <strong>Equipment:</strong>{" "}
-                    {(selectedExercise.equipment || [])
-                      .map((item) => item.name)
-                      .filter(Boolean)
-                      .join(", ") || "Not specified"}
-                  </p>
-                  <div className="tips-save-actions">
-                    <button
-                      type="button"
-                      className="cta save-modal-button"
-                      disabled={
-                        isSaved(selectedExercise) ||
-                        Boolean(savingIds[toExerciseKey(selectedExercise)])
-                      }
-                      onClick={() =>
-                        saveExercise(selectedExercise, selectedExercise?.recommendation)
-                      }
-                    >
-                      {isSaved(selectedExercise)
-                        ? "Saved to plan"
-                        : savingIds[toExerciseKey(selectedExercise)]
-                        ? "Saving..."
-                        : "Save to my plan"}
-                    </button>
-                  </div>
-                  {selectedExercise.description ? (
-                    <p className="exercise-what">{selectedExercise.description}</p>
-                  ) : (
-                    <p className="muted">No description provided for this exercise.</p>
-                  )}
-
-                  {selectedExercise?.recommendation?.reasons?.length ? (
-                    <section className="exercise-details-open">
-                      <h4>Why this was recommended</h4>
-                      <ul>
-                        {selectedExercise.recommendation.reasons.map((reason) => (
-                          <li key={`${selectedExercise.id}-${reason}`}>{reason}</li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-
-                  {(selectedExercise.videos || []).length ? (
-                    <div className="video-links">
-                      {(selectedExercise.videos || []).slice(0, 2).map((item) => (
-                        <a
-                          key={`${selectedExercise.id}-video-${item.id || item.url}`}
-                          href={resolveMediaUrl(item.url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="video-link"
-                        >
-                          Watch reference video
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">No video links available for this exercise.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      <ExerciseDetailsModal
+        selectedExercise={selectedExercise}
+        onClose={() => setSelectedExercise(null)}
+        onSave={saveExercise}
+        isSaved={Boolean(selectedExercise && isSaved(selectedExercise))}
+        isSaving={Boolean(
+          selectedExercise && savingIds[toExerciseKey(selectedExercise)]
+        )}
+      />
     </section>
   );
 }

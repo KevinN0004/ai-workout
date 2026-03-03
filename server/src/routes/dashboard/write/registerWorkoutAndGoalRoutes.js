@@ -1,0 +1,172 @@
+import crypto from "crypto";
+
+export const registerWorkoutAndGoalRoutes = (app, deps) => {
+  const {
+    requireAuth,
+    validateBody,
+    workoutSessionBodySchema,
+    buildWorkoutSessionEntry,
+    WorkoutSession,
+    User,
+    toWorkoutSummaryEntry,
+    mapMongoDocToUser,
+    buildDashboardResponse,
+    caloriesBodySchema,
+    toNullableNumber,
+    cleanText,
+    goalsBodySchema
+  } = deps;
+
+  app.post(
+    ["/api/dashboard/workouts", "/api/dashboard/workout-sessions"],
+    requireAuth,
+    async (req, res) => {
+      try {
+        const body = validateBody(req, res, workoutSessionBodySchema);
+        if (!body) return;
+
+        const session = buildWorkoutSessionEntry(body);
+        if (!session.date || session.duration === null) {
+          return res.status(400).json({ error: "Date and duration are required." });
+        }
+
+        await WorkoutSession.findOneAndUpdate(
+          { userId: req.user.id, id: session.id },
+          {
+            $set: {
+              userId: req.user.id,
+              ...session
+            }
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        const workoutSummary = toWorkoutSummaryEntry(session);
+        const updatedDoc = await User.findOneAndUpdate(
+          { userId: req.user.id },
+          [
+            {
+              $set: {
+                "dashboard.workouts": {
+                  $slice: [
+                    {
+                      $concatArrays: [
+                        [workoutSummary],
+                        {
+                          $filter: {
+                            input: { $ifNull: ["$dashboard.workouts", []] },
+                            as: "item",
+                            cond: {
+                              $ne: [
+                                {
+                                  $toString: { $ifNull: ["$$item.id", ""] }
+                                },
+                                workoutSummary.id
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    500
+                  ]
+                }
+              }
+            }
+          ],
+          { new: true }
+        );
+        if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+
+        const updated = mapMongoDocToUser(updatedDoc);
+        const response = await buildDashboardResponse(updated);
+        return res.json({
+          ...response,
+          workoutSession: session
+        });
+      } catch (err) {
+        return res.status(500).json({ error: err?.message || "Server error." });
+      }
+    }
+  );
+
+  app.post("/api/dashboard/calories", requireAuth, async (req, res) => {
+    try {
+      const body = validateBody(req, res, caloriesBodySchema);
+      if (!body) return;
+
+      const { date, calories } = body;
+      const parsedCalories = toNullableNumber(calories, 800, 10000);
+      if (!cleanText(date, 20) || parsedCalories === null) {
+        return res.status(400).json({ error: "Date and calories are required." });
+      }
+
+      const entry = {
+        id: crypto.randomUUID(),
+        date: cleanText(date, 20),
+        calories: parsedCalories,
+        source: "manual",
+        updatedAt: new Date().toISOString()
+      };
+      const updatedDoc = await User.findOneAndUpdate(
+        { userId: req.user.id },
+        {
+          $push: {
+            "dashboard.calories": {
+              $each: [entry],
+              $position: 0,
+              $slice: 1000
+            }
+          }
+        },
+        { new: true }
+      );
+      if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+      const updated = mapMongoDocToUser(updatedDoc);
+      const response = await buildDashboardResponse(updated);
+      return res.json(response);
+    } catch (err) {
+      return res.status(500).json({ error: err?.message || "Server error." });
+    }
+  });
+
+  app.post("/api/dashboard/goals", requireAuth, async (req, res) => {
+    try {
+      const body = validateBody(req, res, goalsBodySchema);
+      if (!body) return;
+
+      const { targetWeight, targetCalories, weeklyWorkouts } = body;
+      const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
+      const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
+      const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
+      const setFields = {};
+      if (parsedTargetWeight !== null) {
+        setFields["dashboard.goals.targetWeight"] = parsedTargetWeight;
+      }
+      if (parsedTargetCalories !== null) {
+        setFields["dashboard.goals.targetCalories"] = parsedTargetCalories;
+      }
+      if (parsedWeeklyWorkouts !== null) {
+        setFields["dashboard.goals.weeklyWorkouts"] = parsedWeeklyWorkouts;
+      }
+
+      let updatedDoc = null;
+      if (Object.keys(setFields).length) {
+        updatedDoc = await User.findOneAndUpdate(
+          { userId: req.user.id },
+          { $set: setFields },
+          { new: true }
+        );
+      } else {
+        updatedDoc = await User.findOne({ userId: req.user.id });
+      }
+
+      if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+      const updated = mapMongoDocToUser(updatedDoc);
+      const response = await buildDashboardResponse(updated);
+      return res.json(response);
+    } catch (err) {
+      return res.status(500).json({ error: err?.message || "Server error." });
+    }
+  });
+};

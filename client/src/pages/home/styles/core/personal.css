@@ -1,0 +1,241 @@
+
+.personal-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.personal-panel.stage-panel {
+  grid-template-rows: auto auto;
+  width: 100%;
+  margin: 0;
+  min-height: min(620px, calc(100vh - 180px));
+}
+
+.personal-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.personal-panel-header h2 {
+  margin: 0;
+}
+
+.personal-form {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
+  margin-top: 0;
+  align-content: start;
+  gap: 18px;
+  width: min(920px, 100%);
+  justify-self: center;
+  grid-auto-flow: row dense;
+}
+
+.preview-personal-form {
+  width: min(920px, 100%);
+  justify-self: center;
+  margin: 0 auto;
+}
+
+.preview-personal-form input,
+.preview-personal-form select,
+.preview-personal-form textarea,
+.preview-personal-form button {
+  pointer-events: none;
+}
+
+.preview-personal-form label {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.preview-personal-form input,
+.preview-personal-form select,
+.preview-personal-form textarea {
+  width: 100%;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  color: #fff;
+  padding: 10px 12px;
+  font-family: inherit;
+  line-height: 1.35;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  resize: none;
+}
+
+.preview-personal-form select {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.preview-personal-form .height-unit {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.preview-personal-form .day-toggle-btn {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.preview-personal-form .day-toggle-btn {
+  cursor: default;
+}
+
+.preview-personal-form .day-toggle-btn:hover,
+.preview-personal-form .day-toggle-btn:active {
+  transform: none;
+}
+
+.personal-form label {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  align-self: start;
+  color: #fff;
+}
+
+.personal-form label > input,
+.personal-form label > select,
+.personal-form label > textarea {
+  min-height: 44px;
+}
+
+.personal-form .metric-field {
+  display: grid;
+  grid-template-rows: auto minmax(44px, auto);
+  align-items: start;
+}
+
+.personal-form .height-field input {
+  min-height: 44px;
+}
+
+.personal-form .metric-field .label-row {
+  position: relative;
+  display: block;
+  min-height: 22px;
+  padding-right: calc(var(--metric-toggle-slot, 112px) + 10px);
+}
+
+.personal-form .metric-field .label-row .unit-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 100%;
+  max-width: var(--metric-toggle-slot, 112px);
+  justify-self: end;
+  margin-left: 0;
+  flex-shrink: 0;
+}
+
+.personal-form .metric-field > input,
+.personal-form .metric-field .height-split {
+  align-self: stretch;
+}
+
+.personal-form .metric-field .label-row .unit-toggle button {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.personal-form .metric-height {
+  --metric-toggle-slot: 112px;
+}
+
+.personal-form .field-weight {
+  --metric-toggle-slot: 92px;
+}
+
+.personal-form.basic-mode .field-name {
+  grid-column: 1 / -1;
+}
+
+.personal-form.basic-mode .field-age {
+  grid-column: auto;
+}
+
+.personal-form.basic-mode .field-height {
+  grid-column: auto;
+}
+
+.personal-form.basic-mode .field-weight {
+  grid-column: auto;
+}
+
+.personal-form.basic-mode .field-name,
+.personal-form.basic-mode .field-age,
+.personal-form.basic-mode .field-height,
+.personal-form.basic-mode .field-weight {
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+}
+
+.personal-form.basic-mode .field-sex {
+  grid-column: auto;
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+}
+
+.personal-form .personal-footer {
+  width: 100%;
+}
+
+.personal-form.basic-mode .personal-footer {
+  grid-column: 1 / -1;
+}
+
+.personal-form.basic-mode label,
+.personal-form.basic-mode label.metric-field,
+.personal-form.advanced-mode label,
+.personal-form.advanced-mode label.metric-field,
+.personal-form.advanced-mode label.metric-height {
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.personal-form .label-row {
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+}
+
+.personal-form .label-row .unit-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.personal-form.advanced-mode {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.personal-form.advanced-mode .field-name {
+  grid-column: 1 / span 2;
+}
+
+.personal-form.advanced-mode .field-age {
+  grid-column: 3;
+}
+
+.personal-form.advanced-mode .field-height {
+  grid-column: 1;
+}
+
+.personal-form.advanced-mode .field-weight {
+  grid-column: 2;
+}
+
+.personal-form.advanced-mode .field-sex {
+  grid-column: 3;
+}
+

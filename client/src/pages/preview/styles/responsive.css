@@ -1,0 +1,356 @@
+@media (max-width: 1180px) {
+  .preview-stage-panel {
+    --preview-body-copy-size: 0.72rem;
+    --preview-content-height: clamp(
+      500px,
+      calc(100vh - var(--preview-header-top) - var(--preview-header-height) - 30px),
+      760px
+    );
+  }
+
+  .preview-stage-panel {
+    width: 100%;
+    --preview-toc-reserve: calc((var(--preview-chip-expanded) * 2) + 16px);
+  }
+
+  .preview-scroll-story {
+    width: 100%;
+    padding: 0;
+  }
+
+  .preview-step-shell {
+    width: 100%;
+    max-width: var(--preview-body-width);
+  }
+
+  .preview-side-tab {
+    width: calc(var(--preview-chip-expanded) + 4px);
+    min-width: calc(var(--preview-chip-expanded) + 4px);
+    max-width: calc(var(--preview-chip-expanded) + 4px);
+    padding: 3px 3px 3px 1px;
+    box-sizing: border-box;
+  }
+
+  .preview-week-row-label {
+    width: 84px;
+    min-width: 84px;
+    padding: 8px 8px;
+    font-size: 0.62rem;
+  }
+
+  .preview-week-day-name {
+    font-size: 0.76rem;
+  }
+
+  .preview-week-day-head {
+    min-height: 78px;
+  }
+
+  .preview-week-highlights-cell {
+    min-height: 190px;
+  }
+
+  .preview-dashboard-view {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-dashboard-hub-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-personal-sequence {
+    --preview-generate-center-shift-y: -44px;
+  }
+}
+
+@media (max-width: 720px) {
+  .preview-stage-panel {
+    --preview-body-copy-size: 0.62rem;
+    --preview-view-frame-width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
+    --preview-content-height: clamp(
+      420px,
+      calc(100vh - var(--preview-header-top) - var(--preview-header-height) - 24px),
+      620px
+    );
+  }
+
+  .preview-view-header-section {
+    padding-left: var(--home-shell-gutter);
+    padding-right: var(--home-shell-gutter);
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+
+  .preview-view-body-section {
+    padding-left: var(--home-shell-gutter);
+    padding-right: var(--home-shell-gutter);
+  }
+
+  .preview-layout-frame {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+
+  .preview-layout-frame .preview-scroll-story {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .preview-personal-sequence {
+    --preview-generate-center-shift-y: -34px;
+    --preview-builder-gap: clamp(8px, 2.6vw, 14px);
+    --preview-builder-pill-width: clamp(112px, 26vw, 148px);
+    --preview-builder-pill-height: 42px;
+  }
+
+  .preview-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-stage-panel {
+    --preview-toc-reserve: 0px;
+    --preview-header-top: 125px;
+    --preview-header-height: 70px;
+    --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 8px);
+  }
+
+  .preview-stage-header {
+    grid-column: 1;
+    top: auto;
+    width: 100%;
+    max-width: none;
+    left: auto;
+    padding: 9px 10px;
+  }
+
+  .preview-scroll-story {
+    padding: 0;
+  }
+
+  .preview-step-shell {
+    position: relative;
+    top: auto;
+    width: 100%;
+    max-width: var(--preview-body-width);
+    margin: 0 auto;
+    left: 0;
+    padding: 0;
+  }
+
+  .preview-side-tab {
+    position: fixed;
+    top: var(--preview-header-top);
+    left: 0;
+    transform: none;
+    width: calc(var(--preview-chip-expanded) + 4px);
+    min-width: calc(var(--preview-chip-expanded) + 4px);
+    max-width: calc(var(--preview-chip-expanded) + 4px);
+    margin: 0;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    z-index: 22;
+    max-height: calc(100vh - var(--preview-header-top) - 8px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 3px 3px 3px 1px;
+    box-sizing: border-box;
+    border-right: none;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.76), rgba(0, 0, 0, 0));
+    transition: none;
+  }
+
+  .preview-jump-chip {
+    font-size: clamp(0.74rem, 2.8vw, 0.88rem);
+  }
+
+  .preview-builder-btn {
+    width: 100%;
+    min-width: 0;
+    height: var(--preview-builder-pill-height);
+    padding: 0 10px;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    white-space: normal;
+    text-wrap: balance;
+  }
+
+  .preview-week-table {
+    min-width: 0;
+  }
+
+  .preview-week-row-label {
+    width: 68px;
+    min-width: 68px;
+    padding: 7px;
+    font-size: 0.56rem;
+  }
+
+  .preview-week-day-head {
+    padding: 8px 5px;
+    min-height: 68px;
+  }
+
+  .preview-week-day-name {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+  }
+
+  .preview-week-highlights li {
+    padding-left: 9px;
+  }
+
+  .preview-week-highlights-cell {
+    min-height: 154px;
+  }
+
+  .preview-dashboard-overview-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .preview-dashboard-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-dashboard-stat-row {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-dashboard-chart-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+}
+
+@media (max-width: 520px) {
+  .preview-stage-panel {
+    --preview-header-top: 116px;
+    --preview-header-height: 64px;
+    --preview-body-copy-size: 0.58rem;
+  }
+
+  .preview-stage-title-stack {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    padding: 0 4px;
+  }
+
+  .preview-stage-title {
+    position: static;
+    height: auto;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .preview-jump-label {
+    white-space: normal;
+    line-height: 1.1;
+    padding: 0 2px;
+  }
+
+  .preview-week-row-label {
+    width: 56px;
+    min-width: 56px;
+    font-size: 0.52rem;
+    padding: 6px 4px;
+  }
+
+  .preview-week-day-name {
+    white-space: normal;
+    line-height: 1.15;
+  }
+
+  .preview-week-table {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.preview-smooth-scroll {
+    scroll-behavior: auto;
+  }
+
+  .preview-card-page,
+  .preview-card-page.active {
+    transition: none;
+    animation: none;
+  }
+
+  .preview-jump-chip,
+  .preview-jump-label {
+    transition: none;
+  }
+
+  .preview-stage-header.is-entering,
+  .preview-stage-title.is-entering,
+  .preview-stage-title.is-sliding-in-right,
+  .preview-stage-title-ghost.is-leaving {
+    animation: none;
+  }
+
+  .preview-builder-generating::after {
+    animation: none;
+  }
+
+  .preview-personal-form-shell,
+  .preview-personal-morph-surface,
+  .preview-personal-form,
+  .preview-personal-morph-label,
+  .preview-builder-track,
+  .preview-builder-slot,
+  .preview-builder-plus,
+  .preview-builder-generating,
+  .preview-dashboard-card,
+  .preview-dashboard-overview-card,
+  .preview-dashboard-chart-line,
+  .preview-week-day-cell,
+  .preview-week-row-label,
+  .preview-week-outline,
+  .preview-week-outline-line,
+  .preview-week-outline-corner {
+    transition: none;
+  }
+
+  .preview-personal-sequence.builder-stage-3 .preview-builder-plus.plus-one.is-visible,
+  .preview-personal-sequence.builder-stage-3 .preview-builder-slot.env.is-visible,
+  .preview-builder-plus.from-bottom.is-visible {
+    animation: none;
+  }
+
+  .preview-week-plan.is-digitizing .preview-week-table-wrap,
+  .preview-week-plan.is-digitizing .preview-week-table-wrap::before,
+  .preview-week-plan.is-digitizing .preview-week-table-wrap::after,
+  .preview-week-plan.is-digitizing .preview-week-table :is(th, td, p, li) {
+    animation: none;
+  }
+
+  .preview-week-plan.is-breaking-apart .preview-week-table-wrap,
+  .preview-week-plan.is-breaking-apart .preview-week-table-wrap::before,
+  .preview-week-plan.is-breaking-apart .preview-week-table-wrap::after,
+  .preview-week-plan.is-breaking-apart .preview-week-table :is(th, td, p, li, h3),
+  .preview-week-plan.is-breaking-apart .preview-week-table :is(th, td)::before,
+  .preview-week-plan.is-breaking-apart .preview-week-table :is(th, td)::after {
+    animation: none;
+  }
+
+  .preview-week-plan.is-scan-once .preview-week-table-wrap::after {
+    animation: none;
+  }
+
+  .preview-side-tab .preview-jump-chip.active,
+  .preview-jump-chip.active .preview-jump-label {
+    animation: none;
+  }
+
+  .preview-jump-chip.is-expanding,
+  .preview-jump-chip.is-contracting,
+  .preview-jump-chip.is-expanding .preview-jump-label,
+  .preview-jump-chip.is-contracting .preview-jump-label {
+    animation: none !important;
+  }
+}

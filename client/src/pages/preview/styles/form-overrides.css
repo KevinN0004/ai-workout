@@ -1,0 +1,67 @@
+.preview-personal-form input,
+.preview-personal-form select,
+.preview-personal-form textarea,
+.preview-personal-form button {
+  transition: none !important;
+}
+
+.preview-personal-form label {
+  text-align: left;
+}
+
+.preview-personal-sequence:not(.is-generate-view) .preview-personal-form {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(22, 22, 22, 0.72), rgba(10, 10, 10, 0.68));
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 14px;
+}
+
+.preview-personal-form input,
+.preview-personal-form select,
+.preview-personal-form textarea {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.preview-personal-form select {
+  cursor: default;
+}
+
+.preview-personal-form .height-unit {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.preview-personal-form .day-toggle-btn {
+  cursor: default;
+  pointer-events: none;
+}
+
+.preview-personal-form .day-toggle-btn:hover,
+.preview-personal-form .day-toggle-btn:active {
+  transform: none !important;
+}
+
+.preview-stage-panel :is(
+  .preview-stage-kicker,
+  .preview-generate-label,
+  .preview-field-row span,
+  .preview-field-row .preview-field-input,
+  .preview-personal-form label,
+  .preview-personal-form input,
+  .preview-personal-form select,
+  .preview-personal-form textarea,
+  .preview-personal-morph-label,
+  .preview-builder-btn,
+  .preview-builder-generating,
+  .preview-week-row-label,
+  .preview-week-session,
+  .preview-week-meta,
+  .preview-week-highlights li
+) {
+  font-size: var(--preview-body-copy-size);
+}
+
