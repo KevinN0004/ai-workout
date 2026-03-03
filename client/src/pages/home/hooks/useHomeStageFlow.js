@@ -3,10 +3,6 @@ import { animate, createTimeline } from "animejs";
 
 export default function useHomeStageFlow({
   onResetPersonalFlow,
-  setPersonal,
-  setHeightUnit,
-  setWeightUnit,
-  isDevEnvironment,
   samplePlanLength,
   personalMode
 }) {
@@ -407,23 +403,6 @@ export default function useHomeStageFlow({
     }, unifiedAnimationMs + 60);
   };
 
-  const onDevOpenVisualizer = () => {
-    if (!isDevEnvironment || isIntroTransitioning || isStageTransitioning) return;
-    setHeightUnit("cm");
-    setWeightUnit("kg");
-    setPersonal((prev) => ({
-      ...prev,
-      name: "Dev User",
-      age: "30",
-      sex: "Male",
-      heightCm: "178",
-      heightFeet: "5",
-      heightInches: "10",
-      weight: "78"
-    }));
-    goToStage("visualizer");
-  };
-
   useEffect(() => {
     if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
@@ -542,7 +521,6 @@ export default function useHomeStageFlow({
     suppressStageEnter,
     goToStage,
     transitionToStageFromTrigger,
-    onGetStarted,
-    onDevOpenVisualizer
+    onGetStarted
   };
 }

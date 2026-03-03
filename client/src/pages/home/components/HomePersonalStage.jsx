@@ -26,7 +26,10 @@ export default function HomePersonalStage({
   isStageTransitioning
 }) {
   return (
-    <section className="panel personal-panel stage-panel" ref={personalPanelRef}>
+    <section
+      className={`panel personal-panel stage-panel ${personalMode === "advanced" ? "personal-panel-advanced" : "personal-panel-basic"}`}
+      ref={personalPanelRef}
+    >
       <header className="stage-header">
         <div className="stage-header-main">
           <h2>Personal Info</h2>

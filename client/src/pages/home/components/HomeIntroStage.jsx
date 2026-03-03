@@ -5,9 +5,7 @@ export default function HomeIntroStage({
   stageDirection,
   isIntroTransitioning,
   isStageTransitioning,
-  onGetStarted,
-  isDevEnvironment,
-  onDevOpenVisualizer
+  onGetStarted
 }) {
   return (
     <main className="content home-intro-wrap">
@@ -30,16 +28,6 @@ export default function HomeIntroStage({
           >
             Get Started
           </button>
-          {isDevEnvironment && (
-            <button
-              className="ghost"
-              type="button"
-              onClick={onDevOpenVisualizer}
-              disabled={isIntroTransitioning || isStageTransitioning}
-            >
-              Dev: Visualizer
-            </button>
-          )}
         </div>
       </section>
     </main>

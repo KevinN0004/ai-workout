@@ -335,6 +335,8 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
 
   const headTopY = headCenterY - headRadius;
   const chinY = headCenterY + headRadius;
+  const headUpperY = headCenterY - (headRadius * 0.46);
+  const headLowerY = headCenterY + (headRadius * 0.58);
   const neckBaseY = chinY + (headRadius * 0.28);
   const groinY = hipY + ((thighY - hipY) * 0.13);
   const kneeY = thighY + ((calfY - thighY) * 0.38);
@@ -363,6 +365,9 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
     ankleY,
     headCenterY,
     headTopY,
+    headUpperY,
+    headLowerY,
+    chinY,
     neckBaseY,
     groinY,
     kneeY,
@@ -380,8 +385,11 @@ const buildScaleBands = (metrics, fallbackMetrics) => {
   });
 
   const bands = [
-    withScale(metrics.headTopY, metrics.headRadius * 0.96, fallbackMetrics.headRadius * 0.96, 0.86, 1.18),
-    withScale(metrics.headCenterY, metrics.headRadius, fallbackMetrics.headRadius, 0.86, 1.18),
+    withScale(metrics.headTopY, metrics.headRadius * 0.78, fallbackMetrics.headRadius * 0.78, 0.82, 1.14),
+    withScale(metrics.headUpperY, metrics.headRadius * 0.9, fallbackMetrics.headRadius * 0.9, 0.84, 1.16),
+    withScale(metrics.headCenterY, metrics.headRadius * 0.95, fallbackMetrics.headRadius * 0.95, 0.84, 1.16),
+    withScale(metrics.headLowerY, metrics.headRadius * 0.88, fallbackMetrics.headRadius * 0.88, 0.84, 1.15),
+    withScale(metrics.chinY, metrics.headRadius * 0.8, fallbackMetrics.headRadius * 0.8, 0.82, 1.14),
     withScale(metrics.neckBaseY, metrics.neckHalf, fallbackMetrics.neckHalf, 0.84, 1.22),
     withScale(metrics.shoulderY, metrics.shoulderHalf, fallbackMetrics.shoulderHalf, 0.78, 1.26),
     withScale(metrics.chestY, metrics.chestHalf, fallbackMetrics.chestHalf, 0.78, 1.32),
@@ -480,6 +488,14 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
 
     let xScale = interpolateScale(bands, baseY);
     let yOffset = 0;
+
+    if (baseY >= (metrics.headTopY - 1) && baseY <= (metrics.neckBaseY + 1)) {
+      const topTaper = bellCurve(baseY, metrics.headTopY + (metrics.headRadius * 0.18), Math.max(4, metrics.headRadius * 0.36));
+      const chinTaper = bellCurve(baseY, metrics.chinY - (metrics.headRadius * 0.14), Math.max(4, metrics.headRadius * 0.34));
+      const midBulge = bellCurve(baseY, metrics.headCenterY, Math.max(4, metrics.headRadius * 0.44));
+      xScale *= 1 - ((topTaper * 0.08) + (chinTaper * 0.07));
+      xScale *= 1 + (midBulge * 0.04);
+    }
 
     const neckInfluence = bellCurve(
       baseY,

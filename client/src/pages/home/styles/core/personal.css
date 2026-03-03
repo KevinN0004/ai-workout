@@ -9,6 +9,11 @@
   width: 100%;
   margin: 0;
   min-height: min(620px, calc(100vh - 180px));
+  align-content: start;
+}
+
+.personal-panel.stage-panel.personal-panel-basic {
+  min-height: 0;
 }
 
 .personal-panel-header {

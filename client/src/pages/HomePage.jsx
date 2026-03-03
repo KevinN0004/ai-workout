@@ -61,7 +61,6 @@ export default function HomePage({
 
   const silhouetteViewHeight = 430;
   const silhouetteFloorInset = 18;
-  const isDevEnvironment = import.meta.env.DEV;
 
   const {
     visualPanelRef,
@@ -80,14 +79,9 @@ export default function HomePage({
     suppressStageEnter,
     goToStage,
     transitionToStageFromTrigger,
-    onGetStarted,
-    onDevOpenVisualizer
+    onGetStarted
   } = useHomeStageFlow({
     onResetPersonalFlow,
-    setPersonal,
-    setHeightUnit,
-    setWeightUnit,
-    isDevEnvironment,
     samplePlanLength: samplePlan.length,
     personalMode
   });
@@ -150,8 +144,6 @@ export default function HomePage({
           isIntroTransitioning={isIntroTransitioning}
           isStageTransitioning={isStageTransitioning}
           onGetStarted={onGetStarted}
-          isDevEnvironment={isDevEnvironment}
-          onDevOpenVisualizer={onDevOpenVisualizer}
         />
       ) : (
         <main className="content">
@@ -211,7 +203,6 @@ export default function HomePage({
                 visualLabel={visualLabel}
                 silhouetteRenderSignature={silhouetteRenderSignature}
                 silhouetteShape={silhouetteShape}
-                isDevEnvironment={isDevEnvironment}
                 backBtnStyle={backBtnStyle}
                 onBack={() => goToStage("personal")}
                 onContinue={() => transitionToStageFromTrigger("workout")}
