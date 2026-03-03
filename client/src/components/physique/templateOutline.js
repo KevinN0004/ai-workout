@@ -190,22 +190,40 @@ const parseTemplate = () => {
 
 const TEMPLATE = parseTemplate();
 
+const MEDICAL_REGION_CURVE_WEIGHTS = {
+  // Segment weighting informed by anthropometric segment emphasis used in clinical gait/shape models:
+  // trunk drives the dominant cross-sectional variance, pelvis-thigh secondary, distal limbs lower.
+  neck: 0.3,
+  chest: 0.42,
+  shoulder: 0.4,
+  trunk: 0.5,
+  pelvis: 0.4,
+  thigh: 0.34,
+  calf: 0.34,
+  upperArm: 0.36,
+  forearm: 0.28
+};
+
 const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   const shoulderScale = toFiniteNumber(model?.shoulderHalf, fallback.shoulderHalf) / fallback.shoulderHalf;
   const chestScale = toFiniteNumber(model?.chestHalf, fallback.chestHalf) / fallback.chestHalf;
   const waistScale = toFiniteNumber(model?.waistHalf, fallback.waistHalf) / fallback.waistHalf;
   const hipScale = toFiniteNumber(model?.hipHalf, fallback.hipHalf) / fallback.hipHalf;
   const thighScale = toFiniteNumber(model?.thighHalf, fallback.thighHalf) / fallback.thighHalf;
+  const armWidthScale = toFiniteNumber(model?.armWidth, fallback.armWidth) / fallback.armWidth;
+  const calfScale = toFiniteNumber(model?.calfHalf, fallback.calfHalf) / fallback.calfHalf;
   const armSpanScale = toFiniteNumber(model?.armSpanRatio, 1);
+  const sideFat = clamp(toFiniteNumber(model?.sideFat, 0), 0, 1);
   const widthScale = clamp(
-    (shoulderScale * 0.28) +
-      (chestScale * 0.17) +
-      (waistScale * 0.13) +
-      (hipScale * 0.16) +
-      (thighScale * 0.1) +
-      (armSpanScale * 0.16),
-    0.76,
-    1.3
+    ((shoulderScale * 0.17) +
+      (chestScale * 0.15) +
+      (waistScale * 0.18) +
+      (hipScale * 0.18) +
+      (thighScale * 0.11) +
+      (armWidthScale * 0.11) +
+      (calfScale * 0.1)) * ((armSpanScale * 0.96) + 0.04) * (1 + (sideFat * 0.1)),
+    0.78,
+    1.28
   );
 
   const modelStature = toFiniteNumber(model?.ankleY, fallback.ankleY) -
@@ -213,9 +231,9 @@ const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   const fallbackStature = fallback.ankleY - (fallback.headCenterY - fallback.headRadius);
   const heightScale = clamp(modelStature / Math.max(1, fallbackStature), 0.9, 1.14);
 
-  const baseTargetWidth = viewboxWidth * 0.95;
+  const baseTargetWidth = viewboxWidth * 0.82;
   const baseTargetHeight = viewboxHeight * 0.98;
-  const targetWidth = clamp(baseTargetWidth * widthScale, viewboxWidth * 0.76, viewboxWidth * 0.998);
+  const targetWidth = clamp(baseTargetWidth * widthScale, viewboxWidth * 0.68, viewboxWidth * 0.91);
   const targetHeight = clamp(baseTargetHeight * heightScale, viewboxHeight * 0.86, viewboxHeight * 0.998);
 
   return { targetWidth, targetHeight };
@@ -292,14 +310,14 @@ const buildScaleBands = (metrics, fallbackMetrics) => {
     withScale(metrics.headTopY, metrics.headRadius * 0.96, fallbackMetrics.headRadius * 0.96, 0.86, 1.18),
     withScale(metrics.headCenterY, metrics.headRadius, fallbackMetrics.headRadius, 0.86, 1.18),
     withScale(metrics.neckBaseY, metrics.neckHalf, fallbackMetrics.neckHalf, 0.84, 1.22),
-    withScale(metrics.shoulderY, metrics.shoulderHalf, fallbackMetrics.shoulderHalf, 0.78, 1.24),
-    withScale(metrics.chestY, metrics.chestHalf, fallbackMetrics.chestHalf, 0.78, 1.24),
-    withScale(metrics.waistY, metrics.waistHalf, fallbackMetrics.waistHalf, 0.76, 1.3),
-    withScale(metrics.hipY, metrics.hipHalf, fallbackMetrics.hipHalf, 0.76, 1.3),
-    withScale(metrics.groinY, metrics.groinHalf, fallbackMetrics.groinHalf, 0.76, 1.26),
-    withScale(metrics.thighY, metrics.thighHalf, fallbackMetrics.thighHalf, 0.76, 1.26),
-    withScale(metrics.kneeY, metrics.kneeHalf, fallbackMetrics.kneeHalf, 0.76, 1.26),
-    withScale(metrics.calfY, metrics.calfHalf, fallbackMetrics.calfHalf, 0.76, 1.26),
+    withScale(metrics.shoulderY, metrics.shoulderHalf, fallbackMetrics.shoulderHalf, 0.78, 1.26),
+    withScale(metrics.chestY, metrics.chestHalf, fallbackMetrics.chestHalf, 0.78, 1.32),
+    withScale(metrics.waistY, metrics.waistHalf, fallbackMetrics.waistHalf, 0.76, 1.42),
+    withScale(metrics.hipY, metrics.hipHalf, fallbackMetrics.hipHalf, 0.76, 1.4),
+    withScale(metrics.groinY, metrics.groinHalf, fallbackMetrics.groinHalf, 0.76, 1.34),
+    withScale(metrics.thighY, metrics.thighHalf, fallbackMetrics.thighHalf, 0.76, 1.34),
+    withScale(metrics.kneeY, metrics.kneeHalf, fallbackMetrics.kneeHalf, 0.76, 1.32),
+    withScale(metrics.calfY, metrics.calfHalf, fallbackMetrics.calfHalf, 0.76, 1.32),
     withScale(metrics.ankleY, metrics.ankleHalf, fallbackMetrics.ankleHalf, 0.78, 1.24)
   ];
 
@@ -335,36 +353,185 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     0.88,
     1.18
   );
-  const armThicknessScale = clamp(metrics.armWidth / fallbackMetrics.armWidth, 0.84, 1.26);
+  const shoulderInflation = clamp((metrics.shoulderHalf / Math.max(1, fallbackMetrics.shoulderHalf)) - 1, 0, 0.58);
+  const armThicknessScale = clamp(metrics.armWidth / fallbackMetrics.armWidth, 0.82, 1.4);
+  const armInflation = clamp((metrics.armWidth / Math.max(1, fallbackMetrics.armWidth)) - 1, 0, 0.85);
+  const chestInflation = clamp((metrics.chestHalf / Math.max(1, fallbackMetrics.chestHalf)) - 1, 0, 0.72);
+  const waistInflation = clamp((metrics.waistHalf / Math.max(1, fallbackMetrics.waistHalf)) - 1, 0, 0.88);
+  const hipInflation = clamp((metrics.hipHalf / Math.max(1, fallbackMetrics.hipHalf)) - 1, 0, 0.74);
+  const thighInflation = clamp((metrics.thighHalf / Math.max(1, fallbackMetrics.thighHalf)) - 1, 0, 0.74);
+  const calfInflation = clamp((metrics.calfHalf / Math.max(1, fallbackMetrics.calfHalf)) - 1, 0, 1);
+  const neckInflation = clamp((metrics.neckHalf / Math.max(1, fallbackMetrics.neckHalf)) - 1, 0, 0.64);
   const sideFat = clamp(toFiniteNumber(model?.sideFat, 0), 0, 1);
   const shoulderFat = clamp(toFiniteNumber(model?.shoulderFat, 0), 0, 1);
+  const chestFat = clamp(toFiniteNumber(model?.chestFat, sideFat * 0.78), 0, 1);
+  const armFat = clamp(toFiniteNumber(model?.armFat, (sideFat * 0.58) + (shoulderFat * 0.42)), 0, 1);
+  const calfFat = clamp(toFiniteNumber(model?.calfFat, sideFat * 0.46), 0, 1);
+  const calfProfile = clamp(toFiniteNumber(model?.lowerLegAdiposity, calfFat), 0, 1.5);
 
-  const armZoneTop = metrics.shoulderY - clamp(metrics.armWidth * 1.9, 12, 28);
-  const armZoneBottom = metrics.shoulderY + clamp(metrics.armWidth * 2.5, 16, 36);
-  const armStart = clamp(metrics.shoulderHalf + 18, 54, 128);
-  const handBoostStart = armStart + clamp(metrics.armWidth * 2.8, 20, 50);
+  const armZoneTop = metrics.shoulderY - clamp(metrics.armWidth * 2.8, 15, 36);
+  const armZoneBottom = metrics.shoulderY + clamp(metrics.armWidth * 3.2, 20, 46);
+  const armStart = clamp(metrics.shoulderHalf + 14, 48, 122);
+  const handBoostStart = armStart + clamp(metrics.armWidth * 3.2, 22, 58);
+  const torsoTop = metrics.chestY - clamp((metrics.waistY - metrics.chestY) * 0.34, 8, 26);
+  const torsoBottom = metrics.thighY + clamp((metrics.thighY - metrics.hipY) * 0.22, 8, 24);
+  const upperArmSplit = armStart + ((handBoostStart - armStart) * 0.5);
+  const legInnerStart = metrics.groinHalf * 1.04;
+  const legMidStart = legInnerStart + clamp(metrics.thighHalf * 0.34, 4, 16);
+  const legMidEnd = legMidStart + clamp((metrics.thighHalf + metrics.calfHalf) * 0.52, 12, 36);
+  const calfSpreadStart = legInnerStart + clamp(metrics.calfHalf * 0.18, 1.8, 8.8);
+  const calfSpreadPeakStart = legMidStart + clamp(metrics.calfHalf * 0.12, 1.2, 6.2);
+  const calfSpreadEnd = legMidEnd + clamp(metrics.calfHalf * 0.96, 10, 30);
+  const calfVerticalFadeStart = metrics.calfY + ((metrics.ankleY - metrics.calfY) * 0.34);
+  const calfPeakTop = metrics.kneeY + ((metrics.calfY - metrics.kneeY) * 0.12);
+  const calfPeakBottom = metrics.calfY + ((metrics.ankleY - metrics.calfY) * 0.32);
 
   const morphedPoints = TEMPLATE.points.map((point, index) => {
     const baseX = ((point.x - TEMPLATE.minX) * uniformScale) + insetX;
     const baseY = ((point.y - TEMPLATE.minY) * uniformScale) + insetY;
     const dx = baseX - centerX;
     const absDx = Math.abs(dx);
+    const torsoCoreBlend = 1 - smoothstep(armStart * 0.42, armStart * 0.82, absDx);
+    const torsoSideBlend = clamp(
+      smoothstep(legInnerStart * 0.62, armStart * 0.72, absDx) *
+      (1 - smoothstep(armStart * 1.18, armStart * 1.52, absDx)) * 1.8,
+      0,
+      1
+    );
+    const shoulderContourBlend = clamp(
+      smoothstep(armStart * 0.72, armStart * 1.02, absDx) *
+      (1 - smoothstep(armStart * 1.28, armStart * 1.68, absDx)) * 1.7,
+      0,
+      1
+    );
 
     let xScale = interpolateScale(bands, baseY);
 
+    const neckInfluence = bellCurve(
+      baseY,
+      metrics.neckBaseY - ((metrics.neckBaseY - metrics.headCenterY) * 0.2),
+      clamp((metrics.shoulderY - metrics.headCenterY) * 0.44, 10, 26)
+    );
+    const neckBlend = clamp((torsoCoreBlend * 0.74) + (torsoSideBlend * 0.38), 0, 1);
+    xScale *= 1 + (
+      (neckInflation * MEDICAL_REGION_CURVE_WEIGHTS.neck) +
+      (shoulderFat * 0.07)
+    ) * neckInfluence * neckBlend;
+
     const shoulderInfluence = bellCurve(baseY, metrics.shoulderY, clamp(metrics.armWidth * 2.8, 16, 34));
     const torsoInfluence = bellCurve(baseY, metrics.waistY, clamp((metrics.hipY - metrics.chestY) * 0.7, 24, 66));
-    xScale *= 1 + (shoulderFat * 0.1 * shoulderInfluence);
-    xScale *= 1 + (sideFat * 0.11 * torsoInfluence);
+    const shoulderBoost = clamp(
+      (shoulderFat * 0.16) +
+      (shoulderInflation * MEDICAL_REGION_CURVE_WEIGHTS.shoulder) +
+      (chestFat * 0.08) +
+      (sideFat * 0.08),
+      0,
+      0.4
+    );
+    xScale *= 1 + (shoulderBoost * shoulderInfluence * (0.46 + shoulderContourBlend));
+    xScale *= 1 + ((sideFat * 0.18) * torsoInfluence);
+
+    const chestInfluence = bellCurve(baseY, metrics.chestY, clamp((metrics.waistY - metrics.chestY) * 0.58, 16, 46));
+    const chestBlend = clamp((torsoCoreBlend * 0.36) + (torsoSideBlend * 0.88), 0, 1);
+    const chestBoost = clamp(
+      (chestInflation * MEDICAL_REGION_CURVE_WEIGHTS.chest) +
+      (chestFat * 0.24) +
+      (sideFat * 0.12),
+      0,
+      0.52
+    );
+    xScale *= 1 + (chestBoost * chestInfluence * chestBlend);
+
+    const torsoVertical = clamp(
+      smoothstep(torsoTop, metrics.waistY, baseY) * (1 - smoothstep(metrics.hipY, torsoBottom, baseY)) * 1.86,
+      0,
+      1
+    );
+    const torsoBlend = clamp((torsoCoreBlend * 0.28) + (torsoSideBlend * 0.94), 0, 1);
+    const torsoBoost = clamp(
+      (sideFat * 0.34) +
+      (waistInflation * 0.9 * MEDICAL_REGION_CURVE_WEIGHTS.trunk) +
+      (hipInflation * 0.48),
+      0,
+      0.58
+    );
+    xScale *= 1 + (torsoBoost * torsoVertical * torsoBlend);
+
+    const hipInfluence = bellCurve(baseY, metrics.hipY, clamp((metrics.thighY - metrics.waistY) * 0.72, 22, 62));
+    const hipBlend = clamp((torsoSideBlend * 0.92) + (torsoCoreBlend * 0.24), 0, 1);
+    xScale *= 1 + (
+      (sideFat * 0.16 + (hipInflation * MEDICAL_REGION_CURVE_WEIGHTS.pelvis)) *
+      hipInfluence *
+      hipBlend
+    );
+
+    const thighInfluence = bellCurve(baseY, metrics.thighY, clamp((metrics.kneeY - metrics.hipY) * 0.66, 18, 52));
+    const calfInfluence = bellCurve(baseY, metrics.calfY, clamp((metrics.ankleY - metrics.kneeY) * 0.72, 18, 46));
+    const legSpreadBlend = clamp(
+      smoothstep(legInnerStart, legMidStart, absDx) * (1 - smoothstep(legMidEnd, legMidEnd + 18, absDx)) * 1.7,
+      0,
+      1
+    );
+    const calfSpreadBlend = clamp(
+      smoothstep(calfSpreadStart, calfSpreadPeakStart, absDx) *
+      (1 - smoothstep(calfSpreadEnd, calfSpreadEnd + 22, absDx)) * 2,
+      0,
+      1
+    );
+    const calfOuterBlend = smoothstep(calfSpreadPeakStart * 0.9, calfSpreadEnd * 0.9, absDx);
+    const calfBulgeVertical = clamp(
+      smoothstep(calfPeakTop, metrics.calfY, baseY) *
+      (1 - smoothstep(calfPeakBottom, metrics.ankleY + 1, baseY)) * 1.9,
+      0,
+      1
+    );
+    const ankleFade = 1 - smoothstep(calfVerticalFadeStart, metrics.ankleY + 2, baseY);
+    const calfZoneInfluence = clamp(calfInfluence * ankleFade, 0, 1);
+    xScale *= 1 + (((thighInflation * MEDICAL_REGION_CURVE_WEIGHTS.thigh) + (sideFat * 0.1)) * thighInfluence * legSpreadBlend);
+    const calfShapeBoost = clamp(
+      (calfInflation * MEDICAL_REGION_CURVE_WEIGHTS.calf) +
+      (calfFat * 0.32) +
+      (calfProfile * 0.22) +
+      (sideFat * 0.05),
+      0,
+      0.82
+    );
+    xScale *= 1 + (
+      calfShapeBoost *
+      Math.max(calfZoneInfluence, calfBulgeVertical) *
+      Math.max(calfSpreadBlend, legSpreadBlend * 0.5)
+    );
+    xScale *= 1 + (calfFat * 0.12 * calfBulgeVertical * calfOuterBlend);
 
     if (baseY >= armZoneTop && baseY <= armZoneBottom) {
       const topBlend = smoothstep(armZoneTop, metrics.shoulderY, baseY);
       const bottomBlend = 1 - smoothstep(metrics.shoulderY, armZoneBottom, baseY);
-      const armYBlend = clamp(topBlend * bottomBlend * 1.75, 0, 1);
-      const edgeBlend = smoothstep(armStart, armStart + 62, absDx);
+      const shoulderBandInfluence = bellCurve(baseY, metrics.shoulderY, clamp(metrics.armWidth * 3.6, 18, 42));
+      const armYBlend = clamp(Math.max(topBlend * bottomBlend * 1.75, shoulderBandInfluence * 0.88), 0, 1);
+      const edgeBlend = smoothstep(armStart * 0.78, armStart + 58, absDx);
       const handBlend = smoothstep(handBoostStart, handBoostStart + 42, absDx);
+      const upperArmBlend = clamp(
+        smoothstep(armStart * 0.9, upperArmSplit, absDx) *
+        (1 - smoothstep(upperArmSplit, upperArmSplit + 22, absDx)) * 1.95,
+        0,
+        1
+      );
+      const forearmBlend = clamp(
+        smoothstep(upperArmSplit - 6, handBoostStart, absDx) *
+        (1 - smoothstep(handBoostStart + 26, handBoostStart + 52, absDx)) * 1.35,
+        0,
+        1
+      );
+      const armAdiposeBoost = 1 + (armFat * 0.5) + (shoulderFat * 0.18) + (armInflation * 0.4);
+      const armFatSpread = clamp(
+        (armFat * 0.32) + (armInflation * 0.24) + (shoulderFat * 0.08),
+        0,
+        0.44
+      );
       xScale *= 1 + ((armReachScale - 1) * armYBlend * edgeBlend);
-      xScale *= 1 + ((armThicknessScale - 1) * armYBlend * ((edgeBlend * 0.48) + (handBlend * 0.52)));
+      xScale *= 1 + ((armThicknessScale - 1) * armAdiposeBoost * armYBlend * ((upperArmBlend * MEDICAL_REGION_CURVE_WEIGHTS.upperArm) + (forearmBlend * MEDICAL_REGION_CURVE_WEIGHTS.forearm) + (handBlend * 0.28)));
+      xScale *= 1 + (armFatSpread * armYBlend * ((upperArmBlend * 0.9) + (forearmBlend * 0.72) + (handBlend * 0.32) + (edgeBlend * 0.18)));
+      xScale *= 1 + ((chestFat * 0.08) * armYBlend * (1 - edgeBlend) * shoulderContourBlend);
     }
 
     return {

@@ -19,7 +19,7 @@ const FINGER_CONFIGS = [
   { id: "ring", profile: 1.0, yOffsetScale: 0.1, jointCurve: 0.08, xSplayScale: 0.16 },
   { id: "pinky", profile: 0.86, yOffsetScale: 0.2, jointCurve: 0.16, xSplayScale: 0.28 }
 ];
-export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r13";
+export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r20";
 let devHotReloadTick = 0;
 if (import.meta.hot) {
   devHotReloadTick = (import.meta.hot.data?.silhouetteHotReloadTick || 0) + 1;
@@ -76,7 +76,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     const waistHalf = clamp(toFiniteNumber(model.waistHalf, fallback.waistHalf), 11, 52);
     const hipHalf = clamp(toFiniteNumber(model.hipHalf, fallback.hipHalf), 18, 56);
     const thighHalf = clamp(toFiniteNumber(model.thighHalf, fallback.thighHalf), 13, 46);
-    const calfHalf = clamp(toFiniteNumber(model.calfHalf, fallback.calfHalf), 10, 34);
+    const calfHalf = clamp(toFiniteNumber(model.calfHalf, fallback.calfHalf), 10, 36);
     const armWidth = clamp(toFiniteNumber(model.armWidth, fallback.armWidth), 8, 24);
     const armHeight = clamp(toFiniteNumber(model.armHeight, fallback.armHeight), 146, 194);
     const headRadius = clamp(toFiniteNumber(model.headRadius, fallback.headRadius), 15, 28);

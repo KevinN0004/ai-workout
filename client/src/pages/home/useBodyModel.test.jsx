@@ -92,6 +92,40 @@ describe("useBodyModel -> visualizer mapping", () => {
     expect(heavierSignature).not.toBe(leanSignature);
   });
 
+  test("creates visibly larger torso profile for overweight body-fat inputs", () => {
+    const lean = renderBodyModel({
+      personal: {
+        weight: "150",
+        heightFeet: "5",
+        heightInches: "10",
+        bodyFat: "14"
+      }
+    });
+    const overweight = renderBodyModel({
+      personal: {
+        weight: "280",
+        heightFeet: "5",
+        heightInches: "10",
+        bodyFat: "38"
+      }
+    });
+
+    const leanShape = lean.result.current.silhouetteShape;
+    const overweightShape = overweight.result.current.silhouetteShape;
+
+    expect(overweightShape.waistHalf / leanShape.waistHalf).toBeGreaterThan(1.2);
+    expect(overweightShape.hipHalf / leanShape.hipHalf).toBeGreaterThan(1.14);
+    expect(overweightShape.chestHalf / leanShape.chestHalf).toBeGreaterThan(1.12);
+    expect(overweightShape.shoulderHalf / leanShape.shoulderHalf).toBeGreaterThan(1.03);
+    expect(overweightShape.armWidth / leanShape.armWidth).toBeGreaterThan(1.12);
+    expect(overweightShape.calfHalf / leanShape.calfHalf).toBeGreaterThan(1.06);
+    expect(overweightShape.chestFat).toBeGreaterThan(leanShape.chestFat);
+    expect(overweightShape.armFat).toBeGreaterThan(leanShape.armFat);
+    expect(overweightShape.calfFat).toBeGreaterThan(leanShape.calfFat);
+    expect(overweightShape.lowerLegAdiposity).toBeGreaterThan(leanShape.lowerLegAdiposity);
+    expect(overweightShape.sideFat).toBeGreaterThan(leanShape.sideFat);
+  });
+
   test("reflects sex-based anthropometric differences in silhouette", () => {
     const male = renderBodyModel({ personal: { sex: "male", weight: "170", heightFeet: "5", heightInches: "8" } });
     const female = renderBodyModel({ personal: { sex: "female", weight: "170", heightFeet: "5", heightInches: "8" } });
