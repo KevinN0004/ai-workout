@@ -3,6 +3,8 @@ import { buildWeeklyMealPlan } from "./planUtils";
 import ModalPortal from "../../components/ModalPortal";
 import "./PlansView.css";
 
+const SAVED_EXERCISE_PAGE_SIZE = 24;
+
 export default function PlansView({
   weekDays,
   latestPlanByWeekday,
@@ -13,6 +15,7 @@ export default function PlansView({
   onOpenGuides
 }) {
   const [selectedDetail, setSelectedDetail] = useState(null);
+  const [visibleSavedCount, setVisibleSavedCount] = useState(SAVED_EXERCISE_PAGE_SIZE);
 
   const weeklyMealPlan = useMemo(() => {
     const latestPlan = dashboard?.plans?.[0];
@@ -139,6 +142,15 @@ export default function PlansView({
   const savedExercises = Array.isArray(dashboard?.savedExercises)
     ? dashboard.savedExercises
     : [];
+  const visibleSavedExercises = useMemo(
+    () => savedExercises.slice(0, visibleSavedCount),
+    [savedExercises, visibleSavedCount]
+  );
+
+  useEffect(() => {
+    setVisibleSavedCount(SAVED_EXERCISE_PAGE_SIZE);
+  }, [savedExercises.length]);
+
   const hasWeeklyWorkoutPlan = weekDays.some(
     ({ key }) => (latestPlanByWeekday[key] || []).length > 0
   );
@@ -217,7 +229,7 @@ export default function PlansView({
             </div>
           </div>
           <div className="plan-row-grid">
-            {savedExercises.map((item) => (
+            {visibleSavedExercises.map((item) => (
               <article key={item.id} className="hub-card saved-exercise-card card-shell">
                 <div className="card-section-head">
                   <h4>{item.name || "Exercise"}</h4>
@@ -253,6 +265,28 @@ export default function PlansView({
                 </div>
               </article>
             ))}
+            {savedExercises.length > visibleSavedCount ? (
+              <article className="hub-card plan-empty-state-card card-shell">
+                <div className="card-section-head">
+                  <h4>More saved exercises</h4>
+                </div>
+                <div className="card-section-body">
+                  <p className="muted">
+                    {savedExercises.length - visibleSavedCount} more exercise
+                    {savedExercises.length - visibleSavedCount === 1 ? "" : "s"} available.
+                  </p>
+                </div>
+                <div className="card-section-foot">
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setVisibleSavedCount((prev) => prev + SAVED_EXERCISE_PAGE_SIZE)}
+                  >
+                    Show more
+                  </button>
+                </div>
+              </article>
+            ) : null}
             {!savedExercises.length ? (
               <article className="hub-card plan-empty-state-card card-shell">
                 <div className="card-section-head">

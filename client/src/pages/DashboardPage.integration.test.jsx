@@ -150,7 +150,7 @@ describe("Dashboard integration flows", () => {
     const drawer = drawerTitle.closest(".drawer");
     await user.click(within(drawer).getByRole("button", { name: /^logs$/i }));
 
-    expect(screen.getByRole("heading", { name: /^logs$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^logs$/i })).toBeInTheDocument();
   });
 
   test("closes workout modal with cancel", async () => {

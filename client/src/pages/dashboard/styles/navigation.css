@@ -6,7 +6,8 @@
   display: flex;
   justify-content: flex-start;
   z-index: 60;
-  animation: drawer-backdrop-fade-in 180ms ease-out both;
+  animation: drawer-backdrop-fade-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
 }
 
 .drawer {
@@ -22,9 +23,12 @@
   grid-template-rows: auto 1fr auto;
   overflow-y: auto;
   color: var(--dash-text);
-  transform: translateX(-100%);
-  animation: drawer-slide-in 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  will-change: transform;
+  transform: translate3d(-104%, 0, 0);
+  opacity: 0.98;
+  animation: drawer-slide-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+  contain: layout paint;
+  backface-visibility: hidden;
 }
 
 @keyframes drawer-backdrop-fade-in {
@@ -39,11 +43,13 @@
 
 @keyframes drawer-slide-in {
   from {
-    transform: translateX(-100%);
+    transform: translate3d(-104%, 0, 0);
+    opacity: 0.98;
   }
 
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
 }
 
@@ -182,5 +188,21 @@
 .dashboard-bottom-nav button.active {
   border-color: var(--dash-card-border-strong);
   background: #353535;
+}
+
+@media (max-width: 960px), (prefers-reduced-motion: reduce) {
+  .drawer-backdrop,
+  .dashboard-bottom-nav {
+    backdrop-filter: none;
+  }
+
+  .drawer {
+    box-shadow: 12px 0 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .profile-menu-dropdown,
+  .dashboard-bottom-nav {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+  }
 }
 

@@ -1,4 +1,8 @@
+import { useMemo, useState } from "react";
 import "./WorkoutsView.css";
+
+const INITIAL_VISIBLE_ROWS = 40;
+const ROW_BATCH_SIZE = 40;
 
 const getLocalDateKey = () => {
   const date = new Date();
@@ -27,10 +31,50 @@ export default function WorkoutsView({
   onOpenCalories,
   onOpenMeal
 }) {
-  const workoutLogs = sortByDateDesc(Array.isArray(workouts) ? workouts : []);
-  const calorieLogs = sortByDateDesc(Array.isArray(calories) ? calories : []);
-  const mealLogItems = sortByDateDesc(Array.isArray(mealLogs) ? mealLogs : []);
-  const progressLogs = sortByDateDesc(Array.isArray(progressMetrics) ? progressMetrics : []);
+  const [visibleRows, setVisibleRows] = useState({
+    workouts: INITIAL_VISIBLE_ROWS,
+    calories: INITIAL_VISIBLE_ROWS,
+    meals: INITIAL_VISIBLE_ROWS,
+    progress: INITIAL_VISIBLE_ROWS
+  });
+
+  const workoutLogs = useMemo(
+    () => sortByDateDesc(Array.isArray(workouts) ? workouts : []),
+    [workouts]
+  );
+  const calorieLogs = useMemo(
+    () => sortByDateDesc(Array.isArray(calories) ? calories : []),
+    [calories]
+  );
+  const mealLogItems = useMemo(
+    () => sortByDateDesc(Array.isArray(mealLogs) ? mealLogs : []),
+    [mealLogs]
+  );
+  const progressLogs = useMemo(
+    () => sortByDateDesc(Array.isArray(progressMetrics) ? progressMetrics : []),
+    [progressMetrics]
+  );
+
+  const visibleWorkoutLogs = useMemo(
+    () => workoutLogs.slice(0, visibleRows.workouts),
+    [workoutLogs, visibleRows.workouts]
+  );
+  const visibleCalorieLogs = useMemo(
+    () => calorieLogs.slice(0, visibleRows.calories),
+    [calorieLogs, visibleRows.calories]
+  );
+  const visibleMealLogs = useMemo(
+    () => mealLogItems.slice(0, visibleRows.meals),
+    [mealLogItems, visibleRows.meals]
+  );
+  const visibleProgressLogs = useMemo(
+    () => progressLogs.slice(0, visibleRows.progress),
+    [progressLogs, visibleRows.progress]
+  );
+
+  const expandRows = (key) => {
+    setVisibleRows((prev) => ({ ...prev, [key]: prev[key] + ROW_BATCH_SIZE }));
+  };
 
   return (
     <section className="panel workouts-view">
@@ -58,7 +102,7 @@ export default function WorkoutsView({
         <section className="log-section">
           <h3>Workout log</h3>
           <div className="log-list">
-            {workoutLogs.map((item, index) => {
+            {visibleWorkoutLogs.map((item, index) => {
               const sessionMeta = [
                 item.sets ? `${item.sets} sets` : "",
                 item.reps ? `${item.reps} reps` : "",
@@ -102,13 +146,18 @@ export default function WorkoutsView({
                 </button>
               </div>
             )}
+            {workoutLogs.length > visibleRows.workouts && (
+              <button type="button" className="ghost" onClick={() => expandRows("workouts")}>
+                Show more workouts
+              </button>
+            )}
           </div>
         </section>
 
         <section className="log-section">
           <h3>Calories log</h3>
           <div className="log-list">
-            {calorieLogs.map((item, index) => (
+            {visibleCalorieLogs.map((item, index) => (
               <div
                 key={item.id || `calories-${item.date || "unknown"}-${index}`}
                 className="log-list-row"
@@ -127,13 +176,18 @@ export default function WorkoutsView({
                 </button>
               </div>
             )}
+            {calorieLogs.length > visibleRows.calories && (
+              <button type="button" className="ghost" onClick={() => expandRows("calories")}>
+                Show more calories
+              </button>
+            )}
           </div>
         </section>
 
         <section className="log-section">
           <h3>Meal log</h3>
           <div className="log-list">
-            {mealLogItems.map((item, index) => (
+            {visibleMealLogs.map((item, index) => (
               <div
                 key={item.id || `meal-${item.date || "unknown"}-${index}`}
                 className="log-list-row"
@@ -161,13 +215,18 @@ export default function WorkoutsView({
                 </button>
               </div>
             )}
+            {mealLogItems.length > visibleRows.meals && (
+              <button type="button" className="ghost" onClick={() => expandRows("meals")}>
+                Show more meals
+              </button>
+            )}
           </div>
         </section>
 
         <section className="log-section">
           <h3>Progress metrics log</h3>
           <div className="log-list">
-            {progressLogs.map((item, index) => (
+            {visibleProgressLogs.map((item, index) => (
               <div
                 key={item.id || `metric-${item.date || "unknown"}-${index}`}
                 className="log-list-row"
@@ -189,6 +248,11 @@ export default function WorkoutsView({
                   Log progress in goal page
                 </button>
               </div>
+            )}
+            {progressLogs.length > visibleRows.progress && (
+              <button type="button" className="ghost" onClick={() => expandRows("progress")}>
+                Show more metrics
+              </button>
             )}
           </div>
         </section>

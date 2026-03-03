@@ -142,6 +142,7 @@ export default function App() {
   } = useDashboardData({
     user,
     isDashboardRoute,
+    shouldLoadAmbientData: dashView === "summary",
     dashboardCacheKey,
     weatherCacheKey,
     airCacheKey,

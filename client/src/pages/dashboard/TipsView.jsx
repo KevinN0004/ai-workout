@@ -16,6 +16,8 @@ import {
 import "./TipsView.css";
 
 const DEFAULT_LIMIT = 48;
+const SEARCH_DEBOUNCE_MS = 320;
+const LIBRARY_PAGE_SIZE = 24;
 
 export default function TipsView({
   user,
@@ -27,6 +29,7 @@ export default function TipsView({
 }) {
   const [meta, setMeta] = useState({ categories: [], muscles: [], equipment: [] });
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [muscleId, setMuscleId] = useState("");
   const [equipmentId, setEquipmentId] = useState("");
@@ -41,6 +44,18 @@ export default function TipsView({
   const [saveError, setSaveError] = useState("");
   const [savingIds, setSavingIds] = useState({});
   const [activeGuideSection, setActiveGuideSection] = useState("smart");
+  const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_PAGE_SIZE);
+
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timerId);
+  }, [query]);
+
+  useEffect(() => {
+    setLibraryVisibleCount(LIBRARY_PAGE_SIZE);
+  }, [debouncedQuery, categoryId, muscleId, equipmentId, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +89,7 @@ export default function TipsView({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const loadExercises = async () => {
       setLibraryLoading(true);
       setLibraryError("");
@@ -83,13 +99,14 @@ export default function TipsView({
           offset: "0",
           language: "2"
         });
-        if (query.trim()) params.set("q", query.trim());
+        if (debouncedQuery) params.set("q", debouncedQuery);
         if (categoryId) params.set("category", categoryId);
         if (muscleId) params.set("muscle", muscleId);
         if (equipmentId) params.set("equipment", equipmentId);
 
         const res = await fetch(`/api/wger/exercises?${params.toString()}`, {
-          credentials: "include"
+          credentials: "include",
+          signal: controller.signal
         });
         if (!res.ok) {
           throw new Error("Couldn't load exercises right now.");
@@ -98,6 +115,7 @@ export default function TipsView({
         if (cancelled) return;
         setExercises(Array.isArray(data?.exercises) ? data.exercises : []);
       } catch (err) {
+        if (err?.name === "AbortError") return;
         if (cancelled) return;
         setLibraryError(err?.message || "Couldn't load exercises right now.");
         setExercises([]);
@@ -108,8 +126,9 @@ export default function TipsView({
     loadExercises();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [query, categoryId, muscleId, equipmentId, refreshTick]);
+  }, [debouncedQuery, categoryId, muscleId, equipmentId, refreshTick]);
 
   const todayWeekday = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const todayLines = latestPlanByWeekday?.[todayWeekday] || [];
@@ -168,6 +187,10 @@ export default function TipsView({
   const savedExercises = Array.isArray(dashboard?.savedExercises)
     ? dashboard.savedExercises
     : [];
+  const visibleLibraryExercises = useMemo(
+    () => exercises.slice(0, libraryVisibleCount),
+    [exercises, libraryVisibleCount]
+  );
   const savedKeys = useMemo(() => {
     return new Set(
       savedExercises.map((item) => {
@@ -403,7 +426,7 @@ export default function TipsView({
             <p className="muted">Browse and open any movement for details, cues, and videos.</p>
           </div>
           <div className="exercise-grid">
-            {exercises.map((exercise) => {
+            {visibleLibraryExercises.map((exercise) => {
               const key = toExerciseKey(exercise);
               const saved = isSaved(exercise);
               const isSaving = Boolean(savingIds[key]);
@@ -422,6 +445,15 @@ export default function TipsView({
               <p className="muted">No exercises match these filters.</p>
             )}
           </div>
+          {exercises.length > libraryVisibleCount && (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setLibraryVisibleCount((prev) => prev + LIBRARY_PAGE_SIZE)}
+            >
+              Show more exercises
+            </button>
+          )}
         </section>
       )}
 

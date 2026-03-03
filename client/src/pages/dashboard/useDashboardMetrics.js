@@ -108,25 +108,51 @@ export default function useDashboardMetrics({
   weekDays,
   latestPlanByWeekday
 }) {
-  const workoutSessions = Array.isArray(dashboard?.workoutSessions)
-    ? dashboard.workoutSessions
-    : [];
-  const workoutSummaries = Array.isArray(dashboard?.workouts) ? dashboard.workouts : [];
-  const mergedWorkoutSource =
-    workoutSessions.length || workoutSummaries.length
-      ? [...workoutSessions, ...workoutSummaries]
+  const workouts = useMemo(() => {
+    const workoutSessions = Array.isArray(dashboard?.workoutSessions)
+      ? dashboard.workoutSessions
       : [];
-  const workouts = buildDedupedList(mergedWorkoutSource, workoutFallbackKey);
-  const calories = buildDedupedList(dashboard?.calories || [], calorieFallbackKey);
-  const mealLogs = buildDedupedList(
-    Array.isArray(dashboard?.mealLogs) ? dashboard.mealLogs : [],
-    mealFallbackKey
+    const workoutSummaries = Array.isArray(dashboard?.workouts) ? dashboard.workouts : [];
+    const mergedWorkoutSource =
+      workoutSessions.length || workoutSummaries.length
+        ? [...workoutSessions, ...workoutSummaries]
+        : [];
+    return buildDedupedList(mergedWorkoutSource, workoutFallbackKey);
+  }, [dashboard?.workoutSessions, dashboard?.workouts]);
+
+  const calories = useMemo(
+    () =>
+      buildDedupedList(
+        Array.isArray(dashboard?.calories) ? dashboard.calories : [],
+        calorieFallbackKey
+      ),
+    [dashboard?.calories]
   );
-  const progressMetrics = buildDedupedList(
-    Array.isArray(dashboard?.progressMetrics) ? dashboard.progressMetrics : [],
-    progressFallbackKey
+
+  const mealLogs = useMemo(
+    () =>
+      buildDedupedList(
+        Array.isArray(dashboard?.mealLogs) ? dashboard.mealLogs : [],
+        mealFallbackKey
+      ),
+    [dashboard?.mealLogs]
   );
-  const goals = dashboard?.goals || goalForm;
+
+  const progressMetrics = useMemo(
+    () =>
+      buildDedupedList(
+        Array.isArray(dashboard?.progressMetrics) ? dashboard.progressMetrics : [],
+        progressFallbackKey
+      ),
+    [dashboard?.progressMetrics]
+  );
+
+  const plans = useMemo(
+    () => (Array.isArray(dashboard?.plans) ? dashboard.plans : []),
+    [dashboard?.plans]
+  );
+
+  const goals = useMemo(() => dashboard?.goals || goalForm, [dashboard?.goals, goalForm]);
 
   const metrics = useMemo(() => {
     const today = new Date();
@@ -280,13 +306,13 @@ export default function useDashboardMetrics({
         ? Number((latestWeight - previousWeight).toFixed(1))
         : null;
 
-    const latestPlan = dashboard?.plans?.[0];
+    const latestPlan = plans[0];
     const weeklyMealPlan = buildWeeklyMealPlan({
       weekDays,
       latestPlanByWeekday,
       goalText:
         latestPlan?.goal ||
-        dashboard?.goals?.goalType ||
+        goals?.goalType ||
         formGoal ||
         "Build lean strength and energy",
       targetCalories: goals.targetCalories
@@ -325,7 +351,7 @@ export default function useDashboardMetrics({
       todayRecommendation,
       weeklyTrends
     };
-  }, [calories, workouts, goals, dashboard, progressMetrics, formGoal, weekDays, latestPlanByWeekday]);
+  }, [calories, workouts, goals, plans, progressMetrics, formGoal, weekDays, latestPlanByWeekday]);
 
   return {
     workouts,

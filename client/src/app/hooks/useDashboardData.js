@@ -14,6 +14,7 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
 export default function useDashboardData({
   user,
   isDashboardRoute,
+  shouldLoadAmbientData,
   dashboardCacheKey,
   weatherCacheKey,
   airCacheKey,
@@ -36,6 +37,7 @@ export default function useDashboardData({
   const dashboardRequestRef = useRef(0);
   const weatherRequestRef = useRef(0);
   const airRequestRef = useRef(0);
+  const hasAutoLoadedEnvironmentRef = useRef(false);
 
   useEffect(() => {
     weatherDataRef.current = weatherData;
@@ -263,10 +265,21 @@ export default function useDashboardData({
   }, [dashboardCacheKey, isDashboardRoute, setGoalForm, user]);
 
   useEffect(() => {
-    if (!isDashboardRoute || !user) return;
-    loadWeatherRecommendation();
-    loadAirQuality();
-  }, [isDashboardRoute, loadAirQuality, loadWeatherRecommendation, user]);
+    if (isDashboardRoute && user) return;
+    hasAutoLoadedEnvironmentRef.current = false;
+  }, [isDashboardRoute, user]);
+
+  useEffect(() => {
+    if (!isDashboardRoute || !user || !shouldLoadAmbientData) return;
+    if (hasAutoLoadedEnvironmentRef.current) return;
+    hasAutoLoadedEnvironmentRef.current = true;
+    if (!weatherDataRef.current) {
+      loadWeatherRecommendation();
+    }
+    if (!airQualityDataRef.current) {
+      loadAirQuality();
+    }
+  }, [isDashboardRoute, loadAirQuality, loadWeatherRecommendation, shouldLoadAmbientData, user]);
 
   useEffect(() => {
     if (isDashboardRoute && user) return;

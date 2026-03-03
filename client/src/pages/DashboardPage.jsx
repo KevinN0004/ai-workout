@@ -1,12 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import SummaryView from "./dashboard/SummaryView";
-import WorkoutsView from "./dashboard/WorkoutsView";
-import CaloriesView from "./dashboard/CaloriesView";
-import PlansView from "./dashboard/PlansView";
-import MealView from "./dashboard/MealView";
-import TipsView from "./dashboard/TipsView";
-import SettingsView from "./dashboard/SettingsView";
-import DashboardHomeView from "./dashboard/DashboardHomeView";
 import DashboardHeader from "./dashboard/DashboardHeader";
 import DashboardDrawer from "./dashboard/DashboardDrawer";
 import DashboardBottomNav from "./dashboard/DashboardBottomNav";
@@ -14,6 +7,14 @@ import DashboardAtAGlance from "./dashboard/DashboardAtAGlance";
 import DashboardWorkoutModal from "./dashboard/DashboardWorkoutModal";
 import useDashboardMetrics from "./dashboard/useDashboardMetrics";
 import "./DashboardPage.css";
+
+const WorkoutsView = lazy(() => import("./dashboard/WorkoutsView"));
+const CaloriesView = lazy(() => import("./dashboard/CaloriesView"));
+const PlansView = lazy(() => import("./dashboard/PlansView"));
+const MealView = lazy(() => import("./dashboard/MealView"));
+const TipsView = lazy(() => import("./dashboard/TipsView"));
+const SettingsView = lazy(() => import("./dashboard/SettingsView"));
+const DashboardHomeView = lazy(() => import("./dashboard/DashboardHomeView"));
 
 const getLocalDateKey = () => {
   const date = new Date();
@@ -207,107 +208,11 @@ export default function DashboardPage({
   }, [recentWorkouts]);
 
   const showInitialDashboardLoading = dashLoading && !dashboard;
-  const dashboardViews = {
-    summary: (
-      <SummaryView
-        form={form}
-        openPlannerFromProfile={openPlannerFromProfile}
-        last7Workouts={last7Workouts}
-        avgCalories={avgCalories}
-        goals={goals}
-        goalForm={goalForm}
-        weeklyGoal={weeklyGoal}
-        workoutProgress={workoutProgress}
-        calorieGoal={calorieGoal}
-        calorieProgress={calorieProgress}
-        workouts={recentWorkouts}
-        weeklyTrends={weeklyTrends}
-        buildLinePath={buildLinePath}
-        trendRanges={trendRanges}
-        todayRecommendation={todayRecommendation}
-        weatherData={weatherData}
-        weatherLoading={weatherLoading}
-        weatherError={weatherError}
-        weatherLastUpdatedAt={weatherLastUpdatedAt}
-        refreshWeatherRecommendation={refreshWeatherRecommendation}
-        airQualityData={airQualityData}
-        airQualityLoading={airQualityLoading}
-        airQualityError={airQualityError}
-        airQualityLastUpdatedAt={airQualityLastUpdatedAt}
-        refreshAirQuality={refreshAirQuality}
-        onOpenPlans={() => navigateDashView("plans")}
-        onOpenMeal={() => navigateDashView("meal")}
-      />
-    ),
-    workouts: (
-      <WorkoutsView
-        workouts={recentWorkouts}
-        calories={calories}
-        mealLogs={mealLogs}
-        progressMetrics={progressMetrics}
-        setWorkoutForm={setWorkoutForm}
-        setWorkoutModalOpen={setWorkoutModalOpen}
-        onOpenCalories={() => navigateDashView("calories")}
-        onOpenMeal={() => navigateDashView("meal")}
-      />
-    ),
-    calories: (
-      <CaloriesView
-        goalForm={goalForm}
-        setGoalForm={setGoalForm}
-        avgCalories={avgCalories}
-        calorieGoal={calorieGoal}
-        calorieDelta={calorieDelta}
-        buildLinePath={buildLinePath}
-        calorieSeries={calorieSeries}
-        workoutSeries={workoutSeries}
-        last7Keys={last7Keys}
-        submitCalories={submitCalories}
-        calorieForm={calorieForm}
-        setCalorieForm={setCalorieForm}
-        calories={calories}
-        goalPaceText={goalPaceText}
-        submitGoals={submitGoals}
-        progressMetrics={progressMetrics}
-        progressForm={progressForm}
-        setProgressForm={setProgressForm}
-        submitProgressMetric={submitProgressMetric}
-      />
-    ),
-    plans: (
-      <PlansView
-        weekDays={weekDays}
-        latestPlanByWeekday={latestPlanByWeekday}
-        openPlannerFromProfile={openPlannerFromProfile}
-        dashboard={dashboard}
-        fallbackPlan={form}
-        onRemoveSavedExercise={onRemoveSavedExercise}
-        onOpenGuides={() => navigateDashView("tips")}
-      />
-    ),
-    meal: (
-      <MealView
-        dashboard={dashboard}
-        fallbackPlan={form}
-        mealLogForm={mealLogForm}
-        setMealLogForm={setMealLogForm}
-        submitMealLog={submitMealLog}
-        mealLogs={mealLogs}
-      />
-    ),
-    tips: (
-      <TipsView
-        user={user}
-        form={form}
-        dashboard={dashboard}
-        latestPlanByWeekday={latestPlanByWeekday}
-        weatherData={weatherData}
-        onSaveExerciseToPlan={onSaveExerciseToPlan}
-      />
-    ),
-    settings: <SettingsView user={user} personal={personal} />,
-    home: <DashboardHomeView go={go} />
-  };
+  const lazyDashboardViewFallback = (
+    <section className="panel dashboard-loading-card" role="status" aria-live="polite">
+      <p className="muted">Loading view...</p>
+    </section>
+  );
   const dashViewOrder = [
     "summary",
     "workouts",
@@ -319,6 +224,150 @@ export default function DashboardPage({
     "home"
   ];
   const activeDashView = dashViewOrder.includes(dashView) ? dashView : "summary";
+  const renderActiveDashboardView = () => {
+    if (activeDashView === "summary") {
+      return (
+        <SummaryView
+          form={form}
+          openPlannerFromProfile={openPlannerFromProfile}
+          last7Workouts={last7Workouts}
+          avgCalories={avgCalories}
+          goals={goals}
+          goalForm={goalForm}
+          weeklyGoal={weeklyGoal}
+          workoutProgress={workoutProgress}
+          calorieGoal={calorieGoal}
+          calorieProgress={calorieProgress}
+          workouts={recentWorkouts}
+          weeklyTrends={weeklyTrends}
+          buildLinePath={buildLinePath}
+          trendRanges={trendRanges}
+          todayRecommendation={todayRecommendation}
+          weatherData={weatherData}
+          weatherLoading={weatherLoading}
+          weatherError={weatherError}
+          weatherLastUpdatedAt={weatherLastUpdatedAt}
+          refreshWeatherRecommendation={refreshWeatherRecommendation}
+          airQualityData={airQualityData}
+          airQualityLoading={airQualityLoading}
+          airQualityError={airQualityError}
+          airQualityLastUpdatedAt={airQualityLastUpdatedAt}
+          refreshAirQuality={refreshAirQuality}
+          onOpenPlans={() => navigateDashView("plans")}
+          onOpenMeal={() => navigateDashView("meal")}
+        />
+      );
+    }
+
+    if (activeDashView === "workouts") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <WorkoutsView
+            workouts={recentWorkouts}
+            calories={calories}
+            mealLogs={mealLogs}
+            progressMetrics={progressMetrics}
+            setWorkoutForm={setWorkoutForm}
+            setWorkoutModalOpen={setWorkoutModalOpen}
+            onOpenCalories={() => navigateDashView("calories")}
+            onOpenMeal={() => navigateDashView("meal")}
+          />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "calories") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <CaloriesView
+            goalForm={goalForm}
+            setGoalForm={setGoalForm}
+            avgCalories={avgCalories}
+            calorieGoal={calorieGoal}
+            calorieDelta={calorieDelta}
+            buildLinePath={buildLinePath}
+            calorieSeries={calorieSeries}
+            workoutSeries={workoutSeries}
+            last7Keys={last7Keys}
+            submitCalories={submitCalories}
+            calorieForm={calorieForm}
+            setCalorieForm={setCalorieForm}
+            calories={calories}
+            goalPaceText={goalPaceText}
+            submitGoals={submitGoals}
+            progressMetrics={progressMetrics}
+            progressForm={progressForm}
+            setProgressForm={setProgressForm}
+            submitProgressMetric={submitProgressMetric}
+          />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "plans") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <PlansView
+            weekDays={weekDays}
+            latestPlanByWeekday={latestPlanByWeekday}
+            openPlannerFromProfile={openPlannerFromProfile}
+            dashboard={dashboard}
+            fallbackPlan={form}
+            onRemoveSavedExercise={onRemoveSavedExercise}
+            onOpenGuides={() => navigateDashView("tips")}
+          />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "meal") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <MealView
+            dashboard={dashboard}
+            fallbackPlan={form}
+            mealLogForm={mealLogForm}
+            setMealLogForm={setMealLogForm}
+            submitMealLog={submitMealLog}
+            mealLogs={mealLogs}
+          />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "tips") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <TipsView
+            user={user}
+            form={form}
+            dashboard={dashboard}
+            latestPlanByWeekday={latestPlanByWeekday}
+            weatherData={weatherData}
+            onSaveExerciseToPlan={onSaveExerciseToPlan}
+          />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "settings") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <SettingsView user={user} personal={personal} />
+        </Suspense>
+      );
+    }
+
+    if (activeDashView === "home") {
+      return (
+        <Suspense fallback={lazyDashboardViewFallback}>
+          <DashboardHomeView go={go} />
+        </Suspense>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
@@ -382,7 +431,7 @@ export default function DashboardPage({
           )}
           {!showInitialDashboardLoading && (
             <div className="dashboard-view-shell is-active" aria-hidden="false">
-              {dashboardViews[activeDashView]}
+              {renderActiveDashboardView()}
             </div>
           )}
         </main>
