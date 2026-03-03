@@ -1,5 +1,6 @@
 ﻿import "./HomePage.css";
 import useBodyModel from "./home/useBodyModel";
+import { APP_BRAND_NAME } from "../app/constants";
 import useHomeStageFlow from "./home/hooks/useHomeStageFlow";
 import PreviewPage from "./PreviewPage";
 import HomeIntroStage from "./home/components/HomeIntroStage";
@@ -123,7 +124,7 @@ export default function HomePage({
       <div className="home-sticky-nav">
         <span className="home-nav-spacer" aria-hidden="true" />
         <button type="button" className="home-nav-title" onClick={() => goToStage("intro")}>
-          AI Workout Studio
+          {APP_BRAND_NAME}
         </button>
         <button
           type="button"

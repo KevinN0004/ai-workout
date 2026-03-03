@@ -23,7 +23,7 @@ export default function DashboardHeader({
                 aria-label="Go to dashboard summary"
                 title="Go to summary"
               >
-                Dashboard
+                Hub
               </button>
             </h1>
           </div>
@@ -71,7 +71,7 @@ export default function DashboardHeader({
               aria-label="Go to dashboard summary"
               title="Go to summary"
             >
-              Dashboard
+              Hub
             </button>
           </h1>
         </div>
@@ -131,4 +131,3 @@ export default function DashboardHeader({
     </header>
   );
 }
-

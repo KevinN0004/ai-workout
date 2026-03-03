@@ -1,4 +1,5 @@
 import ModalPortal from "../../components/ModalPortal";
+import { APP_BRAND_NAME } from "../constants";
 
 export default function GeneratedPlanModal({
   planModalOpen,
@@ -21,7 +22,7 @@ export default function GeneratedPlanModal({
       >
         <div className="modal plan-modal">
           <div className="modal-header">
-            <h2>Your AI Plan</h2>
+            <h2>Your {APP_BRAND_NAME} Plan</h2>
             <div className="modal-actions">
               <button
                 type="button"

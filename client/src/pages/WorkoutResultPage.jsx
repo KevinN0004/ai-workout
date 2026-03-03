@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import "./WorkoutResultPage.css";
+import { APP_BRAND_NAME } from "../app/constants";
 
 export default function WorkoutResultPage({
   gradient,
@@ -62,7 +63,7 @@ export default function WorkoutResultPage({
   return (
     <div className="page home-page plan-result-page" style={gradient}>
       <header className="title">
-        <h1>Your Generated Workout</h1>
+        <h1>Your {APP_BRAND_NAME} Plan</h1>
         <p className="muted">
           {hasResult
             ? "Review your plan below. Sign up to save your profile and keep tracking."

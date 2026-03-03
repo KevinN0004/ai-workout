@@ -1,4 +1,5 @@
 import "./AuthPage.css";
+import { APP_BRAND_EXPANSION, APP_BRAND_NAME } from "../app/constants";
 
 export default function AuthPage({
   gradient,
@@ -33,11 +34,11 @@ export default function AuthPage({
   return (
     <div className="page auth-page home-page" style={gradient}>
       <header className="title">
-        <h1>Workout Generator</h1>
+        <h1>{APP_BRAND_NAME}</h1>
         <p className="muted">
           {isSignupMode
-            ? "Create your account and complete your profile."
-            : "Sign in to enter dashboard."}
+            ? `Create your account and complete your profile in ${APP_BRAND_EXPANSION}.`
+            : `Sign in to continue your journey in ${APP_BRAND_NAME}.`}
         </p>
       </header>
       <main className="content auth-content">

@@ -1,3 +1,5 @@
+import { APP_BRAND_TAGLINE } from "../../../app/constants";
+
 export default function HomeIntroStage({
   introPanelRef,
   introTitleRef,
@@ -16,7 +18,7 @@ export default function HomeIntroStage({
         }`}
       >
         <h1 ref={introTitleRef} className="home-hook-title">
-          An outline for a great adventure.
+          {APP_BRAND_TAGLINE}
         </h1>
         <div className="home-intro-actions">
           <button
