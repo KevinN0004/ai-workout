@@ -7,6 +7,7 @@ import {
 import { buildSymmetricOutline } from "./outlineGeometry";
 import { appendDefaultGuides } from "./guideLayout";
 import { buildPhysiquePalette } from "./palette";
+import { buildTemplateOutline } from "./templateOutline";
 
 export const VIEWBOX_WIDTH = 430;
 const CENTER_X = VIEWBOX_WIDTH / 2;
@@ -18,7 +19,7 @@ const FINGER_CONFIGS = [
   { id: "ring", profile: 1.0, yOffsetScale: 0.1, jointCurve: 0.08, xSplayScale: 0.16 },
   { id: "pinky", profile: 0.86, yOffsetScale: 0.2, jointCurve: 0.16, xSplayScale: 0.28 }
 ];
-export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r9";
+export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r13";
 let devHotReloadTick = 0;
 if (import.meta.hot) {
   devHotReloadTick = (import.meta.hot.data?.silhouetteHotReloadTick || 0) + 1;
@@ -945,7 +946,20 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
       calfY
     });
 
+    const templateOutline = buildTemplateOutline({
+      model,
+      fallback,
+      viewboxWidth: VIEWBOX_WIDTH,
+      viewboxHeight: VIEWBOX_HEIGHT
+    });
     const palette = buildPhysiquePalette(model, fallback);
 
-    return { anchors, guides, outlineMarkers, outlinePath, palette };
+    return {
+      anchors,
+      guides,
+      outlineMarkers: templateOutline?.outlineMarkers || outlineMarkers,
+      outlinePath: templateOutline?.path || outlinePath,
+      outlineTransform: templateOutline?.transform,
+      palette
+    };
 };

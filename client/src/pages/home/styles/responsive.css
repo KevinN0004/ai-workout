@@ -35,13 +35,20 @@
   }
 
   .visual-stage {
-    width: fit-content;
+    --visual-stage-size: min(
+      clamp(500px, 80vmin, 780px),
+      calc(100dvh - 240px),
+      calc(100vw - 28px)
+    );
+    width: var(--visual-stage-size);
+    height: var(--visual-stage-size);
     max-width: 100%;
   }
 
   .physique-render-surface {
-    width: min(clamp(540px, 80vw, 760px), calc(100vh - 180px));
-    max-width: min(100%, calc(100vw - 28px));
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
   }
 }
 
@@ -186,8 +193,11 @@
   }
 
   .home-page .content,
+  .stage-measure .content {
+    min-height: 0;
+  }
+
   .home-stage,
-  .stage-measure .content,
   .stage-measure .home-stage {
     min-height: 100%;
   }
@@ -274,13 +284,20 @@
   }
 
   .visual-stage {
-    width: fit-content;
+    --visual-stage-size: min(
+      clamp(360px, 88vmin, 620px),
+      calc(100dvh - 224px),
+      calc(100vw - 24px)
+    );
+    width: var(--visual-stage-size);
+    height: var(--visual-stage-size);
     max-width: 100%;
   }
 
   .physique-render-surface {
-    width: min(clamp(420px, 88vw, 620px), calc(100vh - 160px));
-    max-width: min(100%, calc(100vw - 24px));
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
   }
 
   .physique-footnote {
@@ -321,7 +338,18 @@
   }
 
   .physique-render-surface {
-    width: min(clamp(320px, 92vw, 480px), calc(100vh - 140px));
-    max-width: min(100%, calc(100vw - 16px));
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+  }
+
+  .visual-stage {
+    --visual-stage-size: min(
+      clamp(300px, 92vmin, 500px),
+      calc(100dvh - 200px),
+      calc(100vw - 16px)
+    );
+    width: var(--visual-stage-size);
+    height: var(--visual-stage-size);
   }
 }

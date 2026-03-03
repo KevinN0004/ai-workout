@@ -6,6 +6,7 @@ const toFiniteNumber = (value) => {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const toLowerText = (value) => String(value || "").trim().toLowerCase();
 
 const roundTo = (value, decimals = 1) => {
   const factor = 10 ** decimals;
@@ -63,6 +64,73 @@ export default function useBodyModel({
     return value === null ? null : clamp(value, 3, 60);
   }, [personal.bodyFat]);
 
+  const activityScore = useMemo(() => {
+    const map = {
+      light: 0.28,
+      moderate: 0.5,
+      high: 0.72,
+      "very high": 0.9
+    };
+    const key = toLowerText(personal.activity);
+    return map[key] ?? 0.5;
+  }, [personal.activity]);
+
+  const experienceScore = useMemo(() => {
+    const map = {
+      beginner: 0.3,
+      intermediate: 0.58,
+      advanced: 0.84
+    };
+    const key = toLowerText(personal.experience);
+    return map[key] ?? 0.5;
+  }, [personal.experience]);
+
+  const cardioScore = useMemo(() => {
+    const map = {
+      none: 0.2,
+      walking: 0.45,
+      running: 0.78,
+      cycling: 0.72,
+      rowing: 0.74,
+      swimming: 0.76,
+      hiit: 0.86,
+      mixed: 0.7
+    };
+    const key = toLowerText(personal.cardio);
+    return map[key] ?? 0.5;
+  }, [personal.cardio]);
+
+  const nutritionScore = useMemo(() => {
+    const map = {
+      "no preference": 0.5,
+      "high-protein": 0.74,
+      balanced: 0.62,
+      "low-carb": 0.58,
+      vegetarian: 0.54,
+      vegan: 0.52
+    };
+    const key = toLowerText(personal.nutrition);
+    return map[key] ?? 0.55;
+  }, [personal.nutrition]);
+
+  const sleepScore = useMemo(() => {
+    const map = {
+      "less than 4": 0.16,
+      "4 - 6 hours": 0.42,
+      "7 - 8 hours": 0.78,
+      "more than 8": 0.72
+    };
+    const key = toLowerText(personal.sleep);
+    return map[key] ?? 0.56;
+  }, [personal.sleep]);
+
+  const trainingDaysScore = useMemo(() => {
+    const total = Array.isArray(personal.trainingDays) ? personal.trainingDays.length : 0;
+    const map = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.95];
+    const capped = clamp(total, 0, 7);
+    return map[capped];
+  }, [personal.trainingDays]);
+
   const estimatedBodyFat = useMemo(() => {
     if (bmi === null) return null;
     const estimate = 1.35 * bmi - 13.5;
@@ -76,12 +144,33 @@ export default function useBodyModel({
     const bodyFatMassScore = effectiveBodyFat !== null
       ? clamp((effectiveBodyFat - 8) / (42 - 8), 0, 1)
       : null;
-    const fatScore = clamp(
+    const baseFatScore = clamp(
       (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.72 +
         bmiMassScore * 0.28,
       0,
       1
     );
+    const trainingConsistency = clamp((trainingDaysScore * 0.52) + (activityScore * 0.48), 0, 1);
+    const conditioningScore = clamp((cardioScore * 0.58) + (sleepScore * 0.42), 0, 1);
+    const profileMuscleBias = clamp(
+      ((trainingConsistency - 0.5) * 0.44) +
+        ((experienceScore - 0.5) * 0.22) +
+        ((nutritionScore - 0.5) * 0.16),
+      -0.34,
+      0.36
+    );
+    const profileFatBias = clamp(
+      ((conditioningScore - 0.5) * 0.32) +
+        ((trainingConsistency - 0.5) * 0.14),
+      -0.22,
+      0.22
+    );
+    const ageAdjustment = ageValue !== null
+      ? clamp((ageValue - 40) / 45, 0, 0.22)
+      : 0;
+    const fatScore = clamp(baseFatScore - profileFatBias + (ageAdjustment * 0.32), 0, 1);
+    const baseMuscularityScore = clamp((bmiMassScore * 0.64) + ((1 - baseFatScore) * 0.36), 0, 1);
+    const muscularityScore = clamp(baseMuscularityScore + profileMuscleBias - (ageAdjustment * 0.24), 0, 1);
 
     const heightNorm = resolvedHeightCm
       ? clamp((resolvedHeightCm - 150) / (205 - 150), 0, 1)
@@ -141,7 +230,6 @@ export default function useBodyModel({
             armSpanRatio: 1
           };
 
-    const muscularityScore = clamp((bmiMassScore * 0.64) + ((1 - fatScore) * 0.36), 0, 1);
     const legBias = (heightNorm - 0.5) * 18;
     const floorY = silhouetteViewHeight - silhouetteFloorInset;
     const ankleY = floorY + legBias;
@@ -267,12 +355,19 @@ export default function useBodyModel({
       armSpanRatio
     };
   }, [
+    activityScore,
+    ageValue,
     bmi,
+    cardioScore,
     effectiveBodyFat,
+    experienceScore,
+    nutritionScore,
     personal.sex,
     resolvedHeightCm,
+    sleepScore,
     silhouetteFloorInset,
-    silhouetteViewHeight
+    silhouetteViewHeight,
+    trainingDaysScore
   ]);
 
   const silhouetteRenderSignature = useMemo(

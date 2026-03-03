@@ -10,10 +10,11 @@ export { SILHOUETTE_GEOMETRY_REV } from "./physique/geometry";
 
 export default function PhysiqueSilhouette2D({ shape }) {
   const shapeSignature = JSON.stringify(shape || {});
-  const { anchors, outlineMarkers, outlinePath, palette } = useMemo(
+  const { anchors, outlineMarkers, outlinePath, outlineTransform, palette } = useMemo(
     () => buildPhysiqueSilhouetteGeometry(shape),
     [shapeSignature, DEV_HOT_RELOAD_TOKEN]
   );
+  const showDebugPoints = import.meta.env.DEV && import.meta.env.VITE_SHOW_PHYSIQUE_POINTS === "1";
 
   const anchorStyle = {
     "--anchor-major": palette.major,
@@ -34,34 +35,39 @@ export default function PhysiqueSilhouette2D({ shape }) {
     <svg
       className="physique-2d-svg"
       viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+      preserveAspectRatio="xMidYMid meet"
       role="presentation"
       aria-hidden="true"
       style={anchorStyle}
       data-geometry-rev={SILHOUETTE_GEOMETRY_REV}
     >
-      <path className="physique-outline-line" d={outlinePath} />
-      <g className="physique-point-layer physique-outline-anchor-layer">
-        {outlineMarkers.map((point) => (
-          <circle
-            key={point.id}
-            className="physique-point outline"
-            cx={point.x}
-            cy={point.y}
-            r={0.62}
-          />
-        ))}
-      </g>
-      <g className="physique-point-layer physique-anchor-layer">
-        {anchors.map((point) => (
-          <circle
-            key={point.id}
-            className={`physique-point ${point.kind} ${point.group || "surface"}`}
-            cx={point.x}
-            cy={point.y}
-            r={point.kind === "major" ? 1.6 : 0.95}
-          />
-        ))}
-      </g>
+      <path className="physique-outline-line" d={outlinePath} transform={outlineTransform} />
+      {showDebugPoints && (
+        <g className="physique-point-layer physique-outline-anchor-layer">
+          {outlineMarkers.map((point) => (
+            <circle
+              key={point.id}
+              className="physique-point outline"
+              cx={point.x}
+              cy={point.y}
+              r={0.62}
+            />
+          ))}
+        </g>
+      )}
+      {showDebugPoints && (
+        <g className="physique-point-layer physique-anchor-layer">
+          {anchors.map((point) => (
+            <circle
+              key={point.id}
+              className={`physique-point ${point.kind} ${point.group || "surface"}`}
+              cx={point.x}
+              cy={point.y}
+              r={point.kind === "major" ? 1.6 : 0.95}
+            />
+          ))}
+        </g>
+      )}
     </svg>
   );
 }

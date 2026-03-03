@@ -320,7 +320,8 @@
 }
 
 .body-visual-panel h2 {
-  margin-bottom: 6px;
+  margin: 0;
+  line-height: 1.1;
   text-align: center;
 }
 
@@ -330,13 +331,18 @@
 }
 
 .home-page .panel.body-visual-panel {
-  padding: clamp(8px, 0.8vw, 12px);
+  padding: clamp(6px, 0.65vw, 10px);
 }
 
 .visual-stage {
-  width: fit-content;
+  --visual-stage-size: min(
+    clamp(560px, 78vmin, 940px),
+    calc(100dvh - 265px),
+    calc(100vw - 36px)
+  );
+  width: var(--visual-stage-size);
+  height: var(--visual-stage-size);
   max-width: 100%;
-  height: auto;
   justify-self: center;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -344,13 +350,15 @@
   box-shadow: none;
   display: grid;
   place-items: center;
+  padding: clamp(6px, 0.9vmin, 12px);
+  box-sizing: border-box;
   overflow: hidden;
 }
 
 .physique-render-surface {
-  width: min(clamp(620px, 72vw, 900px), calc(100vh - 190px));
-  max-width: min(100%, calc(100vw - 36px));
-  height: auto;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
   aspect-ratio: 1 / 1;
   transform-origin: 50% 50%;
   will-change: transform, opacity;
@@ -473,7 +481,7 @@
 }
 
 .physique-debug-rev {
-  margin: 6px 0 2px;
+  margin: 0;
   text-align: center;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
