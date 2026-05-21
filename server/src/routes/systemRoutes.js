@@ -7,6 +7,7 @@ export const registerSystemRoutes = (app, deps) => {
     redisSessionsEnabled,
     redisClient,
     redisLastErrorRef,
+    mongoLastErrorRef,
     mongoReadyStateToText,
     errorTrackingConfigured,
     errorTrackingEnabled
@@ -39,7 +40,8 @@ export const registerSystemRoutes = (app, deps) => {
         mongodb: {
           connected: mongoConnected,
           stateCode: mongoStateCode,
-          state: mongoReadyStateToText(mongoStateCode)
+          state: mongoReadyStateToText(mongoStateCode),
+          lastError: mongoLastErrorRef?.() || ""
         },
         redis: {
           configured: redisConfigured(),

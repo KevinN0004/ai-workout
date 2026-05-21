@@ -56,7 +56,7 @@ describe("AuthPage", () => {
       />
     );
 
-    expect(screen.getByText(/sign in to enter dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in to continue your journey/i)).toBeInTheDocument();
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /close/i }));

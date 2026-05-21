@@ -61,6 +61,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
+let mongoLastError = "";
 
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
@@ -456,6 +457,7 @@ registerApiRoutes(app, {
   redisSessionsEnabled: sessionService.isRedisSessionsEnabled,
   redisClient: sessionService.getRedisClient,
   redisLastErrorRef: sessionService.getRedisLastError,
+  mongoLastErrorRef: () => mongoLastError,
   errorTrackingConfigured: () => Boolean(cleanText(process.env.SENTRY_DSN || "", 500)),
   errorTrackingEnabled: () => Boolean(errorTracker?.enabled),
   mongoReadyStateToText,
@@ -538,8 +540,25 @@ app.use(
 const startServer = async () => {
   try {
     errorTracker = await initErrorTracking({ logger, toShortText });
-    const { mongoUri } = await connectDatabase();
-    logger.info({ event: "mongodb_connected", mongoUri }, "MongoDB connected.");
+    const mongoStartupRequired = parseEnvBoolean(
+      process.env.MONGODB_STARTUP_REQUIRED,
+      process.env.NODE_ENV === "production"
+    );
+    try {
+      const { mongoUri } = await connectDatabase();
+      mongoLastError = "";
+      logger.info({ event: "mongodb_connected", mongoUri }, "MongoDB connected.");
+    } catch (mongoErr) {
+      mongoLastError = toShortText(mongoErr?.message || String(mongoErr), 300);
+      if (mongoStartupRequired) throw mongoErr;
+      logger.warn(
+        {
+          event: "mongodb_startup_skipped",
+          error: mongoLastError
+        },
+        "MongoDB connection failed. Starting API in degraded local mode."
+      );
+    }
     await initSessionStore();
     app.listen(port, () => {
       logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
