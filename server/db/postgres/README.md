@@ -1,11 +1,13 @@
 # Postgres Migration Foundation
 
 This directory contains the staged relational schema for moving AI Workout from MongoDB-first persistence toward Postgres.
+The Prisma schema in `server/prisma/schema.prisma` maps onto these tables.
 
 Apply migrations after setting `DATABASE_URL` or `POSTGRES_URL`:
 
 ```bash
 npm run migrate:postgres -w server
+npm run prisma:generate -w server
 ```
 
 Migration order:

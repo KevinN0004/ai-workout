@@ -8,6 +8,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 - Express 4 for the API server
 - MongoDB with Mongoose for user and dashboard data
 - Postgres foundation for future relational data
+- Prisma Client for the staged Postgres data layer
 - Optional Redis-backed sessions with in-memory fallback
 - Google Gemini for weekly workout plan generation
 - Vitest for client and server tests
@@ -135,6 +136,13 @@ Run the first Postgres migration after setting `DATABASE_URL` or `POSTGRES_URL`:
 
 ```bash
 npm run migrate:postgres -w server
+```
+
+Generate or validate the Prisma client/schema:
+
+```bash
+npm run prisma:generate -w server
+npm run prisma:validate -w server
 ```
 
 ## More Docs

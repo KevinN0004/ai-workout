@@ -9,6 +9,7 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 - CSRF protection for unsafe API methods
 - Dashboard reads and writes for workouts, calories, goals, meals, progress metrics, plans, and saved exercises
 - Optional Postgres connectivity and migrations for the staged relational-data switch
+- Prisma Client schema and generated delegates for the Postgres data layer
 - AI workout plan generation through Google Gemini
 - Cached integrations for weather, air quality, exercise metadata, and meal search
 - Health, readiness, metrics, logging, and optional Sentry error tracking
@@ -19,6 +20,7 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 server/
 |-- scripts/                    # One-off migration scripts
 |-- db/postgres/                # Postgres SQL migrations
+|-- prisma/schema.prisma        # Prisma model mapping for Postgres tables
 |-- src/
 |   |-- index.js                # Express app setup and server boot
 |   |-- db.js                   # Mongoose connection
@@ -55,6 +57,9 @@ npm run test                          # Run Vitest once
 npm run test:watch                    # Run Vitest in watch mode
 npm run migrate:dashboard-activities  # Run the dashboard activity migration
 npm run migrate:postgres              # Apply Postgres SQL migrations
+npm run prisma:validate               # Validate the Prisma schema
+npm run prisma:generate               # Generate Prisma Client
+npm run prisma:studio                 # Open Prisma Studio
 ```
 
 ## Environment Variables
@@ -100,6 +105,14 @@ POSTGRES_SSL_REJECT_UNAUTHORIZED=true
 ```
 
 When `DATABASE_URL` or `POSTGRES_URL` is set, startup probes Postgres and `/api/ready` reports its status. Existing routes still use MongoDB until each repository/service is migrated.
+
+For local development with the workspace-owned Postgres cluster:
+
+```bash
+npm run postgres:local:start
+npm run migrate:postgres
+npm run prisma:generate
+```
 
 Optional third-party settings:
 

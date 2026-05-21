@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AppUser {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyUserId String?  @unique @map("legacy_user_id")
+  email        String
+  passwordHash String   @map("password_hash")
+  passwordSalt String   @default("") @map("password_salt")
+  passwordAlgo String   @default("argon2id") @map("password_algo")
+  profile      Json     @default("{}")
+  goals        Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  calorieEntries  CalorieEntry[]
+  generatedPlans  GeneratedPlan[]
+  mealLogs        MealLog[]
+  progressMetrics ProgressMetric[]
+  savedExercises  SavedExercise[]
+  workoutSessions WorkoutSession[]
+
+  @@map("app_users")
+}
+
+model WorkoutSession {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  legacyId        String?   @map("legacy_id")
+  workoutDate     DateTime? @map("workout_date") @db.Date
+  focus           String    @default("General")
+  durationMinutes Int?      @map("duration_minutes")
+  exercises       Json      @default("[]")
+  sets            Int?
+  reps            Int?
+  intensityRpe    Decimal?  @map("intensity_rpe") @db.Decimal(4, 1)
+  notes           String    @default("")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "workout_sessions_user_created_idx")
+  @@index([userId, workoutDate(sort: Desc)], map: "workout_sessions_user_date_idx")
+  @@map("workout_sessions")
+}
+
+model MealLog {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  legacyId  String?   @map("legacy_id")
+  mealDate  DateTime? @map("meal_date") @db.Date
+  mealType  String    @default("other") @map("meal_type")
+  name      String
+  calories  Int?
+  proteinG  Decimal?  @map("protein_g") @db.Decimal(8, 2)
+  carbsG    Decimal?  @map("carbs_g") @db.Decimal(8, 2)
+  fatG      Decimal?  @map("fat_g") @db.Decimal(8, 2)
+  notes     String    @default("")
+  loggedAt  DateTime  @default(now()) @map("logged_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedAt(sort: Desc)], map: "meal_logs_user_logged_idx")
+  @@index([userId, mealDate(sort: Desc)], map: "meal_logs_user_date_idx")
+  @@map("meal_logs")
+}
+
+model ProgressMetric {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  legacyId   String?   @map("legacy_id")
+  metricDate DateTime? @map("metric_date") @db.Date
+  weightLb   Decimal?  @map("weight_lb") @db.Decimal(8, 2)
+  bodyFatPct Decimal?  @map("body_fat_pct") @db.Decimal(5, 2)
+  waistCm    Decimal?  @map("waist_cm") @db.Decimal(8, 2)
+  restingHr  Int?      @map("resting_hr")
+  notes      String    @default("")
+  loggedAt   DateTime  @default(now()) @map("logged_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loggedAt(sort: Desc)], map: "progress_metrics_user_logged_idx")
+  @@index([userId, metricDate(sort: Desc)], map: "progress_metrics_user_date_idx")
+  @@map("progress_metrics")
+}
+
+model CalorieEntry {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  legacyId    String?  @map("legacy_id")
+  calorieDate DateTime @map("calorie_date") @db.Date
+  calories    Int
+  source      String   @default("manual")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, calorieDate(sort: Desc)], map: "calorie_entries_user_date_idx")
+  @@map("calorie_entries")
+}
+
+model GeneratedPlan {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  legacyId        String?  @map("legacy_id")
+  goal            String   @default("")
+  equipment       Json     @default("[]")
+  durationMinutes Int?     @map("duration_minutes")
+  level           String   @default("")
+  injuries        String   @default("")
+  days            Int?
+  environment     String   @default("")
+  focuses         Json     @default("[]")
+  planText        String   @default("") @map("plan_text")
+  planPayload     Json     @default("{}") @map("plan_payload")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "generated_plans_user_created_idx")
+  @@map("generated_plans")
+}
+
+model SavedExercise {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  legacyId           String?  @map("legacy_id")
+  externalExerciseId Int?     @map("external_exercise_id")
+  name               String
+  category           String   @default("")
+  muscles            Json     @default("[]")
+  equipment          Json     @default("[]")
+  imageUrl           String   @default("") @map("image_url")
+  videoUrl           String   @default("") @map("video_url")
+  reason             String   @default("")
+  source             String   @default("wger")
+  savedAt            DateTime @default(now()) @map("saved_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, savedAt(sort: Desc)], map: "saved_exercises_user_saved_idx")
+  @@map("saved_exercises")
+}
