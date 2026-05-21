@@ -8,6 +8,7 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 - Cookie sessions with optional Redis storage and in-memory fallback
 - CSRF protection for unsafe API methods
 - Dashboard reads and writes for workouts, calories, goals, meals, progress metrics, plans, and saved exercises
+- Optional Postgres connectivity and migrations for the staged relational-data switch
 - AI workout plan generation through Google Gemini
 - Cached integrations for weather, air quality, exercise metadata, and meal search
 - Health, readiness, metrics, logging, and optional Sentry error tracking
@@ -17,9 +18,11 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 ```text
 server/
 |-- scripts/                    # One-off migration scripts
+|-- db/postgres/                # Postgres SQL migrations
 |-- src/
 |   |-- index.js                # Express app setup and server boot
 |   |-- db.js                   # Mongoose connection
+|   |-- postgres.js             # Optional Postgres connection
 |   |-- middleware/             # Request context and error handling
 |   |-- models/                 # Mongoose models
 |   |-- routes/                 # API route registration
@@ -51,6 +54,7 @@ npm run start                         # Start normally
 npm run test                          # Run Vitest once
 npm run test:watch                    # Run Vitest in watch mode
 npm run migrate:dashboard-activities  # Run the dashboard activity migration
+npm run migrate:postgres              # Apply Postgres SQL migrations
 ```
 
 ## Environment Variables
@@ -61,6 +65,9 @@ Create `server/.env` for local development. Useful defaults:
 PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/ai_workout_backend
 MONGODB_STARTUP_REQUIRED=false
+# Optional during the staged relational migration:
+# DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
+# POSTGRES_STARTUP_REQUIRED=false
 CLIENT_ORIGIN=http://localhost:5173
 LOG_LEVEL=info
 GEMINI_API_KEY=
@@ -82,6 +89,17 @@ REDIS_USERNAME=default
 REDIS_PASSWORD=
 REDIS_TLS=false
 ```
+
+Optional Postgres settings:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
+POSTGRES_STARTUP_REQUIRED=false
+POSTGRES_SSL=false
+POSTGRES_SSL_REJECT_UNAUTHORIZED=true
+```
+
+When `DATABASE_URL` or `POSTGRES_URL` is set, startup probes Postgres and `/api/ready` reports its status. Existing routes still use MongoDB until each repository/service is migrated.
 
 Optional third-party settings:
 

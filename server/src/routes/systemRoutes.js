@@ -8,6 +8,8 @@ export const registerSystemRoutes = (app, deps) => {
     redisClient,
     redisLastErrorRef,
     mongoLastErrorRef,
+    postgresStatusRef,
+    postgresLastErrorRef,
     mongoReadyStateToText,
     errorTrackingConfigured,
     errorTrackingEnabled
@@ -32,7 +34,10 @@ export const registerSystemRoutes = (app, deps) => {
     const mongoStateCode = Number(User?.db?.readyState ?? 0);
     const mongoConnected = mongoStateCode === 1;
     const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isOpen);
-    const ready = mongoConnected && (!redisConfigured() || redisConnected);
+    const postgresStatus =
+      postgresStatusRef?.() || { configured: false, connected: false, lastError: "" };
+    const postgresReady = !postgresStatus.configured || postgresStatus.connected;
+    const ready = mongoConnected && postgresReady && (!redisConfigured() || redisConnected);
     const payload = {
       status: ready ? "ready" : "not_ready",
       requestId: req.requestId || "",
@@ -42,6 +47,12 @@ export const registerSystemRoutes = (app, deps) => {
           stateCode: mongoStateCode,
           state: mongoReadyStateToText(mongoStateCode),
           lastError: mongoLastErrorRef?.() || ""
+        },
+        postgres: {
+          configured: Boolean(postgresStatus.configured),
+          connected: Boolean(postgresStatus.connected),
+          databaseUrl: postgresStatus.databaseUrl || "",
+          lastError: postgresStatus.lastError || postgresLastErrorRef?.() || ""
         },
         redis: {
           configured: redisConfigured(),

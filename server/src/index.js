@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import { connectDatabase } from "./db.js";
+import { connectPostgres, getPostgresStatus } from "./postgres.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
@@ -62,6 +63,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
 let mongoLastError = "";
+let postgresLastError = "";
 
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
@@ -458,6 +460,8 @@ registerApiRoutes(app, {
   redisClient: sessionService.getRedisClient,
   redisLastErrorRef: sessionService.getRedisLastError,
   mongoLastErrorRef: () => mongoLastError,
+  postgresStatusRef: getPostgresStatus,
+  postgresLastErrorRef: () => postgresLastError,
   errorTrackingConfigured: () => Boolean(cleanText(process.env.SENTRY_DSN || "", 500)),
   errorTrackingEnabled: () => Boolean(errorTracker?.enabled),
   mongoReadyStateToText,
@@ -557,6 +561,27 @@ const startServer = async () => {
           error: mongoLastError
         },
         "MongoDB connection failed. Starting API in degraded local mode."
+      );
+    }
+    const postgresStartupRequired = parseEnvBoolean(process.env.POSTGRES_STARTUP_REQUIRED, false);
+    try {
+      const postgresStatus = await connectPostgres();
+      postgresLastError = "";
+      if (postgresStatus.configured) {
+        logger.info(
+          { event: "postgres_connected", databaseUrl: postgresStatus.databaseUrl },
+          "Postgres connected."
+        );
+      }
+    } catch (postgresErr) {
+      postgresLastError = toShortText(postgresErr?.message || String(postgresErr), 300);
+      if (postgresStartupRequired) throw postgresErr;
+      logger.warn(
+        {
+          event: "postgres_startup_skipped",
+          error: postgresLastError
+        },
+        "Postgres connection failed. Continuing with MongoDB-backed routes."
       );
     }
     await initSessionStore();

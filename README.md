@@ -7,6 +7,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 - React 18 and Vite for the frontend
 - Express 4 for the API server
 - MongoDB with Mongoose for user and dashboard data
+- Postgres foundation for future relational data
 - Optional Redis-backed sessions with in-memory fallback
 - Google Gemini for weekly workout plan generation
 - Vitest for client and server tests
@@ -27,6 +28,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 - Node.js 20 or newer is recommended
 - npm
 - MongoDB running locally, or a MongoDB connection string
+- Optional: Postgres for the staged relational-data migration
 - Optional: Redis for persistent sessions across server restarts
 - Optional: a Gemini API key for AI plan generation
 
@@ -45,6 +47,8 @@ PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/ai_workout_backend
 CLIENT_ORIGIN=http://localhost:5173
 GEMINI_API_KEY=
+# Optional while the Postgres migration is staged:
+# DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
 ```
 
 Run the full app in development:
@@ -75,6 +79,10 @@ Common server variables:
 | `PORT` | API server port | `5000` |
 | `MONGODB_URI` | MongoDB connection string | `mongodb://127.0.0.1:27017/ai_workout_backend` |
 | `MONGODB_STARTUP_REQUIRED` | Fail startup if MongoDB is unavailable | `true` in production, otherwise `false` |
+| `DATABASE_URL` / `POSTGRES_URL` | Optional Postgres connection string for the relational migration foundation | unset |
+| `POSTGRES_STARTUP_REQUIRED` | Fail startup if configured Postgres is unavailable | `false` |
+| `POSTGRES_SSL` | Enable TLS for Postgres connections | `false` |
+| `POSTGRES_SSL_REJECT_UNAUTHORIZED` | Reject untrusted Postgres TLS certificates | `true` |
 | `CLIENT_ORIGIN` / `CLIENT_ORIGINS` | Allowed CORS origins, comma-separated | allow any origin when unset |
 | `GEMINI_API_KEY` | Enables `/api/generate` | unset |
 | `GEMINI_MODEL` | Gemini model for workout generation | `gemini-1.5-flash` |
@@ -121,6 +129,12 @@ Run one workspace:
 ```bash
 npm run test -w client
 npm run test -w server
+```
+
+Run the first Postgres migration after setting `DATABASE_URL` or `POSTGRES_URL`:
+
+```bash
+npm run migrate:postgres -w server
 ```
 
 ## More Docs
