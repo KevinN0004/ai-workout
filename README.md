@@ -82,7 +82,9 @@ Common server variables:
 | `ANON_GENERATE_RATE_LIMIT_WINDOW_MS` | Window for the anonymous generation quota | `86400000` (24h) |
 | `GEMINI_MODEL` | Gemini model for workout generation | `gemini-1.5-flash` |
 | `REDIS_URL` | Redis connection URL for sessions | unset |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config | unset |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`) | unset |
+| `REDIS_CONNECT_TIMEOUT_MS` | How long startup waits for Redis before falling back to in-memory sessions | `10000` |
+| `REDIS_STARTUP_REQUIRED` | Fail startup when Redis is configured but unreachable, instead of using in-memory sessions | `false` |
 | `SENTRY_DSN` | Enables Sentry error tracking | unset |
 | `LOG_LEVEL` | Pino log level | `info` |
 

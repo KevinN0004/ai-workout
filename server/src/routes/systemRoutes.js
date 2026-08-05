@@ -26,7 +26,9 @@ export const registerSystemRoutes = (app, deps) => {
   });
 
   app.get("/api/ready", (req, res) => {
-    const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isOpen);
+    // isOpen stays true while the client is merely reconnecting; isReady is only
+    // true when the connection can actually serve commands.
+    const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isReady);
     const postgresStatus =
       postgresStatusRef?.() || { configured: false, connected: false, lastError: "" };
     const postgresReady = Boolean(postgresStatus.configured && postgresStatus.connected);

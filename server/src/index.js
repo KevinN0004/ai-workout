@@ -294,6 +294,7 @@ const openAqCacheTtlSec = toPositiveInt(process.env.OPENAQ_CACHE_TTL_SEC, 180);
 const wgerCacheTtlSec = toPositiveInt(process.env.WGER_CACHE_TTL_SEC, 900);
 const mealDbCacheTtlSec = toPositiveInt(process.env.MEALDB_CACHE_TTL_SEC, 900);
 const sentryShutdownTimeoutMs = toPositiveInt(process.env.SENTRY_SHUTDOWN_TIMEOUT_MS, 2000);
+const redisConnectTimeoutMs = toPositiveInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10000);
 const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
@@ -409,7 +410,8 @@ const sessionService = createSessionService({
   csrfCookieName,
   csrfHeaderName,
   csrfUnsafeMethods,
-  redisSessionKeyPrefix
+  redisSessionKeyPrefix,
+  redisConnectTimeoutMs
 });
 
 const {
@@ -651,7 +653,16 @@ const startServer = async () => {
         "Postgres connection failed. Starting API in degraded local mode."
       );
     }
-    await initSessionStore();
+    const sessionStoreStatus = await initSessionStore();
+    // In-memory sessions do not survive a restart and are not shared between
+    // replicas, so a multi-instance deployment can opt into failing loudly rather
+    // than silently degrading to them.
+    const redisStartupRequired = parseEnvBoolean(process.env.REDIS_STARTUP_REQUIRED, false);
+    if (redisStartupRequired && sessionStoreStatus.configured && !sessionStoreStatus.connected) {
+      throw new Error(
+        `Redis is configured but unreachable and REDIS_STARTUP_REQUIRED is set. ${sessionStoreStatus.lastError}`.trim()
+      );
+    }
     app.listen(port, () => {
       logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
     });
