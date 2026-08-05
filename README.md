@@ -16,8 +16,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 ```text
 .
 |-- client/          # React/Vite app
-|-- server/          # Express API, models, services, routes, tests
-|-- data/            # Legacy/local JSON data
+|-- server/          # Express API, services, routes, tests
 |-- package.json     # npm workspaces and root scripts
 `-- package-lock.json
 ```
