@@ -9,7 +9,7 @@ export const registerAuthRoutes = (app, deps) => {
     profileBodySchema,
     buildProfile,
     User,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     signupBodySchema,
     cleanText,
     findUserByEmail,
@@ -69,7 +69,7 @@ export const registerAuthRoutes = (app, deps) => {
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       res.json({ profile: updated?.profile || defaultProfile() });
     } catch (err) {
       res.status(500).json({ error: err?.message || "Server error." });
@@ -181,4 +181,3 @@ export const registerAuthRoutes = (app, deps) => {
     }
   });
 };
-

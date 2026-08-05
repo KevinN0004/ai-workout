@@ -1,9 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { app, __testables } from "./index.js";
-import MealLog from "./models/MealLog.js";
-import ProgressMetric from "./models/ProgressMetric.js";
-import User from "./models/User.js";
-import WorkoutSession from "./models/WorkoutSession.js";
+import { prisma } from "./prisma.js";
 
 const {
   buildDashboard,
@@ -39,41 +36,17 @@ const toRequestUrl = (input) => {
   return String(input?.url || "");
 };
 
-const createFindChain = (items = []) => {
-  const state = {
-    rows: Array.isArray(items) ? items.map((item) => ({ ...item })) : []
-  };
-  return {
-    sort(sortSpec = {}) {
-      const [sortField, sortDir] = Object.entries(sortSpec)[0] || [];
-      if (!sortField) return this;
-      state.rows.sort((a, b) => {
-        const left = String(a?.[sortField] || "");
-        const right = String(b?.[sortField] || "");
-        return sortDir === -1 ? right.localeCompare(left) : left.localeCompare(right);
-      });
-      return this;
-    },
-    skip(value) {
-      const count = Number.isFinite(Number(value)) ? Number(value) : 0;
-      state.rows = state.rows.slice(Math.max(0, count));
-      return this;
-    },
-    limit(value) {
-      const count = Number.isFinite(Number(value)) ? Number(value) : state.rows.length;
-      state.rows = state.rows.slice(0, Math.max(0, count));
-      return this;
-    },
-    lean: async () => state.rows.map((item) => ({ ...item }))
-  };
-};
-
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
+const clearPostgresTestData = async () => {
+  await prisma.appUser.deleteMany({});
+};
+
 beforeAll(async () => {
+  await clearPostgresTestData();
   server = app.listen(0);
   await new Promise((resolve) => {
     server.once("listening", resolve);
@@ -294,22 +267,6 @@ describe("server routes", () => {
   });
 
   test("auth flow supports signup -> session me -> logout", async () => {
-    const usersById = new Map();
-
-    vi.spyOn(User, "findOne").mockImplementation(async (query = {}) => {
-      if (query.userId) return usersById.get(query.userId) || null;
-      if (query.email) {
-        for (const user of usersById.values()) {
-          if (user.email === query.email) return user;
-        }
-      }
-      return null;
-    });
-    vi.spyOn(User, "create").mockImplementation(async (doc) => {
-      usersById.set(doc.userId, { ...doc });
-      return doc;
-    });
-
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
     const csrfPayload = await csrfResponse.json();
     const csrfToken = String(csrfPayload?.csrfToken || "");
@@ -376,61 +333,6 @@ describe("server routes", () => {
   });
 
   test("dashboard workout mutation returns updated payload for signed-in user", async () => {
-    const usersById = new Map();
-    const workoutsByUser = new Map();
-    const toUserDoc = (doc) => (doc ? { ...doc, toObject: () => ({ ...doc }) } : null);
-
-    vi.spyOn(User, "findOne").mockImplementation(async (query = {}) => {
-      if (query.userId) return toUserDoc(usersById.get(query.userId) || null);
-      if (query.email) {
-        for (const user of usersById.values()) {
-          if (user.email === query.email) return toUserDoc(user);
-        }
-      }
-      return null;
-    });
-    vi.spyOn(User, "create").mockImplementation(async (doc) => {
-      usersById.set(doc.userId, { ...doc, dashboard: doc.dashboard || defaultDashboard() });
-      return toUserDoc(doc);
-    });
-    vi.spyOn(User, "findOneAndUpdate").mockImplementation(async (query = {}, update = {}) => {
-      const user = usersById.get(query.userId);
-      if (!user) return null;
-      if (update.$pull?.["dashboard.workouts"]?.id) {
-        const removeId = update.$pull["dashboard.workouts"].id;
-        user.dashboard.workouts = (user.dashboard.workouts || []).filter((item) => item.id !== removeId);
-      }
-      const pushCfg = update.$push?.["dashboard.workouts"];
-      if (pushCfg?.$each) {
-        const existing = Array.isArray(user.dashboard.workouts) ? user.dashboard.workouts : [];
-        user.dashboard.workouts = [...pushCfg.$each, ...existing].slice(0, pushCfg.$slice || 500);
-      }
-      usersById.set(query.userId, user);
-      return toUserDoc(user);
-    });
-
-    vi.spyOn(WorkoutSession, "findOneAndUpdate").mockImplementation(async (query = {}, update = {}) => {
-      const list = workoutsByUser.get(query.userId) || [];
-      const next = {
-        ...(update.$set || {})
-      };
-      const withoutId = list.filter((item) => item.id !== next.id);
-      workoutsByUser.set(query.userId, [next, ...withoutId]);
-      return next;
-    });
-    vi.spyOn(WorkoutSession, "countDocuments").mockImplementation(async (query = {}) => {
-      const list = workoutsByUser.get(query.userId) || [];
-      return list.length;
-    });
-    vi.spyOn(WorkoutSession, "find").mockImplementation((query = {}) => {
-      return createFindChain(workoutsByUser.get(query.userId) || []);
-    });
-
-    vi.spyOn(MealLog, "countDocuments").mockResolvedValue(0);
-    vi.spyOn(MealLog, "find").mockImplementation(() => createFindChain([]));
-    vi.spyOn(ProgressMetric, "countDocuments").mockResolvedValue(0);
-    vi.spyOn(ProgressMetric, "find").mockImplementation(() => createFindChain([]));
-
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
     const csrfPayload = await csrfResponse.json();
     const csrfToken = String(csrfPayload?.csrfToken || "");

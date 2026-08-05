@@ -140,7 +140,7 @@ export const registerGenerateRoutes = (app, deps) => {
     toNullableNumber,
     getSessionUser,
     User,
-    mapMongoDocToUser
+    mapDbDocToUser
   } = deps;
 
   app.post("/api/generate", async (req, res) => {
@@ -210,7 +210,7 @@ export const registerGenerateRoutes = (app, deps) => {
           },
           { new: true }
         );
-        const updated = mapMongoDocToUser(updatedDoc);
+        const updated = mapDbDocToUser(updatedDoc);
         savedPlan = updated?.dashboard?.plans?.[0] || planEntry;
       }
 

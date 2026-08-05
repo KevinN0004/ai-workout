@@ -7,7 +7,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     MealLog,
     User,
     toFiniteNumber,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     buildDashboardResponse,
     progressMetricBodySchema,
     buildProgressMetricEntry,
@@ -161,7 +161,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
       );
 
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({
         ...response,
@@ -205,7 +205,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
 
       const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({
         ...response,

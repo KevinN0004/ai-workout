@@ -9,7 +9,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     WorkoutSession,
     User,
     toWorkoutSummaryEntry,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     buildDashboardResponse,
     caloriesBodySchema,
     toNullableNumber,
@@ -78,7 +78,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         );
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
-        const updated = mapMongoDocToUser(updatedDoc);
+        const updated = mapDbDocToUser(updatedDoc);
         const response = await buildDashboardResponse(updated);
         return res.json({
           ...response,
@@ -122,7 +122,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {
@@ -162,7 +162,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       }
 
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {

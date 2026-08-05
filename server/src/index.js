@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
-import { connectDatabase } from "./db.js";
 import { connectPostgres, getPostgresStatus } from "./postgres.js";
+import { connectPrisma, prisma } from "./prisma.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
@@ -27,8 +27,9 @@ import {
 import { createExternalDataService } from "./services/externalDataService.js";
 import { initErrorTracking } from "./services/errorTrackingService.js";
 import { createHttpCacheService } from "./services/httpCacheService.js";
-import { isUpstreamFailureStatus, mongoReadyStateToText } from "./services/platformHealthService.js";
+import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
+import { createPrismaDataModels } from "./services/prismaDataModels.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -52,17 +53,12 @@ import {
   parseEnvBoolean,
   parseRedisPort
 } from "./services/sessionService.js";
-import MealLog from "./models/MealLog.js";
-import ProgressMetric from "./models/ProgressMetric.js";
-import User from "./models/User.js";
-import WorkoutSession from "./models/WorkoutSession.js";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
-let mongoLastError = "";
 let postgresLastError = "";
 
 const toShortText = (value, maxLen = 160) =>
@@ -260,6 +256,7 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
+const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -332,7 +329,7 @@ const authUserService = createAuthUserService({
   }
 });
 const {
-  mapMongoDocToUser,
+  mapDbDocToUser,
   findUserById,
   findUserByEmail,
   createUser,
@@ -459,12 +456,10 @@ registerApiRoutes(app, {
   redisSessionsEnabled: sessionService.isRedisSessionsEnabled,
   redisClient: sessionService.getRedisClient,
   redisLastErrorRef: sessionService.getRedisLastError,
-  mongoLastErrorRef: () => mongoLastError,
   postgresStatusRef: getPostgresStatus,
   postgresLastErrorRef: () => postgresLastError,
   errorTrackingConfigured: () => Boolean(cleanText(process.env.SENTRY_DSN || "", 500)),
   errorTrackingEnabled: () => Boolean(errorTracker?.enabled),
-  mongoReadyStateToText,
   isUpstreamFailureStatus,
   toNullableNumber,
   fetchOpenMeteo,
@@ -490,7 +485,7 @@ registerApiRoutes(app, {
   validateBody,
   profileBodySchema,
   buildProfile,
-  mapMongoDocToUser,
+  mapDbDocToUser,
   signupBodySchema,
   findUserByEmail,
   isCompleteSignupProfile,
@@ -544,28 +539,13 @@ app.use(
 const startServer = async () => {
   try {
     errorTracker = await initErrorTracking({ logger, toShortText });
-    const mongoStartupRequired = parseEnvBoolean(
-      process.env.MONGODB_STARTUP_REQUIRED,
+    const postgresStartupRequired = parseEnvBoolean(
+      process.env.POSTGRES_STARTUP_REQUIRED,
       process.env.NODE_ENV === "production"
     );
     try {
-      const { mongoUri } = await connectDatabase();
-      mongoLastError = "";
-      logger.info({ event: "mongodb_connected", mongoUri }, "MongoDB connected.");
-    } catch (mongoErr) {
-      mongoLastError = toShortText(mongoErr?.message || String(mongoErr), 300);
-      if (mongoStartupRequired) throw mongoErr;
-      logger.warn(
-        {
-          event: "mongodb_startup_skipped",
-          error: mongoLastError
-        },
-        "MongoDB connection failed. Starting API in degraded local mode."
-      );
-    }
-    const postgresStartupRequired = parseEnvBoolean(process.env.POSTGRES_STARTUP_REQUIRED, false);
-    try {
       const postgresStatus = await connectPostgres();
+      await connectPrisma();
       postgresLastError = "";
       if (postgresStatus.configured) {
         logger.info(
@@ -581,7 +561,7 @@ const startServer = async () => {
           event: "postgres_startup_skipped",
           error: postgresLastError
         },
-        "Postgres connection failed. Continuing with MongoDB-backed routes."
+        "Postgres connection failed. Starting API in degraded local mode."
       );
     }
     await initSessionStore();

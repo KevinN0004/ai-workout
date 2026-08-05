@@ -7,7 +7,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
     savedExerciseBodySchema,
     buildSavedExerciseEntry,
     User,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     buildDashboardResponse,
     cleanText
   } = deps;
@@ -68,7 +68,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({
         ...response,
@@ -95,7 +95,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({ ...response, ok: true });
     } catch (err) {

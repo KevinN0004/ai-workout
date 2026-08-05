@@ -12,7 +12,7 @@ export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
     hashLength = 32
   } = argon2Options || {};
 
-  const mapMongoDocToUser = (doc) => {
+  const mapDbDocToUser = (doc) => {
     if (!doc) return null;
     const source = typeof doc.toObject === "function" ? doc.toObject() : doc;
     const inferredAlgo =
@@ -30,7 +30,7 @@ export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
     };
   };
 
-  const mapUserToMongoDoc = (user) => {
+  const mapUserToDbDoc = (user) => {
     const doc = {
       userId: user.id,
       email: cleanText(user.email, 254).toLowerCase(),
@@ -46,19 +46,19 @@ export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
 
   const findUserById = async (userId) => {
     const doc = await User.findOne({ userId });
-    return mapMongoDocToUser(doc);
+    return mapDbDocToUser(doc);
   };
 
   const findUserByEmail = async (email) => {
     const doc = await User.findOne({
       email: cleanText(email, 254).toLowerCase()
     });
-    return mapMongoDocToUser(doc);
+    return mapDbDocToUser(doc);
   };
 
   const createUser = async (user) => {
-    const doc = await User.create(mapUserToMongoDoc(user));
-    return mapMongoDocToUser(doc);
+    const doc = await User.create(mapUserToDbDoc(user));
+    return mapDbDocToUser(doc);
   };
 
   const hashPasswordArgon2id = async (password) => {
@@ -129,7 +129,7 @@ export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
   };
 
   return {
-    mapMongoDocToUser,
+    mapDbDocToUser,
     findUserById,
     findUserByEmail,
     createUser,
