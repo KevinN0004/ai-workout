@@ -1,5 +1,6 @@
 import { validateSchemaInput } from "../../services/requestValidationService.js";
 import { mealDbSearchQuerySchema, validateQuery } from "./validation.js";
+import { sendErrorResponse } from "../../services/errorResponseService.js";
 
 export const registerMealDbRoutes = (app, deps) => {
   const { mealDbRequest, mapMealDbMeal, cleanText, isUpstreamFailureStatus } = deps;
@@ -29,13 +30,13 @@ export const registerMealDbRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "mealdb",
-          error: err?.message || "Meal search unavailable.",
+          error: "Meal search unavailable.",
           query,
           count: 0,
           meals: []
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 };

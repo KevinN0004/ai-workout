@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import rateLimit from "express-rate-limit";
@@ -71,13 +72,35 @@ const parseCsvEnv = (value) =>
     .filter(Boolean);
 
 const configuredClientOrigins = parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS);
-const allowAnyCorsOrigin = configuredClientOrigins.length === 0;
 const allowedCorsOrigins = new Set(configuredClientOrigins);
+
+// With credentials enabled, reflecting an arbitrary Origin would let any site
+// issue authenticated cross-origin calls, so an unset allowlist must fail closed.
+// The loopback fallback keeps `npm run dev` working without extra configuration;
+// any other deployment has to name its origins explicitly.
+const isLoopbackOrigin = (origin) => {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+};
+
+const isAllowedCorsOrigin = (origin) => {
+  if (allowedCorsOrigins.has(origin)) return true;
+  return allowedCorsOrigins.size === 0 && isLoopbackOrigin(origin);
+};
+
 const corsOptions = {
   origin(origin, callback) {
+    // Same-origin and non-browser callers send no Origin header.
     if (!origin) return callback(null, true);
-    if (allowAnyCorsOrigin || allowedCorsOrigins.has(origin)) return callback(null, true);
-    return callback(new Error("Origin not allowed by CORS."));
+    if (isAllowedCorsOrigin(origin)) return callback(null, true);
+    // Tag as 4xx so a blocked origin is a client error, not a captured 5xx.
+    const corsError = new Error("Origin not allowed by CORS.");
+    corsError.status = 403;
+    return callback(corsError);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -109,6 +132,14 @@ const logger = pino({
     censor: "[Redacted]"
   }
 });
+
+if (allowedCorsOrigins.size === 0) {
+  logger.warn(
+    { event: "cors_allowlist_missing" },
+    "CLIENT_ORIGIN is not set. Allowing loopback origins only; set it before deploying."
+  );
+}
+
 const initLatencyStats = () => ({
   count: 0,
   totalMs: 0,
@@ -166,6 +197,28 @@ app.use(
   })
 );
 
+app.use(
+  helmet({
+    // Every response here is JSON, so nothing legitimately loads a subresource.
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        "default-src": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "base-uri": ["'none'"],
+        "form-action": ["'none'"]
+      }
+    },
+    // The SPA is served from its own origin, so the default same-origin CORP
+    // would block it from reading these responses.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: "no-referrer" },
+    hsts:
+      process.env.NODE_ENV === "production"
+        ? { maxAge: 31536000, includeSubDomains: true }
+        : false
+  })
+);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
@@ -211,6 +264,13 @@ const generateRateLimitWindowMs = toPositiveInt(
   10 * 60 * 1000
 );
 const generateRateLimitMax = toPositiveInt(process.env.GENERATE_RATE_LIMIT_MAX, 20);
+// Anonymous callers may still try the generator, but on a much tighter budget so
+// an unauthenticated visitor cannot drain the Gemini quota.
+const anonGenerateRateLimitWindowMs = toPositiveInt(
+  process.env.ANON_GENERATE_RATE_LIMIT_WINDOW_MS,
+  24 * 60 * 60 * 1000
+);
+const anonGenerateRateLimitMax = toPositiveInt(process.env.ANON_GENERATE_RATE_LIMIT_MAX, 3);
 const dashboardCollectionDefaultLimit = toPositiveInt(
   process.env.DASHBOARD_COLLECTION_DEFAULT_LIMIT,
   50
@@ -362,6 +422,7 @@ const {
   deleteSession,
   getSessionUser,
   requireAuth,
+  attachOptionalUser,
   ensureCsrfTokenCookie,
   requireCsrfToken
 } = sessionService;
@@ -441,10 +502,36 @@ const generateLimiter = rateLimit({
   }
 });
 
+// Applies only to callers without a session. Uses the library's default IP key
+// generator so IPv6 clients are bucketed by prefix rather than by single address.
+const anonGenerateLimiter = rateLimit({
+  windowMs: anonGenerateRateLimitWindowMs,
+  max: anonGenerateRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => Boolean(req.user),
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "generate_anonymous",
+        method: req.method,
+        path: req.originalUrl || req.url
+      },
+      "Anonymous generate quota reached."
+    );
+    res.status(429).json({
+      error: "Free plan limit reached. Sign in to keep generating workout plans.",
+      requiresAuth: true
+    });
+  }
+});
+
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
-app.use("/api/generate", generateLimiter);
+app.use("/api/generate", attachOptionalUser, anonGenerateLimiter, generateLimiter);
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
 

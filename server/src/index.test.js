@@ -239,31 +239,50 @@ describe("server routes", () => {
     expect(typeof body.dependencies.errorTracking.provider).toBe("string");
   });
 
-  test("POST /api/generate fails fast when GEMINI_API_KEY is missing", async () => {
-    const previousApiKey = process.env.GEMINI_API_KEY;
-    process.env.GEMINI_API_KEY = "";
-
+  // Anonymous access and the anonymous quota share one per-IP limiter bucket, so
+  // they are asserted together rather than in two order-dependent tests.
+  test("POST /api/generate serves anonymous callers until the free quota runs out", async () => {
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
     const csrfPayload = await csrfResponse.json();
     const csrfToken = String(csrfPayload?.csrfToken || "");
-    const csrfCookieRaw = csrfResponse.headers.get("set-cookie") || "";
-    const csrfCookie = csrfCookieRaw.split(";")[0];
+    const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
 
-    const response = await fetch(`${baseUrl}/api/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-        Cookie: csrfCookie
-      },
-      body: JSON.stringify({})
-    });
-    const body = await response.json();
+    const previousApiKey = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "";
 
-    process.env.GEMINI_API_KEY = previousApiKey;
+    const callGenerate = () =>
+      fetch(`${baseUrl}/api/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+          Cookie: csrfCookie
+        },
+        body: JSON.stringify({})
+      });
 
-    expect(response.status).toBe(500);
-    expect(body.error).toMatch(/missing gemini_api_key/i);
+    try {
+      // No session: the request still reaches the handler, which fails fast on the
+      // missing key rather than rejecting the caller as unauthenticated.
+      const firstResponse = await callGenerate();
+      const firstBody = await firstResponse.json();
+      expect(firstResponse.status).toBe(500);
+      expect(firstBody.error).toMatch(/missing gemini_api_key/i);
+
+      let quotaResponse = null;
+      for (let attempt = 0; attempt < 10 && !quotaResponse; attempt += 1) {
+        const response = await callGenerate();
+        if (response.status === 429) quotaResponse = response;
+        else await response.json();
+      }
+
+      expect(quotaResponse).not.toBeNull();
+      const quotaBody = await quotaResponse.json();
+      expect(quotaBody.requiresAuth).toBe(true);
+      expect(quotaBody.error).toMatch(/sign in/i);
+    } finally {
+      process.env.GEMINI_API_KEY = previousApiKey;
+    }
   });
 
   test("auth flow supports signup -> session me -> logout", async () => {

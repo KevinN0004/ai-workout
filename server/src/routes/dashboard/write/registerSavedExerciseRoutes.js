@@ -1,4 +1,5 @@
 import { savedExerciseParamsSchema, validateParams } from "../validation.js";
+import { sendErrorResponse } from "../../../services/errorResponseService.js";
 
 export const registerSavedExerciseRoutes = (app, deps) => {
   const {
@@ -75,7 +76,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         savedExercise: updated.dashboard?.savedExercises?.[0] || entry
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -99,7 +100,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
       const response = await buildDashboardResponse(updated);
       return res.json({ ...response, ok: true });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };

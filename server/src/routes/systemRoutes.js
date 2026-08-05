@@ -5,9 +5,7 @@ export const registerSystemRoutes = (app, deps) => {
     redisConfigured,
     redisSessionsEnabled,
     redisClient,
-    redisLastErrorRef,
     postgresStatusRef,
-    postgresLastErrorRef,
     errorTrackingConfigured,
     errorTrackingEnabled
   } = deps;
@@ -33,6 +31,9 @@ export const registerSystemRoutes = (app, deps) => {
       postgresStatusRef?.() || { configured: false, connected: false, lastError: "" };
     const postgresReady = Boolean(postgresStatus.configured && postgresStatus.connected);
     const ready = postgresReady && (!redisConfigured() || redisConnected);
+    // This endpoint is unauthenticated so load balancers and uptime probes can
+    // reach it. It therefore reports liveness booleans only: connection strings
+    // and driver error text name internal hosts, so they stay in the logs.
     const payload = {
       status: ready ? "ready" : "not_ready",
       requestId: req.requestId || "",
@@ -40,14 +41,12 @@ export const registerSystemRoutes = (app, deps) => {
         postgres: {
           configured: Boolean(postgresStatus.configured),
           connected: Boolean(postgresStatus.connected),
-          databaseUrl: postgresStatus.databaseUrl || "",
-          lastError: postgresStatus.lastError || postgresLastErrorRef?.() || ""
+          healthy: postgresReady
         },
         redis: {
           configured: redisConfigured(),
           connected: redisConnected,
-          mode: redisConnected ? "redis" : "in_memory_fallback",
-          lastError: redisLastErrorRef() || ""
+          mode: redisConnected ? "redis" : "in_memory_fallback"
         },
         errorTracking: {
           configured: errorTrackingConfigured(),
@@ -81,7 +80,6 @@ export const registerSystemRoutes = (app, deps) => {
       requestId: req.requestId || "",
       uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000),
       requestsTotal: metrics.requestsTotal,
-      authFailures: metrics.authFailures,
       rateLimited: metrics.rateLimited,
       requestLatencyMs: {
         ...summarizeLatencyBucket(metrics.requestLatencyMs),

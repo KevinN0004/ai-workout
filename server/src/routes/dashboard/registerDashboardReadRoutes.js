@@ -1,4 +1,5 @@
 import { dashboardPaginationQuerySchema, validateQuery } from "./validation.js";
+import { sendErrorResponse } from "../../services/errorResponseService.js";
 
 export const registerDashboardReadRoutes = (app, deps) => {
   const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollections } =
@@ -9,7 +10,7 @@ export const registerDashboardReadRoutes = (app, deps) => {
       const response = await buildDashboardResponse(req.user);
       return res.json(response);
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -31,7 +32,7 @@ export const registerDashboardReadRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -53,7 +54,7 @@ export const registerDashboardReadRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -75,7 +76,7 @@ export const registerDashboardReadRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };

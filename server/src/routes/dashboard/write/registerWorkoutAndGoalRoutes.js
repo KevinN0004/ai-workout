@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { sendErrorResponse } from "../../../services/errorResponseService.js";
 
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {
@@ -85,7 +86,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
           workoutSession: session
         });
       } catch (err) {
-        return res.status(500).json({ error: err?.message || "Server error." });
+        return sendErrorResponse(req, res, err, 500);
       }
     }
   );
@@ -126,7 +127,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -166,7 +167,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };

@@ -1,3 +1,4 @@
+import { sendErrorResponse } from "../../../services/errorResponseService.js";
 export const registerMealAndMetricRoutes = (app, deps) => {
   const {
     requireAuth,
@@ -168,7 +169,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
         mealLog
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -212,7 +213,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
         progressMetric: metric
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };

@@ -1,4 +1,5 @@
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
+import { sendErrorResponse } from "../../services/errorResponseService.js";
 
 export const registerWeatherRoutes = (app, deps) => {
   const {
@@ -52,7 +53,7 @@ export const registerWeatherRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "open-meteo",
-          error: err?.message || "Weather service unavailable.",
+          error: "Weather service unavailable.",
           location: {
             latitude: toNullableNumber(req.query.latitude, -90, 90),
             longitude: toNullableNumber(req.query.longitude, -180, 180),
@@ -71,7 +72,7 @@ export const registerWeatherRoutes = (app, deps) => {
           }
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 
@@ -133,7 +134,7 @@ export const registerWeatherRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "open-meteo",
-          error: err?.message || "Weather recommendation unavailable.",
+          error: "Weather recommendation unavailable.",
           location: {
             latitude: toNullableNumber(req.query.latitude, -90, 90),
             longitude: toNullableNumber(req.query.longitude, -180, 180),
@@ -159,7 +160,7 @@ export const registerWeatherRoutes = (app, deps) => {
           daily: []
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 };

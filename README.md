@@ -76,8 +76,10 @@ Common server variables:
 | `POSTGRES_STARTUP_REQUIRED` | Fail startup if Postgres is unavailable | `true` in production, otherwise `false` |
 | `POSTGRES_SSL` | Enable TLS for Postgres connections | `false` |
 | `POSTGRES_SSL_REJECT_UNAUTHORIZED` | Reject untrusted Postgres TLS certificates | `true` |
-| `CLIENT_ORIGIN` / `CLIENT_ORIGINS` | Allowed CORS origins, comma-separated | allow any origin when unset |
+| `CLIENT_ORIGIN` / `CLIENT_ORIGINS` | Allowed CORS origins, comma-separated | loopback origins only when unset; set this before deploying |
 | `GEMINI_API_KEY` | Enables `/api/generate` | unset |
+| `ANON_GENERATE_RATE_LIMIT_MAX` | Plan generations allowed per IP without signing in | `3` |
+| `ANON_GENERATE_RATE_LIMIT_WINDOW_MS` | Window for the anonymous generation quota | `86400000` (24h) |
 | `GEMINI_MODEL` | Gemini model for workout generation | `gemini-1.5-flash` |
 | `REDIS_URL` | Redis connection URL for sessions | unset |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config | unset |

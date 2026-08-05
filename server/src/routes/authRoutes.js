@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { sendErrorResponse } from "../services/errorResponseService.js";
 
 export const registerAuthRoutes = (app, deps) => {
   const {
@@ -45,7 +46,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -72,7 +73,7 @@ export const registerAuthRoutes = (app, deps) => {
       const updated = mapDbDocToUser(updatedDoc);
       res.json({ profile: updated?.profile || defaultProfile() });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -117,7 +118,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -164,7 +165,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -177,7 +178,7 @@ export const registerAuthRoutes = (app, deps) => {
       clearCsrfCookie(res);
       res.json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 };

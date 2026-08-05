@@ -1,4 +1,5 @@
 import { validateSchemaInput } from "../../services/requestValidationService.js";
+import { sendErrorResponse } from "../../services/errorResponseService.js";
 import {
   validateParams,
   validateQuery,
@@ -70,13 +71,13 @@ export const registerWgerRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "wger",
-          error: err?.message || "Exercise metadata unavailable.",
+          error: "Exercise metadata unavailable.",
           categories: [],
           muscles: [],
           equipment: []
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 
@@ -140,7 +141,7 @@ export const registerWgerRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "wger",
-          error: err?.message || "Exercise search unavailable.",
+          error: "Exercise search unavailable.",
           count: 0,
           next: "",
           previous: "",
@@ -150,7 +151,7 @@ export const registerWgerRoutes = (app, deps) => {
           exercises: []
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 
@@ -197,11 +198,11 @@ export const registerWgerRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "wger",
-          error: err?.message || "Exercise details unavailable.",
+          error: "Exercise details unavailable.",
           exercise: null
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 };

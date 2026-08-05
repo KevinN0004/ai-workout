@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { createClient } from "redis";
+import { sendErrorResponse } from "./errorResponseService.js";
 
 export const parseCookies = (cookieHeader = "") =>
   cookieHeader.split(";").reduce((acc, pair) => {
@@ -259,8 +260,29 @@ export const createSessionService = ({
       req.user = user;
       next();
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
+  };
+
+  /**
+   * Resolves the session user when one is present but never rejects the request.
+   * Lets a route stay open to anonymous callers while still letting rate limiters
+   * and handlers tell the two apart.
+   */
+  const attachOptionalUser = async (req, res, next) => {
+    try {
+      req.user = (await getSessionUser(req)) || null;
+    } catch (err) {
+      req.user = null;
+      req.log?.warn(
+        {
+          event: "optional_auth_lookup_failed",
+          error: toShortText(err?.message || String(err), 240)
+        },
+        "Optional session lookup failed. Continuing as anonymous."
+      );
+    }
+    next();
   };
 
   const ensureCsrfTokenCookie = (req, res, next) => {
@@ -311,6 +333,7 @@ export const createSessionService = ({
     deleteSession,
     getSessionUser,
     requireAuth,
+    attachOptionalUser,
     ensureCsrfTokenCookie,
     requireCsrfToken,
     isRedisConfigured: () => redisConfigured,
