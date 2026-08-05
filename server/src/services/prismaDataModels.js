@@ -437,7 +437,7 @@ export const createPrismaDataModels = ({ prisma }) => {
       return createFindChain({
         prisma,
         modelName: "workoutSession",
-        where: { user: { legacyUserId: query.userId } },
+        where: { user: userIdWhere(query.userId) },
         mapRow: mapWorkoutSession,
         sortMap: { createdAt: "createdAt", date: "workoutDate" }
       });
@@ -489,7 +489,7 @@ export const createPrismaDataModels = ({ prisma }) => {
       return createFindChain({
         prisma,
         modelName: "mealLog",
-        where: { user: { legacyUserId: query.userId } },
+        where: { user: userIdWhere(query.userId) },
         mapRow: mapMealLog,
         sortMap: { loggedAt: "loggedAt", date: "mealDate" }
       });
@@ -528,7 +528,7 @@ export const createPrismaDataModels = ({ prisma }) => {
       return createFindChain({
         prisma,
         modelName: "progressMetric",
-        where: { user: { legacyUserId: query.userId } },
+        where: { user: userIdWhere(query.userId) },
         mapRow: mapProgressMetric,
         sortMap: { loggedAt: "loggedAt", date: "metricDate" }
       });
