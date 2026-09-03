@@ -115,6 +115,38 @@ npm run prisma:validate        # validate the schema
   not a failure — the build exits 0. Don't treat it as a regression.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
 
+## Fresh Clone Setup
+
+Tracked: `CLAUDE.md`, `.mcp.json`, `scripts/`, and `.claude/settings.json` (the hook wiring).
+Not tracked: `.claude/agents/`, `commands/`, `helpers/`, `skills/` — claude-flow scaffolding.
+
+**15 of the 19 configured hooks, plus the status line, invoke `.claude/helpers/*`, which is
+not in the repo.** Regenerate the scaffolding after cloning:
+
+```bash
+npx ruflo@latest init                 # regenerate .claude/agents|commands|helpers|skills
+git config core.hooksPath .githooks   # activate the repo's pre-commit guard
+```
+
+The second line is required: `core.hooksPath` lives in `.git/config`, which is not part of
+the repository, so a clone does not run `.githooks/pre-commit` until it is set.
+
+Then confirm the wiring actually fires. A missing or broken hook here fails **silently** —
+it will not announce itself, so check exit codes directly rather than assuming:
+
+```bash
+node .claude/helpers/hook-handler.cjs status   # expect exit 0
+node scripts/codex-handoff.mjs --hook          # expect exit 0
+node scripts/scrub-junk-files.js --dry-run     # expect exit 0
+echo '{"prompt":"fix a bug"}' | node scripts/skill-router.mjs
+```
+
+Capture exit codes without a pipe (`cmd >/dev/null 2>&1; echo $?`) — a piped command
+reports the last stage's status, not the command's.
+
+If `npx ruflo@latest init` overwrites `.claude/settings.json`, its permission allowlist is
+hand-trimmed and worth keeping: restore with `git checkout -- .claude/settings.json`.
+
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files

@@ -1,0 +1,423 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_FLOW_V3_ENABLED": "true",
+    "CLAUDE_FLOW_HOOKS_ENABLED": "true"
+  },
+  "attribution": {
+    "commit": "Co-Authored-By: claude-flow <ruv@ruv.net>",
+    "pr": "🤖 Generated with [claude-flow](https://github.com/ruvnet/claude-flow)"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npx @claude-flow*)",
+      "Bash(npx claude-flow*)",
+      "Bash(npx @upstash/context7-mcp*)",
+      "Bash(npx ctx7*)",
+      "Bash(codebase-memory-mcp*)",
+      "Bash(node .claude/*)",
+      "mcp__claude-flow__:*",
+      "mcp__context7__:*",
+      "mcp__codebase-memory-mcp__:*",
+      "Read(//c/Program Files/**)",
+      "Bash(npx node *)",
+      "Bash(docker run *)",
+      "Bash(docker stop *)",
+      "Bash(grep -viE \"\\\\.test\\\\.|//\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts||{}; Object.keys\\(s\\).filter\\(k=>/type|tsc|build|check/.test\\(k\\)\\).forEach\\(k=>console.log\\(k,'=>',s[k]\\)\\)\")",
+      "Bash(node -e \"try{const t=require\\('./tsconfig.json'\\);console.log\\(JSON.stringify\\(t.compilerOptions&&{allowJs:t.compilerOptions.allowJs,checkJs:t.compilerOptions.checkJs,strict:t.compilerOptions.strict,noImplicitAny:t.compilerOptions.noImplicitAny,module:t.compilerOptions.module,moduleResolution:t.compilerOptions.moduleResolution,noEmit:t.compilerOptions.noEmit},null,2\\)\\)}catch\\(e\\){console.log\\('no tsconfig or parse err:',e.message\\)}\")",
+      "Bash(node -e \"console.log\\('type:', require\\('./package.json'\\).type || 'commonjs \\(default\\)'\\)\")",
+      "Bash(node -e \"const t=require\\('./tsconfig.json'\\);console.log\\('esModuleInterop:', t.compilerOptions.esModuleInterop, '| extends:', t.extends||'none'\\)\")",
+      "Bash(echo \"ESLINT EXIT=$?\")",
+      "Bash(awk '{print $5\" bytes\"}')",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts||{}; ['start','start:prod','dev','serve','main'].forEach\\(k=>s[k]&&console.log\\(k,'=>',s[k]\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('main:',p.main,'| type:',p.type||'commonjs'\\)\")",
+      "Bash(node -e \"const d={...require\\('./package.json'\\).dependencies,...require\\('./package.json'\\).devDependencies}; Object.keys\\(d\\).filter\\(k=>k.includes\\('opentelemetry'\\)\\).forEach\\(k=>console.log\\(k,d[k]\\)\\)\")",
+      "Bash(node -e \"try{const b=require\\('@opentelemetry/sdk-trace-base'\\);console.log\\('sdk-trace-base exports:', ['ConsoleSpanExporter','BatchSpanProcessor','SimpleSpanProcessor'].filter\\(x=>x in b\\).join\\(', '\\)||'none'\\)}catch\\(e\\){console.log\\('sdk-trace-base:',e.message\\)}\")",
+      "Bash(node -e \"try{const n=require\\('@opentelemetry/sdk-node'\\);console.log\\('sdk-node has NodeSDK:', 'NodeSDK' in n\\)}catch\\(e\\){console.log\\('sdk-node:',e.message\\)}\")",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"require\\('@opentelemetry/sdk-trace-base'\\).BatchSpanProcessor && console.log\\('ok'\\)\")",
+      "Bash(node -e \"require\\('@opentelemetry/sdk-node'\\) && console.log\\('sdk-node ok'\\)\")",
+      "Bash(OTEL_ENABLED=true OTEL_CONSOLE_EXPORTER=true OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 node --require tsx/cjs -e \"const t=require\\('./src/telemetry/tracing'\\); \\(async\\(\\)=>{ await t.initializeTracing\\(\\); await t.withSpan\\('smoke.test',{},async\\(\\)=>{}\\); await new Promise\\(r=>setTimeout\\(r,200\\)\\); await t.shutdownTracing\\(\\); }\\)\\(\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; Object.keys\\(s\\).filter\\(k=>k.startsWith\\('build:rules'\\)\\).forEach\\(k=>console.log\\(k,'=>',s[k]\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; Object.keys\\(s\\).filter\\(k=>k.startsWith\\('api:check'\\)\\).forEach\\(k=>console.log\\(k+'\\\\t'+s[k]\\)\\)\")",
+      "Bash(sed -n '/Summary:/,/Speedup/p')",
+      "Bash(awk '/model GuildTask /{f=1} f&&/@@index|@@unique/{print} f&&/^}/{f=0}' prisma/schema.prisma)",
+      "Bash(awk '/model NotificationOutbox/{f=1} f&&/@@index|@@unique/{print} f&&/^}/{f=0}' prisma/schema.prisma)",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; Object.keys\\(s\\).filter\\(k=>k.startsWith\\('migrate'\\)\\).forEach\\(k=>console.log\\(k,'=>',s[k]\\)\\)\")",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(grep -nA 22 \"model GuildCalendarEvent\" prisma/schema.prisma)",
+      "Bash(node --require tsx/cjs -e \"const x = require\\('./src/services/notification-outbox/escalationSignal'\\); console.log\\(Object.keys\\(x\\)\\);\")",
+      "Bash(npm audit *)",
+      "Bash(echo \"=== backend build exit: $? ===\")",
+      "Bash(node -e 'console.log\\(Object.keys\\(require\\(\"./package.json\"\\).scripts\\).join\\(\"\\\\n\"\\)\\)')",
+      "Bash(echo \"backend lint exit: $?\")",
+      "Bash(echo \"=== verdict exit: $? ===\")",
+      "Bash(echo \"knip exit: $?\")",
+      "Bash(node --require tsx/cjs -e \"const {PrismaClient}=require\\('@prisma/client'\\); const p=new PrismaClient\\(\\); console.log\\('delegates:', ['userNotification','userNotificationPreference','pushSubscription'].map\\(k=>typeof p[k]\\).join\\(', '\\)\\);\")",
+      "Bash(echo \"lint exit: $?\")",
+      "Bash(echo \"frontend lint exit: $?\")",
+      "Bash(echo \"registry exit: $?\")",
+      "Bash(echo \"build exit: $?\")",
+      "Bash(echo \"unit exit: $?\")",
+      "Bash(echo \"integrity exit: $?\")",
+      "Bash(echo \"impact exit: $?\")",
+      "Bash(echo \"lint: $?\")",
+      "Bash(echo \"knip: $?\")",
+      "Bash(echo \"build: $?\")",
+      "Bash(echo \"registry: $?\")",
+      "Bash(echo \"unit: $?\")",
+      "Bash(echo \"impact: $?\")",
+      "Bash(echo \"integrity: $?\")",
+      "Bash(echo \"backend lint: $?\")",
+      "Bash(echo \"backend knip: $?\")",
+      "Bash(node -e \"const t=require\\('@testing-library/react'\\); console.log\\('renderHook:', typeof t.renderHook\\)\")",
+      "Bash(echo \"coverage exit: $?\")",
+      "Bash(export REQUIRE_DATABASE_URL_FOR_DB_TESTS=1)",
+      "Bash(echo \"coverage: $?\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"{a['security_advisory']['severity']:8} {a['dependency']['package']['name']:24} manifest={a['dependency'].get\\('manifest_path','?'\\)} fixed_in={\\(a['security_vulnerability'].get\\('first_patched_version'\\) or {}\\).get\\('identifier','?'\\)}\\\\\"\\) for a in d if a['state']=='open']\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('workspaces:', JSON.stringify\\(p.workspaces\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; for\\(const k of ['test:unit','test:ci','test:coverage','coverage']\\) if\\(s[k]\\) console.log\\(k, '=>', s[k]\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; for\\(const k of Object.keys\\(s\\)\\) if\\(k.includes\\('catalog'\\)\\) console.log\\(k,'=>',s[k]\\)\")",
+      "Bash(node -e \"const g=require\\('glob'\\); const f=g.sync\\('src/**/*.db.integration.test.js'\\); console.log\\('count:', f.length\\); f.slice\\(0,60\\).forEach\\(x=>console.log\\('  ',x\\)\\)\")",
+      "Bash(export MSYS_NO_PATHCONV=1)",
+      "Bash(export NODE_ENV=test REQUIRE_DATABASE_URL_FOR_DB_TESTS=1 DB_TEST_SCHEMA_READY=1)",
+      "Bash(node --require tsx/cjs --test \"src/db/performance/**/*.db.integration.test.js\" \"src/db/tasks/**/*.db.integration.test.js\")",
+      "Bash(echo \"FULL SUITE EXIT=$?\")",
+      "Bash(echo \"eslint exit: $?\")",
+      "PowerShell(docker compose up -d postgres)",
+      "PowerShell(docker volume ls --format \"{{.Name}}\")",
+      "PowerShell(npm run dev:ready)",
+      "PowerShell(docker volume ls -q | ForEach-Object { $v = docker volume inspect $_ --format \"{{.Name}} {{.CreatedAt}}\"; $v })",
+      "PowerShell(npm run test:full)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\)\\); console.log\\('VALID JSON, allow entries =', JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.json','utf8'\\)\\).permissions.allow.length\\)\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>console.log\\('allow entries =',JSON.parse\\(s\\).permissions.allow.length,'| valid JSON ✓'\\)\\)\")",
+      "Bash(grep -viE \"//|import|require\")",
+      "Bash(echo \"SEED DONE exit=$?\")",
+      "Bash(echo \"grep exit: $?\")",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)",
+      "Bash(echo \"test:unit exit: $?\")",
+      "Bash(cargo clean *)",
+      "Bash(node -e \"const n=require\\('net'\\);const s=n.connect\\(6543,'127.0.0.1'\\);s.on\\('connect',\\(\\)=>{console.log\\('6543 reachable'\\);process.exit\\(0\\)}\\);s.on\\('error',\\(\\)=>{console.log\\('6543 refused'\\);process.exit\\(1\\)}\\)\")",
+      "Bash(grep -viE \"npm error|^\\\\s*$\")",
+      "Bash(node -e \"const s=require\\('./.claude/settings.json'\\); console.log\\(JSON.stringify\\(s.hooks, null, 1\\)\\)\")",
+      "Bash(node -e 'const s=JSON.parse\\(require\\(\"fs\"\\).readFileSync\\(\".claude/settings.json\",\"utf8\"\\)\\); const ss=s.hooks.SessionStart[0].hooks.map\\(h=>h.command.split\\(\"/\"\\).pop\\(\\)\\); const st=s.hooks.Stop[0].hooks.map\\(h=>h.command.split\\(\"/\"\\).pop\\(\\)\\); console.log\\(\"VALID JSON ✓\"\\); console.log\\(\"SessionStart hooks:\", ss.join\\(\" | \"\\)\\); console.log\\(\"Stop hooks:\", st.join\\(\" | \"\\)\\);')",
+      "Bash(echo \"---exit:$?---\")",
+      "Bash(echo \"---CHECK:QUICK EXIT=$?---\")",
+      "Bash(echo \"---CHECK:QUICK RUN3 EXIT=$?---\")",
+      "Bash(node -e \"const n=require\\('net'\\);const s=n.connect\\(6543,'127.0.0.1'\\);s.on\\('connect',\\(\\)=>{console.log\\('6543 IN USE'\\);s.destroy\\(\\);process.exit\\(0\\)}\\);s.on\\('error',\\(\\)=>{console.log\\('6543 free'\\);process.exit\\(0\\)}\\);setTimeout\\(\\(\\)=>{console.log\\('6543 free \\(timeout\\)'\\);process.exit\\(0\\)},2000\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; console.log\\('root test:full =>', s['test:full']\\);\")",
+      "Bash(echo \"---DB EXIT=$?---\")",
+      "Bash(echo \"---UNIT EXIT=$?---\")",
+      "Bash(echo \"---INTEGRITY EXIT=$?---\")",
+      "Bash(echo \"---FE EXIT=$?---\")",
+      "Bash(docker rm *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(\\(p.devDependencies||{}\\).prettier||\\(p.dependencies||{}\\).prettier\\)\")",
+      "Bash(grep -oE '\\\\.[a-z]+$')",
+      "Bash(echo \"format:check exit: $?\")",
+      "Bash(grep -vE \"^\\\\\\\\?\\\\\\\\?\")",
+      "Bash(grep -vE '^ M [^ ]+$')",
+      "Bash(git config *)",
+      "Bash(echo \"=== exit of log fetch: $? ===\")",
+      "Bash(echo \"---FE2 EXIT=$?---\")",
+      "PowerShell($dd = \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\"; if \\(Test-Path $dd\\) { Start-Process $dd; \"started Docker Desktop, waiting for daemon...\" } else { \"not found at $dd\" })",
+      "PowerShell($svc = Get-CimInstance Win32_Service | Where-Object { $_.ProcessId -eq 10404 }; if \\($svc\\) { $svc | Select-Object Name, DisplayName, State, StartMode, PathName | Format-List } else { \"No service for PID 10404; process info:\"; Get-Process -Id 10404 -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, Path | Format-List })",
+      "Bash(node --require tsx/cjs -e ' *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./server/.env)",
+      "Read(./server/.env.*)",
+      "Read(./client/.env)",
+      "Read(./client/.env.*)",
+      "Read(./.postgres-pw)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" pre-bash",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" pre-edit",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-edit",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-bash",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/skill-router.mjs\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-restore",
+            "timeout": 15000
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/auto-memory-hook.mjs\" import",
+            "timeout": 8000
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/auto-memory-hook.mjs\" sync",
+            "timeout": 10000
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/codex-handoff.mjs\" --hook",
+            "timeout": 8000,
+            "statusMessage": "Detecting Codex handoff workflow..."
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.js\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" compact-manual"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" compact-auto"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" session-end",
+            "timeout": 6000
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" status",
+            "timeout": 3000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" post-task",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs\" notify",
+            "timeout": 3000
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "sh -c 'exec node \"${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/statusline.cjs\"'"
+  },
+  "claudeFlow": {
+    "version": "3.0.0",
+    "enabled": true,
+    "platform": {
+      "os": "windows",
+      "arch": "x64",
+      "shell": "powershell"
+    },
+    "modelPreferences": {
+      "default": "claude-opus-4-6",
+      "routing": "claude-haiku-4-5-20251001"
+    },
+    "agentTeams": {
+      "enabled": true,
+      "teammateMode": "auto",
+      "taskListEnabled": true,
+      "mailboxEnabled": true,
+      "coordination": {
+        "autoAssignOnIdle": true,
+        "trainPatternsOnComplete": true,
+        "notifyLeadOnComplete": true,
+        "sharedMemoryNamespace": "agent-teams"
+      },
+      "hooks": {
+        "teammateIdle": {
+          "enabled": true,
+          "autoAssign": true,
+          "checkTaskList": true
+        },
+        "taskCompleted": {
+          "enabled": true,
+          "trainPatterns": true,
+          "notifyLead": true
+        }
+      }
+    },
+    "swarm": {
+      "topology": "hierarchical-mesh",
+      "maxAgents": 15
+    },
+    "memory": {
+      "backend": "hybrid",
+      "enableHNSW": true,
+      "learningBridge": {
+        "enabled": true
+      },
+      "memoryGraph": {
+        "enabled": true
+      },
+      "agentScopes": {
+        "enabled": true
+      }
+    },
+    "neural": {
+      "enabled": true
+    },
+    "daemon": {
+      "autoStart": false,
+      "workers": [
+        "map",
+        "audit",
+        "optimize"
+      ],
+      "schedules": {
+        "audit": {
+          "interval": "4h",
+          "priority": "critical"
+        },
+        "optimize": {
+          "interval": "2h",
+          "priority": "high"
+        }
+      }
+    },
+    "learning": {
+      "enabled": true,
+      "autoTrain": true,
+      "patterns": [
+        "coordination",
+        "optimization",
+        "prediction"
+      ],
+      "retention": {
+        "shortTerm": "24h",
+        "longTerm": "30d"
+      }
+    },
+    "adr": {
+      "autoGenerate": true,
+      "directory": "/docs/adr",
+      "template": "madr"
+    },
+    "ddd": {
+      "trackDomains": true,
+      "validateBoundedContexts": true,
+      "directory": "/docs/ddd"
+    },
+    "security": {
+      "autoScan": true,
+      "scanOnEdit": true,
+      "cveCheck": true,
+      "threatModel": true
+    }
+  }
+}
