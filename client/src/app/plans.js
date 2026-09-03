@@ -15,7 +15,7 @@ export const parsePlanSections = (result) => {
   if (notesStart >= 0) {
     const headerLine = rawLines[notesStart];
     const strippedHeader = headerLine.replace(
-      /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\s*[:\-]?\s*/i,
+      /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\s*[:-]?\s*/i,
       ""
     );
     notes = [

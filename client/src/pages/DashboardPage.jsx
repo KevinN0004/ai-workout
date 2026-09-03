@@ -126,6 +126,32 @@ export default function DashboardPage({
     latestPlanByWeekday
   });
 
+  // Must stay above the `if (!user)` early return below. `user` starts null in
+  // App.jsx and is only set once /api/auth/me resolves, so a hook declared after
+  // that return makes the hook count grow between renders -- React then throws
+  // "Rendered more hooks than during the previous render." on the signed-in
+  // re-render, which crashed a direct load of /dashboard.
+  const nextWorkout = useMemo(() => {
+    const parseDateAsTime = (value) => {
+      if (!value) return 0;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+    };
+    const today = new Date();
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const upcoming = recentWorkouts
+      .map((item) => ({ ...item, parsedDate: new Date(parseDateAsTime(item?.date)) }))
+      .filter((item) => item.parsedDate.getTime() >= todayStart.getTime())
+      .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+    if (upcoming.length) return { ...upcoming[0], context: "Upcoming" };
+    if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
+    return null;
+  }, [recentWorkouts]);
+
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
 
@@ -186,26 +212,6 @@ export default function DashboardPage({
       day: "numeric"
     })}`;
   };
-  const nextWorkout = useMemo(() => {
-    const parseDateAsTime = (value) => {
-      if (!value) return 0;
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
-    };
-    const today = new Date();
-    const todayStart = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    const upcoming = recentWorkouts
-      .map((item) => ({ ...item, parsedDate: new Date(parseDateAsTime(item?.date)) }))
-      .filter((item) => item.parsedDate.getTime() >= todayStart.getTime())
-      .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
-    if (upcoming.length) return { ...upcoming[0], context: "Upcoming" };
-    if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
-    return null;
-  }, [recentWorkouts]);
 
   const showInitialDashboardLoading = dashLoading && !dashboard;
   const lazyDashboardViewFallback = (

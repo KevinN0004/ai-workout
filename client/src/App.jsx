@@ -12,7 +12,6 @@ import {
   defaultPersonalForm,
   defaultSignupProfileForm,
   equipmentOptionsByEnv,
-  quickFocuses,
   samplePlan,
   weekDays
 } from "./app/constants";
@@ -551,9 +550,7 @@ export default function App() {
       user={user}
       onLogout={onLogout}
       go={go}
-      quickFocuses={quickFocuses}
       form={form}
-      toggleFocus={toggleFocus}
       personalMode={personalMode}
       setPersonalMode={setPersonalMode}
       personal={personal}

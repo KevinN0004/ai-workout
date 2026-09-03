@@ -95,6 +95,8 @@ npm run dev:server       # Express server only (node --watch)
 npm run build            # builds the CLIENT only
 npm run start            # starts the server
 npm test                 # client tests, then server tests (Vitest)
+npm run lint             # eslint . across both workspaces
+npm run lint:fix         # eslint . --fix
 ```
 
 Server-only helpers (run from `server/`):
@@ -106,11 +108,13 @@ npm run prisma:generate        # regenerate Prisma Client
 npm run prisma:validate        # validate the schema
 ```
 
-- ALWAYS run `npm test` after making code changes
+- ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Lint/format tooling is not wired up yet** — ESLint and Prettier are planned but not
-  installed, and neither workspace has a `lint` script. Do not invoke `npm run lint` until
-  one exists; update this section when it lands.
+- **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
+  unreachable code, and React Hook contract violations. **There is deliberately no
+  Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do
+  not add formatting rules or reformat files wholesale without asking.
+- `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - `npm run build` emits a "chunks larger than 500 kB" warning. That is pre-existing and
   not a failure — the build exits 0. Don't treat it as a regression.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)

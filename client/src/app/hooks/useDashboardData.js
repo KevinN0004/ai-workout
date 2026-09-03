@@ -117,8 +117,9 @@ export default function useDashboardData({
         );
       }
     } finally {
-      if (weatherRequestRef.current !== requestId) return;
-      setWeatherLoading(false);
+      // Guarded rather than early-returned: a `return` inside `finally`
+      // overrides any in-flight throw or return from the try/catch above.
+      if (weatherRequestRef.current === requestId) setWeatherLoading(false);
     }
   }, [getCurrentCoordinates, weatherCacheKey]);
 
@@ -173,8 +174,7 @@ export default function useDashboardData({
         );
       }
     } finally {
-      if (airRequestRef.current !== requestId) return;
-      setAirQualityLoading(false);
+      if (airRequestRef.current === requestId) setAirQualityLoading(false);
     }
   }, [airCacheKey, getCurrentCoordinates]);
 
@@ -254,8 +254,9 @@ export default function useDashboardData({
             : message
         );
       } finally {
-        if (cancelled || dashboardRequestRef.current !== requestId) return;
-        setDashLoading(false);
+        if (!cancelled && dashboardRequestRef.current === requestId) {
+          setDashLoading(false);
+        }
       }
     };
     loadDashboard();

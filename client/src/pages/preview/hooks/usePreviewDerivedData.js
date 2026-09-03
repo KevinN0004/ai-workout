@@ -16,7 +16,6 @@ import {
 export default function usePreviewDerivedData({
   personal,
   form,
-  heightUnit,
   weightUnit,
   toFeetInchesFromCm,
   toLb,
