@@ -6,7 +6,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     mealLogBodySchema,
     buildMealLogEntry,
     saveMealLog,
-    User,
+    findUserWithDashboard,
     mapDbDocToUser,
     buildDashboardResponse,
     progressMetricBodySchema,
@@ -48,7 +48,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
       // Removed rather than repaired: making it work is a behaviour change and
       // belongs to its own decision, not to this refactor. The working half is
       // preserved as sumCaloriesForDate in repositories/mealLogRepository.js.
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
@@ -83,7 +83,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
 
       await saveProgressMetric({ userId: req.user.id, metric });
 
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

@@ -1,15 +1,16 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
-import { createPrismaDataModels } from "./prismaDataModels.js";
-import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
-import { createDashboardCollectionRepository } from "../repositories/dashboardCollectionRepository.js";
-import { createSavedExerciseRepository } from "../repositories/savedExerciseRepository.js";
-import { createUserRepository } from "../repositories/userRepository.js";
-import { createGeneratedPlanRepository } from "../repositories/generatedPlanRepository.js";
-import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
-import { createMealLogRepository } from "../repositories/mealLogRepository.js";
+import { createUserReadRepository } from "./userReadRepository.js";
+import { createProgressMetricRepository } from "./progressMetricRepository.js";
+import { createDashboardCollectionRepository } from "./dashboardCollectionRepository.js";
+import { createSavedExerciseRepository } from "./savedExerciseRepository.js";
+import { createUserRepository } from "./userRepository.js";
+import { createGeneratedPlanRepository } from "./generatedPlanRepository.js";
+import { createWorkoutSessionRepository } from "./workoutSessionRepository.js";
+import { createMealLogRepository } from "./mealLogRepository.js";
 
-const { User } = createPrismaDataModels({ prisma });
+const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
+  createUserReadRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
@@ -36,33 +37,33 @@ afterAll(async () => {
   await prisma.appUser.deleteMany({});
 });
 
-describe("prismaDataModels user shim", () => {
+describe("userReadRepository", () => {
   test("create round-trips through findOne by userId", async () => {
     const doc = baseUserDoc({ profile: { firstName: "Ada" } });
-    const created = await User.create(doc);
+    const created = await createUserWithDashboard(doc);
 
     expect(created.userId).toBe(doc.userId);
     expect(created.email).toBe(doc.email);
     expect(created.profile).toEqual({ firstName: "Ada" });
     expect(created.dashboard.workoutSessions).toEqual([]);
 
-    const found = await User.findOne({ userId: doc.userId });
+    const found = await findUserWithDashboard(doc.userId);
     expect(found.userId).toBe(doc.userId);
     expect(found.hash).toBe(doc.hash);
   });
 
   test("findOne by email is case-insensitive", async () => {
     const doc = baseUserDoc({ email: "Mixed.Case@Example.com" });
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
-    const found = await User.findOne({ email: "mixed.case@example.com" });
+    const found = await findUserWithDashboardByEmail("mixed.case@example.com");
     expect(found).not.toBeNull();
     expect(found.email).toBe("mixed.case@example.com");
   });
 
   test("findOne returns null for unknown user and empty query", async () => {
-    expect(await User.findOne({ userId: crypto.randomUUID() })).toBeNull();
-    expect(await User.findOne({})).toBeNull();
+    expect(await findUserWithDashboard(crypto.randomUUID())).toBeNull();
+    expect(await findUserWithDashboard("")).toBeNull();
   });
 
   // Goals live in one JSON column, so a partial write must patch rather than
@@ -70,54 +71,54 @@ describe("prismaDataModels user shim", () => {
   // a read-merge-write. Either way this property is the one that matters.
   test("updateGoals merges instead of replacing sibling keys", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
     await updateGoals({ userId: doc.userId, goals: { calories: 2200 } });
     await updateGoals({ userId: doc.userId, goals: { protein: 160 } });
 
-    const updated = await User.findOne({ userId: doc.userId });
+    const updated = await findUserWithDashboard(doc.userId);
     expect(updated.dashboard.goals).toEqual({ calories: 2200, protein: 160 });
   });
 
   test("updateGoals treats an empty patch as a no-op", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
     await updateGoals({ userId: doc.userId, goals: { calories: 2200 } });
 
     expect(await updateGoals({ userId: doc.userId, goals: {} })).toBe(true);
 
-    const updated = await User.findOne({ userId: doc.userId });
+    const updated = await findUserWithDashboard(doc.userId);
     expect(updated.dashboard.goals).toEqual({ calories: 2200 });
   });
 
   test("updateProfile replaces the profile it is given", async () => {
     const doc = baseUserDoc({ profile: { firstName: "Ada" } });
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
     expect(await updateProfile({ userId: doc.userId, profile: { firstName: "Grace" } })).toBe(
       true
     );
 
-    const updated = await User.findOne({ userId: doc.userId });
+    const updated = await findUserWithDashboard(doc.userId);
     expect(updated.profile).toEqual({ firstName: "Grace" });
   });
 
   test("saveCalorieEntry upserts by id rather than duplicating", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
     const entry = { id: "cal-1", date: "2026-03-02", calories: 1800, source: "manual" };
     await saveCalorieEntry({ userId: doc.userId, entry });
     await saveCalorieEntry({ userId: doc.userId, entry: { ...entry, calories: 2000 } });
 
-    const after = await User.findOne({ userId: doc.userId });
+    const after = await findUserWithDashboard(doc.userId);
     expect(after.dashboard.calories).toHaveLength(1);
     expect(after.dashboard.calories[0].calories).toBe(2000);
   });
 
   test("saving a generated plan stores it and returns it newest first", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
     await saveGeneratedPlan({ userId: doc.userId, entry: { id: "p-1", goal: "First", plan: "a" } });
     await saveGeneratedPlan({
@@ -125,7 +126,7 @@ describe("prismaDataModels user shim", () => {
       entry: { id: "p-2", goal: "Second", plan: "b" }
     });
 
-    const after = await User.findOne({ userId: doc.userId });
+    const after = await findUserWithDashboard(doc.userId);
     expect(after.dashboard.plans).toHaveLength(2);
     expect(after.dashboard.plans[0].goal).toBe("Second");
   });
@@ -136,7 +137,7 @@ describe("prismaDataModels user shim", () => {
   // no storage-side cap to preserve -- the table grows without bound by design.
   test("the 200 plan limit is applied on read, not on write", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
     const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
 
     await prisma.generatedPlan.createMany({
@@ -151,7 +152,7 @@ describe("prismaDataModels user shim", () => {
 
     expect(await prisma.generatedPlan.count()).toBe(205);
 
-    const after = await User.findOne({ userId: doc.userId });
+    const after = await findUserWithDashboard(doc.userId);
     expect(after.dashboard.plans).toHaveLength(200);
     expect(after.dashboard.plans[0].goal).toBe("G204");
   });
@@ -169,7 +170,7 @@ describe("prismaDataModels user shim", () => {
   // read has to stop reporting it.
   test("removing a saved exercise clears it from the user's dashboard", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
     const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
     await prisma.savedExercise.create({
       data: { userId: userPk, legacyId: "saved-1", name: "Squat" }
@@ -177,18 +178,18 @@ describe("prismaDataModels user shim", () => {
 
     expect(await removeExercise({ userId: doc.userId, entryId: "saved-1" })).toBe(1);
 
-    const after = await User.findOne({ userId: doc.userId });
+    const after = await findUserWithDashboard(doc.userId);
     expect(after.dashboard.savedExercises).toEqual([]);
   });
 
   test("saving an exercise twice by name updates rather than duplicating", async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
 
     await saveExercise({ userId: doc.userId, entry: { name: "Squat", reason: "first" } });
     await saveExercise({ userId: doc.userId, entry: { name: "squat", reason: "second" } });
 
-    const after = await User.findOne({ userId: doc.userId });
+    const after = await findUserWithDashboard(doc.userId);
     expect(after.dashboard.savedExercises).toHaveLength(1);
     expect(after.dashboard.savedExercises[0].reason).toBe("second");
   });
@@ -203,7 +204,7 @@ describe("prismaDataModels user shim", () => {
 describe("dashboard collection repositories", () => {
   const seedUser = async () => {
     const doc = baseUserDoc();
-    await User.create(doc);
+    await createUserWithDashboard(doc);
     return doc.userId;
   };
 

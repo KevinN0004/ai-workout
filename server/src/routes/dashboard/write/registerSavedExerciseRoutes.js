@@ -9,7 +9,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
     buildSavedExerciseEntry,
     saveExercise,
     removeExercise,
-    User,
+    findUserWithDashboard,
     mapDbDocToUser,
     buildDashboardResponse,
     cleanText
@@ -27,7 +27,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
 
       const savedExercise = await saveExercise({ userId: req.user.id, entry });
 
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
@@ -48,7 +48,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
 
       await removeExercise({ userId: req.user.id, entryId });
 
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

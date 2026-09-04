@@ -31,7 +31,7 @@ import { initErrorTracking } from "./services/errorTrackingService.js";
 import { createHttpCacheService } from "./services/httpCacheService.js";
 import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
-import { createPrismaDataModels } from "./services/prismaDataModels.js";
+import { createUserReadRepository } from "./repositories/userReadRepository.js";
 import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
 import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "./repositories/mealLogRepository.js";
@@ -325,7 +325,8 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
-const { User } = createPrismaDataModels({ prisma });
+const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
+  createUserReadRepository({ prisma });
 // Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
@@ -397,7 +398,9 @@ const {
 } = externalDataService;
 
 const authUserService = createAuthUserService({
-  User,
+  findUserWithDashboard,
+  findUserWithDashboardByEmail,
+  createUserWithDashboard,
   cleanText,
   argon2Options: {
     timeCost: argon2TimeCost,
@@ -554,7 +557,7 @@ app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
 
 registerApiRoutes(app, {
-  User,
+  findUserWithDashboard,
   metrics,
   serverBootAtMs,
   redisConfigured: sessionService.isRedisConfigured,
