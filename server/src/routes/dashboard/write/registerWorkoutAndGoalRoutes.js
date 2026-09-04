@@ -8,6 +8,8 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     workoutSessionBodySchema,
     buildWorkoutSessionEntry,
     saveWorkoutSession,
+    saveCalorieEntry,
+    updateGoals,
     User,
     mapDbDocToUser,
     buildDashboardResponse,
@@ -73,19 +75,9 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         source: "manual",
         updatedAt: new Date().toISOString()
       };
-      const updatedDoc = await User.findOneAndUpdate(
-        { userId: req.user.id },
-        {
-          $push: {
-            "dashboard.calories": {
-              $each: [entry],
-              $position: 0,
-              $slice: 1000
-            }
-          }
-        },
-        { new: true }
-      );
+      await saveCalorieEntry({ userId: req.user.id, entry });
+
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
@@ -104,28 +96,17 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       const parsedTargetWeight = toNullableNumber(targetWeight, 80, 400);
       const parsedTargetCalories = toNullableNumber(targetCalories, 1200, 4500);
       const parsedWeeklyWorkouts = toNullableNumber(weeklyWorkouts, 1, 7);
-      const setFields = {};
-      if (parsedTargetWeight !== null) {
-        setFields["dashboard.goals.targetWeight"] = parsedTargetWeight;
-      }
-      if (parsedTargetCalories !== null) {
-        setFields["dashboard.goals.targetCalories"] = parsedTargetCalories;
-      }
-      if (parsedWeeklyWorkouts !== null) {
-        setFields["dashboard.goals.weeklyWorkouts"] = parsedWeeklyWorkouts;
-      }
+      const goals = {};
+      if (parsedTargetWeight !== null) goals.targetWeight = parsedTargetWeight;
+      if (parsedTargetCalories !== null) goals.targetCalories = parsedTargetCalories;
+      if (parsedWeeklyWorkouts !== null) goals.weeklyWorkouts = parsedWeeklyWorkouts;
 
-      let updatedDoc = null;
-      if (Object.keys(setFields).length) {
-        updatedDoc = await User.findOneAndUpdate(
-          { userId: req.user.id },
-          { $set: setFields },
-          { new: true }
-        );
-      } else {
-        updatedDoc = await User.findOne({ userId: req.user.id });
-      }
+      // updateGoals patches rather than replaces, and treats an empty object as
+      // a no-op, so the route no longer needs to branch on whether anything was
+      // supplied.
+      await updateGoals({ userId: req.user.id, goals });
 
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

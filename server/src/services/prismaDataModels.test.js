@@ -4,6 +4,7 @@ import { createPrismaDataModels } from "./prismaDataModels.js";
 import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
 import { createDashboardCollectionRepository } from "../repositories/dashboardCollectionRepository.js";
 import { createSavedExerciseRepository } from "../repositories/savedExerciseRepository.js";
+import { createUserRepository } from "../repositories/userRepository.js";
 import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "../repositories/mealLogRepository.js";
 
@@ -13,6 +14,8 @@ const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
+  createUserRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -60,38 +63,62 @@ describe("prismaDataModels user shim", () => {
     expect(await User.findOne({})).toBeNull();
   });
 
-  test("$set merges goals instead of replacing sibling keys", async () => {
+  // Goals live in one JSON column, so a partial write must patch rather than
+  // replace. The shim expressed this as dotted $set paths; the repository does
+  // a read-merge-write. Either way this property is the one that matters.
+  test("updateGoals merges instead of replacing sibling keys", async () => {
     const doc = baseUserDoc();
     await User.create(doc);
 
-    await User.findOneAndUpdate(
-      { userId: doc.userId },
-      { $set: { "dashboard.goals.calories": 2200 } }
-    );
-    const updated = await User.findOneAndUpdate(
-      { userId: doc.userId },
-      { $set: { "dashboard.goals.protein": 160 } }
-    );
+    await updateGoals({ userId: doc.userId, goals: { calories: 2200 } });
+    await updateGoals({ userId: doc.userId, goals: { protein: 160 } });
 
+    const updated = await User.findOne({ userId: doc.userId });
     expect(updated.dashboard.goals).toEqual({ calories: 2200, protein: 160 });
   });
 
-  test("$push calories upserts by id rather than duplicating", async () => {
+  test("updateGoals treats an empty patch as a no-op", async () => {
+    const doc = baseUserDoc();
+    await User.create(doc);
+    await updateGoals({ userId: doc.userId, goals: { calories: 2200 } });
+
+    expect(await updateGoals({ userId: doc.userId, goals: {} })).toBe(true);
+
+    const updated = await User.findOne({ userId: doc.userId });
+    expect(updated.dashboard.goals).toEqual({ calories: 2200 });
+  });
+
+  test("updateProfile replaces the profile it is given", async () => {
+    const doc = baseUserDoc({ profile: { firstName: "Ada" } });
+    await User.create(doc);
+
+    expect(await updateProfile({ userId: doc.userId, profile: { firstName: "Grace" } })).toBe(
+      true
+    );
+
+    const updated = await User.findOne({ userId: doc.userId });
+    expect(updated.profile).toEqual({ firstName: "Grace" });
+  });
+
+  test("saveCalorieEntry upserts by id rather than duplicating", async () => {
     const doc = baseUserDoc();
     await User.create(doc);
 
     const entry = { id: "cal-1", date: "2026-03-02", calories: 1800, source: "manual" };
-    await User.findOneAndUpdate(
-      { userId: doc.userId },
-      { $push: { "dashboard.calories": { $each: [entry] } } }
-    );
-    const after = await User.findOneAndUpdate(
-      { userId: doc.userId },
-      { $push: { "dashboard.calories": { $each: [{ ...entry, calories: 2000 }] } } }
-    );
+    await saveCalorieEntry({ userId: doc.userId, entry });
+    await saveCalorieEntry({ userId: doc.userId, entry: { ...entry, calories: 2000 } });
 
+    const after = await User.findOne({ userId: doc.userId });
     expect(after.dashboard.calories).toHaveLength(1);
     expect(after.dashboard.calories[0].calories).toBe(2000);
+  });
+
+  test("user writes report a miss for an unknown user", async () => {
+    const userId = crypto.randomUUID();
+    expect(await updateProfile({ userId, profile: {} })).toBe(false);
+    expect(await updateGoals({ userId, goals: { calories: 1 } })).toBe(false);
+    expect(await saveCalorieEntry({ userId, entry: { calories: 1 } })).toBe(false);
+    expect(await updatePasswordHash({ userId, hash: "x" })).toBe(false);
   });
 
   // Saved-exercise writes moved to repositories/savedExerciseRepository.js.

@@ -37,6 +37,7 @@ import { createWorkoutSessionRepository } from "./repositories/workoutSessionRep
 import { createMealLogRepository } from "./repositories/mealLogRepository.js";
 import { createDashboardCollectionRepository } from "./repositories/dashboardCollectionRepository.js";
 import { createSavedExerciseRepository } from "./repositories/savedExerciseRepository.js";
+import { createUserRepository } from "./repositories/userRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -330,6 +331,8 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
+  createUserRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -399,7 +402,8 @@ const authUserService = createAuthUserService({
     memoryCost: argon2MemoryCost,
     parallelism: argon2Parallelism,
     hashLength: argon2HashLength
-  }
+  },
+  updatePasswordHash
 });
 const {
   mapDbDocToUser,
@@ -622,6 +626,9 @@ registerApiRoutes(app, {
   buildSavedExerciseEntry,
   saveExercise,
   removeExercise,
+  updateProfile,
+  updateGoals,
+  saveCalorieEntry,
   gemini,
   generatePlanBodySchema,
   toCleanArray
