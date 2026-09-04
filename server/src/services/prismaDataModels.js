@@ -1,9 +1,10 @@
 import { toDateOnly, toIso } from "../repositories/rowValues.js";
-import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
+import { userIdWhere } from "../repositories/userLookup.js";
 import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 import { mapMealLog } from "../repositories/mealLogRepository.js";
 import { mapSavedExercise } from "../repositories/savedExerciseRepository.js";
+import { mapGeneratedPlan } from "../repositories/generatedPlanRepository.js";
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -20,20 +21,6 @@ const mapCalorieEntry = (row = {}) => ({
   calories: row.calories ?? null,
   source: row.source || "manual",
   updatedAt: toIso(row.updatedAt || row.createdAt)
-});
-
-const mapGeneratedPlan = (row = {}) => ({
-  id: row.legacyId || row.id,
-  createdAt: toIso(row.createdAt),
-  goal: row.goal || "",
-  equipment: toJsonArray(row.equipment),
-  duration: row.durationMinutes ?? null,
-  level: row.level || "",
-  injuries: row.injuries || "",
-  days: row.days ?? null,
-  environment: row.environment || "",
-  focuses: toJsonArray(row.focuses),
-  plan: row.planText || ""
 });
 
 const mapUser = (row, related = {}) => {
@@ -117,27 +104,6 @@ const loadUserRelated = async (prisma, userId) => {
   });
 };
 
-const upsertGeneratedPlan = async (prisma, userId, entry) => {
-  const userPk = await getUserPk(prisma, userId);
-  if (!userPk) return;
-  await prisma.generatedPlan.create({
-    data: {
-      userId: userPk,
-      legacyId: entry.id || null,
-      goal: entry.goal || "",
-      equipment: toJsonArray(entry.equipment),
-      durationMinutes: entry.duration ?? null,
-      level: entry.level || "",
-      injuries: entry.injuries || "",
-      days: entry.days ?? null,
-      environment: entry.environment || "",
-      focuses: toJsonArray(entry.focuses),
-      planText: entry.plan || "",
-      planPayload: {}
-    }
-  });
-};
-
 export const createPrismaDataModels = ({ prisma }) => {
   const User = {
     async findOne(query = {}) {
@@ -163,21 +129,6 @@ export const createPrismaDataModels = ({ prisma }) => {
         }
       });
       return loadUserRelated(prisma, row.legacyUserId || row.id);
-    },
-    // Only the generated-plan push remains. Profile, goals, password and
-    // calorie writes moved to repositories/userRepository.js; saved exercises
-    // to repositories/savedExerciseRepository.js.
-    async findOneAndUpdate(query = {}, update = {}) {
-      const userId = query.userId;
-      if (!userId) return null;
-
-      const planPush = update.$push?.["dashboard.plans"];
-      if (planPush?.$each?.[0]) {
-        await upsertGeneratedPlan(prisma, userId, planPush.$each[0]);
-        return loadUserRelated(prisma, userId);
-      }
-
-      return loadUserRelated(prisma, userId);
     }
   };
 

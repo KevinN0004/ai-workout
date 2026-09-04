@@ -5,6 +5,7 @@ import { createProgressMetricRepository } from "../repositories/progressMetricRe
 import { createDashboardCollectionRepository } from "../repositories/dashboardCollectionRepository.js";
 import { createSavedExerciseRepository } from "../repositories/savedExerciseRepository.js";
 import { createUserRepository } from "../repositories/userRepository.js";
+import { createGeneratedPlanRepository } from "../repositories/generatedPlanRepository.js";
 import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "../repositories/mealLogRepository.js";
 
@@ -16,6 +17,7 @@ const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
   createUserRepository({ prisma });
+const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -111,6 +113,47 @@ describe("prismaDataModels user shim", () => {
     const after = await User.findOne({ userId: doc.userId });
     expect(after.dashboard.calories).toHaveLength(1);
     expect(after.dashboard.calories[0].calories).toBe(2000);
+  });
+
+  test("saving a generated plan stores it and returns it newest first", async () => {
+    const doc = baseUserDoc();
+    await User.create(doc);
+
+    await saveGeneratedPlan({ userId: doc.userId, entry: { id: "p-1", goal: "First", plan: "a" } });
+    await saveGeneratedPlan({
+      userId: doc.userId,
+      entry: { id: "p-2", goal: "Second", plan: "b" }
+    });
+
+    const after = await User.findOne({ userId: doc.userId });
+    expect(after.dashboard.plans).toHaveLength(2);
+    expect(after.dashboard.plans[0].goal).toBe("Second");
+  });
+
+  // The route asks for $position: 0 and $slice: 200, but neither operator does
+  // anything: rows are always inserted, ordering comes from `createdAt desc`,
+  // and the 200 limit is applied when reading. Pinned because it means there is
+  // no storage-side cap to preserve -- the table grows without bound by design.
+  test("the 200 plan limit is applied on read, not on write", async () => {
+    const doc = baseUserDoc();
+    await User.create(doc);
+    const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
+
+    await prisma.generatedPlan.createMany({
+      data: Array.from({ length: 205 }, (_, index) => ({
+        userId: userPk,
+        legacyId: `p-${index}`,
+        goal: `G${index}`,
+        planText: `plan ${index}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index))
+      }))
+    });
+
+    expect(await prisma.generatedPlan.count()).toBe(205);
+
+    const after = await User.findOne({ userId: doc.userId });
+    expect(after.dashboard.plans).toHaveLength(200);
+    expect(after.dashboard.plans[0].goal).toBe("G204");
   });
 
   test("user writes report a miss for an unknown user", async () => {
