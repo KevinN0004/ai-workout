@@ -5,9 +5,8 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     validateBody,
     mealLogBodySchema,
     buildMealLogEntry,
-    MealLog,
+    saveMealLog,
     User,
-    toFiniteNumber,
     mapDbDocToUser,
     buildDashboardResponse,
     progressMetricBodySchema,
@@ -35,132 +34,21 @@ export const registerMealAndMetricRoutes = (app, deps) => {
           .json({ error: "Add calories or at least one macro value for the meal." });
       }
 
-      await MealLog.findOneAndUpdate(
-        { userId: req.user.id, id: mealLog.id },
-        {
-          $set: {
-            userId: req.user.id,
-            ...mealLog
-          }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+      await saveMealLog({ userId: req.user.id, mealLog });
 
-      const mealLogDate = mealLog.date;
-      const mealLogCaloriesId = `meal-logs-${mealLogDate}`;
-      const mealLogCaloriesUpdatedAt = new Date().toISOString();
-      const aggregate = await MealLog.aggregate([
-        { $match: { userId: req.user.id, date: mealLogDate } },
-        {
-          $group: {
-            _id: null,
-            calories: { $sum: { $ifNull: ["$calories", 0] } }
-          }
-        }
-      ]);
-      const dayCalories = Math.round(toFiniteNumber(aggregate?.[0]?.calories) ?? 0);
-
-      const updatedDoc = await User.findOneAndUpdate(
-        { userId: req.user.id },
-        [
-          {
-            $set: {
-              "dashboard.calories": {
-                $let: {
-                  vars: {
-                    currentCalories: { $ifNull: ["$dashboard.calories", []] }
-                  },
-                  in: {
-                    $let: {
-                      vars: {
-                        hasManualCaloriesForDay: {
-                          $gt: [
-                            {
-                              $size: {
-                                $filter: {
-                                  input: "$$currentCalories",
-                                  as: "entry",
-                                  cond: {
-                                    $and: [
-                                      {
-                                        $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
-                                      },
-                                      {
-                                        $ne: [
-                                          { $ifNull: ["$$entry.source", "manual"] },
-                                          "meal_logs"
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                }
-                              }
-                            },
-                            0
-                          ]
-                        },
-                        caloriesWithoutMealLogSource: {
-                          $filter: {
-                            input: "$$currentCalories",
-                            as: "entry",
-                            cond: {
-                              $not: [
-                                {
-                                  $and: [
-                                    {
-                                      $eq: [{ $ifNull: ["$$entry.date", ""] }, mealLogDate]
-                                    },
-                                    {
-                                      $eq: [{ $ifNull: ["$$entry.source", ""] }, "meal_logs"]
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      in: {
-                        $cond: [
-                          "$$hasManualCaloriesForDay",
-                          { $slice: ["$$currentCalories", 1000] },
-                          {
-                            $slice: [
-                              {
-                                $cond: [
-                                  { $gt: [dayCalories, 0] },
-                                  {
-                                    $concatArrays: [
-                                      [
-                                        {
-                                          id: mealLogCaloriesId,
-                                          date: mealLogDate,
-                                          calories: dayCalories,
-                                          source: "meal_logs",
-                                          updatedAt: mealLogCaloriesUpdatedAt
-                                        }
-                                      ],
-                                      "$$caloriesWithoutMealLogSource"
-                                    ]
-                                  },
-                                  "$$caloriesWithoutMealLogSource"
-                                ]
-                              },
-                              1000
-                            ]
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ],
-        { new: true }
-      );
-
+      // A ~110-line Mongo aggregation-pipeline update used to sit here. It
+      // computed the day’s calorie total and wrote it into dashboard.calories
+      // as a `meal_logs`-sourced entry unless a manual entry already existed.
+      //
+      // None of it ran. The shim only matches object updates carrying
+      // $set/$push/$pull, so an array pipeline fell through to a plain re-read.
+      // Verified against a live server: logging a 700-calorie meal leaves
+      // dashboard.calories empty and calorie_entries with no rows.
+      //
+      // Removed rather than repaired: making it work is a behaviour change and
+      // belongs to its own decision, not to this refactor. The working half is
+      // preserved as sumCaloriesForDate in repositories/mealLogRepository.js.
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

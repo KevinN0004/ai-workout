@@ -1,6 +1,6 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1 and 2 are done; the rest is not started.
+> **STATUS: IN PROGRESS.** Tasks 1-3 are done; the rest is not started.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -143,11 +143,18 @@ first where behaviour is being pinned rather than merely moved.
       remaining effort is smaller than the counts suggest — and every pipeline
       should be checked against the shim's actual branches before being
       treated as behaviour to preserve.
-- [ ] **Task 3 — `MealLog`, including the aggregate.** Convert the pipeline to
-      `prisma.mealLog.aggregate({ where, _sum: { calories: true } })`. Pin the
-      null-handling first: `$ifNull(calories, 0)` and `_sum` over NULLs are not
-      the same thing when every row is NULL — one gives `0`, the other `null`.
-      Write that test before touching the code.
+- [x] **Task 3 — `MealLog`, including the aggregate.** Done.
+
+      The null-handling trap this plan warned about was **already handled**:
+      the shim's `aggregate` coalesced with `result._sum.calories || 0`. The
+      repository keeps that, and it now has a test for the all-NULL case
+      rather than relying on it being noticed again.
+
+      The real finding was larger and is written up under *Defect found
+      during Task 3* above: the ~110-line pipeline consuming that total never
+      ran, so meal logs contribute nothing to the calories view. The dead
+      pipeline was removed; `sumCaloriesForDate` — the half that works — was
+      kept in the repository for whoever fixes the feature.
 - [ ] **Task 3b — the shared read chain, all three models at once.** Replace
       `loadCollectionPage`'s `find().sort().skip().limit().lean()` and
       `countDocuments` with Prisma `findMany` / `count`. This is one task rather
@@ -165,6 +172,41 @@ first where behaviour is being pinned rather than merely moved.
       `$`-operator remains outside `node_modules`.
 
 ---
+
+## Defect found during Task 3: meal logs never reach the calories view
+
+**Not fixed. Needs a product decision, and it is not a refactor's business.**
+
+The meal-log route computed a day's calorie total and built a large pipeline
+to write it into `dashboard.calories` as a `meal_logs`-sourced entry, unless a
+manual entry already existed for that day. That pipeline never executed — the
+shim only matches object updates carrying `$set`/`$push`/`$pull`, and an array
+pipeline falls through to a plain re-read.
+
+Confirmed by probing a running server, not by reading:
+
+```text
+POST /api/dashboard/meal-logs  { date, name, calories: 700 }  -> 200
+dashboard.calories                                            []
+calorie_entries rows                                          []
+```
+
+So logging meals contributes nothing to the calories view, and has not for as
+long as the shim has been in place. The meal itself saves correctly; only the
+derived calorie entry is missing.
+
+Task 3 removed the dead pipeline and **preserved the working half** as
+`sumCaloriesForDate` in `repositories/mealLogRepository.js`, tested including
+the all-NULL case. Wiring it up is a small change whenever the behaviour is
+wanted. The decision to make is what *should* happen:
+
+- should a meal log create or update a `meal_logs`-sourced calorie entry?
+- should a manual entry for that day suppress it, as the dead code intended?
+- should removing a meal log recompute or remove that entry? The dead code
+  never handled deletion at all, so this was unspecified even in intent.
+
+Current behaviour is pinned by a test named *"does not currently create a
+calorie entry from a meal log"*, so changing it is deliberate and visible.
 
 ## Risks
 
