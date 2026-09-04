@@ -1,6 +1,7 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1-3 are done; the rest is not started.
+> **STATUS: IN PROGRESS.** Tasks 1, 2, 3 and 3b are done. The shim is down to
+> `User` alone; Tasks 4-6 remain.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -155,11 +156,20 @@ first where behaviour is being pinned rather than merely moved.
       ran, so meal logs contribute nothing to the calories view. The dead
       pipeline was removed; `sumCaloriesForDate` — the half that works — was
       kept in the repository for whoever fixes the feature.
-- [ ] **Task 3b — the shared read chain, all three models at once.** Replace
-      `loadCollectionPage`'s `find().sort().skip().limit().lean()` and
-      `countDocuments` with Prisma `findMany` / `count`. This is one task rather
-      than three because the function is generic over the model. Only after this
-      can `find` and `countDocuments` leave the shim.
+- [x] **Task 3b — the shared read chain, all three models at once.** Done.
+      Moved to `repositories/dashboardCollectionRepository.js`, keyed by
+      collection name rather than by a passed-in model object.
+
+      The secondary sort is now honoured. Callers always asked for
+      `{ [sortField]: -1, _id: -1 }`; the shim's `sort()` read one entry and
+      discarded the rest. To be precise about severity: probing a live database
+      showed paging still returning all six distinct rows across three pages,
+      so this was **not a demonstrated defect** — stability among tied
+      timestamps was unspecified rather than broken. It is now guaranteed.
+
+      With the reads moved, `WorkoutSession`, `MealLog` and `ProgressMetric`
+      have no consumers left and are gone from the shim, along with
+      `createFindChain`. **The shim now exposes `User` alone.**
 - [ ] **Task 4 — `User`, excluding the capped list.** `$set` becomes `update({
       data })`. `findOne` becomes `findFirst`. Keep the `userIdWhere` UUID-or-
       legacy resolution — it is load-bearing, and commit `19cc8ac` exists because
