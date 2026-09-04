@@ -1,4 +1,5 @@
 import { savedExerciseParamsSchema, validateParams } from "../validation.js";
+import { sendErrorResponse } from "../../../services/errorResponseService.js";
 
 export const registerSavedExerciseRoutes = (app, deps) => {
   const {
@@ -7,7 +8,7 @@ export const registerSavedExerciseRoutes = (app, deps) => {
     savedExerciseBodySchema,
     buildSavedExerciseEntry,
     User,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     buildDashboardResponse,
     cleanText
   } = deps;
@@ -68,14 +69,14 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({
         ...response,
         savedExercise: updated.dashboard?.savedExercises?.[0] || entry
       });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -95,11 +96,11 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({ ...response, ok: true });
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };

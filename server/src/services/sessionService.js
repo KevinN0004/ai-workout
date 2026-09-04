@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { createClient } from "redis";
+import { sendErrorResponse } from "./errorResponseService.js";
 
 export const parseCookies = (cookieHeader = "") =>
   cookieHeader.split(";").reduce((acc, pair) => {
@@ -40,6 +41,20 @@ const appendSetCookieHeader = (res, cookieValue) => {
   res.setHeader("Set-Cookie", [...list, cookieValue]);
 };
 
+/**
+ * Rejects with `message` if `promise` has not settled within `timeoutMs`.
+ * The timer is always cleared so a resolved promise cannot hold the event loop open.
+ */
+export const withTimeout = (promise, timeoutMs, message) => {
+  let timer = null;
+  const timeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+};
+
 const tokensMatch = (a, b) => {
   const left = Buffer.from(String(a || ""), "utf8");
   const right = Buffer.from(String(b || ""), "utf8");
@@ -58,13 +73,43 @@ export const createSessionService = ({
   csrfCookieName,
   csrfHeaderName,
   csrfUnsafeMethods,
-  redisSessionKeyPrefix
+  redisSessionKeyPrefix,
+  redisConnectTimeoutMs = 10000
 }) => {
   const inMemorySessions = new Map();
   let redisClient = null;
   let redisSessionsEnabled = false;
   let redisConfigured = false;
   let redisLastError = "";
+  // node-redis retries a failed connection forever by default, which leaves the
+  // initial connect() pending and stops the process from ever reaching listen().
+  // Retries stay bounded until startup settles, then revert to open-ended backoff
+  // so a Redis blip during normal operation still recovers on its own.
+  let redisStartupSettled = false;
+  const maxStartupReconnectAttempts = 5;
+
+  const redisReconnectStrategy = (retries) => {
+    if (redisStartupSettled) return Math.min(500 * 2 ** Math.min(retries, 6), 30000);
+    if (retries >= maxStartupReconnectAttempts) {
+      return new Error("Redis startup connection retries exhausted.");
+    }
+    return Math.min(100 * 2 ** retries, 1000);
+  };
+
+  const closeRedisClientQuietly = async (client) => {
+    if (!client) return;
+    try {
+      await client.disconnect();
+    } catch {
+      // The client may never have connected; nothing to clean up.
+    }
+  };
+
+  const getSessionStoreStatus = () => ({
+    configured: redisConfigured,
+    connected: redisSessionsEnabled,
+    lastError: redisLastError
+  });
 
   const sessionRedisKey = (token) => `${redisSessionKeyPrefix}${token}`;
 
@@ -95,21 +140,29 @@ export const createSessionService = ({
         "Redis config not set. Using in-memory sessions."
       );
       redisSessionsEnabled = false;
-      return;
+      redisStartupSettled = true;
+      return getSessionStoreStatus();
     }
 
+    redisStartupSettled = false;
+    let client = null;
     try {
-      const client = hasSocketConfig
+      const socketOptions = {
+        connectTimeout: redisConnectTimeoutMs,
+        reconnectStrategy: redisReconnectStrategy
+      };
+      client = hasSocketConfig
         ? createClient({
             username: redisUsername,
             password: redisPassword || undefined,
             socket: {
+              ...socketOptions,
               host: redisHost,
               port: redisPort,
               tls: redisTls
             }
           })
-        : createClient({ url: redisUrl });
+        : createClient({ url: redisUrl, socket: socketOptions });
 
       client.on("error", (err) => {
         redisLastError = cleanText(err?.message || String(err), 260);
@@ -119,12 +172,20 @@ export const createSessionService = ({
         );
       });
 
-      await client.connect();
+      // Hard backstop: the bounded strategy above should surface a failure first,
+      // but a socket that stalls without erroring must not block startup either.
+      await withTimeout(
+        client.connect(),
+        redisConnectTimeoutMs,
+        `Redis connection timed out after ${redisConnectTimeoutMs}ms.`
+      );
+      redisStartupSettled = true;
       redisClient = client;
       redisSessionsEnabled = true;
       redisLastError = "";
       logger.info({ event: "redis_connected" }, "Redis session store connected.");
     } catch (err) {
+      redisStartupSettled = true;
       redisLastError = cleanText(err?.message || String(err), 260);
       logger.error(
         {
@@ -133,9 +194,12 @@ export const createSessionService = ({
         },
         "Failed to connect Redis session store. Falling back to in-memory sessions."
       );
+      // Stop the client retrying in the background, or it keeps logging forever.
+      await closeRedisClientQuietly(client);
       redisClient = null;
       redisSessionsEnabled = false;
     }
+    return getSessionStoreStatus();
   };
 
   const setSessionCookie = (res, token, persistent = true) => {
@@ -259,8 +323,29 @@ export const createSessionService = ({
       req.user = user;
       next();
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
+  };
+
+  /**
+   * Resolves the session user when one is present but never rejects the request.
+   * Lets a route stay open to anonymous callers while still letting rate limiters
+   * and handlers tell the two apart.
+   */
+  const attachOptionalUser = async (req, res, next) => {
+    try {
+      req.user = (await getSessionUser(req)) || null;
+    } catch (err) {
+      req.user = null;
+      req.log?.warn(
+        {
+          event: "optional_auth_lookup_failed",
+          error: toShortText(err?.message || String(err), 240)
+        },
+        "Optional session lookup failed. Continuing as anonymous."
+      );
+    }
+    next();
   };
 
   const ensureCsrfTokenCookie = (req, res, next) => {
@@ -311,8 +396,10 @@ export const createSessionService = ({
     deleteSession,
     getSessionUser,
     requireAuth,
+    attachOptionalUser,
     ensureCsrfTokenCookie,
     requireCsrfToken,
+    getSessionStoreStatus,
     isRedisConfigured: () => redisConfigured,
     isRedisSessionsEnabled: () => redisSessionsEnabled,
     getRedisClient: () => redisClient,

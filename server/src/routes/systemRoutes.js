@@ -1,16 +1,11 @@
 export const registerSystemRoutes = (app, deps) => {
   const {
-    User,
     metrics,
     serverBootAtMs,
     redisConfigured,
     redisSessionsEnabled,
     redisClient,
-    redisLastErrorRef,
-    mongoLastErrorRef,
     postgresStatusRef,
-    postgresLastErrorRef,
-    mongoReadyStateToText,
     errorTrackingConfigured,
     errorTrackingEnabled
   } = deps;
@@ -31,34 +26,29 @@ export const registerSystemRoutes = (app, deps) => {
   });
 
   app.get("/api/ready", (req, res) => {
-    const mongoStateCode = Number(User?.db?.readyState ?? 0);
-    const mongoConnected = mongoStateCode === 1;
-    const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isOpen);
+    // isOpen stays true while the client is merely reconnecting; isReady is only
+    // true when the connection can actually serve commands.
+    const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isReady);
     const postgresStatus =
       postgresStatusRef?.() || { configured: false, connected: false, lastError: "" };
-    const postgresReady = !postgresStatus.configured || postgresStatus.connected;
-    const ready = mongoConnected && postgresReady && (!redisConfigured() || redisConnected);
+    const postgresReady = Boolean(postgresStatus.configured && postgresStatus.connected);
+    const ready = postgresReady && (!redisConfigured() || redisConnected);
+    // This endpoint is unauthenticated so load balancers and uptime probes can
+    // reach it. It therefore reports liveness booleans only: connection strings
+    // and driver error text name internal hosts, so they stay in the logs.
     const payload = {
       status: ready ? "ready" : "not_ready",
       requestId: req.requestId || "",
       dependencies: {
-        mongodb: {
-          connected: mongoConnected,
-          stateCode: mongoStateCode,
-          state: mongoReadyStateToText(mongoStateCode),
-          lastError: mongoLastErrorRef?.() || ""
-        },
         postgres: {
           configured: Boolean(postgresStatus.configured),
           connected: Boolean(postgresStatus.connected),
-          databaseUrl: postgresStatus.databaseUrl || "",
-          lastError: postgresStatus.lastError || postgresLastErrorRef?.() || ""
+          healthy: postgresReady
         },
         redis: {
           configured: redisConfigured(),
           connected: redisConnected,
-          mode: redisConnected ? "redis" : "in_memory_fallback",
-          lastError: redisLastErrorRef() || ""
+          mode: redisConnected ? "redis" : "in_memory_fallback"
         },
         errorTracking: {
           configured: errorTrackingConfigured(),
@@ -92,7 +82,6 @@ export const registerSystemRoutes = (app, deps) => {
       requestId: req.requestId || "",
       uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000),
       requestsTotal: metrics.requestsTotal,
-      authFailures: metrics.authFailures,
       rateLimited: metrics.rateLimited,
       requestLatencyMs: {
         ...summarizeLatencyBucket(metrics.requestLatencyMs),

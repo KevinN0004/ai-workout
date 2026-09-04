@@ -1,4 +1,5 @@
 import { airQualityQuerySchema, validateQuery } from "./validation.js";
+import { sendErrorResponse } from "../../services/errorResponseService.js";
 
 export const registerAirQualityRoutes = (app, deps) => {
   const {
@@ -105,7 +106,7 @@ export const registerAirQualityRoutes = (app, deps) => {
         return res.json({
           fallback: true,
           service: "openaq",
-          error: err?.message || "Air quality service unavailable.",
+          error: "Air quality service unavailable.",
           location: {
             id: null,
             name: "",
@@ -124,7 +125,7 @@ export const registerAirQualityRoutes = (app, deps) => {
           pollutants: []
         });
       }
-      return res.status(status).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, status);
     }
   });
 };

@@ -1,15 +1,7 @@
-import mongoose from "mongoose";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import request from "supertest";
-import { connectDatabase } from "./db.js";
 import { app } from "./index.js";
-import MealLog from "./models/MealLog.js";
-import ProgressMetric from "./models/ProgressMetric.js";
-import User from "./models/User.js";
-import WorkoutSession from "./models/WorkoutSession.js";
-
-let mongoServer;
+import { prisma } from "./prisma.js";
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
@@ -24,18 +16,11 @@ const toRequestUrl = (input) => {
 
 describe("api integration", () => {
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    process.env.MONGODB_URI = mongoServer.getUri();
-    await connectDatabase();
+    await prisma.$connect();
   });
 
   beforeEach(async () => {
-    await Promise.all([
-      User.deleteMany({}),
-      WorkoutSession.deleteMany({}),
-      MealLog.deleteMany({}),
-      ProgressMetric.deleteMany({})
-    ]);
+    await prisma.appUser.deleteMany({});
   });
 
   afterEach(() => {
@@ -44,11 +29,10 @@ describe("api integration", () => {
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    if (mongoServer) await mongoServer.stop();
+    await prisma.$disconnect();
   });
 
-  test("signup -> auth/me -> dashboard mutation works with real mongodb", async () => {
+  test("signup -> auth/me -> dashboard mutation works with real postgres", async () => {
     const agent = request.agent(app);
     const csrfToken = await getCsrf(agent);
 

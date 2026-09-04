@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { sendErrorResponse } from "../services/errorResponseService.js";
 
 const HOME_ACCESS_CAPABILITY_MAP = {
   "bodyweight only": ["bodyweight training", "mobility work", "floor/core work"],
@@ -138,11 +139,13 @@ export const registerGenerateRoutes = (app, deps) => {
     cleanText,
     toCleanArray,
     toNullableNumber,
-    getSessionUser,
     User,
-    mapMongoDocToUser
+    mapDbDocToUser
   } = deps;
 
+  // Open to anonymous callers by design; the anonymous quota is enforced by the
+  // rate limiters mounted on this path in index.js. `req.user` is populated by
+  // attachOptionalUser, so a signed-in caller still gets their plan persisted.
   app.post("/api/generate", async (req, res) => {
     try {
       if (!process.env.GEMINI_API_KEY) {
@@ -179,7 +182,7 @@ export const registerGenerateRoutes = (app, deps) => {
         return res.status(502).json({ error: "No plan generated." });
       }
 
-      const sessionUser = await getSessionUser(req);
+      const sessionUser = req.user;
       let savedPlan = null;
 
       if (sessionUser) {
@@ -210,13 +213,13 @@ export const registerGenerateRoutes = (app, deps) => {
           },
           { new: true }
         );
-        const updated = mapMongoDocToUser(updatedDoc);
+        const updated = mapDbDocToUser(updatedDoc);
         savedPlan = updated?.dashboard?.plans?.[0] || planEntry;
       }
 
       res.json({ plan, savedPlan });
     } catch (err) {
-      res.status(500).json({ error: err?.message || "Server error." });
+      sendErrorResponse(req, res, err, 500);
     }
   });
 };

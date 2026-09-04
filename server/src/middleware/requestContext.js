@@ -1,10 +1,16 @@
 import crypto from "crypto";
 
+const UNMATCHED_ROUTE_LABEL = "<unmatched>";
+
+// Only paths Express actually matched become metric keys. Express collapses
+// params (`/api/wger/exercises/:id`), so that set is bounded by the declared
+// routes. Anything answered before routing -- 404s, CSRF and rate-limit
+// rejections -- carries a caller-supplied path, and keying on it would let an
+// unauthenticated client grow routeLatencyMs without bound.
 const sanitizeRoutePath = (req) => {
   const routePath = req?.route?.path;
   if (typeof routePath === "string" && routePath) return routePath;
-  const rawPath = req?.path || req?.originalUrl || req?.url || "";
-  return String(rawPath).split("?")[0] || "/";
+  return UNMATCHED_ROUTE_LABEL;
 };
 
 const recordLatency = (bucket, durationMs) => {

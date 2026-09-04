@@ -90,4 +90,61 @@ describe("requestContext middleware", () => {
     expect(res.headers["X-Request-Id"]).toBe(req.requestId);
     expect(next).toHaveBeenCalledTimes(1);
   });
+
+  test("collapses unrouted requests into one bucket so metrics stay bounded", () => {
+    const metrics = {
+      requestsTotal: 0,
+      requestLatencyMs: {},
+      routeLatencyMs: {}
+    };
+    const logger = {
+      child: vi.fn(() => ({ info: vi.fn() }))
+    };
+    const middleware = createRequestContextMiddleware({
+      metrics,
+      logger,
+      toShortText: () => ""
+    });
+
+    // 404s and middleware rejections (CSRF, rate limit) arrive with no req.route
+    // and a caller-supplied path. Each must not mint its own metric key.
+    for (const path of ["/api/random-a", "/api/random-b", "/api/random-c"]) {
+      const req = { headers: {}, method: "GET", path, originalUrl: path };
+      const res = createResponseHarness();
+      middleware(req, res, vi.fn());
+      res.finish();
+    }
+
+    expect(Object.keys(metrics.routeLatencyMs)).toEqual(["GET <unmatched>"]);
+    expect(metrics.routeLatencyMs["GET <unmatched>"].count).toBe(3);
+  });
+
+  test("still records a key per matched route", () => {
+    const metrics = {
+      requestsTotal: 0,
+      requestLatencyMs: {},
+      routeLatencyMs: {}
+    };
+    const logger = {
+      child: vi.fn(() => ({ info: vi.fn() }))
+    };
+    const middleware = createRequestContextMiddleware({
+      metrics,
+      logger,
+      toShortText: () => ""
+    });
+
+    const req = {
+      headers: {},
+      method: "GET",
+      path: "/api/wger/exercises/999",
+      originalUrl: "/api/wger/exercises/999",
+      route: { path: "/api/wger/exercises/:id" }
+    };
+    const res = createResponseHarness();
+    middleware(req, res, vi.fn());
+    res.finish();
+
+    expect(metrics.routeLatencyMs["GET /api/wger/exercises/:id"].count).toBe(1);
+  });
 });

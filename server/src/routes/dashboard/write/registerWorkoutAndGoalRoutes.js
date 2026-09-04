@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { sendErrorResponse } from "../../../services/errorResponseService.js";
 
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {
@@ -9,7 +10,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     WorkoutSession,
     User,
     toWorkoutSummaryEntry,
-    mapMongoDocToUser,
+    mapDbDocToUser,
     buildDashboardResponse,
     caloriesBodySchema,
     toNullableNumber,
@@ -78,14 +79,14 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         );
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
-        const updated = mapMongoDocToUser(updatedDoc);
+        const updated = mapDbDocToUser(updatedDoc);
         const response = await buildDashboardResponse(updated);
         return res.json({
           ...response,
           workoutSession: session
         });
       } catch (err) {
-        return res.status(500).json({ error: err?.message || "Server error." });
+        return sendErrorResponse(req, res, err, 500);
       }
     }
   );
@@ -122,11 +123,11 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         { new: true }
       );
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 
@@ -162,11 +163,11 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       }
 
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
-      const updated = mapMongoDocToUser(updatedDoc);
+      const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json(response);
     } catch (err) {
-      return res.status(500).json({ error: err?.message || "Server error." });
+      return sendErrorResponse(req, res, err, 500);
     }
   });
 };
