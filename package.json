@@ -1,7 +1,10 @@
 {
   "name": "ai-workout",
   "private": true,
-  "workspaces": ["client", "server"],
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
     "dev:client": "npm run dev -w client",
@@ -9,9 +12,19 @@
     "build": "npm run build -w client",
     "start": "npm run start -w server",
     "test": "npm run test -w client && npm run test -w server",
-    "test:all": "npm run test"
+    "test:all": "npm run test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^8.2.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

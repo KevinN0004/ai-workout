@@ -4,7 +4,6 @@ import { prisma } from "./prisma.js";
 
 const {
   buildDashboard,
-  defaultDashboard,
   buildMealLogEntry,
   buildProfile,
   buildWorkoutSessionEntry,

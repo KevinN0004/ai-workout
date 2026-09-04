@@ -19,7 +19,7 @@ export const createDashboardCollectionService = ({
 
   const stripUserIdField = (doc = {}) => {
     if (!doc || typeof doc !== "object") return doc;
-    const { userId, ...rest } = doc;
+    const { userId: _omitUserId, ...rest } = doc;
     return rest;
   };
 

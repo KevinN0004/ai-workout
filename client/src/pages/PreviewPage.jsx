@@ -66,7 +66,6 @@ export default function PreviewPage({
   } = usePreviewDerivedData({
     personal,
     form,
-    heightUnit,
     weightUnit,
     toFeetInchesFromCm,
     toLb,

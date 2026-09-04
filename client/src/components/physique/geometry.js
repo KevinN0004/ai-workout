@@ -885,7 +885,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
       "minor"
     );
 
-    const { outlinePoints, outlinePath, outlineMarkers } = buildSymmetricOutline({
+    const { outlinePath, outlineMarkers } = buildSymmetricOutline({
       anchors,
       rightHeadArc,
       fingerConfigs: FINGER_CONFIGS,
