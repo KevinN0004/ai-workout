@@ -1,7 +1,7 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1, 2, 3 and 3b are done. The shim is down to
-> `User` alone; Tasks 4-6 remain.
+> **STATUS: IN PROGRESS.** Tasks 1, 2, 3, 3b and 4a are done. The shim is down
+> to `User` alone, 240 lines from 544; Tasks 4b, 5 and 6 remain.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -170,10 +170,24 @@ first where behaviour is being pinned rather than merely moved.
       With the reads moved, `WorkoutSession`, `MealLog` and `ProgressMetric`
       have no consumers left and are gone from the shim, along with
       `createFindChain`. **The shim now exposes `User` alone.**
-- [ ] **Task 4 — `User`, excluding the capped list.** `$set` becomes `update({
-      data })`. `findOne` becomes `findFirst`. Keep the `userIdWhere` UUID-or-
-      legacy resolution — it is load-bearing, and commit `19cc8ac` exists because
-      it was got wrong once.
+
+**Task 4 is too large for one change and is split.** As written it covers six
+write call sites across four files — profile `$set`, goals `$set`, calories
+`$push`, both saved-exercise routes, and the password-upgrade `updateOne`.
+
+- [x] **Task 4a — saved exercises.** Done. Both call sites live in one route
+      file and share `repositories/savedExerciseRepository.js`.
+
+      Unlike Tasks 2 and 3, **nothing here was dead.** The shim's
+      `extractFirstConcatEntry` matched this pipeline's exact shape, so the
+      two-way deduplication — by external exercise id *or* case-insensitive
+      name — is live behaviour that had to be preserved, not intent that was
+      never running.
+
+- [ ] **Task 4b — profile, goals, calories and the password upgrade.** The
+      remaining `User` writes. `$set` becomes `update({ data })`. Keep the
+      `userIdWhere` UUID-or-legacy resolution — it is load-bearing, and commit
+      `19cc8ac` exists because it was got wrong once.
 - [ ] **Task 5 — the capped plan list.** Decide and document the concurrency
       semantics, then implement. This is the only task with a genuine design
       question in it.
