@@ -1,7 +1,9 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: NOT STARTED.** This is a plan, not a record. Nothing here has been
-> implemented.
+> **STATUS: IN PROGRESS.** Task 1 is done and merged; the rest is not started.
+> Two of this plan's assumptions were wrong and are corrected inline under
+> Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
+> model at a time.
 
 **Goal:** Replace `server/src/services/prismaDataModels.js` — a MongoDB-shaped
 API implemented on top of Prisma — with direct Prisma calls, and delete the shim.
@@ -110,17 +112,35 @@ step that cannot keep it green is a step that needs splitting.
 Each task is one model, and each follows the same shape. Write the failing test
 first where behaviour is being pinned rather than merely moved.
 
-- [ ] **Task 1 — `ProgressMetric`.** Replace `findOneAndUpdate` with a Prisma
-      `upsert` keyed on the partial unique index
-      (`progress_metrics_user_legacy_idx`), and the `find().sort().limit()` chain
-      with `findMany({ where, orderBy, take, skip })`. Delete `ProgressMetric`
-      from the shim.
-- [ ] **Task 2 — `WorkoutSession`.** Same shape as Task 1.
+- [x] **Task 1 — `ProgressMetric` writes.** Done. Replaced `findOneAndUpdate`
+      with `repositories/progressMetricRepository.js`, and lifted the shim's
+      private `rowValues` / `userLookup` helpers so the shim depends on the
+      repositories rather than the reverse.
+
+      Two corrections to this plan came out of doing it:
+
+      **`upsert` is not usable.** The constraint that would make it safe is
+      `progress_metrics_user_legacy_idx`, a *partial* unique index. Prisma
+      cannot express partial indexes, so `upsert` has no constraint to target.
+      The repository keeps an explicit read-then-write.
+
+      **Reads cannot be migrated per model.** `dashboardCollectionService`
+      drives all three collection models through one generic
+      `find().sort().skip().limit()` chain. The per-model ordering below only
+      holds for writes; the read side needs a single task covering all three at
+      once. See Task 3b.
+
+- [ ] **Task 2 — `WorkoutSession` writes.** Same shape as Task 1.
 - [ ] **Task 3 — `MealLog`, including the aggregate.** Convert the pipeline to
       `prisma.mealLog.aggregate({ where, _sum: { calories: true } })`. Pin the
       null-handling first: `$ifNull(calories, 0)` and `_sum` over NULLs are not
       the same thing when every row is NULL — one gives `0`, the other `null`.
       Write that test before touching the code.
+- [ ] **Task 3b — the shared read chain, all three models at once.** Replace
+      `loadCollectionPage`'s `find().sort().skip().limit().lean()` and
+      `countDocuments` with Prisma `findMany` / `count`. This is one task rather
+      than three because the function is generic over the model. Only after this
+      can `find` and `countDocuments` leave the shim.
 - [ ] **Task 4 — `User`, excluding the capped list.** `$set` becomes `update({
       data })`. `findOne` becomes `findFirst`. Keep the `userIdWhere` UUID-or-
       legacy resolution — it is load-bearing, and commit `19cc8ac` exists because
