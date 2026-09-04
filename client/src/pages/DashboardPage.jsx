@@ -6,6 +6,7 @@ import DashboardBottomNav from "./dashboard/DashboardBottomNav";
 import DashboardAtAGlance from "./dashboard/DashboardAtAGlance";
 import DashboardWorkoutModal from "./dashboard/DashboardWorkoutModal";
 import useDashboardMetrics from "./dashboard/useDashboardMetrics";
+import { getLocalDateKey } from "../app/units";
 import "./DashboardPage.css";
 
 const WorkoutsView = lazy(() => import("./dashboard/WorkoutsView"));
@@ -15,14 +16,6 @@ const MealView = lazy(() => import("./dashboard/MealView"));
 const TipsView = lazy(() => import("./dashboard/TipsView"));
 const SettingsView = lazy(() => import("./dashboard/SettingsView"));
 const DashboardHomeView = lazy(() => import("./dashboard/DashboardHomeView"));
-
-const getLocalDateKey = () => {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const DASH_VIEW_TO_ROUTE = {
   summary: "/dashboard",
