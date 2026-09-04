@@ -1,40 +1,11 @@
-const toIso = (value) => {
-  if (!value) return "";
-  if (value instanceof Date) return value.toISOString();
-  return String(value);
-};
-
-const toDateOnly = (value) => {
-  if (!value) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return String(value).slice(0, 10);
-};
-
-const dateOnlyToDate = (value) => {
-  const raw = typeof value === "string" ? value.trim().slice(0, 10) : "";
-  return raw ? new Date(`${raw}T00:00:00.000Z`) : null;
-};
-
-const toNumberOrNull = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "../repositories/rowValues.js";
+import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
+import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 const lower = (value) => String(value || "").trim().toLowerCase();
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const userIdWhere = (userId) => {
-  const value = String(userId || "");
-  return uuidPattern.test(value)
-    ? { OR: [{ legacyUserId: value }, { id: value }] }
-    : { legacyUserId: value };
-};
-
 const withToObject = (doc) =>
   doc && typeof doc === "object" && typeof doc.toObject !== "function"
     ? { ...doc, toObject: () => ({ ...doc }) }
@@ -62,17 +33,6 @@ const mapMealLog = (row = {}) => ({
   proteinG: toNumberOrNull(row.proteinG),
   carbsG: toNumberOrNull(row.carbsG),
   fatG: toNumberOrNull(row.fatG),
-  notes: row.notes || "",
-  loggedAt: toIso(row.loggedAt)
-});
-
-const mapProgressMetric = (row = {}) => ({
-  id: row.legacyId || row.id,
-  date: toDateOnly(row.metricDate),
-  weightLb: toNumberOrNull(row.weightLb),
-  bodyFatPct: toNumberOrNull(row.bodyFatPct),
-  waistCm: toNumberOrNull(row.waistCm),
-  restingHr: row.restingHr ?? null,
   notes: row.notes || "",
   loggedAt: toIso(row.loggedAt)
 });
@@ -192,14 +152,6 @@ const loadUserRelated = async (prisma, userId) => {
     generatedPlans,
     savedExercises
   });
-};
-
-const getUserPk = async (prisma, userId) => {
-  const row = await prisma.appUser.findFirst({
-    where: userIdWhere(userId),
-    select: { id: true }
-  });
-  return row?.id || "";
 };
 
 const applyUserSet = async (prisma, userId, set = {}) => {
@@ -496,30 +448,10 @@ export const createPrismaDataModels = ({ prisma }) => {
     }
   };
 
+  // Writes now go through repositories/progressMetricRepository.js. Only the
+  // read side remains here, because dashboardCollectionService drives all three
+  // collection models through one generic find().sort().limit() chain.
   const ProgressMetric = {
-    async findOneAndUpdate(query = {}, update = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      if (!userPk) return null;
-      const metric = update.$set || {};
-      const existing = await prisma.progressMetric.findFirst({
-        where: { userId: userPk, legacyId: query.id || metric.id }
-      });
-      const data = {
-        userId: userPk,
-        legacyId: metric.id || query.id || null,
-        metricDate: dateOnlyToDate(metric.date),
-        weightLb: metric.weightLb ?? null,
-        bodyFatPct: metric.bodyFatPct ?? null,
-        waistCm: metric.waistCm ?? null,
-        restingHr: metric.restingHr ?? null,
-        notes: metric.notes || "",
-        loggedAt: metric.loggedAt ? new Date(metric.loggedAt) : new Date()
-      };
-      const row = existing
-        ? await prisma.progressMetric.update({ where: { id: existing.id }, data })
-        : await prisma.progressMetric.create({ data });
-      return mapProgressMetric(row);
-    },
     async countDocuments(query = {}) {
       const userPk = await getUserPk(prisma, query.userId);
       return userPk ? prisma.progressMetric.count({ where: { userId: userPk } }) : 0;

@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
 import { createPrismaDataModels } from "./prismaDataModels.js";
+import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
 
 const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
 
@@ -192,12 +193,16 @@ describe("prismaDataModels collection shims", () => {
     expect(await MealLog.aggregate([{ $match: { userId } }])).toEqual([]);
   });
 
+  // Writes moved to the repository; the shim keeps only the read side, so this
+  // now spans both and still asserts what it always did -- that Decimal columns
+  // come back as numbers rather than Prisma Decimal objects.
   test("progress metrics round-trip decimal columns as numbers", async () => {
     const userId = await seedUser();
-    await ProgressMetric.findOneAndUpdate(
-      { userId, id: "p-1" },
-      { $set: { id: "p-1", date: "2026-03-02", weightLb: 181.5, bodyFatPct: 17.25, restingHr: 54 } }
-    );
+    const { saveProgressMetric } = createProgressMetricRepository({ prisma });
+    await saveProgressMetric({
+      userId,
+      metric: { id: "p-1", date: "2026-03-02", weightLb: 181.5, bodyFatPct: 17.25, restingHr: 54 }
+    });
 
     const [metric] = await ProgressMetric.find({ userId }).lean();
     expect(metric.weightLb).toBe(181.5);

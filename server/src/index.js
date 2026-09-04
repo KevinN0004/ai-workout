@@ -32,6 +32,7 @@ import { createHttpCacheService } from "./services/httpCacheService.js";
 import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
 import { createPrismaDataModels } from "./services/prismaDataModels.js";
+import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -320,6 +321,8 @@ const mealDbBaseUrl = cleanText(
 );
 const mealDbTimeoutMs = 12000;
 const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
+// Progress-metric writes go straight to Prisma; the shim still backs its reads.
+const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -610,7 +613,7 @@ registerApiRoutes(app, {
   MealLog,
   progressMetricBodySchema,
   buildProgressMetricEntry,
-  ProgressMetric,
+  saveProgressMetric,
   savedExerciseBodySchema,
   buildSavedExerciseEntry,
   gemini,

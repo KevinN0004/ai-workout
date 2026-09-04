@@ -12,7 +12,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     buildDashboardResponse,
     progressMetricBodySchema,
     buildProgressMetricEntry,
-    ProgressMetric
+    saveProgressMetric
   } = deps;
 
   app.post("/api/dashboard/meal-logs", requireAuth, async (req, res) => {
@@ -193,16 +193,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
         });
       }
 
-      await ProgressMetric.findOneAndUpdate(
-        { userId: req.user.id, id: metric.id },
-        {
-          $set: {
-            userId: req.user.id,
-            ...metric
-          }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+      await saveProgressMetric({ userId: req.user.id, metric });
 
       const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
