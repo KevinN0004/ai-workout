@@ -1,8 +1,8 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1-4 are done. The shim is 185 lines from 544
-> (-66%) and handles exactly one thing: the generated-plan push. Tasks 5 and 6
-> remain.
+> **STATUS: IN PROGRESS.** Tasks 1-5 are done. The shim is 136 lines from 544
+> (-75%) and exposes only `findOne` and `create`. No executable Mongo syntax
+> remains anywhere in `server/src`. Task 6 remains.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -196,9 +196,30 @@ write call sites across four files — profile `$set`, goals `$set`, calories
 
       The shim is now `findOne`, `create`, and a `findOneAndUpdate` handling
       exactly one thing: the generated-plan push that Task 5 owns.
-- [ ] **Task 5 — the capped plan list.** Decide and document the concurrency
-      semantics, then implement. This is the only task with a genuine design
-      question in it.
+- [x] **Task 5 — the capped plan list.** Done, and **the design question this
+      plan promised does not exist.**
+
+      `$position: 0` and `$slice: 200` are both inert. Probed against a live
+      database rather than read:
+
+      ```text
+      205 rows inserted -> table keeps 205, user read returns 200
+      push one more     -> table keeps 206, user read returns 200, newest first
+      ```
+
+      Plans are always inserted, ordering comes from `createdAt desc`, and the
+      200 limit is applied by `loadUserRelated` on read. So there was no
+      concurrency trade-off to decide — the repository just inserts, and a test
+      now pins 205-stored/200-returned so the read-side cap cannot be mistaken
+      for a storage-side one.
+
+      The table growing without bound is pre-existing, not introduced here.
+      Worth its own decision if it ever matters.
+
+      With this gone `User.findOneAndUpdate` had no branches left and was
+      deleted. **There is now no executable Mongo syntax anywhere in
+      `server/src`** — the only `$operator` mentions left are in comments
+      explaining what was removed.
 - [ ] **Task 6 — delete the shim** and its tests, and remove the now-unused
       `mapDbDocToUser` indirection if nothing else reads it. Verify no
       `$`-operator remains outside `node_modules`.

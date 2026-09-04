@@ -139,8 +139,7 @@ export const registerGenerateRoutes = (app, deps) => {
     cleanText,
     toCleanArray,
     toNullableNumber,
-    User,
-    mapDbDocToUser
+    saveGeneratedPlan
   } = deps;
 
   // Open to anonymous callers by design; the anonymous quota is enforced by the
@@ -200,21 +199,11 @@ export const registerGenerateRoutes = (app, deps) => {
           plan
         };
 
-        const updatedDoc = await User.findOneAndUpdate(
-          { userId: sessionUser.id },
-          {
-            $push: {
-              "dashboard.plans": {
-                $each: [planEntry],
-                $position: 0,
-                $slice: 200
-              }
-            }
-          },
-          { new: true }
-        );
-        const updated = mapDbDocToUser(updatedDoc);
-        savedPlan = updated?.dashboard?.plans?.[0] || planEntry;
+        // $position: 0 and $slice: 200 were never doing anything -- plans are
+        // always inserted, ordering comes from createdAt desc, and the 200
+        // limit is applied when the dashboard is read.
+        savedPlan = (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry }))
+          || planEntry;
       }
 
       res.json({ plan, savedPlan });
