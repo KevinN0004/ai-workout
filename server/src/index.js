@@ -5,8 +5,9 @@ import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
-import { connectPostgres, getPostgresStatus } from "./postgres.js";
-import { connectPrisma, prisma } from "./prisma.js";
+import { closePostgres, connectPostgres, getPostgresStatus } from "./postgres.js";
+import { connectPrisma, disconnectPrisma, prisma } from "./prisma.js";
+import { createShutdownHandler } from "./shutdown.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
@@ -295,6 +296,7 @@ const wgerCacheTtlSec = toPositiveInt(process.env.WGER_CACHE_TTL_SEC, 900);
 const mealDbCacheTtlSec = toPositiveInt(process.env.MEALDB_CACHE_TTL_SEC, 900);
 const sentryShutdownTimeoutMs = toPositiveInt(process.env.SENTRY_SHUTDOWN_TIMEOUT_MS, 2000);
 const redisConnectTimeoutMs = toPositiveInt(process.env.REDIS_CONNECT_TIMEOUT_MS, 10000);
+const shutdownTimeoutMs = toPositiveInt(process.env.SHUTDOWN_TIMEOUT_MS, 10000);
 const argon2TimeCost = toPositiveInt(process.env.ARGON2_TIME_COST, 3);
 const argon2MemoryCost = toPositiveInt(process.env.ARGON2_MEMORY_COST, 19456);
 const argon2Parallelism = toPositiveInt(process.env.ARGON2_PARALLELISM, 1);
@@ -663,9 +665,24 @@ const startServer = async () => {
         `Redis is configured but unreachable and REDIS_STARTUP_REQUIRED is set. ${sessionStoreStatus.lastError}`.trim()
       );
     }
-    app.listen(port, () => {
+    const httpServer = app.listen(port, () => {
       logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
     });
+
+    const handleShutdown = createShutdownHandler({
+      logger,
+      toShortText,
+      getHttpServer: () => httpServer,
+      closeSessionStore: sessionService.closeSessionStore,
+      disconnectPrisma,
+      closePostgres,
+      flushErrorTracker: () => errorTracker.flush(sentryShutdownTimeoutMs),
+      shutdownTimeoutMs
+    });
+    // Registered here rather than at module scope so importing `app` in tests
+    // does not attach process-wide handlers.
+    process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+    process.on("SIGINT", () => handleShutdown("SIGINT"));
   } catch (err) {
     logger.fatal(
       { event: "server_start_failed", error: toShortText(err?.message || String(err), 300) },
