@@ -232,38 +232,6 @@ const extractFirstConcatEntry = (update, path) =>
     ? update?.[0]?.$set?.[path]?.$slice?.[0]?.$concatArrays?.[0]?.[0] || null
     : null;
 
-const createFindChain = ({ prisma, modelName, where, mapRow, sortMap }) => {
-  const state = {
-    orderBy: undefined,
-    skip: 0,
-    take: undefined
-  };
-  return {
-    sort(sortSpec = {}) {
-      const [field, direction] = Object.entries(sortSpec)[0] || [];
-      if (field) state.orderBy = [{ [sortMap[field] || field]: direction === -1 ? "desc" : "asc" }];
-      return this;
-    },
-    skip(value) {
-      state.skip = Math.max(0, Number(value) || 0);
-      return this;
-    },
-    limit(value) {
-      state.take = Math.max(0, Number(value) || 0);
-      return this;
-    },
-    async lean() {
-      const rows = await prisma[modelName].findMany({
-        where,
-        orderBy: state.orderBy,
-        skip: state.skip,
-        take: state.take
-      });
-      return rows.map(mapRow);
-    }
-  };
-};
-
 export const createPrismaDataModels = ({ prisma }) => {
   const User = {
     async findOne(query = {}) {
@@ -331,68 +299,5 @@ export const createPrismaDataModels = ({ prisma }) => {
     }
   };
 
-  // Writes now go through repositories/workoutSessionRepository.js. Only the
-  // read side remains, because dashboardCollectionService drives all three
-  // collection models through one generic find().sort().limit() chain.
-  const WorkoutSession = {
-    async countDocuments(query = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      return userPk ? prisma.workoutSession.count({ where: { userId: userPk } }) : 0;
-    },
-    find(query = {}) {
-      return createFindChain({
-        prisma,
-        modelName: "workoutSession",
-        where: { user: userIdWhere(query.userId) },
-        mapRow: mapWorkoutSession,
-        sortMap: { createdAt: "createdAt", date: "workoutDate" }
-      });
-    }
-  };
-
-  // Writes and the day-calorie aggregate now live in
-  // repositories/mealLogRepository.js. Only the read side remains, because
-  // dashboardCollectionService drives all three collection models through one
-  // generic find().sort().limit() chain.
-  const MealLog = {
-    async countDocuments(query = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      return userPk ? prisma.mealLog.count({ where: { userId: userPk } }) : 0;
-    },
-    find(query = {}) {
-      return createFindChain({
-        prisma,
-        modelName: "mealLog",
-        where: { user: userIdWhere(query.userId) },
-        mapRow: mapMealLog,
-        sortMap: { loggedAt: "loggedAt", date: "mealDate" }
-      });
-    }
-  };
-
-  // Writes now go through repositories/progressMetricRepository.js. Only the
-  // read side remains here, because dashboardCollectionService drives all three
-  // collection models through one generic find().sort().limit() chain.
-  const ProgressMetric = {
-    async countDocuments(query = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      return userPk ? prisma.progressMetric.count({ where: { userId: userPk } }) : 0;
-    },
-    find(query = {}) {
-      return createFindChain({
-        prisma,
-        modelName: "progressMetric",
-        where: { user: userIdWhere(query.userId) },
-        mapRow: mapProgressMetric,
-        sortMap: { loggedAt: "loggedAt", date: "metricDate" }
-      });
-    }
-  };
-
-  return {
-    User,
-    WorkoutSession,
-    MealLog,
-    ProgressMetric
-  };
+  return { User };
 };

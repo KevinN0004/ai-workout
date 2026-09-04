@@ -3,9 +3,7 @@ export const createDashboardCollectionService = ({
   toNullableNumber,
   defaultLimit,
   maxLimit,
-  WorkoutSession,
-  MealLog,
-  ProgressMetric,
+  loadCollectionPage,
   buildDashboard
 }) => {
   const parseDashboardPagination = (query = {}, fallbackLimit = defaultLimit) => {
@@ -23,23 +21,15 @@ export const createDashboardCollectionService = ({
     return rest;
   };
 
-  const loadCollectionPage = async ({
-    model,
-    userId,
-    sortField,
-    limit,
-    offset
-  }) => {
-    const [items, total] = await Promise.all([
-      model
-        .find({ userId })
-        .sort({ [sortField]: -1, _id: -1 })
-        .skip(offset)
-        .limit(limit)
-        .lean(),
-      model.countDocuments({ userId })
-    ]);
-
+  // Shape the repository page into the response envelope the routes expect.
+  const toCollectionPage = async ({ collection, userId, sortField, limit, offset }) => {
+    const { items, total } = await loadCollectionPage({
+      collection,
+      userId,
+      sortField,
+      limit,
+      offset
+    });
     return {
       items: items.map(stripUserIdField),
       total,
@@ -73,22 +63,22 @@ export const createDashboardCollectionService = ({
     };
 
     const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
-      loadCollectionPage({
-        model: WorkoutSession,
+      toCollectionPage({
+        collection: "workoutSessions",
         userId,
         sortField: "createdAt",
         limit: workoutPagination.limit,
         offset: workoutPagination.offset
       }),
-      loadCollectionPage({
-        model: MealLog,
+      toCollectionPage({
+        collection: "mealLogs",
         userId,
         sortField: "loggedAt",
         limit: mealPagination.limit,
         offset: mealPagination.offset
       }),
-      loadCollectionPage({
-        model: ProgressMetric,
+      toCollectionPage({
+        collection: "progressMetrics",
         userId,
         sortField: "loggedAt",
         limit: metricPagination.limit,
