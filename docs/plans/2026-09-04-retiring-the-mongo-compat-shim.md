@@ -1,11 +1,16 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1-5 are done. The shim is 136 lines from 544
-> (-75%) and exposes only `findOne` and `create`. No executable Mongo syntax
-> remains anywhere in `server/src`. Task 6 remains.
-> Two of this plan's assumptions were wrong and are corrected inline under
-> Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
-> model at a time.
+> **STATUS: COMPLETE.** All six tasks are done. `prismaDataModels.js` is
+> deleted; its work lives in ten repository modules. No Mongo-shaped API
+> remains in `server/src`. Server tests went 81 → 155.
+>
+> **Every difficulty this plan predicted was wrong**, and every difficulty that
+> actually appeared was unanticipated. The predictions were written from
+> reading the code; the findings all came from running it. Details in each
+> task below — worth reading before trusting a plan of this kind again.
+>
+> **One defect found here is still open and needs a product decision:** meal
+> logs never reach the calories view. See *Defect found during Task 3*.
 
 **Goal:** Replace `server/src/services/prismaDataModels.js` — a MongoDB-shaped
 API implemented on top of Prisma — with direct Prisma calls, and delete the shim.
@@ -220,9 +225,25 @@ write call sites across four files — profile `$set`, goals `$set`, calories
       deleted. **There is now no executable Mongo syntax anywhere in
       `server/src`** — the only `$operator` mentions left are in comments
       explaining what was removed.
-- [ ] **Task 6 — delete the shim** and its tests, and remove the now-unused
-      `mapDbDocToUser` indirection if nothing else reads it. Verify no
-      `$`-operator remains outside `node_modules`.
+- [x] **Task 6 — delete the shim.** Done. `prismaDataModels.js` is gone; what
+      remained of it moved to `repositories/userReadRepository.js` under names
+      that describe the work: `findUserWithDashboard`,
+      `findUserWithDashboardByEmail`, `createUserWithDashboard`.
+
+      Two pieces of real Mongo residue went too: `withToObject`, which wrapped
+      every row so callers could call `.toObject()`, and the branch in
+      `mapDbDocToUser` that tested for it. Nothing has been Mongoose-shaped
+      since `4ce9da8`.
+
+      Two parts of the original wording were **not** done, deliberately:
+
+      `mapDbDocToUser` stays. It is not shim residue — it renames `userId` to
+      `id` and infers the password algorithm, both of which `authUserService`
+      genuinely needs. Only its `.toObject()` branch was removed.
+
+      "Verify no `$`-operator remains" is satisfied for executable code, but
+      six `$operator` mentions survive **inside comments** that explain what
+      was removed and why. Those are worth keeping.
 
 ---
 
