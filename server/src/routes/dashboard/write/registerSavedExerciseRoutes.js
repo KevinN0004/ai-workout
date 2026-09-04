@@ -7,6 +7,8 @@ export const registerSavedExerciseRoutes = (app, deps) => {
     validateBody,
     savedExerciseBodySchema,
     buildSavedExerciseEntry,
+    saveExercise,
+    removeExercise,
     User,
     mapDbDocToUser,
     buildDashboardResponse,
@@ -23,57 +25,15 @@ export const registerSavedExerciseRoutes = (app, deps) => {
         return res.status(400).json({ error: "Exercise name is required." });
       }
 
-      const savedName = entry.name.toLowerCase();
-      const exerciseIdCondition =
-        entry.exerciseId === null ? true : { $ne: ["$$item.exerciseId", entry.exerciseId] };
+      const savedExercise = await saveExercise({ userId: req.user.id, entry });
 
-      const updatedDoc = await User.findOneAndUpdate(
-        { userId: req.user.id },
-        [
-          {
-            $set: {
-              "dashboard.savedExercises": {
-                $slice: [
-                  {
-                    $concatArrays: [
-                      [entry],
-                      {
-                        $filter: {
-                          input: { $ifNull: ["$dashboard.savedExercises", []] },
-                          as: "item",
-                          cond: {
-                            $and: [
-                              exerciseIdCondition,
-                              {
-                                $ne: [
-                                  {
-                                    $toLower: {
-                                      $toString: { $ifNull: ["$$item.name", ""] }
-                                    }
-                                  },
-                                  savedName
-                                ]
-                              }
-                            ]
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  200
-                ]
-              }
-            }
-          }
-        ],
-        { new: true }
-      );
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json({
         ...response,
-        savedExercise: updated.dashboard?.savedExercises?.[0] || entry
+        savedExercise: savedExercise || entry
       });
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
@@ -86,15 +46,9 @@ export const registerSavedExerciseRoutes = (app, deps) => {
       if (!params) return;
       const entryId = cleanText(params.id, 64);
 
-      const updatedDoc = await User.findOneAndUpdate(
-        { userId: req.user.id },
-        {
-          $pull: {
-            "dashboard.savedExercises": { id: entryId }
-          }
-        },
-        { new: true }
-      );
+      await removeExercise({ userId: req.user.id, entryId });
+
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

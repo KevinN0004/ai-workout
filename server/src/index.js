@@ -36,6 +36,7 @@ import { createProgressMetricRepository } from "./repositories/progressMetricRep
 import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "./repositories/mealLogRepository.js";
 import { createDashboardCollectionRepository } from "./repositories/dashboardCollectionRepository.js";
+import { createSavedExerciseRepository } from "./repositories/savedExerciseRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -328,6 +329,7 @@ const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
+const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -618,6 +620,8 @@ registerApiRoutes(app, {
   saveProgressMetric,
   savedExerciseBodySchema,
   buildSavedExerciseEntry,
+  saveExercise,
+  removeExercise,
   gemini,
   generatePlanBodySchema,
   toCleanArray
