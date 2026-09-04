@@ -85,6 +85,7 @@ Common server variables:
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`) | unset |
 | `REDIS_CONNECT_TIMEOUT_MS` | How long startup waits for Redis before falling back to in-memory sessions | `10000` |
 | `REDIS_STARTUP_REQUIRED` | Fail startup when Redis is configured but unreachable, instead of using in-memory sessions | `false` |
+| `SHUTDOWN_TIMEOUT_MS` | Grace period for draining requests and closing connections on SIGTERM/SIGINT | `10000` |
 | `SENTRY_DSN` | Enables Sentry error tracking | unset |
 | `LOG_LEVEL` | Pino log level | `info` |
 
