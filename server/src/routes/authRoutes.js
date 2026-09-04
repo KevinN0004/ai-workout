@@ -10,6 +10,7 @@ export const registerAuthRoutes = (app, deps) => {
     profileBodySchema,
     buildProfile,
     User,
+    updateProfile,
     mapDbDocToUser,
     signupBodySchema,
     cleanText,
@@ -63,11 +64,9 @@ export const registerAuthRoutes = (app, deps) => {
         ...(req.user.profile || defaultProfile()),
         ...profileInput
       });
-      const updatedDoc = await User.findOneAndUpdate(
-        { userId: req.user.id },
-        { $set: { profile: nextProfile } },
-        { new: true }
-      );
+      await updateProfile({ userId: req.user.id, profile: nextProfile });
+
+      const updatedDoc = await User.findOne({ userId: req.user.id });
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
       const updated = mapDbDocToUser(updatedDoc);

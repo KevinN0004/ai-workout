@@ -4,7 +4,12 @@ import { promisify } from "util";
 
 const pbkdf2Async = promisify(crypto.pbkdf2);
 
-export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
+export const createAuthUserService = ({
+  User,
+  cleanText,
+  argon2Options,
+  updatePasswordHash
+}) => {
   const {
     timeCost = 3,
     memoryCost = 19456,
@@ -115,16 +120,12 @@ export const createAuthUserService = ({ User, cleanText, argon2Options }) => {
 
   const upgradeUserPasswordToArgon2id = async (userId, plainPassword) => {
     const next = await hashPasswordArgon2id(plainPassword);
-    await User.updateOne(
-      { userId },
-      {
-        $set: {
-          salt: next.salt,
-          hash: next.hash,
-          passwordAlgo: next.passwordAlgo
-        }
-      }
-    );
+    await updatePasswordHash({
+      userId,
+      salt: next.salt,
+      hash: next.hash,
+      passwordAlgo: next.passwordAlgo
+    });
     return next;
   };
 

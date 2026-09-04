@@ -1,4 +1,4 @@
-import { dateOnlyToDate, toDateOnly, toIso } from "../repositories/rowValues.js";
+import { toDateOnly, toIso } from "../repositories/rowValues.js";
 import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
 import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
@@ -117,52 +117,6 @@ const loadUserRelated = async (prisma, userId) => {
   });
 };
 
-const applyUserSet = async (prisma, userId, set = {}) => {
-  const data = {};
-  const goalsPatch = {};
-  for (const [key, value] of Object.entries(set)) {
-    if (key === "profile") data.profile = value || {};
-    else if (key === "salt") data.passwordSalt = value || "";
-    else if (key === "hash") data.passwordHash = value;
-    else if (key === "passwordAlgo") data.passwordAlgo = value || "argon2id";
-    else if (key.startsWith("dashboard.goals.")) {
-      goalsPatch[key.replace("dashboard.goals.", "")] = value;
-    }
-  }
-
-  if (Object.keys(goalsPatch).length) {
-    const existing = await prisma.appUser.findFirst({
-      where: userIdWhere(userId),
-      select: { goals: true }
-    });
-    data.goals = { ...toJsonObject(existing?.goals), ...goalsPatch };
-  }
-
-  if (!Object.keys(data).length) return loadUserRelated(prisma, userId);
-  await prisma.appUser.updateMany({
-    where: userIdWhere(userId),
-    data
-  });
-  return loadUserRelated(prisma, userId);
-};
-
-const upsertCalorieEntry = async (prisma, userId, entry) => {
-  const userPk = await getUserPk(prisma, userId);
-  if (!userPk) return;
-  const existing = entry.id
-    ? await prisma.calorieEntry.findFirst({ where: { userId: userPk, legacyId: entry.id } })
-    : null;
-  const data = {
-    userId: userPk,
-    legacyId: entry.id || null,
-    calorieDate: dateOnlyToDate(entry.date),
-    calories: Math.round(Number(entry.calories) || 0),
-    source: entry.source || "manual"
-  };
-  if (existing) await prisma.calorieEntry.update({ where: { id: existing.id }, data });
-  else await prisma.calorieEntry.create({ data });
-};
-
 const upsertGeneratedPlan = async (prisma, userId, entry) => {
   const userPk = await getUserPk(prisma, userId);
   if (!userPk) return;
@@ -210,21 +164,12 @@ export const createPrismaDataModels = ({ prisma }) => {
       });
       return loadUserRelated(prisma, row.legacyUserId || row.id);
     },
-    async updateOne(query = {}, update = {}) {
-      await applyUserSet(prisma, query.userId, update.$set || {});
-      return { acknowledged: true, modifiedCount: 1 };
-    },
+    // Only the generated-plan push remains. Profile, goals, password and
+    // calorie writes moved to repositories/userRepository.js; saved exercises
+    // to repositories/savedExerciseRepository.js.
     async findOneAndUpdate(query = {}, update = {}) {
       const userId = query.userId;
       if (!userId) return null;
-
-      if (update.$set) return applyUserSet(prisma, userId, update.$set);
-
-      const caloriePush = update.$push?.["dashboard.calories"];
-      if (caloriePush?.$each?.[0]) {
-        await upsertCalorieEntry(prisma, userId, caloriePush.$each[0]);
-        return loadUserRelated(prisma, userId);
-      }
 
       const planPush = update.$push?.["dashboard.plans"];
       if (planPush?.$each?.[0]) {
