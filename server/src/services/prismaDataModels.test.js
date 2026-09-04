@@ -3,6 +3,7 @@ import { prisma } from "../prisma.js";
 import { createPrismaDataModels } from "./prismaDataModels.js";
 import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
 import { createDashboardCollectionRepository } from "../repositories/dashboardCollectionRepository.js";
+import { createSavedExerciseRepository } from "../repositories/savedExerciseRepository.js";
 import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "../repositories/mealLogRepository.js";
 
@@ -11,6 +12,7 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
+const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -92,7 +94,10 @@ describe("prismaDataModels user shim", () => {
     expect(after.dashboard.calories[0].calories).toBe(2000);
   });
 
-  test("$pull removes a saved exercise by id", async () => {
+  // Saved-exercise writes moved to repositories/savedExerciseRepository.js.
+  // This still spans both: the repository removes the row, and the shim's user
+  // read has to stop reporting it.
+  test("removing a saved exercise clears it from the user's dashboard", async () => {
     const doc = baseUserDoc();
     await User.create(doc);
     const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
@@ -100,12 +105,28 @@ describe("prismaDataModels user shim", () => {
       data: { userId: userPk, legacyId: "saved-1", name: "Squat" }
     });
 
-    const after = await User.findOneAndUpdate(
-      { userId: doc.userId },
-      { $pull: { "dashboard.savedExercises": { id: "saved-1" } } }
-    );
+    expect(await removeExercise({ userId: doc.userId, entryId: "saved-1" })).toBe(1);
 
+    const after = await User.findOne({ userId: doc.userId });
     expect(after.dashboard.savedExercises).toEqual([]);
+  });
+
+  test("saving an exercise twice by name updates rather than duplicating", async () => {
+    const doc = baseUserDoc();
+    await User.create(doc);
+
+    await saveExercise({ userId: doc.userId, entry: { name: "Squat", reason: "first" } });
+    await saveExercise({ userId: doc.userId, entry: { name: "squat", reason: "second" } });
+
+    const after = await User.findOne({ userId: doc.userId });
+    expect(after.dashboard.savedExercises).toHaveLength(1);
+    expect(after.dashboard.savedExercises[0].reason).toBe("second");
+  });
+
+  test("saved-exercise writes are no-ops for an unknown user", async () => {
+    const userId = crypto.randomUUID();
+    expect(await saveExercise({ userId, entry: { name: "Squat" } })).toBeNull();
+    expect(await removeExercise({ userId, entryId: "whatever" })).toBe(0);
   });
 });
 

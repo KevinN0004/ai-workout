@@ -3,6 +3,7 @@ import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
 import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 import { mapMealLog } from "../repositories/mealLogRepository.js";
+import { mapSavedExercise } from "../repositories/savedExerciseRepository.js";
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -33,20 +34,6 @@ const mapGeneratedPlan = (row = {}) => ({
   environment: row.environment || "",
   focuses: toJsonArray(row.focuses),
   plan: row.planText || ""
-});
-
-const mapSavedExercise = (row = {}) => ({
-  id: row.legacyId || row.id,
-  exerciseId: row.externalExerciseId ?? null,
-  name: row.name || "",
-  category: row.category || "",
-  muscles: toJsonArray(row.muscles),
-  equipment: toJsonArray(row.equipment),
-  imageUrl: row.imageUrl || "",
-  videoUrl: row.videoUrl || "",
-  reason: row.reason || "",
-  source: row.source || "wger",
-  savedAt: toIso(row.savedAt)
 });
 
 const mapUser = (row, related = {}) => {
@@ -197,41 +184,6 @@ const upsertGeneratedPlan = async (prisma, userId, entry) => {
   });
 };
 
-const upsertSavedExercise = async (prisma, userId, entry) => {
-  const userPk = await getUserPk(prisma, userId);
-  if (!userPk) return;
-  const existing = await prisma.savedExercise.findFirst({
-    where: {
-      userId: userPk,
-      OR: [
-        ...(entry.exerciseId === null ? [] : [{ externalExerciseId: entry.exerciseId }]),
-        { name: { equals: entry.name, mode: "insensitive" } }
-      ]
-    }
-  });
-  const data = {
-    userId: userPk,
-    legacyId: entry.id || null,
-    externalExerciseId: entry.exerciseId ?? null,
-    name: entry.name || "",
-    category: entry.category || "",
-    muscles: toJsonArray(entry.muscles),
-    equipment: toJsonArray(entry.equipment),
-    imageUrl: entry.imageUrl || "",
-    videoUrl: entry.videoUrl || "",
-    reason: entry.reason || "",
-    source: entry.source || "wger",
-    savedAt: entry.savedAt ? new Date(entry.savedAt) : new Date()
-  };
-  if (existing) await prisma.savedExercise.update({ where: { id: existing.id }, data });
-  else await prisma.savedExercise.create({ data });
-};
-
-const extractFirstConcatEntry = (update, path) =>
-  Array.isArray(update)
-    ? update?.[0]?.$set?.[path]?.$slice?.[0]?.$concatArrays?.[0]?.[0] || null
-    : null;
-
 export const createPrismaDataModels = ({ prisma }) => {
   const User = {
     async findOne(query = {}) {
@@ -277,21 +229,6 @@ export const createPrismaDataModels = ({ prisma }) => {
       const planPush = update.$push?.["dashboard.plans"];
       if (planPush?.$each?.[0]) {
         await upsertGeneratedPlan(prisma, userId, planPush.$each[0]);
-        return loadUserRelated(prisma, userId);
-      }
-
-      const removeSavedId = update.$pull?.["dashboard.savedExercises"]?.id;
-      if (removeSavedId) {
-        const userPk = await getUserPk(prisma, userId);
-        if (userPk) {
-          await prisma.savedExercise.deleteMany({ where: { userId: userPk, legacyId: removeSavedId } });
-        }
-        return loadUserRelated(prisma, userId);
-      }
-
-      const savedExercise = extractFirstConcatEntry(update, "dashboard.savedExercises");
-      if (savedExercise) {
-        await upsertSavedExercise(prisma, userId, savedExercise);
         return loadUserRelated(prisma, userId);
       }
 
