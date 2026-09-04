@@ -33,6 +33,7 @@ import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
 import { createPrismaDataModels } from "./services/prismaDataModels.js";
 import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
+import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -47,8 +48,7 @@ import {
   isCompleteSignupProfile,
   toCleanArray,
   toCleanNameArray,
-  toNullableNumber,
-  toWorkoutSummaryEntry
+  toNullableNumber
 } from "./services/dashboardDataBuildersService.js";
 import {
   createSessionService,
@@ -323,6 +323,7 @@ const mealDbTimeoutMs = 12000;
 const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
 // Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
+const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -604,8 +605,7 @@ registerApiRoutes(app, {
   getDashboardCollections,
   workoutSessionBodySchema,
   buildWorkoutSessionEntry,
-  WorkoutSession,
-  toWorkoutSummaryEntry,
+  saveWorkoutSession,
   caloriesBodySchema,
   goalsBodySchema,
   mealLogBodySchema,
@@ -715,7 +715,6 @@ export const __testables = {
   toCleanArray,
   toCleanNameArray,
   buildWorkoutSessionEntry,
-  toWorkoutSummaryEntry,
   buildMealLogEntry,
   buildProgressMetricEntry,
   buildSavedExerciseEntry,

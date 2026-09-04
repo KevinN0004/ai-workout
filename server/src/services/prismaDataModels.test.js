@@ -2,8 +2,10 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
 import { createPrismaDataModels } from "./prismaDataModels.js";
 import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
+import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
 
 const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
+const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -109,18 +111,21 @@ describe("prismaDataModels collection shims", () => {
     return doc.userId;
   };
 
-  test("workout findOneAndUpdate creates then updates the same legacy id", async () => {
+  // Writes moved to the repository; the shim keeps the read side, so this now
+  // spans both and still asserts the same upsert-by-legacy-id behaviour.
+  test("workout save creates then updates the same legacy id", async () => {
     const userId = await seedUser();
-    const query = { userId, id: "w-1" };
 
-    const created = await WorkoutSession.findOneAndUpdate(query, {
-      $set: { id: "w-1", date: "2026-03-02", focus: "Push", duration: 45, sets: 4, reps: 8 }
+    const created = await saveWorkoutSession({
+      userId,
+      session: { id: "w-1", date: "2026-03-02", focus: "Push", duration: 45, sets: 4, reps: 8 }
     });
     expect(created.focus).toBe("Push");
     expect(created.date).toBe("2026-03-02");
 
-    const updated = await WorkoutSession.findOneAndUpdate(query, {
-      $set: { id: "w-1", date: "2026-03-02", focus: "Pull", duration: 50 }
+    const updated = await saveWorkoutSession({
+      userId,
+      session: { id: "w-1", date: "2026-03-02", focus: "Pull", duration: 50 }
     });
     expect(updated.focus).toBe("Pull");
     expect(await WorkoutSession.countDocuments({ userId })).toBe(1);
@@ -129,17 +134,15 @@ describe("prismaDataModels collection shims", () => {
   test("find chain applies sort, skip and limit", async () => {
     const userId = await seedUser();
     for (const [index, focus] of ["A", "B", "C"].entries()) {
-      await WorkoutSession.findOneAndUpdate(
-        { userId, id: `w-${index}` },
-        {
-          $set: {
-            id: `w-${index}`,
-            focus,
-            date: "2026-03-02",
-            createdAt: new Date(Date.UTC(2026, 2, 2, index)).toISOString()
-          }
+      await saveWorkoutSession({
+        userId,
+        session: {
+          id: `w-${index}`,
+          focus,
+          date: "2026-03-02",
+          createdAt: new Date(Date.UTC(2026, 2, 2, index)).toISOString()
         }
-      );
+      });
     }
 
     const newestFirst = await WorkoutSession.find({ userId }).sort({ createdAt: -1 }).lean();
@@ -212,7 +215,7 @@ describe("prismaDataModels collection shims", () => {
 
   test("collection writes are no-ops for an unknown user", async () => {
     const userId = crypto.randomUUID();
-    expect(await WorkoutSession.findOneAndUpdate({ userId }, { $set: { focus: "X" } })).toBeNull();
+    expect(await saveWorkoutSession({ userId, session: { focus: "X" } })).toBeNull();
     expect(await WorkoutSession.countDocuments({ userId })).toBe(0);
     expect(await WorkoutSession.find({ userId }).lean()).toEqual([]);
   });

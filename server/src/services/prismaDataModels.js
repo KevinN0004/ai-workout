@@ -1,6 +1,7 @@
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "../repositories/rowValues.js";
 import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
 import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
+import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -10,19 +11,6 @@ const withToObject = (doc) =>
   doc && typeof doc === "object" && typeof doc.toObject !== "function"
     ? { ...doc, toObject: () => ({ ...doc }) }
     : doc;
-
-const mapWorkoutSession = (row = {}) => ({
-  id: row.legacyId || row.id,
-  date: toDateOnly(row.workoutDate),
-  focus: row.focus || "General",
-  duration: row.durationMinutes ?? null,
-  exercises: toJsonArray(row.exercises),
-  sets: row.sets ?? null,
-  reps: row.reps ?? null,
-  intensityRpe: toNumberOrNull(row.intensityRpe),
-  notes: row.notes || "",
-  createdAt: toIso(row.createdAt)
-});
 
 const mapMealLog = (row = {}) => ({
   id: row.legacyId || row.id,
@@ -355,32 +343,10 @@ export const createPrismaDataModels = ({ prisma }) => {
     }
   };
 
+  // Writes now go through repositories/workoutSessionRepository.js. Only the
+  // read side remains, because dashboardCollectionService drives all three
+  // collection models through one generic find().sort().limit() chain.
   const WorkoutSession = {
-    async findOneAndUpdate(query = {}, update = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      if (!userPk) return null;
-      const session = update.$set || {};
-      const existing = await prisma.workoutSession.findFirst({
-        where: { userId: userPk, legacyId: query.id || session.id }
-      });
-      const data = {
-        userId: userPk,
-        legacyId: session.id || query.id || null,
-        workoutDate: dateOnlyToDate(session.date),
-        focus: session.focus || "General",
-        durationMinutes: session.duration ?? null,
-        exercises: toJsonArray(session.exercises),
-        sets: session.sets ?? null,
-        reps: session.reps ?? null,
-        intensityRpe: session.intensityRpe ?? null,
-        notes: session.notes || "",
-        createdAt: session.createdAt ? new Date(session.createdAt) : new Date()
-      };
-      const row = existing
-        ? await prisma.workoutSession.update({ where: { id: existing.id }, data })
-        : await prisma.workoutSession.create({ data });
-      return mapWorkoutSession(row);
-    },
     async countDocuments(query = {}) {
       const userPk = await getUserPk(prisma, query.userId);
       return userPk ? prisma.workoutSession.count({ where: { userId: userPk } }) : 0;

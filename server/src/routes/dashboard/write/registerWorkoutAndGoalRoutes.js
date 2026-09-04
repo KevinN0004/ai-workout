@@ -7,9 +7,8 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     validateBody,
     workoutSessionBodySchema,
     buildWorkoutSessionEntry,
-    WorkoutSession,
+    saveWorkoutSession,
     User,
-    toWorkoutSummaryEntry,
     mapDbDocToUser,
     buildDashboardResponse,
     caloriesBodySchema,
@@ -31,52 +30,17 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
           return res.status(400).json({ error: "Date and duration are required." });
         }
 
-        await WorkoutSession.findOneAndUpdate(
-          { userId: req.user.id, id: session.id },
-          {
-            $set: {
-              userId: req.user.id,
-              ...session
-            }
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
+        await saveWorkoutSession({ userId: req.user.id, session });
 
-        const workoutSummary = toWorkoutSummaryEntry(session);
-        const updatedDoc = await User.findOneAndUpdate(
-          { userId: req.user.id },
-          [
-            {
-              $set: {
-                "dashboard.workouts": {
-                  $slice: [
-                    {
-                      $concatArrays: [
-                        [workoutSummary],
-                        {
-                          $filter: {
-                            input: { $ifNull: ["$dashboard.workouts", []] },
-                            as: "item",
-                            cond: {
-                              $ne: [
-                                {
-                                  $toString: { $ifNull: ["$$item.id", ""] }
-                                },
-                                workoutSummary.id
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    },
-                    500
-                  ]
-                }
-              }
-            }
-          ],
-          { new: true }
-        );
+        // The Mongo aggregation-pipeline update that used to sit here was inert.
+        // It prepended a summary into `dashboard.workouts`, deduped by id and
+        // capped at 500 -- but the shim only matched `$set`/`$push`/`$pull`
+        // object updates, so an array pipeline fell through to a plain re-read.
+        // All three effects are already provided elsewhere now that workouts
+        // live in their own table: ordering by loadUserRelated's orderBy, dedupe
+        // by the upsert above, and the 500 cap by mapUser. What remains is the
+        // user-existence check the route actually depends on.
+        const updatedDoc = await User.findOne({ userId: req.user.id });
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
         const updated = mapDbDocToUser(updatedDoc);

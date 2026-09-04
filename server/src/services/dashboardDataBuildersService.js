@@ -99,19 +99,6 @@ export const buildWorkoutSessionEntry = (input = {}) => ({
   createdAt: new Date().toISOString()
 });
 
-export const toWorkoutSummaryEntry = (session) => ({
-  id: cleanText(session?.id, 64) || crypto.randomUUID(),
-  date: cleanText(session?.date, 20),
-  focus: cleanText(session?.focus, 80) || "General",
-  duration: toNullableNumber(session?.duration, 5, 360),
-  exercises: toCleanArray(session?.exercises, 18, 140),
-  sets: toNullableNumber(session?.sets, 1, 80),
-  reps: toNullableNumber(session?.reps, 1, 120),
-  intensityRpe: toNullableNumber(session?.intensityRpe, 1, 10),
-  notes: cleanText(session?.notes, 500),
-  createdAt: cleanText(session?.createdAt, 40) || new Date().toISOString()
-});
-
 export const buildMealLogEntry = (input = {}) => {
   const mealTypeRaw = cleanText(input.mealType, 40).toLowerCase();
   return {
