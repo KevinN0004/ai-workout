@@ -1,4 +1,3 @@
-import { jsPDF } from "jspdf";
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
 import {
   getLocalDateKey,
@@ -8,8 +7,12 @@ import {
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const downloadPlanPdfFromText = (planText) => {
+// jspdf pulls in html2canvas and dompurify, roughly a quarter of the bundle, for
+// a path most sessions never take. Importing it on demand keeps it out of the
+// initial download; the export button is the only caller and can await it.
+const downloadPlanPdfFromText = async (planText) => {
   if (!planText) return;
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const margin = 48;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -168,9 +171,13 @@ export const createAppEventHandlers = ({
     go("/auth");
   };
 
-  const downloadPlanPdf = () => {
-    downloadPlanPdfFromText(result);
-  };
+  const downloadPlanPdf = () =>
+    downloadPlanPdfFromText(result).catch((err) => {
+      // Loading jspdf on demand introduces a failure the static import did not
+      // have: a chunk fetch can fail on a flaky network or against a stale
+      // deploy. Surface it instead of leaving an unhandled rejection.
+      setError(err?.message || "Could not prepare the PDF. Please try again.");
+    });
 
   const onAuthChange = (event) => {
     setAuthForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
