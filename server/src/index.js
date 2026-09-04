@@ -35,6 +35,7 @@ import { createPrismaDataModels } from "./services/prismaDataModels.js";
 import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
 import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "./repositories/mealLogRepository.js";
+import { createDashboardCollectionRepository } from "./repositories/dashboardCollectionRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -321,11 +322,12 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
-const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
+const { User } = createPrismaDataModels({ prisma });
 // Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog } = createMealLogRepository({ prisma });
+const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -441,9 +443,7 @@ const dashboardCollectionService = createDashboardCollectionService({
   toNullableNumber,
   defaultLimit: dashboardCollectionDefaultLimit,
   maxLimit: dashboardCollectionMaxLimit,
-  WorkoutSession,
-  MealLog,
-  ProgressMetric,
+  loadCollectionPage,
   buildDashboard
 });
 const {

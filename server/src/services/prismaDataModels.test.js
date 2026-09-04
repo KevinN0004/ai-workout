@@ -2,12 +2,15 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
 import { createPrismaDataModels } from "./prismaDataModels.js";
 import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
+import { createDashboardCollectionRepository } from "../repositories/dashboardCollectionRepository.js";
 import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
 import { createMealLogRepository } from "../repositories/mealLogRepository.js";
 
-const { User, WorkoutSession, ProgressMetric } = createPrismaDataModels({ prisma });
+const { User } = createPrismaDataModels({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
+const { saveProgressMetric } = createProgressMetricRepository({ prisma });
+const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -106,15 +109,16 @@ describe("prismaDataModels user shim", () => {
   });
 });
 
-describe("prismaDataModels collection shims", () => {
+describe("dashboard collection repositories", () => {
   const seedUser = async () => {
     const doc = baseUserDoc();
     await User.create(doc);
     return doc.userId;
   };
 
-  // Writes moved to the repository; the shim keeps the read side, so this now
-  // spans both and still asserts the same upsert-by-legacy-id behaviour.
+  const page = (collection, userId, sortField, limit = 100, offset = 0) =>
+    loadCollectionPage({ collection, userId, sortField, limit, offset });
+
   test("workout save creates then updates the same legacy id", async () => {
     const userId = await seedUser();
 
@@ -130,10 +134,10 @@ describe("prismaDataModels collection shims", () => {
       session: { id: "w-1", date: "2026-03-02", focus: "Pull", duration: 50 }
     });
     expect(updated.focus).toBe("Pull");
-    expect(await WorkoutSession.countDocuments({ userId })).toBe(1);
+    expect((await page("workoutSessions", userId, "createdAt")).total).toBe(1);
   });
 
-  test("find chain applies sort, skip and limit", async () => {
+  test("collection page applies sort, offset and limit", async () => {
     const userId = await seedUser();
     for (const [index, focus] of ["A", "B", "C"].entries()) {
       await saveWorkoutSession({
@@ -147,18 +151,17 @@ describe("prismaDataModels collection shims", () => {
       });
     }
 
-    const newestFirst = await WorkoutSession.find({ userId }).sort({ createdAt: -1 }).lean();
-    expect(newestFirst.map((row) => row.focus)).toEqual(["C", "B", "A"]);
+    const newestFirst = await page("workoutSessions", userId, "createdAt");
+    expect(newestFirst.items.map((row) => row.focus)).toEqual(["C", "B", "A"]);
 
-    const paged = await WorkoutSession.find({ userId })
-      .sort({ createdAt: -1 })
-      .skip(1)
-      .limit(1)
-      .lean();
-    expect(paged.map((row) => row.focus)).toEqual(["B"]);
+    const paged = await page("workoutSessions", userId, "createdAt", 1, 1);
+    expect(paged.items.map((row) => row.focus)).toEqual(["B"]);
+    expect(paged.total).toBe(3);
   });
 
-  test("find and countDocuments agree when the row has no legacy user id", async () => {
+  // Regression for 19cc8ac: callers hold either the UUID primary key or the
+  // legacy id, so both must resolve. Items and total must agree either way.
+  test("items and total agree when the row has no legacy user id", async () => {
     const row = await prisma.appUser.create({
       data: {
         legacyUserId: null,
@@ -168,16 +171,42 @@ describe("prismaDataModels collection shims", () => {
     });
     await prisma.workoutSession.create({ data: { userId: row.id, focus: "Legs" } });
 
-    const userId = row.id;
-    const total = await WorkoutSession.countDocuments({ userId });
-    const items = await WorkoutSession.find({ userId }).lean();
+    const result = await page("workoutSessions", row.id, "createdAt");
 
-    expect(total).toBe(1);
-    expect(items).toHaveLength(total);
-    expect(items[0].focus).toBe("Legs");
+    expect(result.total).toBe(1);
+    expect(result.items).toHaveLength(result.total);
+    expect(result.items[0].focus).toBe("Legs");
   });
 
-  // The aggregate moved to the repository along with the writes it summed.
+  // The caller has always asked for a secondary sort on id. The shim dropped it,
+  // leaving ordering among tied timestamps to Postgres; the repository honours
+  // it, so paging over ties cannot repeat or skip a row.
+  test("pages tied timestamps without repeating or dropping a row", async () => {
+    const userId = await seedUser();
+    const tied = new Date(Date.UTC(2026, 2, 2)).toISOString();
+    for (let index = 0; index < 6; index += 1) {
+      await saveWorkoutSession({
+        userId,
+        session: { id: `t-${index}`, focus: `F${index}`, date: "2026-03-02", createdAt: tied }
+      });
+    }
+
+    const seen = [];
+    for (let offset = 0; offset < 6; offset += 2) {
+      const result = await page("workoutSessions", userId, "createdAt", 2, offset);
+      seen.push(...result.items.map((row) => row.id));
+    }
+
+    expect(seen).toHaveLength(6);
+    expect(new Set(seen).size).toBe(6);
+  });
+
+  test("rejects an unknown collection rather than querying blindly", async () => {
+    await expect(page("nonsense", "whoever", "createdAt")).rejects.toThrow(
+      /Unknown dashboard collection/
+    );
+  });
+
   test("meal calorie total covers one date only", async () => {
     const userId = await seedUser();
     await saveMealLog({
@@ -216,27 +245,25 @@ describe("prismaDataModels collection shims", () => {
     expect(await sumCaloriesForDate({ userId: crypto.randomUUID(), date: "2026-03-05" })).toBe(0);
   });
 
-  // Writes moved to the repository; the shim keeps only the read side, so this
-  // now spans both and still asserts what it always did -- that Decimal columns
-  // come back as numbers rather than Prisma Decimal objects.
   test("progress metrics round-trip decimal columns as numbers", async () => {
     const userId = await seedUser();
-    const { saveProgressMetric } = createProgressMetricRepository({ prisma });
     await saveProgressMetric({
       userId,
       metric: { id: "p-1", date: "2026-03-02", weightLb: 181.5, bodyFatPct: 17.25, restingHr: 54 }
     });
 
-    const [metric] = await ProgressMetric.find({ userId }).lean();
+    const [metric] = (await page("progressMetrics", userId, "loggedAt")).items;
     expect(metric.weightLb).toBe(181.5);
     expect(metric.bodyFatPct).toBe(17.25);
     expect(metric.restingHr).toBe(54);
   });
 
-  test("collection writes are no-ops for an unknown user", async () => {
+  test("writes are no-ops and reads are empty for an unknown user", async () => {
     const userId = crypto.randomUUID();
     expect(await saveWorkoutSession({ userId, session: { focus: "X" } })).toBeNull();
-    expect(await WorkoutSession.countDocuments({ userId })).toBe(0);
-    expect(await WorkoutSession.find({ userId }).lean()).toEqual([]);
+
+    const result = await page("workoutSessions", userId, "createdAt");
+    expect(result.total).toBe(0);
+    expect(result.items).toEqual([]);
   });
 });
