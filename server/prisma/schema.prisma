@@ -152,3 +152,18 @@ model SavedExercise {
   @@index([userId, savedAt(sort: Desc)], map: "saved_exercises_user_saved_idx")
   @@map("saved_exercises")
 }
+
+/// Bookkeeping for the raw-SQL migration runner in
+/// scripts/apply-postgres-migrations.js. Nothing in the app reads this model.
+///
+/// It is declared here only so `prisma db push` cannot drop the table: push
+/// removes tables the schema does not know about, and losing these rows makes
+/// the runner re-apply every migration from scratch on its next run. That is
+/// survivable for 001_foundation.sql, which is idempotent, but would corrupt a
+/// database the moment a non-idempotent migration exists.
+model SchemaMigration {
+  filename  String   @id
+  appliedAt DateTime @default(now()) @map("applied_at") @db.Timestamptz(6)
+
+  @@map("schema_migrations")
+}
