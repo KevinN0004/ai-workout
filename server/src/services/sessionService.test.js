@@ -88,4 +88,23 @@ describe("initSessionStore", () => {
     const afterDelete = await service.getSessionUser({ headers: { cookie: `sid=${token}` } });
     expect(afterDelete).toBeNull();
   }, 15000);
+
+  test("closeSessionStore is safe when no Redis client was ever created", async () => {
+    const service = buildService();
+    await service.initSessionStore({});
+
+    await expect(service.closeSessionStore()).resolves.toBeUndefined();
+    expect(service.isRedisSessionsEnabled()).toBe(false);
+    expect(service.getRedisClient()).toBeNull();
+  });
+
+  test("closeSessionStore disconnects the client and disables Redis sessions", async () => {
+    const service = buildService({ redisConnectTimeoutMs: 300 });
+    await service.initSessionStore({ REDIS_HOST: "127.0.0.1", REDIS_PORT: "1" });
+
+    await service.closeSessionStore();
+
+    expect(service.isRedisSessionsEnabled()).toBe(false);
+    expect(service.getRedisClient()).toBeNull();
+  }, 15000);
 });

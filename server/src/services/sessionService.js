@@ -348,6 +348,17 @@ export const createSessionService = ({
     next();
   };
 
+  /**
+   * Releases the Redis connection so a shutdown is not held open by it.
+   * Safe to call when Redis was never configured or already fell back.
+   */
+  const closeSessionStore = async () => {
+    const client = redisClient;
+    redisClient = null;
+    redisSessionsEnabled = false;
+    await closeRedisClientQuietly(client);
+  };
+
   const ensureCsrfTokenCookie = (req, res, next) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const current = cleanText(cookies[csrfCookieName], 128);
@@ -397,6 +408,7 @@ export const createSessionService = ({
     getSessionUser,
     requireAuth,
     attachOptionalUser,
+    closeSessionStore,
     ensureCsrfTokenCookie,
     requireCsrfToken,
     getSessionStoreStatus,
