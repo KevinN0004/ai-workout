@@ -1,5 +1,19 @@
 # Operational Hardening Implementation Plan
 
+> **STATUS: COMPLETE.** All five tasks are implemented and merged. Kept as a
+> record of what was changed and why.
+>
+> | Task | Shipped in |
+> | --- | --- |
+> | 1 · Bound route metric cardinality | `6bf111d` |
+> | 2 · Transactional migrations | PR #5 |
+> | 3 · `closeSessionStore()` | PR #4 |
+> | 4 · Injectable shutdown sequence | PR #4 |
+> | 5 · Wire SIGTERM/SIGINT | PR #4 |
+>
+> Two items listed under Out of Scope below remain genuinely open and are worth
+> follow-ups: the Prisma/SQL unique-index drift, and the dependency CVEs.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the three deploy-blocking operational defects found in the audit: unbounded metric cardinality, non-transactional migrations, and the absence of graceful shutdown.
@@ -63,7 +77,7 @@ The migration logic goes in `src/` rather than `scripts/` for one concrete reaso
 - Modify: `server/src/middleware/requestContext.js:3-8`
 - Test: `server/src/middleware/requestContext.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append this test inside the existing `describe("requestContext middleware", ...)` block in `server/src/middleware/requestContext.test.js`, after the last test:
 
@@ -126,7 +140,7 @@ Append this test inside the existing `describe("requestContext middleware", ...)
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/middleware/requestContext.test.js --root server`
 
@@ -136,7 +150,7 @@ AssertionError: expected [ 'GET /api/random-a', 'GET /api/random-b', 'GET /api/r
 ```
 The second new test passes already (it documents behaviour we must not break).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `server/src/middleware/requestContext.js`, replace the `sanitizeRoutePath` function (lines 3-8) with:
 
@@ -155,13 +169,13 @@ const sanitizeRoutePath = (req) => {
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/middleware/requestContext.test.js --root server`
 
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Verify against the live server**
+- [x] **Step 5: Verify against the live server**
 
 ```bash
 cd server && PORT=5095 REDIS_URL= REDIS_HOST= REDIS_PORT= node src/index.js &
@@ -176,7 +190,7 @@ Expected: `byRoute` contains `GET <unmatched>` (count 3), `POST <unmatched>` (co
 
 Stop the server before continuing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/middleware/requestContext.js server/src/middleware/requestContext.test.js
@@ -192,7 +206,7 @@ git commit -m "fix: bound route metric cardinality to declared routes"
 - Create: `server/src/postgresMigrations.test.js`
 - Modify: `server/scripts/apply-postgres-migrations.js` (full rewrite)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `server/src/postgresMigrations.test.js`:
 
@@ -313,13 +327,13 @@ describe("applyMigrations", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/postgresMigrations.test.js --root server`
 
 Expected: FAIL with `Failed to load ./postgresMigrations.js` — the module does not exist yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `server/src/postgresMigrations.js`:
 
@@ -387,13 +401,13 @@ export const applyMigrations = async ({
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/postgresMigrations.test.js --root server`
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Rewrite the CLI script to use it**
+- [x] **Step 5: Rewrite the CLI script to use it**
 
 Replace the entire contents of `server/scripts/apply-postgres-migrations.js` with:
 
@@ -429,7 +443,7 @@ run()
   });
 ```
 
-- [ ] **Step 6: Verify the real migration path still works**
+- [x] **Step 6: Verify the real migration path still works**
 
 ```bash
 npm -w server run migrate:postgres
@@ -445,7 +459,7 @@ npm -w server run test
 
 Expected: all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/postgresMigrations.js server/src/postgresMigrations.test.js server/scripts/apply-postgres-migrations.js
@@ -462,7 +476,7 @@ git commit -m "fix: run each migration in a real transaction on one connection"
 
 This is split from the shutdown sequence because it is the one missing primitive — `closePostgres` and `disconnectPrisma` already exist.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to the `describe("initSessionStore", ...)` block in `server/src/services/sessionService.test.js`:
 
@@ -487,13 +501,13 @@ Append to the `describe("initSessionStore", ...)` block in `server/src/services/
   }, 15000);
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/services/sessionService.test.js --root server`
 
 Expected: FAIL with `service.closeSessionStore is not a function`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `server/src/services/sessionService.js`, add this function immediately after `attachOptionalUser`:
 
@@ -512,13 +526,13 @@ In `server/src/services/sessionService.js`, add this function immediately after 
 
 Then add `closeSessionStore,` to the returned object, immediately after `attachOptionalUser,`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/services/sessionService.test.js --root server`
 
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/sessionService.js server/src/services/sessionService.test.js
@@ -533,7 +547,7 @@ git commit -m "feat: add closeSessionStore to release the Redis connection"
 - Create: `server/src/shutdown.js`
 - Create: `server/src/shutdown.test.js`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `server/src/shutdown.test.js`:
 
@@ -649,13 +663,13 @@ describe("createShutdownHandler", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/shutdown.test.js --root server`
 
 Expected: FAIL with `Failed to load ./shutdown.js`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `server/src/shutdown.js`:
 
@@ -730,13 +744,13 @@ export const createShutdownHandler = ({
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/shutdown.test.js --root server`
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/shutdown.js server/src/shutdown.test.js
@@ -751,7 +765,7 @@ git commit -m "feat: add an injectable graceful shutdown sequence"
 - Modify: `server/src/index.js` (imports, env var, `startServer`)
 - Modify: `README.md`
 
-- [ ] **Step 1: Import the new pieces**
+- [x] **Step 1: Import the new pieces**
 
 In `server/src/index.js`, update the two existing imports and add one:
 
@@ -761,7 +775,7 @@ import { connectPrisma, disconnectPrisma, prisma } from "./prisma.js";
 import { createShutdownHandler } from "./shutdown.js";
 ```
 
-- [ ] **Step 2: Add the timeout setting**
+- [x] **Step 2: Add the timeout setting**
 
 Immediately after the `redisConnectTimeoutMs` line, add:
 
@@ -769,7 +783,7 @@ Immediately after the `redisConnectTimeoutMs` line, add:
 const shutdownTimeoutMs = toPositiveInt(process.env.SHUTDOWN_TIMEOUT_MS, 10000);
 ```
 
-- [ ] **Step 3: Capture the server handle and register handlers**
+- [x] **Step 3: Capture the server handle and register handlers**
 
 In `startServer`, replace this block:
 
@@ -802,7 +816,7 @@ with:
     process.on("SIGINT", () => handleShutdown("SIGINT"));
 ```
 
-- [ ] **Step 4: Document the setting**
+- [x] **Step 4: Document the setting**
 
 In `README.md`, add this row to the server variables table, directly after the `REDIS_STARTUP_REQUIRED` row:
 
@@ -810,7 +824,7 @@ In `README.md`, add this row to the server variables table, directly after the `
 | `SHUTDOWN_TIMEOUT_MS` | Grace period for draining requests and closing connections on SIGTERM/SIGINT | `10000` |
 ```
 
-- [ ] **Step 5: Verify the whole suite and a real boot**
+- [x] **Step 5: Verify the whole suite and a real boot**
 
 ```bash
 npm -w server run test
@@ -830,7 +844,7 @@ curl -s -o /dev/null -w "health -> %{http_code}\n" http://127.0.0.1:5095/api/hea
 
 Expected: `health -> 200`. Stop the server.
 
-- [ ] **Step 6: Verify graceful shutdown on Linux**
+- [x] **Step 6: Verify graceful shutdown on Linux**
 
 Signals cannot be exercised on the Windows dev machine, so use the Linux container that already runs Postgres, or skip to CI. If Docker is available:
 
@@ -849,7 +863,7 @@ Expected: logs show `shutdown_started` then `shutdown_complete`, and `exit code:
 
 If Docker is unavailable, record that this step was skipped — the unit tests in Task 4 cover the sequence, and only the two `process.on` lines remain unverified.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/index.js README.md
