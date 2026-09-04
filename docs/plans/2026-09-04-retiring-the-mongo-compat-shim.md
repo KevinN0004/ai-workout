@@ -1,7 +1,8 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Tasks 1, 2, 3, 3b and 4a are done. The shim is down
-> to `User` alone, 240 lines from 544; Tasks 4b, 5 and 6 remain.
+> **STATUS: IN PROGRESS.** Tasks 1-4 are done. The shim is 185 lines from 544
+> (-66%) and handles exactly one thing: the generated-plan push. Tasks 5 and 6
+> remain.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -184,10 +185,17 @@ write call sites across four files — profile `$set`, goals `$set`, calories
       name — is live behaviour that had to be preserved, not intent that was
       never running.
 
-- [ ] **Task 4b — profile, goals, calories and the password upgrade.** The
-      remaining `User` writes. `$set` becomes `update({ data })`. Keep the
-      `userIdWhere` UUID-or-legacy resolution — it is load-bearing, and commit
-      `19cc8ac` exists because it was got wrong once.
+- [x] **Task 4b — profile, goals, calories and the password upgrade.** Done.
+      All four moved to `repositories/userRepository.js`.
+
+      **`updateGoals` was the sharp edge.** Goals live in a single JSON column,
+      so it must read-merge-write; replacing would silently erase the goals the
+      caller did not send. The guard test sends three goals then one and checks
+      the other two survive — a naive replacement passes every other test in
+      that file.
+
+      The shim is now `findOne`, `create`, and a `findOneAndUpdate` handling
+      exactly one thing: the generated-plan push that Task 5 owns.
 - [ ] **Task 5 — the capped plan list.** Decide and document the concurrency
       semantics, then implement. This is the only task with a genuine design
       question in it.
