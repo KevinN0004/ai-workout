@@ -1,6 +1,6 @@
 # Retiring the Mongo Compatibility Shim
 
-> **STATUS: IN PROGRESS.** Task 1 is done and merged; the rest is not started.
+> **STATUS: IN PROGRESS.** Tasks 1 and 2 are done; the rest is not started.
 > Two of this plan's assumptions were wrong and are corrected inline under
 > Task 1 — `upsert` cannot be used, and the read side cannot be migrated one
 > model at a time.
@@ -130,7 +130,19 @@ first where behaviour is being pinned rather than merely moved.
       holds for writes; the read side needs a single task covering all three at
       once. See Task 3b.
 
-- [ ] **Task 2 — `WorkoutSession` writes.** Same shape as Task 1.
+- [x] **Task 2 — `WorkoutSession` writes.** Done. Same shape as Task 1.
+
+      Also removed a 35-line aggregation-pipeline update from the route that
+      was **inert**: the shim only matches object updates carrying
+      `$set`/`$push`/`$pull`, so an array pipeline fell through to a plain
+      re-read. Its three claimed effects — prepend, dedupe, cap at 500 — are
+      all provided elsewhere now that workouts live in their own table.
+
+      Expect more of these. This plan counted `$`-operators as the units of
+      migration work, assuming each does something. Some do not, so the real
+      remaining effort is smaller than the counts suggest — and every pipeline
+      should be checked against the shim's actual branches before being
+      treated as behaviour to preserve.
 - [ ] **Task 3 — `MealLog`, including the aggregate.** Convert the pipeline to
       `prisma.mealLog.aggregate({ where, _sum: { calories: true } })`. Pin the
       null-handling first: `$ifNull(calories, 0)` and `_sum` over NULLs are not
