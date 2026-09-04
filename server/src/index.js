@@ -34,6 +34,7 @@ import { createDashboardCollectionService } from "./services/dashboardCollection
 import { createPrismaDataModels } from "./services/prismaDataModels.js";
 import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
 import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
+import { createMealLogRepository } from "./repositories/mealLogRepository.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -324,6 +325,7 @@ const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels
 // Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
+const { saveMealLog } = createMealLogRepository({ prisma });
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -610,7 +612,7 @@ registerApiRoutes(app, {
   goalsBodySchema,
   mealLogBodySchema,
   buildMealLogEntry,
-  MealLog,
+  saveMealLog,
   progressMetricBodySchema,
   buildProgressMetricEntry,
   saveProgressMetric,

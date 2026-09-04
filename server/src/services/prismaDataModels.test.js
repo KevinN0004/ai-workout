@@ -3,9 +3,11 @@ import { prisma } from "../prisma.js";
 import { createPrismaDataModels } from "./prismaDataModels.js";
 import { createProgressMetricRepository } from "../repositories/progressMetricRepository.js";
 import { createWorkoutSessionRepository } from "../repositories/workoutSessionRepository.js";
+import { createMealLogRepository } from "../repositories/mealLogRepository.js";
 
-const { User, WorkoutSession, MealLog, ProgressMetric } = createPrismaDataModels({ prisma });
+const { User, WorkoutSession, ProgressMetric } = createPrismaDataModels({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
+const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
@@ -175,25 +177,43 @@ describe("prismaDataModels collection shims", () => {
     expect(items[0].focus).toBe("Legs");
   });
 
-  test("meal aggregate sums calories for a single date", async () => {
+  // The aggregate moved to the repository along with the writes it summed.
+  test("meal calorie total covers one date only", async () => {
     const userId = await seedUser();
-    await MealLog.findOneAndUpdate(
-      { userId, id: "m-1" },
-      { $set: { id: "m-1", date: "2026-03-02", name: "Oats", calories: 400 } }
-    );
-    await MealLog.findOneAndUpdate(
-      { userId, id: "m-2" },
-      { $set: { id: "m-2", date: "2026-03-02", name: "Chicken", calories: 650 } }
-    );
-    await MealLog.findOneAndUpdate(
-      { userId, id: "m-3" },
-      { $set: { id: "m-3", date: "2026-03-03", name: "Rice", calories: 300 } }
-    );
+    await saveMealLog({
+      userId,
+      mealLog: { id: "m-1", date: "2026-03-02", name: "Oats", calories: 400 }
+    });
+    await saveMealLog({
+      userId,
+      mealLog: { id: "m-2", date: "2026-03-02", name: "Chicken", calories: 650 }
+    });
+    await saveMealLog({
+      userId,
+      mealLog: { id: "m-3", date: "2026-03-03", name: "Rice", calories: 300 }
+    });
 
-    const result = await MealLog.aggregate([{ $match: { userId, date: "2026-03-02" } }]);
-    expect(result).toEqual([{ calories: 1050 }]);
+    expect(await sumCaloriesForDate({ userId, date: "2026-03-02" })).toBe(1050);
+    expect(await sumCaloriesForDate({ userId, date: "2026-03-03" })).toBe(300);
+    expect(await sumCaloriesForDate({ userId, date: "2026-03-04" })).toBe(0);
+    expect(await sumCaloriesForDate({ userId, date: "" })).toBe(0);
+  });
 
-    expect(await MealLog.aggregate([{ $match: { userId } }])).toEqual([]);
+  // Prisma's _sum returns null when no row carries a value, which is not the
+  // same as a zero total. The Mongo pipeline this replaced used $ifNull to make
+  // both cases 0; the repository preserves that rather than leaking null.
+  test("meal calorie total is 0, not null, when no meal carries calories", async () => {
+    const userId = await seedUser();
+    await saveMealLog({
+      userId,
+      mealLog: { id: "m-macro", date: "2026-03-05", name: "Shake", proteinG: 30 }
+    });
+
+    expect(await sumCaloriesForDate({ userId, date: "2026-03-05" })).toBe(0);
+  });
+
+  test("meal calorie total is 0 for an unknown user", async () => {
+    expect(await sumCaloriesForDate({ userId: crypto.randomUUID(), date: "2026-03-05" })).toBe(0);
   });
 
   // Writes moved to the repository; the shim keeps only the read side, so this

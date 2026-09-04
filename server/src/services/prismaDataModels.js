@@ -1,7 +1,8 @@
-import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "../repositories/rowValues.js";
+import { dateOnlyToDate, toDateOnly, toIso } from "../repositories/rowValues.js";
 import { getUserPk, userIdWhere } from "../repositories/userLookup.js";
 import { mapProgressMetric } from "../repositories/progressMetricRepository.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
+import { mapMealLog } from "../repositories/mealLogRepository.js";
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -11,19 +12,6 @@ const withToObject = (doc) =>
   doc && typeof doc === "object" && typeof doc.toObject !== "function"
     ? { ...doc, toObject: () => ({ ...doc }) }
     : doc;
-
-const mapMealLog = (row = {}) => ({
-  id: row.legacyId || row.id,
-  date: toDateOnly(row.mealDate),
-  mealType: row.mealType || "other",
-  name: row.name || "",
-  calories: row.calories ?? null,
-  proteinG: toNumberOrNull(row.proteinG),
-  carbsG: toNumberOrNull(row.carbsG),
-  fatG: toNumberOrNull(row.fatG),
-  notes: row.notes || "",
-  loggedAt: toIso(row.loggedAt)
-});
 
 const mapCalorieEntry = (row = {}) => ({
   id: row.legacyId || row.id,
@@ -362,43 +350,11 @@ export const createPrismaDataModels = ({ prisma }) => {
     }
   };
 
+  // Writes and the day-calorie aggregate now live in
+  // repositories/mealLogRepository.js. Only the read side remains, because
+  // dashboardCollectionService drives all three collection models through one
+  // generic find().sort().limit() chain.
   const MealLog = {
-    async findOneAndUpdate(query = {}, update = {}) {
-      const userPk = await getUserPk(prisma, query.userId);
-      if (!userPk) return null;
-      const meal = update.$set || {};
-      const existing = await prisma.mealLog.findFirst({
-        where: { userId: userPk, legacyId: query.id || meal.id }
-      });
-      const data = {
-        userId: userPk,
-        legacyId: meal.id || query.id || null,
-        mealDate: dateOnlyToDate(meal.date),
-        mealType: meal.mealType || "other",
-        name: meal.name || "",
-        calories: meal.calories ?? null,
-        proteinG: meal.proteinG ?? null,
-        carbsG: meal.carbsG ?? null,
-        fatG: meal.fatG ?? null,
-        notes: meal.notes || "",
-        loggedAt: meal.loggedAt ? new Date(meal.loggedAt) : new Date()
-      };
-      const row = existing
-        ? await prisma.mealLog.update({ where: { id: existing.id }, data })
-        : await prisma.mealLog.create({ data });
-      return mapMealLog(row);
-    },
-    async aggregate(pipeline = []) {
-      const userId = pipeline?.[0]?.$match?.userId;
-      const date = pipeline?.[0]?.$match?.date;
-      const userPk = await getUserPk(prisma, userId);
-      if (!userPk || !date) return [];
-      const result = await prisma.mealLog.aggregate({
-        where: { userId: userPk, mealDate: dateOnlyToDate(date) },
-        _sum: { calories: true }
-      });
-      return [{ calories: result._sum.calories || 0 }];
-    },
     async countDocuments(query = {}) {
       const userPk = await getUserPk(prisma, query.userId);
       return userPk ? prisma.mealLog.count({ where: { userId: userPk } }) : 0;
