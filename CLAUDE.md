@@ -157,8 +157,12 @@ npm run prisma:validate        # validate the schema
 
 ## Fresh Clone Setup
 
-Tracked: `CLAUDE.md`, `.mcp.json`, `scripts/`, and `.claude/settings.json` (the hook wiring).
+Tracked: `CLAUDE.md`, `.mcp.json`, `scripts/`, `.githooks/pre-commit`, and
+`.claude/settings.json` (the hook wiring).
 Not tracked: `.claude/agents/`, `commands/`, `helpers/`, `skills/` — claude-flow scaffolding.
+
+The pre-commit hook is in the repo; only its activation is not, which is what the
+`core.hooksPath` line below sets.
 
 **15 of the 19 configured hooks, plus the status line, invoke `.claude/helpers/*`, which is
 not in the repo.** Regenerate the scaffolding after cloning:
