@@ -226,13 +226,17 @@ export default function PreviewPage({
     setPreviewWeekStage
   });
 
+  // Unmount cleanup. Both clear functions are useCallbacks keyed only on refs,
+  // so they are stable for the component's life -- listing them cannot make
+  // this effect re-run, and it removes the risk of the cleanup closing over a
+  // stale first-render copy.
   useEffect(
     () => () => {
       clearPreviewFillTimers();
       clearPreviewWeekParticleAnimation();
       clearPreviewTocSwitchTimer();
     },
-    []
+    [clearPreviewFillTimers, clearPreviewWeekParticleAnimation]
   );
 
   return (

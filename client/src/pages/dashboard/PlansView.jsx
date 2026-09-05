@@ -139,9 +139,11 @@ export default function PlansView({
     return { trainingDays, recoveryDays, dailyTips, weeklyTips };
   }, [weekDays, latestPlanByWeekday]);
 
-  const savedExercises = Array.isArray(dashboard?.savedExercises)
-    ? dashboard.savedExercises
-    : [];
+  // The `: []` branch minted a fresh array every render, defeating the memo below.
+  const savedExercises = useMemo(
+    () => (Array.isArray(dashboard?.savedExercises) ? dashboard.savedExercises : []),
+    [dashboard]
+  );
   const visibleSavedExercises = useMemo(
     () => savedExercises.slice(0, visibleSavedCount),
     [savedExercises, visibleSavedCount]

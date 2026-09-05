@@ -344,6 +344,11 @@ export default function usePreviewWeekParticleAnimation({
         clearPreviewWeekParticleAnimation();
       }
     };
+    // Keyed on the chapter and stage that drive this animation. The listed
+    // "missing" deps are refs, setState functions, and chapter indices that do
+    // not change while a stage is playing; re-running on them would cancel and
+    // restart the particle timeline mid-animation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePreviewChapterId, previewWeekStage]);
 
   return { clearPreviewWeekParticleAnimation };

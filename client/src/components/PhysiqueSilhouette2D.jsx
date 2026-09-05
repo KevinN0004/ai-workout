@@ -9,9 +9,14 @@ import {
 export { SILHOUETTE_GEOMETRY_REV } from "./physique/geometry";
 
 export default function PhysiqueSilhouette2D({ shape }) {
+  // `shape` is rebuilt by the parent on every render, so depending on it
+  // directly would recompute the whole silhouette each time. The JSON signature
+  // is the dependency on purpose: it compares by value, so the geometry is
+  // rebuilt only when the measurements actually change.
   const shapeSignature = JSON.stringify(shape || {});
   const { anchors, outlineMarkers, outlinePath, outlineTransform, palette } = useMemo(
     () => buildPhysiqueSilhouetteGeometry(shape),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [shapeSignature, DEV_HOT_RELOAD_TOKEN]
   );
   const showDebugPoints = import.meta.env.DEV && import.meta.env.VITE_SHOW_PHYSIQUE_POINTS === "1";
