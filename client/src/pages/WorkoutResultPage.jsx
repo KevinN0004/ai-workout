@@ -11,7 +11,13 @@ export default function WorkoutResultPage({
   onDownloadPlanPdf,
   onSignupWithPrefilledProfile
 }) {
-  const days = Array.isArray(planSections?.days) ? planSections.days : [];
+  // Memoized because the `: []` branch minted a fresh array every render, which
+  // made the two useMemo hooks below recompute on every render whenever a plan
+  // had no days.
+  const days = useMemo(
+    () => (Array.isArray(planSections?.days) ? planSections.days : []),
+    [planSections]
+  );
   const notes = Array.isArray(planSections?.notes) ? planSections.notes : [];
   const hasDays = days.length > 0;
   const hasNotes = notes.length > 0;

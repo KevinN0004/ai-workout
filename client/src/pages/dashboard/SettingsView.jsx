@@ -60,14 +60,19 @@ const displayValue = (value) => {
 };
 
 export default function SettingsView({ user, personal }) {
-  const profile = user?.profile || {};
+  // Both memoized because their fallback branches minted a fresh object/array
+  // every render, defeating the tabs memo that depends on them.
+  const profile = useMemo(() => user?.profile || {}, [user]);
   const measurementSystem = useMemo(() => getPreferredMeasurementSystem(), []);
   const fullName =
     personal?.name ||
     [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
     profile.name ||
     "";
-  const trainingDays = Array.isArray(personal?.trainingDays) ? personal.trainingDays : [];
+  const trainingDays = useMemo(
+    () => (Array.isArray(personal?.trainingDays) ? personal.trainingDays : []),
+    [personal]
+  );
 
   const [activeTab, setActiveTab] = useState("profile");
   const tabs = useMemo(

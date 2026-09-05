@@ -330,6 +330,12 @@ export default function usePreviewChapterFlow({
     return () => {
       clearPreviewFillTimers();
     };
+    // Deliberately keyed on the chapter transition alone. This schedules a
+    // timed animation sequence; re-running it because `previewPersonalTargets`
+    // or `previewFillOrder` changed would restart that sequence mid-flight,
+    // which is visibly wrong. The remaining "missing" deps are setState
+    // functions and refs, which are stable and would change nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activePreviewChapterId,
     generateChapterIndex,

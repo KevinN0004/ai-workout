@@ -79,5 +79,14 @@ export default function usePreviewWeekOutline({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", scheduleMeasure);
     };
-  }, [activePreviewChapterId, previewWeekPlan]);
+    // The ref object and the state setter are stable for the component's life,
+    // so listing them satisfies the exhaustive-deps rule without adding a
+    // re-run: the effect still only re-subscribes when the chapter or plan
+    // changes.
+  }, [
+    activePreviewChapterId,
+    previewWeekPlan,
+    previewWeekTableWrapRef,
+    setPreviewWeekLineOffsets
+  ]);
 }

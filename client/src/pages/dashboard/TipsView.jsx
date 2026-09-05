@@ -131,7 +131,11 @@ export default function TipsView({
   }, [debouncedQuery, categoryId, muscleId, equipmentId, refreshTick]);
 
   const todayWeekday = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const todayLines = latestPlanByWeekday?.[todayWeekday] || [];
+  // The `|| []` branch minted a fresh array every render, defeating the memo below.
+  const todayLines = useMemo(
+    () => latestPlanByWeekday?.[todayWeekday] || [],
+    [latestPlanByWeekday, todayWeekday]
+  );
   const goalText =
     dashboard?.plans?.[0]?.goal ||
     dashboard?.goals?.goalType ||
@@ -184,9 +188,11 @@ export default function TipsView({
     [track, weeklyWorkouts, duration, activity, weatherMode, injuryText]
   );
 
-  const savedExercises = Array.isArray(dashboard?.savedExercises)
-    ? dashboard.savedExercises
-    : [];
+  // The `: []` branch minted a fresh array every render, defeating the memo below.
+  const savedExercises = useMemo(
+    () => (Array.isArray(dashboard?.savedExercises) ? dashboard.savedExercises : []),
+    [dashboard]
+  );
   const visibleLibraryExercises = useMemo(
     () => exercises.slice(0, libraryVisibleCount),
     [exercises, libraryVisibleCount]
