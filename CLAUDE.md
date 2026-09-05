@@ -60,6 +60,8 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 - NEVER save to root folder
 - `client/src` — React 18 + Vite frontend source
 - `server/src` — Express 4 API, services, routes
+- `server/src/repositories` — **all Prisma data access lives here.** Routes and services
+  call these; nothing else should touch `prisma.*` directly
 - `server/prisma` — Prisma schema and migrations
 - `server/scripts` — server operational scripts (local Postgres, migrations)
 - `docs/` — documentation and plans
@@ -75,6 +77,33 @@ AI Workout is a full-stack fitness planning app using **npm workspaces** (`clien
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
 - **Tests**: Vitest on both sides
+
+### Data access
+
+All Postgres access goes through `server/src/repositories/`. There is one module per
+concern — workout sessions, meal logs, progress metrics, saved exercises, generated
+plans, the user row, and the paginated dashboard collections — plus two shared helpers:
+
+- `userLookup.js` — `userIdWhere` / `getUserPk`. **Load-bearing.** Callers hold either
+  the UUID primary key or the legacy string id depending on when the account and session
+  were created, and both must resolve. Commit `19cc8ac` exists because a path assumed
+  only the legacy id.
+- `rowValues.js` — date and Decimal conversions shared by every mapper.
+
+Two things to know before adding a write:
+
+- **`upsert` usually is not available.** The uniqueness on these tables comes from
+  *partial* unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
+  express, so Prisma has no constraint to target. The repositories do an explicit
+  read-then-write instead. This is deliberate, not an oversight.
+- **Collection caps are applied on read, not in storage.** `userReadRepository` limits
+  each collection with `take:`; nothing prunes the tables. A "capped list" is a read
+  concern here.
+
+This replaced a MongoDB-shaped compatibility shim (`services/prismaDataModels.js`),
+retired in full — see `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md`. If you
+find `findOneAndUpdate`, `$set`, `$push` or `.lean()` anywhere in `server/src`, it is a
+regression.
 
 Conventions:
 
@@ -115,9 +144,16 @@ npm run prisma:validate        # validate the schema
   Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do
   not add formatting rules or reformat files wholesale without asking.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
-- `npm run build` emits a "chunks larger than 500 kB" warning. That is pre-existing and
-  not a failure — the build exits 0. Don't treat it as a regression.
+- **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
+  `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were
+  deliberate now carry an inline disable explaining why. A new warning means you
+  introduced it.
+- **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
+  that went away when `jspdf` moved to a dynamic import. The main chunk is ~402 kB.
+  If the warning reappears, something got pulled back onto the eager path.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
+- Server tests need Postgres: `npm run postgres:local:start -w server` first, or ~40 of
+  them fail with a connection error that is environmental, not a regression.
 
 ## Fresh Clone Setup
 

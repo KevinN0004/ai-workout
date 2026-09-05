@@ -12,23 +12,57 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 - AI workout plan generation through Google Gemini
 - Cached integrations for weather, air quality, exercise metadata, and meal search
 - Health, readiness, metrics, logging, and optional Sentry error tracking
+- Graceful shutdown on `SIGTERM`/`SIGINT`: stops accepting connections, drains, then
+  releases the session store, Prisma, Postgres and the error tracker before exiting
 
 ## Project Layout
 
 ```text
 server/
-|-- scripts/                    # One-off migration scripts
+|-- scripts/                    # CLI entry points (migration runner, local Postgres)
 |-- db/postgres/                # Postgres SQL migrations
 |-- prisma/schema.prisma        # Prisma model mapping for Postgres tables
 |-- src/
-|   |-- index.js                # Express app setup and server boot
+|   |-- index.js                # Express app setup, wiring, and server boot
 |   |-- postgres.js             # Postgres readiness probe
 |   |-- prisma.js               # Prisma Client setup
+|   |-- postgresMigrations.js   # Transactional SQL migration runner
+|   |-- shutdown.js             # Graceful shutdown sequence
 |   |-- middleware/             # Request context and error handling
 |   |-- routes/                 # API route registration
-|   `-- services/               # Auth, validation, caching, external APIs, builders
+|   |-- repositories/           # All Prisma data access (see below)
+|   `-- services/               # Auth, sessions, validation, caching, external APIs
 `-- package.json
 ```
+
+### Data access
+
+Every Postgres read and write goes through `src/repositories/`. Routes and services call
+these; nothing else touches `prisma.*` directly.
+
+| Module | Responsibility |
+| --- | --- |
+| `userReadRepository.js` | Loads a user with all dashboard collections |
+| `userRepository.js` | Profile, goals, password hash, calorie entries |
+| `workoutSessionRepository.js` | Workout session writes |
+| `mealLogRepository.js` | Meal log writes, day calorie totals, derived calorie entries |
+| `progressMetricRepository.js` | Progress metric writes |
+| `savedExerciseRepository.js` | Saved exercise add/remove, with dedup |
+| `generatedPlanRepository.js` | Generated plan inserts |
+| `dashboardCollectionRepository.js` | Paginated reads for all three collections |
+| `userLookup.js` | UUID-or-legacy user id resolution — load-bearing |
+| `rowValues.js` | Shared date and Decimal conversions |
+
+Two conventions worth knowing before adding a write:
+
+- **`upsert` is usually unavailable.** Uniqueness comes from *partial* unique indexes
+  (`where legacy_id is not null`), which `schema.prisma` cannot express, so Prisma has no
+  constraint to target. The repositories do an explicit read-then-write.
+- **Collection caps are applied on read.** `userReadRepository` limits each collection
+  with `take:`; nothing prunes the tables.
+
+This replaced a MongoDB-shaped compatibility shim, retired in full — see
+`docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md`.
 
 ## Development
 
@@ -171,11 +205,30 @@ Generation and external data:
 - Passwords are hashed with Argon2id.
 - Request logging redacts common sensitive fields by default.
 
+## Operational Notes
+
+- **Shutdown.** `SIGTERM`/`SIGINT` drains in-flight requests and closes every connection.
+  `SHUTDOWN_TIMEOUT_MS` (default `10000`) forces exit if that stalls. Windows does not
+  deliver POSIX signals to Node, so the sequence is injectable and unit-tested by direct
+  call rather than by signalling a process.
+- **Migrations are transactional.** Each file runs `begin`/SQL/`commit` on **one** checked-out
+  connection. A failure rolls back and the file is not recorded, so a partial apply cannot
+  be mistaken for a completed one.
+- **Never run `prisma db push` against a real database.** It drops tables the schema does
+  not declare. `schema_migrations` is declared as a model purely to protect it from that.
+- **The upstream cache is per process.** Each replica keeps its own and multiplies
+  upstream load; it is not shared state.
+
 ## Testing Notes
 
-Run only server tests from the repo root:
+Server tests run against a real Postgres — there are no database mocks. Start one first
+or roughly 40 tests fail with a connection error that is environmental, not a regression:
 
 ```bash
 npm run postgres:local:start -w server
 npm run test -w server
 ```
+
+`vitest.config.js` sets `fileParallelism: false` deliberately. Suites share one database
+and several call `prisma.appUser.deleteMany({})`, so running files in parallel let one
+truncate rows another was mid-request on.
