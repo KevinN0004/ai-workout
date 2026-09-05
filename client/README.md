@@ -66,6 +66,12 @@ Routing is handled in `src/App.jsx` with browser history state rather than a rou
 - `/dashboard/meal` - Meal planning and logs
 - `/dashboard/tips` - Exercise guide recommendations
 - `/dashboard/settings` - User settings
+- `/dashboard/home` - Dashboard home view
+
+Every dashboard view except the summary is `React.lazy`-loaded and ships as its own
+chunk. Adding a view means adding it to `DASH_VIEW_TO_ROUTE` in `DashboardPage.jsx` and
+to `DASHBOARD_ROUTE_VIEW_MAP` in `app/constants.js` — the first maps view to URL, the
+second maps URL back to view.
 
 ## API Access
 
@@ -73,9 +79,29 @@ Use `src/app/hooks/useApiClient.js` for unsafe requests. It ensures the CSRF coo
 
 Use `src/app/network.js` when a request should have an explicit timeout.
 
+## Bundle Notes
+
+The main chunk is ~402 kB (~128 kB gzipped) and the build emits no size warning. Two
+things keep it there:
+
+- **`jspdf` is imported dynamically**, inside the export handler in `app/events.js`.
+  It is ~386 kB on its own — roughly half the bundle — and most sessions never export a
+  PDF. Turning that back into a static import would undo the split silently, since the
+  build would still succeed.
+- **Dashboard views are `React.lazy`-loaded**, so each is fetched on first visit.
+
+If `npm run build` starts warning about chunks over 500 kB, something was pulled back
+onto the eager path.
+
 ## Testing Notes
 
 Tests use Vitest, jsdom, and Testing Library. The setup file is `src/test/setup.js`.
+
+`components/physique/geometry.js` guards its HMR block on `import.meta.hot?.data`, not
+on `import.meta.hot`. That is deliberate and load-bearing for tests: under vitest
+`import.meta.hot` is truthy while its data bag is undefined, so the unguarded version
+threw on import and made the module — and everything importing it — impossible to test.
+Simplifying that guard back would silently disable about 20 tests.
 
 Run only client tests from the repo root:
 
