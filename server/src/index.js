@@ -330,7 +330,7 @@ const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashb
 // Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
-const { saveMealLog } = createMealLogRepository({ prisma });
+const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
@@ -624,6 +624,7 @@ registerApiRoutes(app, {
   mealLogBodySchema,
   buildMealLogEntry,
   saveMealLog,
+  syncDerivedCalorieEntry,
   progressMetricBodySchema,
   buildProgressMetricEntry,
   saveProgressMetric,

@@ -6,6 +6,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     mealLogBodySchema,
     buildMealLogEntry,
     saveMealLog,
+    syncDerivedCalorieEntry,
     findUserWithDashboard,
     mapDbDocToUser,
     buildDashboardResponse,
@@ -35,6 +36,9 @@ export const registerMealAndMetricRoutes = (app, deps) => {
       }
 
       await saveMealLog({ userId: req.user.id, mealLog });
+      // Recomputes the whole day, so this is correct when an existing meal is
+      // edited by id as well as when a new one is added.
+      await syncDerivedCalorieEntry({ userId: req.user.id, date: mealLog.date });
 
       // A ~110-line Mongo aggregation-pipeline update used to sit here. It
       // computed the day’s calorie total and wrote it into dashboard.calories

@@ -157,23 +157,83 @@ describe("POST /api/dashboard/meal-logs", () => {
     expect(await prisma.mealLog.count()).toBe(0);
   });
 
-  // KNOWN BUG, pinned so the migration cannot quietly change it.
-  //
-  // The route computes a day's calorie total and builds a large Mongo pipeline
-  // intended to write it into dashboard.calories as a `meal_logs`-sourced entry.
-  // The shim never matches array pipelines, so none of that runs: logging a meal
-  // contributes nothing to the calories view. Asserted as-is; fixing it is a
-  // product decision, not part of a refactor.
-  test("does not currently create a calorie entry from a meal log", async () => {
-    const response = await postMeal(agent, csrfToken, {
-      date: "2026-06-08",
-      name: "Big dinner",
-      calories: 900
+  // Meal logs feeding the calories view. The rules are taken from the Mongo
+  // pipeline that was supposed to do this and never ran -- see the plan doc.
+  describe("derived calorie entries", () => {
+    test("creates a meal_logs entry holding the day's total", async () => {
+      const response = await postMeal(agent, csrfToken, {
+        date: "2026-06-08",
+        name: "Big dinner",
+        calories: 900
+      });
+
+      expect(response.status).toBe(200);
+      const [row] = await prisma.calorieEntry.findMany();
+      expect(row.calories).toBe(900);
+      expect(row.source).toBe("meal_logs");
+      expect(row.legacyId).toBe("meal-logs-2026-06-08");
+
+      const entries = response.body.dashboard?.calories || [];
+      expect(entries.some((entry) => entry.calories === 900)).toBe(true);
     });
 
-    expect(response.status).toBe(200);
-    expect(response.body.dashboard?.calories).toEqual([]);
-    expect(await prisma.calorieEntry.count()).toBe(0);
+    test("updates the same entry as more meals are logged that day", async () => {
+      await postMeal(agent, csrfToken, { date: "2026-06-09", name: "Breakfast", calories: 400 });
+      await postMeal(agent, csrfToken, { date: "2026-06-09", name: "Lunch", calories: 650 });
+
+      const rows = await prisma.calorieEntry.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].calories).toBe(1050);
+    });
+
+    test("keeps separate entries for separate days", async () => {
+      await postMeal(agent, csrfToken, { date: "2026-06-10", name: "A", calories: 300 });
+      await postMeal(agent, csrfToken, { date: "2026-06-11", name: "B", calories: 500 });
+
+      const rows = await prisma.calorieEntry.findMany({ orderBy: { calorieDate: "asc" } });
+      expect(rows.map((row) => row.calories)).toEqual([300, 500]);
+    });
+
+    // A number the user typed themselves outranks one derived from meals.
+    test("a manual entry for that day suppresses the derived one", async () => {
+      await agent
+        .post("/api/dashboard/calories")
+        .set("X-CSRF-Token", csrfToken)
+        .send({ date: "2026-06-12", calories: 2000 });
+
+      await postMeal(agent, csrfToken, { date: "2026-06-12", name: "Snack", calories: 250 });
+
+      const rows = await prisma.calorieEntry.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].source).toBe("manual");
+      expect(rows[0].calories).toBe(2000);
+    });
+
+    test("a manual entry on another day does not block the derived one", async () => {
+      await agent
+        .post("/api/dashboard/calories")
+        .set("X-CSRF-Token", csrfToken)
+        .send({ date: "2026-06-13", calories: 2000 });
+
+      await postMeal(agent, csrfToken, { date: "2026-06-14", name: "Snack", calories: 250 });
+
+      const rows = await prisma.calorieEntry.findMany({ orderBy: { calorieDate: "asc" } });
+      expect(rows).toHaveLength(2);
+      expect(rows[1].source).toBe("meal_logs");
+    });
+
+    // Macros-only meals total zero, and the original rules wrote nothing in
+    // that case rather than a misleading 0-calorie day.
+    test("writes nothing when the day's meals carry no calories", async () => {
+      const response = await postMeal(agent, csrfToken, {
+        date: "2026-06-15",
+        name: "Protein shake",
+        proteinG: 30
+      });
+
+      expect(response.status).toBe(200);
+      expect(await prisma.calorieEntry.count()).toBe(0);
+    });
   });
 
   test("requires authentication", async () => {
