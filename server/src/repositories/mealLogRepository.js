@@ -7,6 +7,10 @@ import { getUserPk } from "./userLookup.js";
  * Task 3 of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
  */
 
+// Marks a calorie entry as derived from meal logs rather than typed by the user.
+const DERIVED_CALORIE_SOURCE = "meal_logs";
+const DERIVED_CALORIE_SOURCE_PREFIX = "meal-logs-";
+
 export const mapMealLog = (row = {}) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.mealDate),
@@ -65,12 +69,6 @@ export const createMealLogRepository = ({ prisma }) => {
   /**
    * Total calories logged by a user on one date.
    *
-   * Nothing calls this yet. It is kept because it is the working half of a
-   * feature that is currently broken: the meal-log route computed this total and
-   * then fed it to a Mongo pipeline the shim never executed, so meal logs
-   * contribute nothing to the calories view. Deleting it would throw away the
-   * only part that works. See the plan document for the defect writeup.
-   *
    * `_sum` returns null when no row has a calories value, which is not the same
    * as a zero total -- the Mongo pipeline this replaces used `$ifNull` to make
    * both cases 0, so that coalescing is preserved here rather than left to the
@@ -88,5 +86,59 @@ export const createMealLogRepository = ({ prisma }) => {
     return result._sum.calories || 0;
   };
 
-  return { saveMealLog, sumCaloriesForDate };
+  /**
+   * Keeps the calories view in step with the meals logged for one date.
+   *
+   * The rules are lifted from the Mongo aggregation pipeline that was supposed
+   * to do this and never executed -- the shim only matched object updates, so
+   * an array pipeline fell through to a plain re-read and meal logs contributed
+   * nothing to the calories view. Restated plainly, that pipeline said:
+   *
+   *   1. if a manual entry exists for the day, change nothing -- a number the
+   *      user typed themselves outranks one derived from meals
+   *   2. otherwise replace the derived entry with the day's current total
+   *   3. if that total is zero, leave no entry rather than a misleading 0
+   *
+   * Rule 3 matters for macros-only meals, which sum to zero calories.
+   *
+   * Recomputing the whole day rather than adding a delta means this is correct
+   * when an existing meal is edited, which the POST route allows by id.
+   */
+  const syncDerivedCalorieEntry = async ({ userId, date }) => {
+    const userPk = await getUserPk(prisma, userId);
+    const calorieDate = dateOnlyToDate(date);
+    if (!userPk || !calorieDate) return null;
+
+    const manualEntry = await prisma.calorieEntry.findFirst({
+      where: { userId: userPk, calorieDate, NOT: { source: DERIVED_CALORIE_SOURCE } },
+      select: { id: true }
+    });
+    if (manualEntry) return null;
+
+    const total = await sumCaloriesForDate({ userId, date });
+    const legacyId = `${DERIVED_CALORIE_SOURCE_PREFIX}${String(date).slice(0, 10)}`;
+    const existing = await prisma.calorieEntry.findFirst({
+      where: { userId: userPk, calorieDate, source: DERIVED_CALORIE_SOURCE },
+      select: { id: true }
+    });
+
+    if (total <= 0) {
+      if (existing) await prisma.calorieEntry.delete({ where: { id: existing.id } });
+      return null;
+    }
+
+    const data = {
+      userId: userPk,
+      legacyId,
+      calorieDate,
+      calories: total,
+      source: DERIVED_CALORIE_SOURCE
+    };
+    const row = existing
+      ? await prisma.calorieEntry.update({ where: { id: existing.id }, data })
+      : await prisma.calorieEntry.create({ data });
+    return row.calories;
+  };
+
+  return { saveMealLog, sumCaloriesForDate, syncDerivedCalorieEntry };
 };

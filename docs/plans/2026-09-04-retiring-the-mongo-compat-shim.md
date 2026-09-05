@@ -9,8 +9,8 @@
 > reading the code; the findings all came from running it. Details in each
 > task below — worth reading before trusting a plan of this kind again.
 >
-> **One defect found here is still open and needs a product decision:** meal
-> logs never reach the calories view. See *Defect found during Task 3*.
+> **The one defect found along the way is now fixed too:** meal logs reach the
+> calories view again. See *Defect found during Task 3*.
 
 **Goal:** Replace `server/src/services/prismaDataModels.js` — a MongoDB-shaped
 API implemented on top of Prisma — with direct Prisma calls, and delete the shim.
@@ -249,7 +249,31 @@ write call sites across four files — profile `$set`, goals `$set`, calories
 
 ## Defect found during Task 3: meal logs never reach the calories view
 
-**Not fixed. Needs a product decision, and it is not a refactor's business.**
+**FIXED, after the plan's tasks were complete.** Kept below as the record of
+what was wrong and how the intended behaviour was recovered.
+
+The three questions this section listed turned out to have answers rather than
+needing invention:
+
+1. *Should a meal log create the entry?* — yes; the dead pipeline's whole
+   purpose.
+2. *Should a manual entry suppress it?* — yes; `hasManualCaloriesForDay` tested
+   exactly that.
+3. *What happens on delete?* — **moot.** There is no meal-log delete endpoint;
+   only `GET` and `POST` exist. The hardest question was about a scenario the
+   API cannot reach.
+
+Recovering the pipeline from git gave the rules verbatim: skip when a manual
+entry exists for the day, otherwise replace the derived entry with the day's
+total, and write nothing at all when that total is zero. Implemented as
+`syncDerivedCalorieEntry`, which recomputes the whole day so editing an
+existing meal by id is handled as well as adding one.
+
+Verified with the same probe that first exposed the bug — a 700-calorie meal
+now yields `[{ id: "meal-logs-2026-06-01", calories: 700, source: "meal_logs" }]`
+where it previously yielded `[]`.
+
+### The original writeup follows
 
 The meal-log route computed a day's calorie total and built a large pipeline
 to write it into `dashboard.calories` as a `meal_logs`-sourced entry, unless a
