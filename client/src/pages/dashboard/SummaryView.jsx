@@ -65,6 +65,10 @@ export default function SummaryView({
     : [];
   const isCommercialEnvironment = form?.environment === "Commercial";
   const environmentSelections = Array.isArray(form?.equipment) ? form.equipment : [];
+  // Guarded the same way as equipment above. Not a live bug -- the planner form
+  // always ships focuses as an array -- but the two reads sat side by side with
+  // only one defended, and an undefended read here crashes the whole dashboard.
+  const focusSelections = Array.isArray(form?.focuses) ? form.focuses : [];
   const emptyEnvironmentSelectionLabel = isCommercialEnvironment
     ? "No rooms or operations selected yet."
     : "No equipment selected yet.";
@@ -152,7 +156,7 @@ export default function SummaryView({
               </div>
               <div className="card-section-body">
                 <p className="overview-value">
-                  {form.focuses.length ? form.focuses.join(", ") : "Pick a focus"}
+                  {focusSelections.length ? focusSelections.join(", ") : "Pick a focus"}
                 </p>
                 <p className="muted">Quick focus tags to steer the plan.</p>
               </div>
