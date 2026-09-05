@@ -21,8 +21,11 @@ const FINGER_CONFIGS = [
 ];
 export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r24";
 let devHotReloadTick = 0;
-if (import.meta.hot) {
-  devHotReloadTick = (import.meta.hot.data?.silhouetteHotReloadTick || 0) + 1;
+// Guard on `data`, not just on `hot`. Under vitest `import.meta.hot` is truthy
+// but its data bag is undefined, so writing to it threw and made this module
+// impossible to import from a test at all.
+if (import.meta.hot?.data) {
+  devHotReloadTick = (import.meta.hot.data.silhouetteHotReloadTick || 0) + 1;
   import.meta.hot.data.silhouetteHotReloadTick = devHotReloadTick;
 }
 export const DEV_HOT_RELOAD_TOKEN = import.meta.env.DEV
