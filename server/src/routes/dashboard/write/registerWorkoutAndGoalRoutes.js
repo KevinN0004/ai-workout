@@ -10,7 +10,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     saveWorkoutSession,
     saveCalorieEntry,
     updateGoals,
-    User,
+    findUserWithDashboard,
     mapDbDocToUser,
     buildDashboardResponse,
     caloriesBodySchema,
@@ -42,7 +42,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         // live in their own table: ordering by loadUserRelated's orderBy, dedupe
         // by the upsert above, and the 500 cap by mapUser. What remains is the
         // user-existence check the route actually depends on.
-        const updatedDoc = await User.findOne({ userId: req.user.id });
+        const updatedDoc = await findUserWithDashboard(req.user.id);
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
         const updated = mapDbDocToUser(updatedDoc);
@@ -77,7 +77,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       };
       await saveCalorieEntry({ userId: req.user.id, entry });
 
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
@@ -106,7 +106,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       // supplied.
       await updateGoals({ userId: req.user.id, goals });
 
-      const updatedDoc = await User.findOne({ userId: req.user.id });
+      const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);

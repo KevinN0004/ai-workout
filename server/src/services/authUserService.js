@@ -5,10 +5,12 @@ import { promisify } from "util";
 const pbkdf2Async = promisify(crypto.pbkdf2);
 
 export const createAuthUserService = ({
-  User,
   cleanText,
   argon2Options,
-  updatePasswordHash
+  updatePasswordHash,
+  findUserWithDashboard,
+  findUserWithDashboardByEmail,
+  createUserWithDashboard
 }) => {
   const {
     timeCost = 3,
@@ -17,9 +19,10 @@ export const createAuthUserService = ({
     hashLength = 32
   } = argon2Options || {};
 
-  const mapDbDocToUser = (doc) => {
-    if (!doc) return null;
-    const source = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  // `source` used to be `doc.toObject()` when the data layer handed back
+  // Mongoose-shaped documents. Nothing wraps rows like that any more.
+  const mapDbDocToUser = (source) => {
+    if (!source) return null;
     const inferredAlgo =
       cleanText(source.passwordAlgo, 24) ||
       (cleanText(source.hash, 260).startsWith("$argon2") ? "argon2id" : "pbkdf2");
@@ -49,22 +52,14 @@ export const createAuthUserService = ({
     return doc;
   };
 
-  const findUserById = async (userId) => {
-    const doc = await User.findOne({ userId });
-    return mapDbDocToUser(doc);
-  };
+  const findUserById = async (userId) =>
+    mapDbDocToUser(await findUserWithDashboard(userId));
 
-  const findUserByEmail = async (email) => {
-    const doc = await User.findOne({
-      email: cleanText(email, 254).toLowerCase()
-    });
-    return mapDbDocToUser(doc);
-  };
+  const findUserByEmail = async (email) =>
+    mapDbDocToUser(await findUserWithDashboardByEmail(cleanText(email, 254).toLowerCase()));
 
-  const createUser = async (user) => {
-    const doc = await User.create(mapUserToDbDoc(user));
-    return mapDbDocToUser(doc);
-  };
+  const createUser = async (user) =>
+    mapDbDocToUser(await createUserWithDashboard(mapUserToDbDoc(user)));
 
   const hashPasswordArgon2id = async (password) => {
     const hash = await argon2.hash(password, {
