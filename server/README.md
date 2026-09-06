@@ -218,6 +218,15 @@ Generation and external data:
   not declare. `schema_migrations` is declared as a model purely to protect it from that.
 - **The upstream cache is per process.** Each replica keeps its own and multiplies
   upstream load; it is not shared state.
+- **An upstream outage on `/api/air-quality/current` answers `200`, not an error.** The
+  body carries `fallback: true`, null readings, and indoor guidance, so the dashboard
+  panel degrades instead of failing. A thrown network error carries no status, defaults
+  to 500, and takes the same path. Only a non-upstream status (a real 4xx) is returned as
+  an error.
+- **Absent upstream readings must be rejected before `Number()`.** `Number(null)` and
+  `Number("")` are both `0`, so coercing first turns missing data into a measurement —
+  this shipped twice as wrong health advice. See "External data: absent is not zero" in
+  `CLAUDE.md`.
 
 ## Testing Notes
 
