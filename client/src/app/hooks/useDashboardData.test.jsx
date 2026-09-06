@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useDashboardData from "./useDashboardData";
 
@@ -8,7 +8,26 @@ import useDashboardData from "./useDashboardData";
 // rather than a wrong animation.
 
 const CACHE_KEY = "dashboard:test-user";
+const WEATHER_KEY = "weather:test-user";
+const AIR_KEY = "air:test-user";
 const user = { id: "u-1", email: "a@b.com" };
+// Stable across rerenders: setGoalForm is in the load effect deps, so a fresh
+// vi.fn() each render would re-trigger it forever.
+const setGoalForm = vi.fn();
+
+// The ambient loads go through navigator.geolocation before they can request
+// anything, so most of the failure modes are reached from here rather than
+// from fetch. Resolving and rejecting are both callback-style.
+const stubGeolocation = ({ position = { coords: { latitude: 40.1, longitude: -75.2 } }, error } = {}) => {
+  vi.stubGlobal("navigator", {
+    geolocation: {
+      getCurrentPosition: (onSuccess, onError) => {
+        if (error) onError(error);
+        else onSuccess(position);
+      }
+    }
+  });
+};
 
 const jsonResponse = (body, ok = true) => ({
   ok,
@@ -178,6 +197,380 @@ describe("useDashboardData", () => {
 
       await waitFor(() => expect(result.current.dashboard).toBeNull());
       expect(result.current.dashError).toBe("");
+    });
+
+    test("drops the ambient data too", async () => {
+      stubGeolocation();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation: {} })));
+      const { result } = render({ weatherCacheKey: WEATHER_KEY });
+
+      await act(async () => result.current.loadWeatherRecommendation());
+      await waitFor(() => expect(result.current.weatherData).toBeTruthy());
+
+      act(() => result.current.clearDashboardDataState());
+
+      await waitFor(() => expect(result.current.weatherData).toBeNull());
+      expect(result.current.weatherLastUpdatedAt).toBeNull();
+      expect(result.current.weatherError).toBe("");
+      expect(result.current.airQualityData).toBeNull();
+    });
+  });
+});
+
+// The weather and air-quality half of the hook, which was the uncovered part.
+// Both go through the browser's geolocation before they can ask the server, so
+// most of what can go wrong happens before the request does.
+describe("ambient data", () => {
+  const geoError = (code) => ({ code, message: `geo ${code}` });
+
+  const ambient = (overrides = {}) =>
+    render({ weatherCacheKey: WEATHER_KEY, airCacheKey: AIR_KEY, ...overrides });
+
+  describe("locating the user", () => {
+    test("asks the server for the coordinates it was given", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({ recommendation: {} }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      const url = fetchMock.mock.calls.find(([u]) => u.includes("/api/weather"))[0];
+      expect(url).toContain("latitude=40.1");
+      expect(url).toContain("longitude=-75.2");
+    });
+
+    // The browser reports why it refused, and each reason means something
+    // different to a user: one is fixable in settings, one is not.
+    test.each([
+      [1, /permission was denied/i],
+      [2, /unavailable/i],
+      [3, /timed out/i],
+      [99, /unable to access location/i]
+    ])("turns geolocation error code %i into its own message", async (code, pattern) => {
+      stubGeolocation({ error: geoError(code) });
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherError).toMatch(pattern));
+    });
+
+    test("says so when the browser has no geolocation at all", async () => {
+      vi.stubGlobal("navigator", {});
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherError).toMatch(/not available/i));
+    });
+
+    test("rejects coordinates that are not numbers", async () => {
+      stubGeolocation({ position: { coords: { latitude: "north", longitude: null } } });
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() =>
+        expect(result.current.weatherError).toMatch(/determine location coordinates/i)
+      );
+    });
+
+    test("does not call the server when locating fails", async () => {
+      stubGeolocation({ error: geoError(1) });
+      const fetchMock = vi.fn(async () => jsonResponse({}));
+      vi.stubGlobal("fetch", fetchMock);
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      expect(fetchMock.mock.calls.filter(([u]) => u.includes("/api/weather"))).toHaveLength(0);
+    });
+  });
+
+  describe("loading weather", () => {
+    test("stores the recommendation and stamps when it arrived", async () => {
+      stubGeolocation();
+      const recommendation = { workoutType: "outdoor" };
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation })));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherData).toEqual({ recommendation }));
+      expect(typeof result.current.weatherLastUpdatedAt).toBe("number");
+    });
+
+    test("writes it to the cache for the next visit", async () => {
+      stubGeolocation();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation: {} })));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherData).toBeTruthy());
+      const stored = JSON.parse(window.localStorage.getItem(WEATHER_KEY));
+      expect(stored.data).toEqual({ recommendation: {} });
+    });
+
+    test("clears the loading flag when it settles", async () => {
+      stubGeolocation();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherLoading).toBe(false));
+    });
+
+    test("surfaces the server's message when the request is refused", async () => {
+      stubGeolocation();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "Upstream is down." }, false)));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherError).toBe("Upstream is down."));
+    });
+
+    // Once something is on screen, "unable to load" would be wrong -- the user
+    // is looking at a real, if older, reading.
+    // The hook also loads /api/dashboard, so a call-ordered mock hands the
+    // first response to whichever request happens to go first. Keyed on the
+    // url instead.
+    test("says the reading is stale rather than missing when it already has one", async () => {
+      stubGeolocation();
+      let weatherFails = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) => {
+          if (!String(url).includes("/api/weather")) return jsonResponse({ dashboard: {} });
+          return weatherFails
+            ? jsonResponse({ error: "Upstream is down." }, false)
+            : jsonResponse({ recommendation: {} });
+        })
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+      await waitFor(() => expect(result.current.weatherData).toBeTruthy());
+
+      weatherFails = true;
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherError).toMatch(/last update/i));
+      // The old reading stays on screen.
+      expect(result.current.weatherData).toBeTruthy();
+    });
+  });
+
+  describe("loading air quality", () => {
+    test("stores the reading", async () => {
+      stubGeolocation();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ summary: { aqiUs: 42 } })));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityData).toBeTruthy());
+      expect(typeof result.current.airQualityLastUpdatedAt).toBe("number");
+    });
+
+    test("reports a geolocation refusal the same way weather does", async () => {
+      stubGeolocation({ error: geoError(1) });
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityError).toMatch(/permission was denied/i));
+    });
+
+    test("says the reading is stale rather than missing when it already has one", async () => {
+      stubGeolocation();
+      let airFails = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) => {
+          if (!String(url).includes("/api/air-quality")) return jsonResponse({ dashboard: {} });
+          return airFails
+            ? jsonResponse({ error: "Upstream is down." }, false)
+            : jsonResponse({ summary: {} });
+        })
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+      await waitFor(() => expect(result.current.airQualityData).toBeTruthy());
+
+      airFails = true;
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityError).toMatch(/last update/i));
+    });
+  });
+
+  describe("cached readings", () => {
+    test("shows a cached weather reading before anything is requested", async () => {
+      const cached = { recommendation: { workoutType: "indoor" } };
+      window.localStorage.setItem(
+        WEATHER_KEY,
+        JSON.stringify({ data: cached, updatedAt: 1234 })
+      );
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+      const { result } = ambient();
+
+      await waitFor(() => expect(result.current.weatherData).toEqual(cached));
+      expect(result.current.weatherLastUpdatedAt).toBe(1234);
+    });
+
+    test("shows a cached air quality reading too", async () => {
+      const cached = { summary: { aqiUs: 42 } };
+      window.localStorage.setItem(AIR_KEY, JSON.stringify({ data: cached, updatedAt: 1234 }));
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+      const { result } = ambient();
+
+      await waitFor(() => expect(result.current.airQualityData).toEqual(cached));
+    });
+
+    test("ignores an unparseable cached reading", async () => {
+      window.localStorage.setItem(WEATHER_KEY, "{not json");
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+      const { result } = ambient();
+
+      await waitFor(() => expect(result.current.weatherData).toBeNull());
+      expect(result.current.weatherError).toBe("");
+    });
+  });
+
+  describe("loading on arrival", () => {
+    test("fetches both readings when the dashboard opens", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({}));
+      vi.stubGlobal("fetch", fetchMock);
+
+      ambient({ shouldLoadAmbientData: true });
+
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.some(([u]) => u.includes("/api/weather"))).toBe(true)
+      );
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.some(([u]) => u.includes("/api/air-quality"))).toBe(true)
+      );
+    });
+
+    test("does not fetch when ambient data was not asked for", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      ambient({ shouldLoadAmbientData: false });
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(fetchMock.mock.calls.some(([u]) => u.includes("/api/weather"))).toBe(false);
+    });
+
+    test("does not fetch away from the dashboard", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({}));
+      vi.stubGlobal("fetch", fetchMock);
+
+      ambient({ shouldLoadAmbientData: true, isDashboardRoute: false });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(fetchMock.mock.calls.some(([u]) => u.includes("/api/weather"))).toBe(false);
+    });
+
+    test("does not fetch without a signed-in user", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({}));
+      vi.stubGlobal("fetch", fetchMock);
+
+      ambient({ shouldLoadAmbientData: true, user: null });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    // The auto-load is guarded by `if (!weatherDataRef.current)`, but on a cold
+    // mount that ref is still null when the guard runs: the effect syncing it
+    // is declared first and sees the initial null, the cache-hydration effects
+    // set state further down, and the auto-load effect reads the ref in the
+    // same pass. So a cached reading does not prevent the request, and the user
+    // is prompted for their location anyway. Recorded as it behaves.
+    test("still refetches on a cold mount even with a cached reading", async () => {
+      window.localStorage.setItem(
+        WEATHER_KEY,
+        JSON.stringify({ data: { recommendation: {} }, updatedAt: 1 })
+      );
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({}));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { result } = ambient({ shouldLoadAmbientData: true });
+      await waitFor(() => expect(result.current.weatherData).toBeTruthy());
+
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.some(([u]) => u.includes("/api/weather"))).toBe(true)
+      );
+    });
+
+    // The guard is not dead, though: it is written for the case where the user
+    // leaves the dashboard and comes back without the hook unmounting. The
+    // once-per-visit flag is cleared on the way out, and by then the ref does
+    // hold the reading loaded earlier.
+    test("does not refetch when returning to the dashboard in the same session", async () => {
+      stubGeolocation();
+      const fetchMock = vi.fn(async () => jsonResponse({ recommendation: {} }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { result, rerender } = renderHook((props) => useDashboardData(props), {
+        initialProps: {
+          user,
+          isDashboardRoute: true,
+          shouldLoadAmbientData: true,
+          dashboardCacheKey: CACHE_KEY,
+          weatherCacheKey: WEATHER_KEY,
+          airCacheKey: AIR_KEY,
+          setGoalForm
+        }
+      });
+      await waitFor(() => expect(result.current.weatherData).toBeTruthy());
+      const afterFirst = fetchMock.mock.calls.filter(([u]) =>
+        String(u).includes("/api/weather")
+      ).length;
+
+      // Leave, which clears the once-per-visit flag, then come back.
+      rerender({
+        user,
+        isDashboardRoute: false,
+        shouldLoadAmbientData: true,
+        dashboardCacheKey: CACHE_KEY,
+        weatherCacheKey: WEATHER_KEY,
+        airCacheKey: AIR_KEY,
+        setGoalForm
+      });
+      rerender({
+        user,
+        isDashboardRoute: true,
+        shouldLoadAmbientData: true,
+        dashboardCacheKey: CACHE_KEY,
+        weatherCacheKey: WEATHER_KEY,
+        airCacheKey: AIR_KEY,
+        setGoalForm
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const afterReturn = fetchMock.mock.calls.filter(([u]) =>
+        String(u).includes("/api/weather")
+      ).length;
+      expect(afterReturn).toBe(afterFirst);
     });
   });
 });
