@@ -15,6 +15,7 @@ const {
   aqiBand,
   isSevereWeatherCode,
   isOutdoorFriendlyNow,
+  weatherCodeToText,
   buildWorkoutRecommendation
 } =
   createExternalDataService({
@@ -239,6 +240,42 @@ describe("buildWorkoutRecommendation", () => {
 
   test("still names a real clear-sky code", () => {
     expect(buildWorkoutRecommendation({ weather_code: 0 }).weatherText).toBe("Clear sky");
+  });
+
+  // buildWorkoutRecommendation guards the null itself, so it was fixed by that
+  // guard alone. weatherCodeToText still coerced with Number() internally, and
+  // the weather routes call it with the raw upstream value rather than through
+  // toFiniteNumber -- so the same "null is Clear sky" reading survived there
+  // after it had been fixed here. These pin the helper directly.
+  describe("weatherCodeToText", () => {
+    test.each([
+      ["null", null],
+      ["undefined", undefined],
+      ["an empty string", ""]
+    ])("calls %s unknown rather than clear sky", (_label, code) => {
+      expect(weatherCodeToText(code)).toBe("Unknown");
+    });
+
+    test("still reads a real code 0 as clear sky", () => {
+      expect(weatherCodeToText(0)).toBe("Clear sky");
+      expect(weatherCodeToText("0")).toBe("Clear sky");
+    });
+
+    test.each([
+      [3, "Partly cloudy"],
+      [45, "Fog"],
+      [51, "Drizzle"],
+      [61, "Rain"],
+      [71, "Snow"],
+      [95, "Thunderstorm"]
+    ])("maps code %i to %s", (code, text) => {
+      expect(weatherCodeToText(code)).toBe(text);
+    });
+
+    test("calls an unrecognised code unknown", () => {
+      expect(weatherCodeToText(4242)).toBe("Unknown");
+      expect(weatherCodeToText("sunny")).toBe("Unknown");
+    });
   });
 
   // The same null-is-zero read put a "too cold" reason on a payload that

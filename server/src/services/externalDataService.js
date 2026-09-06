@@ -40,7 +40,15 @@ export const createExternalDataService = ({
     return Number.isFinite(num) ? num : null;
   };
 
+  // Absent input is rejected before Number(), for the same reason toFiniteNumber
+  // does it: Number(null) and Number("") are both 0, and 0 is "Clear sky". The
+  // weather routes build weatherCode with toFiniteNumber but weatherText from
+  // the raw upstream value, so one response reported weatherCode null alongside
+  // weatherText "Clear sky" -- and the text is the half a user reads. undefined
+  // already fell through to "Unknown", which is why an omitted key and an
+  // explicit null disagreed. A real code 0 is still a clear sky.
   const weatherCodeToText = (code) => {
+    if (code === null || code === undefined || code === "") return "Unknown";
     const value = Number(code);
     if (value === 0) return "Clear sky";
     if ([1, 2, 3].includes(value)) return "Partly cloudy";
