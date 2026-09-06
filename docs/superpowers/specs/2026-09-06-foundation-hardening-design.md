@@ -289,18 +289,30 @@ Three jobs replacing today's single serial `test-and-build`:
 **Cost, stated plainly:** 4 `npm ci` runs versus 1 today, and Postgres spun up twice. Accepted in
 exchange for fast-failing quality checks and real Node-version coverage.
 
-**Audit gate.** `audit-ci` fails on high/critical, with `.audit-ci.jsonc` allowlisting the three
-Prisma-chain advisories (`GHSA-3f6p-5ww8-9rcr`, `GHSA-rgwj-5xj2-c3m3`, `GHSA-ggr8-5vv4-36mx`), each
-with a reason and a `reviewBy` date.
+**Audit gate.** `audit-ci` fails on high/critical, with `.audit-ci.json` allowlisting **two**
+advisories: `GHSA-3f6p-5ww8-9rcr` (mysql2) and `GHSA-ggr8-5vv4-36mx` (deepmerge-ts).
+
+Two, not three — verified by running `audit-ci` against this tree. The third mysql2 advisory
+(`GHSA-rgwj-5xj2-c3m3`) sits below the `high` threshold and never trips the gate, so allowlisting it
+makes `audit-ci` report `Consider not allowlisting advisory`. The allowlist names exactly what is
+being suppressed and nothing more.
 
 **The expiry is enforced, not documented.** `audit-ci` has no native expiry support, and a date in a
-comment is exactly the kind of suppression that silently rots. So `scripts/check-audit-allowlist.mjs`
-parses `.audit-ci.jsonc` and exits non-zero once any entry's `reviewBy` has passed, running in the
-`quality` job immediately before `audit-ci`. The suppression therefore invalidates itself and forces
-a human decision on a known date, rather than becoming permanent by inattention.
+comment is exactly the kind of suppression that silently rots. Two files split the concern:
 
-The script is small enough to unit-test, and gets tests covering: a future date passes, a past date
-fails, and a malformed or missing date fails closed.
+- `.audit-ci.json` holds **only** keys `audit-ci`'s schema accepts, so it can never be rejected for
+  carrying metadata the tool does not recognise.
+- `security/advisory-reviews.json` holds the `reason` and `reviewBy` for each entry.
+
+`scripts/check-audit-allowlist.mjs` cross-checks the two and exits non-zero when an entry is past its
+`reviewBy`, is missing a justification, or has gone stale (a review for an advisory no longer
+allowlisted). It runs in the `quality` job immediately before `audit-ci`, so a suppression
+invalidates itself on a known date instead of becoming permanent by inattention.
+
+The checker is a pure function taking `{ allowlist, reviews, today }`, so it is unit-tested without
+filesystem or clock. Tests cover: future date passes, the boundary date itself passes, a past date
+fails, malformed and missing dates fail closed, a missing reason fails, a stale review fails, and all
+problems are reported at once rather than stopping at the first.
 
 The `qs` advisory is **fixed, not allowlisted**, via root `overrides: { "qs": "^6.16.0" }`.
 
@@ -379,8 +391,8 @@ On completion, all of the following must hold:
 - Client suite: 655 tests passing (no regression)
 - Server suite: 750 tests passing (no regression)
 - `npm run build` exits 0 (the "chunks larger than 500 kB" warning is pre-existing, not a failure)
-- `npm audit` reports **no** `qs` or `body-parser` findings; only the three allowlisted Prisma-chain
-  advisories remain
+- `npm audit` reports **no** `qs` or `body-parser` findings; only the allowlisted Prisma-chain
+  advisories remain, and `audit-ci --config .audit-ci.json` exits 0
 - `node scripts/check-audit-allowlist.mjs` exits 0 today, and its unit tests cover future-date pass,
   past-date fail, and malformed-date fail-closed
 - `docker compose up -d` followed by `npm -w server run migrate:postgres` yields a working dev
