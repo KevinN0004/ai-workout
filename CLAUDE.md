@@ -150,6 +150,7 @@ npm run dev:server       # Express server only (node --watch)
 npm run build            # builds the CLIENT only
 npm run start            # starts the server
 npm test                 # client tests, then server tests (Vitest)
+npm run test:coverage    # the same suites with a v8 coverage report
 npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
@@ -165,6 +166,18 @@ npm run prisma:validate        # validate the schema
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
+- **Coverage is measured, not estimated.** `npm run test:coverage`. Baseline on
+  2026-09-05: server **70.8%** statements / 59.2% branches, client **53.9%** / 32.5%.
+  Both configs measure all of `src/**` and exclude only the tests themselves, because a
+  narrower `include` reports a better number rather than a truer one.
+  - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
+    repositories have almost none and sit near 95%, because the dashboard integration
+    suites drive them; several 500-line view components have no test and sit at 0%.
+  - Thin areas as of that baseline, worst first: `registerWgerRoutes.js` (13%),
+    `mealDbRoutes.js` (15%), `middleware/errorHandler.js` (15%, and 0% branch — it is
+    what masks 5xx detail, so it is worth more than its size), `registerWeatherRoutes.js`
+    (44%), `authUserService.js` (56% / 32% branch). On the client, most of
+    `pages/dashboard/*View.jsx` and `pages/home/components/*` are at 0%.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, and React Hook contract violations. **There is deliberately no
   Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do

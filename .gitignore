@@ -25,3 +25,6 @@ dist
 .claude/commands/
 .claude/helpers/
 .claude/skills/
+
+# Coverage output from `npm run test:coverage`.
+coverage

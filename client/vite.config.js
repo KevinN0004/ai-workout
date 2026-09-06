@@ -12,6 +12,15 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.js",
-    globals: true
+    globals: true,
+    coverage: {
+      provider: "v8",
+      // Everything under src is measured. Only the tests and their setup are
+      // excluded -- narrowing this further would report a better number rather
+      // than a truer one.
+      include: ["src/**"],
+      exclude: ["**/*.test.{js,jsx}", "src/test/**"],
+      reporter: ["text", "html"]
+    }
   }
 });
