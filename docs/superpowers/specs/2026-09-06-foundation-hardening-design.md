@@ -109,7 +109,7 @@ The small rewrap count does **not** imply a small diff. This is what `.git-blame
 
 ### 6. Zero circular dependencies
 
-`madge --circular` across 251 files: **no circular dependency found**. `import/no-cycle` can
+`madge --circular` across 251 files: **no circular dependency found**. `import-x/no-cycle` can
 therefore ship as `error` immediately — it costs zero findings today and is a pure regression guard.
 
 ### 7. `no-console` is nearly free
@@ -128,7 +128,44 @@ a property the codebase already has (pino is the server logger).
 The current `>=20` permits Node 20.0–20.18, which Vite and Prisma both reject. Correct floor:
 `^20.19 || ^22.12 || >=24`. Note Vitest excludes odd-numbered Node 23.
 
-### 9. Local Postgres uses a non-standard port and injects its own `DATABASE_URL`
+### 9. Every candidate ESLint rule measures zero — but `import-x` needs resolver config
+
+Measured by running each rule against the tree with a throwaway config (installed with
+`--no-save --no-package-lock`; both manifests verified byte-identical afterward):
+
+| Rule | Violations |
+| --- | --- |
+| `import-x/no-cycle` | 0 |
+| `import-x/no-unresolved` | 0 *(with resolver configured — see below)* |
+| `import-x/no-self-import` | 0 |
+| `import-x/no-duplicates` | 0 |
+| `react/jsx-key` | 0 |
+| `react/no-unstable-nested-components` | 0 |
+
+**The trap:** without resolver configuration, `import-x/no-unresolved` reports **53 false positives**.
+The client imports `.jsx` files extensionlessly (`./DashboardHeader`, `../../components/ModalPortal`),
+which Vite resolves and the default Node resolver does not. The fix is mandatory:
+
+```js
+settings: { "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } } }
+```
+
+With that setting, all 53 disappear. Discovering this during implementation would have burned a full
+PR cycle.
+
+`eslint-plugin-import-x` is chosen over `eslint-plugin-import`: it is the actively maintained fork
+with first-class flat-config support, and it is the version verified against this tree.
+
+### 10. Prettier on Markdown costs 8 files, not a flood
+
+Only **8 tracked** `.md` files exist; Prettier would change **7**. The `.claude/**` tree contains
+hundreds more, but those are gitignored generated scaffolding already excluded from linting.
+
+This reverses an earlier decision to skip Markdown. At 7 files the cost is trivial, all of them land
+inside the already-quarantined reformat commit, and the alternative is permanent formatting drift in
+`CLAUDE.md` and the READMEs — the documents most often read and edited.
+
+### 11. Local Postgres uses a non-standard port and injects its own `DATABASE_URL`
 
 `server/scripts/start-local-postgres.ps1` runs on port **55432** (not 5432), database `ai_workout`,
 user `postgres`, with a random password written to `.postgres-pw` — and it **rewrites `DATABASE_URL`
@@ -175,8 +212,9 @@ preserving hot reload and the existing Windows workflow.
 
 Config matched to observed house style: double quotes, semicolons, 2-space indent, `printWidth: 100`.
 
-Scope: `js`, `jsx`, `json`, `yml`. **`.md` is excluded** — formatting it would inflate the diff with
-the two tracked plan docs and the README for no defect-class benefit.
+Scope: `js`, `jsx`, `json`, `yml`, **and `md`**. Markdown is included on the evidence in Finding 10 —
+only 7 tracked files change, and excluding it would let `CLAUDE.md` and the READMEs drift
+permanently.
 
 Three commits, deliberately separated:
 
@@ -199,19 +237,33 @@ local git does not. This goes in CLAUDE.md's "Fresh Clone Setup" alongside the e
 
 No style rules; Prettier owns formatting. Added:
 
-| Rule | Current violations | Rationale |
+All counts below are **measured, not projected** (Finding 9). Every rule ships as `error` — none needs
+triage, and none lands silently disabled.
+
+| Rule | Violations | Rationale |
 | --- | --- | --- |
-| `import/no-cycle` (**error**) | 0 | Pure regression guard; madge confirms zero cycles |
-| `import/no-unresolved` (**error**) | confirm on first run | Catches broken ESM specifiers |
+| `import-x/no-cycle` (**error**) | 0 | Regression guard; madge independently confirms zero cycles |
+| `import-x/no-unresolved` (**error**) | 0 | Catches broken ESM specifiers |
+| `import-x/no-self-import` (**error**) | 0 | Free correctness guard |
+| `import-x/no-duplicates` (**error**) | 0 | Free; collapses split imports of one module |
 | `no-console` (**error**) | 1 (server) | pino is the logger; locks in existing property |
-| `react/jsx-key` (**error**) | confirm on first run | Real defect class, currently unchecked |
-| `react/no-unstable-nested-components` (**error**) | confirm on first run | Remount/perf defect class |
+| `react/jsx-key` (**error**) | 0 | Real defect class, currently unchecked |
+| `react/no-unstable-nested-components` (**error**) | 0 | Remount/perf defect class |
 
-Also add `"type": "module"` to the root `package.json` — the lint run currently emits
-`MODULE_TYPELESS_PACKAGE_JSON` for `eslint.config.js`.
+**Mandatory resolver setting** — without it `no-unresolved` emits 53 false positives on the client's
+extensionless `.jsx` imports:
 
-Any rule whose first run produces violations is triaged in that PR: fix if small, downgrade to `warn`
-with a recorded count if not. No rule lands silently disabled.
+```js
+settings: { "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } } }
+```
+
+Also:
+
+- `linterOptions.reportUnusedDisableDirectives: "error"`. ESLint 9 defaults this to `warn`; promoting
+  it to `error` stops dead suppressions accumulating. Currently zero unused directives, so it is free
+  today and only ever fires on newly-orphaned ones.
+- `"type": "module"` in the root `package.json` — the lint run currently emits
+  `MODULE_TYPELESS_PACKAGE_JSON` for `eslint.config.js`.
 
 ### 4. CI restructure
 
@@ -229,15 +281,26 @@ Three jobs replacing today's single serial `test-and-build`:
 - Least-privilege `permissions:` block for `GITHUB_TOKEN`.
 - `.nvmrc` = **24** (the version actually developed on), `engines` = `^20.19 || ^22.12 || >=24` (the
   supported floor), CI matrix covers both ends.
+- `.npmrc` with `engine-strict=true` is **attempted, not assumed**. It turns `engines` from advisory
+  metadata into an install-time gate, which is the stronger practice — but npm applies it to every
+  package in the tree, so one transitive dependency with a careless `engines` field can break
+  installs. Keep it only if `npm ci` succeeds on both 20.19 and 24; drop it otherwise and note why.
 
 **Cost, stated plainly:** 4 `npm ci` runs versus 1 today, and Postgres spun up twice. Accepted in
 exchange for fast-failing quality checks and real Node-version coverage.
 
 **Audit gate.** `audit-ci` fails on high/critical, with `.audit-ci.jsonc` allowlisting the three
 Prisma-chain advisories (`GHSA-3f6p-5ww8-9rcr`, `GHSA-rgwj-5xj2-c3m3`, `GHSA-ggr8-5vv4-36mx`), each
-with a reason. The review date in that file is **convention only — `audit-ci` does not enforce
-expiry.** The implementation plan must pick one of: accept it as a comment, or add a CI step that
-actually fails once the date passes. It must not imply enforcement that does not exist.
+with a reason and a `reviewBy` date.
+
+**The expiry is enforced, not documented.** `audit-ci` has no native expiry support, and a date in a
+comment is exactly the kind of suppression that silently rots. So `scripts/check-audit-allowlist.mjs`
+parses `.audit-ci.jsonc` and exits non-zero once any entry's `reviewBy` has passed, running in the
+`quality` job immediately before `audit-ci`. The suppression therefore invalidates itself and forces
+a human decision on a known date, rather than becoming permanent by inattention.
+
+The script is small enough to unit-test, and gets tests covering: a future date passes, a past date
+fails, and a malformed or missing date fails closed.
 
 The `qs` advisory is **fixed, not allowlisted**, via root `overrides: { "qs": "^6.16.0" }`.
 
@@ -284,7 +347,7 @@ Dependabot (`npm` and `github-actions`, weekly, minor/patch grouped to limit PR 
 | --- | --- | --- |
 | 1 | Prettier + ESLint config, `type: module` | No reformat; keeps config reviewable |
 | 2 | The reformat + `.git-blame-ignore-revs` | Isolated so the SHA can be quarantined |
-| 3 | CI restructure, `.nvmrc`, `engines` fix, audit gate, `qs` override | Must follow 2, or `prettier --check` fails on arrival. All Node-version work lands together so `engines`, `.nvmrc`, and the CI matrix never disagree |
+| 3 | CI restructure, `.nvmrc`, `.npmrc`, `engines` fix, audit gate + `check-audit-allowlist.mjs`, `qs` override | Must follow 2, or `prettier --check` fails on arrival. All Node-version work lands together so `engines`, `.nvmrc`, and the CI matrix never disagree |
 | 4 | Docker Compose | Independent |
 | 5 | Env preflight + `.env.example` | Independent |
 | 6 | Dependabot, PR template, CODEOWNERS | Independent |
@@ -300,8 +363,10 @@ PR 2 conflicts with any in-flight branch. Land it when nothing else is open.
 | `qs` override also forces `supertest → superagent → qs 6.14.2` up to 6.16.0 | Semver-minor, but unproven — gate PR 3 on the full 1,405-test suite |
 | Compose and the PowerShell script collide on port 55432 | Documented as mutually exclusive |
 | The 10,447-line reformat conflicts with open branches | Land PR 2 against a quiet tree |
-| `quality` job runs without `prisma generate` | `import/no-unresolved` should resolve `@prisma/client` from the package, not the generated client — confirm on first run |
+| `quality` job runs without `prisma generate` | Measured: `import-x/no-unresolved` reports 0 errors against the tree, resolving `@prisma/client` from the package rather than the generated client |
 | `.git-blame-ignore-revs` silently inert locally | Documented in CLAUDE.md Fresh Clone Setup |
+| `engine-strict=true` breaks install via a transitive `engines` field | Gated on `npm ci` passing on both matrix versions; dropped if it fails |
+| `import-x` resolver misconfigured → 53 false positives | Resolver `extensions` setting is specified in the design, not left to discovery |
 
 ---
 
@@ -316,6 +381,8 @@ On completion, all of the following must hold:
 - `npm run build` exits 0 (the "chunks larger than 500 kB" warning is pre-existing, not a failure)
 - `npm audit` reports **no** `qs` or `body-parser` findings; only the three allowlisted Prisma-chain
   advisories remain
+- `node scripts/check-audit-allowlist.mjs` exits 0 today, and its unit tests cover future-date pass,
+  past-date fail, and malformed-date fail-closed
 - `docker compose up -d` followed by `npm -w server run migrate:postgres` yields a working dev
   database
 - Starting the server with `DATABASE_URL` unset produces a single readable error listing all problems
