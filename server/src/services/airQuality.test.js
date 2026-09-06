@@ -10,7 +10,13 @@ import { createExternalDataService } from "./externalDataService.js";
 // widening a production export to make a test possible; the factory already
 // offers a seam, so it is used instead. Every dependency below is a stub: the
 // functions under test are pure and touch none of them.
-const { pm25ToUsAqi, aqiBand, isSevereWeatherCode, isOutdoorFriendlyNow } =
+const {
+  pm25ToUsAqi,
+  aqiBand,
+  isSevereWeatherCode,
+  isOutdoorFriendlyNow,
+  buildWorkoutRecommendation
+} =
   createExternalDataService({
     cleanText: (value, maxLen = 120) =>
       typeof value === "string" ? value.trim().slice(0, maxLen) : "",
@@ -178,5 +184,72 @@ describe("weather safety helpers", () => {
     expect(isOutdoorFriendlyNow()).toBe(true);
     expect(isOutdoorFriendlyNow({})).toBe(true);
     expect(() => isOutdoorFriendlyNow({ temperature_2m: "warm" })).not.toThrow();
+  });
+
+  // Open-Meteo omits a variable it has no value for on some models and sends an
+  // explicit null on others. Both mean the same thing -- no reading -- so both
+  // have to answer the same way. Every gate in the function is written as
+  // `value !== null && ...`, which says the intent plainly.
+  describe("a missing reading is missing however it arrives", () => {
+    test.each([
+      ["temperature", "temperature_2m"],
+      ["wind", "wind_speed_10m"],
+      ["precipitation", "precipitation"],
+      ["weather code", "weather_code"]
+    ])("an explicit null %s reads the same as an absent one", (_label, key) => {
+      expect(isOutdoorFriendlyNow({ [key]: null })).toBe(isOutdoorFriendlyNow({}));
+    });
+
+    // The whole-payload case, which is what a degraded upstream actually sends.
+    test("a reading of nothing but nulls is not treated as freezing", () => {
+      expect(
+        isOutdoorFriendlyNow({
+          temperature_2m: null,
+          wind_speed_10m: null,
+          precipitation: null,
+          weather_code: null
+        })
+      ).toBe(true);
+    });
+
+    // An empty string is the other way upstreams spell "no value", and
+    // Number("") is 0 just as Number(null) is.
+    test("an empty-string temperature is not treated as freezing", () => {
+      expect(isOutdoorFriendlyNow({ temperature_2m: "" })).toBe(true);
+    });
+
+    // Guarding the fix from the other side: a real zero still means zero, and
+    // 0C is genuinely below the cold limit.
+    test("a measured zero is still a measurement", () => {
+      expect(isOutdoorFriendlyNow({ temperature_2m: 0 })).toBe(false);
+      expect(isOutdoorFriendlyNow({ precipitation: 0 })).toBe(true);
+    });
+  });
+});
+
+describe("buildWorkoutRecommendation", () => {
+  // buildWorkoutRecommendation opens with `weatherCode === null ? "Unknown"`,
+  // so the author plainly meant a missing code to read as unknown. Weather code
+  // 0 is "Clear sky", and Number(null) is 0, so that branch could not fire for
+  // the input it was written for: a null code reported clear skies.
+  test("calls a missing weather code unknown rather than clear sky", () => {
+    expect(buildWorkoutRecommendation({ weather_code: null }).weatherText).toBe("Unknown");
+    expect(buildWorkoutRecommendation({}).weatherText).toBe("Unknown");
+  });
+
+  test("still names a real clear-sky code", () => {
+    expect(buildWorkoutRecommendation({ weather_code: 0 }).weatherText).toBe("Clear sky");
+  });
+
+  // The same null-is-zero read put a "too cold" reason on a payload that
+  // carried no temperature at all.
+  test("gives no temperature reason when no temperature was reported", () => {
+    const reasons = buildWorkoutRecommendation({ temperature_2m: null }).reasons;
+    expect(reasons.join(" ")).not.toMatch(/temperature/i);
+  });
+
+  test("still gives a temperature reason for a real cold reading", () => {
+    const reasons = buildWorkoutRecommendation({ temperature_2m: 2 }).reasons;
+    expect(reasons.join(" ")).toMatch(/temperature/i);
   });
 });
