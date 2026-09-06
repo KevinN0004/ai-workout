@@ -184,7 +184,7 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **75.6%** statements / 64.9% branches, client **53.9%** / 32.5%.
+  server **75.6%** statements / 64.9% branches, client **56.9%** / 36.6%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
@@ -194,8 +194,15 @@ npm run prisma:validate        # validate the schema
     `registerMealDbRoutes.js` (15% / 0%), `externalDataService.js` (49% — what is
     left is the wger and mealdb response mappers; its retry, weather and AQI logic
     are covered), `postgres.js` (53%), `index.js` (68%), and `generateRoutes.js`
-    (75% / 48%). On the client, most of `pages/dashboard/*View.jsx` and
-    `pages/home/components/*` are at 0%.
+    (75% / 48%). On the client, worst first: `usePreviewChapterFlow.js` and
+    `usePreviewWeekParticleAnimation.js` (both 0%, both animation orchestration),
+    `TipsView.jsx` (0%), `app/events.js` (39%), `useHomeStageFlow.js` (56%),
+    `useDashboardData.js` (50%), and `useMealDbSearch.js` (0%). Most
+    `pages/dashboard/*View.jsx` are still at 0%.
+  - **Prefer the client's logic modules to its components.** `units.js` and
+    `tips/recommendationUtils.js` are both above 98% and were the highest-value
+    client work available — pure functions producing numbers and advice a user acts
+    on. A 450-line view component is more lines for less risk.
   - **The auth path and the external routes are now covered**, and are the worked
     examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
     at 100% statements; the weather and air-quality routes are covered end to end.
