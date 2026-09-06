@@ -102,8 +102,13 @@ Line-length distribution across `client/src` + `server/src` (36,898 lines):
 printWidth 100 rewraps only 201 lines; printWidth 80 would touch 1,906. But Prettier's other
 normalizations reach much further — measured by formatting a copy of the tree and diffing:
 
-- **174 of 188 files** changed (93%)
-- **10,447 lines** changed (8,204 client + 2,243 server), roughly 28% of the codebase
+- **173 files** changed
+- **3,651 insertions and 3,538 deletions** — roughly 7,200 lines touched
+- By type: 83 `.js`, 43 `.jsx`, 33 `.css`, 8 `.md`, 5 `.mjs`, 1 `.yml`
+
+The config matters more than expected. An earlier measurement using Prettier's *defaults* produced
+10,447 changed lines; setting `trailingComma: "none"` to match house style cuts that by about 30%.
+Measure with the config you intend to ship, never with defaults.
 
 The small rewrap count does **not** imply a small diff. This is what `.git-blame-ignore-revs` is for.
 
@@ -212,7 +217,10 @@ preserving hot reload and the existing Windows workflow.
 
 Config matched to observed house style: double quotes, semicolons, 2-space indent, `printWidth: 100`.
 
-Scope: `js`, `jsx`, `json`, `yml`, **and `md`**. Markdown is included on the evidence in Finding 10 —
+Scope: every language Prettier supports that is not ignored — in practice `js`, `jsx`, `mjs`, `css`,
+`json`, `yml`, and `md`. CSS is 33 of the 173 files; it was missing from an earlier draft of this
+scope by oversight, and there is no reason to exempt it. Markdown is included on the evidence in
+Finding 10 —
 only 7 tracked files change, and excluding it would let `CLAUDE.md` and the READMEs drift
 permanently.
 
@@ -374,7 +382,7 @@ PR 2 conflicts with any in-flight branch. Land it when nothing else is open.
 | --- | --- |
 | `qs` override also forces `supertest → superagent → qs 6.14.2` up to 6.16.0 | Semver-minor, but unproven — gate PR 3 on the full 1,405-test suite |
 | Compose and the PowerShell script collide on port 55432 | Documented as mutually exclusive |
-| The 10,447-line reformat conflicts with open branches | Land PR 2 against a quiet tree |
+| The ~7,200-line reformat conflicts with open branches | Land PR 2 against a quiet tree |
 | `quality` job runs without `prisma generate` | Measured: `import-x/no-unresolved` reports 0 errors against the tree, resolving `@prisma/client` from the package rather than the generated client |
 | `.git-blame-ignore-revs` silently inert locally | Documented in CLAUDE.md Fresh Clone Setup |
 | `engine-strict=true` breaks install via a transitive `engines` field | Gated on `npm ci` passing on both matrix versions; dropped if it fails |

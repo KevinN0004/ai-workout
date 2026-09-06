@@ -73,7 +73,7 @@ No reformatting happens in this PR. Config only, so it stays reviewable.
 Run from the repository root. Do not pass `-w` — these belong to the root package, not a workspace.
 
 ```bash
-npm install -D prettier@3 eslint-config-prettier eslint-plugin-import-x eslint-import-resolver-node vitest
+npm install -D prettier@3 eslint-config-prettier eslint-plugin-import-x eslint-import-resolver-node vitest@^4.1.11
 ```
 
 `vitest` is added at the root deliberately: it currently resolves only by hoisting from the workspaces, and Task 9 adds root-level tests that must not depend on that accident.
@@ -124,7 +124,14 @@ Add to the `scripts` block:
 npx prettier --check . ; echo "EXIT=$?"
 ```
 
-Expected: `EXIT=1` with roughly 181 files listed (174 JS/JSX + 7 Markdown). This confirms the config loads and the ignore file works — the reformat itself is Task 4.
+Expected: `EXIT=1` and a summary line reading `Code style issues found in 173 files.` Breakdown,
+measured against this tree with this exact config: 83 `.js`, 43 `.jsx`, 33 `.css`, 8 `.md`, 5
+`.mjs`, 1 `.yml`.
+
+**Prettier writes the file list to stderr**, so `2>/dev/null` silently discards it and makes a failing
+run look clean. Redirect with `> out.txt 2>&1` to inspect the list.
+
+This confirms the config loads and the ignore file works — the reformat itself is Task 4.
 
 - [ ] **Step 6: Commit**
 
@@ -390,11 +397,12 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ## PR 2 — The reformat
 
-Land this against a quiet tree. It touches roughly 10,447 lines and will conflict with any open branch.
+Land this against a quiet tree. It touches roughly 7,200 lines and will conflict with any open branch.
 
 ### Task 4: Reformat the repository in one isolated commit
 
-**Files:** ~181 files across `client/`, `server/`, `scripts/`, and tracked Markdown.
+**Files:** 173 files across `client/`, `server/`, `scripts/`, and tracked Markdown — 83 `.js`, 43
+`.jsx`, 33 `.css`, 8 `.md`, 5 `.mjs`, 1 `.yml`.
 
 - [ ] **Step 1: Confirm the tree is clean**
 
@@ -424,7 +432,9 @@ npm run format
 git diff --shortstat
 ```
 
-Expected: roughly 181 files changed and on the order of 10,000 insertions plus deletions. A wildly different number means `.prettierignore` is wrong — investigate before committing.
+Expected: **173 files changed, ~3,651 insertions, ~3,538 deletions** (~7,200 lines touched). These
+numbers were measured against this tree with this exact `.prettierrc`. A materially different count
+means `.prettierignore` or `.prettierrc` differs from the plan — investigate before committing.
 
 - [ ] **Step 5: Verify nothing behavioural changed**
 
