@@ -109,11 +109,45 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`, currently 59.0% statements / 38.5%
+Coverage is `npm run test:coverage -w client`, currently 61.3% statements / 40.6%
 branches. Prefer the logic modules to the view components when adding tests —
-`app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js` and
-`app/hooks/useOptimisticLogs.js` are all at or above 95% and were worth far more than
-their line count.
+`app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js`,
+`app/hooks/useOptimisticLogs.js` and `app/hooks/useApiClient.js` are all at or above
+95% and were worth far more than their line count.
+
+## Requests and Sign-out
+
+`app/hooks/useApiClient.js` wraps every call. Two defaults there are invisible when
+they work and expensive when they do not:
+
+- `credentials` defaults to `"include"`. Without it the session cookie is not sent and
+  every request is anonymous.
+- The method is upper-cased before the safe-method check, so a lowercase `"post"` still
+  gets a CSRF token rather than being treated as a read and sent unprotected.
+
+A state-changing request whose CSRF token cannot be obtained **throws instead of being
+sent**, so the failure surfaces as a message rather than an unexplained 403.
+
+`onLogout` in `app/events.js` clears local state inside a `try`/`catch`, and the order
+matters. The button is wired straight to the handler with nothing catching it, so when
+the request was awaited bare, a rejection skipped every clear and left the previous
+account's dashboard on screen. Both a dead network and `apiFetch` refusing to send
+without a CSRF token reach that path. The session cookie is HttpOnly and cannot be
+cleared from here, so a failed request may leave the server session alive — clearing
+what we can is deliberate.
+
+## Logging an Entry
+
+Workout, calorie and meal submissions go through the optimistic queue; goals, progress
+metrics and saved exercises write directly. The difference shows in when the form is
+cleared: the optimistic handlers clear immediately because the queue owns the failure,
+the direct ones only once the write has landed.
+
+**Empty is not zero.** A workout's `duration`, `sets`, `reps` and `intensityRpe`, and a
+meal's macros, are written as `field ? Number(field) : null` so an unfilled field stays
+null. A zero-minute session would drag the weekly totals down and a zero-calorie meal
+the daily average. `submitCalories` is the exception — `Number(calories || 0)` makes an
+empty field `0` — so the three do not agree.
 
 ## Saving a Log Entry
 
