@@ -97,6 +97,23 @@ onto the eager path.
 
 Tests use Vitest, jsdom, and Testing Library. The setup file is `src/test/setup.js`.
 
+**Mocking a module the app constructs with `new`.** `app/events.test.js` mocks `jspdf`,
+which `events.js` loads on demand and calls as `new jsPDF(...)`. `vi.fn()` returns an
+arrow function, and arrows are not constructable — so a factory of the shape
+`vi.mock("jspdf", () => ({ jsPDF: vi.fn(...) }))` throws *"is not a constructor"* before
+the spy is ever reached. What you see is the spy reporting **zero calls**, which reads
+exactly like the mock not being applied. Export a function expression that delegates to
+the spy instead:
+
+```js
+const jsPDF = vi.fn(() => pdfDoc);
+vi.mock("jspdf", () => ({
+  jsPDF: function jsPDFMock(...args) {
+    return jsPDF(...args);
+  }
+}));
+```
+
 `components/physique/geometry.js` guards its HMR block on `import.meta.hot?.data`, not
 on `import.meta.hot`. That is deliberate and load-bearing for tests: under vitest
 `import.meta.hot` is truthy while its data bag is undefined, so the unguarded version
@@ -109,7 +126,7 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`, currently 61.3% statements / 40.6%
+Coverage is `npm run test:coverage -w client`, currently 62.1% statements / 42.2%
 branches. Prefer the logic modules to the view components when adding tests —
 `app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js`,
 `app/hooks/useOptimisticLogs.js` and `app/hooks/useApiClient.js` are all at or above

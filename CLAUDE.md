@@ -184,7 +184,7 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **75.6%** statements / 64.9% branches, client **61.3%** / 40.6%.
+  server **75.6%** statements / 64.9% branches, client **62.1%** / 42.2%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
@@ -201,11 +201,9 @@ npm run prisma:validate        # validate the schema
     `pages/dashboard/*View.jsx` are still at 0%.
   - **Prefer the client's logic modules to its components.** `units.js`,
     `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js` and
-    `useApiClient.js` are all at or above 95% — pure functions, state machines and
-    the request layer, producing numbers, advice and saved data. `app/events.js` is
-    at 78%: its auth, sign-out and log-submission handlers are covered, its plan
-    generation and PDF export are not. A 450-line view component is more lines for
-    less risk than any of these.
+    `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
+    state machines, the request layer and every user action. A 450-line view
+    component is more lines for less risk than any of these.
   - **The auth path and the external routes are now covered**, and are the worked
     examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
     at 100% statements; the weather and air-quality routes are covered end to end.
