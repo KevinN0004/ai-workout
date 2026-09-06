@@ -108,3 +108,30 @@ Run only client tests from the repo root:
 ```bash
 npm run test -w client
 ```
+
+Coverage is `npm run test:coverage -w client`, currently 56.9% statements / 36.6%
+branches. Prefer the logic modules to the view components when adding tests —
+`app/units.js` and `pages/dashboard/tips/recommendationUtils.js` are both above 98%
+and were worth far more than their line count.
+
+## Exercise Recommendations
+
+`pages/dashboard/tips/recommendationUtils.js` ranks exercises for the Tips view by
+adding up matches — category focus `+5`, available equipment `+3`, today's planned
+muscles `+2`, and so on — and subtracting `7` for each reported injury the exercise
+conflicts with.
+
+**That subtraction is a ranking penalty, not an exclusion.** An exercise matching the
+focus, the equipment, the goal wording and today's muscles banks 12 points, so a single
+`-7` still leaves it at 5 — above a safe exercise that matches almost nothing. A
+movement someone has been told to avoid can therefore still appear, ranked lower.
+Excluding one outright needs a filter, not a bigger penalty.
+
+Two details that are not obvious from reading the file:
+
+- `detectInjuryFlags` matches injury names as substrings, and `back` is inside
+  `lower back`, so a lower-back note raises **both** rules. They carry the same
+  keywords, so a conflicting exercise is penalised twice. The ordering depends on that.
+- `getExerciseImage` picks the entry flagged `isMain` that has a url, then falls back to
+  `images[0]` — positionally, not to the first entry that has a url. An `images[0]`
+  carrying no url yields the placeholder even when a later image would have served.
