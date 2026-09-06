@@ -3,6 +3,28 @@ import { createAppEventHandlers } from "./events";
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg } from "./units";
 
+// jspdf is loaded on demand so it stays out of the initial bundle, which means
+// the export path has a failure mode the static import did not: the chunk
+// fetch itself. Mocking the module lets both halves be driven without pulling
+// a quarter of the bundle into the test run.
+const pdfDoc = {
+  internal: { pageSize: { getWidth: () => 612, getHeight: () => 792 } },
+  splitTextToSize: vi.fn((text) => String(text).split("\n")),
+  addPage: vi.fn(),
+  text: vi.fn(),
+  save: vi.fn()
+};
+const jsPDF = vi.fn(() => pdfDoc);
+// The export has to be constructable: the module does `new jsPDF(...)`, and an
+// arrow -- which is what vi.fn hands back -- throws "is not a constructor"
+// before the spy is ever reached. A function expression delegates to the spy
+// and, by returning an object, makes `new` yield pdfDoc.
+vi.mock("jspdf", () => ({
+  jsPDF: function jsPDFMock(...args) {
+    return jsPDF(...args);
+  }
+}));
+
 // The auth and sign-out handlers out of app/events.js, which was at 39%.
 // These decide what the client does with a session: what it sends to the auth
 // endpoints, and what it clears when a user signs out.
@@ -778,5 +800,329 @@ describe("direct submissions", () => {
       expect(result).toEqual({ ok: false, error: "Not found." });
       expect(deps.setDashboard).not.toHaveBeenCalled();
     });
+  });
+});
+
+// The app's main feature: send the planner form to Gemini and route the user to
+// the plan that comes back.
+describe("onSubmit", () => {
+  const generated = (overrides = {}) =>
+    jsonResponse({ plan: "Monday - Push\nBench press", ...overrides });
+
+  test("posts the planner form to the generate endpoint", async () => {
+    deps.apiFetch.mockResolvedValue(generated());
+    const event = submitEvent();
+
+    await build({ form: { goal: "build muscle", days: 4 } }).onSubmit(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    const [url, options] = deps.apiFetch.mock.calls[0];
+    expect(url).toBe("/api/generate");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toEqual({ goal: "build muscle", days: 4 });
+  });
+
+  test("clears the previous result and error before starting", async () => {
+    deps.apiFetch.mockResolvedValue(generated());
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.setError).toHaveBeenNthCalledWith(1, "");
+    expect(deps.setResult).toHaveBeenNthCalledWith(1, "");
+  });
+
+  test("stores the generated plan", async () => {
+    deps.apiFetch.mockResolvedValue(generated());
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.setResult).toHaveBeenLastCalledWith("Monday - Push\nBench press");
+  });
+
+  // Generation takes long enough that the spinner is the only thing telling a
+  // user anything is happening.
+  test.each([
+    ["success", async () => jsonResponse({ plan: "Monday" })],
+    ["rejection", async () => jsonResponse({ error: "no" }, false)],
+    [
+      "network failure",
+      async () => {
+        throw new Error("network down");
+      }
+    ]
+  ])("clears the loading flag after a %s", async (_label, apiFetch) => {
+    await build({ apiFetch: vi.fn(apiFetch) }).onSubmit(submitEvent());
+
+    expect(deps.setLoading).toHaveBeenNthCalledWith(1, true);
+    expect(deps.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  describe("the saved plan", () => {
+    const savedPlan = { id: "p-new", plan: "Monday - Push" };
+
+    test("is put at the front of the dashboard's plans", async () => {
+      deps.apiFetch.mockResolvedValue(generated({ savedPlan }));
+
+      await build().onSubmit(submitEvent());
+
+      const updater = deps.setDashboard.mock.calls[0][0];
+      expect(updater({ plans: [{ id: "p-old" }] }).plans).toEqual([
+        savedPlan,
+        { id: "p-old" }
+      ]);
+    });
+
+    test("becomes the only plan when there were none", async () => {
+      deps.apiFetch.mockResolvedValue(generated({ savedPlan }));
+
+      await build().onSubmit(submitEvent());
+
+      const updater = deps.setDashboard.mock.calls[0][0];
+      expect(updater({}).plans).toEqual([savedPlan]);
+    });
+
+    // Generating a plan while signed out leaves nothing to merge into.
+    test("does not invent a dashboard when there is none", async () => {
+      deps.apiFetch.mockResolvedValue(generated({ savedPlan }));
+
+      await build().onSubmit(submitEvent());
+
+      const updater = deps.setDashboard.mock.calls[0][0];
+      expect(updater(null)).toBeNull();
+    });
+
+    test("is not merged when the server saved nothing", async () => {
+      deps.apiFetch.mockResolvedValue(generated());
+
+      await build().onSubmit(submitEvent());
+
+      expect(deps.setDashboard).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("where it sends the user", () => {
+    test("stays on the dashboard when that is where the request came from", async () => {
+      deps.apiFetch.mockResolvedValue(generated());
+
+      await build({ isDashboardRoute: true }).onSubmit(submitEvent());
+
+      expect(deps.setDashView).toHaveBeenCalledWith("summary");
+      expect(deps.go).toHaveBeenCalledWith("/dashboard");
+    });
+
+    test("opens the plan page otherwise", async () => {
+      deps.apiFetch.mockResolvedValue(generated());
+
+      await build({ isDashboardRoute: false }).onSubmit(submitEvent());
+
+      expect(deps.go).toHaveBeenCalledWith("/plan");
+      expect(deps.setDashView).not.toHaveBeenCalled();
+    });
+
+    test("closes the planner and its modal either way", async () => {
+      deps.apiFetch.mockResolvedValue(generated());
+
+      await build().onSubmit(submitEvent());
+
+      expect(deps.closePlanner).toHaveBeenCalledTimes(1);
+      expect(deps.setPlanModalOpen).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe("when generation fails", () => {
+    test("surfaces the server's message", async () => {
+      deps.apiFetch.mockResolvedValue(
+        jsonResponse({ error: "The model is overloaded." }, false)
+      );
+
+      await build().onSubmit(submitEvent());
+
+      expect(deps.setError).toHaveBeenLastCalledWith("The model is overloaded.");
+    });
+
+    test("falls back to a generic message when the body is unreadable", async () => {
+      deps.apiFetch.mockResolvedValue({
+        ok: false,
+        json: async () => {
+          throw new Error("not json");
+        }
+      });
+
+      await build().onSubmit(submitEvent());
+
+      expect(deps.setError).toHaveBeenLastCalledWith("Something went wrong.");
+    });
+
+    test("reports a network failure rather than throwing at the caller", async () => {
+      deps.apiFetch.mockRejectedValue(new Error("network down"));
+
+      await expect(build().onSubmit(submitEvent())).resolves.toBeUndefined();
+      expect(deps.setError).toHaveBeenLastCalledWith("network down");
+    });
+
+    // A failed generation must not navigate away from the form the user just
+    // filled in.
+    test("leaves the user where they were", async () => {
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "no" }, false));
+
+      await build().onSubmit(submitEvent());
+
+      expect(deps.go).not.toHaveBeenCalled();
+      expect(deps.closePlanner).not.toHaveBeenCalled();
+      expect(deps.setResult).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("downloadPlanPdf", () => {
+  beforeEach(() => {
+    jsPDF.mockClear();
+    pdfDoc.save.mockClear();
+    pdfDoc.text.mockClear();
+    pdfDoc.addPage.mockClear();
+  });
+
+  test("renders the current plan and saves it", async () => {
+    await build({ result: "Monday - Push\nBench press" }).downloadPlanPdf();
+
+    expect(jsPDF).toHaveBeenCalledTimes(1);
+    expect(pdfDoc.text).toHaveBeenCalledTimes(2);
+    expect(pdfDoc.save).toHaveBeenCalledWith("ai-workout-plan.pdf");
+  });
+
+  test("does nothing when there is no plan to export", async () => {
+    await build({ result: "" }).downloadPlanPdf();
+
+    expect(jsPDF).not.toHaveBeenCalled();
+    expect(deps.setError).not.toHaveBeenCalled();
+  });
+
+  // Enough lines to run past the bottom of a page.
+  test("starts a new page when the text runs off the bottom", async () => {
+    const manyLines = Array.from({ length: 60 }, (_, i) => `Line ${i}`).join("\n");
+
+    await build({ result: manyLines }).downloadPlanPdf();
+
+    expect(pdfDoc.addPage).toHaveBeenCalled();
+  });
+
+  // The reason the handler catches at all: loading jspdf on demand can fail on
+  // a flaky network or against a stale deploy, and an unhandled rejection would
+  // leave the button looking like it did nothing.
+  test("reports a failure instead of rejecting", async () => {
+    jsPDF.mockImplementationOnce(() => {
+      throw new Error("chunk load failed");
+    });
+
+    await expect(build({ result: "Monday" }).downloadPlanPdf()).resolves.toBeUndefined();
+    expect(deps.setError).toHaveBeenCalledWith("chunk load failed");
+  });
+
+  test("falls back to a readable message when the failure has none", async () => {
+    jsPDF.mockImplementationOnce(() => {
+      throw new Error("");
+    });
+
+    await build({ result: "Monday" }).downloadPlanPdf();
+
+    expect(deps.setError).toHaveBeenCalledWith("Could not prepare the PDF. Please try again.");
+  });
+});
+
+// The bridge from the signed-out planner into signup: whatever the visitor
+// already typed should not have to be typed again.
+describe("openSignupWithPrefilledProfile", () => {
+  const personal = (overrides = {}) => ({
+    name: "Jordan Kim",
+    age: "29",
+    heightFeet: "5",
+    heightInches: "10",
+    heightCm: "",
+    weight: "168",
+    sex: "Male",
+    bodyFat: "18",
+    activity: "High",
+    notes: "knee trouble",
+    ...overrides
+  });
+
+  const profile = () => deps.setSignupProfileForm.mock.calls[0][0];
+
+  test("switches to signup and goes to the auth page", () => {
+    build({ personal: personal() }).openSignupWithPrefilledProfile();
+
+    expect(deps.setAuthMode).toHaveBeenCalledWith("signup");
+    expect(deps.go).toHaveBeenCalledWith("/auth");
+  });
+
+  test("splits the name the visitor gave into first and last", () => {
+    build({ personal: personal() }).openSignupWithPrefilledProfile();
+
+    expect(profile()).toMatchObject({ firstName: "Jordan", lastName: "Kim" });
+  });
+
+  test("carries the rest of the profile across", () => {
+    build({ personal: personal() }).openSignupWithPrefilledProfile();
+
+    expect(profile()).toMatchObject({
+      age: "29",
+      sex: "Male",
+      bodyFat: "18",
+      activity: "High",
+      notes: "knee trouble"
+    });
+  });
+
+  test("converts an imperial height and weight for the signup form", () => {
+    build({ personal: personal(), heightUnit: "ft", weightUnit: "lb" })
+      .openSignupWithPrefilledProfile();
+
+    expect(profile()).toMatchObject({ heightCm: "178", weightKg: "76" });
+    expect(deps.setSignupHeightUnit).toHaveBeenCalledWith("ft");
+    expect(deps.setSignupWeightUnit).toHaveBeenCalledWith("lb");
+  });
+
+  // Coming from a metric planner, the feet and inches still have to be filled
+  // in so the signup form can offer either unit.
+  test("derives feet and inches from a metric height", () => {
+    build({
+      personal: personal({ heightFeet: "", heightInches: "", heightCm: "178" }),
+      heightUnit: "cm",
+      weightUnit: "kg"
+    }).openSignupWithPrefilledProfile();
+
+    expect(profile()).toMatchObject({ heightCm: "178", heightFeet: "5", heightInches: "10" });
+    expect(deps.setSignupHeightUnit).toHaveBeenCalledWith("cm");
+  });
+
+  test("falls back to the centimetre value when the imperial fields are empty", () => {
+    build({
+      personal: personal({ heightFeet: "", heightInches: "", heightCm: "180" }),
+      heightUnit: "ft"
+    }).openSignupWithPrefilledProfile();
+
+    expect(profile().heightCm).toBe("180");
+  });
+
+  test("keeps the default activity when the visitor chose none", () => {
+    build({ personal: personal({ activity: "" }) }).openSignupWithPrefilledProfile();
+
+    expect(profile().activity).toBe(defaultSignupProfileForm.activity);
+  });
+
+  // A visitor who typed nothing must still get a usable, empty signup form.
+  test("survives an empty planner", () => {
+    build({ personal: {} }).openSignupWithPrefilledProfile();
+
+    expect(profile()).toMatchObject({ firstName: "", lastName: "", age: "" });
+    expect(deps.go).toHaveBeenCalledWith("/auth");
+  });
+
+  test("starts the credentials form empty", () => {
+    build({ personal: personal() }).openSignupWithPrefilledProfile();
+
+    expect(deps.setAuthForm).toHaveBeenCalledWith({ ...defaultAuthForm });
+    expect(deps.setShowPassword).toHaveBeenCalledWith(false);
+    expect(deps.setAuthError).toHaveBeenCalledWith("");
   });
 });
