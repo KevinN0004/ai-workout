@@ -270,7 +270,17 @@ export const createAppEventHandlers = ({
   };
 
   const onLogout = async () => {
-    await apiFetch("/api/auth/logout", { method: "POST" });
+    // Signing out locally must not depend on the request succeeding. The button
+    // is wired straight to this, so a rejection used to skip every clear below
+    // and leave the previous account's dashboard on screen -- with nothing
+    // catching it, and no sign to the user that Log out had not worked. A dead
+    // network, or apiFetch refusing to send without a CSRF token, both get here.
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // The cookie is HttpOnly and cannot be cleared from here, so the server
+      // session may outlive this. Clearing what we can beats clearing nothing.
+    }
     setUser(null);
     clearOptimisticOperations();
     clearDashboardDataState();
