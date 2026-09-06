@@ -126,7 +126,7 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`, currently 62.1% statements / 42.2%
+Coverage is `npm run test:coverage -w client`, currently 64.9% statements / 44.6%
 branches. Prefer the logic modules to the view components when adding tests —
 `app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js`,
 `app/hooks/useOptimisticLogs.js` and `app/hooks/useApiClient.js` are all at or above
