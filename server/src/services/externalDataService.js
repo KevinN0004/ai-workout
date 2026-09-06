@@ -25,7 +25,17 @@ export const createExternalDataService = ({
   mealDbTimeoutMs,
   mealDbCacheTtlSec
 }) => {
+  // Absent input is rejected before conversion, because Number(null) and
+  // Number("") are both 0. Callers all test the result against null to decide
+  // whether a reading exists -- isOutdoorFriendlyNow gates every check on
+  // `!== null`, and buildWorkoutRecommendation maps null to "Unknown" -- so
+  // converting an absent value to 0 made those guards unreachable for the input
+  // they were written for. A null weather code read as code 0, "Clear sky"; a
+  // null temperature read as 0C and was reported as too cold to train outdoors.
+  // undefined already behaved correctly, which is why an omitted key and an
+  // explicit null used to give opposite answers.
   const toFiniteNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
   };
@@ -282,15 +292,12 @@ export const createExternalDataService = ({
     return labels[key] || (key ? key.toUpperCase() : "");
   };
 
-  // Skips absent candidates before converting, because Number(null) and
-  // Number("") are both 0. Without this the first candidate being null ends the
-  // search at 0 -- so a pm2.5 sensor reporting no reading was published as
-  // 0 ug/m3, which scores AQI 0 and tells the user the air is clean. It also
-  // defeated the point of the fallback chain, which is to try the later shapes.
-  // A real 0 is still a measurement and is returned as one.
+  // Walks the shapes an upstream might use until one carries a value. This
+  // depends on toFiniteNumber rejecting absent input: while it converted null
+  // to 0, the first candidate being null ended the search here at 0 and the
+  // later shapes were never tried. A real 0 is still a measurement.
   const firstFinite = (values) => {
     for (const value of values) {
-      if (value === null || value === undefined || value === "") continue;
       const num = toFiniteNumber(value);
       if (num !== null) return num;
     }
