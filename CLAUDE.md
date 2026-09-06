@@ -111,17 +111,34 @@ Upstreams spell "no reading" three ways — an omitted key, an explicit `null`, 
 and **`Number(null)` and `Number("")` are both `0`**. Any numeric coercion that converts
 before testing turns missing data into a real-looking measurement.
 
-**Guard absent input before `Number()`, never after.** `toFiniteNumber` in
-`externalDataService.js` and `toNumberOrNull` in `repositories/rowValues.js` both do
-this; copy that shape rather than writing a fresh coercion.
+**Guard absent input before `Number()`, never after.** `toFiniteNumber` and
+`weatherCodeToText` in `externalDataService.js`, and `toNumberOrNull` in
+`repositories/rowValues.js`, all do this; copy that shape rather than writing a fresh
+coercion.
 
-This is not hypothetical. Two shipped bugs came from it, both in health advice:
+**Guarding the converter does not protect a caller that bypasses it.** This class has
+recurred three times, and the third was in code I had already declared fixed:
+`weatherCodeToText` kept its own `Number(code)`, and the weather routes called it with
+the raw upstream value while building the neighbouring numeric field through
+`toFiniteNumber`. One response carried `weatherCode: null` beside
+`weatherText: "Clear sky"`. When you fix one of these, grep for every caller of the
+helper and check what each passes in.
+
+This is not hypothetical. Three shipped bugs came from it, all in health advice:
 
 - a pm2.5 sensor reporting `null` was published as `0 ug/m3`, which scores **AQI 0** and
   told the user the air was clean
 - a `null` weather code is code `0`, **"Clear sky"**, and a `null` temperature is `0 °C`,
   so a payload carrying no weather at all was reported as clear *and* too cold to train
   outdoors
+- the same `null` weather code went on reporting **"Clear sky"** from both weather routes
+  and every day of the forecast after that fix, because those build `weatherText` from
+  the raw value rather than from the guarded number
+
+The whole external-data path has since been swept for it. `pm25ToUsAqi`, `aqiBand`,
+`toFiniteNumber`, `weatherCodeToText` and `toNumberOrNull` all guard; `isSevereWeatherCode`
+is safe because `0` is not a severe code; the wger and mealdb routes only use `cleanText`,
+which tests `typeof value === "string"`.
 
 `undefined` already behaved correctly, so an omitted key and an explicit `null` gave
 opposite answers for the same missing data — which is what made it hard to see.
@@ -167,23 +184,25 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **74.4%** statements / 63.5% branches, client **53.9%** / 32.5%.
+  server **75.6%** statements / 64.9% branches, client **53.9%** / 32.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
   - Thin areas, worst first: `registerWgerRoutes.js` (13% / 3% branch),
-    `registerMealDbRoutes.js` (15% / 0%), `registerWeatherRoutes.js` (44% / 28%),
-    `externalDataService.js` (47% — mostly the wger and mealdb response mappers;
-    its retry and AQI logic are covered), `postgres.js` (53%), `index.js` (68%),
-    and `generateRoutes.js` (75% / 48%). On the client, most of
-    `pages/dashboard/*View.jsx` and `pages/home/components/*` are at 0%.
-  - **The whole auth path is now covered** and is the worked example to copy:
-    `authUserService.js` and `authRoutes.js` at 100% statements, `errorHandler.js`
-    at 100%/100%. Their tests stub only the database, the session store and the
-    cookie writers — password hashing is the real argon2, so signup-then-login runs
-    the same code a request does.
+    `registerMealDbRoutes.js` (15% / 0%), `externalDataService.js` (49% — what is
+    left is the wger and mealdb response mappers; its retry, weather and AQI logic
+    are covered), `postgres.js` (53%), `index.js` (68%), and `generateRoutes.js`
+    (75% / 48%). On the client, most of `pages/dashboard/*View.jsx` and
+    `pages/home/components/*` are at 0%.
+  - **The auth path and the external routes are now covered**, and are the worked
+    examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
+    at 100% statements; the weather and air-quality routes are covered end to end.
+    Both suites stub only the boundary — the database, session store and cookie
+    writers for auth; `fetchOpenMeteo` and `openAqRequest` for the external routes —
+    and use the real injected function everywhere else, so password hashing is real
+    argon2 and the AQI maths under test are the ones that ship.
   - **Pick by risk, not by size.** `middleware/errorHandler.js` was 33 lines at 15% with
     0% branch, and it is what masks 5xx detail before it reaches a client.
     `registerWgerRoutes.js` is five times the size and a read-only proxy of public
