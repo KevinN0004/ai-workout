@@ -105,6 +105,32 @@ retired in full — see `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md
 find `findOneAndUpdate`, `$set`, `$push` or `.lean()` anywhere in `server/src`, it is a
 regression.
 
+### External data: absent is not zero
+
+Upstreams spell "no reading" three ways — an omitted key, an explicit `null`, and `""` —
+and **`Number(null)` and `Number("")` are both `0`**. Any numeric coercion that converts
+before testing turns missing data into a real-looking measurement.
+
+**Guard absent input before `Number()`, never after.** `toFiniteNumber` in
+`externalDataService.js` and `toNumberOrNull` in `repositories/rowValues.js` both do
+this; copy that shape rather than writing a fresh coercion.
+
+This is not hypothetical. Two shipped bugs came from it, both in health advice:
+
+- a pm2.5 sensor reporting `null` was published as `0 ug/m3`, which scores **AQI 0** and
+  told the user the air was clean
+- a `null` weather code is code `0`, **"Clear sky"**, and a `null` temperature is `0 °C`,
+  so a payload carrying no weather at all was reported as clear *and* too cold to train
+  outdoors
+
+`undefined` already behaved correctly, so an omitted key and an explicit `null` gave
+opposite answers for the same missing data — which is what made it hard to see.
+
+**Do not "fix" this with `!value`.** That swallows a genuine zero, and a measured zero is
+a measurement: 0 °C really is below the cold gate. Range checks can mask the bug too —
+`toPositiveInt` and `parseRedisPort` are safe only because `> 0` and a port range reject
+the accidental `0`. Don't rely on that in new code.
+
 Conventions:
 
 - Keep files under 500 lines
