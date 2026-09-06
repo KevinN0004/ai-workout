@@ -184,17 +184,17 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **83.0%** statements / 74.1% branches, client **66.8%** / 46.5%.
+  server **88.8%** statements / 80.5% branches, client **66.8%** / 46.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
-  - Thin areas, worst first: `postgres.js` (53%), `externalDataService.js` (62% —
-    what is left is the wger and mealdb response mappers; its retry, weather and
-    AQI logic are covered), `index.js` (68% — app bootstrap), `httpCacheService.js`
-    (77%), and `sessionService.js` (79%). **Every route file is now at or above
-    81%, and every one the user's data passes through is at 100%.**
+  - Thin areas, worst first: `postgres.js` (53% — connection and pool setup),
+    `index.js` (68% — app bootstrap and wiring), and `httpCacheService.js` (77%).
+    **Every route file is at or above 81%, every route the user's data passes
+    through is at 100%, and every service is at or above 82%.** What is left on
+    the server is infrastructure rather than request handling.
     On the client, worst first: `usePreviewChapterFlow.js` and
     `usePreviewWeekParticleAnimation.js` (both 0%, both animation orchestration),
     `TipsView.jsx` (0%), `useHomeStageFlow.js` (56%),

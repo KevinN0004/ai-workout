@@ -217,6 +217,34 @@ The prompt asks for weekday headings and a `"Coach Notes:"` section by name beca
 boundary with nothing type-checking it** — changing the wording here breaks plan parsing
 there, and only the generate-route tests will say so.
 
+## Sessions
+
+Redis-backed when `REDIS_URL`, or `REDIS_HOST` **and** a valid `REDIS_PORT`, are set;
+in-memory otherwise. A host without a usable port counts as *no* configuration rather
+than a broken one, and a failed connection falls back to memory and disconnects the
+client so it does not retry and log forever.
+
+**The two cookies differ deliberately.** `sid` is `HttpOnly` so script cannot read it;
+the CSRF cookie is **not**, because the client has to read it to echo it back in a header
+for the double-submit check to mean anything. `appendSetCookieHeader` accumulates rather
+than overwrites — signup writes both on one response, and overwriting would silently drop
+whichever went first. Remember-me is the presence or absence of `Max-Age` on `sid`.
+
+**Known inconsistency in the Redis fallback.** When Redis is connected:
+
+- `createSession` catches a write failure and falls back to the in-memory map.
+- `getSessionByToken` consults **only** Redis — a miss returns null; memory is never read.
+- `deleteSession` returns after the Redis delete and never touches memory.
+
+So a session created during a Redis blip is written to memory but cannot be read back —
+the user is signed out on their next request — and sign-out cannot clear it. It is not
+inert either: if Redis is later disabled (including by `closeSessionStore`), those
+entries begin resolving as live sessions. There are tests pinning both halves.
+
+Making the read fall back to memory would fix the sign-out but would also let a *deleted*
+session return, so this wants a decision about which store is authoritative rather than a
+patch.
+
 ## Security Notes
 
 - Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` in production.
