@@ -282,8 +282,15 @@ export const createExternalDataService = ({
     return labels[key] || (key ? key.toUpperCase() : "");
   };
 
+  // Skips absent candidates before converting, because Number(null) and
+  // Number("") are both 0. Without this the first candidate being null ends the
+  // search at 0 -- so a pm2.5 sensor reporting no reading was published as
+  // 0 ug/m3, which scores AQI 0 and tells the user the air is clean. It also
+  // defeated the point of the fallback chain, which is to try the later shapes.
+  // A real 0 is still a measurement and is returned as one.
   const firstFinite = (values) => {
     for (const value of values) {
+      if (value === null || value === undefined || value === "") continue;
       const num = toFiniteNumber(value);
       if (num !== null) return num;
     }
