@@ -109,10 +109,41 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`, currently 56.9% statements / 36.6%
+Coverage is `npm run test:coverage -w client`, currently 59.0% statements / 38.5%
 branches. Prefer the logic modules to the view components when adding tests —
-`app/units.js` and `pages/dashboard/tips/recommendationUtils.js` are both above 98%
-and were worth far more than their line count.
+`app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js` and
+`app/hooks/useOptimisticLogs.js` are all at or above 95% and were worth far more than
+their line count.
+
+## Saving a Log Entry
+
+`app/hooks/useOptimisticLogs.js` shows a new log entry on the dashboard straight away
+and **holds the request back for `OPTIMISTIC_UNDO_WINDOW_MS` (4.5s)** before sending it.
+The window is a delay, not a compensation: an undo inside it means the write never
+happens, rather than being reversed afterwards. Shortening that timer to zero would make
+undo silently useless while every test about the entry appearing still passed — there is
+one asserting the request is not called before the window closes.
+
+If the save fails, the optimistic entry is **removed** rather than left on screen. An
+entry that stays would look saved and would not be. Undo is refused once the request is
+in flight (`operation.committing`), because calling it off at that point would leave the
+dashboard disagreeing with the server.
+
+`clearOptimisticOperations` cancels the queued requests as well as clearing the entries;
+that is what stops a write queued before a sign-out firing against the next account.
+
+## Generated Plan Parsing
+
+`app/plans.js` parses the plan text Gemini returns. Two things to know:
+
+- **Weekday headings are matched with `startsWith`**, so markdown emphasis defeats them.
+  `**Monday - Push**`, `## Monday` and `- Monday` are all invisible, and the week
+  collapses into a single "Your plan" section instead of failing visibly.
+- **The two parsers disagree about a plan with no weekday headings.**
+  `parsePlanSections` falls back to one "Your plan" section, so the Plans view still
+  renders; `extractLatestPlanByWeekday` has no fallback and returns `{}`, so the
+  dashboard's today panel is empty for the same plan. A test asserts both halves
+  together so the asymmetry cannot be half-fixed.
 
 ## Exercise Recommendations
 
