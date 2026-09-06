@@ -1,0 +1,9 @@
+node_modules
+dist
+client/dist
+coverage
+.claude
+.githooks
+.postgres-data
+.postgres-pw
+package-lock.json
