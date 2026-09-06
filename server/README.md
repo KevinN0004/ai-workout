@@ -202,7 +202,17 @@ Generation and external data:
 
 - Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` in production.
 - The server issues a `csrfToken` cookie and requires a matching `X-CSRF-Token` header for unsafe methods.
-- Passwords are hashed with Argon2id.
+- Passwords are hashed with Argon2id. Rows predating that are pbkdf2, and a successful
+  login rehashes them in place. A failed rehash is logged and the sign-in still succeeds —
+  the upgrade must not cost a user their session over a write they did not ask for.
+- **Login does not reveal whether an account exists.** A wrong password and an unknown
+  address return the same status and body, and the unknown-address path still verifies
+  against a dummy hash so the two take comparable time. Returning early there would make
+  the login form an oracle for which addresses are registered.
+- **Signup does not validate the shape of an email**, only that it is a non-empty string
+  of at most 254 characters (`signupBodySchema`). The address is a login identifier and
+  the app sends no mail, so this is a data-quality gap rather than a hole; adding a format
+  check would reject addresses existing rows may already hold.
 - Request logging redacts common sensitive fields by default.
 
 ## Operational Notes

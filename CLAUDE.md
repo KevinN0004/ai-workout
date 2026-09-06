@@ -167,7 +167,7 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **72.6%** statements / 62.0% branches, client **53.9%** / 32.5%.
+  server **74.4%** statements / 63.5% branches, client **53.9%** / 32.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
@@ -176,13 +176,18 @@ npm run prisma:validate        # validate the schema
   - Thin areas, worst first: `registerWgerRoutes.js` (13% / 3% branch),
     `registerMealDbRoutes.js` (15% / 0%), `registerWeatherRoutes.js` (44% / 28%),
     `externalDataService.js` (47% — mostly the wger and mealdb response mappers;
-    its retry and AQI logic are covered), `postgres.js` (53%), and `authRoutes.js`
-    (59% / 38%, the highest-risk of these). On the client, most of
+    its retry and AQI logic are covered), `postgres.js` (53%), `index.js` (68%),
+    and `generateRoutes.js` (75% / 48%). On the client, most of
     `pages/dashboard/*View.jsx` and `pages/home/components/*` are at 0%.
+  - **The whole auth path is now covered** and is the worked example to copy:
+    `authUserService.js` and `authRoutes.js` at 100% statements, `errorHandler.js`
+    at 100%/100%. Their tests stub only the database, the session store and the
+    cookie writers — password hashing is the real argon2, so signup-then-login runs
+    the same code a request does.
   - **Pick by risk, not by size.** `middleware/errorHandler.js` was 33 lines at 15% with
-    0% branch, and it is what masks 5xx detail before it reaches a client; it and
-    `authUserService.js` are now at 100%/100%. `registerWgerRoutes.js` is five times the
-    size and a read-only proxy of public exercise data.
+    0% branch, and it is what masks 5xx detail before it reaches a client.
+    `registerWgerRoutes.js` is five times the size and a read-only proxy of public
+    exercise data — it is bottom of this list for a reason.
   - **When mutation-testing, confirm the mutation applied.** An unapplied mutation and an
     uncaught one both read as "tests passed". Check the file changed, not just the exit
     code. Not every survivor is a weak test either: removing the `!user?.hash` guard in
