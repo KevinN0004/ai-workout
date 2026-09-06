@@ -184,19 +184,20 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **75.6%** statements / 64.9% branches, client **64.9%** / 44.6%.
+  server **82.3%** statements / 72.4% branches, client **66.8%** / 46.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
-  - Thin areas, worst first: `registerWgerRoutes.js` (13% / 3% branch),
-    `registerMealDbRoutes.js` (15% / 0%), `externalDataService.js` (49% — what is
-    left is the wger and mealdb response mappers; its retry, weather and AQI logic
-    are covered), `postgres.js` (53%), `index.js` (68%), and `generateRoutes.js`
-    (75% / 48%). On the client, worst first: `usePreviewChapterFlow.js` and
+  - Thin areas, worst first: `postgres.js` (53%), `externalDataService.js` (62% —
+    what is left is the wger and mealdb response mappers; its retry, weather and
+    AQI logic are covered), `index.js` (68% — app bootstrap), `generateRoutes.js`
+    (75% / 48%, the highest-risk of these), and `httpCacheService.js` (77%).
+    Every route file is now at or above 81%.
+    On the client, worst first: `usePreviewChapterFlow.js` and
     `usePreviewWeekParticleAnimation.js` (both 0%, both animation orchestration),
-    `TipsView.jsx` (0%), `useHomeStageFlow.js` (56%), `useDashboardData.js` (50%),
+    `TipsView.jsx` (0%), `useHomeStageFlow.js` (56%),
     and `PlansView.jsx` (0%). Most `pages/dashboard/*View.jsx` are still at 0%.
   - **Check before calling something untestable.** The animation hooks genuinely
     are limited — they measure real element rects, which jsdom does not provide —

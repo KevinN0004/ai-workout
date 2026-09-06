@@ -228,11 +228,23 @@ Generation and external data:
   not declare. `schema_migrations` is declared as a model purely to protect it from that.
 - **The upstream cache is per process.** Each replica keeps its own and multiplies
   upstream load; it is not shared state.
-- **An upstream outage on `/api/air-quality/current` answers `200`, not an error.** The
-  body carries `fallback: true`, null readings, and indoor guidance, so the dashboard
-  panel degrades instead of failing. A thrown network error carries no status, defaults
-  to 500, and takes the same path. Only a non-upstream status (a real 4xx) is returned as
-  an error.
+- **Every external route answers `200` on an upstream outage, not an error.** Air quality,
+  both weather routes, all three wger routes and the mealdb search each return
+  `fallback: true` with empty or null readings, so the panel degrades instead of failing.
+  A thrown network error carries no status, defaults to 500, and takes the same path.
+  Only a non-upstream status (a real 4xx) is returned as an error — so **a 200 from these
+  routes is not proof the upstream is healthy.** `/api/wger/exercises` goes further and
+  re-parses the query in its fallback, so the client's paging survives an outage instead
+  of silently resetting to page one.
+- **`/api/wger/exercises` implements the text search itself.** wger has none, so with a
+  `q` the route asks upstream for a wider page (`limit * 4`, floored at 100, capped at
+  200), filters on name, description, category and muscle names, then cuts back to the
+  requested limit. `count` is the *filtered* length in that case, not the upstream total —
+  reporting the total would claim results that are not in the response.
+- **`/api/wger/exercises/:id` asks twice.** wger returns nothing at all for an exercise
+  with no translation in the requested language, so a first attempt with the language
+  filter is followed by one without it, and only then a 404. Removing the retry turns a
+  findable exercise into a not-found.
 - **Absent upstream readings must be rejected before `Number()`.** `Number(null)` and
   `Number("")` are both `0`, so coercing first turns missing data into a measurement —
   this shipped twice as wrong health advice. See "External data: absent is not zero" in
