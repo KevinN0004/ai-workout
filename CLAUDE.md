@@ -166,18 +166,28 @@ npm run prisma:validate        # validate the schema
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. Baseline on
-  2026-09-05: server **70.8%** statements / 59.2% branches, client **53.9%** / 32.5%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
+  server **72.6%** statements / 62.0% branches, client **53.9%** / 32.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
-  - Thin areas as of that baseline, worst first: `registerWgerRoutes.js` (13%),
-    `mealDbRoutes.js` (15%), `middleware/errorHandler.js` (15%, and 0% branch — it is
-    what masks 5xx detail, so it is worth more than its size), `registerWeatherRoutes.js`
-    (44%), `authUserService.js` (56% / 32% branch). On the client, most of
+  - Thin areas, worst first: `registerWgerRoutes.js` (13% / 3% branch),
+    `registerMealDbRoutes.js` (15% / 0%), `registerWeatherRoutes.js` (44% / 28%),
+    `externalDataService.js` (47% — mostly the wger and mealdb response mappers;
+    its retry and AQI logic are covered), `postgres.js` (53%), and `authRoutes.js`
+    (59% / 38%, the highest-risk of these). On the client, most of
     `pages/dashboard/*View.jsx` and `pages/home/components/*` are at 0%.
+  - **Pick by risk, not by size.** `middleware/errorHandler.js` was 33 lines at 15% with
+    0% branch, and it is what masks 5xx detail before it reaches a client; it and
+    `authUserService.js` are now at 100%/100%. `registerWgerRoutes.js` is five times the
+    size and a read-only proxy of public exercise data.
+  - **When mutation-testing, confirm the mutation applied.** An unapplied mutation and an
+    uncaught one both read as "tests passed". Check the file changed, not just the exit
+    code. Not every survivor is a weak test either: removing the `!user?.hash` guard in
+    `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
+    existing catch returns the same `false`.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, and React Hook contract violations. **There is deliberately no
   Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do
