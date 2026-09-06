@@ -198,6 +198,25 @@ Generation and external data:
 - `GET /api/wger/exercises/:id`
 - `GET /api/mealdb/search`
 
+## Plan Generation
+
+`POST /api/generate` is **open to anonymous callers by design** — the anonymous quota is
+enforced by the rate limiters mounted on the path in `index.js`. A signed-in caller gets
+their plan persisted; an anonymous one gets the plan and nothing is written.
+
+`buildGenerationEquipmentContext` (exported from `routes/generateRoutes.js`) decides what
+the model is told the user can train with, and two of its branches are easy to break:
+
+- **"Full gym access" is a shorthand, not a room.** It expands to every commercial
+  capability rather than being passed through as one label.
+- **Anything whose environment is not `"commercial"` falls to the home map.** A typo in
+  the environment silently changes which equipment vocabulary is used.
+
+The prompt asks for weekday headings and a `"Coach Notes:"` section by name because
+`client/src/app/plans.js` parses exactly those. **That contract crosses the client/server
+boundary with nothing type-checking it** — changing the wording here breaks plan parsing
+there, and only the generate-route tests will say so.
+
 ## Security Notes
 
 - Session cookies are `HttpOnly`, `SameSite=Lax`, and marked `Secure` in production.

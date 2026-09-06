@@ -184,7 +184,7 @@ npm run prisma:validate        # validate the schema
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **82.3%** statements / 72.4% branches, client **66.8%** / 46.5%.
+  server **83.0%** statements / 74.1% branches, client **66.8%** / 46.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
@@ -192,9 +192,9 @@ npm run prisma:validate        # validate the schema
     suites drive them; several 500-line view components have no test and sit at 0%.
   - Thin areas, worst first: `postgres.js` (53%), `externalDataService.js` (62% —
     what is left is the wger and mealdb response mappers; its retry, weather and
-    AQI logic are covered), `index.js` (68% — app bootstrap), `generateRoutes.js`
-    (75% / 48%, the highest-risk of these), and `httpCacheService.js` (77%).
-    Every route file is now at or above 81%.
+    AQI logic are covered), `index.js` (68% — app bootstrap), `httpCacheService.js`
+    (77%), and `sessionService.js` (79%). **Every route file is now at or above
+    81%, and every one the user's data passes through is at 100%.**
     On the client, worst first: `usePreviewChapterFlow.js` and
     `usePreviewWeekParticleAnimation.js` (both 0%, both animation orchestration),
     `TipsView.jsx` (0%), `useHomeStageFlow.js` (56%),
@@ -222,9 +222,14 @@ npm run prisma:validate        # validate the schema
     exercise data — it is bottom of this list for a reason.
   - **When mutation-testing, confirm the mutation applied.** An unapplied mutation and an
     uncaught one both read as "tests passed". Check the file changed, not just the exit
-    code. Four things have silently prevented a match so far: shell escaping eating a
-    backslash, indentation not matching, an apostrophe in the pattern, and **CRLF line
-    endings** — some files in this repo use them, so match on `\r?\n` rather than `\n`. Not every survivor is a weak test either: removing the `!user?.hash` guard in
+    code. Five things have silently prevented a match so far: shell escaping eating a
+    backslash, indentation not matching, an apostrophe in the pattern, **CRLF line
+    endings** (some files here use them — match on `\r?\n`), and a **heredoc collapsing
+    `\\n` to `\n`** even with a quoted delimiter. Three of those five are the shell, so
+    **write mutation scripts with the Write tool rather than a heredoc**, and use
+    `String.raw` for any pattern containing a backslash. The prompt in
+    `generateRoutes.js` is the awkward case: its newlines are the two characters
+    backslash-n inside a template literal. Not every survivor is a weak test either: removing the `!user?.hash` guard in
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
