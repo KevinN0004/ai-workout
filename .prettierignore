@@ -1,9 +1,10 @@
 node_modules
 dist
-client/dist
 coverage
 .claude
+.claude-flow
 .githooks
 .postgres-data
 .postgres-pw
 package-lock.json
+server/db/**/*.sql
