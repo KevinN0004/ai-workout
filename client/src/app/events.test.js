@@ -410,3 +410,373 @@ describe("form field handlers", () => {
     });
   });
 });
+
+// The three handlers that go through the optimistic queue covered in
+// useOptimisticLogs. They build the entry shown before anything is sent and
+// the request closure that eventually sends it, so this is where a form value
+// turns into what the API receives.
+describe("optimistic submissions", () => {
+  const queued = () => deps.queueOptimisticLogCommit.mock.calls[0][0];
+
+  describe("submitWorkout", () => {
+    const workoutForm = (overrides = {}) => ({
+      date: "2026-03-02",
+      focus: "Push",
+      duration: "45",
+      exercises: "Bench press, Overhead press",
+      sets: "4",
+      reps: "6",
+      intensityRpe: "8",
+      notes: "felt strong",
+      ...overrides
+    });
+
+    test("queues an optimistic workout rather than posting straight away", async () => {
+      await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+
+      expect(deps.queueOptimisticLogCommit).toHaveBeenCalledTimes(1);
+      expect(deps.apiFetch).not.toHaveBeenCalled();
+      expect(queued().type).toBe("workout");
+    });
+
+    test("splits the exercises on commas and trims them", async () => {
+      await build({
+        workoutForm: workoutForm({ exercises: " Bench press ,, Squat ,  " })
+      }).submitWorkout(submitEvent());
+
+      expect(queued().item.exercises).toEqual(["Bench press", "Squat"]);
+    });
+
+    test("turns the numeric fields into numbers", async () => {
+      await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+
+      expect(queued().item).toMatchObject({
+        duration: 45,
+        sets: 4,
+        reps: 6,
+        intensityRpe: 8
+      });
+    });
+
+    // An empty field is absent, not zero. A workout logged with no duration
+    // must not read as a zero-minute session in the totals.
+    test("leaves an empty numeric field null rather than zero", async () => {
+      await build({
+        workoutForm: workoutForm({ duration: "", sets: "", reps: "", intensityRpe: "" })
+      }).submitWorkout(submitEvent());
+
+      expect(queued().item).toMatchObject({
+        duration: null,
+        sets: null,
+        reps: null,
+        intensityRpe: null
+      });
+    });
+
+    test("falls back to today and a general focus", async () => {
+      await build({
+        workoutForm: workoutForm({ date: "", focus: "" })
+      }).submitWorkout(submitEvent());
+
+      expect(queued().item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(queued().item.focus).toBe("General");
+    });
+
+    test("clears the form and closes the modal without waiting for the save", async () => {
+      await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+
+      expect(deps.setWorkoutModalOpen).toHaveBeenCalledWith(false);
+      expect(deps.setWorkoutForm).toHaveBeenCalledWith(
+        expect.objectContaining({ focus: "", exercises: "", duration: "" })
+      );
+    });
+
+    describe("the queued request", () => {
+      test("posts the normalised payload", async () => {
+        await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+        deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard: {} }));
+
+        await queued().request();
+
+        const [url, options] = deps.apiFetch.mock.calls[0];
+        expect(url).toBe("/api/dashboard/workout-sessions");
+        expect(options.method).toBe("POST");
+        expect(JSON.parse(options.body).exercises).toEqual(["Bench press", "Overhead press"]);
+      });
+
+      test("returns the parsed body on success", async () => {
+        await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+        const dashboard = { workouts: [{ id: "w1" }] };
+        deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard }));
+
+        await expect(queued().request()).resolves.toEqual({ dashboard });
+      });
+
+      test("throws the server's message when the save is refused", async () => {
+        await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+        deps.apiFetch.mockResolvedValue(jsonResponse({ error: "Duration is required." }, false));
+
+        await expect(queued().request()).rejects.toThrow("Duration is required.");
+      });
+
+      test("throws a generic message when the body is unreadable", async () => {
+        await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
+        deps.apiFetch.mockResolvedValue({
+          ok: false,
+          json: async () => {
+            throw new Error("not json");
+          }
+        });
+
+        await expect(queued().request()).rejects.toThrow("Unable to save workout.");
+      });
+    });
+  });
+
+  describe("submitCalories", () => {
+    test("queues an entry dated today", async () => {
+      await build({ calorieForm: { calories: "2200" } }).submitCalories(submitEvent());
+
+      expect(queued().type).toBe("calorie");
+      expect(queued().item.calories).toBe(2200);
+      expect(queued().item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    // Recorded as it behaves: an empty field becomes 0 here rather than null,
+    // unlike the workout numbers above.
+    test("treats an empty field as zero calories", async () => {
+      await build({ calorieForm: { calories: "" } }).submitCalories(submitEvent());
+
+      expect(queued().item.calories).toBe(0);
+    });
+
+    test("clears the form", async () => {
+      await build({ calorieForm: { calories: "2200" } }).submitCalories(submitEvent());
+
+      expect(deps.setCalorieForm).toHaveBeenCalledWith({ calories: "" });
+    });
+
+    test("posts to the calories endpoint", async () => {
+      await build({ calorieForm: { calories: "2200" } }).submitCalories(submitEvent());
+      deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard: {} }));
+
+      await queued().request();
+
+      expect(deps.apiFetch.mock.calls[0][0]).toBe("/api/dashboard/calories");
+    });
+  });
+
+  describe("submitMealLog", () => {
+    const mealLogForm = (overrides = {}) => ({
+      date: "2026-03-02",
+      mealType: "lunch",
+      name: "Porridge",
+      calories: "420",
+      proteinG: "18",
+      carbsG: "60",
+      fatG: "9",
+      notes: "",
+      ...overrides
+    });
+
+    test("queues the meal with its macros as numbers", async () => {
+      await build({ mealLogForm: mealLogForm() }).submitMealLog(submitEvent());
+
+      expect(queued().type).toBe("meal");
+      expect(queued().item).toMatchObject({
+        name: "Porridge",
+        mealType: "lunch",
+        calories: 420,
+        proteinG: 18,
+        carbsG: 60,
+        fatG: 9
+      });
+    });
+
+    // A macro nobody filled in is unknown, not zero -- averaging it as zero
+    // would drag the daily figures down.
+    test("leaves an unfilled macro null", async () => {
+      await build({
+        mealLogForm: mealLogForm({ calories: "", proteinG: "", carbsG: "", fatG: "" })
+      }).submitMealLog(submitEvent());
+
+      expect(queued().item).toMatchObject({
+        calories: null,
+        proteinG: null,
+        carbsG: null,
+        fatG: null
+      });
+    });
+
+    test("falls back to today and an other meal type", async () => {
+      await build({
+        mealLogForm: mealLogForm({ date: "", mealType: "" })
+      }).submitMealLog(submitEvent());
+
+      expect(queued().item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(queued().item.mealType).toBe("other");
+    });
+
+    test("resets the form to breakfast and today", async () => {
+      await build({ mealLogForm: mealLogForm() }).submitMealLog(submitEvent());
+
+      expect(deps.setMealLogForm).toHaveBeenCalledWith(
+        expect.objectContaining({ mealType: "breakfast", name: "", calories: "" })
+      );
+    });
+
+    test("posts to the meal-logs endpoint", async () => {
+      await build({ mealLogForm: mealLogForm() }).submitMealLog(submitEvent());
+      deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard: {} }));
+
+      await queued().request();
+
+      expect(deps.apiFetch.mock.calls[0][0]).toBe("/api/dashboard/meal-logs");
+    });
+  });
+
+  // Each queued entry needs its own id, or two logs in the same second would
+  // collide in the operation map and one would never commit.
+  test("gives every queued entry a distinct id", async () => {
+    const handlers = build({ calorieForm: { calories: "100" } });
+
+    await handlers.submitCalories(submitEvent());
+    await handlers.submitCalories(submitEvent());
+
+    const ids = deps.queueOptimisticLogCommit.mock.calls.map(([o]) => o.item.id);
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+});
+
+// The handlers that write directly, without the undo window.
+describe("direct submissions", () => {
+  const ok = (dashboard = { workouts: [] }) => jsonResponse({ dashboard });
+
+  describe("submitGoals", () => {
+    test("posts the goal form and stores the returned dashboard", async () => {
+      const dashboard = { goals: { weeklyWorkouts: 4 } };
+      deps.apiFetch.mockResolvedValue(ok(dashboard));
+
+      await build({ goalForm: { weeklyWorkouts: 4 } }).submitGoals(submitEvent());
+
+      const [url, options] = deps.apiFetch.mock.calls[0];
+      expect(url).toBe("/api/dashboard/goals");
+      expect(JSON.parse(options.body)).toEqual({ weeklyWorkouts: 4 });
+      expect(deps.setDashboard).toHaveBeenCalledWith(dashboard);
+      expect(deps.showDashboardToast).toHaveBeenCalledWith("Goals updated.");
+    });
+
+    test("clears any standing error first", async () => {
+      deps.apiFetch.mockResolvedValue(ok());
+
+      await build().submitGoals(submitEvent());
+
+      expect(deps.setDashError).toHaveBeenNthCalledWith(1, "");
+    });
+
+    test("reports the server's message on a rejection", async () => {
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "Goal must be positive." }, false));
+
+      await build().submitGoals(submitEvent());
+
+      expect(deps.setDashError).toHaveBeenLastCalledWith("Goal must be positive.");
+      expect(deps.showDashboardToast).toHaveBeenCalledWith("Goal must be positive.", "error");
+      expect(deps.setDashboard).not.toHaveBeenCalled();
+    });
+
+    test("reports a network failure rather than throwing at the caller", async () => {
+      deps.apiFetch.mockRejectedValue(new Error("network down"));
+
+      await expect(build().submitGoals(submitEvent())).resolves.toBeUndefined();
+      expect(deps.setDashError).toHaveBeenLastCalledWith("network down");
+    });
+  });
+
+  describe("submitProgressMetric", () => {
+    test("posts the form and stores the returned dashboard", async () => {
+      const dashboard = { progressMetrics: [{ id: "p1" }] };
+      deps.apiFetch.mockResolvedValue(ok(dashboard));
+
+      await build({ progressForm: { weightLb: "168" } }).submitProgressMetric(submitEvent());
+
+      expect(deps.apiFetch.mock.calls[0][0]).toBe("/api/dashboard/progress-metrics");
+      expect(deps.setDashboard).toHaveBeenCalledWith(dashboard);
+    });
+
+    // The form is only emptied once the write has actually landed, unlike the
+    // optimistic handlers above.
+    test("clears the form only on success", async () => {
+      deps.apiFetch.mockResolvedValue(ok());
+
+      await build().submitProgressMetric(submitEvent());
+
+      expect(deps.setProgressForm).toHaveBeenCalledWith(
+        expect.objectContaining({ weightLb: "", bodyFatPct: "" })
+      );
+    });
+
+    test("keeps the form when the save is refused", async () => {
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "Weight is required." }, false));
+
+      await build().submitProgressMetric(submitEvent());
+
+      expect(deps.setProgressForm).not.toHaveBeenCalled();
+      expect(deps.setDashError).toHaveBeenLastCalledWith("Weight is required.");
+    });
+  });
+
+  describe("saveExerciseToPlan", () => {
+    test("reports success to its caller", async () => {
+      const dashboard = { savedExercises: [{ id: "s1" }] };
+      deps.apiFetch.mockResolvedValue(ok(dashboard));
+
+      const result = await build().saveExerciseToPlan({ name: "Bench press" });
+
+      expect(deps.apiFetch.mock.calls[0][0]).toBe("/api/dashboard/saved-exercises");
+      expect(result).toEqual({ ok: true, data: { dashboard } });
+      expect(deps.setDashboard).toHaveBeenCalledWith(dashboard);
+    });
+
+    // Returns rather than throws, because the caller is a button that needs to
+    // know whether to change its own label.
+    test("reports failure to its caller instead of throwing", async () => {
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "Already saved." }, false));
+
+      const result = await build().saveExerciseToPlan({ name: "Bench press" });
+
+      expect(result).toEqual({ ok: false, error: "Already saved." });
+      expect(deps.showDashboardToast).toHaveBeenCalledWith("Already saved.", "error");
+    });
+
+    test("sends an empty object when given nothing", async () => {
+      deps.apiFetch.mockResolvedValue(ok());
+
+      await build().saveExerciseToPlan();
+
+      expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toEqual({});
+    });
+  });
+
+  describe("removeSavedExercise", () => {
+    test("deletes by id and stores the returned dashboard", async () => {
+      const dashboard = { savedExercises: [] };
+      deps.apiFetch.mockResolvedValue(ok(dashboard));
+
+      const result = await build().removeSavedExercise("s1");
+
+      const [url, options] = deps.apiFetch.mock.calls[0];
+      expect(url).toBe("/api/dashboard/saved-exercises/s1");
+      expect(options.method).toBe("DELETE");
+      expect(result).toEqual({ ok: true, data: { dashboard } });
+    });
+
+    test("reports failure to its caller instead of throwing", async () => {
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "Not found." }, false));
+
+      const result = await build().removeSavedExercise("missing");
+
+      expect(result).toEqual({ ok: false, error: "Not found." });
+      expect(deps.setDashboard).not.toHaveBeenCalled();
+    });
+  });
+});
