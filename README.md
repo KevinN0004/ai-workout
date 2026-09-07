@@ -54,6 +54,25 @@ npm run dev
 
 The client runs on `http://localhost:5173` and proxies `/api` requests to the server on `http://localhost:5000`.
 
+### Local dependencies with Docker
+
+`docker-compose.yml` brings up Postgres and Redis only. The app is deliberately not containerised, so Vite and `node --watch` keep running natively.
+
+```bash
+docker compose up -d               # Postgres on 55432, Redis on 6379
+npm -w server run migrate:postgres # the container starts empty
+```
+
+Then set in `server/.env`:
+
+```text
+DATABASE_URL=postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout
+```
+
+Compose and `npm run postgres:local:start -w server` both bind **55432** and are therefore mutually exclusive — use one or the other, not both.
+
+Redis is opt-in: the server falls back to in-memory sessions unless `REDIS_URL` is set, so starting the container alone changes nothing. To use it, set `REDIS_URL=redis://127.0.0.1:6379`.
+
 ## Root Scripts
 
 ```bash

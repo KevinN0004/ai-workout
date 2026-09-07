@@ -1,0 +1,39 @@
+# Development dependencies only. The app itself is deliberately NOT
+# containerised -- Vite and `node --watch` keep running natively so hot reload
+# and the Windows workflow are preserved.
+#
+# Postgres publishes on 55432 to match server/scripts/start-local-postgres.ps1.
+# The two are alternatives, not complements: same port, so they collide.
+services:
+  postgres:
+    image: postgres:16
+    container_name: ai-workout-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_workout_dev}
+      POSTGRES_DB: ai_workout
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_workout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-workout-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

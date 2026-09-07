@@ -181,6 +181,12 @@ npm run prisma:generate        # regenerate Prisma Client
 npm run prisma:validate        # validate the schema
 ```
 
+`docker compose up -d` is the alternative to that first helper: `docker-compose.yml` runs
+Postgres and Redis in containers while the app itself stays native. Both it and
+`npm run postgres:local:start` bind **55432**, so they are alternatives, not complements.
+Compose starts an empty database, so `npm -w server run migrate:postgres` is required
+before the server or its test suite will work against it.
+
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
