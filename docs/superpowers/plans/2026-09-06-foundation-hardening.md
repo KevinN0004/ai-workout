@@ -247,19 +247,19 @@ const importRules = {
 };
 ```
 
-- [ ] **Step 3: Add `linterOptions` to the first config object**
+- [ ] **Step 3: Add `linterOptions` in its OWN config object**
 
-Replace the existing `ignores`-only first entry with:
+**Do not add `linterOptions` to the existing `ignores` object.** In ESLint 9 flat config, an object
+containing *only* `ignores` is treated as **global ignores**. Adding any other key demotes it to an
+ordinary config object whose ignores apply only in its own scope. Verified empirically: doing so
+makes `npx eslint .` start linting `.claude/helpers/**` and blow up from 9 lines of output to **990**.
+
+Leave the `ignores` object byte-identical, and add a separate entry after it:
 
 ```js
   {
-    ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      ".claude/**",
-      ".githooks/**",
-      "client/dist/**"
-    ],
+    // Must live in its own object. Adding any key to the ignores-only object
+    // above would stop those ignores being global -- see the 990-line blowup.
     linterOptions: {
       // ESLint 9 defaults this to "warn". Promoting it to "error" stops dead
       // suppressions accumulating. There are zero unused directives today.
@@ -267,6 +267,11 @@ Replace the existing `ignores`-only first entry with:
     }
   },
 ```
+
+**Canary for verifying global ignores still hold:** `.claude/helpers/*.js` are bare CommonJS files
+using `require()`. If global ignores break, they get linted and emit `no-undef` bursts. Confirm with
+`npx eslint .claude/helpers`, which should report that the files are *ignored* — not merely that
+none matched.
 
 - [ ] **Step 4: Extend the client block**
 
@@ -339,7 +344,21 @@ It must be last so it can switch off any stylistic rule an earlier block enabled
 npx eslint . ; echo "EXIT=$?"
 ```
 
-Expected: `EXIT=1` with exactly **one** `no-console` error in `server/src` (measured: 1 occurrence outside tests, 0 in the client). Replace that call with the pino `logger` already available in that module, or with `process.stderr.write` if no logger is in scope.
+Expected: `EXIT=1` with exactly **two** `no-console` errors:
+
+| File | Call |
+| --- | --- |
+| `server/src/postgresMigrations.js:13` | `console.log` as an injectable `log` default |
+| `server/scripts/apply-postgres-migrations.js` | `console.error` in the CLI catch handler |
+
+An earlier draft said one. That count came from grepping `server/src` alone and missed the second:
+`files: ["server/**/*.js"]` also matches **`server/scripts/`**. The note in Step 6 that "`scripts/**`
+needs no exemption" refers to the *root* `scripts/` directory only.
+
+There is no shared logger to use — pino is instantiated inside `server/src/index.js` and never
+exported — so replace each call with a direct stream write. **Preserve the original stream:**
+`console.log` becomes `process.stdout.write`, `console.error` becomes `process.stderr.write`. A lint
+fix must not silently relocate output between streams.
 
 If any *other* rule fires, stop and report it — the measurement said zero, so a violation means the config differs from what was probed.
 
