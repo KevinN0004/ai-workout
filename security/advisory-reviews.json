@@ -1,0 +1,16 @@
+{
+  "reviews": [
+    {
+      "advisory": "GHSA-3f6p-5ww8-9rcr",
+      "package": "mysql2",
+      "reason": "Reached only through the prisma CLI devDependency. This app never connects to MySQL and the CLI does not ship to production runtime. npm's remedy is prisma@6.19.3, a downgrade from 7.10.",
+      "reviewBy": "2026-12-07"
+    },
+    {
+      "advisory": "GHSA-ggr8-5vv4-36mx",
+      "package": "deepmerge-ts",
+      "reason": "Reached through @prisma/config, itself a prisma CLI devDependency. Not present in the production runtime tree.",
+      "reviewBy": "2026-12-07"
+    }
+  ]
+}
