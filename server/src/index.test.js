@@ -280,7 +280,11 @@ describe("server routes", () => {
       expect(quotaBody.requiresAuth).toBe(true);
       expect(quotaBody.error).toMatch(/sign in/i);
     } finally {
-      process.env.GEMINI_API_KEY = previousApiKey;
+      if (previousApiKey === undefined) {
+        delete process.env.GEMINI_API_KEY;
+      } else {
+        process.env.GEMINI_API_KEY = previousApiKey;
+      }
     }
   });
 
@@ -538,7 +542,11 @@ describe("server routes", () => {
 
       expect(sawRateLimit).toBe(true);
     } finally {
-      process.env.GEMINI_API_KEY = previousApiKey;
+      if (previousApiKey === undefined) {
+        delete process.env.GEMINI_API_KEY;
+      } else {
+        process.env.GEMINI_API_KEY = previousApiKey;
+      }
     }
   });
 

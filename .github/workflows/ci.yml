@@ -7,10 +7,11 @@ on:
       - master
   pull_request:
 
-# Supersede in-flight runs on the same ref rather than paying for both.
+# Supersede in-flight runs on the same ref rather than paying for both, except on
+# main -- an intermediate commit there should keep its own CI signal.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Least privilege: nothing here writes to the repository.
 permissions:
@@ -31,23 +32,25 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "npm"
 
+      # Imports only node builtins, so it runs before the install: a stale review
+      # date fails in about a second rather than sixty.
+      - name: Audit Allowlist Expiry
+        run: node scripts/check-audit-allowlist.mjs
+
       - name: Install Dependencies
         run: npm ci
 
       - name: ESLint
-        run: npx eslint .
+        run: npm run lint
 
       - name: Prettier
-        run: npx prettier --check .
+        run: npm run format:check
 
       - name: Script Tests
         run: npm run test:scripts
 
-      - name: Audit Allowlist Expiry
-        run: node scripts/check-audit-allowlist.mjs
-
       - name: Dependency Audit
-        run: npx --yes audit-ci@7 --config .audit-ci.json
+        run: npx --yes audit-ci@7.1.0 --config .audit-ci.json
 
   test:
     name: Tests (Node ${{ matrix.node }})
@@ -90,14 +93,16 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      # Needs no database, so it runs first: a migration problem cannot mask an
+      # unrelated client failure.
+      - name: Client Tests
+        run: npm -w client run test
+
       - name: Generate Prisma Client
         run: npm -w server run prisma:generate
 
       - name: Apply Postgres Migrations
         run: npm -w server run migrate:postgres
-
-      - name: Client Tests
-        run: npm -w client run test
 
       - name: Server Tests
         run: npm -w server run test
