@@ -141,7 +141,7 @@ describe("applyMigrations", () => {
       errSpy.mockRestore();
     }
 
-    expect(out.join("")).toContain("applied");
+    expect(out.join("")).toContain("[postgres:migrate] applied 001_demo.sql\n");
     expect(err.join("")).not.toContain("[postgres:migrate]");
   });
 });

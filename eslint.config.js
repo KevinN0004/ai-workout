@@ -20,6 +20,9 @@ const importResolverSettings = {
 // trips no-undef, or globals but no exemption, as client/src/test/** was.
 const testFiles = ["**/*.test.{js,jsx,mjs}", "client/src/test/**"];
 
+// Spread into a block's `rules` alongside `plugins: { "import-x": importX }`;
+// a new block needs both. Omitting the plugin fails loudly -- ESLint refuses to
+// load the config -- but omitting this spread just silently drops the rules.
 const importRules = {
   "import-x/no-cycle": "error",
   "import-x/no-unresolved": "error",
@@ -111,6 +114,9 @@ export default [
   },
 
   // ---- Server: node globals, ESM ----------------------------------------
+  // "server/**" reaches server/scripts/ too, so no-console covers those CLIs.
+  // Root scripts/** is deliberately left out of it: that tree is repo tooling
+  // whose job is to print, and enabling the rule there flags 13 valid calls.
   {
     files: ["server/**/*.js"],
     languageOptions: {
