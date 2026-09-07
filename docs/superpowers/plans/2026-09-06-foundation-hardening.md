@@ -19,7 +19,7 @@
 | --- | --- | --- |
 | Lint | `npx eslint .` | exit 0 |
 | Client tests | `npm -w client run test` | 33 files, 655 tests passing |
-| Server tests | `npm -w server run test` | 32 files, 750 tests passing |
+| Server tests | `npm -w server run test` | 32 files, 751 tests passing |
 | Build | `npm run build` | exit 0 (the "chunks larger than 500 kB" warning is pre-existing) |
 
 Server tests need Postgres reachable on `127.0.0.1:55432` with `DATABASE_URL` set in `server/.env`.
@@ -388,7 +388,7 @@ Expected: `EXIT=1` with an `import-x/no-unresolved` error. Then confirm the prob
 npm test
 ```
 
-Expected: 655 client and 750 server tests passing.
+Expected: 655 client and 751 server tests passing.
 
 - [ ] **Step 12: Commit**
 
@@ -437,7 +437,7 @@ Expected: empty output. Do not proceed otherwise — this commit must contain fo
 npm test 2>&1 | grep -E "Tests +[0-9]+ passed"
 ```
 
-Expected: `655 passed` then `750 passed`.
+Expected: `655 passed` then `751 passed`.
 
 - [ ] **Step 3: Run the formatter**
 
@@ -463,7 +463,7 @@ npm test 2>&1 | grep -E "Tests +[0-9]+ passed"
 npm run build ; echo "BUILD=$?"
 ```
 
-Expected: `LINT=0`, `655 passed`, `750 passed`, `BUILD=0`. Formatting must not change a single test outcome.
+Expected: `LINT=0`, `655 passed`, `751 passed`, `BUILD=0`. Formatting must not change a single test outcome.
 
 - [ ] **Step 6: Commit the reformat alone**
 
@@ -472,7 +472,7 @@ git add -A
 git commit -m "style: format the repository with Prettier
 
 Formatting only -- no behavioural change. Verified by running the full
-suite before and after: 655 client and 750 server tests pass either way,
+suite before and after: 655 client and 751 server tests pass either way,
 and eslint and the build stay green.
 
 This commit is recorded in .git-blame-ignore-revs so it does not obscure
@@ -612,7 +612,7 @@ The override also lifts `supertest → superagent → qs@6.14.2` to 6.16.0. This
 npm test
 ```
 
-Expected: 655 client and 750 server tests passing. **If the server suite fails, stop** — report the failure rather than pinning `qs` only for Express.
+Expected: 655 client and 751 server tests passing. **If the server suite fails, stop** — report the failure rather than pinning `qs` only for Express.
 
 - [ ] **Step 6: Commit**
 
@@ -684,7 +684,7 @@ Expected: `EXIT=0`. **If it fails**, delete `.npmrc`, record the offending packa
 npm test
 ```
 
-Expected: 655 client and 750 server tests passing.
+Expected: 655 client and 751 server tests passing.
 
 - [ ] **Step 6: Commit**
 
@@ -1377,7 +1377,7 @@ Expected: `EXIT=0`.
 npm -w server run test
 ```
 
-Expected: 750 tests passing.
+Expected: 751 tests passing.
 
 - [ ] **Step 6: Document it in `README.md`**
 
@@ -1721,7 +1721,7 @@ This is the critical check — the whole design rests on the guard keeping valid
 npm -w server run test
 ```
 
-Expected: 750 tests passing, unchanged.
+Expected: 751 tests passing, unchanged.
 
 - [ ] **Step 4: Verify the preflight actually fires on a real boot**
 
@@ -1755,7 +1755,7 @@ git add server/src/index.js
 git commit -m "feat(server): run the env preflight before starting
 
 Placed inside the existing NODE_ENV/VITEST guard so it never runs under
-the test runner. Verified: the 750-test server suite is unchanged, and a
+the test runner. Verified: the 751-test server suite is unchanged, and a
 real boot with DATABASE_URL unset now exits 1 with a readable message
 instead of surfacing a Postgres driver error deep in startup.
 
@@ -1977,7 +1977,7 @@ Paste the actual output, not a claim that it passed.
 
 - [ ] `npm run lint` — exit 0
 - [ ] `npm run format:check` — exit 0
-- [ ] `npm test` — 655 client, 750 server, scripts green
+- [ ] `npm test` — 655 client, 751 server, scripts green
 - [ ] `npm run build` — exit 0
 
 ## Risk
@@ -2039,7 +2039,7 @@ Run after all six PRs have landed.
 
 - [ ] `npx eslint .` — exit 0
 - [ ] `npx prettier --check .` — exit 0
-- [ ] `npm test` — 655 client, 750 server, 9 script tests passing
+- [ ] `npm test` — 655 client, 751 server, 9 script tests passing
 - [ ] `npm run build` — exit 0
 - [ ] `npm audit` — no `qs` or `body-parser` findings; only the Prisma-chain advisories remain
 - [ ] `npx audit-ci@7 --config .audit-ci.json` — exit 0, with no "Consider not allowlisting" notice

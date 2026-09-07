@@ -17,7 +17,7 @@ Measured on this machine before any change. These are the numbers the plan must 
 | --- | --- |
 | `npx eslint .` | exit 0 |
 | Client suite | 33 files, **655 tests** passing |
-| Server suite | 32 files, **750 tests** passing (against local Postgres on 55432) |
+| Server suite | 32 files, **751 tests** passing (against local Postgres on 55432) |
 | Dev Node | **v24.14.1** |
 | `npm audit` | 6 vulnerabilities — 2 moderate, 4 high |
 
@@ -346,7 +346,7 @@ Every existing live `process.env` read stays exactly as-is.
 
 Consequences of that choice:
 
-- It never runs under Vitest, so the 750 server tests are untouched.
+- It never runs under Vitest, so the 751 server tests are untouched.
 - `GEMINI_API_KEY` stays optional with its per-request 500.
 - Tests that mutate `process.env` at runtime keep working.
 
@@ -408,7 +408,7 @@ On completion, all of the following must hold:
 - `npx eslint .` exits 0
 - `npx prettier --check` exits 0
 - Client suite: 655 tests passing (no regression)
-- Server suite: 750 tests passing (no regression)
+- Server suite: 751 tests passing (no regression)
 - `npm run build` exits 0 (the "chunks larger than 500 kB" warning is pre-existing, not a failure)
 - `npm audit` reports **no** `qs` or `body-parser` findings; only the allowlisted Prisma-chain
   advisories remain, and `audit-ci --config .audit-ci.json` exits 0
