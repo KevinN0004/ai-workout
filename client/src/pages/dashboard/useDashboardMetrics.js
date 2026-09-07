@@ -281,8 +281,8 @@ export default function useDashboardMetrics({
       remainingWorkouts === 0
         ? "Weekly workout goal reached."
         : avgDailyWorkouts > 0
-        ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
-        : "Log a workout to start your pace estimate.";
+          ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
+          : "Log a workout to start your pace estimate.";
     const calorieDelta = Math.round(avgCalories - calorieGoal);
     const workoutDeltaVsLastWeek = last7Workouts.length - previous7Workouts.length;
     const calorieDeltaVsLastWeek = Math.round(avgCalories - previousAvgCalories);
@@ -310,11 +310,7 @@ export default function useDashboardMetrics({
     const weeklyMealPlan = buildWeeklyMealPlan({
       weekDays,
       latestPlanByWeekday,
-      goalText:
-        latestPlan?.goal ||
-        goals?.goalType ||
-        formGoal ||
-        "Build lean strength and energy",
+      goalText: latestPlan?.goal || goals?.goalType || formGoal || "Build lean strength and energy",
       targetCalories: goals.targetCalories
     });
     const todayWeekday = todayDate.toLocaleDateString("en-US", {

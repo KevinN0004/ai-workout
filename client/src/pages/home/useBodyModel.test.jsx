@@ -6,7 +6,7 @@ const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feet = Number(feetValue);
   const inches = Number(inchesValue);
   if (!Number.isFinite(feet) && !Number.isFinite(inches)) return null;
-  return ((Number.isFinite(feet) ? feet : 0) * 30.48) + ((Number.isFinite(inches) ? inches : 0) * 2.54);
+  return (Number.isFinite(feet) ? feet : 0) * 30.48 + (Number.isFinite(inches) ? inches : 0) * 2.54;
 };
 
 const toKg = (weightValue, unit) => {
@@ -72,7 +72,11 @@ describe("useBodyModel -> visualizer mapping", () => {
           silhouetteViewHeight: 430,
           silhouetteFloorInset: 18
         }),
-      { initialProps: { personal: { ...BASE_PERSONAL, weight: "150", heightFeet: "5", heightInches: "6" } } }
+      {
+        initialProps: {
+          personal: { ...BASE_PERSONAL, weight: "150", heightFeet: "5", heightInches: "6" }
+        }
+      }
     );
 
     const leanShape = result.current.silhouetteShape;
@@ -127,12 +131,18 @@ describe("useBodyModel -> visualizer mapping", () => {
   });
 
   test("reflects sex-based anthropometric differences in silhouette", () => {
-    const male = renderBodyModel({ personal: { sex: "male", weight: "170", heightFeet: "5", heightInches: "8" } });
-    const female = renderBodyModel({ personal: { sex: "female", weight: "170", heightFeet: "5", heightInches: "8" } });
+    const male = renderBodyModel({
+      personal: { sex: "male", weight: "170", heightFeet: "5", heightInches: "8" }
+    });
+    const female = renderBodyModel({
+      personal: { sex: "female", weight: "170", heightFeet: "5", heightInches: "8" }
+    });
 
-    expect(male.result.current.silhouetteShape.shoulderHalf)
-      .toBeGreaterThan(female.result.current.silhouetteShape.shoulderHalf);
-    expect(female.result.current.silhouetteShape.hipHalf)
-      .toBeGreaterThan(male.result.current.silhouetteShape.hipHalf);
+    expect(male.result.current.silhouetteShape.shoulderHalf).toBeGreaterThan(
+      female.result.current.silhouetteShape.shoulderHalf
+    );
+    expect(female.result.current.silhouetteShape.hipHalf).toBeGreaterThan(
+      male.result.current.silhouetteShape.hipHalf
+    );
   });
 });

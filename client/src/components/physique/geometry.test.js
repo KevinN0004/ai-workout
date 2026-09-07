@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  VIEWBOX_HEIGHT,
-  VIEWBOX_WIDTH,
-  buildPhysiqueSilhouetteGeometry
-} from "./geometry";
+import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH, buildPhysiqueSilhouetteGeometry } from "./geometry";
 
 // This module was untestable until the HMR guard was fixed. `import.meta.hot`
 // is truthy under vitest but its `data` bag is undefined, and the module wrote
@@ -33,9 +29,7 @@ describe("buildPhysiqueSilhouetteGeometry", () => {
 
   test("is deterministic for the same shape", () => {
     const shape = { shoulderHalf: 50, waistHalf: 25, fillHue: 200 };
-    expect(buildPhysiqueSilhouetteGeometry(shape)).toEqual(
-      buildPhysiqueSilhouetteGeometry(shape)
-    );
+    expect(buildPhysiqueSilhouetteGeometry(shape)).toEqual(buildPhysiqueSilhouetteGeometry(shape));
   });
 
   test("emits a closed SVG path with no NaN", () => {

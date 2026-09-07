@@ -18,4 +18,3 @@ export const validateSchemaInput = (schema, input, fallbackPath = "request") => 
     error: getSchemaValidationMessage(result.error, fallbackPath)
   };
 };
-

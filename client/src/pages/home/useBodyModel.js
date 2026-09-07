@@ -6,7 +6,10 @@ const toFiniteNumber = (value) => {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const toLowerText = (value) => String(value || "").trim().toLowerCase();
+const toLowerText = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
 
 const roundTo = (value, decimals = 1) => {
   const factor = 10 ** decimals;
@@ -61,9 +64,8 @@ export default function useBodyModel({
     const fromImperialInput = toFiniteNumber(
       toCmFromFeetInches(personal.heightFeet, personal.heightInches)
     );
-    const picked = heightUnit === "ft"
-      ? fromImperialInput ?? fromCmInput
-      : fromCmInput ?? fromImperialInput;
+    const picked =
+      heightUnit === "ft" ? (fromImperialInput ?? fromCmInput) : (fromCmInput ?? fromImperialInput);
     return picked && picked > 0 ? picked : null;
   }, [
     heightUnit,
@@ -87,7 +89,8 @@ export default function useBodyModel({
   const ageValue = useMemo(() => toFiniteNumber(personal.age), [personal.age]);
   const hasValidName = Boolean(personal.name?.trim());
   const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 99;
-  const isPersonalComplete = hasValidName &&
+  const isPersonalComplete =
+    hasValidName &&
     hasValidAge &&
     resolvedHeightCm !== null &&
     resolvedWeightKg !== null &&
@@ -175,39 +178,34 @@ export default function useBodyModel({
 
   const silhouetteShape = useMemo(() => {
     const bmiMassScore = bmi !== null ? clamp((bmi - 18.5) / (45 - 18.5), 0, 1) : 0.45;
-    const bodyFatMassScore = effectiveBodyFat !== null
-      ? clamp((effectiveBodyFat - 8) / (50 - 8), 0, 1)
-      : null;
+    const bodyFatMassScore =
+      effectiveBodyFat !== null ? clamp((effectiveBodyFat - 8) / (50 - 8), 0, 1) : null;
     const baseFatScore = clamp(
-      (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.74 +
-        bmiMassScore * 0.26,
+      (bodyFatMassScore !== null ? bodyFatMassScore : bmiMassScore) * 0.74 + bmiMassScore * 0.26,
       0,
       1
     );
-    const trainingConsistency = clamp((trainingDaysScore * 0.52) + (activityScore * 0.48), 0, 1);
-    const conditioningScore = clamp((cardioScore * 0.58) + (sleepScore * 0.42), 0, 1);
+    const trainingConsistency = clamp(trainingDaysScore * 0.52 + activityScore * 0.48, 0, 1);
+    const conditioningScore = clamp(cardioScore * 0.58 + sleepScore * 0.42, 0, 1);
     const profileMuscleBias = clamp(
-      ((trainingConsistency - 0.5) * 0.44) +
-        ((experienceScore - 0.5) * 0.22) +
-        ((nutritionScore - 0.5) * 0.16),
+      (trainingConsistency - 0.5) * 0.44 +
+        (experienceScore - 0.5) * 0.22 +
+        (nutritionScore - 0.5) * 0.16,
       -0.34,
       0.36
     );
     const profileFatBias = clamp(
-      ((conditioningScore - 0.5) * 0.32) +
-        ((trainingConsistency - 0.5) * 0.14),
+      (conditioningScore - 0.5) * 0.32 + (trainingConsistency - 0.5) * 0.14,
       -0.22,
       0.22
     );
-    const ageAdjustment = ageValue !== null
-      ? clamp((ageValue - 40) / 45, 0, 0.22)
-      : 0;
-    const fatScore = clamp(baseFatScore - profileFatBias + (ageAdjustment * 0.32), 0, 1);
+    const ageAdjustment = ageValue !== null ? clamp((ageValue - 40) / 45, 0, 0.22) : 0;
+    const fatScore = clamp(baseFatScore - profileFatBias + ageAdjustment * 0.32, 0, 1);
     const obesityBias = clamp((bmiMassScore - 0.38) / 0.62, 0, 1);
-    const adiposityPressure = clamp((fatScore * 0.68) + (obesityBias * 0.32), 0, 1);
-    const baseMuscularityScore = clamp((bmiMassScore * 0.4) + ((1 - baseFatScore) * 0.6), 0, 1);
+    const adiposityPressure = clamp(fatScore * 0.68 + obesityBias * 0.32, 0, 1);
+    const baseMuscularityScore = clamp(bmiMassScore * 0.4 + (1 - baseFatScore) * 0.6, 0, 1);
     const muscularityScore = clamp(
-      baseMuscularityScore + profileMuscleBias - (ageAdjustment * 0.24) - (adiposityPressure * 0.18),
+      baseMuscularityScore + profileMuscleBias - ageAdjustment * 0.24 - adiposityPressure * 0.18,
       0,
       1
     );
@@ -215,72 +213,76 @@ export default function useBodyModel({
     const heightNorm = resolvedHeightCm
       ? clamp((resolvedHeightCm - 150) / (205 - 150), 0, 1)
       : 0.48;
-    const sexLabel = String(personal.sex || "").trim().toLowerCase();
-    const anthropometry = sexLabel === "male"
-      ? {
-          headHeight: 0.132,
-          acromionHeight: 0.824,
-          waistHeight: 0.583,
-          crotchHeight: 0.444,
-          kneeHeight: 0.27,
-          ankleHeight: 0.041,
-          shoulderBreadth: 0.259,
-          chestBreadth: 0.181,
-          waistBreadth: 0.154,
-          hipBreadth: 0.191,
-          thighBreadth: 0.118,
-          calfBreadth: 0.081,
-          armBreadth: 0.084,
-          armReach: 0.455,
-          armSpanRatio: 1
-        }
-      : sexLabel === "female"
+    const sexLabel = String(personal.sex || "")
+      .trim()
+      .toLowerCase();
+    const anthropometry =
+      sexLabel === "male"
         ? {
-            headHeight: 0.131,
+            headHeight: 0.132,
             acromionHeight: 0.824,
-            waistHeight: 0.596,
-            crotchHeight: 0.445,
-            kneeHeight: 0.269,
-            ankleHeight: 0.04,
-            shoulderBreadth: 0.242,
-            chestBreadth: 0.171,
-            waistBreadth: 0.153,
-            hipBreadth: 0.214,
-            thighBreadth: 0.126,
-            calfBreadth: 0.085,
-            armBreadth: 0.078,
-            armReach: 0.451,
+            waistHeight: 0.583,
+            crotchHeight: 0.444,
+            kneeHeight: 0.27,
+            ankleHeight: 0.041,
+            shoulderBreadth: 0.259,
+            chestBreadth: 0.181,
+            waistBreadth: 0.154,
+            hipBreadth: 0.191,
+            thighBreadth: 0.118,
+            calfBreadth: 0.081,
+            armBreadth: 0.084,
+            armReach: 0.455,
             armSpanRatio: 1
           }
-        : {
-            headHeight: 0.1315,
-            acromionHeight: 0.824,
-            waistHeight: 0.5895,
-            crotchHeight: 0.4445,
-            kneeHeight: 0.2695,
-            ankleHeight: 0.0405,
-            shoulderBreadth: 0.2505,
-            chestBreadth: 0.176,
-            waistBreadth: 0.1535,
-            hipBreadth: 0.2025,
-            thighBreadth: 0.122,
-            calfBreadth: 0.083,
-            armBreadth: 0.081,
-            armReach: 0.453,
-            armSpanRatio: 1
-          };
-    const medicalRegionProfile = sexLabel === "male"
-      ? MEDICAL_REGION_PROFILES.male
-      : sexLabel === "female"
-        ? MEDICAL_REGION_PROFILES.female
-        : MEDICAL_REGION_PROFILES.neutral;
+        : sexLabel === "female"
+          ? {
+              headHeight: 0.131,
+              acromionHeight: 0.824,
+              waistHeight: 0.596,
+              crotchHeight: 0.445,
+              kneeHeight: 0.269,
+              ankleHeight: 0.04,
+              shoulderBreadth: 0.242,
+              chestBreadth: 0.171,
+              waistBreadth: 0.153,
+              hipBreadth: 0.214,
+              thighBreadth: 0.126,
+              calfBreadth: 0.085,
+              armBreadth: 0.078,
+              armReach: 0.451,
+              armSpanRatio: 1
+            }
+          : {
+              headHeight: 0.1315,
+              acromionHeight: 0.824,
+              waistHeight: 0.5895,
+              crotchHeight: 0.4445,
+              kneeHeight: 0.2695,
+              ankleHeight: 0.0405,
+              shoulderBreadth: 0.2505,
+              chestBreadth: 0.176,
+              waistBreadth: 0.1535,
+              hipBreadth: 0.2025,
+              thighBreadth: 0.122,
+              calfBreadth: 0.083,
+              armBreadth: 0.081,
+              armReach: 0.453,
+              armSpanRatio: 1
+            };
+    const medicalRegionProfile =
+      sexLabel === "male"
+        ? MEDICAL_REGION_PROFILES.male
+        : sexLabel === "female"
+          ? MEDICAL_REGION_PROFILES.female
+          : MEDICAL_REGION_PROFILES.neutral;
 
     const legBias = (heightNorm - 0.5) * 18;
     const floorY = silhouetteViewHeight - silhouetteFloorInset;
     const ankleY = floorY + legBias;
-    const statureSpan = clamp((silhouetteViewHeight * 0.865) + ((heightNorm - 0.5) * 34), 356, 392);
+    const statureSpan = clamp(silhouetteViewHeight * 0.865 + (heightNorm - 0.5) * 34, 356, 392);
     const headHeight = clamp(
-      statureSpan * anthropometry.headHeight * (1 + (fatScore * 0.04)),
+      statureSpan * anthropometry.headHeight * (1 + fatScore * 0.04),
       34,
       56
     );
@@ -290,17 +292,17 @@ export default function useBodyModel({
 
     const yFromHeightRatio = (heightRatioFromFloor) => {
       const progressFromTop = (1 - heightRatioFromFloor) / (1 - anthropometry.ankleHeight);
-      return headTopY + (statureSpan * clamp(progressFromTop, 0, 1));
+      return headTopY + statureSpan * clamp(progressFromTop, 0, 1);
     };
 
     const shoulderYRaw = yFromHeightRatio(anthropometry.acromionHeight);
     const waistYRaw = yFromHeightRatio(anthropometry.waistHeight);
     const groinTargetY = yFromHeightRatio(anthropometry.crotchHeight);
     const kneeTargetY = yFromHeightRatio(anthropometry.kneeHeight);
-    const chestYRaw = shoulderYRaw + ((waistYRaw - shoulderYRaw) * 0.34);
-    const thighYRaw = groinTargetY + ((kneeTargetY - groinTargetY) * 0.52);
-    const hipYRaw = (groinTargetY - (0.13 * thighYRaw)) / 0.87;
-    const calfYRaw = (kneeTargetY - (0.62 * thighYRaw)) / 0.38;
+    const chestYRaw = shoulderYRaw + (waistYRaw - shoulderYRaw) * 0.34;
+    const thighYRaw = groinTargetY + (kneeTargetY - groinTargetY) * 0.52;
+    const hipYRaw = (groinTargetY - 0.13 * thighYRaw) / 0.87;
+    const calfYRaw = (kneeTargetY - 0.62 * thighYRaw) / 0.38;
 
     const shoulderY = clamp(shoulderYRaw, 84, 132);
     const chestY = clamp(chestYRaw, shoulderY + 18, shoulderY + 82);
@@ -316,95 +318,85 @@ export default function useBodyModel({
     const thighBreadth = statureSpan * anthropometry.thighBreadth;
     const calfBreadth = statureSpan * anthropometry.calfBreadth;
     const armBreadth = statureSpan * anthropometry.armBreadth;
-    const trunkFatWeight = clamp(0.74 + (medicalRegionProfile.trunkFatShare * 0.66), 0.92, 1.24);
-    const hipFatWeight = clamp(0.54 + (medicalRegionProfile.hipFatShare * 1.46), 0.72, 1.08);
-    const thighFatWeight = clamp(0.5 + (medicalRegionProfile.thighFatShare * 1.5), 0.68, 1.08);
-    const armFatWeight = clamp(0.54 + (medicalRegionProfile.armFatShare * 1.72), 0.62, 1.04);
-    const calfFatWeight = clamp(0.42 + (medicalRegionProfile.calfFatShare * 1.95), 0.5, 0.92);
+    const trunkFatWeight = clamp(0.74 + medicalRegionProfile.trunkFatShare * 0.66, 0.92, 1.24);
+    const hipFatWeight = clamp(0.54 + medicalRegionProfile.hipFatShare * 1.46, 0.72, 1.08);
+    const thighFatWeight = clamp(0.5 + medicalRegionProfile.thighFatShare * 1.5, 0.68, 1.08);
+    const armFatWeight = clamp(0.54 + medicalRegionProfile.armFatShare * 1.72, 0.62, 1.04);
+    const calfFatWeight = clamp(0.42 + medicalRegionProfile.calfFatShare * 1.95, 0.5, 0.92);
     const upperTrunkAdiposity = clamp(
-      (fatScore * 0.62 * trunkFatWeight) + (adiposityPressure * 0.48),
+      fatScore * 0.62 * trunkFatWeight + adiposityPressure * 0.48,
       0,
       1.42
     );
-    const appendicularAdiposity = clamp(
-      (fatScore * 0.54) + (adiposityPressure * 0.42),
-      0,
-      1.36
-    );
+    const appendicularAdiposity = clamp(fatScore * 0.54 + adiposityPressure * 0.42, 0, 1.36);
     const lowerLegAdiposity = clamp(
-      (appendicularAdiposity * 0.58) + (fatScore * 0.22) + (adiposityPressure * 0.2),
+      appendicularAdiposity * 0.58 + fatScore * 0.22 + adiposityPressure * 0.2,
       0,
       1.5
     );
 
     const shoulderHalf = clamp(
-      (shoulderBreadth * (
-        0.5 +
-        (muscularityScore * 0.08) +
-        (upperTrunkAdiposity * 0.09) -
-        ((1 - muscularityScore) * 0.01)
-      )),
+      shoulderBreadth *
+        (0.5 +
+          muscularityScore * 0.08 +
+          upperTrunkAdiposity * 0.09 -
+          (1 - muscularityScore) * 0.01),
       30,
       72
     );
     const chestHalfRaw = clamp(
-      (chestBreadth * (
-        0.5 +
-        (muscularityScore * 0.06) +
-        (upperTrunkAdiposity * 0.2) +
-        (adiposityPressure * 0.1)
-      )),
+      chestBreadth *
+        (0.5 + muscularityScore * 0.06 + upperTrunkAdiposity * 0.2 + adiposityPressure * 0.1),
       22,
       62
     );
     const waistHalfRaw = clamp(
-      (waistBreadth * (0.5 + (fatScore * 0.28 * trunkFatWeight) + (adiposityPressure * 0.2 * trunkFatWeight))),
+      waistBreadth *
+        (0.5 + fatScore * 0.28 * trunkFatWeight + adiposityPressure * 0.2 * trunkFatWeight),
       11,
       52
     );
     const hipHalfRaw = clamp(
-      (hipBreadth * (0.5 + (fatScore * 0.16 * hipFatWeight) + (adiposityPressure * 0.12 * hipFatWeight))),
+      hipBreadth * (0.5 + fatScore * 0.16 * hipFatWeight + adiposityPressure * 0.12 * hipFatWeight),
       18,
       56
     );
     const thighHalf = clamp(
-      (thighBreadth * (
-        0.5 +
-        (muscularityScore * 0.06) +
-        (fatScore * 0.17 * thighFatWeight) +
-        (adiposityPressure * 0.14 * thighFatWeight)
-      )),
+      thighBreadth *
+        (0.5 +
+          muscularityScore * 0.06 +
+          fatScore * 0.17 * thighFatWeight +
+          adiposityPressure * 0.14 * thighFatWeight),
       13,
       46
     );
     const calfHalf = clamp(
-      (calfBreadth * (
-        0.5 +
-        (muscularityScore * 0.06) +
-        (fatScore * 0.18 * calfFatWeight) +
-        (adiposityPressure * 0.16 * calfFatWeight) +
-        (lowerLegAdiposity * 0.14)
-      )),
+      calfBreadth *
+        (0.5 +
+          muscularityScore * 0.06 +
+          fatScore * 0.18 * calfFatWeight +
+          adiposityPressure * 0.16 * calfFatWeight +
+          lowerLegAdiposity * 0.14),
       10,
       36
     );
     const armWidth = clamp(
-      (armBreadth * (
-        0.4 +
-        (muscularityScore * 0.11) +
-        (appendicularAdiposity * 0.24 * armFatWeight) +
-        (adiposityPressure * 0.14 * armFatWeight)
-      )),
+      armBreadth *
+        (0.4 +
+          muscularityScore * 0.11 +
+          appendicularAdiposity * 0.24 * armFatWeight +
+          adiposityPressure * 0.14 * armFatWeight),
       8,
       24
     );
-    const expectedWhr = medicalRegionProfile.whrLean +
-      ((medicalRegionProfile.whrHighAdiposity - medicalRegionProfile.whrLean) * adiposityPressure);
+    const expectedWhr =
+      medicalRegionProfile.whrLean +
+      (medicalRegionProfile.whrHighAdiposity - medicalRegionProfile.whrLean) * adiposityPressure;
     const rawWhr = waistHalfRaw / Math.max(hipHalfRaw, 1);
     const whrDelta = clamp(expectedWhr - rawWhr, -0.22, 0.26);
-    const waistHalf = clamp(waistHalfRaw * (1 + (whrDelta * 0.38)), 11, 52);
-    const hipHalf = clamp(hipHalfRaw * (1 - (whrDelta * 0.2)), 18, 56);
-    const chestHalf = clamp(chestHalfRaw * (1 + (whrDelta * 0.06)), 22, 62);
+    const waistHalf = clamp(waistHalfRaw * (1 + whrDelta * 0.38), 11, 52);
+    const hipHalf = clamp(hipHalfRaw * (1 - whrDelta * 0.2), 18, 56);
+    const chestHalf = clamp(chestHalfRaw * (1 + whrDelta * 0.06), 22, 62);
     const armHeight = clamp(statureSpan * anthropometry.armReach, 146, 194);
     const armSpanRatio = anthropometry.armSpanRatio;
 
@@ -421,18 +413,22 @@ export default function useBodyModel({
       1.45
     );
     const sideFat = clamp(
-      (fatScore * 0.82) + ((torsoSoftTissueRatio - 0.72) * 1.02) + (adiposityPressure * 0.22),
+      fatScore * 0.82 + (torsoSoftTissueRatio - 0.72) * 1.02 + adiposityPressure * 0.22,
       0,
       1
     );
     const shoulderFat = clamp(
-      (fatScore * 0.5) + ((shoulderHalf / Math.max(chestHalf, 1)) * 0.2) + (adiposityPressure * 0.1),
+      fatScore * 0.5 + (shoulderHalf / Math.max(chestHalf, 1)) * 0.2 + adiposityPressure * 0.1,
       0,
       1
     );
-    const chestFat = clamp((upperTrunkAdiposity * 0.78) + (adiposityPressure * 0.14), 0, 1);
-    const armFat = clamp((appendicularAdiposity * armFatWeight * 0.92) + (adiposityPressure * 0.1), 0, 1);
-    const calfFat = clamp((lowerLegAdiposity * calfFatWeight * 1.08) + (adiposityPressure * 0.1), 0, 1);
+    const chestFat = clamp(upperTrunkAdiposity * 0.78 + adiposityPressure * 0.14, 0, 1);
+    const armFat = clamp(
+      appendicularAdiposity * armFatWeight * 0.92 + adiposityPressure * 0.1,
+      0,
+      1
+    );
+    const calfFat = clamp(lowerLegAdiposity * calfFatWeight * 1.08 + adiposityPressure * 0.1, 0, 1);
 
     return {
       shoulderHalf,

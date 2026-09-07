@@ -17,7 +17,7 @@ export const interpolateBandWidth = (bands, yValue) => {
     if (yValue > next.y) continue;
     const range = Math.max(1, next.y - current.y);
     const progress = (yValue - current.y) / range;
-    return current.w + ((next.w - current.w) * progress);
+    return current.w + (next.w - current.w) * progress;
   }
 
   return bands[bands.length - 1].w;

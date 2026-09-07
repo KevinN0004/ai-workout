@@ -1,12 +1,12 @@
-import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { join, basename, extname, dirname } from 'node:path';
+import { execSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
+import { join, basename, extname, dirname } from "node:path";
 
 const SYMBOL_RE = /^export\s+(?:async\s+)?(?:function|class|const)\s+(\w+)/gm;
 
 function extractSymbols(absPath) {
   try {
-    const content = readFileSync(absPath, 'utf8');
+    const content = readFileSync(absPath, "utf8");
     const symbols = [];
     let m;
     while ((m = SYMBOL_RE.exec(content)) !== null) {
@@ -22,25 +22,25 @@ function extractSymbols(absPath) {
 function findTestFile(absPath, repoRoot) {
   const base = basename(absPath, extname(absPath));
   const dir = dirname(absPath);
-  const exts = ['.mjs', '.ts', '.js'];
-  const suffixes = ['.test', '.spec'];
+  const exts = [".mjs", ".ts", ".js"];
+  const suffixes = [".test", ".spec"];
   for (const suffix of suffixes) {
     for (const ext of exts) {
       const candidates = [
         join(dir, `${base}${suffix}${ext}`),
         join(
           repoRoot,
-          'tests',
-          dir.replace(repoRoot, '').replace(/^[\\/]/, ''),
-          `${base}${suffix}${ext}`,
-        ),
+          "tests",
+          dir.replace(repoRoot, "").replace(/^[\\/]/, ""),
+          `${base}${suffix}${ext}`
+        )
       ];
       for (const c of candidates) {
         if (existsSync(c)) {
           return c
-            .replace(repoRoot, '')
-            .replace(/^[\\/]/, '')
-            .replace(/\\/g, '/');
+            .replace(repoRoot, "")
+            .replace(/^[\\/]/, "")
+            .replace(/\\/g, "/");
         }
       }
     }
@@ -50,13 +50,13 @@ function findTestFile(absPath, repoRoot) {
 
 function defaultGrep(symbol, repoRoot) {
   try {
-    const dirs = ['src', 'backend'].map((d) => join(repoRoot, d)).filter(existsSync);
+    const dirs = ["src", "backend"].map((d) => join(repoRoot, d)).filter(existsSync);
     if (dirs.length === 0) return [];
-    const result = execSync(`grep -rl "${symbol}" ${dirs.map((d) => `"${d}"`).join(' ')}`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
+    const result = execSync(`grep -rl "${symbol}" ${dirs.map((d) => `"${d}"`).join(" ")}`, {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"]
     });
-    return result.trim().split('\n').filter(Boolean);
+    return result.trim().split("\n").filter(Boolean);
   } catch {
     return [];
   }
@@ -66,7 +66,7 @@ export function suggestFiles({
   changedFiles = [],
   stagedFiles = [],
   repoRoot = process.cwd(),
-  grepFn,
+  grepFn
 } = {}) {
   const grep = grepFn ?? defaultGrep;
   const result = [];
@@ -75,14 +75,14 @@ export function suggestFiles({
   for (const f of stagedFiles) {
     if (!seen.has(f)) {
       seen.add(f);
-      result.push({ path: f, label: 'staged' });
+      result.push({ path: f, label: "staged" });
     }
   }
 
   for (const f of changedFiles) {
     if (!seen.has(f)) {
       seen.add(f);
-      result.push({ path: f, label: 'modified' });
+      result.push({ path: f, label: "modified" });
     }
   }
 
@@ -92,12 +92,12 @@ export function suggestFiles({
 
   for (const relPath of allChanged) {
     const absPath =
-      relPath.startsWith('/') || /^[A-Za-z]:/.test(relPath) ? relPath : join(repoRoot, relPath);
+      relPath.startsWith("/") || /^[A-Za-z]:/.test(relPath) ? relPath : join(repoRoot, relPath);
 
     const testFile = findTestFile(absPath, repoRoot);
     if (testFile && !discoveredSeen.has(testFile)) {
       discoveredSeen.add(testFile);
-      discovered.push({ path: testFile, label: 'test match' });
+      discovered.push({ path: testFile, label: "test match" });
     }
 
     let symbols = [];
@@ -116,9 +116,9 @@ export function suggestFiles({
       }
       for (const site of callSites) {
         const rel = site
-          .replace(repoRoot, '')
-          .replace(/^[\\/]/, '')
-          .replace(/\\/g, '/');
+          .replace(repoRoot, "")
+          .replace(/^[\\/]/, "")
+          .replace(/\\/g, "/");
         if (!discoveredSeen.has(rel) && !allChanged.includes(rel)) {
           discoveredSeen.add(rel);
           discovered.push({ path: rel, label: `call site (uses ${symbol})` });

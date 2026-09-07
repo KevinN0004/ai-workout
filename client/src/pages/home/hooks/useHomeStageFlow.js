@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 
-export default function useHomeStageFlow({
-  onResetPersonalFlow,
-  samplePlanLength,
-  personalMode
-}) {
+export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
   const visualPanelRef = useRef(null);
   const visualIntroTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
@@ -140,7 +136,9 @@ export default function useHomeStageFlow({
 
     const contentEl = document.querySelector(".home-page .content");
     const contentRect = contentEl?.getBoundingClientRect();
-    const fallbackCenterX = contentRect ? contentRect.left + contentRect.width / 2 : window.innerWidth / 2;
+    const fallbackCenterX = contentRect
+      ? contentRect.left + contentRect.width / 2
+      : window.innerWidth / 2;
     const fallbackCenterY = contentRect
       ? contentRect.top + contentRect.height / 2
       : window.innerHeight / 2;
@@ -156,19 +154,20 @@ export default function useHomeStageFlow({
       homeStage === "visualizer" && nextStage === "workout"
         ? "rgba(14, 14, 14, 1)"
         : "rgba(28, 28, 28, 1)";
-    const targetVisual = nextStage === "intro"
-      ? {
-          bg: "rgba(255, 255, 255, 0)",
-          border: "rgba(255, 255, 255, 0)",
-          color: "rgb(255, 255, 255)",
-          radius: "24px"
-        }
-      : {
-          bg: "rgba(110, 110, 110, 0.28)",
-          border: "rgba(255, 255, 255, 0.16)",
-          color: "rgb(243, 243, 243)",
-          radius: "24px"
-        };
+    const targetVisual =
+      nextStage === "intro"
+        ? {
+            bg: "rgba(255, 255, 255, 0)",
+            border: "rgba(255, 255, 255, 0)",
+            color: "rgb(255, 255, 255)",
+            radius: "24px"
+          }
+        : {
+            bg: "rgba(110, 110, 110, 0.28)",
+            border: "rgba(255, 255, 255, 0.16)",
+            color: "rgb(243, 243, 243)",
+            radius: "24px"
+          };
 
     stageSwapTimelineRef.current?.cancel();
     clearStageSwapTimers();
@@ -302,10 +301,13 @@ export default function useHomeStageFlow({
         }
       }, completeDelayMs);
 
-      stageSwapTimeoutRef.current = window.setTimeout(() => {
-        stageSwapTimeoutRef.current = null;
-        clearStageMorphClone();
-      }, completeDelayMs + crossfadeDurationMs + 20);
+      stageSwapTimeoutRef.current = window.setTimeout(
+        () => {
+          stageSwapTimeoutRef.current = null;
+          clearStageMorphClone();
+        },
+        completeDelayMs + crossfadeDurationMs + 20
+      );
     };
 
     stageSwapRafRef.current = window.requestAnimationFrame(() => {

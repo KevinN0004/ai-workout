@@ -318,11 +318,7 @@ describe("requireAuth", () => {
     const token = await service.createSession("u-1");
     const res = buildRes();
 
-    await service.requireAuth(
-      buildReq({ headers: { cookie: `sid=${token}` } }),
-      res,
-      vi.fn()
-    );
+    await service.requireAuth(buildReq({ headers: { cookie: `sid=${token}` } }), res, vi.fn());
 
     expect(res.statusCode).toBe(500);
     expect(JSON.stringify(res.body)).not.toMatch(/connection terminated/);

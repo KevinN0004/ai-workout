@@ -39,13 +39,7 @@ const importRules = {
  */
 export default [
   {
-    ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      ".claude/**",
-      ".githooks/**",
-      "client/dist/**"
-    ]
+    ignores: ["**/node_modules/**", "**/dist/**", ".claude/**", ".githooks/**", "client/dist/**"]
   },
 
   // A config object holding only `ignores` is ESLint 9's global-ignores form.

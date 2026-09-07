@@ -19,19 +19,22 @@ const getCsrf = async (agent) => {
 
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
-  const response = await agent.post("/api/auth/signup").set("X-CSRF-Token", csrfToken).send({
-    email,
-    password: "StrongPass123!",
-    profile: {
-      firstName: "Robin",
-      lastName: "Hale",
-      age: 34,
-      heightCm: 172,
-      weightKg: 68,
-      sex: "Non-binary",
-      activity: "Light"
-    }
-  });
+  const response = await agent
+    .post("/api/auth/signup")
+    .set("X-CSRF-Token", csrfToken)
+    .send({
+      email,
+      password: "StrongPass123!",
+      profile: {
+        firstName: "Robin",
+        lastName: "Hale",
+        age: 34,
+        heightCm: 172,
+        weightKg: 68,
+        sex: "Non-binary",
+        activity: "Light"
+      }
+    });
   expect(response.status).toBe(200);
   return getCsrf(agent);
 };

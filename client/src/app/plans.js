@@ -1,5 +1,4 @@
-const hasNotesHeading = (line) =>
-  /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line);
+const hasNotesHeading = (line) => /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line);
 
 export const parsePlanSections = (result) => {
   if (!result) return { days: [], notes: [] };
@@ -18,10 +17,7 @@ export const parsePlanSections = (result) => {
       /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\s*[:-]?\s*/i,
       ""
     );
-    notes = [
-      ...[strippedHeader].filter((line) => line),
-      ...rawLines.slice(notesStart + 1)
-    ];
+    notes = [...[strippedHeader].filter((line) => line), ...rawLines.slice(notesStart + 1)];
     lines = rawLines.slice(0, notesStart);
   }
 
@@ -34,8 +30,7 @@ export const parsePlanSections = (result) => {
     ["saturday", "Saturday"],
     ["sunday", "Sunday"]
   ];
-  const isWeekdayHeader = (line) =>
-    weekdayMap.some(([key]) => line.toLowerCase().startsWith(key));
+  const isWeekdayHeader = (line) => weekdayMap.some(([key]) => line.toLowerCase().startsWith(key));
 
   const dayIndices = lines
     .map((line, index) => (isWeekdayHeader(line) ? index : -1))
@@ -49,8 +44,8 @@ export const parsePlanSections = (result) => {
         return { title, lines: dayLines };
       })
     : lines.length
-    ? [{ title: "Your plan", lines }]
-    : [];
+      ? [{ title: "Your plan", lines }]
+      : [];
 
   return { days, notes };
 };

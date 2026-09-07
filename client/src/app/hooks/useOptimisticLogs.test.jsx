@@ -79,10 +79,7 @@ describe("queueOptimisticLogCommit", () => {
       )
     );
 
-    expect(result.current.optimisticLogEntries.map((e) => e.operationId)).toEqual([
-      "op-2",
-      "op-1"
-    ]);
+    expect(result.current.optimisticLogEntries.map((e) => e.operationId)).toEqual(["op-2", "op-1"]);
   });
 
   test("clears any standing dashboard error", () => {
@@ -263,9 +260,7 @@ describe("undo", () => {
     const { result } = render();
 
     act(() =>
-      result.current.queueOptimisticLogCommit(
-        queue({ dashboard: {} }, { undoMessage: undefined })
-      )
+      result.current.queueOptimisticLogCommit(queue({ dashboard: {} }, { undoMessage: undefined }))
     );
     undoVia(result);
 

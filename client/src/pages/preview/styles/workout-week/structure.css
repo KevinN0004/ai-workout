@@ -39,11 +39,7 @@
 
 .preview-week-table-wrap::before {
   background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.16) 0 1px,
-      transparent 1px 4px
-    ),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 4px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
   mix-blend-mode: screen;
 }
@@ -233,4 +229,3 @@
 .preview-week-plan.is-digitizing .preview-week-table :is(th, td, p, li) {
   animation: preview-week-digitize-content 1480ms steps(18, end) both;
 }
-

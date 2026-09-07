@@ -8,7 +8,10 @@ export default function HomeWorkoutMeasure({
       <main className="content">
         <div className="home-stage">
           <div className="workout-stage-shell" ref={workoutMeasureShellRef}>
-            <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutMeasureRef}>
+            <section
+              className="panel center-panel stage-panel workout-stage-panel"
+              ref={workoutMeasureRef}
+            >
               <div className="workout-header">
                 <button type="button" className="back-btn workout-back-arrow" tabIndex={-1}>
                   <svg

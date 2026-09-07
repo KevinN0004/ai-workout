@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-'use strict';
+"use strict";
 
 /*
  * scrub-junk-files.cjs
@@ -33,12 +33,12 @@
  * when it actually removes something. Pass --dry-run to report without deleting.
  */
 
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
+const { execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
-const ROOT = path.join(__dirname, '..');
-const DRY_RUN = process.argv.includes('--dry-run');
+const ROOT = path.join(__dirname, "..");
+const DRY_RUN = process.argv.includes("--dry-run");
 
 // Basename carries a character that never appears in this repo's real filenames
 // but is present in every observed junk name.
@@ -48,88 +48,88 @@ const JUNK_SIGNATURE = /[{}()[\]'"`;&|<>*?$]|\s/;
 // tooling extensions a future file might reasonably arrive with. Deliberately
 // generous: a missed junk file costs nothing, a wrong deletion costs trust.
 const KNOWN_EXTENSIONS = new Set([
-  '.js',
-  '.mjs',
-  '.cjs',
-  '.ts',
-  '.tsx',
-  '.jsx',
-  '.json',
-  '.md',
-  '.mdx',
-  '.css',
-  '.scss',
-  '.less',
-  '.html',
-  '.xml',
-  '.svg',
-  '.sh',
-  '.ps1',
-  '.bat',
-  '.cmd',
-  '.py',
-  '.rb',
-  '.go',
-  '.rs',
-  '.java',
-  '.sql',
-  '.prisma',
-  '.yml',
-  '.yaml',
-  '.toml',
-  '.ini',
-  '.conf',
-  '.lock',
-  '.txt',
-  '.csv',
-  '.log',
-  '.map',
-  '.snap',
-  '.patch',
-  '.diff',
-  '.example',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.ico',
-  '.woff',
-  '.woff2',
-  '.ttf',
-  '.wasm',
-  '.zip',
-  '.gz',
-  '.tsbuildinfo',
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".jsx",
+  ".json",
+  ".md",
+  ".mdx",
+  ".css",
+  ".scss",
+  ".less",
+  ".html",
+  ".xml",
+  ".svg",
+  ".sh",
+  ".ps1",
+  ".bat",
+  ".cmd",
+  ".py",
+  ".rb",
+  ".go",
+  ".rs",
+  ".java",
+  ".sql",
+  ".prisma",
+  ".yml",
+  ".yaml",
+  ".toml",
+  ".ini",
+  ".conf",
+  ".lock",
+  ".txt",
+  ".csv",
+  ".log",
+  ".map",
+  ".snap",
+  ".patch",
+  ".diff",
+  ".example",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".wasm",
+  ".zip",
+  ".gz",
+  ".tsbuildinfo"
 ]);
 
 // Legitimate names that carry no extension (or are dotfiles, which Node reports
 // as having no extension). Anything not here and not extension-bearing is junk.
 const KNOWN_NAMES = new Set([
-  'Dockerfile',
-  'Makefile',
-  'Procfile',
-  'LICENSE',
-  'NOTICE',
-  'CHANGELOG',
-  'README',
-  'pre-commit',
-  'pre-push',
-  'post-commit',
-  'commit-msg',
-  '.gitignore',
-  '.gitattributes',
-  '.gitkeep',
-  '.gitmodules',
-  '.keep',
-  '.npmrc',
-  '.nvmrc',
-  '.editorconfig',
-  '.dockerignore',
-  '.prettierrc',
-  '.prettierignore',
-  '.eslintrc',
-  '.eslintignore',
+  "Dockerfile",
+  "Makefile",
+  "Procfile",
+  "LICENSE",
+  "NOTICE",
+  "CHANGELOG",
+  "README",
+  "pre-commit",
+  "pre-push",
+  "post-commit",
+  "commit-msg",
+  ".gitignore",
+  ".gitattributes",
+  ".gitkeep",
+  ".gitmodules",
+  ".keep",
+  ".npmrc",
+  ".nvmrc",
+  ".editorconfig",
+  ".dockerignore",
+  ".prettierrc",
+  ".prettierignore",
+  ".eslintrc",
+  ".eslintignore"
 ]);
 
 // A name that reads like a real file: a known extension, a known bare name, or
@@ -137,19 +137,19 @@ const KNOWN_NAMES = new Set([
 // easy to recreate empty.
 function looksLegitimate(base) {
   if (KNOWN_NAMES.has(base)) return true;
-  if (base === '.env' || base.startsWith('.env.')) return true;
+  if (base === ".env" || base.startsWith(".env.")) return true;
   const ext = path.extname(base).toLowerCase();
-  return ext !== '' && KNOWN_EXTENSIONS.has(ext);
+  return ext !== "" && KNOWN_EXTENSIONS.has(ext);
 }
 
 function untrackedFiles() {
   try {
-    const out = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+    const out = execFileSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
       cwd: ROOT,
-      encoding: 'utf8',
-      windowsHide: true,
+      encoding: "utf8",
+      windowsHide: true
     });
-    return out.split('\0').filter(Boolean);
+    return out.split("\0").filter(Boolean);
   } catch {
     // Not a git repo / git unavailable — do nothing rather than guess.
     return [];
@@ -158,7 +158,7 @@ function untrackedFiles() {
 
 function isJunk(relPath) {
   const base = path.basename(relPath);
-  const suspicious = JUNK_SIGNATURE.test(base) || base.startsWith('-') || !looksLegitimate(base);
+  const suspicious = JUNK_SIGNATURE.test(base) || base.startsWith("-") || !looksLegitimate(base);
   if (!suspicious) return false;
   const abs = path.join(ROOT, relPath);
   try {
@@ -185,11 +185,11 @@ for (const rel of untrackedFiles()) {
 }
 
 if (removed.length > 0) {
-  const verb = DRY_RUN ? 'would remove' : 'removed';
+  const verb = DRY_RUN ? "would remove" : "removed";
   process.stdout.write(
     `scrub-junk-files: ${verb} ${removed.length} junk file(s): ${removed
       .map((r) => JSON.stringify(r))
-      .join(', ')}\n`,
+      .join(", ")}\n`
   );
 }
 

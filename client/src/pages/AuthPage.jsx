@@ -230,7 +230,10 @@ export default function AuthPage({
                           type="button"
                           className={signupWeightUnit === "lb" ? "active" : ""}
                           onClick={() => {
-                            setSignupField("weight", toLb(signupProfileForm.weight, signupWeightUnit));
+                            setSignupField(
+                              "weight",
+                              toLb(signupProfileForm.weight, signupWeightUnit)
+                            );
                             setSignupWeightUnit("lb");
                           }}
                         >
@@ -240,7 +243,10 @@ export default function AuthPage({
                           type="button"
                           className={signupWeightUnit === "kg" ? "active" : ""}
                           onClick={() => {
-                            setSignupField("weight", toKg(signupProfileForm.weight, signupWeightUnit));
+                            setSignupField(
+                              "weight",
+                              toKg(signupProfileForm.weight, signupWeightUnit)
+                            );
                             setSignupWeightUnit("kg");
                           }}
                         >

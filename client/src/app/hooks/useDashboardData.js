@@ -231,11 +231,7 @@ export default function useDashboardData({
       setDashLoading(true);
       setDashError("");
       try {
-        const res = await fetchWithTimeout(
-          "/api/dashboard",
-          { credentials: "include" },
-          12000
-        );
+        const res = await fetchWithTimeout("/api/dashboard", { credentials: "include" }, 12000);
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
           throw new Error(payload?.error || "Unable to load dashboard.");
@@ -249,9 +245,7 @@ export default function useDashboardData({
         if (cancelled || dashboardRequestRef.current !== requestId) return;
         const message = err?.message || "Unable to load dashboard.";
         setDashError(
-          hasCachedFallback
-            ? "Unable to refresh dashboard right now. Showing saved data."
-            : message
+          hasCachedFallback ? "Unable to refresh dashboard right now. Showing saved data." : message
         );
       } finally {
         if (!cancelled && dashboardRequestRef.current === requestId) {

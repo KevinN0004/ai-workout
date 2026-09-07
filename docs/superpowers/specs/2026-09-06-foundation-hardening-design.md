@@ -13,13 +13,13 @@ boot-time environment validation.
 
 Measured on this machine before any change. These are the numbers the plan must not regress.
 
-| Check | Result |
-| --- | --- |
-| `npx eslint .` | exit 0 |
-| Client suite | 33 files, **655 tests** passing |
-| Server suite | 32 files, **751 tests** passing (against local Postgres on 55432) |
-| Dev Node | **v24.14.1** |
-| `npm audit` | 6 vulnerabilities — 2 moderate, 4 high |
+| Check          | Result                                                            |
+| -------------- | ----------------------------------------------------------------- |
+| `npx eslint .` | exit 0                                                            |
+| Client suite   | 33 files, **655 tests** passing                                   |
+| Server suite   | 32 files, **751 tests** passing (against local Postgres on 55432) |
+| Dev Node       | **v24.14.1**                                                      |
+| `npm audit`    | 6 vulnerabilities — 2 moderate, 4 high                            |
 
 The linter passes today, so CI adopting it is a pure gate addition with no cleanup backlog.
 
@@ -33,12 +33,12 @@ Verified by running the commands, not inferred. Each drives a decision below.
 
 The vulnerable `qs` range is `2.2.5 – 6.15.3`; the fix landed in **6.16.0**. Dependency ranges:
 
-| Package | `qs` range | Vulnerable? |
-| --- | --- | --- |
-| `body-parser@1.20.6` (current) | `~6.15.1` → 6.15.3 | yes |
-| `body-parser@1.20.4` (what `audit fix` installs) | `~6.14.0` | **yes** |
-| `express@4.22.1` (current) | `~6.14.0` | yes |
-| `express@4.22.2` (latest v4) | `~6.15.1` | yes |
+| Package                                          | `qs` range         | Vulnerable? |
+| ------------------------------------------------ | ------------------ | ----------- |
+| `body-parser@1.20.6` (current)                   | `~6.15.1` → 6.15.3 | yes         |
+| `body-parser@1.20.4` (what `audit fix` installs) | `~6.14.0`          | **yes**     |
+| `express@4.22.1` (current)                       | `~6.14.0`          | yes         |
+| `express@4.22.2` (latest v4)                     | `~6.15.1`          | yes         |
 
 `npm audit fix --dry-run` reports `change body-parser 1.20.6 => 1.20.4`, a **downgrade**, and the
 post-fix audit still reports all 6 vulnerabilities. **No Express 4 release reaches a patched `qs`**,
@@ -96,8 +96,8 @@ would be an unrequested behavior change that could break a running deploy. It st
 Line-length distribution across `client/src` + `server/src` (36,898 lines):
 
 | p50 | p90 | p95 | p99 | max | >100 chars | >80 chars |
-| --- | --- | --- | --- | --- | --- | --- |
-| 29 | 73 | 81 | 96 | 774 | 201 | 1,906 |
+| --- | --- | --- | --- | --- | ---------- | --------- |
+| 29  | 73  | 81  | 96  | 774 | 201        | 1,906     |
 
 printWidth 100 rewraps only 201 lines; printWidth 80 would touch 1,906. But Prettier's other
 normalizations reach much further — measured by formatting a copy of the tree and diffing:
@@ -106,7 +106,7 @@ normalizations reach much further — measured by formatting a copy of the tree 
 - **3,651 insertions and 3,538 deletions** — roughly 7,200 lines touched
 - By type: 83 `.js`, 43 `.jsx`, 33 `.css`, 8 `.md`, 5 `.mjs`, 1 `.yml`
 
-The config matters more than expected. An earlier measurement using Prettier's *defaults* produced
+The config matters more than expected. An earlier measurement using Prettier's _defaults_ produced
 10,447 changed lines; setting `trailingComma: "none"` to match house style cuts that by about 30%.
 Measure with the config you intend to ship, never with defaults.
 
@@ -124,10 +124,10 @@ a property the codebase already has (pino is the server logger).
 
 ### 8. `engines: ">=20"` is wrong
 
-| Package | Required Node |
-| --- | --- |
-| `vite@7` | `^20.19.0 \|\| >=22.12.0` |
-| `prisma@7` | `^20.19 \|\| ^22.12 \|\| >=24.0` |
+| Package    | Required Node                        |
+| ---------- | ------------------------------------ |
+| `vite@7`   | `^20.19.0 \|\| >=22.12.0`            |
+| `prisma@7` | `^20.19 \|\| ^22.12 \|\| >=24.0`     |
 | `vitest@4` | `^20.0.0 \|\| ^22.0.0 \|\| >=24.0.0` |
 
 The current `>=20` permits Node 20.0–20.18, which Vite and Prisma both reject. Correct floor:
@@ -138,14 +138,14 @@ The current `>=20` permits Node 20.0–20.18, which Vite and Prisma both reject.
 Measured by running each rule against the tree with a throwaway config (installed with
 `--no-save --no-package-lock`; both manifests verified byte-identical afterward):
 
-| Rule | Violations |
-| --- | --- |
-| `import-x/no-cycle` | 0 |
-| `import-x/no-unresolved` | 0 *(with resolver configured — see below)* |
-| `import-x/no-self-import` | 0 |
-| `import-x/no-duplicates` | 0 |
-| `react/jsx-key` | 0 |
-| `react/no-unstable-nested-components` | 0 |
+| Rule                                  | Violations                                 |
+| ------------------------------------- | ------------------------------------------ |
+| `import-x/no-cycle`                   | 0                                          |
+| `import-x/no-unresolved`              | 0 _(with resolver configured — see below)_ |
+| `import-x/no-self-import`             | 0                                          |
+| `import-x/no-duplicates`              | 0                                          |
+| `react/jsx-key`                       | 0                                          |
+| `react/no-unstable-nested-components` | 0                                          |
 
 **The trap:** without resolver configuration, `import-x/no-unresolved` reports **53 false positives**.
 The client imports `.jsx` files extensionlessly (`./DashboardHeader`, `../../components/ModalPortal`),
@@ -245,7 +245,7 @@ a stdin probe: with the compat entry applied the rule is silent on code that oth
 `Unexpected newline between function and ( of function call`.
 
 That trade is normally sound, because Prettier's output makes the rule unreachable. It is not sound
-*here* until the reformat lands, so the config re-enables `no-unexpected-multiline` in a final entry
+_here_ until the reformat lands, so the config re-enables `no-unexpected-multiline` in a final entry
 after `prettierCompat` — and keeps it on permanently, since after the reformat it simply never fires
 and still guards anything Prettier does not reach.
 
@@ -259,15 +259,15 @@ No style rules; Prettier owns formatting. Added:
 All counts below are **measured, not projected** (Finding 9). Every rule ships as `error` — none needs
 triage, and none lands silently disabled.
 
-| Rule | Violations | Rationale |
-| --- | --- | --- |
-| `import-x/no-cycle` (**error**) | 0 | Regression guard; madge independently confirms zero cycles |
-| `import-x/no-unresolved` (**error**) | 0 | Catches broken ESM specifiers |
-| `import-x/no-self-import` (**error**) | 0 | Free correctness guard |
-| `import-x/no-duplicates` (**error**) | 0 | Free; collapses split imports of one module |
-| `no-console` (**error**) | 1 (server) | pino is the logger; locks in existing property |
-| `react/jsx-key` (**error**) | 0 | Real defect class, currently unchecked |
-| `react/no-unstable-nested-components` (**error**) | 0 | Remount/perf defect class |
+| Rule                                              | Violations | Rationale                                                  |
+| ------------------------------------------------- | ---------- | ---------------------------------------------------------- |
+| `import-x/no-cycle` (**error**)                   | 0          | Regression guard; madge independently confirms zero cycles |
+| `import-x/no-unresolved` (**error**)              | 0          | Catches broken ESM specifiers                              |
+| `import-x/no-self-import` (**error**)             | 0          | Free correctness guard                                     |
+| `import-x/no-duplicates` (**error**)              | 0          | Free; collapses split imports of one module                |
+| `no-console` (**error**)                          | 1 (server) | pino is the logger; locks in existing property             |
+| `react/jsx-key` (**error**)                       | 0          | Real defect class, currently unchecked                     |
+| `react/no-unstable-nested-components` (**error**) | 0          | Remount/perf defect class                                  |
 
 **Mandatory resolver setting** — without it `no-unresolved` emits 53 false positives on the client's
 extensionless `.jsx` imports:
@@ -288,11 +288,11 @@ Also:
 
 Three jobs replacing today's single serial `test-and-build`:
 
-| Job | Postgres | Contents |
-| --- | --- | --- |
-| `quality` | no | `eslint .` · `prettier --check` · `audit-ci` |
-| `test` | yes | Matrix Node **20.19** and **24**; prisma generate → migrate → client tests → server tests |
-| `build` | no | Client build |
+| Job       | Postgres | Contents                                                                                  |
+| --------- | -------- | ----------------------------------------------------------------------------------------- |
+| `quality` | no       | `eslint .` · `prettier --check` · `audit-ci`                                              |
+| `test`    | yes      | Matrix Node **20.19** and **24**; prisma generate → migrate → client tests → server tests |
+| `build`   | no       | Client build                                                                              |
 
 - `quality` needs no database and fails in well under a minute, so a lint typo no longer waits behind
   a Postgres spin-up.
@@ -352,12 +352,12 @@ Consequences of that choice:
 
 Tiering:
 
-| Tier | Vars | Behavior |
-| --- | --- | --- |
-| Hard-required | `DATABASE_URL` | Fatal when absent outside test |
-| Production-required | `CLIENT_ORIGIN` / `CLIENT_ORIGINS` | Fatal only when `NODE_ENV=production` |
-| Typed with defaults | Ports, timeouts, rate-limit windows, Argon2 costs | Coerced and range-checked; bad values fatal |
-| Optional passthrough | Sentry, external API base URLs, `GEMINI_API_KEY` | Unvalidated |
+| Tier                 | Vars                                              | Behavior                                    |
+| -------------------- | ------------------------------------------------- | ------------------------------------------- |
+| Hard-required        | `DATABASE_URL`                                    | Fatal when absent outside test              |
+| Production-required  | `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                | Fatal only when `NODE_ENV=production`       |
+| Typed with defaults  | Ports, timeouts, rate-limit windows, Argon2 costs | Coerced and range-checked; bad values fatal |
+| Optional passthrough | Sentry, external API base URLs, `GEMINI_API_KEY`  | Unvalidated                                 |
 
 Failure mode: one readable message listing **every** problem at once, then exit — replacing today's
 missing-`DATABASE_URL`-as-a-deep-driver-error.
@@ -374,14 +374,14 @@ Dependabot (`npm` and `github-actions`, weekly, minor/patch grouped to limit PR 
 
 ## Sequencing
 
-| PR | Contents | Why here |
-| --- | --- | --- |
-| 1 | Prettier + ESLint config, `type: module` | No reformat; keeps config reviewable |
-| 2 | The reformat + `.git-blame-ignore-revs` | Isolated so the SHA can be quarantined |
-| 3 | CI restructure, `.nvmrc`, `.npmrc`, `engines` fix, audit gate + `check-audit-allowlist.mjs`, `qs` override | Must follow 2, or `prettier --check` fails on arrival. All Node-version work lands together so `engines`, `.nvmrc`, and the CI matrix never disagree |
-| 4 | Docker Compose | Independent |
-| 5 | Env preflight + `.env.example` | Independent |
-| 6 | Dependabot, PR template, CODEOWNERS | Independent |
+| PR  | Contents                                                                                                   | Why here                                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Prettier + ESLint config, `type: module`                                                                   | No reformat; keeps config reviewable                                                                                                                 |
+| 2   | The reformat + `.git-blame-ignore-revs`                                                                    | Isolated so the SHA can be quarantined                                                                                                               |
+| 3   | CI restructure, `.nvmrc`, `.npmrc`, `engines` fix, audit gate + `check-audit-allowlist.mjs`, `qs` override | Must follow 2, or `prettier --check` fails on arrival. All Node-version work lands together so `engines`, `.nvmrc`, and the CI matrix never disagree |
+| 4   | Docker Compose                                                                                             | Independent                                                                                                                                          |
+| 5   | Env preflight + `.env.example`                                                                             | Independent                                                                                                                                          |
+| 6   | Dependabot, PR template, CODEOWNERS                                                                        | Independent                                                                                                                                          |
 
 PR 2 conflicts with any in-flight branch. Land it when nothing else is open.
 
@@ -389,15 +389,15 @@ PR 2 conflicts with any in-flight branch. Land it when nothing else is open.
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| `qs` override also forces `supertest → superagent → qs 6.14.2` up to 6.16.0 | Semver-minor, but unproven — gate PR 3 on the full 1,405-test suite |
-| Compose and the PowerShell script collide on port 55432 | Documented as mutually exclusive |
-| The ~7,200-line reformat conflicts with open branches | Land PR 2 against a quiet tree |
-| `quality` job runs without `prisma generate` | Measured: `import-x/no-unresolved` reports 0 errors against the tree, resolving `@prisma/client` from the package rather than the generated client |
-| `.git-blame-ignore-revs` silently inert locally | Documented in CLAUDE.md Fresh Clone Setup |
-| `engine-strict=true` breaks install via a transitive `engines` field | Gated on `npm ci` passing on both matrix versions; dropped if it fails |
-| `import-x` resolver misconfigured → 53 false positives | Resolver `extensions` setting is specified in the design, not left to discovery |
+| Risk                                                                        | Mitigation                                                                                                                                         |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `qs` override also forces `supertest → superagent → qs 6.14.2` up to 6.16.0 | Semver-minor, but unproven — gate PR 3 on the full 1,405-test suite                                                                                |
+| Compose and the PowerShell script collide on port 55432                     | Documented as mutually exclusive                                                                                                                   |
+| The ~7,200-line reformat conflicts with open branches                       | Land PR 2 against a quiet tree                                                                                                                     |
+| `quality` job runs without `prisma generate`                                | Measured: `import-x/no-unresolved` reports 0 errors against the tree, resolving `@prisma/client` from the package rather than the generated client |
+| `.git-blame-ignore-revs` silently inert locally                             | Documented in CLAUDE.md Fresh Clone Setup                                                                                                          |
+| `engine-strict=true` breaks install via a transitive `engines` field        | Gated on `npm ci` passing on both matrix versions; dropped if it fails                                                                             |
+| `import-x` resolver misconfigured → 53 false positives                      | Resolver `extensions` setting is specified in the design, not left to discovery                                                                    |
 
 ---
 

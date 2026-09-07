@@ -13,9 +13,7 @@ export default function useMealDbSearch(mealTrack) {
   const [mealDbRecommendationsError, setMealDbRecommendationsError] = useState("");
 
   const mealDbGoalRecommendations = useMemo(
-    () =>
-      MEALDB_RECOMMENDATION_QUERIES[mealTrack] ||
-      MEALDB_RECOMMENDATION_QUERIES.lean_strength,
+    () => MEALDB_RECOMMENDATION_QUERIES[mealTrack] || MEALDB_RECOMMENDATION_QUERIES.lean_strength,
     [mealTrack]
   );
 
@@ -61,9 +59,7 @@ export default function useMealDbSearch(mealTrack) {
       } catch (err) {
         if (cancelled || err?.name === "AbortError") return;
         setMealDbRecommendations([]);
-        setMealDbRecommendationsError(
-          err?.message || "Couldn't load meal suggestions right now."
-        );
+        setMealDbRecommendationsError(err?.message || "Couldn't load meal suggestions right now.");
       } finally {
         if (!cancelled) setMealDbRecommendationsLoading(false);
       }

@@ -22,7 +22,10 @@ import { mapGeneratedPlan } from "./generatedPlanRepository.js";
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};
-const lower = (value) => String(value || "").trim().toLowerCase();
+const lower = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
 
 const mapCalorieEntry = (row = {}) => ({
   id: row.legacyId || row.id,

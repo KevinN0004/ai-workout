@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  createDefaultPreviewWeekLineOffsets,
-  PREVIEW_TOC_SWITCH_MS
-} from "./preview/constants";
+import { createDefaultPreviewWeekLineOffsets, PREVIEW_TOC_SWITCH_MS } from "./preview/constants";
 import PreviewToc from "./preview/components/PreviewToc";
 import PreviewPersonalChapter from "./preview/components/PreviewPersonalChapter";
 import PreviewWorkoutWeekChapter from "./preview/components/PreviewWorkoutWeekChapter";
@@ -41,7 +38,9 @@ export default function PreviewPage({
   const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
   const [previewWeekStage, setPreviewWeekStage] = useState(0);
   const [previewDashboardStage, setPreviewDashboardStage] = useState(0);
-  const [previewWeekLineOffsets, setPreviewWeekLineOffsets] = useState(createDefaultPreviewWeekLineOffsets);
+  const [previewWeekLineOffsets, setPreviewWeekLineOffsets] = useState(
+    createDefaultPreviewWeekLineOffsets
+  );
   const [previewWeekHeaderTypingProgress, setPreviewWeekHeaderTypingProgress] = useState(0);
   const [previewWeekTypingProgress, setPreviewWeekTypingProgress] = useState(0);
 
@@ -84,7 +83,7 @@ export default function PreviewPage({
     previewTocSwitchTimeoutRef.current = null;
   };
 
-  const renderPreviewChapterBody = (chapter) => (
+  const renderPreviewChapterBody = (chapter) =>
     chapter.id === "personal-info" ? (
       <PreviewPersonalChapter
         previewPersonalCollapsed={previewPersonalCollapsed}
@@ -125,7 +124,7 @@ export default function PreviewPage({
     ) : (
       <div className="preview-fields-grid">
         {chapter.fields.map((field, fieldIndex) => {
-          const rows = field.multiline ? (field.rows || 3) : getPreviewFieldRows(field);
+          const rows = field.multiline ? field.rows || 3 : getPreviewFieldRows(field);
           return (
             <label key={`${chapter.id}-${field.label}-${fieldIndex}`} className="preview-field-row">
               <span>{field.label}</span>
@@ -139,8 +138,7 @@ export default function PreviewPage({
           );
         })}
       </div>
-    )
-  );
+    );
 
   const scrollPreviewIntoView = () => {
     if (!previewStageRef.current) return;

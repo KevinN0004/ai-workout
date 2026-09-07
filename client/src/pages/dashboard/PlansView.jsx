@@ -34,9 +34,7 @@ export default function PlansView({
 
   const selectedDay = useMemo(() => {
     if (!selectedDetail?.dayKey) return null;
-    const mealDay = weeklyMealPlan.days.find(
-      (day) => day.key === selectedDetail.dayKey
-    );
+    const mealDay = weeklyMealPlan.days.find((day) => day.key === selectedDetail.dayKey);
     if (!mealDay) return null;
     return {
       ...mealDay,
@@ -248,12 +246,7 @@ export default function PlansView({
                 </div>
                 <div className="card-section-foot saved-exercise-actions">
                   {item.videoUrl ? (
-                    <a
-                      href={item.videoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ghost"
-                    >
+                    <a href={item.videoUrl} target="_blank" rel="noreferrer" className="ghost">
                       Video
                     </a>
                   ) : null}
@@ -313,9 +306,7 @@ export default function PlansView({
           <div className="plan-row-header">
             <div>
               <h3>Meals week</h3>
-              <p className="muted">
-                Curated weekly meals based on your goal and calorie target.
-              </p>
+              <p className="muted">Curated weekly meals based on your goal and calorie target.</p>
             </div>
             <div className="meal-track-pill">
               {weeklyMealPlan.goalText} | {weeklyMealPlan.targetCalories} cal/day
@@ -421,8 +412,8 @@ export default function PlansView({
             >
               <div className="modal-header">
                 <h2>
-                  {selectedDay.key}{" "}
-                  {selectedDetail?.mode === "workout" ? "Workout" : "Meal"} details
+                  {selectedDay.key} {selectedDetail?.mode === "workout" ? "Workout" : "Meal"}{" "}
+                  details
                 </h2>
                 <button
                   type="button"
@@ -453,9 +444,7 @@ export default function PlansView({
                         ))}
                       </ul>
                     ) : (
-                      <p className="muted">
-                        Recovery or rest day. No workout block assigned.
-                      </p>
+                      <p className="muted">Recovery or rest day. No workout block assigned.</p>
                     )}
                   </section>
                 ) : (
@@ -490,4 +479,3 @@ export default function PlansView({
     </section>
   );
 }
-

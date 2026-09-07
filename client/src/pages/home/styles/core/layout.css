@@ -74,11 +74,15 @@ html.preview-smooth-scroll {
   background: #fff !important;
   border-color: #fff !important;
   color: #000 !important;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.48), 0 0 18px rgba(255, 255, 255, 0.2) !important;
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.48),
+    0 0 18px rgba(255, 255, 255, 0.2) !important;
 }
 
 .home-preview-btn:hover:not(:disabled) {
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.62), 0 0 24px rgba(255, 255, 255, 0.28) !important;
+  box-shadow:
+    0 0 14px rgba(255, 255, 255, 0.62),
+    0 0 24px rgba(255, 255, 255, 0.28) !important;
 }
 
 .home-preview-btn:disabled {
@@ -339,4 +343,3 @@ html.preview-smooth-scroll {
   min-height: auto;
   align-content: stretch;
 }
-

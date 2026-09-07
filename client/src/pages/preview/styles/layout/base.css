@@ -80,7 +80,11 @@
 }
 
 .preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--preview-scrollbar-thumb-hover), rgba(238, 238, 238, 0.95));
+  background: linear-gradient(
+    180deg,
+    var(--preview-scrollbar-thumb-hover),
+    rgba(238, 238, 238, 0.95)
+  );
 }
 
 .preview-stage-panel :is(.preview-side-tab, .preview-card-page)::-webkit-scrollbar-corner {
@@ -119,4 +123,3 @@
   min-height: var(--preview-content-height);
   max-height: var(--preview-content-height);
 }
-

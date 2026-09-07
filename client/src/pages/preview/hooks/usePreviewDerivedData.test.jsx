@@ -49,8 +49,12 @@ describe("usePreviewDerivedData", () => {
 
   describe("chapter indices", () => {
     test("resolve to real positions in the chapter list", () => {
-      const { previewChapters, generateChapterIndex, workoutWeekChapterIndex, dashboardPreviewChapterIndex } =
-        render();
+      const {
+        previewChapters,
+        generateChapterIndex,
+        workoutWeekChapterIndex,
+        dashboardPreviewChapterIndex
+      } = render();
 
       expect(Array.isArray(previewChapters)).toBe(true);
       expect(previewChapters.length).toBeGreaterThan(0);
@@ -83,9 +87,9 @@ describe("usePreviewDerivedData", () => {
     test("falls back to sensible defaults when nothing is entered", () => {
       const { activePreviewProfile } = render();
 
-      expect(Number(activePreviewProfile.heightCm) > 0 || activePreviewProfile.heightCm === "").toBe(
-        true
-      );
+      expect(
+        Number(activePreviewProfile.heightCm) > 0 || activePreviewProfile.heightCm === ""
+      ).toBe(true);
       expect(activePreviewProfile).toBeTruthy();
     });
 

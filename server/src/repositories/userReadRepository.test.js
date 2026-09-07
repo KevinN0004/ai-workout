@@ -16,8 +16,9 @@ const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
-const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
-  createUserRepository({ prisma });
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } = createUserRepository({
+  prisma
+});
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 
 const baseUserDoc = (overrides = {}) => ({
@@ -95,9 +96,7 @@ describe("userReadRepository", () => {
     const doc = baseUserDoc({ profile: { firstName: "Ada" } });
     await createUserWithDashboard(doc);
 
-    expect(await updateProfile({ userId: doc.userId, profile: { firstName: "Grace" } })).toBe(
-      true
-    );
+    expect(await updateProfile({ userId: doc.userId, profile: { firstName: "Grace" } })).toBe(true);
 
     const updated = await findUserWithDashboard(doc.userId);
     expect(updated.profile).toEqual({ firstName: "Grace" });

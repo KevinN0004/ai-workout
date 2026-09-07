@@ -90,12 +90,11 @@ export const buildSymmetricOutline = ({
     extractCurvePoints("calf-trapezoid", "r", chooseXInner),
     { minSpacing: 2.6, minDeviation: 0.34, minTurn: 0.036, maxStride: 2 }
   );
-  const upperArmTopOutlineRaw = upperArmTop.filter(
-    (point) => point.x >= (shoulderArmTopX + 0.25)
-  );
-  const upperArmTopOutline = upperArmTopOutlineRaw.length >= 2 ? upperArmTopOutlineRaw : upperArmTop;
+  const upperArmTopOutlineRaw = upperArmTop.filter((point) => point.x >= shoulderArmTopX + 0.25);
+  const upperArmTopOutline =
+    upperArmTopOutlineRaw.length >= 2 ? upperArmTopOutlineRaw : upperArmTop;
   const thighOuterOutline = thighOuter.filter(
-    (point, index) => index === 0 || point.x >= (quadOuterUpperX - 0.45)
+    (point, index) => index === 0 || point.x >= quadOuterUpperX - 0.45
   );
   const fingerTips = fingerConfigs
     .map((finger) => getAnchorPoint(`${finger.id}-tip-r`))
@@ -104,7 +103,9 @@ export const buildSymmetricOutline = ({
 
   const rightPerimeter = [];
   appendPoint(rightPerimeter, { id: "head-top", x: centerX, y: headTopY });
-  rightHeadArc.forEach((point, index) => appendPoint(rightPerimeter, { id: `head-arc-${index + 1}-r`, ...point }));
+  rightHeadArc.forEach((point, index) =>
+    appendPoint(rightPerimeter, { id: `head-arc-${index + 1}-r`, ...point })
+  );
   appendPoint(rightPerimeter, getAnchorPoint("jaw-r"));
   appendPoint(rightPerimeter, getAnchorPoint("neck-curve-upper-r"));
   appendPoint(rightPerimeter, getAnchorPoint("neck-curve-mid-r"));
@@ -119,8 +120,14 @@ export const buildSymmetricOutline = ({
   upperArmTopOutline.forEach((point) => appendPoint(rightPerimeter, point));
   forearmTop.forEach((point) => appendPoint(rightPerimeter, point));
   fingerTips.forEach((point) => appendPoint(rightPerimeter, point));
-  forearmBottom.slice().reverse().forEach((point) => appendPoint(rightPerimeter, point));
-  upperArmBottom.slice().reverse().forEach((point) => appendPoint(rightPerimeter, point));
+  forearmBottom
+    .slice()
+    .reverse()
+    .forEach((point) => appendPoint(rightPerimeter, point));
+  upperArmBottom
+    .slice()
+    .reverse()
+    .forEach((point) => appendPoint(rightPerimeter, point));
   appendPoint(rightPerimeter, getAnchorPoint("shoulder-arm-bottom-r"));
   appendPoint(rightPerimeter, getAnchorPoint("shoulder-lower-r"));
   appendPoint(rightPerimeter, getAnchorPoint("shoulder-rear-r"));
@@ -164,11 +171,17 @@ export const buildSymmetricOutline = ({
   appendPoint(rightPerimeter, getAnchorPoint("ankle-joint-left-r"));
   appendPoint(rightPerimeter, getAnchorPoint("inner-ankle-r"));
   appendPoint(rightPerimeter, getAnchorPoint("inner-calf-upper-r"));
-  calfInner.slice().reverse().forEach((point) => appendPoint(rightPerimeter, point));
+  calfInner
+    .slice()
+    .reverse()
+    .forEach((point) => appendPoint(rightPerimeter, point));
   appendPoint(rightPerimeter, getAnchorPoint("inner-calf-r"));
   appendPoint(rightPerimeter, getAnchorPoint("inner-knee-soft-r"));
   appendPoint(rightPerimeter, getAnchorPoint("inner-knee-r"));
-  thighInner.slice().reverse().forEach((point) => appendPoint(rightPerimeter, point));
+  thighInner
+    .slice()
+    .reverse()
+    .forEach((point) => appendPoint(rightPerimeter, point));
   appendPoint(rightPerimeter, getAnchorPoint("inner-quad-upper-r"));
   appendPoint(rightPerimeter, getAnchorPoint("inner-thigh-root-r"));
   appendPoint(rightPerimeter, getAnchorPoint("pelvis-inner-bridge-r"));

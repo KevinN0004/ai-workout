@@ -101,9 +101,9 @@ describe("verifyPassword", () => {
     });
 
     test("rejects a user record with no hash", async () => {
-      expect(
-        await build().verifyPassword("StrongPass123!", { passwordAlgo: "argon2id" })
-      ).toBe(false);
+      expect(await build().verifyPassword("StrongPass123!", { passwordAlgo: "argon2id" })).toBe(
+        false
+      );
     });
   });
 
@@ -158,9 +158,9 @@ describe("verifyPassword", () => {
       const service = build();
       const { hash } = await service.hashPassword("StrongPass123!");
 
-      expect(
-        await service.verifyPassword("StrongPass123!", { hash, passwordAlgo: "bcrypt" })
-      ).toBe(true);
+      expect(await service.verifyPassword("StrongPass123!", { hash, passwordAlgo: "bcrypt" })).toBe(
+        true
+      );
     });
 
     // The inference is `$argon2`, not `$`. Other schemes are also $-prefixed --

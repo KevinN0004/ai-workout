@@ -122,7 +122,7 @@ export const registerWgerRoutes = (app, deps) => {
 
       res.json({
         cache,
-        count: q ? exercises.length : toFiniteNumber(data?.count) ?? exercises.length,
+        count: q ? exercises.length : (toFiniteNumber(data?.count) ?? exercises.length),
         next: cleanText(data?.next, 300),
         previous: cleanText(data?.previous, 300),
         limit,
@@ -133,8 +133,8 @@ export const registerWgerRoutes = (app, deps) => {
     } catch (err) {
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
-        const queryInput = validateSchemaInput(wgerExercisesQuerySchema, req.query || {}, "query")
-          .data || {};
+        const queryInput =
+          validateSchemaInput(wgerExercisesQuerySchema, req.query || {}, "query").data || {};
         const limit = queryInput.limit ?? 15;
         const offset = queryInput.offset ?? 0;
         const language = queryInput.language ?? wgerDefaultLanguage;

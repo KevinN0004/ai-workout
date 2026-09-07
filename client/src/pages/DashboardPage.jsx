@@ -131,11 +131,7 @@ export default function DashboardPage({
       return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
     };
     const today = new Date();
-    const todayStart = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const upcoming = recentWorkouts
       .map((item) => ({ ...item, parsedDate: new Date(parseDateAsTime(item?.date)) }))
       .filter((item) => item.parsedDate.getTime() >= todayStart.getTime())
@@ -170,11 +166,7 @@ export default function DashboardPage({
   if (!user) {
     return (
       <div className="page dashboard-page">
-        <DashboardHeader
-          user={user}
-          go={go}
-          onNavigateSummary={() => go("/dashboard")}
-        />
+        <DashboardHeader user={user} go={go} onNavigateSummary={() => go("/dashboard")} />
       </div>
     );
   }
@@ -388,7 +380,9 @@ export default function DashboardPage({
             onLogout();
           }}
         />
-        <p className="muted dashboard-header-note">Visual summary of your progress and key metrics.</p>
+        <p className="muted dashboard-header-note">
+          Visual summary of your progress and key metrics.
+        </p>
 
         <DashboardAtAGlance
           nextWorkout={nextWorkout}
@@ -414,7 +408,11 @@ export default function DashboardPage({
 
         <main className="dashboard-grid">
           {showInitialDashboardLoading && (
-            <section className="panel dashboard-loading-card dashboard-loading-skeleton" role="status" aria-live="polite">
+            <section
+              className="panel dashboard-loading-card dashboard-loading-skeleton"
+              role="status"
+              aria-live="polite"
+            >
               <div className="dashboard-skeleton-bar dashboard-skeleton-title" />
               <div className="dashboard-skeleton-row">
                 <span className="dashboard-skeleton-chip" />
@@ -496,7 +494,3 @@ export default function DashboardPage({
     </>
   );
 }
-
-
-
-

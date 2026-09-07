@@ -47,7 +47,9 @@ const equipmentThumbByLabel = {
 };
 
 const resolveEquipmentThumb = (label) => {
-  const key = String(label || "").trim().toLowerCase();
+  const key = String(label || "")
+    .trim()
+    .toLowerCase();
   return (
     equipmentThumbByLabel[key] || {
       image: thumbCommercialFullGym,
@@ -70,8 +72,7 @@ export default function PlannerSetupModal({
   onSubmit
 }) {
   if (!plannerOpen) return null;
-  const plannerHeaderTitle =
-    plannerHeaderTitleByStep[plannerStep] || plannerHeaderTitleByStep[1];
+  const plannerHeaderTitle = plannerHeaderTitleByStep[plannerStep] || plannerHeaderTitleByStep[1];
   const isCommercialEnvironment = form.environment === "Commercial";
   const hasFullGymAccess = isCommercialEnvironment && form.equipment.includes("Full gym access");
 
@@ -133,9 +134,7 @@ export default function PlannerSetupModal({
                     </button>
                     <button
                       type="button"
-                      className={
-                        form.environment === "Commercial" ? "active" : ""
-                      }
+                      className={form.environment === "Commercial" ? "active" : ""}
                       onClick={() => onEnvironmentChange("Commercial")}
                     >
                       Commercial
@@ -159,9 +158,7 @@ export default function PlannerSetupModal({
                       <button
                         key={item}
                         type="button"
-                        className={`equip-card ${
-                          form.equipment.includes(item) ? "active" : ""
-                        }`}
+                        className={`equip-card ${form.equipment.includes(item) ? "active" : ""}`}
                         onClick={() => toggleEquipment(item)}
                       >
                         <span className={`equip-thumb ${thumb.tone}`} aria-hidden="true">
@@ -196,11 +193,7 @@ export default function PlannerSetupModal({
                   </label>
                   <label>
                     Session length (minutes)
-                    <select
-                      name="duration"
-                      value={form.duration}
-                      onChange={onChange}
-                    >
+                    <select name="duration" value={form.duration} onChange={onChange}>
                       <option value="30">30</option>
                       <option value="45">45</option>
                       <option value="60">60</option>
@@ -218,11 +211,7 @@ export default function PlannerSetupModal({
                   </label>
                   <label>
                     Injuries or limitations
-                    <select
-                      name="injuries"
-                      value={form.injuries}
-                      onChange={onChange}
-                    >
+                    <select name="injuries" value={form.injuries} onChange={onChange}>
                       {injuryOptions.map((item) => (
                         <option key={item} value={item}>
                           {item}
@@ -262,12 +251,7 @@ export default function PlannerSetupModal({
                   Next
                 </button>
               ) : (
-                <button
-                  className="cta"
-                  type="button"
-                  disabled={loading}
-                  onClick={onSubmit}
-                >
+                <button className="cta" type="button" disabled={loading} onClick={onSubmit}>
                   {loading ? "Generating..." : "Generate workout"}
                 </button>
               )}

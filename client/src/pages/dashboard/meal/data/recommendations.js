@@ -82,4 +82,3 @@ export const MEALDB_RECOMMENDATION_QUERIES = {
     }
   ]
 };
-

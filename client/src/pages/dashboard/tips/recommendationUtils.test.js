@@ -414,9 +414,7 @@ describe("scoreExercise", () => {
       const squat = exercise({ name: "Back Squat", category: { name: "Legs" } });
       const ctx = { preferredCategories: ["Legs"] };
 
-      expect(scoreOf(squat, { ...ctx, injuryFlags: [kneeFlag] })).toBe(
-        scoreOf(squat, ctx) - 7
-      );
+      expect(scoreOf(squat, { ...ctx, injuryFlags: [kneeFlag] })).toBe(scoreOf(squat, ctx) - 7);
     });
 
     // Worth being explicit about, because it is easy to read -7 as a veto. It

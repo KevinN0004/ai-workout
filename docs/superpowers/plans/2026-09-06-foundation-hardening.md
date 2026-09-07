@@ -8,19 +8,18 @@
 
 **Tech Stack:** Node 20.19+/24 (ESM), npm workspaces, ESLint 9 flat config, Prettier 3, Vitest 4, `audit-ci`, Docker Compose, GitHub Actions.
 
-
 **Design spec:** [`docs/superpowers/specs/2026-09-06-foundation-hardening-design.md`](../specs/2026-09-06-foundation-hardening-design.md)
 
 ---
 
 ## Baseline (must not regress)
 
-| Check | Command | Expected |
-| --- | --- | --- |
-| Lint | `npx eslint .` | exit 0 |
-| Client tests | `npm -w client run test` | 33 files, 655 tests passing |
-| Server tests | `npm -w server run test` | 32 files, 751 tests passing |
-| Build | `npm run build` | exit 0 (the "chunks larger than 500 kB" warning is pre-existing) |
+| Check        | Command                  | Expected                                                         |
+| ------------ | ------------------------ | ---------------------------------------------------------------- |
+| Lint         | `npx eslint .`           | exit 0                                                           |
+| Client tests | `npm -w client run test` | 33 files, 655 tests passing                                      |
+| Server tests | `npm -w server run test` | 32 files, 751 tests passing                                      |
+| Build        | `npm run build`          | exit 0 (the "chunks larger than 500 kB" warning is pre-existing) |
 
 Server tests need Postgres reachable on `127.0.0.1:55432` with `DATABASE_URL` set in `server/.env`.
 
@@ -28,31 +27,31 @@ Server tests need Postgres reachable on `127.0.0.1:55432` with `DATABASE_URL` se
 
 ## File Structure
 
-| File | Status | Responsibility |
-| --- | --- | --- |
-| `.prettierrc` | Create | Formatter settings matched to house style |
-| `.prettierignore` | Create | Paths the formatter must not touch |
-| `eslint.config.js` | Modify | Add import-x, React defect rules, `no-console`, Prettier compat |
-| `package.json` (root) | Modify | `type: module`, `engines`, `overrides`, format/test scripts, devDeps |
-| `.git-blame-ignore-revs` | Create | Quarantines the reformat commit from blame |
-| `.nvmrc` | Create | Pins the development Node version (24) |
-| `.npmrc` | Create | `engine-strict` trial (kept only if `npm ci` passes) |
-| `.audit-ci.json` | Create | audit-ci gate config and advisory allowlist |
-| `security/advisory-reviews.json` | Create | Per-advisory reason and `reviewBy` date |
-| `scripts/check-audit-allowlist.mjs` | Create | Pure expiry/consistency checker + CLI entry |
-| `scripts/check-audit-allowlist.test.mjs` | Create | Unit tests for the checker |
-| `vitest.config.js` (root) | Create | Runs `scripts/**` tests, which have none today |
-| `.github/workflows/ci.yml` | Modify | Split into `quality` / `test` / `build` |
-| `docker-compose.yml` | Create | Postgres + Redis for dev parity |
-| `server/src/services/envValidationService.js` | Create | Pure env preflight validator |
-| `server/src/services/envValidationService.test.js` | Create | Unit tests for the validator |
-| `server/src/index.js:757` | Modify | Invoke preflight inside the existing test guard |
-| `.env.example` | Create | Tracked template for every documented variable |
-| `.github/dependabot.yml` | Create | Weekly npm + actions updates |
-| `.github/pull_request_template.md` | Create | PR checklist |
-| `CODEOWNERS` | Create | Review routing |
-| `CLAUDE.md` | Modify | Document the blame-ignore and compose gotchas |
-| `README.md` | Modify | Document compose usage and `.env.example` |
+| File                                               | Status | Responsibility                                                       |
+| -------------------------------------------------- | ------ | -------------------------------------------------------------------- |
+| `.prettierrc`                                      | Create | Formatter settings matched to house style                            |
+| `.prettierignore`                                  | Create | Paths the formatter must not touch                                   |
+| `eslint.config.js`                                 | Modify | Add import-x, React defect rules, `no-console`, Prettier compat      |
+| `package.json` (root)                              | Modify | `type: module`, `engines`, `overrides`, format/test scripts, devDeps |
+| `.git-blame-ignore-revs`                           | Create | Quarantines the reformat commit from blame                           |
+| `.nvmrc`                                           | Create | Pins the development Node version (24)                               |
+| `.npmrc`                                           | Create | `engine-strict` trial (kept only if `npm ci` passes)                 |
+| `.audit-ci.json`                                   | Create | audit-ci gate config and advisory allowlist                          |
+| `security/advisory-reviews.json`                   | Create | Per-advisory reason and `reviewBy` date                              |
+| `scripts/check-audit-allowlist.mjs`                | Create | Pure expiry/consistency checker + CLI entry                          |
+| `scripts/check-audit-allowlist.test.mjs`           | Create | Unit tests for the checker                                           |
+| `vitest.config.js` (root)                          | Create | Runs `scripts/**` tests, which have none today                       |
+| `.github/workflows/ci.yml`                         | Modify | Split into `quality` / `test` / `build`                              |
+| `docker-compose.yml`                               | Create | Postgres + Redis for dev parity                                      |
+| `server/src/services/envValidationService.js`      | Create | Pure env preflight validator                                         |
+| `server/src/services/envValidationService.test.js` | Create | Unit tests for the validator                                         |
+| `server/src/index.js:757`                          | Modify | Invoke preflight inside the existing test guard                      |
+| `.env.example`                                     | Create | Tracked template for every documented variable                       |
+| `.github/dependabot.yml`                           | Create | Weekly npm + actions updates                                         |
+| `.github/pull_request_template.md`                 | Create | PR checklist                                                         |
+| `CODEOWNERS`                                       | Create | Review routing                                                       |
+| `CLAUDE.md`                                        | Modify | Document the blame-ignore and compose gotchas                        |
+| `README.md`                                        | Modify | Document compose usage and `.env.example`                            |
 
 ---
 
@@ -250,7 +249,7 @@ const importRules = {
 - [ ] **Step 3: Add `linterOptions` in its OWN config object**
 
 **Do not add `linterOptions` to the existing `ignores` object.** In ESLint 9 flat config, an object
-containing *only* `ignores` is treated as **global ignores**. Adding any other key demotes it to an
+containing _only_ `ignores` is treated as **global ignores**. Adding any other key demotes it to an
 ordinary config object whose ignores apply only in its own scope. Verified empirically: doing so
 makes `npx eslint .` start linting `.claude/helpers/**` and blow up from 9 lines of output to **990**.
 
@@ -270,7 +269,7 @@ Leave the `ignores` object byte-identical, and add a separate entry after it:
 
 **Canary for verifying global ignores still hold:** `.claude/helpers/*.js` are bare CommonJS files
 using `require()`. If global ignores break, they get linted and emit `no-undef` bursts. Confirm with
-`npx eslint .claude/helpers`, which should report that the files are *ignored* — not merely that
+`npx eslint .claude/helpers`, which should report that the files are _ignored_ — not merely that
 none matched.
 
 - [ ] **Step 4: Extend the client block**
@@ -346,21 +345,21 @@ npx eslint . ; echo "EXIT=$?"
 
 Expected: `EXIT=1` with exactly **two** `no-console` errors:
 
-| File | Call |
-| --- | --- |
-| `server/src/postgresMigrations.js:13` | `console.log` as an injectable `log` default |
-| `server/scripts/apply-postgres-migrations.js` | `console.error` in the CLI catch handler |
+| File                                          | Call                                         |
+| --------------------------------------------- | -------------------------------------------- |
+| `server/src/postgresMigrations.js:13`         | `console.log` as an injectable `log` default |
+| `server/scripts/apply-postgres-migrations.js` | `console.error` in the CLI catch handler     |
 
 An earlier draft said one. That count came from grepping `server/src` alone and missed the second:
 `files: ["server/**/*.js"]` also matches **`server/scripts/`**. The note in Step 6 that "`scripts/**`
-needs no exemption" refers to the *root* `scripts/` directory only.
+needs no exemption" refers to the _root_ `scripts/` directory only.
 
 There is no shared logger to use — pino is instantiated inside `server/src/index.js` and never
 exported — so replace each call with a direct stream write. **Preserve the original stream:**
 `console.log` becomes `process.stdout.write`, `console.error` becomes `process.stderr.write`. A lint
 fix must not silently relocate output between streams.
 
-If any *other* rule fires, stop and report it — the measurement said zero, so a violation means the config differs from what was probed.
+If any _other_ rule fires, stop and report it — the measurement said zero, so a violation means the config differs from what was probed.
 
 - [ ] **Step 9: Verify a clean run**
 
@@ -565,7 +564,7 @@ Must land after PR 2, or `prettier --check` fails on arrival.
 
 ### Task 6: Fix the `qs` advisory with an override
 
-`npm audit fix` is the wrong tool here: it *downgrades* `body-parser` 1.20.6 → 1.20.4, whose `qs` range (`~6.14.0`) is still inside the vulnerable `2.2.5 – 6.15.3` window. No Express 4 release reaches a patched `qs`. The fix is 6.16.0, reachable only by override.
+`npm audit fix` is the wrong tool here: it _downgrades_ `body-parser` 1.20.6 → 1.20.4, whose `qs` range (`~6.14.0`) is still inside the vulnerable `2.2.5 – 6.15.3` window. No Express 4 release reaches a patched `qs`. The fix is 6.16.0, reachable only by override.
 
 **Files:**
 
@@ -727,10 +726,7 @@ should name exactly what is being suppressed and nothing more.
 ```json
 {
   "high": true,
-  "allowlist": [
-    "GHSA-3f6p-5ww8-9rcr",
-    "GHSA-ggr8-5vv4-36mx"
-  ]
+  "allowlist": ["GHSA-3f6p-5ww8-9rcr", "GHSA-ggr8-5vv4-36mx"]
 }
 ```
 
@@ -1000,7 +996,9 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
 
   for (const advisory of byAdvisory.keys()) {
     if (!allowlist.includes(advisory)) {
-      errors.push(`${advisory} has a review entry but is not allowlisted — remove the stale entry.`);
+      errors.push(
+        `${advisory} has a review entry but is not allowlisted — remove the stale entry.`
+      );
     }
   }
 
@@ -1501,7 +1499,9 @@ describe("validateEnv", () => {
   });
 
   test("ignores optional numeric settings that are unset or blank", () => {
-    expect(validateEnv({ ...validEnv, ARGON2_TIME_COST: "", EXTERNAL_API_RETRIES: undefined })).toEqual([]);
+    expect(
+      validateEnv({ ...validEnv, ARGON2_TIME_COST: "", EXTERNAL_API_RETRIES: undefined })
+    ).toEqual([]);
   });
 
   test("rejects a malformed upstream base URL", () => {
@@ -1522,7 +1522,9 @@ describe("validateEnv", () => {
   });
 
   test("does not treat GEMINI_API_KEY as required", () => {
-    expect(validateEnv({ ...validEnv, NODE_ENV: "production", CLIENT_ORIGIN: "https://x.com" })).toEqual([]);
+    expect(
+      validateEnv({ ...validEnv, NODE_ENV: "production", CLIENT_ORIGIN: "https://x.com" })
+    ).toEqual([]);
   });
 });
 ```
@@ -1581,12 +1583,7 @@ const NUMERIC_VARS = [
 // Only HTTP endpoints are parsed. Postgres and Redis connection strings are
 // checked for presence alone -- passwords routinely contain characters that
 // make new URL() throw on a perfectly valid DSN.
-const URL_VARS = [
-  "OPEN_METEO_BASE_URL",
-  "OPENAQ_BASE_URL",
-  "WGER_BASE_URL",
-  "MEALDB_BASE_URL"
-];
+const URL_VARS = ["OPEN_METEO_BASE_URL", "OPENAQ_BASE_URL", "WGER_BASE_URL", "MEALDB_BASE_URL"];
 
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === "";
 

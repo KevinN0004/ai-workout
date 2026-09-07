@@ -1,8 +1,4 @@
-export default function MealSections({
-  displayedSections,
-  onSelectMeal,
-  handleImageError
-}) {
+export default function MealSections({ displayedSections, onSelectMeal, handleImageError }) {
   return (
     <div className="meal-sections">
       {displayedSections.map((section) => (

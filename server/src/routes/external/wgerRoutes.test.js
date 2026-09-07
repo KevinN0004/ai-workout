@@ -264,10 +264,7 @@ describe("GET /api/wger/exercises", () => {
     });
 
     test("keeps only the matching exercises", async () => {
-      const wgerRequest = listUpstream([
-        exercise(1, "Bench Press"),
-        exercise(2, "Barbell Squat")
-      ]);
+      const wgerRequest = listUpstream([exercise(1, "Bench Press"), exercise(2, "Barbell Squat")]);
 
       const response = await get(buildWgerApp(wgerRequest), "q=bench");
 

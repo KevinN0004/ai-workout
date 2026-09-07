@@ -39,9 +39,7 @@ describe("goal recommendations", () => {
     const { result } = render("lean_strength");
 
     await waitFor(() =>
-      expect(result.current.mealDbRecommendations).toHaveLength(
-        sectionsFor("lean_strength").length
-      )
+      expect(result.current.mealDbRecommendations).toHaveLength(sectionsFor("lean_strength").length)
     );
   });
 
@@ -49,9 +47,7 @@ describe("goal recommendations", () => {
     const { result } = render("nonsense");
 
     await waitFor(() =>
-      expect(result.current.mealDbRecommendations).toHaveLength(
-        sectionsFor("lean_strength").length
-      )
+      expect(result.current.mealDbRecommendations).toHaveLength(sectionsFor("lean_strength").length)
     );
   });
 

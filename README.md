@@ -69,63 +69,63 @@ npm run test         # Run client and server tests
 
 Common server variables:
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `PORT` | API server port | `5000` |
-| `DATABASE_URL` / `POSTGRES_URL` | Postgres connection string | unset |
-| `POSTGRES_STARTUP_REQUIRED` | Fail startup if Postgres is unavailable | `true` in production, otherwise `false` |
-| `POSTGRES_SSL` | Enable TLS for Postgres connections | `false` |
-| `POSTGRES_SSL_REJECT_UNAUTHORIZED` | Reject untrusted Postgres TLS certificates | `true` |
-| `CLIENT_ORIGIN` / `CLIENT_ORIGINS` | Allowed CORS origins, comma-separated | loopback origins only when unset; set this before deploying |
-| `GEMINI_API_KEY` | Enables `/api/generate` | unset |
-| `ANON_GENERATE_RATE_LIMIT_MAX` | Plan generations allowed per IP without signing in | `3` |
-| `ANON_GENERATE_RATE_LIMIT_WINDOW_MS` | Window for the anonymous generation quota | `86400000` (24h) |
-| `GEMINI_MODEL` | Gemini model for workout generation | `gemini-1.5-flash` |
-| `REDIS_URL` | Redis connection URL for sessions | unset |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`) | unset |
-| `REDIS_CONNECT_TIMEOUT_MS` | How long startup waits for Redis before falling back to in-memory sessions | `10000` |
-| `REDIS_STARTUP_REQUIRED` | Fail startup when Redis is configured but unreachable, instead of using in-memory sessions | `false` |
-| `SHUTDOWN_TIMEOUT_MS` | Grace period for draining requests and closing connections on SIGTERM/SIGINT | `10000` |
-| `SENTRY_DSN` | Enables Sentry error tracking | unset |
-| `SENTRY_ENVIRONMENT` | Environment tag sent to Sentry | `NODE_ENV`, else `development` |
-| `SENTRY_RELEASE` | Release tag sent to Sentry | unset |
-| `SENTRY_TRACES_SAMPLE_RATE` | Sentry trace sampling, clamped to 0–1 | `0` |
-| `SENTRY_SHUTDOWN_TIMEOUT_MS` | How long shutdown waits for Sentry to flush | `2000` |
-| `LOG_LEVEL` | Pino log level | `info` |
-| `LOG_REDACT_PATHS` | Extra comma-separated log paths to redact, on top of the defaults | unset |
+| Variable                                                                    | Purpose                                                                                    | Default                                                     |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `PORT`                                                                      | API server port                                                                            | `5000`                                                      |
+| `DATABASE_URL` / `POSTGRES_URL`                                             | Postgres connection string                                                                 | unset                                                       |
+| `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                    | `true` in production, otherwise `false`                     |
+| `POSTGRES_SSL`                                                              | Enable TLS for Postgres connections                                                        | `false`                                                     |
+| `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted Postgres TLS certificates                                                 | `true`                                                      |
+| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated                                                      | loopback origins only when unset; set this before deploying |
+| `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                    | unset                                                       |
+| `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                         | `3`                                                         |
+| `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                  | `86400000` (24h)                                            |
+| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                        | `gemini-1.5-flash`                                          |
+| `REDIS_URL`                                                                 | Redis connection URL for sessions                                                          | unset                                                       |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`)                              | unset                                                       |
+| `REDIS_CONNECT_TIMEOUT_MS`                                                  | How long startup waits for Redis before falling back to in-memory sessions                 | `10000`                                                     |
+| `REDIS_STARTUP_REQUIRED`                                                    | Fail startup when Redis is configured but unreachable, instead of using in-memory sessions | `false`                                                     |
+| `SHUTDOWN_TIMEOUT_MS`                                                       | Grace period for draining requests and closing connections on SIGTERM/SIGINT               | `10000`                                                     |
+| `SENTRY_DSN`                                                                | Enables Sentry error tracking                                                              | unset                                                       |
+| `SENTRY_ENVIRONMENT`                                                        | Environment tag sent to Sentry                                                             | `NODE_ENV`, else `development`                              |
+| `SENTRY_RELEASE`                                                            | Release tag sent to Sentry                                                                 | unset                                                       |
+| `SENTRY_TRACES_SAMPLE_RATE`                                                 | Sentry trace sampling, clamped to 0–1                                                      | `0`                                                         |
+| `SENTRY_SHUTDOWN_TIMEOUT_MS`                                                | How long shutdown waits for Sentry to flush                                                | `2000`                                                      |
+| `LOG_LEVEL`                                                                 | Pino log level                                                                             | `info`                                                      |
+| `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                          | unset                                                       |
 
 Rate limiting. Each bucket is separate; a request can be counted by more than one.
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `API_RATE_LIMIT_WINDOW_MS` / `API_RATE_LIMIT_MAX` | Global limit on everything under `/api` | `900000` (15m) / `300` |
-| `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX` | Limit on signup and login | `600000` (10m) / `25` |
-| `GENERATE_RATE_LIMIT_WINDOW_MS` / `GENERATE_RATE_LIMIT_MAX` | Limit on `/api/generate` for everyone | `600000` (10m) / `20` |
+| Variable                                                    | Purpose                                 | Default                |
+| ----------------------------------------------------------- | --------------------------------------- | ---------------------- |
+| `API_RATE_LIMIT_WINDOW_MS` / `API_RATE_LIMIT_MAX`           | Global limit on everything under `/api` | `900000` (15m) / `300` |
+| `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX`         | Limit on signup and login               | `600000` (10m) / `25`  |
+| `GENERATE_RATE_LIMIT_WINDOW_MS` / `GENERATE_RATE_LIMIT_MAX` | Limit on `/api/generate` for everyone   | `600000` (10m) / `20`  |
 
 Password hashing. These are Argon2id cost parameters — raising them makes login slower
 and more expensive to attack.
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `ARGON2_TIME_COST` | Iterations | `3` |
-| `ARGON2_MEMORY_COST` | Memory in KiB | `19456` |
-| `ARGON2_PARALLELISM` | Parallel lanes | `1` |
-| `ARGON2_HASH_LENGTH` | Output length in bytes | `32` |
+| Variable             | Purpose                | Default |
+| -------------------- | ---------------------- | ------- |
+| `ARGON2_TIME_COST`   | Iterations             | `3`     |
+| `ARGON2_MEMORY_COST` | Memory in KiB          | `19456` |
+| `ARGON2_PARALLELISM` | Parallel lanes         | `1`     |
+| `ARGON2_HASH_LENGTH` | Output length in bytes | `32`    |
 
 Dashboard pagination and external-API behaviour.
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one | `50` |
-| `DASHBOARD_COLLECTION_MAX_LIMIT` | Largest page size a request may ask for | `200` |
-| `EXTERNAL_API_RETRIES` | Retry attempts per upstream call | `2` |
-| `EXTERNAL_API_RETRY_BASE_DELAY_MS` | Base backoff between retries | `250` |
-| `EXTERNAL_CACHE_MAX_ENTRIES` | Entries held in the in-process upstream cache | `500` |
-| `EXTERNAL_CACHE_STALE_TTL_SEC` | How long a stale entry may still be served | `21600` (6h) |
-| `OPEN_METEO_CACHE_TTL_SEC` | Fresh-cache window for weather | `300` |
-| `OPENAQ_CACHE_TTL_SEC` | Fresh-cache window for air quality | `180` |
-| `WGER_CACHE_TTL_SEC` | Fresh-cache window for exercise data | `900` |
-| `MEALDB_CACHE_TTL_SEC` | Fresh-cache window for meal search | `900` |
+| Variable                             | Purpose                                       | Default      |
+| ------------------------------------ | --------------------------------------------- | ------------ |
+| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one | `50`         |
+| `DASHBOARD_COLLECTION_MAX_LIMIT`     | Largest page size a request may ask for       | `200`        |
+| `EXTERNAL_API_RETRIES`               | Retry attempts per upstream call              | `2`          |
+| `EXTERNAL_API_RETRY_BASE_DELAY_MS`   | Base backoff between retries                  | `250`        |
+| `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-process upstream cache | `500`        |
+| `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served    | `21600` (6h) |
+| `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                | `300`        |
+| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality            | `180`        |
+| `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data          | `900`        |
+| `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search            | `900`        |
 
 `NODE_ENV` is read directly rather than configured: `production` enables HSTS, `Secure`
 cookies and `trust proxy`, and makes Postgres required at startup. `VITEST` is set by the
@@ -136,15 +136,15 @@ multiplies upstream load accordingly.
 
 External API variables:
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `OPEN_METEO_BASE_URL` | Weather API base URL | Open-Meteo forecast API |
-| `OPENAQ_BASE_URL` | Air quality API base URL | OpenAQ v3 |
-| `OPENAQ_API_KEY` | Optional OpenAQ key | unset |
-| `WGER_BASE_URL` | Exercise API base URL | wger API |
-| `WGER_API_TOKEN` | Optional wger token | unset |
-| `WGER_DEFAULT_LANGUAGE` | wger language ID | `2` |
-| `MEALDB_BASE_URL` | Meal search API base URL | TheMealDB v1 |
+| Variable                | Purpose                  | Default                 |
+| ----------------------- | ------------------------ | ----------------------- |
+| `OPEN_METEO_BASE_URL`   | Weather API base URL     | Open-Meteo forecast API |
+| `OPENAQ_BASE_URL`       | Air quality API base URL | OpenAQ v3               |
+| `OPENAQ_API_KEY`        | Optional OpenAQ key      | unset                   |
+| `WGER_BASE_URL`         | Exercise API base URL    | wger API                |
+| `WGER_API_TOKEN`        | Optional wger token      | unset                   |
+| `WGER_DEFAULT_LANGUAGE` | wger language ID         | `2`                     |
+| `MEALDB_BASE_URL`       | Meal search API base URL | TheMealDB v1            |
 
 ## API Overview
 

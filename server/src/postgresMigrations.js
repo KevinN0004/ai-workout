@@ -13,12 +13,7 @@ const logToStdout = (message) => {
  * `fs` is injectable so the transaction sequence can be tested without touching
  * the filesystem. Returns the filenames applied during this run.
  */
-export const applyMigrations = async ({
-  pool,
-  migrationsDir,
-  log = logToStdout,
-  fs = nodeFs
-}) => {
+export const applyMigrations = async ({ pool, migrationsDir, log = logToStdout, fs = nodeFs }) => {
   await pool.query(`
     create table if not exists schema_migrations (
       filename text primary key,

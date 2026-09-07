@@ -8,3 +8,11 @@ coverage
 .postgres-pw
 package-lock.json
 server/db/**/*.sql
+
+# Prettier 3.9.6 does not converge on this file: each --write pass re-indents
+# the continuation paragraphs under its nested `- [x]` task-list items four
+# spaces deeper than the last, with no fixed point (verified over 5 passes,
+# +280 bytes each time). Excluded until that's fixed upstream -- re-run
+# `prettier --check` on it after any Prettier upgrade to see if it's safe to
+# drop this line.
+docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md

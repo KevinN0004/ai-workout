@@ -25,7 +25,8 @@ export const sendErrorResponse = (req, res, err, status = 500) => {
       method: req?.method,
       path: req?.originalUrl || req?.url,
       status: resolvedStatus,
-      error: typeof err?.message === "string" ? err.message.slice(0, 300) : String(err).slice(0, 300)
+      error:
+        typeof err?.message === "string" ? err.message.slice(0, 300) : String(err).slice(0, 300)
     },
     "Route handler error."
   );

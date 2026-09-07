@@ -30,30 +30,30 @@
 
 Before responding, check if the prompt matches any of these patterns and invoke the listed skill FIRST:
 
-| Prompt contains                                                                           | Invoke this skill first                                 |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| bug, error, fail, broken, not working, exception, crash                                   | `superpowers:systematic-debugging`                      |
-| build, create, add feature, implement (no existing spec)                                  | `superpowers:brainstorming`                             |
-| plan, spec, design, how should we, architecture                                           | `superpowers:brainstorming`                             |
-| review, PR, pull request, code review                                                     | `superpowers:requesting-code-review`                    |
-| done, finished, complete, ready to merge, ship                                            | `superpowers:verification-before-completion`            |
-| library, docs, how do I use, API syntax, framework                                        | `context7-mcp`                                          |
-| find where, search codebase, where is, which files                                        | `codebase-memory-mcp`                                   |
-| frontend, UI, component, CSS, React, page, layout                                         | `frontend-design`                                       |
-| test, TDD, unit test, write tests                                                         | `superpowers:test-driven-development`                   |
-| audit design, polish UI, critique layout, design anti-pattern, impeccable, /impeccable    | `impeccable`                                            |
-| design system, UI style, ui-ux-pro-max, professional UI, reasoning rules                  | `ui-ux-pro-max`                                         |
-| premium frontend, anti-slop, taste skill, boilerplate UI, generic design, design quality  | `taste`                                                 |
-| font, typeface, Google Fonts, font pairing, typography selection, variable font           | `fonts`                                                 |
-| mockup, wireframe, prototype, Stitch, generate UI design, design with AI                  | `stitch`                                                |
-| component registry, 21st.dev, pre-built component, AI component, copy component           | `21st-dev`                                              |
-| E2E test, end-to-end test, browser automation, Playwright, playwright test                | `playwright`                                            |
-| install skill, add skill, skill manager, npx skills add, skillui                          | `skillui`                                               |
-| find skill, discover skill, skill collection, awesome skills, browse skills               | `awesome-design`                                        |
-| review PR, code review, check diff, pre-merge, before merging, review branch              | `github:code-review`                                    |
-| build page, new component, landing page, dashboard page, UI for                           | `frontend-design`                                       |
-| button, modal, form, card component, navbar, sidebar, table component                     | `ui-ux-pro-max`                                         |
-| /frontend, run frontend workflow, design and implement, polish and verify                 | `/frontend` command — runs full 9-skill design workflow |
+| Prompt contains                                                                          | Invoke this skill first                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| bug, error, fail, broken, not working, exception, crash                                  | `superpowers:systematic-debugging`                      |
+| build, create, add feature, implement (no existing spec)                                 | `superpowers:brainstorming`                             |
+| plan, spec, design, how should we, architecture                                          | `superpowers:brainstorming`                             |
+| review, PR, pull request, code review                                                    | `superpowers:requesting-code-review`                    |
+| done, finished, complete, ready to merge, ship                                           | `superpowers:verification-before-completion`            |
+| library, docs, how do I use, API syntax, framework                                       | `context7-mcp`                                          |
+| find where, search codebase, where is, which files                                       | `codebase-memory-mcp`                                   |
+| frontend, UI, component, CSS, React, page, layout                                        | `frontend-design`                                       |
+| test, TDD, unit test, write tests                                                        | `superpowers:test-driven-development`                   |
+| audit design, polish UI, critique layout, design anti-pattern, impeccable, /impeccable   | `impeccable`                                            |
+| design system, UI style, ui-ux-pro-max, professional UI, reasoning rules                 | `ui-ux-pro-max`                                         |
+| premium frontend, anti-slop, taste skill, boilerplate UI, generic design, design quality | `taste`                                                 |
+| font, typeface, Google Fonts, font pairing, typography selection, variable font          | `fonts`                                                 |
+| mockup, wireframe, prototype, Stitch, generate UI design, design with AI                 | `stitch`                                                |
+| component registry, 21st.dev, pre-built component, AI component, copy component          | `21st-dev`                                              |
+| E2E test, end-to-end test, browser automation, Playwright, playwright test               | `playwright`                                            |
+| install skill, add skill, skill manager, npx skills add, skillui                         | `skillui`                                               |
+| find skill, discover skill, skill collection, awesome skills, browse skills              | `awesome-design`                                        |
+| review PR, code review, check diff, pre-merge, before merging, review branch             | `github:code-review`                                    |
+| build page, new component, landing page, dashboard page, UI for                          | `frontend-design`                                       |
+| button, modal, form, card component, navbar, sidebar, table component                    | `ui-ux-pro-max`                                         |
+| /frontend, run frontend workflow, design and implement, polish and verify                | `/frontend` command — runs full 9-skill design workflow |
 
 ## File Organization
 
@@ -93,7 +93,7 @@ plans, the user row, and the paginated dashboard collections — plus two shared
 Two things to know before adding a write:
 
 - **`upsert` usually is not available.** The uniqueness on these tables comes from
-  *partial* unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
+  _partial_ unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
   express, so Prisma has no constraint to target. The repositories do an explicit
   read-then-write instead. This is deliberate, not an oversight.
 - **Collection caps are applied on read, not in storage.** `userReadRepository` limits
@@ -129,7 +129,7 @@ This is not hypothetical. Three shipped bugs came from it, all in health advice:
 - a pm2.5 sensor reporting `null` was published as `0 ug/m3`, which scores **AQI 0** and
   told the user the air was clean
 - a `null` weather code is code `0`, **"Clear sky"**, and a `null` temperature is `0 °C`,
-  so a payload carrying no weather at all was reported as clear *and* too cold to train
+  so a payload carrying no weather at all was reported as clear _and_ too cold to train
   outdoors
 - the same `null` weather code went on reporting **"Clear sky"** from both weather routes
   and every day of the forecast after that fix, because those build `weatherText` from

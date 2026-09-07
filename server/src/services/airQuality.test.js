@@ -17,20 +17,19 @@ const {
   isOutdoorFriendlyNow,
   weatherCodeToText,
   buildWorkoutRecommendation
-} =
-  createExternalDataService({
-    cleanText: (value, maxLen = 120) =>
-      typeof value === "string" ? value.trim().slice(0, maxLen) : "",
-    toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-    readThroughExternalCache: async () => ({}),
-    buildExternalCacheKey: () => "",
-    metrics: { externalApiFailures: {}, externalApiRetries: {} },
-    logger: { info() {}, warn() {}, error() {} },
-    toShortText: (value) => String(value ?? ""),
-    recordExternalApiLatency: () => {},
-    externalApiRetries: 0,
-    externalApiRetryBaseDelayMs: 0
-  });
+} = createExternalDataService({
+  cleanText: (value, maxLen = 120) =>
+    typeof value === "string" ? value.trim().slice(0, maxLen) : "",
+  toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+  readThroughExternalCache: async () => ({}),
+  buildExternalCacheKey: () => "",
+  metrics: { externalApiFailures: {}, externalApiRetries: {} },
+  logger: { info() {}, warn() {}, error() {} },
+  toShortText: (value) => String(value ?? ""),
+  recordExternalApiLatency: () => {},
+  externalApiRetries: 0,
+  externalApiRetryBaseDelayMs: 0
+});
 
 describe("pm25ToUsAqi", () => {
   test("returns null rather than a number for absent input", () => {

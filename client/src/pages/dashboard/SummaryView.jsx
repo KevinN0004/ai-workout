@@ -72,9 +72,7 @@ export default function SummaryView({
   const emptyEnvironmentSelectionLabel = isCommercialEnvironment
     ? "No rooms or operations selected yet."
     : "No equipment selected yet.";
-  const nextForecast = Array.isArray(weatherData?.daily)
-    ? weatherData.daily.slice(0, 3)
-    : [];
+  const nextForecast = Array.isArray(weatherData?.daily) ? weatherData.daily.slice(0, 3) : [];
   const airSummary = airQualityData?.summary || null;
   const airLocation = airQualityData?.location || null;
   const topPollutants = Array.isArray(airQualityData?.pollutants)
@@ -88,8 +86,7 @@ export default function SummaryView({
     const numeric = Number(value);
     const tone = numeric > 0 ? "up" : numeric < 0 ? "down" : "flat";
     const absolute = Math.abs(numeric);
-    const formatted =
-      decimals > 0 ? absolute.toFixed(decimals) : String(Math.round(absolute));
+    const formatted = decimals > 0 ? absolute.toFixed(decimals) : String(Math.round(absolute));
     const sign = numeric > 0 ? "+" : numeric < 0 ? "-" : "";
     return (
       <span className={`trend-badge trend-${tone}`}>
@@ -108,9 +105,7 @@ export default function SummaryView({
             <div>
               <p className="eyebrow">Overview</p>
               <h2>Today's training snapshot</h2>
-              <p className="muted">
-                A quick read on your current plan settings and priorities.
-              </p>
+              <p className="muted">A quick read on your current plan settings and priorities.</p>
             </div>
             <button type="button" className="ghost" onClick={openPlannerFromProfile}>
               Update plan
@@ -186,7 +181,9 @@ export default function SummaryView({
                     ))}
                   </ul>
                 ) : (
-                  <p className="muted">No workout assigned for today. Use this as a recovery day.</p>
+                  <p className="muted">
+                    No workout assigned for today. Use this as a recovery day.
+                  </p>
                 )}
               </div>
               <div className="card-section-foot">
@@ -347,8 +344,7 @@ export default function SummaryView({
                     </p>
                     <p>{airSummary.guidance}</p>
                     <p className="muted">
-                      {airSummary.primaryPollutant || "PM2.5"}:{" "}
-                      {airSummary.pm25 ?? "--"} ug/m3
+                      {airSummary.primaryPollutant || "PM2.5"}: {airSummary.pm25 ?? "--"} ug/m3
                       {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
                         ? ` | US AQI ${airSummary.aqiUs}`
                         : ""}
@@ -409,7 +405,9 @@ export default function SummaryView({
               <div className="summary-stat-main">
                 <h3>
                   {(weeklyTrends?.latestWeight ??
-                    Number(goals.targetWeight || goalForm.targetWeight)) || 0} lb
+                    Number(goals.targetWeight || goalForm.targetWeight)) ||
+                    0}{" "}
+                  lb
                 </h3>
                 {renderTrendBadge(weeklyTrends?.weightDelta, {
                   suffix: "vs last log",
@@ -452,7 +450,6 @@ export default function SummaryView({
             {!workouts.length && <p className="muted">No workouts logged yet.</p>}
           </div>
         </section>
-
       </div>
 
       <aside className="summary-side">
@@ -499,7 +496,9 @@ export default function SummaryView({
           <>
             <TrendChart
               title="Calories"
-              subtitle={trendRange === "month" ? "Daily calories (30 days)" : "Daily calories (7 days)"}
+              subtitle={
+                trendRange === "month" ? "Daily calories (30 days)" : "Daily calories (7 days)"
+              }
               series={activeTrend.caloriesSeries}
               buildLinePath={buildLinePath}
               lineClassName="summary-chart-line"
@@ -536,4 +535,3 @@ export default function SummaryView({
     </section>
   );
 }
-

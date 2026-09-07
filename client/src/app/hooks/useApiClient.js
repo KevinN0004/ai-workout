@@ -37,9 +37,7 @@ export default function useApiClient() {
 
       if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
         const csrfToken =
-          (await ensureCsrfToken()) ||
-          csrfTokenRef.current ||
-          readCookie(CSRF_COOKIE_NAME);
+          (await ensureCsrfToken()) || csrfTokenRef.current || readCookie(CSRF_COOKIE_NAME);
         if (!csrfToken) {
           throw new Error("Security token unavailable. Refresh and try again.");
         }

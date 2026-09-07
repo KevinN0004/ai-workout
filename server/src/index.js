@@ -78,7 +78,9 @@ const parseCsvEnv = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const configuredClientOrigins = parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS);
+const configuredClientOrigins = parseCsvEnv(
+  process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS
+);
 const allowedCorsOrigins = new Set(configuredClientOrigins);
 
 // With credentials enabled, reflecting an arbitrary Origin would let any site
@@ -221,9 +223,7 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
     referrerPolicy: { policy: "no-referrer" },
     hsts:
-      process.env.NODE_ENV === "production"
-        ? { maxAge: 31536000, includeSubDomains: true }
-        : false
+      process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false
   })
 );
 app.use(cors(corsOptions));
@@ -261,10 +261,7 @@ const recordExternalApiLatency = (serviceName, durationMs) => {
 
 const apiRateLimitWindowMs = toPositiveInt(process.env.API_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
 const apiRateLimitMax = toPositiveInt(process.env.API_RATE_LIMIT_MAX, 300);
-const authRateLimitWindowMs = toPositiveInt(
-  process.env.AUTH_RATE_LIMIT_WINDOW_MS,
-  10 * 60 * 1000
-);
+const authRateLimitWindowMs = toPositiveInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10 * 60 * 1000);
 const authRateLimitMax = toPositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 25);
 const generateRateLimitWindowMs = toPositiveInt(
   process.env.GENERATE_RATE_LIMIT_WINDOW_MS,
@@ -282,10 +279,7 @@ const dashboardCollectionDefaultLimit = toPositiveInt(
   process.env.DASHBOARD_COLLECTION_DEFAULT_LIMIT,
   50
 );
-const dashboardCollectionMaxLimit = toPositiveInt(
-  process.env.DASHBOARD_COLLECTION_MAX_LIMIT,
-  200
-);
+const dashboardCollectionMaxLimit = toPositiveInt(process.env.DASHBOARD_COLLECTION_MAX_LIMIT, 200);
 const externalApiRetries = toPositiveInt(process.env.EXTERNAL_API_RETRIES, 2);
 const externalApiRetryBaseDelayMs = toPositiveInt(
   process.env.EXTERNAL_API_RETRY_BASE_DELAY_MS,
@@ -333,8 +327,9 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
-const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } =
-  createUserRepository({ prisma });
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } = createUserRepository({
+  prisma
+});
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 const {
   serializeCacheKeyPart,
@@ -457,11 +452,8 @@ const dashboardCollectionService = createDashboardCollectionService({
   loadCollectionPage,
   buildDashboard
 });
-const {
-  parseDashboardPagination,
-  getDashboardCollections,
-  buildDashboardResponse
-} = dashboardCollectionService;
+const { parseDashboardPagination, getDashboardCollections, buildDashboardResponse } =
+  dashboardCollectionService;
 
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
@@ -519,7 +511,9 @@ const generateLimiter = rateLimit({
       },
       "Generate request rate limited."
     );
-    res.status(429).json({ error: "Workout generation rate limit reached. Please wait and retry." });
+    res
+      .status(429)
+      .json({ error: "Workout generation rate limit reached. Please wait and retry." });
   }
 });
 
@@ -687,7 +681,10 @@ const startServer = async () => {
       );
     }
     const httpServer = app.listen(port, () => {
-      logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
+      logger.info(
+        { event: "server_started", port },
+        `Server listening on http://localhost:${port}`
+      );
     });
 
     const handleShutdown = createShutdownHandler({
@@ -718,10 +715,7 @@ const startServer = async () => {
   }
 };
 
-export {
-  app,
-  startServer
-};
+export { app, startServer };
 
 export const __testables = {
   defaultProfile,
@@ -757,7 +751,3 @@ export const __testables = {
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startServer();
 }
-
-
-
-

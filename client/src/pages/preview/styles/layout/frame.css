@@ -1,8 +1,5 @@
 ﻿.preview-layout-frame {
-  width: min(
-    calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)),
-    100%
-  );
+  width: min(calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)), 100%);
   max-width: calc(var(--preview-body-width) * var(--preview-step-width-scale, 1));
   margin: 0 auto;
   display: grid;
@@ -259,4 +256,3 @@
     transform: translateY(0);
   }
 }
-

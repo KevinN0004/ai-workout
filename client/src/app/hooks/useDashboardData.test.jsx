@@ -18,7 +18,10 @@ const setGoalForm = vi.fn();
 // The ambient loads go through navigator.geolocation before they can request
 // anything, so most of the failure modes are reached from here rather than
 // from fetch. Resolving and rejecting are both callback-style.
-const stubGeolocation = ({ position = { coords: { latitude: 40.1, longitude: -75.2 } }, error } = {}) => {
+const stubGeolocation = ({
+  position = { coords: { latitude: 40.1, longitude: -75.2 } },
+  error
+} = {}) => {
   vi.stubGlobal("navigator", {
     geolocation: {
       getCurrentPosition: (onSuccess, onError) => {
@@ -64,7 +67,10 @@ afterEach(() => {
 describe("useDashboardData", () => {
   test("loads the dashboard on a dashboard route", async () => {
     const dashboard = { workouts: [{ id: "w1" }], goals: {} };
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ dashboard })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ dashboard }))
+    );
 
     const { result } = render();
 
@@ -91,7 +97,10 @@ describe("useDashboardData", () => {
   });
 
   test("clears loading once the request settles", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ dashboard: { goals: {} } })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ dashboard: { goals: {} } }))
+    );
 
     const { result } = render();
 
@@ -106,7 +115,10 @@ describe("useDashboardData", () => {
         JSON.stringify({ dashboard: cached, updatedAt: Date.now() })
       );
       // Never resolves, so only the cached value can be on screen.
-      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => new Promise(() => {}))
+      );
 
       const { result } = render();
 
@@ -115,7 +127,10 @@ describe("useDashboardData", () => {
 
     test("writes the loaded dashboard back to the cache", async () => {
       const dashboard = { workouts: [{ id: "fresh" }], goals: {} };
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ dashboard })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard }))
+      );
 
       const { result } = render();
 
@@ -126,7 +141,10 @@ describe("useDashboardData", () => {
 
     test("survives unparseable cached JSON", async () => {
       window.localStorage.setItem(CACHE_KEY, "{not json");
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ dashboard: { goals: {} } })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals: {} } }))
+      );
 
       const { result } = render();
 
@@ -143,7 +161,10 @@ describe("useDashboardData", () => {
         CACHE_KEY,
         JSON.stringify({ dashboard: { workouts: [], goals: {} }, updatedAt: Date.now() })
       );
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "boom" }, false)));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ error: "boom" }, false))
+      );
 
       const { result } = render();
 
@@ -151,7 +172,10 @@ describe("useDashboardData", () => {
     });
 
     test("surfaces the server's message when nothing is cached", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "server exploded" }, false)));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ error: "server exploded" }, false))
+      );
 
       const { result } = render();
 
@@ -175,9 +199,12 @@ describe("useDashboardData", () => {
     });
 
     test("reports a rejected request rather than hanging", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => {
-        throw new Error("network down");
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new Error("network down");
+        })
+      );
 
       const { result } = render();
 
@@ -188,7 +215,10 @@ describe("useDashboardData", () => {
 
   describe("clearDashboardDataState", () => {
     test("drops the dashboard and its error", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ dashboard: { goals: {} } })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals: {} } }))
+      );
 
       const { result } = render();
       await waitFor(() => expect(result.current.dashboard).toBeTruthy());
@@ -201,7 +231,10 @@ describe("useDashboardData", () => {
 
     test("drops the ambient data too", async () => {
       stubGeolocation();
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation: {} })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ recommendation: {} }))
+      );
       const { result } = render({ weatherCacheKey: WEATHER_KEY });
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -249,7 +282,10 @@ describe("ambient data", () => {
       [99, /unable to access location/i]
     ])("turns geolocation error code %i into its own message", async (code, pattern) => {
       stubGeolocation({ error: geoError(code) });
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -259,7 +295,10 @@ describe("ambient data", () => {
 
     test("says so when the browser has no geolocation at all", async () => {
       vi.stubGlobal("navigator", {});
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -269,7 +308,10 @@ describe("ambient data", () => {
 
     test("rejects coordinates that are not numbers", async () => {
       stubGeolocation({ position: { coords: { latitude: "north", longitude: null } } });
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -295,7 +337,10 @@ describe("ambient data", () => {
     test("stores the recommendation and stamps when it arrived", async () => {
       stubGeolocation();
       const recommendation = { workoutType: "outdoor" };
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ recommendation }))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -306,7 +351,10 @@ describe("ambient data", () => {
 
     test("writes it to the cache for the next visit", async () => {
       stubGeolocation();
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ recommendation: {} })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ recommendation: {} }))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -318,7 +366,10 @@ describe("ambient data", () => {
 
     test("clears the loading flag when it settles", async () => {
       stubGeolocation();
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -328,7 +379,10 @@ describe("ambient data", () => {
 
     test("surfaces the server's message when the request is refused", async () => {
       stubGeolocation();
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "Upstream is down." }, false)));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ error: "Upstream is down." }, false))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
@@ -370,7 +424,10 @@ describe("ambient data", () => {
   describe("loading air quality", () => {
     test("stores the reading", async () => {
       stubGeolocation();
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ summary: { aqiUs: 42 } })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ summary: { aqiUs: 42 } }))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadAirQuality());
@@ -381,7 +438,10 @@ describe("ambient data", () => {
 
     test("reports a geolocation refusal the same way weather does", async () => {
       stubGeolocation({ error: geoError(1) });
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
       const { result } = ambient();
 
       await act(async () => result.current.loadAirQuality());
@@ -416,11 +476,11 @@ describe("ambient data", () => {
   describe("cached readings", () => {
     test("shows a cached weather reading before anything is requested", async () => {
       const cached = { recommendation: { workoutType: "indoor" } };
-      window.localStorage.setItem(
-        WEATHER_KEY,
-        JSON.stringify({ data: cached, updatedAt: 1234 })
+      window.localStorage.setItem(WEATHER_KEY, JSON.stringify({ data: cached, updatedAt: 1234 }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => new Promise(() => {}))
       );
-      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
 
       const { result } = ambient();
 
@@ -431,7 +491,10 @@ describe("ambient data", () => {
     test("shows a cached air quality reading too", async () => {
       const cached = { summary: { aqiUs: 42 } };
       window.localStorage.setItem(AIR_KEY, JSON.stringify({ data: cached, updatedAt: 1234 }));
-      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => new Promise(() => {}))
+      );
 
       const { result } = ambient();
 
@@ -440,7 +503,10 @@ describe("ambient data", () => {
 
     test("ignores an unparseable cached reading", async () => {
       window.localStorage.setItem(WEATHER_KEY, "{not json");
-      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => new Promise(() => {}))
+      );
 
       const { result } = ambient();
 

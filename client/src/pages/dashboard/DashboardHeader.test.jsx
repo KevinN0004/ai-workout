@@ -22,17 +22,10 @@ describe("DashboardHeader", () => {
     const onNavigateSummary = vi.fn();
 
     render(
-      <DashboardHeader
-        {...baseProps}
-        user={null}
-        go={go}
-        onNavigateSummary={onNavigateSummary}
-      />
+      <DashboardHeader {...baseProps} user={null} go={go} onNavigateSummary={onNavigateSummary} />
     );
 
-    expect(
-      screen.getByText("Please sign in to access your dashboard.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Please sign in to access your dashboard.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /login \/ sign up/i }));
     expect(go).toHaveBeenCalledWith("/auth");

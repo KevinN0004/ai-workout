@@ -94,16 +94,22 @@ export default function usePreviewChapterFlow({
       }
 
       [1, 2, 3, 4, 5, 6].forEach((stage, idx) => {
-        const builderStepTimeoutId = window.setTimeout(() => {
-          setPreviewBuilderStage(stage);
-        }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
+        const builderStepTimeoutId = window.setTimeout(
+          () => {
+            setPreviewBuilderStage(stage);
+          },
+          PREVIEW_BUILDER_START_DELAY_MS + idx * PREVIEW_BUILDER_STEP_MS
+        );
         previewFillTimeoutsRef.current.push(builderStepTimeoutId);
       });
 
       if (workoutWeekChapterIndex >= 0) {
-        const weekChapterTimeoutId = window.setTimeout(() => {
-          scrollToChapter(workoutWeekChapterIndex);
-        }, PREVIEW_BUILDER_START_DELAY_MS + (5 * PREVIEW_BUILDER_STEP_MS) + PREVIEW_GENERATING_HOLD_MS);
+        const weekChapterTimeoutId = window.setTimeout(
+          () => {
+            scrollToChapter(workoutWeekChapterIndex);
+          },
+          PREVIEW_BUILDER_START_DELAY_MS + 5 * PREVIEW_BUILDER_STEP_MS + PREVIEW_GENERATING_HOLD_MS
+        );
         previewFillTimeoutsRef.current.push(weekChapterTimeoutId);
       }
       return undefined;
@@ -147,30 +153,33 @@ export default function usePreviewChapterFlow({
       }, PREVIEW_WEEK_OUTLINE_START_MS + PREVIEW_WEEK_OUTLINE_DRAW_MS);
       previewFillTimeoutsRef.current.push(headerTimeoutId);
 
-      const rowTypingTimeoutId = window.setTimeout(() => {
-        setPreviewWeekStage(3);
-        setPreviewWeekHeaderTypingProgress(1);
-        setPreviewWeekTypingProgress(0);
-        const typingStartedAt = Date.now();
-        const typingIntervalId = window.setInterval(() => {
-          const elapsedMs = Date.now() - typingStartedAt;
-          const nextProgress = clamp(elapsedMs / PREVIEW_WEEK_ROW_TYPING_MS, 0, 1);
-          setPreviewWeekTypingProgress(nextProgress);
-          if (nextProgress >= 1) {
-            window.clearInterval(typingIntervalId);
-            setPreviewWeekStage(4);
-            const scanTimeoutId = window.setTimeout(() => {
-              setPreviewWeekStage(5);
-              const breakTimeoutId = window.setTimeout(() => {
-                setPreviewWeekStage(6);
-              }, PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS);
-              previewFillTimeoutsRef.current.push(breakTimeoutId);
-            }, PREVIEW_WEEK_SCAN_DELAY_MS);
-            previewFillTimeoutsRef.current.push(scanTimeoutId);
-          }
-        }, 32);
-        previewFillTimeoutsRef.current.push(typingIntervalId);
-      }, PREVIEW_WEEK_OUTLINE_START_MS + PREVIEW_WEEK_OUTLINE_DRAW_MS + PREVIEW_WEEK_HEADER_REVEAL_MS);
+      const rowTypingTimeoutId = window.setTimeout(
+        () => {
+          setPreviewWeekStage(3);
+          setPreviewWeekHeaderTypingProgress(1);
+          setPreviewWeekTypingProgress(0);
+          const typingStartedAt = Date.now();
+          const typingIntervalId = window.setInterval(() => {
+            const elapsedMs = Date.now() - typingStartedAt;
+            const nextProgress = clamp(elapsedMs / PREVIEW_WEEK_ROW_TYPING_MS, 0, 1);
+            setPreviewWeekTypingProgress(nextProgress);
+            if (nextProgress >= 1) {
+              window.clearInterval(typingIntervalId);
+              setPreviewWeekStage(4);
+              const scanTimeoutId = window.setTimeout(() => {
+                setPreviewWeekStage(5);
+                const breakTimeoutId = window.setTimeout(() => {
+                  setPreviewWeekStage(6);
+                }, PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS);
+                previewFillTimeoutsRef.current.push(breakTimeoutId);
+              }, PREVIEW_WEEK_SCAN_DELAY_MS);
+              previewFillTimeoutsRef.current.push(scanTimeoutId);
+            }
+          }, 32);
+          previewFillTimeoutsRef.current.push(typingIntervalId);
+        },
+        PREVIEW_WEEK_OUTLINE_START_MS + PREVIEW_WEEK_OUTLINE_DRAW_MS + PREVIEW_WEEK_HEADER_REVEAL_MS
+      );
       previewFillTimeoutsRef.current.push(rowTypingTimeoutId);
       return undefined;
     }
@@ -195,9 +204,12 @@ export default function usePreviewChapterFlow({
         (_, index) => index + 1
       );
       dashboardStageSteps.forEach((stage, index) => {
-        const dashboardStepTimeoutId = window.setTimeout(() => {
-          setPreviewDashboardStage(stage);
-        }, PREVIEW_DASHBOARD_STAGE_START_MS + (index * PREVIEW_DASHBOARD_STAGE_STEP_MS));
+        const dashboardStepTimeoutId = window.setTimeout(
+          () => {
+            setPreviewDashboardStage(stage);
+          },
+          PREVIEW_DASHBOARD_STAGE_START_MS + index * PREVIEW_DASHBOARD_STAGE_STEP_MS
+        );
         previewFillTimeoutsRef.current.push(dashboardStepTimeoutId);
       });
       return undefined;
@@ -285,9 +297,8 @@ export default function usePreviewChapterFlow({
         const trainingDays = Array.isArray(personalTargets.trainingDays)
           ? personalTargets.trainingDays
           : [];
-        const revealMs = trainingDays.length > 0
-          ? (trainingDays.length - 1) * PREVIEW_TRAINING_DAY_STEP_MS
-          : 0;
+        const revealMs =
+          trainingDays.length > 0 ? (trainingDays.length - 1) * PREVIEW_TRAINING_DAY_STEP_MS : 0;
         latestCompletionMs = Math.max(latestCompletionMs, fieldStartMs + revealMs);
         return;
       }
@@ -299,7 +310,10 @@ export default function usePreviewChapterFlow({
       }
 
       const typingStepMs = getPreviewTypingStepMs(targetValue.length);
-      latestCompletionMs = Math.max(latestCompletionMs, fieldStartMs + (targetValue.length * typingStepMs));
+      latestCompletionMs = Math.max(
+        latestCompletionMs,
+        fieldStartMs + targetValue.length * typingStepMs
+      );
     });
 
     const collapseTimeoutId = window.setTimeout(() => {
@@ -317,9 +331,12 @@ export default function usePreviewChapterFlow({
         setPreviewPersonalShifted(true);
         setPreviewBuilderStage(0);
         [1, 2, 3, 4, 5, 6].forEach((stage, idx) => {
-          const builderStepTimeoutId = window.setTimeout(() => {
-            setPreviewBuilderStage(stage);
-          }, PREVIEW_BUILDER_START_DELAY_MS + (idx * PREVIEW_BUILDER_STEP_MS));
+          const builderStepTimeoutId = window.setTimeout(
+            () => {
+              setPreviewBuilderStage(stage);
+            },
+            PREVIEW_BUILDER_START_DELAY_MS + idx * PREVIEW_BUILDER_STEP_MS
+          );
           previewFillTimeoutsRef.current.push(builderStepTimeoutId);
         });
       }, PREVIEW_POST_MORPH_SHIFT_DELAY_MS);
@@ -336,11 +353,7 @@ export default function usePreviewChapterFlow({
     // which is visibly wrong. The remaining "missing" deps are setState
     // functions and refs, which are stable and would change nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    activePreviewChapterId,
-    generateChapterIndex,
-    workoutWeekChapterIndex
-  ]);
+  }, [activePreviewChapterId, generateChapterIndex, workoutWeekChapterIndex]);
 
   return { clearPreviewFillTimers };
 }

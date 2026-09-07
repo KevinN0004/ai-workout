@@ -15,11 +15,7 @@ export default function GeneratedPlanModal({
 
   return (
     <ModalPortal open={Boolean(planModalOpen && result)}>
-      <div
-        className="modal-backdrop plan-modal-backdrop"
-        role="dialog"
-        aria-modal="true"
-      >
+      <div className="modal-backdrop plan-modal-backdrop" role="dialog" aria-modal="true">
         <div className="modal plan-modal">
           <div className="modal-header">
             <h2>Your {APP_BRAND_NAME} Plan</h2>
@@ -30,12 +26,7 @@ export default function GeneratedPlanModal({
                 aria-label="Close"
                 onClick={() => setPlanModalOpen(false)}
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                  aria-hidden="true"
-                >
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                   <path
                     d="M6 6l12 12M18 6L6 18"
                     stroke="currentColor"
@@ -69,13 +60,9 @@ export default function GeneratedPlanModal({
                       <h3>{planSections.days[activeDayIndex]?.title}</h3>
                       {planSections.days[activeDayIndex]?.lines?.length ? (
                         <ul>
-                          {planSections.days[activeDayIndex].lines.map(
-                            (line, lineIndex) => (
-                              <li key={`${activeDayIndex}-${lineIndex}-${line}`}>
-                                {line}
-                              </li>
-                            )
-                          )}
+                          {planSections.days[activeDayIndex].lines.map((line, lineIndex) => (
+                            <li key={`${activeDayIndex}-${lineIndex}-${line}`}>{line}</li>
+                          ))}
                         </ul>
                       ) : null}
                     </div>

@@ -59,11 +59,7 @@ export default function HomePersonalStage({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => go("/auth")}
-            >
+            <button type="button" className="ghost" onClick={() => go("/auth")}>
               Login / Sign up
             </button>
           )}
@@ -124,10 +120,7 @@ export default function HomePersonalStage({
                 onClick={() => {
                   setPersonal((prev) => ({
                     ...prev,
-                    heightCm: toCmFromFeetInches(
-                      prev.heightFeet,
-                      prev.heightInches
-                    )
+                    heightCm: toCmFromFeetInches(prev.heightFeet, prev.heightInches)
                   }));
                   setHeightUnit("cm");
                 }}
@@ -236,11 +229,7 @@ export default function HomePersonalStage({
           <div className="advanced-fields-inner">
             <label>
               Activity level
-              <select
-                name="activity"
-                value={personal.activity}
-                onChange={onPersonalChange}
-              >
+              <select name="activity" value={personal.activity} onChange={onPersonalChange}>
                 <option value="">Select</option>
                 <option>Light</option>
                 <option>Moderate</option>
@@ -250,11 +239,7 @@ export default function HomePersonalStage({
             </label>
             <label>
               Sleep
-              <select
-                name="sleep"
-                value={personal.sleep}
-                onChange={onPersonalChange}
-              >
+              <select name="sleep" value={personal.sleep} onChange={onPersonalChange}>
                 <option value="">Select</option>
                 <option>Less than 4</option>
                 <option>4 - 6 hours</option>
@@ -273,11 +258,7 @@ export default function HomePersonalStage({
             </label>
             <label>
               Training experience
-              <select
-                name="experience"
-                value={personal.experience}
-                onChange={onPersonalChange}
-              >
+              <select name="experience" value={personal.experience} onChange={onPersonalChange}>
                 <option value="">Select</option>
                 <option>Beginner</option>
                 <option>Intermediate</option>
@@ -286,11 +267,7 @@ export default function HomePersonalStage({
             </label>
             <label>
               Nutrition preference
-              <select
-                name="nutrition"
-                value={personal.nutrition}
-                onChange={onPersonalChange}
-              >
+              <select name="nutrition" value={personal.nutrition} onChange={onPersonalChange}>
                 <option value="">Select</option>
                 <option>No preference</option>
                 <option>High-protein</option>
@@ -302,11 +279,7 @@ export default function HomePersonalStage({
             </label>
             <label>
               Cardio preference
-              <select
-                name="cardio"
-                value={personal.cardio}
-                onChange={onPersonalChange}
-              >
+              <select name="cardio" value={personal.cardio} onChange={onPersonalChange}>
                 <option value="">Select</option>
                 <option>None</option>
                 <option>Walking</option>
@@ -322,8 +295,8 @@ export default function HomePersonalStage({
               Training days
               <div className="day-toggle-grid">
                 {trainingDayOptions.map((day) => {
-                  const isSelected = Array.isArray(personal.trainingDays) &&
-                    personal.trainingDays.includes(day);
+                  const isSelected =
+                    Array.isArray(personal.trainingDays) && personal.trainingDays.includes(day);
                   return (
                     <button
                       key={day}

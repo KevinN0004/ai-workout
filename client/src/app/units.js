@@ -30,9 +30,10 @@ export const getRegionFromLocale = (locale) => {
 
 export const getPreferredMeasurementSystem = () => {
   if (typeof navigator === "undefined") return "metric";
-  const locales = Array.isArray(navigator.languages) && navigator.languages.length
-    ? navigator.languages
-    : [navigator.language];
+  const locales =
+    Array.isArray(navigator.languages) && navigator.languages.length
+      ? navigator.languages
+      : [navigator.language];
   for (const locale of locales) {
     const region = getRegionFromLocale(locale);
     if (IMPERIAL_REGION_CODES.has(region)) {
@@ -54,8 +55,8 @@ export const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feetNum = Number(feetValue);
   const inchesNum = Number(inchesValue);
   if (Number.isNaN(feetNum) && Number.isNaN(inchesNum)) return "";
-  const totalInches = (Number.isNaN(feetNum) ? 0 : feetNum * 12) +
-    (Number.isNaN(inchesNum) ? 0 : inchesNum);
+  const totalInches =
+    (Number.isNaN(feetNum) ? 0 : feetNum * 12) + (Number.isNaN(inchesNum) ? 0 : inchesNum);
   if (!totalInches) return "";
   return String(Math.round(totalInches * 2.54));
 };

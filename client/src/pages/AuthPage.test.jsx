@@ -89,9 +89,7 @@ describe("AuthPage", () => {
       />
     );
 
-    expect(
-      screen.getByText(/create your account and complete your profile/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/create your account and complete your profile/i)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "cm" }));

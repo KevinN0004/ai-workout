@@ -1,8 +1,5 @@
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
-import {
-  getLocalDateKey,
-  splitFullName
-} from "./units";
+import { getLocalDateKey, splitFullName } from "./units";
 
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -108,9 +105,7 @@ export const createAppEventHandlers = ({
       setResult(data.plan);
       if (data.savedPlan) {
         setDashboard((prev) =>
-          prev
-            ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] }
-            : prev
+          prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev
         );
       }
       closePlanner();
@@ -132,19 +127,19 @@ export const createAppEventHandlers = ({
   const openSignupWithPrefilledProfile = () => {
     const { firstName, lastName } = splitFullName(personal.name);
     const fallbackHeightCm = String(personal.heightCm || "").trim();
-    const computedHeightCm = heightUnit === "ft"
-      ? (toCmFromFeetInches(personal.heightFeet, personal.heightInches) || fallbackHeightCm)
-      : fallbackHeightCm;
-    const computedHeightSplit = heightUnit === "ft"
-      ? {
-          feet: String(personal.heightFeet || "").trim(),
-          inches: String(personal.heightInches || "").trim()
-        }
-      : toFeetInchesFromCm(computedHeightCm);
+    const computedHeightCm =
+      heightUnit === "ft"
+        ? toCmFromFeetInches(personal.heightFeet, personal.heightInches) || fallbackHeightCm
+        : fallbackHeightCm;
+    const computedHeightSplit =
+      heightUnit === "ft"
+        ? {
+            feet: String(personal.heightFeet || "").trim(),
+            inches: String(personal.heightInches || "").trim()
+          }
+        : toFeetInchesFromCm(computedHeightCm);
     const normalizedWeight = String(personal.weight || "").trim();
-    const computedWeightKg = weightUnit === "lb"
-      ? toKg(normalizedWeight, "lb")
-      : normalizedWeight;
+    const computedWeightKg = weightUnit === "lb" ? toKg(normalizedWeight, "lb") : normalizedWeight;
 
     setAuthForm({ ...defaultAuthForm });
     setAuthMode("signup");
@@ -213,10 +208,7 @@ export const createAppEventHandlers = ({
           ...signupProfileForm,
           heightCm:
             signupHeightUnit === "ft"
-              ? toCmFromFeetInches(
-                  signupProfileForm.heightFeet,
-                  signupProfileForm.heightInches
-                )
+              ? toCmFromFeetInches(signupProfileForm.heightFeet, signupProfileForm.heightInches)
               : signupProfileForm.heightCm,
           weightKg:
             signupWeightUnit === "lb"

@@ -37,8 +37,7 @@ const baseProps = {
   onOpenPlans: noop
 };
 
-const renderView = (overrides = {}) =>
-  render(<SummaryView {...baseProps} {...overrides} />);
+const renderView = (overrides = {}) => render(<SummaryView {...baseProps} {...overrides} />);
 
 describe("SummaryView", () => {
   describe("robustness", () => {
@@ -65,9 +64,7 @@ describe("SummaryView", () => {
     });
 
     test("renders when form fields are not arrays", () => {
-      expect(() =>
-        renderView({ form: { equipment: "barbell", focuses: null } })
-      ).not.toThrow();
+      expect(() => renderView({ form: { equipment: "barbell", focuses: null } })).not.toThrow();
     });
   });
 
@@ -124,12 +121,8 @@ describe("SummaryView", () => {
     });
 
     test("labels the weather refresh control differently while retrying", () => {
-      const { container: idle } = render(
-        <SummaryView {...baseProps} weatherLoading={false} />
-      );
-      const { container: busy } = render(
-        <SummaryView {...baseProps} weatherLoading={true} />
-      );
+      const { container: idle } = render(<SummaryView {...baseProps} weatherLoading={false} />);
+      const { container: busy } = render(<SummaryView {...baseProps} weatherLoading={true} />);
 
       const idleLabel = idle.querySelector('[aria-label*="weather" i]')?.getAttribute("aria-label");
       const busyLabel = busy.querySelector('[aria-label*="weather" i]')?.getAttribute("aria-label");

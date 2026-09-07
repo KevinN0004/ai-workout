@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
-import {
-  buildGenerationEquipmentContext,
-  registerGenerateRoutes
-} from "./generateRoutes.js";
+import { buildGenerationEquipmentContext, registerGenerateRoutes } from "./generateRoutes.js";
 import { generatePlanBodySchema, validateBody } from "../services/apiSchemaService.js";
 import {
   cleanText,
@@ -409,9 +406,7 @@ describe("POST /api/generate", () => {
     // The upstream message can name the model, the project and the key state,
     // so it is masked like any other 5xx.
     test("masks the upstream error", async () => {
-      generateContent.mockRejectedValue(
-        new Error("API key not valid for project ai-workout-42")
-      );
+      generateContent.mockRejectedValue(new Error("API key not valid for project ai-workout-42"));
 
       const response = await post(buildApp());
 

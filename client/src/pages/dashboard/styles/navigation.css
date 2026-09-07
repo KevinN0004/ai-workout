@@ -83,7 +83,10 @@
   font-weight: 600;
   width: 100%;
   font-size: 16px;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .drawer .ghost {
@@ -205,4 +208,3 @@
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
   }
 }
-

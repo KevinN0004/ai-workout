@@ -6,7 +6,9 @@ import {
 } from "./constants";
 
 export const normalizePreviewTrainingDay = (dayValue) => {
-  const normalizedKey = String(dayValue ?? "").trim().toLowerCase();
+  const normalizedKey = String(dayValue ?? "")
+    .trim()
+    .toLowerCase();
   if (!normalizedKey) return "";
   return PREVIEW_WEEK_DAY_NORMALIZATION[normalizedKey] || "";
 };
@@ -38,7 +40,7 @@ export const getPreviewTypingStepMs = (textLength) =>
     Math.min(PREVIEW_TYPING_MAX_MS, Math.round(560 / Math.max(Number(textLength) || 1, 1)))
   );
 
-export const randomBetween = (min, max) => min + (Math.random() * (max - min));
+export const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 export const buildPreviewLinePath = (values, width = 260, height = 110, padding = 10) => {
   const safeValues = values.length ? values : [0];
@@ -50,7 +52,7 @@ export const buildPreviewLinePath = (values, width = 260, height = 110, padding 
   return safeValues
     .map((value, index) => {
       const x = padding + stepX * index;
-      const y = height - padding - (((value - min) / range) * (height - padding * 2));
+      const y = height - padding - ((value - min) / range) * (height - padding * 2);
       return `${index === 0 ? "M" : "L"}${x},${y}`;
     })
     .join(" ");

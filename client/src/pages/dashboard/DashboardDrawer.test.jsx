@@ -21,9 +21,7 @@ describe("DashboardDrawer", () => {
       />
     );
 
-    expect(
-      screen.queryByRole("heading", { name: /dashboard menu/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /dashboard menu/i })).not.toBeInTheDocument();
   });
 
   test("renders nav buttons, keeps settings in footer, and triggers callbacks", async () => {

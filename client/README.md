@@ -100,7 +100,7 @@ Tests use Vitest, jsdom, and Testing Library. The setup file is `src/test/setup.
 **Mocking a module the app constructs with `new`.** `app/events.test.js` mocks `jspdf`,
 which `events.js` loads on demand and calls as `new jsPDF(...)`. `vi.fn()` returns an
 arrow function, and arrows are not constructable — so a factory of the shape
-`vi.mock("jspdf", () => ({ jsPDF: vi.fn(...) }))` throws *"is not a constructor"* before
+`vi.mock("jspdf", () => ({ jsPDF: vi.fn(...) }))` throws _"is not a constructor"_ before
 the spy is ever reached. What you see is the spy reporting **zero calls**, which reads
 exactly like the mock not being applied. Export a function expression that delegates to
 the spy instead:

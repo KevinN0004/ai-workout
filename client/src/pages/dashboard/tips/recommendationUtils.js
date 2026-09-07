@@ -156,8 +156,8 @@ export const scoreExercise = (exercise, context) => {
     const equipmentMatch = context.equipmentKeywords.some((keyword) =>
       equipmentNames.some((name) => name.includes(keyword))
     );
-    const bodyweightFriendly = equipmentNames.some((name) =>
-      name.includes("bodyweight") || name.includes("none (bodyweight")
+    const bodyweightFriendly = equipmentNames.some(
+      (name) => name.includes("bodyweight") || name.includes("none (bodyweight")
     );
     if (equipmentMatch) {
       score += 3;
@@ -223,19 +223,19 @@ export const buildGuideCards = ({
     weeklyWorkouts >= 5
       ? "Use a 5-day split: push, pull, legs, upper, lower with 1-2 recovery days."
       : weeklyWorkouts === 4
-      ? "Use an upper/lower split with one conditioning day and one full recovery day."
-      : weeklyWorkouts <= 2
-      ? "Use full-body sessions each workout day and keep a mobility block on off days."
-      : "Use push/pull/legs or full-body rotation based on available days.";
+        ? "Use an upper/lower split with one conditioning day and one full recovery day."
+        : weeklyWorkouts <= 2
+          ? "Use full-body sessions each workout day and keep a mobility block on off days."
+          : "Use push/pull/legs or full-body rotation based on available days.";
 
   const intensityText =
     track === "fat_loss"
       ? "Keep compounds at 6-10 reps and add short finishers; keep 1-2 reps in reserve."
       : track === "endurance"
-      ? "Prioritize sustainable pacing and controlled intervals before adding load."
-      : track === "recovery"
-      ? "Use submax loads, slower eccentrics, and higher movement quality focus."
-      : "Progress top sets gradually and add load only after clean reps across all sets.";
+        ? "Prioritize sustainable pacing and controlled intervals before adding load."
+        : track === "recovery"
+          ? "Use submax loads, slower eccentrics, and higher movement quality focus."
+          : "Progress top sets gradually and add load only after clean reps across all sets.";
 
   const volumeText =
     activity === "Very high" || activity === "High"
@@ -246,8 +246,8 @@ export const buildGuideCards = ({
     weatherMode === "outdoor"
       ? "Weather favors outdoor work: place cardio blocks before sunset and hydrate early."
       : weatherMode === "indoor"
-      ? "Weather favors indoor work: bias strength circuits, machines, and controlled conditioning."
-      : "Weather mode unavailable: default to your planned split and adjust by RPE.";
+        ? "Weather favors indoor work: bias strength circuits, machines, and controlled conditioning."
+        : "Weather mode unavailable: default to your planned split and adjust by RPE.";
 
   const injuryGuidance = normalizeText(injuryText)
     ? "Injury note detected: use controlled tempo, pain-free ranges, and swap high-risk patterns."

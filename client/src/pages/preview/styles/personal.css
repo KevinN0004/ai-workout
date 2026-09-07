@@ -17,10 +17,10 @@
   isolation: isolate;
   clip-path: inset(
     var(--personal-collapse-inset-top)
-    calc(var(--personal-collapse-inset-x) + var(--personal-collapse-shift-x))
-    var(--personal-collapse-inset-bottom)
-    calc(var(--personal-collapse-inset-x) - var(--personal-collapse-shift-x))
-    round var(--personal-collapse-radius)
+      calc(var(--personal-collapse-inset-x) + var(--personal-collapse-shift-x))
+      var(--personal-collapse-inset-bottom)
+      calc(var(--personal-collapse-inset-x) - var(--personal-collapse-shift-x)) round
+      var(--personal-collapse-radius)
   );
   transition:
     min-height var(--personal-morph-duration) var(--personal-morph-ease),
@@ -36,13 +36,12 @@
   --preview-builder-pill-height: 46px;
   --preview-builder-plus-size: var(--preview-builder-pill-height);
   --preview-shift-two-col: calc(
-    ((var(--preview-builder-pill-width) + var(--preview-builder-plus-size)) / 2)
-    + var(--preview-builder-gap)
+    ((var(--preview-builder-pill-width) + var(--preview-builder-plus-size)) / 2) +
+      var(--preview-builder-gap)
   );
   --preview-shift-three-col: calc(
-    var(--preview-builder-pill-width)
-    + var(--preview-builder-plus-size)
-    + (var(--preview-builder-gap) * 2)
+    var(--preview-builder-pill-width) + var(--preview-builder-plus-size) +
+      (var(--preview-builder-gap) * 2)
   );
   position: relative;
   display: grid;
@@ -215,8 +214,12 @@
 
 /* In Generate stage 0, render pill + label immediately (no background catch-up slide). */
 .preview-personal-sequence.is-generate-view.builder-stage-0 .preview-personal-form-shell,
-.preview-personal-sequence.is-generate-view.builder-stage-0 .preview-personal-form-shell .preview-personal-morph-surface,
-.preview-personal-sequence.is-generate-view.builder-stage-0 .preview-personal-form-shell .preview-personal-morph-label {
+.preview-personal-sequence.is-generate-view.builder-stage-0
+  .preview-personal-form-shell
+  .preview-personal-morph-surface,
+.preview-personal-sequence.is-generate-view.builder-stage-0
+  .preview-personal-form-shell
+  .preview-personal-morph-label {
   transition-duration: 0ms;
   transition-delay: 0ms;
 }
@@ -321,12 +324,14 @@
 
 .preview-personal-sequence.builder-stage-3 .preview-builder-plus.plus-one.is-visible {
   --preview-shift-x: var(--preview-shift-two-col);
-  animation: preview-builder-shift-left var(--preview-motion-duration) var(--preview-motion-ease) both;
+  animation: preview-builder-shift-left var(--preview-motion-duration) var(--preview-motion-ease)
+    both;
 }
 
 .preview-personal-sequence.builder-stage-3 .preview-builder-slot.env.is-visible {
   --preview-shift-x: var(--preview-shift-two-col);
-  animation: preview-builder-shift-left var(--preview-motion-duration) var(--preview-motion-ease) both;
+  animation: preview-builder-shift-left var(--preview-motion-duration) var(--preview-motion-ease)
+    both;
 }
 
 .preview-personal-sequence.builder-stage-5 .preview-builder-plus.plus-one.is-visible {
@@ -353,8 +358,12 @@
   transform: translate3d(calc(var(--preview-shift-three-col) * -1), 0, 0);
 }
 
-.preview-personal-sequence.builder-stage-6 .preview-personal-form-shell.is-collapsed .preview-personal-morph-surface,
-.preview-personal-sequence.builder-stage-6 .preview-personal-form-shell.is-collapsed .preview-personal-morph-label {
+.preview-personal-sequence.builder-stage-6
+  .preview-personal-form-shell.is-collapsed
+  .preview-personal-morph-surface,
+.preview-personal-sequence.builder-stage-6
+  .preview-personal-form-shell.is-collapsed
+  .preview-personal-morph-label {
   opacity: 0;
   transition-delay: 0ms;
 }
@@ -504,4 +513,3 @@
     transform: rotate(360deg);
   }
 }
-

@@ -866,10 +866,7 @@ describe("onSubmit", () => {
       await build().onSubmit(submitEvent());
 
       const updater = deps.setDashboard.mock.calls[0][0];
-      expect(updater({ plans: [{ id: "p-old" }] }).plans).toEqual([
-        savedPlan,
-        { id: "p-old" }
-      ]);
+      expect(updater({ plans: [{ id: "p-old" }] }).plans).toEqual([savedPlan, { id: "p-old" }]);
     });
 
     test("becomes the only plan when there were none", async () => {
@@ -931,9 +928,7 @@ describe("onSubmit", () => {
 
   describe("when generation fails", () => {
     test("surfaces the server's message", async () => {
-      deps.apiFetch.mockResolvedValue(
-        jsonResponse({ error: "The model is overloaded." }, false)
-      );
+      deps.apiFetch.mockResolvedValue(jsonResponse({ error: "The model is overloaded." }, false));
 
       await build().onSubmit(submitEvent());
 
@@ -1074,8 +1069,11 @@ describe("openSignupWithPrefilledProfile", () => {
   });
 
   test("converts an imperial height and weight for the signup form", () => {
-    build({ personal: personal(), heightUnit: "ft", weightUnit: "lb" })
-      .openSignupWithPrefilledProfile();
+    build({
+      personal: personal(),
+      heightUnit: "ft",
+      weightUnit: "lb"
+    }).openSignupWithPrefilledProfile();
 
     expect(profile()).toMatchObject({ heightCm: "178", weightKg: "76" });
     expect(deps.setSignupHeightUnit).toHaveBeenCalledWith("ft");

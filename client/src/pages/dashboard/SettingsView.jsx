@@ -19,9 +19,10 @@ const getRegionFromLocale = (locale) => {
 
 const getPreferredMeasurementSystem = () => {
   if (typeof navigator === "undefined") return "metric";
-  const locales = Array.isArray(navigator.languages) && navigator.languages.length
-    ? navigator.languages
-    : [navigator.language];
+  const locales =
+    Array.isArray(navigator.languages) && navigator.languages.length
+      ? navigator.languages
+      : [navigator.language];
   for (const locale of locales) {
     const region = getRegionFromLocale(locale);
     if (IMPERIAL_REGION_CODES.has(region)) {

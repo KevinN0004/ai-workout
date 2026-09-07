@@ -256,8 +256,7 @@ export default function TipsView({
   const openExerciseModal = (payload) => {
     setSelectedExercise(payload);
   };
-  const showExerciseFilters =
-    activeGuideSection === "smart" || activeGuideSection === "library";
+  const showExerciseFilters = activeGuideSection === "smart" || activeGuideSection === "library";
 
   return (
     <section className="panel tips-view">
@@ -468,11 +467,8 @@ export default function TipsView({
         onClose={() => setSelectedExercise(null)}
         onSave={saveExercise}
         isSaved={Boolean(selectedExercise && isSaved(selectedExercise))}
-        isSaving={Boolean(
-          selectedExercise && savingIds[toExerciseKey(selectedExercise)]
-        )}
+        isSaving={Boolean(selectedExercise && savingIds[toExerciseKey(selectedExercise)])}
       />
     </section>
   );
 }
-
