@@ -6,6 +6,9 @@
     "client",
     "server"
   ],
+  "overrides": {
+    "qs": "^6.16.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
     "dev:client": "npm run dev -w client",
