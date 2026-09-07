@@ -23,7 +23,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ## Prerequisites
 
-- Node.js 20 or newer is recommended
+- Node.js `^22.13 || >=24` (see `.nvmrc`; development is on Node 24)
 - npm
 - Postgres running locally, or use the workspace-owned local Postgres helper
 - Optional: Redis for persistent sessions across server restarts
