@@ -263,10 +263,17 @@ not in the repo.** Regenerate the scaffolding after cloning:
 ```bash
 npx ruflo@latest init                 # regenerate .claude/agents|commands|helpers|skills
 git config core.hooksPath .githooks   # activate the repo's pre-commit guard
+git config blame.ignoreRevsFile .git-blame-ignore-revs   # skip the Prettier reformat in blame
 ```
 
 The second line is required: `core.hooksPath` lives in `.git/config`, which is not part of
 the repository, so a clone does not run `.githooks/pre-commit` until it is set.
+
+The third line is the same class of gotcha. `.git-blame-ignore-revs` lists the commit that
+reformatted the repository with Prettier, but `blame.ignoreRevsFile` — the setting that
+tells local git to actually skip it — lives in `.git/config`, not the repository, so a
+fresh clone will silently attribute ~3,500 lines to the reformat commit until this is set.
+GitHub honours the file automatically on its blame views; local `git blame` does not.
 
 Then confirm the wiring actually fires. A missing or broken hook here fails **silently** —
 it will not announce itself, so check exit codes directly rather than assuming:

@@ -1,0 +1,9 @@
+# Revisions listed here are skipped by `git blame`.
+#
+# This file is NOT automatically honoured by local git. Enable it once per
+# clone with:
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies it automatically with no configuration.
+
+# style: format the repository with Prettier (2026-09-06)
+86621a37696ec70dd12b944fae5df4f75e41a078
