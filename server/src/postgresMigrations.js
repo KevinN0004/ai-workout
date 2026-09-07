@@ -1,10 +1,10 @@
 import nodeFs from "fs/promises";
 import path from "path";
 
-// Progress lines go to stderr so stdout stays free for command output. Callers
-// that want them elsewhere -- the tests do -- inject `log`.
-const logToStderr = (message) => {
-  process.stderr.write(`${message}\n`);
+// Matches what console.log did before no-console landed. Callers that want
+// the progress lines elsewhere -- the tests do -- inject `log`.
+const logToStdout = (message) => {
+  process.stdout.write(`${message}\n`);
 };
 
 /**
@@ -16,7 +16,7 @@ const logToStderr = (message) => {
 export const applyMigrations = async ({
   pool,
   migrationsDir,
-  log = logToStderr,
+  log = logToStdout,
   fs = nodeFs
 }) => {
   await pool.query(`
