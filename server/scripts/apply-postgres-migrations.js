@@ -21,7 +21,7 @@ const run = async () => {
 
 run()
   .catch((err) => {
-    console.error("[postgres:migrate] failed:", err);
+    process.stderr.write(`[postgres:migrate] failed: ${err?.stack ?? err}\n`);
     process.exitCode = 1;
   })
   .finally(async () => {

@@ -1,6 +1,12 @@
 import nodeFs from "fs/promises";
 import path from "path";
 
+// Progress lines go to stderr so stdout stays free for command output. Callers
+// that want them elsewhere -- the tests do -- inject `log`.
+const logToStderr = (message) => {
+  process.stderr.write(`${message}\n`);
+};
+
 /**
  * Applies every unapplied .sql file in `migrationsDir`, in filename order.
  *
@@ -10,7 +16,7 @@ import path from "path";
 export const applyMigrations = async ({
   pool,
   migrationsDir,
-  log = console.log,
+  log = logToStderr,
   fs = nodeFs
 }) => {
   await pool.query(`
