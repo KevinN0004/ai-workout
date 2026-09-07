@@ -274,7 +274,7 @@ it will not announce itself, so check exit codes directly rather than assuming:
 ```bash
 node .claude/helpers/hook-handler.cjs status   # expect exit 0
 node scripts/codex-handoff.mjs --hook          # expect exit 0
-node scripts/scrub-junk-files.js --dry-run     # expect exit 0
+node scripts/scrub-junk-files.cjs --dry-run    # expect exit 0
 echo '{"prompt":"fix a bug"}' | node scripts/skill-router.mjs
 ```
 

@@ -93,7 +93,7 @@ export default [
     }
   },
   {
-    files: ["scripts/**/*.js"],
+    files: ["scripts/**/*.cjs"],
     languageOptions: { sourceType: "commonjs" }
   }
 ];

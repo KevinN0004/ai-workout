@@ -2,7 +2,7 @@
 'use strict';
 
 /*
- * scrub-junk-files.js
+ * scrub-junk-files.cjs
  *
  * Removes stray 0-byte "junk" files that a background tooling process occasionally
  * spawns in the working tree (names that are shell/code fragments, e.g.

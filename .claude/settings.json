@@ -209,7 +209,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.js\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.cjs\"",
             "timeout": 5000
           }
         ]
@@ -242,7 +242,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.js\"",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/scrub-junk-files.cjs\"",
             "timeout": 5000
           }
         ]
