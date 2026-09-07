@@ -238,8 +238,19 @@ Three commits, deliberately separated:
 local git does not. This goes in CLAUDE.md's "Fresh Clone Setup" alongside the existing
 `core.hooksPath` note — it is the same class of silent-failure gotcha.
 
-`eslint-config-prettier` is close to a no-op today (the config carries no stylistic rules beyond what
-`js.configs.recommended` implies), but it prevents a future rule from fighting the formatter.
+`eslint-config-prettier` is **not** the no-op an earlier draft of this spec claimed. It disables
+`no-unexpected-multiline`, which `js.configs.recommended` sets to `error` and which is a **defect**
+rule (ASI hazards), not a style rule — precisely the class this config exists to catch. Verified with
+a stdin probe: with the compat entry applied the rule is silent on code that otherwise reports
+`Unexpected newline between function and ( of function call`.
+
+That trade is normally sound, because Prettier's output makes the rule unreachable. It is not sound
+*here* until the reformat lands, so the config re-enables `no-unexpected-multiline` in a final entry
+after `prettierCompat` — and keeps it on permanently, since after the reformat it simply never fires
+and still guards anything Prettier does not reach.
+
+The rest of `eslint-config-prettier` does earn its place: it stops a future stylistic rule from
+fighting the formatter.
 
 ### 3. ESLint expansion — still defect-scoped
 
