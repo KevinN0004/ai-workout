@@ -68,6 +68,31 @@ describe("checkAdvisoryReviews", () => {
     expect(errors[0]).toContain("expected YYYY-MM-DD");
   });
 
+  // Date.parse("2026-13-45T00:00:00Z") is NaN, and NaN < anything is false, so
+  // a shape-only check let an impossible date skip the expiry comparison
+  // entirely. The realistic trigger is a typo: 12 -> 13 when extending a review.
+  test("fails closed on a well-formed but impossible date", () => {
+    const errors = checkAdvisoryReviews({
+      allowlist: ["GHSA-aaaa-bbbb-cccc"],
+      reviews: [review({ reviewBy: "2026-13-45" })],
+      today: "2026-09-07"
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("expected YYYY-MM-DD");
+  });
+
+  // Quieter variant: V8 rolls "2026-02-30" over to 2026-03-02 rather than
+  // returning NaN, which would move the deadline silently instead of erroring.
+  test("fails closed on a date that rolls over into the next month", () => {
+    const errors = checkAdvisoryReviews({
+      allowlist: ["GHSA-aaaa-bbbb-cccc"],
+      reviews: [review({ reviewBy: "2026-02-30" })],
+      today: "2026-09-07"
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("expected YYYY-MM-DD");
+  });
+
   test("fails when a review has no reason", () => {
     const errors = checkAdvisoryReviews({
       allowlist: ["GHSA-aaaa-bbbb-cccc"],
@@ -86,6 +111,26 @@ describe("checkAdvisoryReviews", () => {
     });
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("not allowlisted");
+  });
+
+  test("fails when the same advisory is reviewed twice", () => {
+    const errors = checkAdvisoryReviews({
+      allowlist: ["GHSA-aaaa-bbbb-cccc"],
+      reviews: [review(), review()],
+      today: "2026-09-07"
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("Duplicate review entry");
+  });
+
+  test("fails when a review entry has no advisory id", () => {
+    const errors = checkAdvisoryReviews({
+      allowlist: [],
+      reviews: [review({ advisory: undefined })],
+      today: "2026-09-07"
+    });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('non-empty "advisory" id');
   });
 
   test("reports every problem at once rather than stopping at the first", () => {
