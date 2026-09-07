@@ -124,14 +124,28 @@ a property the codebase already has (pino is the server logger).
 
 ### 8. `engines: ">=20"` is wrong
 
-| Package    | Required Node                        |
-| ---------- | ------------------------------------ |
-| `vite@7`   | `^20.19.0 \|\| >=22.12.0`            |
-| `prisma@7` | `^20.19 \|\| ^22.12 \|\| >=24.0`     |
-| `vitest@4` | `^20.0.0 \|\| ^22.0.0 \|\| >=24.0.0` |
+| Package                 | Required Node                          |
+| ----------------------- | -------------------------------------- |
+| `vite@7`                | `^20.19.0 \|\| >=22.12.0`              |
+| `prisma@7`              | `^20.19 \|\| ^22.12 \|\| >=24.0`       |
+| `vitest@4`              | `^20.0.0 \|\| ^22.0.0 \|\| >=24.0.0`   |
+| `concurrently@10`       | `>=22`                                 |
+| `@prisma/streams-local` | `>=22.0.0`                             |
+| `@napi-rs/wasm-runtime` | `^20.19.0 \|\| ^22.13.0 \|\| >=23.5.0` |
 
-The current `>=20` permits Node 20.0–20.18, which Vite and Prisma both reject. Correct floor:
-`^20.19 || ^22.12 || >=24`. Note Vitest excludes odd-numbered Node 23.
+The current `>=20` permits Node 20.0–20.18, which Vite and Prisma reject. But the direct dependencies
+are not the binding constraint — the last three rows are, and they come from one devDependency and
+two transitives. So the floor is not `^20.19 || ^22.12 || >=24` either; that was a second wrong answer. Sweeping every `engines` field in the lockfile gives the real one:
+
+| Node              | Packages rejecting                                                |
+| ----------------- | ----------------------------------------------------------------- |
+| 20.19             | **2** — `concurrently` (`>=22`), `@prisma/streams-local` (`>=22`) |
+| 22.12             | 1 — `@napi-rs/wasm-runtime` (`^22.13`, optional + dev only)       |
+| **22.13 / 22.20** | **0**                                                             |
+| 23.5              | 4 — `@prisma/client`, `@prisma/studio-core`, `prisma`, `vitest`   |
+| **24.14.1**       | **0**                                                             |
+
+**Node 20.19 is not supportable**, because `concurrently` is a root devDependency requiring `>=22` and it powers `npm run dev`. Correct range: **`^22.13 || >=24`**, with a CI matrix of 22 and 24. A useful consequence: `engine-strict=true` stops being speculative, since zero packages reject either matrix version.
 
 ### 9. Every candidate ESLint rule measures zero — but `import-x` needs resolver config
 
@@ -288,22 +302,22 @@ Also:
 
 Three jobs replacing today's single serial `test-and-build`:
 
-| Job       | Postgres | Contents                                                                                  |
-| --------- | -------- | ----------------------------------------------------------------------------------------- |
-| `quality` | no       | `eslint .` · `prettier --check` · `audit-ci`                                              |
-| `test`    | yes      | Matrix Node **20.19** and **24**; prisma generate → migrate → client tests → server tests |
-| `build`   | no       | Client build                                                                              |
+| Job       | Postgres | Contents                                                                               |
+| --------- | -------- | -------------------------------------------------------------------------------------- |
+| `quality` | no       | `eslint .` · `prettier --check` · `audit-ci`                                           |
+| `test`    | yes      | Matrix Node **22** and **24**; prisma generate → migrate → client tests → server tests |
+| `build`   | no       | Client build                                                                           |
 
 - `quality` needs no database and fails in well under a minute, so a lint typo no longer waits behind
   a Postgres spin-up.
 - `concurrency` group cancels superseded runs on force-push.
 - Least-privilege `permissions:` block for `GITHUB_TOKEN`.
-- `.nvmrc` = **24** (the version actually developed on), `engines` = `^20.19 || ^22.12 || >=24` (the
+- `.nvmrc` = **24** (the version actually developed on), `engines` = `^22.13 || >=24` (the
   supported floor), CI matrix covers both ends.
 - `.npmrc` with `engine-strict=true` is **attempted, not assumed**. It turns `engines` from advisory
   metadata into an install-time gate, which is the stronger practice — but npm applies it to every
   package in the tree, so one transitive dependency with a careless `engines` field can break
-  installs. Keep it only if `npm ci` succeeds on both 20.19 and 24; drop it otherwise and note why.
+  installs. Measured to be safe for this range: zero packages reject 22.13, 22.20, or 24.14.1. Keep it only if `npm ci` succeeds on both matrix versions; drop it otherwise and note why.
 
 **Cost, stated plainly:** 4 `npm ci` runs versus 1 today, and Postgres spun up twice. Accepted in
 exchange for fast-failing quality checks and real Node-version coverage.
@@ -417,4 +431,4 @@ On completion, all of the following must hold:
 - `docker compose up -d` followed by `npm -w server run migrate:postgres` yields a working dev
   database
 - Starting the server with `DATABASE_URL` unset produces a single readable error listing all problems
-- CI: `quality`, `test` (Node 20.19 and 24), and `build` all green
+- CI: `quality`, `test` (Node 22 and 24), and `build` all green

@@ -6,7 +6,7 @@
 
 **Architecture:** Six independent PRs, sequenced so each lands on a green tree. Configuration changes are verified by running the tool and checking the exit code. The two pieces carrying real logic — the audit-allowlist expiry checker and the environment validator — are pure functions built test-first and unit-tested without filesystem or network.
 
-**Tech Stack:** Node 20.19+/24 (ESM), npm workspaces, ESLint 9 flat config, Prettier 3, Vitest 4, `audit-ci`, Docker Compose, GitHub Actions.
+**Tech Stack:** Node 22.13+/24 (ESM), npm workspaces, ESLint 9 flat config, Prettier 3, Vitest 4, `audit-ci`, Docker Compose, GitHub Actions.
 
 **Design spec:** [`docs/superpowers/specs/2026-09-06-foundation-hardening-design.md`](../specs/2026-09-06-foundation-hardening-design.md)
 
@@ -654,7 +654,17 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ### Task 7: Align the Node version across `engines`, `.nvmrc`, and CI
 
-`engines: ">=20"` is wrong: it permits Node 20.0–20.18, which both Vite 7 (`^20.19.0 || >=22.12.0`) and Prisma 7 (`^20.19 || ^22.12 || >=24.0`) reject. Vitest additionally excludes odd-numbered Node 23.
+`engines: ">=20"` is wrong, and an earlier draft of this plan replaced it with a range that was also wrong. Measured by sweeping every `engines` field in the lockfile, rather than reading the direct dependencies:
+
+| Node              | Packages rejecting                                                |
+| ----------------- | ----------------------------------------------------------------- |
+| 20.19             | **2** — `concurrently` (`>=22`), `@prisma/streams-local` (`>=22`) |
+| 22.12             | 1 — `@napi-rs/wasm-runtime` (`^22.13`, optional + dev only)       |
+| **22.13 / 22.20** | **0**                                                             |
+| 23.5              | 4 — `@prisma/client`, `@prisma/studio-core`, `prisma`, `vitest`   |
+| **24.14.1**       | **0**                                                             |
+
+**Node 20.19 is not supportable.** `concurrently` is a root devDependency and it powers `npm run dev`, the project's primary documented command, so claiming 20.19 support would be false. Node 23 is excluded by Prisma and Vitest alike. The honest range is **`^22.13 || >=24`**.
 
 **Files:**
 
@@ -666,7 +676,7 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ```json
 "engines": {
-  "node": "^20.19 || ^22.12 || >=24"
+  "node": "^22.13 || >=24"
 }
 ```
 
@@ -687,11 +697,13 @@ engine-strict=true
 
 - [ ] **Step 4: Verify `engine-strict` does not break installs**
 
-npm applies `engine-strict` to **every package in the tree**, so one transitive dependency with a careless `engines` field breaks `npm ci`.
+npm applies `engine-strict` to **every package in the tree**, so one transitive dependency with a careless `engines` field breaks `npm ci`. With the corrected `^22.13 || >=24` range this should now succeed: **zero** packages reject 22.13, 22.20, or 24.14.1.
+
+**Do not run `npm ci` in the working repository to test this.** It deletes `node_modules`, and on this Windows checkout it has already failed once with `EPERM` unlinking `argon2`'s native prebuild, leaving the tree half-removed and needing a `prisma generate` to recover. Test in a throwaway copy instead: copy the three `package.json` files plus `package-lock.json` into a scratch directory and run `npm ci --ignore-scripts` there.
 
 ```bash
-rm -rf node_modules
-npm ci ; echo "EXIT=$?"
+# In a SCRATCH COPY, never the working repo -- see the warning above.
+npm ci --ignore-scripts ; echo "EXIT=$?"
 ```
 
 Expected: `EXIT=0`. **If it fails**, delete `.npmrc`, record the offending package in the commit message, and continue — `engines` plus the CI matrix remain the enforcement. Do not weaken `engines` to satisfy a transitive dependency.
@@ -711,9 +723,11 @@ git add package.json client/package.json server/package.json .nvmrc .npmrc
 git commit -m "build: correct the Node engines range and pin the dev version
 
 engines said >=20, which permits 20.0-20.18 -- versions Vite 7
-(^20.19.0 || >=22.12.0) and Prisma 7 (^20.19 || ^22.12 || >=24.0) both
-reject. Vitest also excludes odd-numbered 23, so the honest range is
-^20.19 || ^22.12 || >=24.
+Measured against the lockfile: 20.19 is rejected by concurrently (>=22)
+and @prisma/streams-local (>=22), and concurrently powers `npm run dev`,
+so 20.19 was never supportable. 23 is rejected by prisma and vitest.
+22.12 is rejected by @napi-rs/wasm-runtime (^22.13). Zero packages
+reject 22.13, 22.20 or 24.14, so the honest range is ^22.13 || >=24.
 
 .nvmrc pins 24, the version actually developed on, while engines
 describes the supported floor and CI exercises both ends.
@@ -1179,7 +1193,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ["20.19", "24"]
+        node: ["22", "24"]
 
     services:
       postgres:
@@ -1277,7 +1291,7 @@ The single serial job meant a 30-second lint error waited behind a
 Postgres spin-up, and lint was never actually run in CI at all despite
 the linter existing. quality now needs no database and fails fast.
 
-test gains a Node 20.19 + 24 matrix, closing the drift between the CI pin
+test gains a Node 22 + 24 matrix, closing the drift between the CI pin
 and the version actually developed on. Adds a concurrency group so
 superseded runs are cancelled, and a least-privilege permissions block.
 
@@ -2062,5 +2076,5 @@ Run after all six PRs have landed.
 - [ ] `node scripts/check-audit-allowlist.mjs` — exit 0
 - [ ] `docker compose up -d && npm -w server run migrate:postgres` — working dev database
 - [ ] Booting with `DATABASE_URL` unset exits 1 with a readable message
-- [ ] CI shows `quality`, `test (20.19)`, `test (24)`, and `build` all green
+- [ ] CI shows `quality`, `test (22)`, `test (24)`, and `build` all green
 - [ ] `git blame` on a reformatted file attributes lines to their original commits
