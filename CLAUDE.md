@@ -284,6 +284,11 @@ reports the last stage's status, not the command's.
 If `npx ruflo@latest init` overwrites `.claude/settings.json`, its permission allowlist is
 hand-trimmed and worth keeping: restore with `git checkout -- .claude/settings.json`.
 
+Re-run the verification checklist above after **any** `ruflo init`, not just a fresh clone.
+A regenerated `settings.json` silently reverts the `scrub-junk-files.cjs` hook path to the
+stale `.js` name, and a broken hook does not announce itself — the exit-code checks are the
+only thing that will catch it.
+
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files
