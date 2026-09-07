@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { applyMigrations } from "./postgresMigrations.js";
 
 const firstWord = (sql) => String(sql).trim().split(/\s+/)[0].toLowerCase();
@@ -110,5 +110,38 @@ describe("applyMigrations", () => {
 
     expect(applied).toEqual([]);
     expect(pool.checkedOut).toHaveLength(0);
+  });
+
+  // The default `log` is the only production path: apply-postgres-migrations.js
+  // is its one non-test caller and passes no log. Every test above injects one,
+  // so nothing here noticed when the default was briefly writing to stderr.
+  test("writes progress to stdout by default", async () => {
+    const pool = createFakePool();
+    const out = [];
+    const err = [];
+    const outSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out.push(String(chunk));
+      return true;
+    });
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      err.push(String(chunk));
+      return true;
+    });
+
+    // Restore before asserting: a failing expect() while stdout is stubbed would
+    // swallow Vitest's own diff output.
+    try {
+      await applyMigrations({
+        pool,
+        migrationsDir: "/migrations",
+        fs: { readdir, readFile }
+      });
+    } finally {
+      outSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+
+    expect(out.join("")).toContain("applied");
+    expect(err.join("")).not.toContain("[postgres:migrate]");
   });
 });

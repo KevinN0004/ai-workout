@@ -5,12 +5,20 @@ import reactHooks from "eslint-plugin-react-hooks";
 import importX from "eslint-plugin-import-x";
 import prettierCompat from "eslint-config-prettier";
 
-// The client imports .jsx files without an extension, which Vite resolves and
-// the default node resolver does not. Without these extensions no-unresolved
-// reports 53 false positives.
+// Extensions import-x/no-unresolved must try before it reports a miss. The
+// client is why they are needed: it imports .jsx without an extension, which
+// Vite resolves and the default node resolver does not -- without this the rule
+// emits 53 false positives there. The server has no extensionless imports, but
+// both blocks share the setting so the two cannot drift apart.
 const importResolverSettings = {
   "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } }
 };
+
+// One list for both test blocks: one supplies the vitest globals, the other
+// exempts tests from no-console. Kept together because a file that landed in
+// only one would get half the pair -- no-console off but no globals, which
+// trips no-undef, or globals but no exemption, as client/src/test/** was.
+const testFiles = ["**/*.test.{js,jsx,mjs}", "client/src/test/**"];
 
 const importRules = {
   "import-x/no-cycle": "error",
@@ -84,7 +92,7 @@ export default [
   // test / expect without importing them. Most files here do import from
   // "vitest" explicitly; the integration suite does not.
   {
-    files: ["**/*.test.{js,jsx}", "client/src/test/**"],
+    files: testFiles,
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -138,9 +146,15 @@ export default [
   // server block's no-console would otherwise apply to suites. No test file
   // logs today; this is a forward guard.
   {
-    files: ["**/*.test.{js,jsx,mjs}"],
+    files: testFiles,
     rules: { "no-console": "off" }
   },
 
-  prettierCompat
+  prettierCompat,
+
+  // eslint-config-prettier disables this because Prettier's output makes it
+  // unreachable. Keep it on regardless: it is a defect rule (ASI hazards) out of
+  // js.configs.recommended, not a style rule, and it still guards code Prettier
+  // does not reach.
+  { rules: { "no-unexpected-multiline": "error" } }
 ];
