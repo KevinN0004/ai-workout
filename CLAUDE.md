@@ -239,9 +239,30 @@ before the server or its test suite will work against it.
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
-  unreachable code, and React Hook contract violations. **There is deliberately no
-  Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do
-  not add formatting rules or reformat files wholesale without asking.
+  unreachable code, React Hook contract violations, import cycles and unresolved
+  specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
+  Every one of those was measured against the tree before being enabled and reported zero
+  violations, except `no-console`, which reported two.
+  - `import-x/no-unresolved` **requires** `settings: { "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } } }`.
+    Without it the rule emits 53 false positives, because the client imports `.jsx` files
+    extensionlessly and Vite resolves those where the default node resolver does not.
+  - `no-console` covers `client/**` and `server/**` — including `server/scripts/` — but
+    **not** root `scripts/**`, which is tooling that legitimately prints. Test files are
+    exempt.
+  - `linterOptions` lives in its **own** config object. Adding any key to the
+    `ignores`-only object would stop those ignores being global; measured, that takes
+    `eslint .` from 9 lines of output to 990 as `.claude/helpers/**` starts being linted.
+- **Formatting is Prettier's job, and CI enforces it.** `npm run format:check` gates every
+  PR, `npm run format` fixes. `eslint-config-prettier` is applied last so no rule fights
+  the formatter — with one deliberate exception re-enabled after it,
+  `no-unexpected-multiline`, which is an ASI-hazard defect rule rather than a style rule.
+  The repo-wide reformat is commit `86621a3` (173 files, ~7,200 lines), recorded in
+  `.git-blame-ignore-revs`.
+  - `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md` is excluded from Prettier.
+    Version 3.9.6 **never converges** on it: every `--write` pass indents the continuation
+    paragraphs under its nested `- [x]` task-list items four spaces deeper, growing the
+    file 280 bytes per run with no fixed point. Re-test after a Prettier upgrade by
+    checking byte-stability across ~3 consecutive passes, not by a single clean `--check`.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
   `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were
