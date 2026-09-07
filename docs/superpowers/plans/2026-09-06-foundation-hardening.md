@@ -523,10 +523,29 @@ Substitute the real SHA from Step 1 for `<SHA>`:
 
 ```bash
 git config blame.ignoreRevsFile .git-blame-ignore-revs
-git blame -L 1,5 server/src/shutdown.js | head -5
+git blame -L 1,2 server/src/middleware/errorHandler.js
 ```
 
-Expected: the listed commits are the original authoring commits, **not** the reformat SHA from Step 1.
+Expected: the listed commit is the original authoring commit, **not** the reformat SHA.
+
+**Pick a file the reformat actually touched.** An earlier draft used `server/src/shutdown.js`, which
+the reformat never modified — blaming it produces the same answer either way and proves nothing.
+Confirm your chosen file was touched: `git show --stat <reformat-sha> -- <file>` must be non-empty.
+
+**To prove the setting is doing the work, you must truly unset it.**
+`git -c blame.ignoreRevsFile= blame ...` does **not** override an existing local value:
+`blame.ignoreRevsFile` is a _multi-valued_ config key, so `-c` appends an empty entry rather than
+replacing. Verified — the `-c` form returns the identical result to the configured run, which reads
+as a passing test when nothing was actually disabled. Use:
+
+```bash
+git config --unset blame.ignoreRevsFile
+git blame -L 1,2 server/src/middleware/errorHandler.js     # expect the REFORMAT sha
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+git blame -L 1,2 server/src/middleware/errorHandler.js     # expect the ORIGINAL author's sha
+```
+
+Restore the setting when done, and confirm with `git config --get blame.ignoreRevsFile`.
 
 - [ ] **Step 4: Document the gotcha in `CLAUDE.md`**
 
