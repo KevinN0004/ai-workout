@@ -61,6 +61,7 @@ import {
   parseEnvBoolean,
   parseRedisPort
 } from "./services/sessionService.js";
+import { validateEnv } from "./services/envValidationService.js";
 
 dotenv.config();
 
@@ -749,5 +750,16 @@ export const __testables = {
 };
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  // Inside the existing test guard on purpose: the suite imports `app` from
+  // this module and must never trip a fatal env check.
+  const envErrors = validateEnv(process.env);
+  if (envErrors.length > 0) {
+    // process.stderr rather than the pino logger: LOG_LEVEL is itself
+    // environment-derived, so the logger may not be trustworthy here.
+    process.stderr.write(
+      `Environment validation failed:\n${envErrors.map((line) => `  - ${line}`).join("\n")}\n`
+    );
+    process.exit(1);
+  }
   startServer();
 }
