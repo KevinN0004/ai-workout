@@ -65,6 +65,24 @@ import { validateEnv } from "./services/envValidationService.js";
 
 dotenv.config();
 
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  // Must run before any other module-scope code reads process.env below
+  // (the pino logger, argon2 options, the port, ~30 vars in all) -- a
+  // check that runs after those reads is not a preflight, it is a report
+  // filed after the crash. Kept in its own guard so the suite, which
+  // imports `app` from this module, never trips a fatal env check.
+  const envErrors = validateEnv(process.env);
+  if (envErrors.length > 0) {
+    // process.stderr rather than the pino logger: the logger is not yet
+    // constructed at this point, and even once it exists, LOG_LEVEL=silent
+    // would swallow a logger.fatal here with no output at all.
+    process.stderr.write(
+      `Environment validation failed:\n${envErrors.map((line) => `  - ${line}`).join("\n")}\n`
+    );
+    process.exit(1);
+  }
+}
+
 const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
@@ -750,16 +768,5 @@ export const __testables = {
 };
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-  // Inside the existing test guard on purpose: the suite imports `app` from
-  // this module and must never trip a fatal env check.
-  const envErrors = validateEnv(process.env);
-  if (envErrors.length > 0) {
-    // process.stderr rather than the pino logger: LOG_LEVEL is itself
-    // environment-derived, so the logger may not be trustworthy here.
-    process.stderr.write(
-      `Environment validation failed:\n${envErrors.map((line) => `  - ${line}`).join("\n")}\n`
-    );
-    process.exit(1);
-  }
   startServer();
 }

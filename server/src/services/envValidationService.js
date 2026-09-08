@@ -6,10 +6,19 @@
  * runtime and generateRoutes.js reads it per request.
  */
 
+// Every min/max here is meant to match what the corresponding reader in
+// index.js / sessionService.js actually accepts, not just what sounds
+// reasonable in isolation -- a floor the reader silently discards (falling
+// back to its default) is worse than no floor: it tells the operator their
+// setting took effect when it did not. Check the call site before changing
+// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST additionally have to
+// clear argon2's own library-enforced minimums (timeCost >= 2, memoryCost
+// >= 1024), which are stricter than what toPositiveInt alone would require.
 const NUMERIC_VARS = [
   { name: "PORT", min: 1, max: 65535 },
-  { name: "SHUTDOWN_TIMEOUT_MS", min: 0 },
-  { name: "REDIS_CONNECT_TIMEOUT_MS", min: 0 },
+  { name: "SHUTDOWN_TIMEOUT_MS", min: 1 },
+  { name: "REDIS_CONNECT_TIMEOUT_MS", min: 1 },
+  { name: "REDIS_PORT", min: 1, max: 65535 },
   { name: "API_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "API_RATE_LIMIT_MAX", min: 1 },
   { name: "AUTH_RATE_LIMIT_WINDOW_MS", min: 1000 },
@@ -18,22 +27,22 @@ const NUMERIC_VARS = [
   { name: "GENERATE_RATE_LIMIT_MAX", min: 1 },
   { name: "ANON_GENERATE_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "ANON_GENERATE_RATE_LIMIT_MAX", min: 1 },
-  { name: "ARGON2_TIME_COST", min: 1 },
-  { name: "ARGON2_MEMORY_COST", min: 8 },
+  { name: "ARGON2_TIME_COST", min: 2 },
+  { name: "ARGON2_MEMORY_COST", min: 1024 },
   { name: "ARGON2_PARALLELISM", min: 1 },
   { name: "ARGON2_HASH_LENGTH", min: 4 },
   { name: "DASHBOARD_COLLECTION_DEFAULT_LIMIT", min: 1 },
   { name: "DASHBOARD_COLLECTION_MAX_LIMIT", min: 1 },
-  { name: "EXTERNAL_API_RETRIES", min: 0 },
-  { name: "EXTERNAL_API_RETRY_BASE_DELAY_MS", min: 0 },
+  { name: "EXTERNAL_API_RETRIES", min: 1 },
+  { name: "EXTERNAL_API_RETRY_BASE_DELAY_MS", min: 1 },
   { name: "EXTERNAL_CACHE_MAX_ENTRIES", min: 1 },
-  { name: "EXTERNAL_CACHE_STALE_TTL_SEC", min: 0 },
-  { name: "OPEN_METEO_CACHE_TTL_SEC", min: 0 },
-  { name: "OPENAQ_CACHE_TTL_SEC", min: 0 },
-  { name: "WGER_CACHE_TTL_SEC", min: 0 },
-  { name: "MEALDB_CACHE_TTL_SEC", min: 0 },
-  { name: "WGER_DEFAULT_LANGUAGE", min: 1 },
-  { name: "SENTRY_SHUTDOWN_TIMEOUT_MS", min: 0 }
+  { name: "EXTERNAL_CACHE_STALE_TTL_SEC", min: 1 },
+  { name: "OPEN_METEO_CACHE_TTL_SEC", min: 1 },
+  { name: "OPENAQ_CACHE_TTL_SEC", min: 1 },
+  { name: "WGER_CACHE_TTL_SEC", min: 1 },
+  { name: "MEALDB_CACHE_TTL_SEC", min: 1 },
+  { name: "WGER_DEFAULT_LANGUAGE", min: 1, max: 100 },
+  { name: "SENTRY_SHUTDOWN_TIMEOUT_MS", min: 1 }
 ];
 
 // Only HTTP endpoints are parsed. Postgres and Redis connection strings are
