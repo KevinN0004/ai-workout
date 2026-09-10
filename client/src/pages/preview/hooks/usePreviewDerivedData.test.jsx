@@ -187,6 +187,126 @@ describe("usePreviewDerivedData", () => {
     });
   });
 
+  describe("week typing gates", () => {
+    // The two typed-text helpers are gated on previewWeekStage, and every
+    // existing test renders at stage 0 -- so the stages that actually reveal
+    // text were never exercised.
+    const HEADER = "Your week at a glance";
+
+    test.each([[0], [1]])("the header shows nothing before stage 2 (stage %i)", (stage) => {
+      const { getPreviewWeekHeaderTypedText } = render({
+        previewWeekStage: stage,
+        previewWeekHeaderTypingProgress: 1
+      });
+      expect(getPreviewWeekHeaderTypedText(HEADER)).toBe("");
+    });
+
+    test("at stage 2 the header follows the typing progress", () => {
+      const { getPreviewWeekHeaderTypedText } = render({
+        previewWeekStage: 2,
+        previewWeekHeaderTypingProgress: 0.5
+      });
+      const typed = getPreviewWeekHeaderTypedText(HEADER);
+      expect(typed).toBe(HEADER.slice(0, Math.ceil(HEADER.length * 0.5)));
+      expect(typed.length).toBeLessThan(HEADER.length);
+    });
+
+    test("stage 3 forces the header complete regardless of progress", () => {
+      // Past the header's own stage its animation is done, so a stale progress
+      // value must not re-truncate it.
+      const { getPreviewWeekHeaderTypedText } = render({
+        previewWeekStage: 3,
+        previewWeekHeaderTypingProgress: 0
+      });
+      expect(getPreviewWeekHeaderTypedText(HEADER)).toBe(HEADER);
+    });
+
+    test.each([[0], [1], [2]])("the body shows nothing before stage 3 (stage %i)", (stage) => {
+      const { getPreviewWeekTypedText } = render({
+        previewWeekStage: stage,
+        previewWeekTypingProgress: 1
+      });
+      expect(getPreviewWeekTypedText("Monday")).toBe("");
+    });
+
+    test("at stage 3 the body follows its own progress", () => {
+      const { getPreviewWeekTypedText } = render({
+        previewWeekStage: 3,
+        previewWeekTypingProgress: 0.5
+      });
+      expect(getPreviewWeekTypedText("Monday")).toBe("Mon");
+    });
+
+    test("progress at or above 1 returns the whole string", () => {
+      const { getPreviewWeekTypedText } = render({
+        previewWeekStage: 3,
+        previewWeekTypingProgress: 1
+      });
+      expect(getPreviewWeekTypedText("Monday")).toBe("Monday");
+    });
+
+    test.each([[null], [undefined], [0]])(
+      "coerces %s to a string rather than throwing",
+      (value) => {
+        const { getPreviewWeekTypedText, getPreviewWeekHeaderTypedText } = render({
+          previewWeekStage: 3,
+          previewWeekTypingProgress: 1,
+          previewWeekHeaderTypingProgress: 1
+        });
+        expect(typeof getPreviewWeekTypedText(value)).toBe("string");
+        expect(typeof getPreviewWeekHeaderTypedText(value)).toBe("string");
+      }
+    );
+  });
+
+  describe("personal targets", () => {
+    // Every field is String(x ?? ""). The existing tests render an empty
+    // profile, so only the nullish side of each of those was reached.
+    const populated = {
+      personal: {
+        name: "Ada",
+        age: "31",
+        sex: "female",
+        trainingDays: ["monday", "wednesday", "friday"]
+      },
+      resolvedHeightCm: 170,
+      resolvedWeightKg: 65,
+      effectiveBodyFat: 22
+    };
+
+    test("every field comes back as a string", () => {
+      const { previewPersonalTargets } = render(populated);
+      for (const [key, value] of Object.entries(previewPersonalTargets)) {
+        if (key === "trainingDays") continue;
+        expect(typeof value).toBe("string");
+      }
+    });
+
+    test("carries through what the visitor actually entered", () => {
+      const { previewPersonalTargets } = render(populated);
+      expect(previewPersonalTargets.name).toBe("Ada");
+      expect(previewPersonalTargets.age).toBe("31");
+      expect(previewPersonalTargets.sex).toBe("female");
+      expect(previewPersonalTargets.trainingDays).toEqual(["monday", "wednesday", "friday"]);
+    });
+
+    test("still yields strings, never null, from an empty profile", () => {
+      const { previewPersonalTargets } = render();
+      for (const [key, value] of Object.entries(previewPersonalTargets)) {
+        if (key === "trainingDays") continue;
+        expect(value).not.toBeNull();
+        expect(typeof value).toBe("string");
+      }
+      expect(Array.isArray(previewPersonalTargets.trainingDays)).toBe(true);
+    });
+
+    test("imperial input produces feet and inches alongside the centimetre value", () => {
+      const { previewPersonalTargets } = render({ ...populated, weightUnit: "lb" });
+      expect(previewPersonalTargets.heightFeet).not.toBe("");
+      expect(previewPersonalTargets.heightInches).not.toBe("");
+    });
+  });
+
   describe("units", () => {
     test("resolves to a boolean without throwing on the ambient locale", () => {
       expect(typeof render().usesImperialUnits).toBe("boolean");
