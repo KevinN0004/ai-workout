@@ -330,6 +330,17 @@ only thing that will catch it.
   Gemini key and the Postgres connection string
 - Always validate user input at system boundaries
 - Always sanitize file paths to prevent directory traversal
+- **Never route around a permission rule.** If a deny rule blocks a path, stop and say so.
+  Reaching the same file by an indirect route — a Node script instead of Read, a shell verb
+  the matcher does not catch — defeats a control the user set deliberately. This has already
+  tripped a security classifier here once.
+- **`.env.example` is tracked and public, yet `Read(./.env.*)` in `.claude/settings.json`
+  matches it too.** That over-reach is accepted on purpose. Permission rules support only
+  exact matches and prefix wildcards — there is no negation — so excepting one filename
+  means replacing the wildcard with an enumeration that has to anticipate every future
+  secret-bearing name, and a miss would be silent. Catching the unanticipated ones is the
+  wildcard's whole job. Read the template with `git show HEAD:.env.example`; a write to it
+  needs explicit approval. Do not "fix" this by loosening the rule.
 
 ## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
 
