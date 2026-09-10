@@ -39,7 +39,18 @@ const importRules = {
  */
 export default [
   {
-    ignores: ["**/node_modules/**", "**/dist/**", ".claude/**", ".githooks/**", "client/dist/**"]
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      ".claude/**",
+      ".githooks/**",
+      "client/dist/**",
+      // Generated v8 coverage reports. Gitignored and prettier-ignored, but
+      // this list is separate -- and the reports carry their own
+      // eslint-disable comments, which reportUnusedDisableDirectives turns
+      // into errors the moment anyone runs coverage locally.
+      "**/coverage/**"
+    ]
   },
 
   // A config object holding only `ignores` is ESLint 9's global-ignores form.

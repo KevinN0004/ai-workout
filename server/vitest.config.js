@@ -15,7 +15,15 @@ export default defineConfig({
       // report a better number rather than a truer one.
       include: ["src/**"],
       exclude: ["**/*.test.js", "src/generated/**"],
-      reporter: ["text", "html"]
+      reporter: ["text", "html"],
+      // A ratchet, not a target -- see the note in client/vite.config.js.
+      // Measured 2026-09-10, floored to whole percent.
+      thresholds: {
+        statements: 88,
+        branches: 80,
+        functions: 91,
+        lines: 90
+      }
     }
   }
 });
