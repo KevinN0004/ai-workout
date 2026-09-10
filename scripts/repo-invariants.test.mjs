@@ -7,6 +7,47 @@ import { describe, expect, test } from "vitest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+describe("the qs security override", () => {
+  // The audit-ci gate is set to `high`, but the qs DoS advisories are
+  // *moderate* -- so if this override were ever dropped, the vulnerability we
+  // fixed would come straight back and the gate would stay green. Raising the
+  // whole gate to `moderate` would fail the build on unrelated transitive
+  // noise, so the fix that regressed is pinned directly instead.
+  //
+  // No Express 4 release reaches a patched qs: 4.22.2 pins qs ~6.15.1 and the
+  // vulnerable range runs to 6.15.3. The override is the only thing holding
+  // this, which is exactly why it needs its own assertion.
+  const MINIMUM = [6, 16, 0];
+
+  const atLeastMinimum = (version) => {
+    const parts = version.split(".").map(Number);
+    for (let i = 0; i < MINIMUM.length; i += 1) {
+      if (parts[i] > MINIMUM[i]) return true;
+      if (parts[i] < MINIMUM[i]) return false;
+    }
+    return true;
+  };
+
+  test("package.json still declares the override", () => {
+    const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+    expect(pkg.overrides?.qs).toBeDefined();
+    expect(atLeastMinimum(pkg.overrides.qs.replace(/^[^0-9]*/, ""))).toBe(true);
+  });
+
+  test("every resolved qs in the lockfile is at or above 6.16.0", () => {
+    const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
+    const resolved = Object.entries(lock.packages)
+      .filter(([name]) => /(^|\/)qs$/.test(name))
+      .map(([name, entry]) => ({ name, version: entry.version }));
+
+    // A lockfile with no qs at all would pass vacuously; express pulls it in.
+    expect(resolved.length).toBeGreaterThan(0);
+
+    const stale = resolved.filter((entry) => !atLeastMinimum(entry.version));
+    expect(stale).toEqual([]);
+  });
+});
+
 const readSourceFiles = (dir) => {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

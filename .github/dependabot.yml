@@ -16,6 +16,12 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
+  # Majors are deliberately NOT ignored here, unlike npm above. GitHub
+  # deprecates old action majors and eventually forces the migration, and
+  # there are only a handful of actions, each fully exercised by the very
+  # workflow the bump edits -- so a major arriving as a PR with green CI
+  # attached IS the deliberate review. Ignoring them would hide the upgrade
+  # until it broke. Read a major here as "look at this", not "merge this".
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
