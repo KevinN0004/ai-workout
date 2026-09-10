@@ -22,7 +22,8 @@
     "lint:fix": "eslint . --fix",
     "test:coverage": "npm run test:coverage -w client && npm run test:coverage -w server",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "node scripts/setup-git-config.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

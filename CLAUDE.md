@@ -289,6 +289,8 @@ not in the repo.** Regenerate the scaffolding after cloning:
 
 ```bash
 npx ruflo@latest init                 # regenerate .claude/agents|commands|helpers|skills
+# The two git config lines below are applied automatically by the `prepare` script
+# on every `npm install` / `npm ci` -- run them by hand only to repair a checkout.
 git config core.hooksPath .githooks   # activate the repo's pre-commit guard
 git config blame.ignoreRevsFile .git-blame-ignore-revs   # skip the Prettier reformat in blame
 ```
@@ -334,13 +336,14 @@ only thing that will catch it.
   Reaching the same file by an indirect route — a Node script instead of Read, a shell verb
   the matcher does not catch — defeats a control the user set deliberately. This has already
   tripped a security classifier here once.
-- **`.env.example` is tracked and public, yet `Read(./.env.*)` in `.claude/settings.json`
-  matches it too.** That over-reach is accepted on purpose. Permission rules support only
-  exact matches and prefix wildcards — there is no negation — so excepting one filename
-  means replacing the wildcard with an enumeration that has to anticipate every future
-  secret-bearing name, and a miss would be silent. Catching the unanticipated ones is the
-  wildcard's whole job. Read the template with `git show HEAD:.env.example`; a write to it
-  needs explicit approval. Do not "fix" this by loosening the rule.
+- **The env template is `env.example`, with no leading dot, and that is deliberate.**
+  `Read(./.env.*)` in `.claude/settings.json` would match `.env.example`, blocking a file
+  whose entire purpose is to be public. Permission rules support only exact matches and
+  prefix wildcards — there is no negation — so excepting one filename would mean replacing
+  that wildcard with an enumeration anticipating every future secret-bearing name, and a
+  miss would be silent. Catching the names nobody anticipated is the wildcard's whole job,
+  so the rule stays broad and the template sits outside it instead. Do not rename the
+  template back, and do not loosen the rule.
 
 ## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
 

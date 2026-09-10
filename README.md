@@ -86,7 +86,7 @@ npm run test         # Run client and server tests
 
 ## Environment Variables
 
-A complete template lives in [`.env.example`](.env.example). Copy it to `server/.env` and fill
+A complete template lives in [`env.example`](env.example). Copy it to `server/.env` and fill
 in the values that matter for your setup. The server validates this environment at startup and
 reports every problem at once, rather than failing on the first one it happens to hit.
 
