@@ -108,7 +108,8 @@ describe("mergeOptimisticDashboard", () => {
       entry("meal", "no-timestamp", undefined),
       entry("meal", "timestamped", 5)
     ]);
-    expect(merged.mealLogs.map((item) => item.id)).toEqual(["no-timestamp", "timestamped"]);
+    // Missing timestamps read as 0, so it sorts last.
+    expect(merged.mealLogs.map((item) => item.id)).toEqual(["timestamped", "no-timestamp"]);
   });
 
   test("entries with no createdAt at all keep their original order", () => {
@@ -119,28 +120,20 @@ describe("mergeOptimisticDashboard", () => {
       entry("meal", "first", undefined),
       entry("meal", "second", undefined)
     ]);
-    expect(merged.mealLogs.map((item) => item.id)).toEqual(["second", "first"]);
+    // Array.prototype.sort is stable, so equal keys keep their input order.
+    expect(merged.mealLogs.map((item) => item.id)).toEqual(["first", "second"]);
   });
 
-  test("CURRENT BEHAVIOUR: pending entries end up oldest-first, not newest-first", () => {
-    // This pins what the code does today, and what it does looks wrong.
-    //
-    // The entries are sorted descending by createdAt (newest first) and then
-    // each is unshift()ed onto the front of the array, which reverses that
-    // ordering again. Three workouts logged in quick succession therefore
-    // appear oldest-first.
-    //
-    // It is partly masked downstream: WorkoutsView and useDashboardMetrics
-    // re-sort by `date`, so it only shows when several entries share a date.
-    // Nothing re-sorts calories or mealLogs at all.
-    //
-    // If that ordering is corrected, this test should fail -- that is the
-    // point of it. Update it deliberately rather than deleting it.
+  test("pending entries render newest first", () => {
+    // This test previously pinned the opposite, because the code sorted
+    // descending and then unshift()ed each entry onto the front, undoing the
+    // sort. Nothing re-sorted calories or mealLogs downstream, so meals logged
+    // in quick succession genuinely rendered oldest-first.
     const merged = mergeOptimisticDashboard(emptyDashboard(), [
       entry("meal", "oldest", 100),
       entry("meal", "newest", 300),
       entry("meal", "middle", 200)
     ]);
-    expect(merged.mealLogs.map((item) => item.id)).toEqual(["oldest", "middle", "newest"]);
+    expect(merged.mealLogs.map((item) => item.id)).toEqual(["newest", "middle", "oldest"]);
   });
 });

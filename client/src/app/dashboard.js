@@ -23,23 +23,30 @@ export const mergeOptimisticDashboard = (dashboard, optimisticLogEntries) => {
   const nextCalories = Array.isArray(base.calories) ? [...base.calories] : [];
   const nextMealLogs = Array.isArray(base.mealLogs) ? [...base.mealLogs] : [];
 
+  // Newest first. The previous version sorted descending and then unshift()ed
+  // each entry onto the front, which reversed the ordering it had just
+  // established -- so several entries logged in quick succession rendered
+  // oldest-first. Collecting per bucket and prepending as a group keeps the
+  // sort's result intact.
   const ordered = [...optimisticLogEntries].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const pendingWorkouts = [];
+  const pendingCalories = [];
+  const pendingMealLogs = [];
   for (const entry of ordered) {
     if (entry.type === "workout") {
-      nextWorkoutSessions.unshift(entry.item);
-      nextWorkouts.unshift(entry.item);
+      pendingWorkouts.push(entry.item);
     } else if (entry.type === "calorie") {
-      nextCalories.unshift(entry.item);
+      pendingCalories.push(entry.item);
     } else if (entry.type === "meal") {
-      nextMealLogs.unshift(entry.item);
+      pendingMealLogs.push(entry.item);
     }
   }
 
   return {
     ...base,
-    workoutSessions: nextWorkoutSessions,
-    workouts: nextWorkouts,
-    calories: nextCalories,
-    mealLogs: nextMealLogs
+    workoutSessions: [...pendingWorkouts, ...nextWorkoutSessions],
+    workouts: [...pendingWorkouts, ...nextWorkouts],
+    calories: [...pendingCalories, ...nextCalories],
+    mealLogs: [...pendingMealLogs, ...nextMealLogs]
   };
 };
