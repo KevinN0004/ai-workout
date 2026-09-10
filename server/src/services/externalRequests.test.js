@@ -141,7 +141,10 @@ describe("wgerRequest", () => {
   });
 
   test("returns the parsed body", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => okJson({ results: [{ id: 1 }] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => okJson({ results: [{ id: 1 }] }))
+    );
 
     const result = await buildRequesters().wgerRequest("exerciseinfo/");
 
@@ -169,7 +172,10 @@ describe("wgerRequest", () => {
     // A 5xx upstream becomes a 502, so the route reports a bad gateway rather
     // than claiming the failure was its own.
     test("maps a 5xx to 502", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => failJson(503, { detail: "down" })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => failJson(503, { detail: "down" }))
+      );
 
       await expect(buildRequesters().wgerRequest("exerciseinfo/")).rejects.toMatchObject({
         status: 502,
@@ -178,7 +184,10 @@ describe("wgerRequest", () => {
     });
 
     test("passes a 4xx through unchanged", async () => {
-      vi.stubGlobal("fetch", vi.fn(async () => failJson(404, { detail: "Not found." })));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => failJson(404, { detail: "Not found." }))
+      );
 
       await expect(buildRequesters().wgerRequest("exerciseinfo/")).rejects.toMatchObject({
         status: 404,
@@ -192,7 +201,10 @@ describe("wgerRequest", () => {
       ["message", { message: "from message" }, "from message"],
       ["nothing usable", {}, "Wger request failed."]
     ])("takes the message from %s", async (_label, body, expected) => {
-      vi.stubGlobal("fetch", vi.fn(async () => failJson(400, body)));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => failJson(400, body))
+      );
 
       await expect(buildRequesters().wgerRequest("exerciseinfo/")).rejects.toThrow(expected);
     });
@@ -236,7 +248,10 @@ describe("mealDbRequest", () => {
   });
 
   test("returns the parsed body", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => okJson({ meals: [{ idMeal: "1" }] })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => okJson({ meals: [{ idMeal: "1" }] }))
+    );
 
     const result = await buildRequesters().mealDbRequest("search.php", { s: "penne" });
 
@@ -268,7 +283,10 @@ describe("mealDbRequest", () => {
   });
 
   test("maps a 5xx to 502", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failJson(500, { message: "down" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failJson(500, { message: "down" }))
+    );
 
     await expect(
       buildRequesters().mealDbRequest("search.php", { s: "penne" })
@@ -276,7 +294,10 @@ describe("mealDbRequest", () => {
   });
 
   test("passes a 4xx through unchanged", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failJson(429, { message: "slow down" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failJson(429, { message: "slow down" }))
+    );
 
     await expect(
       buildRequesters().mealDbRequest("search.php", { s: "penne" })
@@ -284,11 +305,14 @@ describe("mealDbRequest", () => {
   });
 
   test("falls back to its own message when the body carries none", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failJson(400, {})));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failJson(400, {}))
+    );
 
-    await expect(
-      buildRequesters().mealDbRequest("search.php", { s: "penne" })
-    ).rejects.toThrow("MealDB request failed.");
+    await expect(buildRequesters().mealDbRequest("search.php", { s: "penne" })).rejects.toThrow(
+      "MealDB request failed."
+    );
   });
 
   test("turns an abort into a 504", async () => {

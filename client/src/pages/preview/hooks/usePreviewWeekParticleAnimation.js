@@ -55,11 +55,7 @@ export default function usePreviewWeekParticleAnimation({
     if (previewWeekParticleLayerRef.current) {
       previewWeekParticleLayerRef.current.replaceChildren();
     }
-  }, [
-    previewWeekParticleLayerRef,
-    previewWeekParticlePlayersRef,
-    previewWeekParticleTargetsRef
-  ]);
+  }, [previewWeekParticleLayerRef, previewWeekParticlePlayersRef, previewWeekParticleTargetsRef]);
 
   useEffect(() => {
     if (activePreviewChapterId !== "workout-week" || previewWeekStage < 6) {
@@ -96,8 +92,8 @@ export default function usePreviewWeekParticleAnimation({
         if (relativeLeft > wrapRect.width || relativeTop > wrapRect.height) return null;
         if (relativeLeft + rect.width < 0 || relativeTop + rect.height < 0) return null;
 
-        const centerX = relativeLeft + (rect.width / 2);
-        const centerY = relativeTop + (rect.height / 2);
+        const centerX = relativeLeft + rect.width / 2;
+        const centerY = relativeTop + rect.height / 2;
         const rowProgress = clamp(centerY / Math.max(wrapRect.height, 1), 0, 1);
         const colProgress = clamp(centerX / Math.max(wrapRect.width, 1), 0, 1);
         const targetStyle = window.getComputedStyle(targetEl);
@@ -128,13 +124,7 @@ export default function usePreviewWeekParticleAnimation({
     const fragment = document.createDocumentFragment();
 
     contentEntries.forEach((entry) => {
-      const {
-        rect,
-        relativeLeft,
-        relativeTop,
-        rowProgress,
-        particleColor
-      } = entry;
+      const { rect, relativeLeft, relativeTop, rowProgress, particleColor } = entry;
       const particleCount = Math.min(
         PREVIEW_WEEK_PARTICLE_MAX_TOTAL - particles.length,
         clamp(
@@ -149,15 +139,14 @@ export default function usePreviewWeekParticleAnimation({
         const particleEl = document.createElement("span");
         particleEl.className = "preview-week-particle";
 
-        const size = randomBetween(PREVIEW_WEEK_PARTICLE_MIN_SIZE_PX, PREVIEW_WEEK_PARTICLE_MAX_SIZE_PX);
+        const size = randomBetween(
+          PREVIEW_WEEK_PARTICLE_MIN_SIZE_PX,
+          PREVIEW_WEEK_PARTICLE_MAX_SIZE_PX
+        );
         const particleX = relativeLeft + randomBetween(0, rect.width);
         const particleY = relativeTop + randomBetween(0, rect.height);
         const localRowProgress = clamp((particleY - relativeTop) / Math.max(rect.height, 1), 0, 1);
-        const particleRowProgress = clamp(
-          rowProgress + ((localRowProgress - 0.5) * 0.09),
-          0,
-          1
-        );
+        const particleRowProgress = clamp(rowProgress + (localRowProgress - 0.5) * 0.09, 0, 1);
 
         particleEl.style.left = `${particleX.toFixed(2)}px`;
         particleEl.style.top = `${particleY.toFixed(2)}px`;
@@ -171,10 +160,15 @@ export default function usePreviewWeekParticleAnimation({
         particles.push(particleEl);
         particleMeta.push({
           delay: Math.round(
-            (particleRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) +
-            randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
+            particleRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS +
+              randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
           ),
-          duration: Math.round(randomBetween(PREVIEW_WEEK_PARTICLE_MIN_DURATION_MS, PREVIEW_WEEK_PARTICLE_MAX_DURATION_MS)),
+          duration: Math.round(
+            randomBetween(
+              PREVIEW_WEEK_PARTICLE_MIN_DURATION_MS,
+              PREVIEW_WEEK_PARTICLE_MAX_DURATION_MS
+            )
+          ),
           driftX: randomBetween(-72, 72),
           driftY: randomBetween(-188, -84),
           rotate: randomBetween(-110, 110),
@@ -184,31 +178,24 @@ export default function usePreviewWeekParticleAnimation({
     });
 
     cellEntries.forEach((entry) => {
-      const {
-        targetEl,
-        rect,
-        relativeLeft,
-        relativeTop,
-        rowProgress,
-        colProgress
-      } = entry;
+      const { targetEl, rect, relativeLeft, relativeTop, rowProgress, colProgress } = entry;
 
       const targetStyle = window.getComputedStyle(targetEl);
       const chunkBaseColor =
         targetStyle.backgroundColor && targetStyle.backgroundColor !== "rgba(0, 0, 0, 0)"
           ? targetStyle.backgroundColor
-          : (targetEl.tagName === "TH" ? "rgba(255, 255, 255, 0.13)" : "rgba(255, 255, 255, 0.08)");
+          : targetEl.tagName === "TH"
+            ? "rgba(255, 255, 255, 0.13)"
+            : "rgba(255, 255, 255, 0.08)";
       const chunkBorderColor = targetStyle.borderTopColor || "rgba(255, 255, 255, 0.16)";
       const chunkCount = Math.min(
         PREVIEW_WEEK_CHUNK_MAX_TOTAL - chunks.length,
-        clamp(
-          Math.round((rect.width * rect.height) / 2600),
-          4,
-          10
-        )
+        clamp(Math.round((rect.width * rect.height) / 2600), 4, 10)
       );
       if (chunkCount <= 0) return;
-      const baseDelay = Math.round((rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (colProgress * 24));
+      const baseDelay = Math.round(
+        rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS + colProgress * 24
+      );
 
       cellMeta.push({
         delay: baseDelay,
@@ -231,7 +218,7 @@ export default function usePreviewWeekParticleAnimation({
         const chunkX = relativeLeft + randomBetween(0, Math.max(rect.width - chunkWidth, 0));
         const chunkY = relativeTop + randomBetween(0, Math.max(rect.height - chunkHeight, 0));
         const chunkLocalProgress = clamp((chunkY - relativeTop) / Math.max(rect.height, 1), 0, 1);
-        const chunkRowProgress = clamp(rowProgress + ((chunkLocalProgress - 0.5) * 0.12), 0, 1);
+        const chunkRowProgress = clamp(rowProgress + (chunkLocalProgress - 0.5) * 0.12, 0, 1);
 
         chunkEl.style.left = `${chunkX.toFixed(2)}px`;
         chunkEl.style.top = `${chunkY.toFixed(2)}px`;
@@ -245,7 +232,8 @@ export default function usePreviewWeekParticleAnimation({
         chunks.push(chunkEl);
         chunkMeta.push({
           delay: Math.round(
-            (chunkRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
+            chunkRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS +
+              randomBetween(0, PREVIEW_WEEK_PARTICLE_JITTER_MS)
           ),
           duration: Math.round(randomBetween(1380, 2480)),
           driftX: randomBetween(-64, 64),
@@ -258,8 +246,10 @@ export default function usePreviewWeekParticleAnimation({
 
     textEntries.forEach((entry) => {
       textMeta.push({
-        delay: Math.round((entry.rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS) + (entry.colProgress * 20)),
-        rise: -16 - (entry.rowProgress * 12)
+        delay: Math.round(
+          entry.rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS + entry.colProgress * 20
+        ),
+        rise: -16 - entry.rowProgress * 12
       });
     });
 
@@ -283,7 +273,10 @@ export default function usePreviewWeekParticleAnimation({
       onComplete: () => {
         keepCompletionFrame = true;
         setPreviewWeekStage((current) => (current < 7 ? 7 : current));
-        if (dashboardPreviewChapterIndex >= 0 && previewStepIndexRef.current === workoutWeekChapterIndex) {
+        if (
+          dashboardPreviewChapterIndex >= 0 &&
+          previewStepIndexRef.current === workoutWeekChapterIndex
+        ) {
           const dashboardAdvanceTimeoutId = window.setTimeout(() => {
             scrollToChapter(dashboardPreviewChapterIndex);
           }, PREVIEW_DASHBOARD_AUTO_ADVANCE_MS);
@@ -291,51 +284,70 @@ export default function usePreviewWeekParticleAnimation({
         }
       }
     })
-      .add(tableEl, {
-        translateY: [0, -46],
-        opacity: [1, 0],
-        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS
-      }, Math.round(PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS * 0.18))
-      .add(cellTargets, {
-        opacity: [1, 0],
-        translateY: (_, index) => cellMeta[index]?.driftY ?? -18,
-        translateX: (_, index) => cellMeta[index]?.driftX ?? 0,
-        rotate: (_, index) => cellMeta[index]?.rotate ?? 0,
-        scale: (_, index) => cellMeta[index]?.scale ?? 0.95,
-        clipPath: (_, index) => (
-          `inset(${(cellMeta[index]?.clipTop ?? 26).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}% ${(cellMeta[index]?.clipBottom ?? 48).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}%)`
-        ),
-        duration: (_, index) => cellMeta[index]?.duration ?? 1500,
-        delay: (_, index) => cellMeta[index]?.delay ?? 0,
-        ease: "outSine"
-      }, 0)
-      .add(textTargets, {
-        opacity: [1, 0],
-        translateY: (_, index) => textMeta[index]?.rise ?? -20,
-        duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 680,
-        delay: (_, index) => textMeta[index]?.delay ?? 0,
-        ease: "inOutSine"
-      }, 0)
-      .add(chunks, {
-        translateX: (_, index) => chunkMeta[index].driftX,
-        translateY: (_, index) => chunkMeta[index].driftY,
-        rotate: (_, index) => chunkMeta[index].rotate,
-        scale: [1, (_, index) => chunkMeta[index].scale],
-        opacity: [1, 0],
-        delay: (_, index) => chunkMeta[index].delay,
-        duration: (_, index) => chunkMeta[index].duration,
-        ease: "outSine"
-      }, 0)
-      .add(particles, {
-        translateX: (_, index) => particleMeta[index].driftX,
-        translateY: (_, index) => particleMeta[index].driftY,
-        rotate: (_, index) => particleMeta[index].rotate,
-        scale: [1, (_, index) => particleMeta[index].scale],
-        opacity: [1, 0],
-        delay: (_, index) => particleMeta[index].delay,
-        duration: (_, index) => particleMeta[index].duration,
-        ease: "outSine"
-      }, 0);
+      .add(
+        tableEl,
+        {
+          translateY: [0, -46],
+          opacity: [1, 0],
+          duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS
+        },
+        Math.round(PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS * 0.18)
+      )
+      .add(
+        cellTargets,
+        {
+          opacity: [1, 0],
+          translateY: (_, index) => cellMeta[index]?.driftY ?? -18,
+          translateX: (_, index) => cellMeta[index]?.driftX ?? 0,
+          rotate: (_, index) => cellMeta[index]?.rotate ?? 0,
+          scale: (_, index) => cellMeta[index]?.scale ?? 0.95,
+          clipPath: (_, index) =>
+            `inset(${(cellMeta[index]?.clipTop ?? 26).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}% ${(cellMeta[index]?.clipBottom ?? 48).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}%)`,
+          duration: (_, index) => cellMeta[index]?.duration ?? 1500,
+          delay: (_, index) => cellMeta[index]?.delay ?? 0,
+          ease: "outSine"
+        },
+        0
+      )
+      .add(
+        textTargets,
+        {
+          opacity: [1, 0],
+          translateY: (_, index) => textMeta[index]?.rise ?? -20,
+          duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 680,
+          delay: (_, index) => textMeta[index]?.delay ?? 0,
+          ease: "inOutSine"
+        },
+        0
+      )
+      .add(
+        chunks,
+        {
+          translateX: (_, index) => chunkMeta[index].driftX,
+          translateY: (_, index) => chunkMeta[index].driftY,
+          rotate: (_, index) => chunkMeta[index].rotate,
+          scale: [1, (_, index) => chunkMeta[index].scale],
+          opacity: [1, 0],
+          delay: (_, index) => chunkMeta[index].delay,
+          duration: (_, index) => chunkMeta[index].duration,
+          ease: "outSine"
+        },
+        0
+      )
+      .add(
+        particles,
+        {
+          translateX: (_, index) => particleMeta[index].driftX,
+          translateY: (_, index) => particleMeta[index].driftY,
+          rotate: (_, index) => particleMeta[index].rotate,
+          scale: [1, (_, index) => particleMeta[index].scale],
+          opacity: [1, 0],
+          delay: (_, index) => particleMeta[index].delay,
+          duration: (_, index) => particleMeta[index].duration,
+          ease: "outSine"
+        },
+        0
+      );
 
     previewWeekParticlePlayersRef.current = [dissolveTimeline];
 

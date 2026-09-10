@@ -18,7 +18,10 @@ export default function MealDetailsModal({
         aria-label={`Meal details for ${activeMeal.title}`}
         onClick={onClose}
       >
-        <div className="modal dashboard-modal meal-modal" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal dashboard-modal meal-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className="modal-header meal-modal-header">
             <button
               type="button"
@@ -41,11 +44,7 @@ export default function MealDetailsModal({
           <div className="modal-body">
             <div className="meal-modal-grid">
               <section className="meal-modal-left">
-                <img
-                  src={activeMeal.image}
-                  alt={activeMeal.title}
-                  onError={handleImageError}
-                />
+                <img src={activeMeal.image} alt={activeMeal.title} onError={handleImageError} />
               </section>
 
               <section className="meal-modal-right">

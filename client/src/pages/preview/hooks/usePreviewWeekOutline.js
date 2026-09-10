@@ -16,17 +16,22 @@ export default function usePreviewWeekOutline({
 
     let frameId = 0;
 
-    const areOffsetsEqual = (currentOffsets, nextOffsets) => (
+    const areOffsetsEqual = (currentOffsets, nextOffsets) =>
       currentOffsets.horizontal.length === nextOffsets.horizontal.length &&
       currentOffsets.vertical.length === nextOffsets.vertical.length &&
       currentOffsets.horizontal.every((value, index) => value === nextOffsets.horizontal[index]) &&
-      currentOffsets.vertical.every((value, index) => value === nextOffsets.vertical[index])
-    );
+      currentOffsets.vertical.every((value, index) => value === nextOffsets.vertical[index]);
 
     const measureOutlineOffsets = () => {
       const wrapRect = wrapEl.getBoundingClientRect();
       const tableRect = tableEl.getBoundingClientRect();
-      if (wrapRect.width <= 0 || wrapRect.height <= 0 || tableRect.width <= 0 || tableRect.height <= 0) return;
+      if (
+        wrapRect.width <= 0 ||
+        wrapRect.height <= 0 ||
+        tableRect.width <= 0 ||
+        tableRect.height <= 0
+      )
+        return;
 
       const tableRows = Array.from(tableEl.querySelectorAll("tr"));
       const headerCells = tableRows[0] ? Array.from(tableRows[0].children) : [];
@@ -42,18 +47,17 @@ export default function usePreviewWeekOutline({
         verticalPx.push(cellEl.getBoundingClientRect().right - wrapRect.left);
       });
 
-      const toPercent = (pixelValue, containerSize) => (
-        `${clamp((pixelValue / Math.max(containerSize, 1)) * 100, 0, 100).toFixed(3)}%`
-      );
+      const toPercent = (pixelValue, containerSize) =>
+        `${clamp((pixelValue / Math.max(containerSize, 1)) * 100, 0, 100).toFixed(3)}%`;
 
       const nextOffsets = {
         horizontal: horizontalPx.map((pixelValue) => toPercent(pixelValue, wrapRect.height)),
         vertical: verticalPx.map((pixelValue) => toPercent(pixelValue, wrapRect.width))
       };
 
-      setPreviewWeekLineOffsets((currentOffsets) => (
+      setPreviewWeekLineOffsets((currentOffsets) =>
         areOffsetsEqual(currentOffsets, nextOffsets) ? currentOffsets : nextOffsets
-      ));
+      );
     };
 
     const scheduleMeasure = () => {
@@ -63,9 +67,8 @@ export default function usePreviewWeekOutline({
       frameId = window.requestAnimationFrame(measureOutlineOffsets);
     };
 
-    const resizeObserver = typeof ResizeObserver === "function"
-      ? new ResizeObserver(scheduleMeasure)
-      : null;
+    const resizeObserver =
+      typeof ResizeObserver === "function" ? new ResizeObserver(scheduleMeasure) : null;
 
     resizeObserver?.observe(wrapEl);
     resizeObserver?.observe(tableEl);
@@ -83,10 +86,5 @@ export default function usePreviewWeekOutline({
     // so listing them satisfies the exhaustive-deps rule without adding a
     // re-run: the effect still only re-subscribes when the chapter or plan
     // changes.
-  }, [
-    activePreviewChapterId,
-    previewWeekPlan,
-    previewWeekTableWrapRef,
-    setPreviewWeekLineOffsets
-  ]);
+  }, [activePreviewChapterId, previewWeekPlan, previewWeekTableWrapRef, setPreviewWeekLineOffsets]);
 }

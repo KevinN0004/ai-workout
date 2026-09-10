@@ -107,7 +107,9 @@
   padding-inline-end: 34px;
 }
 
-.modal.dashboard-modal .dashboard-workout-form input[type="date"]::-webkit-calendar-picker-indicator {
+.modal.dashboard-modal
+  .dashboard-workout-form
+  input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(2);
   opacity: 1;
   cursor: pointer;
@@ -208,4 +210,3 @@
     gap: 12px;
   }
 }
-

@@ -68,7 +68,9 @@ export const buildDashboard = (input = {}) => {
   return {
     ...base,
     workouts: Array.isArray(input.workouts) ? input.workouts.slice(0, 500) : [],
-    workoutSessions: Array.isArray(input.workoutSessions) ? input.workoutSessions.slice(0, 500) : [],
+    workoutSessions: Array.isArray(input.workoutSessions)
+      ? input.workoutSessions.slice(0, 500)
+      : [],
     calories: Array.isArray(input.calories) ? input.calories : [],
     mealLogs: Array.isArray(input.mealLogs) ? input.mealLogs.slice(0, 800) : [],
     progressMetrics: Array.isArray(input.progressMetrics)
@@ -168,9 +170,9 @@ export const buildProfile = (input = {}) => {
 export const isCompleteSignupProfile = (profile) =>
   Boolean(
     cleanText(profile?.firstName, 40) &&
-      cleanText(profile?.lastName, 60) &&
-      profile?.age !== null &&
-      profile?.heightCm !== null &&
-      profile?.weightKg !== null &&
-      cleanText(profile?.sex, 40)
+    cleanText(profile?.lastName, 60) &&
+    profile?.age !== null &&
+    profile?.heightCm !== null &&
+    profile?.weightKg !== null &&
+    cleanText(profile?.sex, 40)
   );

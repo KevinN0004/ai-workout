@@ -21,7 +21,8 @@ const recordLatency = (bucket, durationMs) => {
   bucket.lastMs = durationMs;
 };
 
-export const createRequestContextMiddleware = ({ metrics, logger, toShortText }) =>
+export const createRequestContextMiddleware =
+  ({ metrics, logger, toShortText }) =>
   (req, res, next) => {
     const incomingId = toShortText(req.headers["x-request-id"], 128);
     const requestId = incomingId || crypto.randomUUID();

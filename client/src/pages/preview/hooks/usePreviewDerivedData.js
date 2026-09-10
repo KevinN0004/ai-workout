@@ -91,9 +91,11 @@ export default function usePreviewDerivedData({
     [effectiveBodyFat, form, inferredTrainingDayCount, personal, resolvedHeightCm, resolvedWeightKg]
   );
 
-  const activeHeightCm = Number(activePreviewProfile.heightCm) > 0 ? Number(activePreviewProfile.heightCm) : 175;
-  const activeWeightKg = Number(activePreviewProfile.weightKg) > 0 ? Number(activePreviewProfile.weightKg) : 72;
-  const previewBmi = Number((activeWeightKg / ((activeHeightCm / 100) ** 2)).toFixed(1));
+  const activeHeightCm =
+    Number(activePreviewProfile.heightCm) > 0 ? Number(activePreviewProfile.heightCm) : 175;
+  const activeWeightKg =
+    Number(activePreviewProfile.weightKg) > 0 ? Number(activePreviewProfile.weightKg) : 72;
+  const previewBmi = Number((activeWeightKg / (activeHeightCm / 100) ** 2).toFixed(1));
   const previewBodyFat = Number.isFinite(Number(activePreviewProfile.bodyFat))
     ? roundTo(clamp(Number(activePreviewProfile.bodyFat), 3, 60), 1)
     : roundTo(clamp(1.35 * previewBmi - 13.5, 3, 60), 1);
@@ -109,8 +111,10 @@ export default function usePreviewDerivedData({
   const previewHeightInches = previewHeightSplit?.inches || "9";
   const defaultHeightCm = String(Math.round(activeHeightCm));
   const previewHeightCmValue = String(personal.heightCm ?? "").trim() || defaultHeightCm;
-  const previewHeightFeetValue = String(personal.heightFeet ?? "").trim() || String(previewHeightFeet);
-  const previewHeightInchesValue = String(personal.heightInches ?? "").trim() || String(previewHeightInches);
+  const previewHeightFeetValue =
+    String(personal.heightFeet ?? "").trim() || String(previewHeightFeet);
+  const previewHeightInchesValue =
+    String(personal.heightInches ?? "").trim() || String(previewHeightInches);
   const previewWeightValue = (() => {
     const typedWeight = String(personal.weight ?? "").trim();
     if (typedWeight) return typedWeight;
@@ -133,9 +137,7 @@ export default function usePreviewDerivedData({
         ? activePreviewProfile.trainingDays
         : JOHN_DOE_PREVIEW_PROFILE.trainingDays;
     const trainingDaysSet = new Set(
-      sourceTrainingDaysRaw
-        .map((day) => normalizePreviewTrainingDay(day))
-        .filter(Boolean)
+      sourceTrainingDaysRaw.map((day) => normalizePreviewTrainingDay(day)).filter(Boolean)
     );
     const requestedWorkoutDays = Number(activePreviewProfile.days);
     const targetWorkoutDays = clamp(
@@ -158,9 +160,10 @@ export default function usePreviewDerivedData({
       Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
         ? activePreviewProfile.focuses
         : JOHN_DOE_PREVIEW_PROFILE.focuses;
-    const sessionDuration = Number(activePreviewProfile.duration) > 0
-      ? `${Number(activePreviewProfile.duration)} min`
-      : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
+    const sessionDuration =
+      Number(activePreviewProfile.duration) > 0
+        ? `${Number(activePreviewProfile.duration)} min`
+        : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
     const environmentLabel = String(
       activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment
     );
@@ -226,15 +229,23 @@ export default function usePreviewDerivedData({
       PREVIEW_WEEK_DAY_ORDER.length
     );
     const completedWorkouts = clamp(trainingDays.length, 0, weeklyGoal);
-    const workoutProgress = clamp(Math.round((completedWorkouts / Math.max(weeklyGoal, 1)) * 100), 0, 100);
+    const workoutProgress = clamp(
+      Math.round((completedWorkouts / Math.max(weeklyGoal, 1)) * 100),
+      0,
+      100
+    );
 
-    const calorieGoal = clamp(Math.round((activeWeightKg * 30) + (weeklyGoal * 18)), 1700, 3400);
+    const calorieGoal = clamp(Math.round(activeWeightKg * 30 + weeklyGoal * 18), 1700, 3400);
     const avgCalories = clamp(
-      Math.round(calorieGoal * (0.92 + ((workoutProgress / 100) * 0.06))),
+      Math.round(calorieGoal * (0.92 + (workoutProgress / 100) * 0.06)),
       1500,
       3600
     );
-    const calorieProgress = clamp(Math.round((avgCalories / Math.max(calorieGoal, 1)) * 100), 0, 100);
+    const calorieProgress = clamp(
+      Math.round((avgCalories / Math.max(calorieGoal, 1)) * 100),
+      0,
+      100
+    );
     const calorieDelta = Math.round(avgCalories - calorieGoal);
 
     const goalText = String(activePreviewProfile.goal || JOHN_DOE_PREVIEW_PROFILE.goal);
@@ -255,7 +266,9 @@ export default function usePreviewDerivedData({
       .map((line) => line.trim())
       .filter(Boolean)
       .slice(0, 3);
-    const todayDuration = String(todayPlan?.meta || "50 min").split(" - ")[0].trim();
+    const todayDuration = String(todayPlan?.meta || "50 min")
+      .split(" - ")[0]
+      .trim();
 
     const todayIndex = Math.max(0, PREVIEW_WEEK_DAY_ORDER.indexOf(todayPlan?.day || todayName));
     let nextTrainingPlan = null;
@@ -302,13 +315,17 @@ export default function usePreviewDerivedData({
     const recentActivity = trainingDays.slice(0, 4).map((dayPlan) => ({
       day: dayPlan.day,
       session: dayPlan.session,
-      duration: String(dayPlan.meta || "50 min").split(" - ")[0].trim()
+      duration: String(dayPlan.meta || "50 min")
+        .split(" - ")[0]
+        .trim()
     }));
     const focusPicks =
       Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
         ? activePreviewProfile.focuses.slice(0, 3)
         : JOHN_DOE_PREVIEW_PROFILE.focuses.slice(0, 3);
-    const environmentText = String(activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment);
+    const environmentText = String(
+      activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment
+    );
     const equipmentList =
       Array.isArray(activePreviewProfile.equipment) && activePreviewProfile.equipment.length
         ? activePreviewProfile.equipment.slice(0, 3)
@@ -322,8 +339,8 @@ export default function usePreviewDerivedData({
       remainingWorkouts === 0
         ? "Weekly workout goal reached."
         : avgDailyWorkouts > 0
-        ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
-        : "Log a workout to start your pace estimate.";
+          ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
+          : "Log a workout to start your pace estimate.";
     const mealPlan = todayPlan?.isTraining
       ? {
           breakfast: "Greek yogurt + oats + berries",
@@ -426,7 +443,7 @@ export default function usePreviewDerivedData({
   );
 
   const previewFillOrder = useMemo(
-    () => (
+    () =>
       usesImperialUnits
         ? [
             "name",
@@ -458,8 +475,7 @@ export default function usePreviewDerivedData({
             "cardio",
             "trainingDays",
             "notes"
-          ]
-    ),
+          ],
     [usesImperialUnits]
   );
 
@@ -473,7 +489,7 @@ export default function usePreviewDerivedData({
   }
 
   const previewChapters = useMemo(
-    () => ([
+    () => [
       {
         id: "personal-info",
         title: "Personal Info",
@@ -490,7 +506,12 @@ export default function usePreviewDerivedData({
           { label: "Sex", value: defaultSex },
           { label: "Activity level", value: activePreviewProfile.activity },
           { label: "Sleep", value: activePreviewProfile.sleep },
-          { label: "Goal timeline", value: activePreviewProfile.timeline, multiline: true, rows: 2 },
+          {
+            label: "Goal timeline",
+            value: activePreviewProfile.timeline,
+            multiline: true,
+            rows: 2
+          },
           { label: "Training experience", value: activePreviewProfile.experience },
           { label: "Nutrition preference", value: activePreviewProfile.nutrition },
           { label: "Cardio preference", value: activePreviewProfile.cardio },
@@ -513,7 +534,7 @@ export default function usePreviewDerivedData({
         title: "Dashboard",
         fields: []
       }
-    ]),
+    ],
     [
       defaultName,
       defaultAge,
@@ -535,14 +556,18 @@ export default function usePreviewDerivedData({
   );
 
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
-  const workoutWeekChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "workout-week");
-  const dashboardPreviewChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "dashboard-preview");
+  const workoutWeekChapterIndex = previewChapters.findIndex(
+    (chapter) => chapter.id === "workout-week"
+  );
+  const dashboardPreviewChapterIndex = previewChapters.findIndex(
+    (chapter) => chapter.id === "dashboard-preview"
+  );
 
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
   const isCenteredBodyChapter =
-    activePreviewChapter.id === "personal-info"
-    || activePreviewChapter.id === "generate"
-    || activePreviewChapter.id === "workout-week";
+    activePreviewChapter.id === "personal-info" ||
+    activePreviewChapter.id === "generate" ||
+    activePreviewChapter.id === "workout-week";
   const previewMaxChapterTitleLength = previewChapters.reduce(
     (maxLength, chapter) => Math.max(maxLength, chapter.title.length),
     0
@@ -553,7 +578,9 @@ export default function usePreviewDerivedData({
     "--preview-body-width": "clamp(1480px, 99vw, 2140px)",
     "--preview-chip-expanded": previewChipExpandedWidth,
     "--preview-title-width": previewTitleWidth,
-    "--preview-body-right-pad": isCenteredBodyChapter ? "calc(var(--preview-toc-lane-width) + 8px)" : "0px",
+    "--preview-body-right-pad": isCenteredBodyChapter
+      ? "calc(var(--preview-toc-lane-width) + 8px)"
+      : "0px",
     "--preview-step-width-scale": "1.18",
     "--preview-step-card-width-scale": "1.18",
     "--preview-step-toc-reserve-scale": "1"

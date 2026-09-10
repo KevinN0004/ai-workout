@@ -35,11 +35,7 @@
   }
 
   .visual-stage {
-    --visual-stage-size: min(
-      clamp(500px, 80vmin, 780px),
-      calc(100dvh - 240px),
-      calc(100vw - 28px)
-    );
+    --visual-stage-size: min(clamp(500px, 80vmin, 780px), calc(100dvh - 240px), calc(100vw - 28px));
     width: var(--visual-stage-size);
     height: var(--visual-stage-size);
     max-width: 100%;
@@ -284,11 +280,7 @@
   }
 
   .visual-stage {
-    --visual-stage-size: min(
-      clamp(360px, 88vmin, 620px),
-      calc(100dvh - 224px),
-      calc(100vw - 24px)
-    );
+    --visual-stage-size: min(clamp(360px, 88vmin, 620px), calc(100dvh - 224px), calc(100vw - 24px));
     width: var(--visual-stage-size);
     height: var(--visual-stage-size);
     max-width: 100%;
@@ -344,11 +336,7 @@
   }
 
   .visual-stage {
-    --visual-stage-size: min(
-      clamp(300px, 92vmin, 500px),
-      calc(100dvh - 200px),
-      calc(100vw - 16px)
-    );
+    --visual-stage-size: min(clamp(300px, 92vmin, 500px), calc(100dvh - 200px), calc(100vw - 16px));
     width: var(--visual-stage-size);
     height: var(--visual-stage-size);
   }

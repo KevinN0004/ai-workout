@@ -24,7 +24,9 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.32);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25), 0 0 20px rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.25),
+    0 0 20px rgba(255, 255, 255, 0.12);
   transform: translateX(0%);
   transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 0;
@@ -160,14 +162,18 @@
   background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
-  box-shadow: 0 0 12px rgba(255, 61, 88, 0.56), 0 0 28px rgba(255, 135, 58, 0.38) !important;
+  box-shadow:
+    0 0 12px rgba(255, 61, 88, 0.56),
+    0 0 28px rgba(255, 135, 58, 0.38) !important;
 }
 
 .planner-setup-modal .modal-actions .back-btn:hover:not(:disabled) {
   background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
-  box-shadow: 0 0 16px rgba(255, 61, 88, 0.68), 0 0 34px rgba(255, 135, 58, 0.46) !important;
+  box-shadow:
+    0 0 16px rgba(255, 61, 88, 0.68),
+    0 0 34px rgba(255, 135, 58, 0.46) !important;
 }
 
 .planner-setup-modal .modal-actions .back-btn:active:not(:disabled),
@@ -201,4 +207,3 @@
   display: block;
   pointer-events: none;
 }
-

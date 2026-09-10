@@ -3,8 +3,7 @@
     {
       id: "lean-salmon-bowl",
       title: "Salmon Rice Power Bowl",
-      image:
-        "https://source.unsplash.com/featured/900x650/?salmon,rice,bowl,mealprep",
+      image: "https://source.unsplash.com/featured/900x650/?salmon,rice,bowl,mealprep",
       blurb: "High protein with omega-3 fats for recovery and strength days.",
       calories: 620,
       ingredients: [
@@ -33,8 +32,7 @@
     {
       id: "lean-chicken-quinoa",
       title: "Chicken Quinoa Prep Box",
-      image:
-        "https://source.unsplash.com/featured/900x650/?chicken,quinoa,mealprep",
+      image: "https://source.unsplash.com/featured/900x650/?chicken,quinoa,mealprep",
       blurb: "Lean protein and complex carbs for steady energy and muscle gain.",
       calories: 540,
       ingredients: [
@@ -63,8 +61,7 @@
     {
       id: "lean-turkey-chili",
       title: "Turkey Bean Chili",
-      image:
-        "https://source.unsplash.com/featured/900x650/?turkey,chili,beans",
+      image: "https://source.unsplash.com/featured/900x650/?turkey,chili,beans",
       blurb: "Batch-cook friendly with high protein and fiber per serving.",
       calories: 500,
       ingredients: [
@@ -93,8 +90,7 @@
     {
       id: "lean-yogurt-oats",
       title: "Greek Yogurt Oats Cup",
-      image:
-        "https://source.unsplash.com/featured/900x650/?greek,yogurt,oats,berries",
+      image: "https://source.unsplash.com/featured/900x650/?greek,yogurt,oats,berries",
       blurb: "Fast prep breakfast with protein, carbs, and fruit.",
       calories: 430,
       ingredients: [
@@ -125,8 +121,7 @@
     {
       id: "fat-chicken-salad",
       title: "Chicken Crunch Salad Bowl",
-      image:
-        "https://source.unsplash.com/featured/900x650/?chicken,salad,healthy",
+      image: "https://source.unsplash.com/featured/900x650/?chicken,salad,healthy",
       blurb: "High volume and high protein with lower calories.",
       calories: 420,
       ingredients: [
@@ -155,8 +150,7 @@
     {
       id: "fat-shrimp-cauliflower",
       title: "Shrimp Cauliflower Rice Stir Fry",
-      image:
-        "https://source.unsplash.com/featured/900x650/?shrimp,cauliflower,rice",
+      image: "https://source.unsplash.com/featured/900x650/?shrimp,cauliflower,rice",
       blurb: "Light but filling option for fat loss and conditioning blocks.",
       calories: 390,
       ingredients: [
@@ -185,8 +179,7 @@
     {
       id: "fat-egg-white-wrap",
       title: "Egg White Veggie Wrap",
-      image:
-        "https://source.unsplash.com/featured/900x650/?egg,white,wrap,veggies",
+      image: "https://source.unsplash.com/featured/900x650/?egg,white,wrap,veggies",
       blurb: "Quick prep meal with protein and fiber for lower-calorie days.",
       calories: 360,
       ingredients: [
@@ -215,8 +208,7 @@
     {
       id: "fat-lentil-soup",
       title: "Lentil Vegetable Soup",
-      image:
-        "https://source.unsplash.com/featured/900x650/?lentil,soup,vegetable",
+      image: "https://source.unsplash.com/featured/900x650/?lentil,soup,vegetable",
       blurb: "Budget-friendly fiber and plant protein for satiety.",
       calories: 410,
       ingredients: [
@@ -247,8 +239,7 @@
     {
       id: "endurance-oats",
       title: "Banana Peanut Overnight Oats",
-      image:
-        "https://source.unsplash.com/featured/900x650/?overnight,oats,banana,peanut",
+      image: "https://source.unsplash.com/featured/900x650/?overnight,oats,banana,peanut",
       blurb: "Higher carb breakfast for longer cardio sessions.",
       calories: 520,
       ingredients: [
@@ -277,8 +268,7 @@
     {
       id: "endurance-chicken-pasta",
       title: "Chicken Pasta Prep",
-      image:
-        "https://source.unsplash.com/featured/900x650/?chicken,pasta,mealprep",
+      image: "https://source.unsplash.com/featured/900x650/?chicken,pasta,mealprep",
       blurb: "Carb-forward lunch for training volume and recovery.",
       calories: 640,
       ingredients: [
@@ -307,8 +297,7 @@
     {
       id: "endurance-tofu-teriyaki",
       title: "Tofu Teriyaki Rice Bowl",
-      image:
-        "https://source.unsplash.com/featured/900x650/?tofu,teriyaki,rice,bowl",
+      image: "https://source.unsplash.com/featured/900x650/?tofu,teriyaki,rice,bowl",
       blurb: "Plant-based option with solid carbs and post-workout protein.",
       calories: 560,
       ingredients: [
@@ -337,8 +326,7 @@
     {
       id: "endurance-beef-sweet-potato",
       title: "Beef Sweet Potato Skillet",
-      image:
-        "https://source.unsplash.com/featured/900x650/?beef,sweet-potato,skillet",
+      image: "https://source.unsplash.com/featured/900x650/?beef,sweet-potato,skillet",
       blurb: "Iron-rich protein and carbs to support harder training blocks.",
       calories: 610,
       ingredients: [
@@ -369,8 +357,7 @@
     {
       id: "recovery-turmeric-soup",
       title: "Turmeric Chicken Soup",
-      image:
-        "https://source.unsplash.com/featured/900x650/?chicken,soup,turmeric",
+      image: "https://source.unsplash.com/featured/900x650/?chicken,soup,turmeric",
       blurb: "Hydrating and warm meal for lighter or recovery-focused days.",
       calories: 460,
       ingredients: [
@@ -399,8 +386,7 @@
     {
       id: "recovery-salmon-quinoa",
       title: "Salmon Avocado Quinoa Plate",
-      image:
-        "https://source.unsplash.com/featured/900x650/?salmon,avocado,quinoa",
+      image: "https://source.unsplash.com/featured/900x650/?salmon,avocado,quinoa",
       blurb: "Omega-3 rich meal supporting joint and tissue recovery.",
       calories: 590,
       ingredients: [
@@ -429,8 +415,7 @@
     {
       id: "recovery-tofu-soba",
       title: "Tofu Soba Noodle Bowl",
-      image:
-        "https://source.unsplash.com/featured/900x650/?tofu,soba,noodles",
+      image: "https://source.unsplash.com/featured/900x650/?tofu,soba,noodles",
       blurb: "Easy-to-digest carbs and protein for active recovery windows.",
       calories: 520,
       ingredients: [
@@ -459,8 +444,7 @@
     {
       id: "recovery-frittata",
       title: "Turkey Veggie Frittata",
-      image:
-        "https://source.unsplash.com/featured/900x650/?frittata,turkey,vegetables",
+      image: "https://source.unsplash.com/featured/900x650/?frittata,turkey,vegetables",
       blurb: "Simple make-ahead option for protein and micronutrients.",
       calories: 470,
       ingredients: [
@@ -488,4 +472,3 @@
     }
   ]
 };
-

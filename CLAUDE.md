@@ -30,30 +30,30 @@
 
 Before responding, check if the prompt matches any of these patterns and invoke the listed skill FIRST:
 
-| Prompt contains                                                                           | Invoke this skill first                                 |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| bug, error, fail, broken, not working, exception, crash                                   | `superpowers:systematic-debugging`                      |
-| build, create, add feature, implement (no existing spec)                                  | `superpowers:brainstorming`                             |
-| plan, spec, design, how should we, architecture                                           | `superpowers:brainstorming`                             |
-| review, PR, pull request, code review                                                     | `superpowers:requesting-code-review`                    |
-| done, finished, complete, ready to merge, ship                                            | `superpowers:verification-before-completion`            |
-| library, docs, how do I use, API syntax, framework                                        | `context7-mcp`                                          |
-| find where, search codebase, where is, which files                                        | `codebase-memory-mcp`                                   |
-| frontend, UI, component, CSS, React, page, layout                                         | `frontend-design`                                       |
-| test, TDD, unit test, write tests                                                         | `superpowers:test-driven-development`                   |
-| audit design, polish UI, critique layout, design anti-pattern, impeccable, /impeccable    | `impeccable`                                            |
-| design system, UI style, ui-ux-pro-max, professional UI, reasoning rules                  | `ui-ux-pro-max`                                         |
-| premium frontend, anti-slop, taste skill, boilerplate UI, generic design, design quality  | `taste`                                                 |
-| font, typeface, Google Fonts, font pairing, typography selection, variable font           | `fonts`                                                 |
-| mockup, wireframe, prototype, Stitch, generate UI design, design with AI                  | `stitch`                                                |
-| component registry, 21st.dev, pre-built component, AI component, copy component           | `21st-dev`                                              |
-| E2E test, end-to-end test, browser automation, Playwright, playwright test                | `playwright`                                            |
-| install skill, add skill, skill manager, npx skills add, skillui                          | `skillui`                                               |
-| find skill, discover skill, skill collection, awesome skills, browse skills               | `awesome-design`                                        |
-| review PR, code review, check diff, pre-merge, before merging, review branch              | `github:code-review`                                    |
-| build page, new component, landing page, dashboard page, UI for                           | `frontend-design`                                       |
-| button, modal, form, card component, navbar, sidebar, table component                     | `ui-ux-pro-max`                                         |
-| /frontend, run frontend workflow, design and implement, polish and verify                 | `/frontend` command — runs full 9-skill design workflow |
+| Prompt contains                                                                          | Invoke this skill first                                 |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| bug, error, fail, broken, not working, exception, crash                                  | `superpowers:systematic-debugging`                      |
+| build, create, add feature, implement (no existing spec)                                 | `superpowers:brainstorming`                             |
+| plan, spec, design, how should we, architecture                                          | `superpowers:brainstorming`                             |
+| review, PR, pull request, code review                                                    | `superpowers:requesting-code-review`                    |
+| done, finished, complete, ready to merge, ship                                           | `superpowers:verification-before-completion`            |
+| library, docs, how do I use, API syntax, framework                                       | `context7-mcp`                                          |
+| find where, search codebase, where is, which files                                       | `codebase-memory-mcp`                                   |
+| frontend, UI, component, CSS, React, page, layout                                        | `frontend-design`                                       |
+| test, TDD, unit test, write tests                                                        | `superpowers:test-driven-development`                   |
+| audit design, polish UI, critique layout, design anti-pattern, impeccable, /impeccable   | `impeccable`                                            |
+| design system, UI style, ui-ux-pro-max, professional UI, reasoning rules                 | `ui-ux-pro-max`                                         |
+| premium frontend, anti-slop, taste skill, boilerplate UI, generic design, design quality | `taste`                                                 |
+| font, typeface, Google Fonts, font pairing, typography selection, variable font          | `fonts`                                                 |
+| mockup, wireframe, prototype, Stitch, generate UI design, design with AI                 | `stitch`                                                |
+| component registry, 21st.dev, pre-built component, AI component, copy component          | `21st-dev`                                              |
+| E2E test, end-to-end test, browser automation, Playwright, playwright test               | `playwright`                                            |
+| install skill, add skill, skill manager, npx skills add, skillui                         | `skillui`                                               |
+| find skill, discover skill, skill collection, awesome skills, browse skills              | `awesome-design`                                        |
+| review PR, code review, check diff, pre-merge, before merging, review branch             | `github:code-review`                                    |
+| build page, new component, landing page, dashboard page, UI for                          | `frontend-design`                                       |
+| button, modal, form, card component, navbar, sidebar, table component                    | `ui-ux-pro-max`                                         |
+| /frontend, run frontend workflow, design and implement, polish and verify                | `/frontend` command — runs full 9-skill design workflow |
 
 ## File Organization
 
@@ -93,7 +93,7 @@ plans, the user row, and the paginated dashboard collections — plus two shared
 Two things to know before adding a write:
 
 - **`upsert` usually is not available.** The uniqueness on these tables comes from
-  *partial* unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
+  _partial_ unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
   express, so Prisma has no constraint to target. The repositories do an explicit
   read-then-write instead. This is deliberate, not an oversight.
 - **Collection caps are applied on read, not in storage.** `userReadRepository` limits
@@ -129,7 +129,7 @@ This is not hypothetical. Three shipped bugs came from it, all in health advice:
 - a pm2.5 sensor reporting `null` was published as `0 ug/m3`, which scores **AQI 0** and
   told the user the air was clean
 - a `null` weather code is code `0`, **"Clear sky"**, and a `null` temperature is `0 °C`,
-  so a payload carrying no weather at all was reported as clear *and* too cold to train
+  so a payload carrying no weather at all was reported as clear _and_ too cold to train
   outdoors
 - the same `null` weather code went on reporting **"Clear sky"** from both weather routes
   and every day of the forecast after that fix, because those build `weatherText` from
@@ -180,6 +180,12 @@ npm run migrate:postgres       # apply Postgres migrations
 npm run prisma:generate        # regenerate Prisma Client
 npm run prisma:validate        # validate the schema
 ```
+
+`docker compose up -d` is the alternative to that first helper: `docker-compose.yml` runs
+Postgres and Redis in containers while the app itself stays native. Both it and
+`npm run postgres:local:start` bind **55432**, so they are alternatives, not complements.
+Compose starts an empty database, so `npm -w server run migrate:postgres` is required
+before the server or its test suite will work against it.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
@@ -233,9 +239,30 @@ npm run prisma:validate        # validate the schema
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
-  unreachable code, and React Hook contract violations. **There is deliberately no
-  Prettier**, and no formatting rules: reflowing 27k lines would bury real findings. Do
-  not add formatting rules or reformat files wholesale without asking.
+  unreachable code, React Hook contract violations, import cycles and unresolved
+  specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
+  Every one of those was measured against the tree before being enabled and reported zero
+  violations, except `no-console`, which reported two.
+  - `import-x/no-unresolved` **requires** `settings: { "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } } }`.
+    Without it the rule emits 53 false positives, because the client imports `.jsx` files
+    extensionlessly and Vite resolves those where the default node resolver does not.
+  - `no-console` covers `client/**` and `server/**` — including `server/scripts/` — but
+    **not** root `scripts/**`, which is tooling that legitimately prints. Test files are
+    exempt.
+  - `linterOptions` lives in its **own** config object. Adding any key to the
+    `ignores`-only object would stop those ignores being global; measured, that takes
+    `eslint .` from 9 lines of output to 990 as `.claude/helpers/**` starts being linted.
+- **Formatting is Prettier's job, and CI enforces it.** `npm run format:check` gates every
+  PR, `npm run format` fixes. `eslint-config-prettier` is applied last so no rule fights
+  the formatter — with one deliberate exception re-enabled after it,
+  `no-unexpected-multiline`, which is an ASI-hazard defect rule rather than a style rule.
+  The repo-wide reformat is commit `86621a3` (173 files, ~7,200 lines), recorded in
+  `.git-blame-ignore-revs`.
+  - `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md` is excluded from Prettier.
+    Version 3.9.6 **never converges** on it: every `--write` pass indents the continuation
+    paragraphs under its nested `- [x]` task-list items four spaces deeper, growing the
+    file 280 bytes per run with no fixed point. Re-test after a Prettier upgrade by
+    checking byte-stability across ~3 consecutive passes, not by a single clean `--check`.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
   `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were
@@ -262,11 +289,20 @@ not in the repo.** Regenerate the scaffolding after cloning:
 
 ```bash
 npx ruflo@latest init                 # regenerate .claude/agents|commands|helpers|skills
+# The two git config lines below are applied automatically by the `prepare` script
+# on every `npm install` / `npm ci` -- run them by hand only to repair a checkout.
 git config core.hooksPath .githooks   # activate the repo's pre-commit guard
+git config blame.ignoreRevsFile .git-blame-ignore-revs   # skip the Prettier reformat in blame
 ```
 
 The second line is required: `core.hooksPath` lives in `.git/config`, which is not part of
 the repository, so a clone does not run `.githooks/pre-commit` until it is set.
+
+The third line is the same class of gotcha. `.git-blame-ignore-revs` lists the commit that
+reformatted the repository with Prettier, but `blame.ignoreRevsFile` — the setting that
+tells local git to actually skip it — lives in `.git/config`, not the repository, so a
+fresh clone will silently attribute ~3,500 lines to the reformat commit until this is set.
+GitHub honours the file automatically on its blame views; local `git blame` does not.
 
 Then confirm the wiring actually fires. A missing or broken hook here fails **silently** —
 it will not announce itself, so check exit codes directly rather than assuming:
@@ -274,7 +310,7 @@ it will not announce itself, so check exit codes directly rather than assuming:
 ```bash
 node .claude/helpers/hook-handler.cjs status   # expect exit 0
 node scripts/codex-handoff.mjs --hook          # expect exit 0
-node scripts/scrub-junk-files.js --dry-run     # expect exit 0
+node scripts/scrub-junk-files.cjs --dry-run    # expect exit 0
 echo '{"prompt":"fix a bug"}' | node scripts/skill-router.mjs
 ```
 
@@ -284,6 +320,11 @@ reports the last stage's status, not the command's.
 If `npx ruflo@latest init` overwrites `.claude/settings.json`, its permission allowlist is
 hand-trimmed and worth keeping: restore with `git checkout -- .claude/settings.json`.
 
+Re-run the verification checklist above after **any** `ruflo init`, not just a fresh clone.
+A regenerated `settings.json` silently reverts the `scrub-junk-files.cjs` hook path to the
+stale `.js` name, and a broken hook does not announce itself — the exit-code checks are the
+only thing that will catch it.
+
 ## Security Rules
 
 - NEVER hardcode API keys, secrets, or credentials in source files
@@ -291,6 +332,18 @@ hand-trimmed and worth keeping: restore with `git checkout -- .claude/settings.j
   Gemini key and the Postgres connection string
 - Always validate user input at system boundaries
 - Always sanitize file paths to prevent directory traversal
+- **Never route around a permission rule.** If a deny rule blocks a path, stop and say so.
+  Reaching the same file by an indirect route — a Node script instead of Read, a shell verb
+  the matcher does not catch — defeats a control the user set deliberately. This has already
+  tripped a security classifier here once.
+- **The env template is `env.example`, with no leading dot, and that is deliberate.**
+  `Read(./.env.*)` in `.claude/settings.json` would match `.env.example`, blocking a file
+  whose entire purpose is to be public. Permission rules support only exact matches and
+  prefix wildcards — there is no negation — so excepting one filename would mean replacing
+  that wildcard with an enumeration anticipating every future secret-bearing name, and a
+  miss would be silent. Catching the names nobody anticipated is the wildcard's whole job,
+  so the rule stays broad and the template sits outside it instead. Do not rename the
+  template back, and do not loosen the rule.
 
 ## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
 

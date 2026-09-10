@@ -2,13 +2,7 @@ export const APP_BRAND_NAME = "PATH";
 export const APP_BRAND_EXPANSION = "Personalized AI Training Hub";
 export const APP_BRAND_TAGLINE = "Your guide for this journey.";
 
-export const quickFocuses = [
-  "Strength",
-  "Weight Loss",
-  "Mobility",
-  "Recovery",
-  "Cardio"
-];
+export const quickFocuses = ["Strength", "Weight Loss", "Mobility", "Recovery", "Cardio"];
 
 export const goalOptions = [
   "Build lean strength and energy",
@@ -40,14 +34,7 @@ export const equipmentOptionsByEnv = {
   ]
 };
 
-export const injuryOptions = [
-  "None",
-  "Lower back",
-  "Knee",
-  "Shoulder",
-  "Hip",
-  "Wrist/Elbow"
-];
+export const injuryOptions = ["None", "Lower back", "Knee", "Shoulder", "Hip", "Wrist/Elbow"];
 
 export const samplePlan = [
   {

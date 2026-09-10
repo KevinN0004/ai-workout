@@ -125,8 +125,8 @@ export default function MealLogPanel({
                 {item.name ? ` - ${item.name}` : ""}
               </span>
               <p className="muted meal-log-meta">
-                {item.calories ?? "--"} kcal | P {item.proteinG ?? "--"} / C {item.carbsG ?? "--"} / F{" "}
-                {item.fatG ?? "--"}
+                {item.calories ?? "--"} kcal | P {item.proteinG ?? "--"} / C {item.carbsG ?? "--"} /
+                F {item.fatG ?? "--"}
               </p>
             </div>
           </div>

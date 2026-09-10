@@ -29,8 +29,11 @@ export const registerSystemRoutes = (app, deps) => {
     // isOpen stays true while the client is merely reconnecting; isReady is only
     // true when the connection can actually serve commands.
     const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isReady);
-    const postgresStatus =
-      postgresStatusRef?.() || { configured: false, connected: false, lastError: "" };
+    const postgresStatus = postgresStatusRef?.() || {
+      configured: false,
+      connected: false,
+      lastError: ""
+    };
     const postgresReady = Boolean(postgresStatus.configured && postgresStatus.connected);
     const ready = postgresReady && (!redisConfigured() || redisConnected);
     // This endpoint is unauthenticated so load balancers and uptime probes can
@@ -64,7 +67,10 @@ export const registerSystemRoutes = (app, deps) => {
 
   app.get("/api/metrics", (req, res) => {
     const cacheLookups = (metrics.externalCache?.hits || 0) + (metrics.externalCache?.misses || 0);
-    const cacheHitRatio = cacheLookups > 0 ? Number(((metrics.externalCache?.hits || 0) / cacheLookups).toFixed(4)) : null;
+    const cacheHitRatio =
+      cacheLookups > 0
+        ? Number(((metrics.externalCache?.hits || 0) / cacheLookups).toFixed(4))
+        : null;
     const routeLatency = Object.fromEntries(
       Object.entries(metrics.routeLatencyMs || {}).map(([routeKey, bucket]) => [
         routeKey,

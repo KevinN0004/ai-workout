@@ -1,4 +1,5 @@
 import path from "path";
+import { inspect } from "node:util";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { closePostgres, connectPostgres, getPostgresPool } from "../src/postgres.js";
@@ -21,7 +22,7 @@ const run = async () => {
 
 run()
   .catch((err) => {
-    console.error("[postgres:migrate] failed:", err);
+    process.stderr.write(`[postgres:migrate] failed: ${inspect(err)}\n`);
     process.exitCode = 1;
   })
   .finally(async () => {

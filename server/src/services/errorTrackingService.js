@@ -28,7 +28,10 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
     const tracesSampleRate = toRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 0);
     Sentry.init({
       dsn,
-      environment: toShortText(process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development", 80),
+      environment: toShortText(
+        process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development",
+        80
+      ),
       release: toShortText(process.env.SENTRY_RELEASE || "", 120) || undefined,
       tracesSampleRate
     });
@@ -73,4 +76,3 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
     };
   }
 };
-

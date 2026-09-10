@@ -83,9 +83,7 @@ describe("parsePlanSections", () => {
     test("falls back to a single section when no weekday is found", () => {
       const { days } = parsePlanSections(plan("Do 20 push-ups", "Then a 2km run"));
 
-      expect(days).toEqual([
-        { title: "Your plan", lines: ["Do 20 push-ups", "Then a 2km run"] }
-      ]);
+      expect(days).toEqual([{ title: "Your plan", lines: ["Do 20 push-ups", "Then a 2km run"] }]);
     });
 
     // startsWith, not a contains, so a line only counts as a heading when the

@@ -280,7 +280,11 @@ describe("server routes", () => {
       expect(quotaBody.requiresAuth).toBe(true);
       expect(quotaBody.error).toMatch(/sign in/i);
     } finally {
-      process.env.GEMINI_API_KEY = previousApiKey;
+      if (previousApiKey === undefined) {
+        delete process.env.GEMINI_API_KEY;
+      } else {
+        process.env.GEMINI_API_KEY = previousApiKey;
+      }
     }
   });
 
@@ -435,7 +439,9 @@ describe("server routes", () => {
       })
     );
 
-    const response = await fetch(`${baseUrl}/api/weather/current?latitude=38.1111&longitude=-122.5555`);
+    const response = await fetch(
+      `${baseUrl}/api/weather/current?latitude=38.1111&longitude=-122.5555`
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -512,7 +518,10 @@ describe("server routes", () => {
       const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
       const csrfPayload = await csrfResponse.json();
       const csrfToken = String(csrfPayload?.csrfToken || "");
-      const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
+      const csrfCookie = extractCookieFromHeader(
+        csrfResponse.headers.get("set-cookie"),
+        "csrfToken"
+      );
 
       let sawRateLimit = false;
       for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -533,7 +542,11 @@ describe("server routes", () => {
 
       expect(sawRateLimit).toBe(true);
     } finally {
-      process.env.GEMINI_API_KEY = previousApiKey;
+      if (previousApiKey === undefined) {
+        delete process.env.GEMINI_API_KEY;
+      } else {
+        process.env.GEMINI_API_KEY = previousApiKey;
+      }
     }
   });
 

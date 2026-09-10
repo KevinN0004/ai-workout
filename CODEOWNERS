@@ -1,0 +1,7 @@
+# Default owner for everything in the repository.
+* @KevinN0004
+
+# Tooling and CI changes are easy to get subtly wrong.
+/.github/       @KevinN0004
+/scripts/       @KevinN0004
+/security/      @KevinN0004

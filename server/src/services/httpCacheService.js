@@ -116,9 +116,7 @@ export const createHttpCacheService = ({
 
   const mergeCacheStatuses = (...statuses) => {
     const clean = statuses
-      .map((status) =>
-        typeof status === "string" ? status.trim().slice(0, 20).toLowerCase() : ""
-      )
+      .map((status) => (typeof status === "string" ? status.trim().slice(0, 20).toLowerCase() : ""))
       .filter(Boolean);
     if (!clean.length) return "";
     if (clean.includes("stale")) return "stale";
@@ -134,4 +132,3 @@ export const createHttpCacheService = ({
     mergeCacheStatuses
   };
 };
-

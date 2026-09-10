@@ -4,10 +4,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const prismaLog =
-  process.env.NODE_ENV === "production"
-    ? ["warn", "error"]
-    : ["warn", "error"];
+const prismaLog = process.env.NODE_ENV === "production" ? ["warn", "error"] : ["warn", "error"];
 
 const globalPrisma = globalThis.__aiWorkoutPrismaClient;
 const adapter = new PrismaPg({

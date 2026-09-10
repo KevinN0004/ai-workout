@@ -118,10 +118,7 @@ export default function CaloriesView({
                 role="img"
                 aria-label="Workouts line chart"
               >
-                <path
-                  className="chart-line chart-line-alt"
-                  d={buildLinePath(workoutSeries)}
-                />
+                <path className="chart-line chart-line-alt" d={buildLinePath(workoutSeries)} />
               </svg>
               <div className="chart-labels">
                 <span>{last7Keys[0]}</span>
@@ -290,9 +287,7 @@ export default function CaloriesView({
                   </div>
                 </div>
               ))}
-              {!progressMetrics?.length && (
-                <p className="muted">No progress metrics logged yet.</p>
-              )}
+              {!progressMetrics?.length && <p className="muted">No progress metrics logged yet.</p>}
             </div>
           </section>
         </aside>

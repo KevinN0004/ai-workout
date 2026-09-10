@@ -3,8 +3,7 @@
     {
       id: "dessert-berry-parfait",
       title: "Berry Protein Parfait",
-      image:
-        "https://source.unsplash.com/featured/900x650/?berry,parfait,healthy,dessert",
+      image: "https://source.unsplash.com/featured/900x650/?berry,parfait,healthy,dessert",
       blurb: "Sweet finish with protein and fiber.",
       calories: 260,
       ingredients: [
@@ -33,8 +32,7 @@
     {
       id: "dessert-choco-pudding",
       title: "Chocolate Chia Pudding",
-      image:
-        "https://source.unsplash.com/featured/900x650/?chia,pudding,chocolate",
+      image: "https://source.unsplash.com/featured/900x650/?chia,pudding,chocolate",
       blurb: "Prep-ahead dessert with healthy fats.",
       calories: 300,
       ingredients: [
@@ -63,8 +61,7 @@
     {
       id: "dessert-protein-brownie",
       title: "Protein Brownie Bites",
-      image:
-        "https://source.unsplash.com/featured/900x650/?protein,brownies,dessert",
+      image: "https://source.unsplash.com/featured/900x650/?protein,brownies,dessert",
       blurb: "Batch dessert option for controlled sweet cravings.",
       calories: 220,
       ingredients: [
@@ -95,8 +92,7 @@
     {
       id: "snack-hummus-box",
       title: "Hummus Crunch Snack Box",
-      image:
-        "https://source.unsplash.com/featured/900x650/?hummus,vegetable,snack",
+      image: "https://source.unsplash.com/featured/900x650/?hummus,vegetable,snack",
       blurb: "Fiber-rich snack to stabilize appetite.",
       calories: 280,
       ingredients: [
@@ -125,16 +121,10 @@
     {
       id: "snack-apple-peanut",
       title: "Apple Peanut Butter Pack",
-      image:
-        "https://source.unsplash.com/featured/900x650/?apple,peanut,butter,snack",
+      image: "https://source.unsplash.com/featured/900x650/?apple,peanut,butter,snack",
       blurb: "Simple carb-plus-fat snack for training days.",
       calories: 240,
-      ingredients: [
-        "1 apple",
-        "1.5 tbsp peanut butter",
-        "Pinch cinnamon",
-        "Optional chia seeds"
-      ],
+      ingredients: ["1 apple", "1.5 tbsp peanut butter", "Pinch cinnamon", "Optional chia seeds"],
       recipes: [
         {
           label: "Food Network search",
@@ -154,8 +144,7 @@
     {
       id: "snack-cottage-cup",
       title: "Cottage Cheese Fruit Cup",
-      image:
-        "https://source.unsplash.com/featured/900x650/?cottage,cheese,fruit",
+      image: "https://source.unsplash.com/featured/900x650/?cottage,cheese,fruit",
       blurb: "High-protein snack with quick prep.",
       calories: 230,
       ingredients: [
@@ -185,8 +174,7 @@
     {
       id: "drink-green-smoothie",
       title: "Green Protein Smoothie",
-      image:
-        "https://source.unsplash.com/featured/900x650/?green,smoothie,protein",
+      image: "https://source.unsplash.com/featured/900x650/?green,smoothie,protein",
       blurb: "Post-workout drink for protein and micronutrients.",
       calories: 320,
       ingredients: [
@@ -215,8 +203,7 @@
     {
       id: "drink-coldbrew-shake",
       title: "Cold Brew Recovery Shake",
-      image:
-        "https://source.unsplash.com/featured/900x650/?coffee,protein,shake",
+      image: "https://source.unsplash.com/featured/900x650/?coffee,protein,shake",
       blurb: "Caffeine plus protein for busy mornings.",
       calories: 290,
       ingredients: [
@@ -245,8 +232,7 @@
     {
       id: "drink-electrolyte-refresher",
       title: "Citrus Electrolyte Refresher",
-      image:
-        "https://source.unsplash.com/featured/900x650/?citrus,drink,hydration",
+      image: "https://source.unsplash.com/featured/900x650/?citrus,drink,hydration",
       blurb: "Hydration-focused option for high-sweat sessions.",
       calories: 90,
       ingredients: [
@@ -274,5 +260,3 @@
     }
   ]
 };
-
-

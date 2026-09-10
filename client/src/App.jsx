@@ -107,8 +107,7 @@ export default function App() {
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const { apiFetch, ensureCsrfToken } = useApiClient();
-  const isDashboardRoute =
-    route === "/dashboard" || route.startsWith("/dashboard/");
+  const isDashboardRoute = route === "/dashboard" || route.startsWith("/dashboard/");
   const dashboardCacheKey = useMemo(
     () => (user ? buildScopedCacheKey(DASHBOARD_CACHE_PREFIX, user) : ""),
     [user]
@@ -207,7 +206,8 @@ export default function App() {
     setForm((prev) => {
       const options = equipmentOptionsByEnv[prev.environment] || [];
       const fullAccessLabel = "Full gym access";
-      const isCommercialEnv = prev.environment === "Commercial" && options.includes(fullAccessLabel);
+      const isCommercialEnv =
+        prev.environment === "Commercial" && options.includes(fullAccessLabel);
       const currentSelection = prev.equipment.filter((value) => options.includes(value));
 
       if (!isCommercialEnv) {
@@ -262,9 +262,7 @@ export default function App() {
   const onEnvironmentChange = (nextEnv) => {
     const nextOptions = equipmentOptionsByEnv[nextEnv] || [];
     setForm((prev) => {
-      const filtered = prev.equipment.filter((item) =>
-        nextOptions.includes(item)
-      );
+      const filtered = prev.equipment.filter((item) => nextOptions.includes(item));
       return {
         ...prev,
         environment: nextEnv,
@@ -278,9 +276,7 @@ export default function App() {
       const exists = prev.focuses.includes(item);
       return {
         ...prev,
-        focuses: exists
-          ? prev.focuses.filter((focus) => focus !== item)
-          : [...prev.focuses, item]
+        focuses: exists ? prev.focuses.filter((focus) => focus !== item) : [...prev.focuses, item]
       };
     });
   };
@@ -396,10 +392,7 @@ export default function App() {
     setActiveDayIndex(0);
   }, [planSections.days.length, result]);
 
-  const latestPlanByWeekday = useMemo(
-    () => extractLatestPlanByWeekday(dashboard),
-    [dashboard]
-  );
+  const latestPlanByWeekday = useMemo(() => extractLatestPlanByWeekday(dashboard), [dashboard]);
 
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);

@@ -88,14 +88,7 @@ export default function DashboardHeader({
               title={user.email}
             >
               <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                <circle
-                  cx="12"
-                  cy="8"
-                  r="4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                />
+                <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
                 <path
                   d="M5 20c0-3.1 2.8-5 7-5s7 1.9 7 5"
                   fill="none"

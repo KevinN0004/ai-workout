@@ -74,7 +74,9 @@ export default function WorkoutsView({
       <div className="panel-header">
         <div>
           <h2>Logs</h2>
-          <p className="muted">View all logged items across workouts, calories, meals, and metrics.</p>
+          <p className="muted">
+            View all logged items across workouts, calories, meals, and metrics.
+          </p>
         </div>
         <button
           type="button"
@@ -253,4 +255,3 @@ export default function WorkoutsView({
     </section>
   );
 }
-

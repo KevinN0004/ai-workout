@@ -3,13 +3,13 @@
 > **STATUS: COMPLETE.** All five tasks are implemented and merged. Kept as a
 > record of what was changed and why.
 >
-> | Task | Shipped in |
-> | --- | --- |
-> | 1 · Bound route metric cardinality | `6bf111d` |
-> | 2 · Transactional migrations | PR #5 |
-> | 3 · `closeSessionStore()` | PR #4 |
-> | 4 · Injectable shutdown sequence | PR #4 |
-> | 5 · Wire SIGTERM/SIGINT | PR #4 |
+> | Task                               | Shipped in |
+> | ---------------------------------- | ---------- |
+> | 1 · Bound route metric cardinality | `6bf111d`  |
+> | 2 · Transactional migrations       | PR #5      |
+> | 3 · `closeSessionStore()`          | PR #4      |
+> | 4 · Injectable shutdown sequence   | PR #4      |
+> | 5 · Wire SIGTERM/SIGINT            | PR #4      |
 >
 > Two items listed under Out of Scope below remain genuinely open and are worth
 > follow-ups: the Prisma/SQL unique-index drift, and the dependency CVEs.
@@ -30,11 +30,11 @@ These were verified against the running server, not assumed. They drive the desi
 
 **1. Metric cardinality leak is broader than 404s.** `sanitizeRoutePath` falls back to the caller-supplied path whenever `req.route` is absent. Probing a live server produced these `routeLatencyMs` keys:
 
-| Request | Key recorded |
-|---|---|
-| `GET /api/health` (matched) | `GET /api/health` |
-| `GET /api/wger/exercises/999` (matched, param) | `GET /api/wger/exercises/:id` |
-| `GET /api/nope-unmatched-xyz` (404) | `GET /api/nope-unmatched-xyz` |
+| Request                                               | Key recorded                      |
+| ----------------------------------------------------- | --------------------------------- |
+| `GET /api/health` (matched)                           | `GET /api/health`                 |
+| `GET /api/wger/exercises/999` (matched, param)        | `GET /api/wger/exercises/:id`     |
+| `GET /api/nope-unmatched-xyz` (404)                   | `GET /api/nope-unmatched-xyz`     |
 | `POST /api/attacker-controlled-25896` (CSRF-rejected) | `POST /attacker-controlled-25896` |
 
 The last row matters most: **CSRF-rejected POSTs leak too**, and they need no session and no valid token, so an unauthenticated caller can grow the map. Note the missing `/api` prefix — `app.use("/api", ...)` strips the mount path, and the middleware ends the response before Express restores `req.url`.
@@ -47,25 +47,25 @@ The test must assert `pool.connect()` is used, because a "same client" assertion
 
 **3. Shutdown primitives already exist but are unused.** `closePostgres()` (`postgres.js:102`) and `disconnectPrisma()` (`prisma.js:33`) are exported and never called. There is **no** Redis close function — one must be added. `app.listen()`'s return value is discarded, so there is no server handle to close. `http.Server#closeIdleConnections` and `closeAllConnections` are both available on the installed Node.
 
-**4. Windows cannot test signals.** The dev machine is Windows, where Node does not receive POSIX signals the way CI (ubuntu-latest) does. Therefore the shutdown *sequence* is extracted into `createShutdownHandler` and unit-tested by direct invocation with an injected `exit`; only the one-line `process.on` wiring is untested locally.
+**4. Windows cannot test signals.** The dev machine is Windows, where Node does not receive POSIX signals the way CI (ubuntu-latest) does. Therefore the shutdown _sequence_ is extracted into `createShutdownHandler` and unit-tested by direct invocation with an injected `exit`; only the one-line `process.on` wiring is untested locally.
 
 ---
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `server/src/middleware/requestContext.js` | *Modify.* Bound route-metric cardinality. |
-| `server/src/middleware/requestContext.test.js` | *Modify.* Add cardinality regression test. |
-| `server/src/postgresMigrations.js` | *Create.* Transactional migration runner (importable, no side effects). |
-| `server/src/postgresMigrations.test.js` | *Create.* Fake-pool tests for commit/rollback/checkout. |
-| `server/scripts/apply-postgres-migrations.js` | *Modify.* Reduce to a thin CLI wrapper. |
-| `server/src/shutdown.js` | *Create.* Injectable shutdown sequence. |
-| `server/src/shutdown.test.js` | *Create.* Ordering, idempotency, failure, timeout tests. |
-| `server/src/services/sessionService.js` | *Modify.* Add `closeSessionStore()`. |
-| `server/src/services/sessionService.test.js` | *Modify.* Cover `closeSessionStore()`. |
-| `server/src/index.js` | *Modify.* Capture server handle, wire signal handlers. |
-| `README.md` | *Modify.* Document `SHUTDOWN_TIMEOUT_MS`. |
+| File                                           | Responsibility                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------- |
+| `server/src/middleware/requestContext.js`      | _Modify._ Bound route-metric cardinality.                               |
+| `server/src/middleware/requestContext.test.js` | _Modify._ Add cardinality regression test.                              |
+| `server/src/postgresMigrations.js`             | _Create._ Transactional migration runner (importable, no side effects). |
+| `server/src/postgresMigrations.test.js`        | _Create._ Fake-pool tests for commit/rollback/checkout.                 |
+| `server/scripts/apply-postgres-migrations.js`  | _Modify._ Reduce to a thin CLI wrapper.                                 |
+| `server/src/shutdown.js`                       | _Create._ Injectable shutdown sequence.                                 |
+| `server/src/shutdown.test.js`                  | _Create._ Ordering, idempotency, failure, timeout tests.                |
+| `server/src/services/sessionService.js`        | _Modify._ Add `closeSessionStore()`.                                    |
+| `server/src/services/sessionService.test.js`   | _Modify._ Cover `closeSessionStore()`.                                  |
+| `server/src/index.js`                          | _Modify._ Capture server handle, wire signal handlers.                  |
+| `README.md`                                    | _Modify._ Document `SHUTDOWN_TIMEOUT_MS`.                               |
 
 The migration logic goes in `src/` rather than `scripts/` for one concrete reason: the current script calls `run()` at module scope, so importing it in a test would execute a real migration. Splitting logic from entry point avoids needing a main-module guard.
 
@@ -74,6 +74,7 @@ The migration logic goes in `src/` rather than `scripts/` for one concrete reaso
 ### Task 1: Bound route metric cardinality
 
 **Files:**
+
 - Modify: `server/src/middleware/requestContext.js:3-8`
 - Test: `server/src/middleware/requestContext.test.js`
 
@@ -82,62 +83,62 @@ The migration logic goes in `src/` rather than `scripts/` for one concrete reaso
 Append this test inside the existing `describe("requestContext middleware", ...)` block in `server/src/middleware/requestContext.test.js`, after the last test:
 
 ```javascript
-  test("collapses unrouted requests into one bucket so metrics stay bounded", () => {
-    const metrics = {
-      requestsTotal: 0,
-      requestLatencyMs: {},
-      routeLatencyMs: {}
-    };
-    const logger = {
-      child: vi.fn(() => ({ info: vi.fn() }))
-    };
-    const middleware = createRequestContextMiddleware({
-      metrics,
-      logger,
-      toShortText: () => ""
-    });
-
-    // 404s and middleware rejections (CSRF, rate limit) arrive with no req.route
-    // and a caller-supplied path. Each must not mint its own metric key.
-    for (const path of ["/api/random-a", "/api/random-b", "/api/random-c"]) {
-      const req = { headers: {}, method: "GET", path, originalUrl: path };
-      const res = createResponseHarness();
-      middleware(req, res, vi.fn());
-      res.finish();
-    }
-
-    expect(Object.keys(metrics.routeLatencyMs)).toEqual(["GET <unmatched>"]);
-    expect(metrics.routeLatencyMs["GET <unmatched>"].count).toBe(3);
+test("collapses unrouted requests into one bucket so metrics stay bounded", () => {
+  const metrics = {
+    requestsTotal: 0,
+    requestLatencyMs: {},
+    routeLatencyMs: {}
+  };
+  const logger = {
+    child: vi.fn(() => ({ info: vi.fn() }))
+  };
+  const middleware = createRequestContextMiddleware({
+    metrics,
+    logger,
+    toShortText: () => ""
   });
 
-  test("still records a key per matched route", () => {
-    const metrics = {
-      requestsTotal: 0,
-      requestLatencyMs: {},
-      routeLatencyMs: {}
-    };
-    const logger = {
-      child: vi.fn(() => ({ info: vi.fn() }))
-    };
-    const middleware = createRequestContextMiddleware({
-      metrics,
-      logger,
-      toShortText: () => ""
-    });
-
-    const req = {
-      headers: {},
-      method: "GET",
-      path: "/api/wger/exercises/999",
-      originalUrl: "/api/wger/exercises/999",
-      route: { path: "/api/wger/exercises/:id" }
-    };
+  // 404s and middleware rejections (CSRF, rate limit) arrive with no req.route
+  // and a caller-supplied path. Each must not mint its own metric key.
+  for (const path of ["/api/random-a", "/api/random-b", "/api/random-c"]) {
+    const req = { headers: {}, method: "GET", path, originalUrl: path };
     const res = createResponseHarness();
     middleware(req, res, vi.fn());
     res.finish();
+  }
 
-    expect(metrics.routeLatencyMs["GET /api/wger/exercises/:id"].count).toBe(1);
+  expect(Object.keys(metrics.routeLatencyMs)).toEqual(["GET <unmatched>"]);
+  expect(metrics.routeLatencyMs["GET <unmatched>"].count).toBe(3);
+});
+
+test("still records a key per matched route", () => {
+  const metrics = {
+    requestsTotal: 0,
+    requestLatencyMs: {},
+    routeLatencyMs: {}
+  };
+  const logger = {
+    child: vi.fn(() => ({ info: vi.fn() }))
+  };
+  const middleware = createRequestContextMiddleware({
+    metrics,
+    logger,
+    toShortText: () => ""
   });
+
+  const req = {
+    headers: {},
+    method: "GET",
+    path: "/api/wger/exercises/999",
+    originalUrl: "/api/wger/exercises/999",
+    route: { path: "/api/wger/exercises/:id" }
+  };
+  const res = createResponseHarness();
+  middleware(req, res, vi.fn());
+  res.finish();
+
+  expect(metrics.routeLatencyMs["GET /api/wger/exercises/:id"].count).toBe(1);
+});
 ```
 
 - [x] **Step 2: Run test to verify it fails**
@@ -145,9 +146,11 @@ Append this test inside the existing `describe("requestContext middleware", ...)
 Run: `npx vitest run src/middleware/requestContext.test.js --root server`
 
 Expected: FAIL. The first new test reports three keys instead of one — something like:
+
 ```
 AssertionError: expected [ 'GET /api/random-a', 'GET /api/random-b', 'GET /api/random-c' ] to deeply equal [ 'GET <unmatched>' ]
 ```
+
 The second new test passes already (it documents behaviour we must not break).
 
 - [x] **Step 3: Write minimal implementation**
@@ -202,6 +205,7 @@ git commit -m "fix: bound route metric cardinality to declared routes"
 ### Task 2: Make migrations genuinely transactional
 
 **Files:**
+
 - Create: `server/src/postgresMigrations.js`
 - Create: `server/src/postgresMigrations.test.js`
 - Modify: `server/scripts/apply-postgres-migrations.js` (full rewrite)
@@ -347,12 +351,7 @@ import path from "path";
  * `fs` is injectable so the transaction sequence can be tested without touching
  * the filesystem. Returns the filenames applied during this run.
  */
-export const applyMigrations = async ({
-  pool,
-  migrationsDir,
-  log = console.log,
-  fs = nodeFs
-}) => {
+export const applyMigrations = async ({ pool, migrationsDir, log = console.log, fs = nodeFs }) => {
   await pool.query(`
     create table if not exists schema_migrations (
       filename text primary key,
@@ -471,6 +470,7 @@ git commit -m "fix: run each migration in a real transaction on one connection"
 ### Task 3: Add a Redis close function
 
 **Files:**
+
 - Modify: `server/src/services/sessionService.js`
 - Test: `server/src/services/sessionService.test.js`
 
@@ -481,24 +481,24 @@ This is split from the shutdown sequence because it is the one missing primitive
 Append to the `describe("initSessionStore", ...)` block in `server/src/services/sessionService.test.js`:
 
 ```javascript
-  test("closeSessionStore is safe when no Redis client was ever created", async () => {
-    const service = buildService();
-    await service.initSessionStore({});
+test("closeSessionStore is safe when no Redis client was ever created", async () => {
+  const service = buildService();
+  await service.initSessionStore({});
 
-    await expect(service.closeSessionStore()).resolves.toBeUndefined();
-    expect(service.isRedisSessionsEnabled()).toBe(false);
-    expect(service.getRedisClient()).toBeNull();
-  });
+  await expect(service.closeSessionStore()).resolves.toBeUndefined();
+  expect(service.isRedisSessionsEnabled()).toBe(false);
+  expect(service.getRedisClient()).toBeNull();
+});
 
-  test("closeSessionStore disconnects the client and disables Redis sessions", async () => {
-    const service = buildService({ redisConnectTimeoutMs: 300 });
-    await service.initSessionStore({ REDIS_HOST: "127.0.0.1", REDIS_PORT: "1" });
+test("closeSessionStore disconnects the client and disables Redis sessions", async () => {
+  const service = buildService({ redisConnectTimeoutMs: 300 });
+  await service.initSessionStore({ REDIS_HOST: "127.0.0.1", REDIS_PORT: "1" });
 
-    await service.closeSessionStore();
+  await service.closeSessionStore();
 
-    expect(service.isRedisSessionsEnabled()).toBe(false);
-    expect(service.getRedisClient()).toBeNull();
-  }, 15000);
+  expect(service.isRedisSessionsEnabled()).toBe(false);
+  expect(service.getRedisClient()).toBeNull();
+}, 15000);
 ```
 
 - [x] **Step 2: Run test to verify it fails**
@@ -512,16 +512,16 @@ Expected: FAIL with `service.closeSessionStore is not a function`.
 In `server/src/services/sessionService.js`, add this function immediately after `attachOptionalUser`:
 
 ```javascript
-  /**
-   * Releases the Redis connection so a shutdown is not held open by it.
-   * Safe to call when Redis was never configured or already fell back.
-   */
-  const closeSessionStore = async () => {
-    const client = redisClient;
-    redisClient = null;
-    redisSessionsEnabled = false;
-    await closeRedisClientQuietly(client);
-  };
+/**
+ * Releases the Redis connection so a shutdown is not held open by it.
+ * Safe to call when Redis was never configured or already fell back.
+ */
+const closeSessionStore = async () => {
+  const client = redisClient;
+  redisClient = null;
+  redisSessionsEnabled = false;
+  await closeRedisClientQuietly(client);
+};
 ```
 
 Then add `closeSessionStore,` to the returned object, immediately after `attachOptionalUser,`.
@@ -544,6 +544,7 @@ git commit -m "feat: add closeSessionStore to release the Redis connection"
 ### Task 4: Build the shutdown sequence
 
 **Files:**
+
 - Create: `server/src/shutdown.js`
 - Create: `server/src/shutdown.test.js`
 
@@ -762,6 +763,7 @@ git commit -m "feat: add an injectable graceful shutdown sequence"
 ### Task 5: Wire shutdown into the server
 
 **Files:**
+
 - Modify: `server/src/index.js` (imports, env var, `startServer`)
 - Modify: `README.md`
 
@@ -788,32 +790,32 @@ const shutdownTimeoutMs = toPositiveInt(process.env.SHUTDOWN_TIMEOUT_MS, 10000);
 In `startServer`, replace this block:
 
 ```javascript
-    app.listen(port, () => {
-      logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
-    });
+app.listen(port, () => {
+  logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
+});
 ```
 
 with:
 
 ```javascript
-    const httpServer = app.listen(port, () => {
-      logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
-    });
+const httpServer = app.listen(port, () => {
+  logger.info({ event: "server_started", port }, `Server listening on http://localhost:${port}`);
+});
 
-    const handleShutdown = createShutdownHandler({
-      logger,
-      toShortText,
-      getHttpServer: () => httpServer,
-      closeSessionStore: sessionService.closeSessionStore,
-      disconnectPrisma,
-      closePostgres,
-      flushErrorTracker: () => errorTracker.flush(sentryShutdownTimeoutMs),
-      shutdownTimeoutMs
-    });
-    // Registered here rather than at module scope so importing `app` in tests
-    // does not attach process-wide handlers.
-    process.on("SIGTERM", () => handleShutdown("SIGTERM"));
-    process.on("SIGINT", () => handleShutdown("SIGINT"));
+const handleShutdown = createShutdownHandler({
+  logger,
+  toShortText,
+  getHttpServer: () => httpServer,
+  closeSessionStore: sessionService.closeSessionStore,
+  disconnectPrisma,
+  closePostgres,
+  flushErrorTracker: () => errorTracker.flush(sentryShutdownTimeoutMs),
+  shutdownTimeoutMs
+});
+// Registered here rather than at module scope so importing `app` in tests
+// does not attach process-wide handlers.
+process.on("SIGTERM", () => handleShutdown("SIGTERM"));
+process.on("SIGINT", () => handleShutdown("SIGINT"));
 ```
 
 - [x] **Step 4: Document the setting**

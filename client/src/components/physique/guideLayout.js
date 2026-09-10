@@ -69,14 +69,21 @@ export const appendDefaultGuides = ({
   pushMirrorGuide("lat", underarmX, underarmY, waistX, waistY, "muscle");
   pushMirrorGuide(
     "trap-upper",
-    centerX + (neckHalf * 0.66),
+    centerX + neckHalf * 0.66,
     neckBaseY + clamp(headRadiusY * 0.08, 0.8, 2.8),
     trapCurveX,
     trapCurveY,
     "muscle"
   );
   pushMirrorGuide("trap-lower", trapCurveX, trapCurveY, shoulderCapX, shoulderCapY, "muscle");
-  pushMirrorGuide("deltoid-cap", shoulderCapX, shoulderCapY, shoulderLowerX, shoulderLowerY, "muscle");
+  pushMirrorGuide(
+    "deltoid-cap",
+    shoulderCapX,
+    shoulderCapY,
+    shoulderLowerX,
+    shoulderLowerY,
+    "muscle"
+  );
   pushMirrorGuide("deltoid", shoulderX, shoulderY, underarmX, underarmY, "muscle");
   pushMirrorGuide("upper-arm-mid", shoulderX, shoulderY, upperArmMidX, upperArmMidY, "muscle");
   pushMirrorGuide("upper-arm-end", upperArmMidX, upperArmMidY, elbowX, elbowY, "muscle");

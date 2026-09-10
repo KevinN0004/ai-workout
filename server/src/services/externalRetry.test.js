@@ -126,7 +126,10 @@ describe("external request retry", () => {
   });
 
   test("records latency for every attempt, not just the last", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failResponse(500)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failResponse(500))
+    );
     const { service, recordExternalApiLatency } = buildService();
 
     await expect(service.fetchOpenMeteo({ latitude: 1 })).rejects.toThrow();
@@ -136,7 +139,10 @@ describe("external request retry", () => {
   });
 
   test("logs each retry with the service and attempt number", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failResponse(500)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failResponse(500))
+    );
     const { service, logger } = buildService();
 
     await expect(service.fetchOpenMeteo({ latitude: 1 })).rejects.toThrow();
@@ -151,7 +157,10 @@ describe("external request retry", () => {
 
   // base * 2^attempt, so with base 1 the waits are 1ms then 2ms.
   test("backs off exponentially between attempts", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => failResponse(500)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => failResponse(500))
+    );
     const { service, logger } = buildService({ externalApiRetryBaseDelayMs: 10 });
 
     await expect(service.fetchOpenMeteo({ latitude: 1 })).rejects.toThrow();

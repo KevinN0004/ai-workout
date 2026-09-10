@@ -12,9 +12,8 @@ export default function PreviewPersonalChapter({
 }) {
   const showCollapsed = previewPersonalCollapsed || isGenerateView;
   const showBuilder = previewPersonalShifted || isGenerateView;
-  const getFieldValue = (fieldKey) => (
-    typeof previewFilledFields[fieldKey] === "string" ? previewFilledFields[fieldKey] : ""
-  );
+  const getFieldValue = (fieldKey) =>
+    typeof previewFilledFields[fieldKey] === "string" ? previewFilledFields[fieldKey] : "";
   const previewTrainingDays = Array.isArray(previewFilledFields.trainingDays)
     ? previewFilledFields.trainingDays
     : [];
@@ -23,12 +22,15 @@ export default function PreviewPersonalChapter({
     <div
       className={`preview-personal-sequence ${isGenerateView ? "is-generate-view" : ""} ${showBuilder ? "is-builder-active" : ""} builder-stage-${previewBuilderStage}`}
     >
-      <div
-        className={`preview-personal-form-shell ${showCollapsed ? "is-collapsed" : ""}`}
-      >
+      <div className={`preview-personal-form-shell ${showCollapsed ? "is-collapsed" : ""}`}>
         <div className="preview-personal-morph-surface" aria-hidden="true" />
-        <span className="preview-personal-morph-label" aria-hidden="true">Personal Info</span>
-        <form className="form personal-form advanced-mode preview-personal-form" onSubmit={(event) => event.preventDefault()}>
+        <span className="preview-personal-morph-label" aria-hidden="true">
+          Personal Info
+        </span>
+        <form
+          className="form personal-form advanced-mode preview-personal-form"
+          onSubmit={(event) => event.preventDefault()}
+        >
           <label className="field-name">
             Full name
             <textarea
@@ -57,18 +59,10 @@ export default function PreviewPersonalChapter({
                 role="group"
                 aria-label="Height units"
               >
-                <button
-                  type="button"
-                  className={heightUnit === "ft" ? "active" : ""}
-                  tabIndex={-1}
-                >
+                <button type="button" className={heightUnit === "ft" ? "active" : ""} tabIndex={-1}>
                   ft/in
                 </button>
-                <button
-                  type="button"
-                  className={heightUnit === "cm" ? "active" : ""}
-                  tabIndex={-1}
-                >
+                <button type="button" className={heightUnit === "cm" ? "active" : ""} tabIndex={-1}>
                   cm
                 </button>
               </span>
@@ -117,18 +111,10 @@ export default function PreviewPersonalChapter({
                 role="group"
                 aria-label="Weight units"
               >
-                <button
-                  type="button"
-                  className={weightUnit === "lb" ? "active" : ""}
-                  tabIndex={-1}
-                >
+                <button type="button" className={weightUnit === "lb" ? "active" : ""} tabIndex={-1}>
                   lb
                 </button>
-                <button
-                  type="button"
-                  className={weightUnit === "kg" ? "active" : ""}
-                  tabIndex={-1}
-                >
+                <button type="button" className={weightUnit === "kg" ? "active" : ""} tabIndex={-1}>
                   kg
                 </button>
               </span>
@@ -157,11 +143,7 @@ export default function PreviewPersonalChapter({
             <div className="advanced-fields-inner">
               <label>
                 Activity level
-                <select
-                  name="activity"
-                  value={getFieldValue("activity")}
-                  onChange={() => {}}
-                >
+                <select name="activity" value={getFieldValue("activity")} onChange={() => {}}>
                   <option value="">Select</option>
                   <option>Light</option>
                   <option>Moderate</option>
@@ -171,11 +153,7 @@ export default function PreviewPersonalChapter({
               </label>
               <label>
                 Sleep
-                <select
-                  name="sleep"
-                  value={getFieldValue("sleep")}
-                  onChange={() => {}}
-                >
+                <select name="sleep" value={getFieldValue("sleep")} onChange={() => {}}>
                   <option value="">Select</option>
                   <option>Less than 4</option>
                   <option>4 - 6 hours</option>
@@ -194,11 +172,7 @@ export default function PreviewPersonalChapter({
               </label>
               <label>
                 Training experience
-                <select
-                  name="experience"
-                  value={getFieldValue("experience")}
-                  onChange={() => {}}
-                >
+                <select name="experience" value={getFieldValue("experience")} onChange={() => {}}>
                   <option value="">Select</option>
                   <option>Beginner</option>
                   <option>Intermediate</option>
@@ -207,11 +181,7 @@ export default function PreviewPersonalChapter({
               </label>
               <label>
                 Nutrition preference
-                <select
-                  name="nutrition"
-                  value={getFieldValue("nutrition")}
-                  onChange={() => {}}
-                >
+                <select name="nutrition" value={getFieldValue("nutrition")} onChange={() => {}}>
                   <option value="">Select</option>
                   <option>No preference</option>
                   <option>High-protein</option>
@@ -223,11 +193,7 @@ export default function PreviewPersonalChapter({
               </label>
               <label>
                 Cardio preference
-                <select
-                  name="cardio"
-                  value={getFieldValue("cardio")}
-                  onChange={() => {}}
-                >
+                <select name="cardio" value={getFieldValue("cardio")} onChange={() => {}}>
                   <option value="">Select</option>
                   <option>None</option>
                   <option>Walking</option>
@@ -270,17 +236,34 @@ export default function PreviewPersonalChapter({
           </div>
         </form>
       </div>
-      <div className={`preview-builder-track ${showBuilder ? "is-active" : ""}`} aria-hidden={!showBuilder}>
+      <div
+        className={`preview-builder-track ${showBuilder ? "is-active" : ""}`}
+        aria-hidden={!showBuilder}
+      >
         <div className="preview-builder-spacer" aria-hidden="true" />
-        <span className={`preview-builder-plus plus-one from-bottom ${previewBuilderStage >= 1 ? "is-visible" : ""}`}>+</span>
-        <div className={`preview-builder-slot env from-top ${previewBuilderStage >= 2 ? "is-visible" : ""}`}>
+        <span
+          className={`preview-builder-plus plus-one from-bottom ${previewBuilderStage >= 1 ? "is-visible" : ""}`}
+        >
+          +
+        </span>
+        <div
+          className={`preview-builder-slot env from-top ${previewBuilderStage >= 2 ? "is-visible" : ""}`}
+        >
           <span className="preview-builder-btn">Environment</span>
         </div>
-        <span className={`preview-builder-plus plus-two from-bottom ${previewBuilderStage >= 3 ? "is-visible" : ""}`}>+</span>
-        <div className={`preview-builder-slot focus from-top ${previewBuilderStage >= 4 ? "is-visible" : ""}`}>
+        <span
+          className={`preview-builder-plus plus-two from-bottom ${previewBuilderStage >= 3 ? "is-visible" : ""}`}
+        >
+          +
+        </span>
+        <div
+          className={`preview-builder-slot focus from-top ${previewBuilderStage >= 4 ? "is-visible" : ""}`}
+        >
           <span className="preview-builder-btn">Focus</span>
         </div>
-        <span className={`preview-builder-generating ${previewBuilderStage >= 6 ? "is-visible" : ""}`}>
+        <span
+          className={`preview-builder-generating ${previewBuilderStage >= 6 ? "is-visible" : ""}`}
+        >
           Generating
         </span>
       </div>

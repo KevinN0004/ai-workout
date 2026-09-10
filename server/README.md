@@ -40,22 +40,22 @@ server/
 Every Postgres read and write goes through `src/repositories/`. Routes and services call
 these; nothing else touches `prisma.*` directly.
 
-| Module | Responsibility |
-| --- | --- |
-| `userReadRepository.js` | Loads a user with all dashboard collections |
-| `userRepository.js` | Profile, goals, password hash, calorie entries |
-| `workoutSessionRepository.js` | Workout session writes |
-| `mealLogRepository.js` | Meal log writes, day calorie totals, derived calorie entries |
-| `progressMetricRepository.js` | Progress metric writes |
-| `savedExerciseRepository.js` | Saved exercise add/remove, with dedup |
-| `generatedPlanRepository.js` | Generated plan inserts |
-| `dashboardCollectionRepository.js` | Paginated reads for all three collections |
-| `userLookup.js` | UUID-or-legacy user id resolution — load-bearing |
-| `rowValues.js` | Shared date and Decimal conversions |
+| Module                             | Responsibility                                               |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `userReadRepository.js`            | Loads a user with all dashboard collections                  |
+| `userRepository.js`                | Profile, goals, password hash, calorie entries               |
+| `workoutSessionRepository.js`      | Workout session writes                                       |
+| `mealLogRepository.js`             | Meal log writes, day calorie totals, derived calorie entries |
+| `progressMetricRepository.js`      | Progress metric writes                                       |
+| `savedExerciseRepository.js`       | Saved exercise add/remove, with dedup                        |
+| `generatedPlanRepository.js`       | Generated plan inserts                                       |
+| `dashboardCollectionRepository.js` | Paginated reads for all three collections                    |
+| `userLookup.js`                    | UUID-or-legacy user id resolution — load-bearing             |
+| `rowValues.js`                     | Shared date and Decimal conversions                          |
 
 Two conventions worth knowing before adding a write:
 
-- **`upsert` is usually unavailable.** Uniqueness comes from *partial* unique indexes
+- **`upsert` is usually unavailable.** Uniqueness comes from _partial_ unique indexes
   (`where legacy_id is not null`), which `schema.prisma` cannot express, so Prisma has no
   constraint to target. The repositories do an explicit read-then-write.
 - **Collection caps are applied on read.** `userReadRepository` limits each collection
@@ -220,7 +220,7 @@ there, and only the generate-route tests will say so.
 ## Sessions
 
 Redis-backed when `REDIS_URL`, or `REDIS_HOST` **and** a valid `REDIS_PORT`, are set;
-in-memory otherwise. A host without a usable port counts as *no* configuration rather
+in-memory otherwise. A host without a usable port counts as _no_ configuration rather
 than a broken one, and a failed connection falls back to memory and disconnects the
 client so it does not retry and log forever.
 
@@ -241,7 +241,7 @@ the user is signed out on their next request — and sign-out cannot clear it. I
 inert either: if Redis is later disabled (including by `closeSessionStore`), those
 entries begin resolving as live sessions. There are tests pinning both halves.
 
-Making the read fall back to memory would fix the sign-out but would also let a *deleted*
+Making the read fall back to memory would fix the sign-out but would also let a _deleted_
 session return, so this wants a decision about which store is authoritative rather than a
 patch.
 
@@ -286,7 +286,7 @@ patch.
 - **`/api/wger/exercises` implements the text search itself.** wger has none, so with a
   `q` the route asks upstream for a wider page (`limit * 4`, floored at 100, capped at
   200), filters on name, description, category and muscle names, then cuts back to the
-  requested limit. `count` is the *filtered* length in that case, not the upstream total —
+  requested limit. `count` is the _filtered_ length in that case, not the upstream total —
   reporting the total would claim results that are not in the response.
 - **`/api/wger/exercises/:id` asks twice.** wger returns nothing at all for an exercise
   with no translation in the requested language, so a first attempt with the language

@@ -23,8 +23,7 @@ export const parseRedisPort = (value) => {
 };
 
 export const parseEnvBoolean = (value, fallback = false) => {
-  const normalized =
-    typeof value === "string" ? value.trim().slice(0, 12).toLowerCase() : "";
+  const normalized = typeof value === "string" ? value.trim().slice(0, 12).toLowerCase() : "";
   if (!normalized) return fallback;
   if (["true", "1", "yes", "on"].includes(normalized)) return true;
   if (["false", "0", "no", "off"].includes(normalized)) return false;
@@ -126,8 +125,7 @@ export const createSessionService = ({
     const redisUrl = cleanText(env.REDIS_URL || "", 500);
     const redisHost = cleanText(env.REDIS_HOST || "", 255);
     const redisPort = parseRedisPort(env.REDIS_PORT);
-    const redisUsername =
-      cleanText(env.REDIS_USERNAME || "default", 120) || "default";
+    const redisUsername = cleanText(env.REDIS_USERNAME || "default", 120) || "default";
     const redisPassword = cleanText(env.REDIS_PASSWORD || "", 500);
     const redisTls = parseEnvBoolean(env.REDIS_TLS, false);
     const hasSocketConfig = Boolean(redisHost && redisPort !== null);
@@ -212,10 +210,7 @@ export const createSessionService = ({
   };
 
   const clearSessionCookie = (res) => {
-    appendSetCookieHeader(
-      res,
-      `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`
-    );
+    appendSetCookieHeader(res, `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`);
   };
 
   const setCsrfCookie = (res, token) => {
@@ -418,4 +413,3 @@ export const createSessionService = ({
     getRedisLastError: () => redisLastError
   };
 };
-

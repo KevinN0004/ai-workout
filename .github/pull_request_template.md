@@ -1,0 +1,20 @@
+## What changed
+
+<!-- One or two sentences. What does this do, and why now? -->
+
+## Verification
+
+Paste the actual output, not a claim that it passed.
+
+- [ ] `npm run lint` — exit 0
+- [ ] `npm run format:check` — exit 0
+- [ ] `npm test` — 13 scripts, 655 client, 770 server
+- [ ] `npm run build` — exit 0
+
+## Risk
+
+<!-- What could this break, and how would you notice? Write "none" only if you checked. -->
+
+## Notes for the reviewer
+
+<!-- Anything non-obvious: a rejected alternative, a deliberate omission, a follow-up. -->

@@ -34,8 +34,7 @@ export default function MealView({
     notes: ""
   };
 
-  const updateMealLogForm =
-    typeof setMealLogForm === "function" ? setMealLogForm : () => {};
+  const updateMealLogForm = typeof setMealLogForm === "function" ? setMealLogForm : () => {};
   const onSubmitMealLog =
     typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
 
@@ -64,19 +63,13 @@ export default function MealView({
   const mealContext = useMemo(() => {
     const targetCalories = Number(dashboard?.goals?.targetCalories || 2200);
     const weeklyDays = Number(
-      latestPlan?.days ||
-        dashboard?.goals?.weeklyWorkouts ||
-        fallbackPlan?.days ||
-        3
+      latestPlan?.days || dashboard?.goals?.weeklyWorkouts || fallbackPlan?.days || 3
     );
     const calorieBand = getCalorieBand(targetCalories);
     const withPortions = (items) =>
       items.map((meal) => ({
         ...meal,
-        portionNote:
-          meal.portionByCalorie?.[calorieBand] ||
-          meal.portionByCalorie?.balanced ||
-          ""
+        portionNote: meal.portionByCalorie?.[calorieBand] || meal.portionByCalorie?.balanced || ""
       }));
 
     const recommendationSections = mealDbRecommendations.map((section) => ({
@@ -139,7 +132,9 @@ export default function MealView({
     () => mealContext.allMeals.find((meal) => meal.id === activeMealId) || null,
     [mealContext.allMeals, activeMealId]
   );
-  const activeMealIngredients = Array.isArray(activeMeal?.ingredients) ? activeMeal.ingredients : [];
+  const activeMealIngredients = Array.isArray(activeMeal?.ingredients)
+    ? activeMeal.ingredients
+    : [];
   const activeMealRecipes = Array.isArray(activeMeal?.recipes) ? activeMeal.recipes : [];
 
   useEffect(() => {
@@ -162,9 +157,7 @@ export default function MealView({
       <div className="meal-view-header">
         <div>
           <h2>Meal prep</h2>
-          <p className="muted">
-            Suggestions based on your current account plan and goals.
-          </p>
+          <p className="muted">Suggestions based on your current account plan and goals.</p>
         </div>
         <aside className="meal-context">
           <p>

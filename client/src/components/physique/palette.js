@@ -2,7 +2,11 @@ import { clamp, toFiniteNumber } from "./math";
 
 export const buildPhysiquePalette = (model, fallback) => {
   const fillHue = clamp(toFiniteNumber(model.fillHue, fallback.fillHue), 0, 360);
-  const fillSaturation = clamp(toFiniteNumber(model.fillSaturation, fallback.fillSaturation), 10, 100);
+  const fillSaturation = clamp(
+    toFiniteNumber(model.fillSaturation, fallback.fillSaturation),
+    10,
+    100
+  );
   const fillLightness = clamp(toFiniteNumber(model.fillLightness, fallback.fillLightness), 10, 90);
   return {
     major: `hsla(${fillHue}, ${Math.max(18, fillSaturation - 6)}%, ${Math.min(94, fillLightness + 42)}%, 0.98)`,

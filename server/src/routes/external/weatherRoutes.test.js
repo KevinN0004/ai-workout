@@ -14,22 +14,20 @@ import { cleanText, toNullableNumber } from "../../services/dashboardDataBuilder
 // dependency is the real injected function, so the recommendation under test is
 // the one that runs in production.
 
-const {
-  toFiniteNumber,
-  weatherCodeToText,
-  buildWorkoutRecommendation
-} = createExternalDataService({
-  cleanText,
-  toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-  readThroughExternalCache: async () => ({}),
-  buildExternalCacheKey: () => "",
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: { info() {}, warn() {}, error() {} },
-  toShortText: (value) => String(value ?? ""),
-  recordExternalApiLatency: () => {},
-  externalApiRetries: 0,
-  externalApiRetryBaseDelayMs: 0
-});
+const { toFiniteNumber, weatherCodeToText, buildWorkoutRecommendation } = createExternalDataService(
+  {
+    cleanText,
+    toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+    readThroughExternalCache: async () => ({}),
+    buildExternalCacheKey: () => "",
+    metrics: { externalApiFailures: {}, externalApiRetries: {} },
+    logger: { info() {}, warn() {}, error() {} },
+    toShortText: (value) => String(value ?? ""),
+    recordExternalApiLatency: () => {},
+    externalApiRetries: 0,
+    externalApiRetryBaseDelayMs: 0
+  }
+);
 
 const buildApp = (fetchOpenMeteo) => {
   const app = express();
@@ -409,10 +407,7 @@ describe("/api/weather/recommendation", () => {
       ["high wind", { wind_speed_10m: 33 }],
       ["rain", { precipitation: 1.2 }]
     ])("advises indoor training in %s", async (_label, patch) => {
-      const response = await get(
-        buildApp(upstream(withDaily(patch))),
-        path
-      );
+      const response = await get(buildApp(upstream(withDaily(patch))), path);
 
       expect(response.body.recommendation.workoutType).toBe("indoor");
       expect(response.body.recommendation.reasons.length).toBeGreaterThan(0);

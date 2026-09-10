@@ -1,32 +1,45 @@
 {
   "name": "ai-workout",
   "private": true,
+  "type": "module",
   "workspaces": [
     "client",
     "server"
   ],
+  "overrides": {
+    "qs": "^6.16.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
     "dev:client": "npm run dev -w client",
     "dev:server": "npm run dev -w server",
     "build": "npm run build -w client",
     "start": "npm run start -w server",
-    "test": "npm run test -w client && npm run test -w server",
+    "test": "npm run test:scripts && npm run test -w client && npm run test -w server",
+    "test:scripts": "vitest run",
     "test:all": "npm run test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test:coverage": "npm run test:coverage -w client && npm run test:coverage -w server"
+    "test:coverage": "npm run test:coverage -w client && npm run test:coverage -w server",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "node scripts/setup-git-config.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@vitest/coverage-v8": "^4.1.11",
     "concurrently": "^10.0.5",
     "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-node": "^0.4.0",
+    "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.12.0"
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^22.13 || >=24"
   }
 }

@@ -33,18 +33,21 @@ export default function PreviewDashboardChapter({
     trendStartLabel,
     trendEndLabel,
     streakDays,
-    recentActivity,
+    recentActivity
   } = previewDashboardSummary;
 
-  const nextWorkoutDuration = String(nextTrainingPlan?.meta || "50 min").split(" - ")[0].trim();
+  const nextWorkoutDuration = String(nextTrainingPlan?.meta || "50 min")
+    .split(" - ")[0]
+    .trim();
   const nextWorkoutNotes = Array.isArray(nextTrainingPlan?.highlights)
     ? nextTrainingPlan.highlights.slice(0, 2)
     : [];
-  const calorieDeltaLabel = calorieDelta === 0
-    ? "on target"
-    : calorieDelta > 0
-    ? `+${calorieDelta} kcal vs target`
-    : `${calorieDelta} kcal vs target`;
+  const calorieDeltaLabel =
+    calorieDelta === 0
+      ? "on target"
+      : calorieDelta > 0
+        ? `+${calorieDelta} kcal vs target`
+        : `${calorieDelta} kcal vs target`;
 
   const renderTrendChart = ({ title, subtitle, series, lineClassName, revealStage }) => (
     <section
@@ -63,7 +66,10 @@ export default function PreviewDashboardChapter({
         role="img"
         aria-label={`${title} trend`}
       >
-        <path className={`preview-dashboard-chart-line ${lineClassName}`} d={buildPreviewLinePath(series)} />
+        <path
+          className={`preview-dashboard-chart-line ${lineClassName}`}
+          d={buildPreviewLinePath(series)}
+        />
       </svg>
       <div className="preview-dashboard-chart-labels">
         <span>{trendStartLabel}</span>
@@ -75,9 +81,11 @@ export default function PreviewDashboardChapter({
   return (
     <section className="preview-dashboard-view" aria-label="Dashboard preview snapshot">
       <div className="preview-dashboard-main">
-        <section className={`preview-dashboard-card preview-dashboard-overview-panel ${
-          previewDashboardStage >= 1 ? "is-visible" : ""
-        }`}>
+        <section
+          className={`preview-dashboard-card preview-dashboard-overview-panel ${
+            previewDashboardStage >= 1 ? "is-visible" : ""
+          }`}
+        >
           <div className="preview-dashboard-overview-head">
             <div>
               <p className="preview-dashboard-eyebrow">Overview</p>
@@ -110,7 +118,9 @@ export default function PreviewDashboardChapter({
           </div>
         </section>
 
-        <section className={`preview-dashboard-card ${previewDashboardStage >= 2 ? "is-visible" : ""}`}>
+        <section
+          className={`preview-dashboard-card ${previewDashboardStage >= 2 ? "is-visible" : ""}`}
+        >
           <div className="preview-dashboard-overview-head">
             <div>
               <h3>{todayName} recommendations</h3>
@@ -131,17 +141,27 @@ export default function PreviewDashboardChapter({
             <article className="preview-dashboard-hub-card">
               <h4>Meal plan</h4>
               <ul>
-                <li><strong>Breakfast:</strong> {todayMealPlan.breakfast}</li>
-                <li><strong>Lunch:</strong> {todayMealPlan.lunch}</li>
-                <li><strong>Dinner:</strong> {todayMealPlan.dinner}</li>
-                <li><strong>Snack:</strong> {todayMealPlan.snack}</li>
+                <li>
+                  <strong>Breakfast:</strong> {todayMealPlan.breakfast}
+                </li>
+                <li>
+                  <strong>Lunch:</strong> {todayMealPlan.lunch}
+                </li>
+                <li>
+                  <strong>Dinner:</strong> {todayMealPlan.dinner}
+                </li>
+                <li>
+                  <strong>Snack:</strong> {todayMealPlan.snack}
+                </li>
               </ul>
               <p className="muted">Daily target: ~{todayMealPlan.calories} kcal</p>
             </article>
           </div>
         </section>
 
-        <section className={`preview-dashboard-card ${previewDashboardStage >= 3 ? "is-visible" : ""}`}>
+        <section
+          className={`preview-dashboard-card ${previewDashboardStage >= 3 ? "is-visible" : ""}`}
+        >
           <h3>Weekly progress</h3>
           <div className="preview-dashboard-stat-row">
             <div>
@@ -176,7 +196,9 @@ export default function PreviewDashboardChapter({
           <p className="muted">{goalPaceText}</p>
         </section>
 
-        <section className={`preview-dashboard-card ${previewDashboardStage >= 4 ? "is-visible" : ""}`}>
+        <section
+          className={`preview-dashboard-card ${previewDashboardStage >= 4 ? "is-visible" : ""}`}
+        >
           <h3>Recent activity</h3>
           <div className="preview-dashboard-activity-list">
             {recentActivity.map((item) => (
@@ -194,7 +216,9 @@ export default function PreviewDashboardChapter({
       </div>
 
       <aside className="preview-dashboard-side">
-        <section className={`preview-dashboard-card ${previewDashboardStage >= 5 ? "is-visible" : ""}`}>
+        <section
+          className={`preview-dashboard-card ${previewDashboardStage >= 5 ? "is-visible" : ""}`}
+        >
           <div className="preview-dashboard-range-head">
             <h3>Trend window</h3>
             <div className="preview-dashboard-range-pills" role="group" aria-label="Trend range">
@@ -217,9 +241,12 @@ export default function PreviewDashboardChapter({
               <h4>{avgRecovery}</h4>
             </div>
           </div>
-          <p className="muted">{streakDays} day streak | {todaySession} ({todayDuration})</p>
           <p className="muted">
-            Next: {nextTrainingPlan?.day || "Next"} - {nextTrainingPlan?.session || "Training Session"} ({nextWorkoutDuration})
+            {streakDays} day streak | {todaySession} ({todayDuration})
+          </p>
+          <p className="muted">
+            Next: {nextTrainingPlan?.day || "Next"} -{" "}
+            {nextTrainingPlan?.session || "Training Session"} ({nextWorkoutDuration})
           </p>
           <ul className="preview-dashboard-compact-list">
             {nextWorkoutNotes.map((item) => (

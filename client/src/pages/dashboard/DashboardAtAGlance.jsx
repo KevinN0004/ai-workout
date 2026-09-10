@@ -49,8 +49,8 @@ export default function DashboardAtAGlance({
               {caloriesGap === 0
                 ? "On target"
                 : caloriesGap > 0
-                ? `${caloriesGap} under target`
-                : `${Math.abs(caloriesGap)} over target`}
+                  ? `${caloriesGap} under target`
+                  : `${Math.abs(caloriesGap)} over target`}
             </p>
             <p className="muted">
               Avg {Math.round(avgCalories)} / goal {calorieGoal} kcal
@@ -68,12 +68,12 @@ export default function DashboardAtAGlance({
                   ? "Refreshing..."
                   : "Checking..."
                 : weatherRecommendation?.workoutType === "outdoor"
-                ? "Outdoor friendly"
-                : weatherRecommendation?.workoutType === "indoor"
-                ? "Indoor suggested"
-                : weatherError
-                ? "Unavailable"
-                : "Unavailable"}
+                  ? "Outdoor friendly"
+                  : weatherRecommendation?.workoutType === "indoor"
+                    ? "Indoor suggested"
+                    : weatherError
+                      ? "Unavailable"
+                      : "Unavailable"}
             </p>
             <p className="muted">
               {weatherRecommendation?.summary || weatherError || "No weather update yet."}

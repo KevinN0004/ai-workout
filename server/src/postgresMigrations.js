@@ -1,18 +1,19 @@
 import nodeFs from "fs/promises";
 import path from "path";
 
+// Matches what console.log did before no-console landed. Callers that want
+// the progress lines elsewhere -- the tests do -- inject `log`.
+const logToStdout = (message) => {
+  process.stdout.write(`${message}\n`);
+};
+
 /**
  * Applies every unapplied .sql file in `migrationsDir`, in filename order.
  *
  * `fs` is injectable so the transaction sequence can be tested without touching
  * the filesystem. Returns the filenames applied during this run.
  */
-export const applyMigrations = async ({
-  pool,
-  migrationsDir,
-  log = console.log,
-  fs = nodeFs
-}) => {
+export const applyMigrations = async ({ pool, migrationsDir, log = logToStdout, fs = nodeFs }) => {
   await pool.query(`
     create table if not exists schema_migrations (
       filename text primary key,

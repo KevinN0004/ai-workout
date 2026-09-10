@@ -115,7 +115,8 @@ export default function HomePage({
     boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
   };
 
-  const visualLabel = "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
+  const visualLabel =
+    "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
 
   return (
     <div className="page home-page" style={gradient}>

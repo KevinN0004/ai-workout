@@ -160,7 +160,9 @@ describe("POST /api/auth/signup", () => {
 
   // The address is the login identifier, so it is stored in one form.
   test("normalises the email before storing it", async () => {
-    await request(buildApp()).post("/api/auth/signup").send(signupBody({ email: " A@B.Com " }));
+    await request(buildApp())
+      .post("/api/auth/signup")
+      .send(signupBody({ email: " A@B.Com " }));
 
     expect(rows[0].email).toBe("a@b.com");
   });
@@ -195,7 +197,9 @@ describe("POST /api/auth/signup", () => {
   // Case is not a way around the duplicate check.
   test("treats a differently-cased email as the same account", async () => {
     const app = buildApp();
-    await request(app).post("/api/auth/signup").send(signupBody({ email: "person@example.com" }));
+    await request(app)
+      .post("/api/auth/signup")
+      .send(signupBody({ email: "person@example.com" }));
 
     const second = await request(app)
       .post("/api/auth/signup")

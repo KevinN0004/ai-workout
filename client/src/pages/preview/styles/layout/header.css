@@ -12,10 +12,7 @@
   min-height: var(--preview-header-height);
   z-index: 23;
   margin: 0 auto;
-  width: min(
-    calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)),
-    100%
-  );
+  width: min(calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)), 100%);
   max-width: calc(var(--preview-body-width) * var(--preview-step-width-scale, 1));
   padding: 8px 0 10px;
   border-radius: 0;
@@ -140,4 +137,3 @@
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.8);
 }
-

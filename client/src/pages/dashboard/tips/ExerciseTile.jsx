@@ -30,7 +30,9 @@ export default function ExerciseTile({
           </div>
           <div className="card-section-body">
             <p className="muted">{equipmentText || "Equipment details unavailable"}</p>
-            {recommendation?.reasons?.[0] ? <p className="muted">{recommendation.reasons[0]}</p> : null}
+            {recommendation?.reasons?.[0] ? (
+              <p className="muted">{recommendation.reasons[0]}</p>
+            ) : null}
           </div>
         </div>
       </button>

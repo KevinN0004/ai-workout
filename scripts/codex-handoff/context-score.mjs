@@ -1,11 +1,11 @@
-const CRITERIA_WORDS = ['should', 'must', 'expect', 'assert', 'given', 'when', 'then'];
+const CRITERIA_WORDS = ["should", "must", "expect", "assert", "given", "when", "then"];
 
 export function scoreContext({
-  taskText = '',
+  taskText = "",
   files = [],
-  staged = '',
-  unstaged = '',
-  recentLog = '',
+  staged = "",
+  unstaged = "",
+  recentLog = ""
 } = {}) {
   const gaps = [];
   let score = 0;
@@ -15,14 +15,14 @@ export function scoreContext({
   if (wordCount > 10) {
     score += 20;
   } else {
-    gaps.push('task description too brief');
+    gaps.push("task description too brief");
   }
 
   // ≥2 files identified (20 pts)
   if (files.length >= 2) {
     score += 20;
   } else {
-    gaps.push('no files identified');
+    gaps.push("no files identified");
   }
 
   // Staged or unstaged changes present (20 pts)
@@ -31,15 +31,15 @@ export function scoreContext({
   if (hasChanges) {
     score += 20;
   } else {
-    gaps.push('no changes detected');
+    gaps.push("no changes detected");
   }
 
   // Recent log has ≥2 meaningful commits (10 pts)
-  const commitCount = recentLog.trim().split('\n').filter(Boolean).length;
+  const commitCount = recentLog.trim().split("\n").filter(Boolean).length;
   if (commitCount >= 2) {
     score += 10;
   } else {
-    gaps.push('thin commit history');
+    gaps.push("thin commit history");
   }
 
   // Acceptance criteria language (30 pts)
@@ -48,9 +48,9 @@ export function scoreContext({
   if (hasCriteria) {
     score += 30;
   } else {
-    gaps.push('acceptance criteria missing');
+    gaps.push("acceptance criteria missing");
   }
 
-  const label = score < 40 ? 'low' : score <= 70 ? 'medium' : 'high';
+  const label = score < 40 ? "low" : score <= 70 ? "medium" : "high";
   return { score, label, gaps };
 }

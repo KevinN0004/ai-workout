@@ -93,7 +93,8 @@
   transform: translateZ(0);
   pointer-events: auto;
   width: var(--preview-chip-collapsed);
-  animation: preview-toc-chip-collapse var(--preview-toc-collapse-ms) var(--preview-motion-ease) both;
+  animation: preview-toc-chip-collapse var(--preview-toc-collapse-ms) var(--preview-motion-ease)
+    both;
 }
 
 .preview-jump-chip.is-contracting .preview-jump-label {
@@ -102,7 +103,9 @@
   animation: preview-toc-label-out 150ms var(--preview-motion-ease) both;
 }
 
-.preview-jump-chip:not(.active):not(.is-expanding):not(.is-contracting):not(:focus-visible):not(:hover) {
+.preview-jump-chip:not(.active):not(.is-expanding):not(.is-contracting):not(:focus-visible):not(
+    :hover
+  ) {
   width: var(--preview-chip-collapsed);
   opacity: 0.82;
 }
@@ -200,7 +203,9 @@
   }
 }
 
-.preview-side-tab .preview-jump-chip:not(.active):not(.is-expanding):not(:hover):not(:focus-visible) .preview-jump-label {
+.preview-side-tab
+  .preview-jump-chip:not(.active):not(.is-expanding):not(:hover):not(:focus-visible)
+  .preview-jump-label {
   opacity: 0 !important;
   transform: translateX(-16px);
 }
@@ -218,4 +223,3 @@
   opacity: 1;
   transform: translateX(0);
 }
-

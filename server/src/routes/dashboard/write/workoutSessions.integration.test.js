@@ -19,19 +19,22 @@ const getCsrf = async (agent) => {
 
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
-  const response = await agent.post("/api/auth/signup").set("X-CSRF-Token", csrfToken).send({
-    email,
-    password: "StrongPass123!",
-    profile: {
-      firstName: "Alex",
-      lastName: "Chen",
-      age: 28,
-      heightCm: 180,
-      weightKg: 78,
-      sex: "Male",
-      activity: "High"
-    }
-  });
+  const response = await agent
+    .post("/api/auth/signup")
+    .set("X-CSRF-Token", csrfToken)
+    .send({
+      email,
+      password: "StrongPass123!",
+      profile: {
+        firstName: "Alex",
+        lastName: "Chen",
+        age: 28,
+        heightCm: 180,
+        weightKg: 78,
+        sex: "Male",
+        activity: "High"
+      }
+    });
   expect(response.status).toBe(200);
   return getCsrf(agent);
 };
@@ -138,8 +141,18 @@ describe("POST /api/dashboard/workout-sessions", () => {
   });
 
   test("returns dashboard workouts newest first", async () => {
-    await postWorkout(agent, csrfToken, { id: "w-1", date: "2026-05-05", focus: "First", duration: 30 });
-    await postWorkout(agent, csrfToken, { id: "w-2", date: "2026-05-06", focus: "Second", duration: 30 });
+    await postWorkout(agent, csrfToken, {
+      id: "w-1",
+      date: "2026-05-05",
+      focus: "First",
+      duration: 30
+    });
+    await postWorkout(agent, csrfToken, {
+      id: "w-2",
+      date: "2026-05-06",
+      focus: "Second",
+      duration: 30
+    });
     const third = await postWorkout(agent, csrfToken, {
       id: "w-3",
       date: "2026-05-07",

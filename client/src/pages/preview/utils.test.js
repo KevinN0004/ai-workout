@@ -1,9 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import {
-  PREVIEW_TYPING_MAX_MS,
-  PREVIEW_TYPING_MIN_MS,
-  PREVIEW_WEEK_DAY_ORDER
-} from "./constants";
+import { PREVIEW_TYPING_MAX_MS, PREVIEW_TYPING_MIN_MS, PREVIEW_WEEK_DAY_ORDER } from "./constants";
 import {
   buildPreviewLinePath,
   clamp,
@@ -159,9 +155,7 @@ describe("getPreviewWeekdayName", () => {
   // JS getDay() is Sunday-first; the preview week is Monday-first, so the
   // rotation has to move Sunday to the end rather than the start.
   test("maps a Monday date to the first day of the preview week", () => {
-    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe(
-      PREVIEW_WEEK_DAY_ORDER[0]
-    );
+    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
   });
 
   test("maps a Sunday date to the last day of the preview week", () => {

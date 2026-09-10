@@ -40,11 +40,7 @@ export default function MealSearchPanel({
       {!mealDbLoading && !mealDbError && mealDbQuery && !mealDbMeals.length && (
         <div className="meal-empty-state">
           <p className="muted">No recipes found for "{mealDbQuery}".</p>
-          <button
-            type="button"
-            className="ghost"
-            onClick={onTryDefaultSearch}
-          >
+          <button type="button" className="ghost" onClick={onTryDefaultSearch}>
             Try "chicken"
           </button>
         </div>

@@ -106,7 +106,12 @@ describe("buildSmoothClosedPath", () => {
   });
 
   test("emits a straight closed path for two points", () => {
-    expect(buildSmoothClosedPath([{ x: 0, y: 0 }, { x: 10, y: 5 }])).toBe("M 0 0 L 10 5 Z");
+    expect(
+      buildSmoothClosedPath([
+        { x: 0, y: 0 },
+        { x: 10, y: 5 }
+      ])
+    ).toBe("M 0 0 L 10 5 Z");
   });
 
   test("emits one cubic segment per point so the loop closes", () => {
@@ -145,7 +150,9 @@ describe("buildSmoothClosedPath", () => {
       { id: "c", x: 0, y: 50 }
     ];
     const hard = buildSmoothClosedPath(points);
-    const soft = buildSmoothClosedPath(points.map((p) => ({ ...p, id: p.id.replace("head-top", "z") })));
+    const soft = buildSmoothClosedPath(
+      points.map((p) => ({ ...p, id: p.id.replace("head-top", "z") }))
+    );
 
     expect(hard).not.toBe(soft);
     expect(hard).not.toMatch(/NaN/);

@@ -24,8 +24,8 @@ export const registerMealDbRoutes = (app, deps) => {
     } catch (err) {
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
-        const queryInput = validateSchemaInput(mealDbSearchQuerySchema, req.query || {}, "query")
-          .data || {};
+        const queryInput =
+          validateSchemaInput(mealDbSearchQuerySchema, req.query || {}, "query").data || {};
         const query = cleanText(queryInput.query ?? queryInput.q, 100);
         return res.json({
           fallback: true,

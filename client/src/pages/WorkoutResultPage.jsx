@@ -32,39 +32,32 @@ export default function WorkoutResultPage({
     "--plan-day-count": String(dayCount),
     "--plan-vertical-line-cols": String(verticalLineColumnCount)
   };
-  const horizontalRows = useMemo(
-    () => {
-      const getTaskLabelFromRow = (values, rowIndex) => {
-        const firstLine = values.find((value) => String(value || "").trim());
-        const normalizedLine = String(firstLine || "").trim();
-        if (!normalizedLine) return `Task ${rowIndex + 1}`;
+  const horizontalRows = useMemo(() => {
+    const getTaskLabelFromRow = (values, rowIndex) => {
+      const firstLine = values.find((value) => String(value || "").trim());
+      const normalizedLine = String(firstLine || "").trim();
+      if (!normalizedLine) return `Task ${rowIndex + 1}`;
 
-        const colonIndex = normalizedLine.indexOf(":");
-        if (colonIndex > 0) {
-          const prefix = normalizedLine.slice(0, colonIndex).trim();
-          if (prefix) return prefix;
-        }
+      const colonIndex = normalizedLine.indexOf(":");
+      if (colonIndex > 0) {
+        const prefix = normalizedLine.slice(0, colonIndex).trim();
+        if (prefix) return prefix;
+      }
 
-        const firstWords = normalizedLine
-          .split(/\s+/)
-          .slice(0, 3)
-          .join(" ")
-          .trim();
-        return firstWords || `Task ${rowIndex + 1}`;
+      const firstWords = normalizedLine.split(/\s+/).slice(0, 3).join(" ").trim();
+      return firstWords || `Task ${rowIndex + 1}`;
+    };
+    return Array.from({ length: maxLineCount }, (_, rowIndex) => {
+      const values = days.map((day) =>
+        Array.isArray(day.lines) && day.lines[rowIndex] ? day.lines[rowIndex] : ""
+      );
+      return {
+        key: `line-${rowIndex + 1}`,
+        label: getTaskLabelFromRow(values, rowIndex),
+        values
       };
-      return Array.from({ length: maxLineCount }, (_, rowIndex) => {
-        const values = days.map((day) =>
-          Array.isArray(day.lines) && day.lines[rowIndex] ? day.lines[rowIndex] : ""
-        );
-        return {
-          key: `line-${rowIndex + 1}`,
-          label: getTaskLabelFromRow(values, rowIndex),
-          values
-        };
-      });
-    },
-    [days, maxLineCount]
-  );
+    });
+  }, [days, maxLineCount]);
 
   return (
     <div className="page home-page plan-result-page" style={gradient}>
@@ -159,7 +152,10 @@ export default function WorkoutResultPage({
                     </tbody>
                   </table>
                 ) : (
-                  <table className="plan-result-table" aria-label="Generated workout table vertical layout">
+                  <table
+                    className="plan-result-table"
+                    aria-label="Generated workout table vertical layout"
+                  >
                     <thead>
                       <tr>
                         <th scope="col">Day</th>
@@ -213,11 +209,7 @@ export default function WorkoutResultPage({
                   Download PDF
                 </button>
                 {!user && (
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={onSignupWithPrefilledProfile}
-                  >
+                  <button type="button" className="ghost" onClick={onSignupWithPrefilledProfile}>
                     Signup
                   </button>
                 )}

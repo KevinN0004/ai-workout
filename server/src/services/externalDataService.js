@@ -360,10 +360,8 @@ export const createExternalDataService = ({
       50
     );
     const label =
-      firstClean(
-        [parameterObj?.displayName, parameterObj?.display_name, parameterObj?.name],
-        80
-      ) || openAqParameterLabel(code);
+      firstClean([parameterObj?.displayName, parameterObj?.display_name, parameterObj?.name], 80) ||
+      openAqParameterLabel(code);
 
     return { code, label, value, unit, measuredAt };
   };
@@ -448,7 +446,10 @@ export const createExternalDataService = ({
 
   const normalizePlainText = (value, maxLen = 500) => {
     if (typeof value !== "string") return "";
-    const stripped = value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const stripped = value
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return stripped.slice(0, maxLen);
   };
 
@@ -647,9 +648,7 @@ export const createExternalDataService = ({
     );
     if (exact) return exact;
 
-    const english = list.find(
-      (item) => Number(item?.language) === 2 && cleanText(item?.name, 200)
-    );
+    const english = list.find((item) => Number(item?.language) === 2 && cleanText(item?.name, 200));
     if (english) return english;
 
     return list.find((item) => cleanText(item?.name, 200)) || list[0] || null;

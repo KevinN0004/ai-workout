@@ -36,19 +36,22 @@ describe("api integration", () => {
     const agent = request.agent(app);
     const csrfToken = await getCsrf(agent);
 
-    const signupResponse = await agent.post("/api/auth/signup").set("X-CSRF-Token", csrfToken).send({
-      email: "integration-realdb@example.com",
-      password: "StrongPass123!",
-      profile: {
-        firstName: "Jordan",
-        lastName: "Kim",
-        age: 29,
-        heightCm: 178,
-        weightKg: 76,
-        sex: "Male",
-        activity: "Moderate"
-      }
-    });
+    const signupResponse = await agent
+      .post("/api/auth/signup")
+      .set("X-CSRF-Token", csrfToken)
+      .send({
+        email: "integration-realdb@example.com",
+        password: "StrongPass123!",
+        profile: {
+          firstName: "Jordan",
+          lastName: "Kim",
+          age: 29,
+          heightCm: 178,
+          weightKg: 76,
+          sex: "Male",
+          activity: "Moderate"
+        }
+      });
     expect(signupResponse.status).toBe(200);
 
     const meResponse = await agent.get("/api/auth/me");
@@ -87,19 +90,22 @@ describe("api integration", () => {
 
     const agent = request.agent(app);
     const csrfToken = await getCsrf(agent);
-    await agent.post("/api/auth/signup").set("X-CSRF-Token", csrfToken).send({
-      email: "validation-check@example.com",
-      password: "StrongPass123!",
-      profile: {
-        firstName: "A",
-        lastName: "B",
-        age: 24,
-        heightCm: 168,
-        weightKg: 63,
-        sex: "Female",
-        activity: "Light"
-      }
-    });
+    await agent
+      .post("/api/auth/signup")
+      .set("X-CSRF-Token", csrfToken)
+      .send({
+        email: "validation-check@example.com",
+        password: "StrongPass123!",
+        profile: {
+          firstName: "A",
+          lastName: "B",
+          age: 24,
+          heightCm: 168,
+          weightKg: 63,
+          sex: "Female",
+          activity: "Light"
+        }
+      });
     const invalidPagination = await agent.get("/api/dashboard/workout-sessions?limit=100000");
     expect(invalidPagination.status).toBe(400);
     expect(String(invalidPagination.body?.error || "")).toMatch(/limit/i);
@@ -151,12 +157,16 @@ describe("api integration", () => {
       })
     );
 
-    const first = await request(app).get(`/api/weather/current?latitude=${latitude}&longitude=${longitude}`);
+    const first = await request(app).get(
+      `/api/weather/current?latitude=${latitude}&longitude=${longitude}`
+    );
     expect(first.status).toBe(200);
     expect(first.body?.cache).toBe("miss");
 
     nowOffset = 301000;
-    const second = await request(app).get(`/api/weather/current?latitude=${latitude}&longitude=${longitude}`);
+    const second = await request(app).get(
+      `/api/weather/current?latitude=${latitude}&longitude=${longitude}`
+    );
     expect(second.status).toBe(200);
     expect(second.body?.cache).toBe("stale");
     expect(second.body?.fallback).not.toBe(true);

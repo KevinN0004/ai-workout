@@ -45,23 +45,23 @@
   transform: none !important;
 }
 
-.preview-stage-panel :is(
-  .preview-stage-kicker,
-  .preview-generate-label,
-  .preview-field-row span,
-  .preview-field-row .preview-field-input,
-  .preview-personal-form label,
-  .preview-personal-form input,
-  .preview-personal-form select,
-  .preview-personal-form textarea,
-  .preview-personal-morph-label,
-  .preview-builder-btn,
-  .preview-builder-generating,
-  .preview-week-row-label,
-  .preview-week-session,
-  .preview-week-meta,
-  .preview-week-highlights li
-) {
+.preview-stage-panel
+  :is(
+    .preview-stage-kicker,
+    .preview-generate-label,
+    .preview-field-row span,
+    .preview-field-row .preview-field-input,
+    .preview-personal-form label,
+    .preview-personal-form input,
+    .preview-personal-form select,
+    .preview-personal-form textarea,
+    .preview-personal-morph-label,
+    .preview-builder-btn,
+    .preview-builder-generating,
+    .preview-week-row-label,
+    .preview-week-session,
+    .preview-week-meta,
+    .preview-week-highlights li
+  ) {
   font-size: var(--preview-body-copy-size);
 }
-

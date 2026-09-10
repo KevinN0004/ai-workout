@@ -31,9 +31,7 @@ export default function PreviewWorkoutWeekChapter({
               key={`preview-week-outline-h-${index}`}
               className={`preview-week-outline-line horizontal ${
                 index === 0 ? "is-top-edge" : ""
-              } ${
-                index === horizontalLineOffsets.length - 1 ? "is-bottom-edge" : ""
-              }`}
+              } ${index === horizontalLineOffsets.length - 1 ? "is-bottom-edge" : ""}`}
               style={{
                 "--preview-line-offset": offset,
                 "--preview-line-delay": `${index * PREVIEW_WEEK_LINE_STAGGER_MS}ms`
@@ -43,9 +41,7 @@ export default function PreviewWorkoutWeekChapter({
           {verticalLineOffsets.map((offset, index) => (
             <span
               key={`preview-week-outline-v-${index}`}
-              className={`preview-week-outline-line vertical ${
-                index === 0 ? "is-left-edge" : ""
-              } ${
+              className={`preview-week-outline-line vertical ${index === 0 ? "is-left-edge" : ""} ${
                 index === verticalLineOffsets.length - 1 ? "is-right-edge" : ""
               }`}
               style={{
@@ -68,7 +64,8 @@ export default function PreviewWorkoutWeekChapter({
             className="preview-week-outline-corner bottom-right"
             style={{
               "--preview-line-delay": `${
-                (horizontalLineOffsets.length + verticalLineOffsets.length - 2) * PREVIEW_WEEK_LINE_STAGGER_MS
+                (horizontalLineOffsets.length + verticalLineOffsets.length - 2) *
+                PREVIEW_WEEK_LINE_STAGGER_MS
               }ms`
             }}
           />
@@ -76,7 +73,8 @@ export default function PreviewWorkoutWeekChapter({
             className="preview-week-outline-corner bottom-left"
             style={{
               "--preview-line-delay": `${
-                (horizontalLineOffsets.length + verticalLineOffsets.length - 1) * PREVIEW_WEEK_LINE_STAGGER_MS
+                (horizontalLineOffsets.length + verticalLineOffsets.length - 1) *
+                PREVIEW_WEEK_LINE_STAGGER_MS
               }ms`
             }}
           />
@@ -99,7 +97,9 @@ export default function PreviewWorkoutWeekChapter({
                     dayPlan.isTraining ? "is-training" : "is-recovery"
                   } ${previewWeekStage >= 2 ? "is-visible" : ""}`}
                 >
-                  <h3 className="preview-week-day-name">{getPreviewWeekHeaderTypedText(dayPlan.day) || "\u00A0"}</h3>
+                  <h3 className="preview-week-day-name">
+                    {getPreviewWeekHeaderTypedText(dayPlan.day) || "\u00A0"}
+                  </h3>
                 </th>
               ))}
             </tr>
@@ -107,7 +107,10 @@ export default function PreviewWorkoutWeekChapter({
           <tbody>
             {PREVIEW_WEEK_TEXT_ROW_CONFIG.map((rowConfig) => (
               <tr key={`preview-week-row-${rowConfig.id}`}>
-                <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
+                <th
+                  scope="row"
+                  className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}
+                >
                   {getPreviewWeekHeaderTypedText(rowConfig.label) || "\u00A0"}
                 </th>
                 {previewWeekPlan.map((dayPlan) => {
@@ -127,7 +130,10 @@ export default function PreviewWorkoutWeekChapter({
               </tr>
             ))}
             <tr>
-              <th scope="row" className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}>
+              <th
+                scope="row"
+                className={`preview-week-row-label ${previewWeekStage >= 2 ? "is-visible" : ""}`}
+              >
                 {getPreviewWeekHeaderTypedText("Highlights") || "\u00A0"}
               </th>
               {previewWeekPlan.map((dayPlan) => (
@@ -155,7 +161,11 @@ export default function PreviewWorkoutWeekChapter({
             </tr>
           </tbody>
         </table>
-        <div ref={previewWeekParticleLayerRef} className="preview-week-particle-layer" aria-hidden="true" />
+        <div
+          ref={previewWeekParticleLayerRef}
+          className="preview-week-particle-layer"
+          aria-hidden="true"
+        />
       </div>
     </div>
   );

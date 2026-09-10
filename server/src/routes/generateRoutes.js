@@ -51,16 +51,8 @@ const COMMERCIAL_ACCESS_CAPABILITY_MAP = {
     "light equipment circuits",
     "mobility classes"
   ],
-  "pool / aquatic center": [
-    "lap swimming",
-    "aquatic conditioning",
-    "low-impact cardio"
-  ],
-  "court sports area": [
-    "agility drills",
-    "conditioning runs",
-    "plyometric patterns"
-  ],
+  "pool / aquatic center": ["lap swimming", "aquatic conditioning", "low-impact cardio"],
+  "court sports area": ["agility drills", "conditioning runs", "plyometric patterns"],
   "recovery & mobility zone": [
     "mobility circuits",
     "stretching work",
@@ -81,8 +73,7 @@ const COMMERCIAL_ACCESS_CAPABILITY_MAP = {
 };
 
 const uniqueList = (items) => [...new Set(items.filter(Boolean))];
-const normalizeText = (value) =>
-  typeof value === "string" ? value.trim().toLowerCase() : "";
+const normalizeText = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
 export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
   const environmentKey = normalizeText(environment);
@@ -108,9 +99,7 @@ export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
       profileLine:
         selectedLabels.join(", ") ||
         "Commercial facility access unspecified (assume standard gym spaces).",
-      capabilityLine:
-        capabilityHints.join(", ") ||
-        "standard strength and cardio gym capabilities",
+      capabilityLine: capabilityHints.join(", ") || "standard strength and cardio gym capabilities",
       planningGuidance: hasFullGymAccess
         ? "Full gym access is available. Program across all gym rooms and operations."
         : "Program only with the listed commercial rooms and operations."
@@ -202,8 +191,8 @@ export const registerGenerateRoutes = (app, deps) => {
         // $position: 0 and $slice: 200 were never doing anything -- plans are
         // always inserted, ordering comes from createdAt desc, and the 200
         // limit is applied when the dashboard is read.
-        savedPlan = (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry }))
-          || planEntry;
+        savedPlan =
+          (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry })) || planEntry;
       }
 
       res.json({ plan, savedPlan });

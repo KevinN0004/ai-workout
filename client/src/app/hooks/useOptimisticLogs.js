@@ -15,33 +15,30 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     setDashboardToast(null);
   }, []);
 
-  const showDashboardToast = useCallback(
-    (message, tone = "success", options = {}) => {
-      if (!message) return;
-      if (dashboardToastTimeoutRef.current) {
-        clearTimeout(dashboardToastTimeoutRef.current);
-      }
-      const nextToast = {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        tone,
-        message,
-        actionLabel: options?.actionLabel || "",
-        onAction: typeof options?.onAction === "function" ? options.onAction : null
-      };
-      const timeoutMs =
-        Number(options?.durationMs) > 0
-          ? Number(options.durationMs)
-          : nextToast.onAction
+  const showDashboardToast = useCallback((message, tone = "success", options = {}) => {
+    if (!message) return;
+    if (dashboardToastTimeoutRef.current) {
+      clearTimeout(dashboardToastTimeoutRef.current);
+    }
+    const nextToast = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      tone,
+      message,
+      actionLabel: options?.actionLabel || "",
+      onAction: typeof options?.onAction === "function" ? options.onAction : null
+    };
+    const timeoutMs =
+      Number(options?.durationMs) > 0
+        ? Number(options.durationMs)
+        : nextToast.onAction
           ? 5200
           : 3200;
-      setDashboardToast(nextToast);
-      dashboardToastTimeoutRef.current = setTimeout(() => {
-        setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
-        dashboardToastTimeoutRef.current = null;
-      }, timeoutMs);
-    },
-    []
-  );
+    setDashboardToast(nextToast);
+    dashboardToastTimeoutRef.current = setTimeout(() => {
+      setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
+      dashboardToastTimeoutRef.current = null;
+    }, timeoutMs);
+  }, []);
 
   useEffect(() => {
     return () => {

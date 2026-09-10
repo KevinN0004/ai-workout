@@ -11,4 +11,3 @@ export const registerApiRoutes = (app, deps) => {
   registerDashboardRoutes(app, deps);
   registerGenerateRoutes(app, deps);
 };
-

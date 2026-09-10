@@ -18,7 +18,10 @@ export default function ExerciseDetailsModal({
         aria-modal="true"
         onClick={onClose}
       >
-        <div className="modal dashboard-modal exercise-modal" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal dashboard-modal exercise-modal"
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className="modal-header">
             <h3>{selectedExercise.name}</h3>
             <button
@@ -68,9 +71,7 @@ export default function ExerciseDetailsModal({
                   type="button"
                   className="cta save-modal-button"
                   disabled={isSaved || isSaving}
-                  onClick={() =>
-                    onSave(selectedExercise, selectedExercise?.recommendation)
-                  }
+                  onClick={() => onSave(selectedExercise, selectedExercise?.recommendation)}
                 >
                   {isSaved ? "Saved to plan" : isSaving ? "Saving..." : "Save to my plan"}
                 </button>

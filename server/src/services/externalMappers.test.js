@@ -8,24 +8,20 @@ import { cleanText, toNullableNumber } from "./dashboardDataBuildersService.js";
 // on. These were the bulk of what was left uncovered in externalDataService --
 // its retry layer, weather and AQI maths are covered elsewhere.
 
-const {
-  mapWgerExercise,
-  mapMealDbMeal,
-  normalizePlainText,
-  parseMultiNumberQuery
-} = createExternalDataService({
-  cleanText,
-  toNullableNumber,
-  readThroughExternalCache: async () => ({}),
-  buildExternalCacheKey: () => "",
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: { info() {}, warn() {}, error() {} },
-  toShortText: (value) => String(value ?? ""),
-  recordExternalApiLatency: () => {},
-  externalApiRetries: 0,
-  externalApiRetryBaseDelayMs: 0,
-  wgerDefaultLanguage: 2
-});
+const { mapWgerExercise, mapMealDbMeal, normalizePlainText, parseMultiNumberQuery } =
+  createExternalDataService({
+    cleanText,
+    toNullableNumber,
+    readThroughExternalCache: async () => ({}),
+    buildExternalCacheKey: () => "",
+    metrics: { externalApiFailures: {}, externalApiRetries: {} },
+    logger: { info() {}, warn() {}, error() {} },
+    toShortText: (value) => String(value ?? ""),
+    recordExternalApiLatency: () => {},
+    externalApiRetries: 0,
+    externalApiRetryBaseDelayMs: 0,
+    wgerDefaultLanguage: 2
+  });
 
 describe("normalizePlainText", () => {
   // wger descriptions arrive as HTML and are rendered as plain text.
@@ -129,7 +125,9 @@ describe("mapWgerExercise", () => {
   describe("choosing a translation", () => {
     test("prefers the requested language", () => {
       const result = mapWgerExercise(
-        exercise({ translations: [translation(2, "Bench Press"), translation(4, "Press de banca")] }),
+        exercise({
+          translations: [translation(2, "Bench Press"), translation(4, "Press de banca")]
+        }),
         4
       );
 
@@ -181,7 +179,9 @@ describe("mapWgerExercise", () => {
     // anyway.
     test("treats a null language as matching a null preference", () => {
       const result = mapWgerExercise(
-        exercise({ translations: [translation(null, "Unlabelled"), translation(2, "Bench Press")] }),
+        exercise({
+          translations: [translation(null, "Unlabelled"), translation(2, "Bench Press")]
+        }),
         null
       );
 
@@ -204,9 +204,7 @@ describe("mapWgerExercise", () => {
     });
 
     test("maps the secondary muscles separately", () => {
-      expect(mapWgerExercise(exercise(), 2).secondaryMuscles).toEqual([
-        { id: 5, name: "Triceps" }
-      ]);
+      expect(mapWgerExercise(exercise(), 2).secondaryMuscles).toEqual([{ id: 5, name: "Triceps" }]);
     });
 
     test("maps the equipment", () => {
@@ -215,10 +213,7 @@ describe("mapWgerExercise", () => {
 
     // Some wger endpoints send bare ids rather than objects.
     test("accepts a bare id in place of an object", () => {
-      const result = mapWgerExercise(
-        exercise({ muscles: [4], equipment: [1], category: 10 }),
-        2
-      );
+      const result = mapWgerExercise(exercise({ muscles: [4], equipment: [1], category: 10 }), 2);
 
       expect(result.muscles).toEqual([{ id: 4, name: "" }]);
       expect(result.equipment).toEqual([{ id: 1, name: "" }]);
@@ -232,8 +227,9 @@ describe("mapWgerExercise", () => {
     ])("returns an empty list when %s is not a list", (_label, key) => {
       const result = mapWgerExercise(exercise({ [key]: "nope" }), 2);
 
-      expect(result.muscles.length + result.secondaryMuscles.length + result.equipment.length)
-        .toBeLessThan(3);
+      expect(
+        result.muscles.length + result.secondaryMuscles.length + result.equipment.length
+      ).toBeLessThan(3);
     });
   });
 
@@ -335,9 +331,7 @@ describe("mapMealDbMeal", () => {
     });
 
     test("falls back again when there is nothing to say", () => {
-      const result = mapMealDbMeal(
-        meal({ strInstructions: "", strCategory: "", strArea: "" })
-      );
+      const result = mapMealDbMeal(meal({ strInstructions: "", strCategory: "", strArea: "" }));
 
       expect(result.blurb).toBe("Recipe from TheMealDB.");
     });

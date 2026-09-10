@@ -191,11 +191,7 @@ describe("dedupeMeals", () => {
   });
 
   test("falls back to the title when there is no id", () => {
-    const result = dedupeMeals([
-      { title: "Penne" },
-      { title: "Penne" },
-      { title: "Risotto" }
-    ]);
+    const result = dedupeMeals([{ title: "Penne" }, { title: "Penne" }, { title: "Risotto" }]);
 
     expect(result.map((m) => m.title)).toEqual(["Penne", "Risotto"]);
   });

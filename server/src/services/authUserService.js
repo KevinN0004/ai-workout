@@ -52,8 +52,7 @@ export const createAuthUserService = ({
     return doc;
   };
 
-  const findUserById = async (userId) =>
-    mapDbDocToUser(await findUserWithDashboard(userId));
+  const findUserById = async (userId) => mapDbDocToUser(await findUserWithDashboard(userId));
 
   const findUserByEmail = async (email) =>
     mapDbDocToUser(await findUserWithDashboardByEmail(cleanText(email, 254).toLowerCase()));

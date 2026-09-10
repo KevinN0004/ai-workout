@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import {
-  getSchemaValidationMessage,
-  validateSchemaInput
-} from "./requestValidationService.js";
+import { getSchemaValidationMessage, validateSchemaInput } from "./requestValidationService.js";
 
 describe("requestValidationService", () => {
   test("returns readable issue path/message from zod error", () => {

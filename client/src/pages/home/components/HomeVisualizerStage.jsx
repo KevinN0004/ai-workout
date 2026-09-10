@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "../../../components/PhysiqueSilhouette2D";
+import PhysiqueSilhouette2D, {
+  SILHOUETTE_GEOMETRY_REV
+} from "../../../components/PhysiqueSilhouette2D";
 
 export default function HomeVisualizerStage({
   visualPanelRef,
@@ -26,13 +28,13 @@ export default function HomeVisualizerStage({
 
   return (
     <section className="visualizer-only-stage">
-      <div className="panel body-visual-panel stage-panel visualizer-only-panel" ref={visualPanelRef}>
+      <div
+        className="panel body-visual-panel stage-panel visualizer-only-panel"
+        ref={visualPanelRef}
+      >
         <h2>Physique</h2>
         <div className="visual-stage" role="img" aria-label={visualLabel}>
-          <div
-            className="physique-render-surface"
-            data-silhouette-rev={SILHOUETTE_GEOMETRY_REV}
-          >
+          <div className="physique-render-surface" data-silhouette-rev={SILHOUETTE_GEOMETRY_REV}>
             <PhysiqueSilhouette2D
               key={`silhouette-${SILHOUETTE_GEOMETRY_REV}-${silhouetteRenderSignature}`}
               shape={silhouetteShape}

@@ -23,23 +23,20 @@ const optionalBooleanField = z
   }, z.boolean())
   .optional();
 const optionalNullableNumberField = (min, max) =>
-  z.preprocess(
-    toNumberInput,
-    z.union([z.number().min(min).max(max), z.null()]).optional()
-  );
-const requiredNumberField = (min, max) =>
-  z.preprocess(toNumberInput, z.number().min(min).max(max));
+  z.preprocess(toNumberInput, z.union([z.number().min(min).max(max), z.null()]).optional());
+const requiredNumberField = (min, max) => z.preprocess(toNumberInput, z.number().min(min).max(max));
 const optionalStringArrayField = (maxItems, maxLen) =>
-  z.preprocess((value) => {
-    if (value === undefined || value === null) return undefined;
-    const list = Array.isArray(value) ? value : [value];
-    return list
-      .map((item) =>
-        typeof item === "string" ? item.trim().slice(0, maxLen) : ""
-      )
-      .filter(Boolean)
-      .slice(0, maxItems);
-  }, z.array(z.string().max(maxLen)).max(maxItems).optional());
+  z.preprocess(
+    (value) => {
+      if (value === undefined || value === null) return undefined;
+      const list = Array.isArray(value) ? value : [value];
+      return list
+        .map((item) => (typeof item === "string" ? item.trim().slice(0, maxLen) : ""))
+        .filter(Boolean)
+        .slice(0, maxItems);
+    },
+    z.array(z.string().max(maxLen)).max(maxItems).optional()
+  );
 
 const profileInputSchema = z
   .object({

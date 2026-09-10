@@ -1,4 +1,5 @@
-export const createErrorHandler = ({ logger, toShortText, captureException = () => {} }) =>
+export const createErrorHandler =
+  ({ logger, toShortText, captureException = () => {} }) =>
   (err, req, res, next) => {
     const status = Number.isInteger(err?.status) ? err.status : 500;
     const isServerError = status >= 500;

@@ -1,8 +1,4 @@
-export default function MealCoursePanel({
-  courseOptions,
-  activeCourseKey,
-  setActiveCourseKey
-}) {
+export default function MealCoursePanel({ courseOptions, activeCourseKey, setActiveCourseKey }) {
   return (
     <section className="meal-course-panel">
       <div className="meal-log-header">

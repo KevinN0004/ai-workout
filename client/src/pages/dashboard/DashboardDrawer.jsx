@@ -1,10 +1,4 @@
-export default function DashboardDrawer({
-  open,
-  dashView,
-  items,
-  onClose,
-  onNavigate
-}) {
+export default function DashboardDrawer({ open, dashView, items, onClose, onNavigate }) {
   if (!open) return null;
 
   return (
@@ -31,16 +25,18 @@ export default function DashboardDrawer({
           </button>
         </div>
         <div className="drawer-links">
-          {items.filter((item) => item.key !== "settings").map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={dashView === item.key ? "active" : ""}
-              onClick={() => onNavigate(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
+          {items
+            .filter((item) => item.key !== "settings")
+            .map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={dashView === item.key ? "active" : ""}
+                onClick={() => onNavigate(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
         </div>
         <div className="drawer-footer">
           <button
@@ -55,4 +51,3 @@ export default function DashboardDrawer({
     </div>
   );
 }
-
