@@ -29,10 +29,10 @@ export default defineConfig({
       // Aspirational values would block every PR from day one, which is how
       // coverage gates get deleted instead of met.
       thresholds: {
-        statements: 66,
-        branches: 46,
+        statements: 67,
+        branches: 47,
         functions: 45,
-        lines: 68
+        lines: 69
       }
     }
   }
