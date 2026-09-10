@@ -20,7 +20,20 @@ export default defineConfig({
       // than a truer one.
       include: ["src/**"],
       exclude: ["**/*.test.{js,jsx}", "src/test/**"],
-      reporter: ["text", "html"]
+      reporter: ["text", "html"],
+      // A ratchet, not a target. These are the numbers this suite actually
+      // produced on 2026-09-10, floored to whole percent -- so they never fail
+      // a green tree, and they fail the moment coverage slips. Raise them when
+      // coverage rises; never lower them to make a build pass.
+      //
+      // Aspirational values would block every PR from day one, which is how
+      // coverage gates get deleted instead of met.
+      thresholds: {
+        statements: 66,
+        branches: 46,
+        functions: 45,
+        lines: 68
+      }
     }
   }
 });

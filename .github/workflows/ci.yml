@@ -95,8 +95,8 @@ jobs:
 
       # Needs no database, so it runs first: a migration problem cannot mask an
       # unrelated client failure.
-      - name: Client Tests
-        run: npm -w client run test
+      - name: Client Tests + Coverage
+        run: npm -w client run test:coverage
 
       - name: Generate Prisma Client
         run: npm -w server run prisma:generate
@@ -104,8 +104,8 @@ jobs:
       - name: Apply Postgres Migrations
         run: npm -w server run migrate:postgres
 
-      - name: Server Tests
-        run: npm -w server run test
+      - name: Server Tests + Coverage
+        run: npm -w server run test:coverage
 
   build:
     name: Build client
