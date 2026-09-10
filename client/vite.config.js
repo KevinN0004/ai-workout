@@ -28,11 +28,15 @@ export default defineConfig({
       //
       // Aspirational values would block every PR from day one, which is how
       // coverage gates get deleted instead of met.
+      // One decimal, floored from the measured value. These suites are
+      // deterministic -- no randomness, no timing-dependent branches -- so a
+      // tenth of a point is a safe margin, and whole percent would have let
+      // this increment's gain evaporate without tripping anything.
       thresholds: {
-        statements: 67,
-        branches: 47,
-        functions: 45,
-        lines: 69
+        statements: 67.3,
+        branches: 47.5,
+        functions: 45.9,
+        lines: 69.2
       }
     }
   }
