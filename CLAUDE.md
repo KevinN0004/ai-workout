@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **85.9%** / 66.7%.
+  server **88.8%** statements / 80.7% branches, client **86.4%** / 69.1%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -207,7 +207,7 @@ before the server or its test suite will work against it.
     the server is infrastructure rather than request handling.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    `WorkoutsView.jsx` (78), `TipsView.jsx` (70),
+    `TipsView.jsx` (70),
     `SummaryView.jsx` (60), `PlansView.jsx` (57), then the preview chapter
     components (56 and 47, both 0%), `useDashboardMetrics.js` (46), `App.jsx` (44)
     and `DashboardPage.jsx` (44).
@@ -216,7 +216,8 @@ before the server or its test suite will work against it.
     `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
     `usePreviewChapterFlow.js` (100% / 100%),
     `usePreviewWeekParticleAnimation.js` (100% / 96%) and
-    `usePreviewDerivedData.js` (98% / 83%).
+    `usePreviewDerivedData.js` (98% / 83%) and
+    `WorkoutsView.jsx` (100% / 99%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
