@@ -242,3 +242,213 @@ describe("removeSavedExercise", () => {
     expect(deps.setDashboard).not.toHaveBeenCalled();
   });
 });
+
+// The optimistic log actions hand a `request` closure to
+// `queueOptimisticLogCommit` rather than calling the API themselves, and every
+// test above mocks that queue -- so the closure, and the failure handling
+// inside it, was never run. These capture it and drive it directly.
+describe("the optimistic log requests", () => {
+  const queuedRequest = (queueMock) => queueMock.mock.calls.at(-1)[0].request;
+
+  const mealForm = {
+    date: "2026-03-01",
+    mealType: "lunch",
+    name: "Rice bowl",
+    calories: "600",
+    proteinG: "40",
+    carbsG: "70",
+    fatG: "12",
+    notes: "post-workout"
+  };
+
+  describe.each([
+    ["calories", "submitCalories", "/api/dashboard/calories", "Unable to save calories.", {}],
+    [
+      "meal log",
+      "submitMealLog",
+      "/api/dashboard/meal-logs",
+      "Unable to save meal log.",
+      { mealLogForm: mealForm, setMealLogForm: () => {} }
+    ]
+  ])("%s", (_label, method, path, fallbackMessage, extraDeps) => {
+    test("posts to its own endpoint", async () => {
+      const { deps, handlers } = buildDeps(extraDeps);
+      await handlers[method](submitEvent());
+
+      await queuedRequest(deps.queueOptimisticLogCommit)();
+
+      const [url, options] = deps.apiFetch.mock.calls.at(-1);
+      expect(url).toBe(path);
+      expect(options.method).toBe("POST");
+    });
+
+    test("surfaces the server's own refusal", async () => {
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => jsonResponse({ error: "Daily limit reached." }, false))
+      });
+      await handlers[method](submitEvent());
+
+      await expect(queuedRequest(deps.queueOptimisticLogCommit)()).rejects.toThrow(
+        "Daily limit reached."
+      );
+    });
+
+    test("falls back to its own message when the refusal carries none", async () => {
+      // Every write action in this file has its own default. A shared or
+      // missing one tells the visitor the wrong thing failed.
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => jsonResponse({}, false))
+      });
+      await handlers[method](submitEvent());
+
+      await expect(queuedRequest(deps.queueOptimisticLogCommit)()).rejects.toThrow(fallbackMessage);
+    });
+
+    test("falls back when the refusal body cannot be read at all", async () => {
+      // A proxy timeout answers with an error status and an HTML body.
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => ({
+          ok: false,
+          json: async () => {
+            throw new Error("not json");
+          }
+        }))
+      });
+      await handlers[method](submitEvent());
+
+      await expect(queuedRequest(deps.queueOptimisticLogCommit)()).rejects.toThrow(fallbackMessage);
+    });
+
+    test("returns the server's payload on success", async () => {
+      const dashboard = { workouts: [] };
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => jsonResponse({ dashboard }))
+      });
+      await handlers[method](submitEvent());
+
+      await expect(queuedRequest(deps.queueOptimisticLogCommit)()).resolves.toEqual({
+        dashboard
+      });
+    });
+  });
+
+  test("a meal with no name is queued as an empty one rather than as undefined", () => {
+    // The optimistic row is rendered before the server answers, and
+    // "undefined" would appear in the list beside the date.
+    // The field must be *absent*, not empty: an empty string is already ""
+    // and cannot tell the fallback from its absence.
+    const { name: _name, notes: _notes, ...withoutText } = mealForm;
+    const { deps, handlers } = buildDeps({
+      mealLogForm: withoutText,
+      setMealLogForm: () => {}
+    });
+
+    handlers.submitMealLog(submitEvent());
+
+    const { item } = deps.queueOptimisticLogCommit.mock.calls.at(-1)[0];
+    expect(item.name).toBe("");
+    expect(item.notes).toBe("");
+  });
+
+  test("a meal with no macros is queued as absent rather than as zero", () => {
+    // A logged 0g of protein and an unrecorded one are different claims.
+    const { deps, handlers } = buildDeps({
+      mealLogForm: { ...mealForm, calories: "", proteinG: "", carbsG: "", fatG: "" },
+      setMealLogForm: () => {}
+    });
+
+    handlers.submitMealLog(submitEvent());
+
+    const { item } = deps.queueOptimisticLogCommit.mock.calls.at(-1)[0];
+    expect(item.calories).toBeNull();
+    expect(item.proteinG).toBeNull();
+  });
+
+  test("a meal with no type is queued as other", () => {
+    const { deps, handlers } = buildDeps({
+      mealLogForm: { ...mealForm, mealType: "" },
+      setMealLogForm: () => {}
+    });
+
+    handlers.submitMealLog(submitEvent());
+
+    expect(deps.queueOptimisticLogCommit.mock.calls.at(-1)[0].item.mealType).toBe("other");
+  });
+});
+
+// Each direct write action carries its own default message for a refusal that
+// carries none, and its own default for a thrown error with no message. The
+// tests above supply a message every time, so only the server's own wording was
+// ever seen.
+describe("the direct write actions' fallback messages", () => {
+  const goalForm = { targetWeight: "170", targetCalories: "2200", weeklyWorkouts: "4" };
+  const progressForm = { date: "2026-03-01", weightLb: "170" };
+
+  const cases = [
+    ["submitGoals", "Unable to save goals.", { goalForm, setGoalForm: () => {} }, [submitEvent()]],
+    [
+      "submitProgressMetric",
+      "Unable to save progress metric.",
+      { progressForm, setProgressForm: () => {} },
+      [submitEvent()]
+    ],
+    ["saveExerciseToPlan", "Unable to save exercise.", {}, [{ name: "Row" }]],
+    ["removeSavedExercise", "Unable to remove saved exercise.", {}, ["entry-1"]]
+  ];
+
+  test.each(cases)(
+    "%s uses its own default when the refusal carries none",
+    async (method, fallbackMessage, extraDeps, args) => {
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => jsonResponse({}, false))
+      });
+
+      await handlers[method](...args);
+
+      expect(deps.showDashboardToast).toHaveBeenCalledWith(fallbackMessage, "error");
+      expect(deps.setDashError).toHaveBeenCalledWith(fallbackMessage);
+    }
+  );
+
+  test.each(cases)(
+    "%s uses it again when the refusal body is unreadable",
+    async (method, fallbackMessage, extraDeps, args) => {
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => ({
+          ok: false,
+          json: async () => {
+            throw new Error("not json");
+          }
+        }))
+      });
+
+      await handlers[method](...args);
+
+      expect(deps.showDashboardToast).toHaveBeenCalledWith(fallbackMessage, "error");
+    }
+  );
+
+  test.each(cases)(
+    "%s uses it when the request throws without a message",
+    async (method, fallbackMessage, extraDeps, args) => {
+      // An aborted request rejects with an empty message, and an empty toast
+      // tells the visitor nothing at all.
+      const { deps, handlers } = buildDeps({
+        ...extraDeps,
+        apiFetch: vi.fn(async () => {
+          throw new Error("");
+        })
+      });
+
+      await handlers[method](...args);
+
+      expect(deps.showDashboardToast).toHaveBeenCalledWith(fallbackMessage, "error");
+    }
+  );
+});

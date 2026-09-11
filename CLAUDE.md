@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **93.3%** / 84.5%.
+  server **88.8%** statements / 80.7% branches, client **93.5%** / 85.1%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -217,8 +217,7 @@ before the server or its test suite will work against it.
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
     `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) and
-    `useDashboardData.js` (99% / 94%).
+    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) and `events.js` (100% / 99%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
