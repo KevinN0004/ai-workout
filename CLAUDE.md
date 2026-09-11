@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **89.3%** / 79.1%.
+  server **88.8%** statements / 80.7% branches, client **90.3%** / 79.8%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -207,8 +207,8 @@ before the server or its test suite will work against it.
     the server is infrastructure rather than request handling.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    `App.jsx` (44) and `DashboardPage.jsx` (44) -- routing and wiring rather
-    than derivation, and the last two of any size.
+    `DashboardPage.jsx` (44) -- wiring rather than derivation, and the last
+    file of any size.
     Done, and worth copying from: `SettingsView.jsx` (89%),
     `WorkoutResultPage.jsx` (100%), `MealView.jsx` (100%, which took the five
     `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
@@ -217,8 +217,8 @@ before the server or its test suite will work against it.
     `usePreviewDerivedData.js` (98% / 83%) and
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
-    `useDashboardMetrics.js` (99% / 89%) and both preview chapter components
-    (100% / 100%).
+    `useDashboardMetrics.js` (99% / 89%) both preview chapter components
+    (100% / 100%) and `App.jsx` (92% / 73%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
