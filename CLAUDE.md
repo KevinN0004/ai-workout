@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **77.5%** / 60.8%.
+  server **88.8%** statements / 80.7% branches, client **85.6%** / 65.6%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -207,29 +207,48 @@ before the server or its test suite will work against it.
     the server is infrastructure rather than request handling.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    `usePreviewWeekParticleAnimation.js` (91, 0%),
     `usePreviewDerivedData.js` (83), `WorkoutsView.jsx` (78), `TipsView.jsx` (70),
-    `usePreviewChapterFlow.js` (68, 0%), `SummaryView.jsx` (60), `PlansView.jsx` (57),
-    then the preview chapter components (56 and 47, both 0%).
-    `SettingsView.jsx`, `WorkoutResultPage.jsx` and `MealView.jsx` are done —
-    89%, 100% and 100% statements, the last of which took the five `meal/*` panels
-    with it. `useHomeStageFlow.js` is done too, at 99% statements and 94% branches;
-    the two preview animation hooks are the same shape and are now the obvious
-    next candidates rather than write-offs.
-  - **Check before calling something untestable.** This entry twice said the
-    animation hooks were limited because they measure real element rects, which
-    jsdom does not provide. Both halves of that were wrong.
-    `useMealDbSearch.js` sat at 0% described the same way on nothing but
-    proximity to them; it is a data-fetching hook and went to 97% with no layout
-    at all. Then `useHomeStageFlow.js` — the one that really does measure rects —
-    went from 41% to 94% branches, because **layout is a boundary like any
-    other**. `getBoundingClientRect` is a function on the element you hand the
-    hook, so a test stubs it exactly as it stubs `fetch`, and the arithmetic on
-    top of the fake numbers is the arithmetic that ships. Where the output is a
-    library call rather than DOM, record the call: wrapping `createTimeline`
-    from animejs turns "it did not throw" into an assertion that a 600×320 panel
-    morphs to 900×600 and translates by (-30, -60). Reach for that before
-    writing anything off.
+    `SummaryView.jsx` (60), `PlansView.jsx` (57), then the preview chapter
+    components (56 and 47, both 0%), `useDashboardMetrics.js` (46), `App.jsx` (44)
+    and `DashboardPage.jsx` (44).
+    Done, and worth copying from: `SettingsView.jsx` (89%),
+    `WorkoutResultPage.jsx` (100%), `MealView.jsx` (100%, which took the five
+    `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
+    `usePreviewChapterFlow.js` (100% / 100%) and
+    `usePreviewWeekParticleAnimation.js` (100% / 96%).
+    **There are no animation write-offs left.** All three hooks that were listed
+    as untestable are now at or above 94% branches.
+  - **Check before calling something untestable.** This entry said for months
+    that the animation hooks were limited because they measure real element
+    rects, which jsdom does not provide. Every part of that turned out wrong,
+    and it cost four files their coverage:
+    - `useMealDbSearch.js` sat at 0% described that way on nothing but proximity
+      to them. It is a data-fetching hook and went to 97% with no layout at all.
+    - `usePreviewChapterFlow.js` sat at 0% on the same list and **measures
+      nothing** — it is a timed state machine over `setTimeout`, `setInterval`
+      and `Date.now`, and fake timers drive all of it. 0% → 100%/100%.
+    - `useHomeStageFlow.js` and `usePreviewWeekParticleAnimation.js` really do
+      measure rects, and went to 94% and 96% branches anyway.
+
+    The technique, in order of what to reach for:
+    - **Layout is a boundary.** `getBoundingClientRect` is a function on the
+      element you hand the hook, so a test stubs it exactly as it stubs `fetch`.
+      The arithmetic on top of the fake numbers is the arithmetic that ships.
+    - **Randomness is a boundary.** `vi.spyOn(Math, "random").mockReturnValue(0.5)`
+      makes `randomBetween` land on its midpoint, so a cell's area maps to an
+      exact particle count. Vary the draw to reach both sides of a coin flip.
+    - **Where the output is a library call rather than DOM, record the call.**
+      Wrapping `createTimeline` from animejs turns "it did not throw" into an
+      assertion that a 600×320 panel morphs to 900×600 and translates by
+      (-30, -60), and gives you the `onComplete` to invoke directly.
+
+    Reach for those before writing anything off.
+
+  - **jsdom's CSSOM is not a faithful mirror, and guessing at it wastes a run.**
+    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`; `border: none` reads
+    back as `""`, not `"none"`; and an unstyled element's computed `color` is
+    `canvastext` rather than empty, so a `style.color || fallback` branch can
+    never take its fallback here. Check what it stores before asserting on it.
   - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
     `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
     `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
