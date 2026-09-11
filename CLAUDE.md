@@ -199,6 +199,25 @@ Postgres and Redis in containers while the app itself stays native. Both it and
 Compose starts an empty database, so `npm -w server run migrate:postgres` is required
 before the server or its test suite will work against it.
 
+**On Windows, running both does not conflict — it silently shadows the container**, so
+"alternatives" is not enforced by anything and you can believe you are on Docker while you
+are not. Measured on 2026-09-11: the native PostgreSQL 18 service binds `127.0.0.1:55432`
+and Docker binds `0.0.0.0:55432`, and both listeners coexist. `localhost` resolves to
+`127.0.0.1` first, so every connection — the app, the test suite, and
+`migrate:postgres` — reaches the **native** instance. `docker compose up -d` reports
+success, the migration prints `skipped 001_foundation.sql` because the _native_ database
+already had it, and the container's `ai_workout` sits at zero tables. Nothing errors.
+Check which one you are actually on before trusting a compose-based repro:
+
+```bash
+netstat -ano | grep -E ":55432" | grep LISTENING        # two rows means shadowed
+docker exec ai-workout-postgres psql -U postgres -d ai_workout -c '\dt'
+```
+
+An empty `\dt` next to a passing test suite is the tell. The container itself is fine —
+piping `server/db/postgres/001_foundation.sql` into that same `docker exec` builds all
+seven tables — so this is a routing problem, not an image or migration problem.
+
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
@@ -373,6 +392,10 @@ before the server or its test suite will work against it.
     paragraphs under its nested `- [x]` task-list items four spaces deeper, growing the
     file 280 bytes per run with no fixed point. Re-test after a Prettier upgrade by
     checking byte-stability across ~3 consecutive passes, not by a single clean `--check`.
+    Not every slow-converging file is that file. `docs/superpowers/plans/2026-09-06-foundation-hardening.md`
+    needed **two** `--write` passes to settle (70,068 then 70,066 bytes, stable after) and
+    is not excluded, because it has a fixed point. The pathological case grows without
+    bound; a file that stops changing is merely awkward. Measure before excluding one.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
   `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were

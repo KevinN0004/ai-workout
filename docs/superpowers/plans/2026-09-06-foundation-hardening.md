@@ -2065,16 +2065,40 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ## Final verification
 
-Run after all six PRs have landed.
+Run after all six PRs have landed. **Executed 2026-09-11 against `main` at `14706f7`.**
+Ten of the eleven pass; item 8 does not, and the reason is recorded in `CLAUDE.md`.
 
-- [ ] `npx eslint .` — exit 0
-- [ ] `npx prettier --check .` — exit 0
-- [ ] `npm test` — 655 client, 751 server, 9 script tests passing
-- [ ] `npm run build` — exit 0
-- [ ] `npm audit` — no `qs` or `body-parser` findings; only the Prisma-chain advisories remain
-- [ ] `npx audit-ci@7 --config .audit-ci.json` — exit 0, with no "Consider not allowlisting" notice
-- [ ] `node scripts/check-audit-allowlist.mjs` — exit 0
-- [ ] `docker compose up -d && npm -w server run migrate:postgres` — working dev database
-- [ ] Booting with `DATABASE_URL` unset exits 1 with a readable message
-- [ ] CI shows `quality`, `test (22)`, `test (24)`, and `build` all green
-- [ ] `git blame` on a reformatted file attributes lines to their original commits
+- [x] `npx eslint .` — exit 0
+- [x] `npx prettier --check .` — exit 0
+- [x] `npm test` — exit 0. Counts have moved on from this plan's baseline: **20 script,
+      1,699 client, 772 server** (the plan was written at 9 / 655 / 751).
+- [x] `npm run build` — exit 0
+- [x] `npm audit` — exits 1, which is expected: the four remaining advisories are all high
+      severity and all in the Prisma chain (`@prisma/config` ← `deepmerge-ts`,
+      `prisma` ← `mysql2`). **Zero `qs` and zero `body-parser` findings**, which is what
+      this item was checking for. `audit-ci` below is the gate, not this.
+- [x] `npx audit-ci@7 --config .audit-ci.json` — exit 0, and no "Consider not
+      allowlisting" notice. It does print `Found vulnerable allowlisted advisories:
+GHSA-3f6p-5ww8-9rcr, GHSA-ggr8-5vv4-36mx`, which is the allowlist working.
+- [x] `node scripts/check-audit-allowlist.mjs` — exit 0, `Audit allowlist OK (2 entries).`
+- [ ] `docker compose up -d && npm -w server run migrate:postgres` — **does not give a
+      working dev database on this machine, and fails silently.** Compose starts both
+      containers and exits 0, but a native PostgreSQL 18 service is already bound to
+      `127.0.0.1:55432` while Docker binds `0.0.0.0:55432`. The two coexist on Windows,
+      `localhost` resolves to `127.0.0.1` first, and so the migration ran against the
+      _native_ database — printing `skipped 001_foundation.sql` because that one was
+      already migrated — while the container's `ai_workout` stayed at zero tables.
+      The container is not at fault: piping `server/db/postgres/001_foundation.sql` into
+      `docker exec ai-workout-postgres psql` builds all seven tables. This is a routing
+      problem, and the detection recipe is in `CLAUDE.md` under Build & Test.
+- [x] Booting with `DATABASE_URL` unset exits 1 with a readable message — verified by
+      running `server/src/index.js` from a directory with no `.env`, since `dotenv.config()`
+      reads the cwd. Output: `Environment validation failed:` /
+      `  - DATABASE_URL (or POSTGRES_URL) is required.`
+- [x] CI shows all four jobs green — on PR #102: `Build client`, `Lint, format, audit`,
+      `Tests (Node 22)`, `Tests (Node 24)`. The job display names differ from the
+      `quality` / `test (22)` / `test (24)` / `build` this plan anticipated; they are the
+      same four jobs.
+- [x] `git blame` on a reformatted file attributes lines to their original commits —
+      `git blame --line-porcelain client/src/App.jsx` attributes **0** lines to the
+      reformat commit `86621a3`, with `blame.ignoreRevsFile=.git-blame-ignore-revs` set.
