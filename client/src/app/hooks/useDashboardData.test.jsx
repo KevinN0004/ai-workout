@@ -419,6 +419,174 @@ describe("ambient data", () => {
       // The old reading stays on screen.
       expect(result.current.weatherData).toBeTruthy();
     });
+
+    // The mirror of the air-quality block below: these two loaders carry
+    // near-identical response handling, and each had the half the other was
+    // missing. Weather had its geolocation codes covered but not its response
+    // errors; air quality had the reverse.
+    test("surfaces the server's own message when nothing is cached", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/weather")
+            ? jsonResponse({ error: "Upstream refused." }, false)
+            : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherError).toBe("Upstream refused."));
+    });
+
+    test("falls back to a generic message when the error body carries none", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/weather") ? jsonResponse({}, false) : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() =>
+        expect(result.current.weatherError).toMatch(/unable to load weather recommendation/i)
+      );
+    });
+
+    test("falls back when the error body cannot be read at all", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/weather")
+            ? {
+                ok: false,
+                json: async () => {
+                  throw new Error("not json");
+                }
+              }
+            : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() =>
+        expect(result.current.weatherError).toMatch(/unable to load weather recommendation/i)
+      );
+    });
+
+    test("a null body is stored as no reading rather than as an empty one", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse(null))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherLastUpdatedAt).toBeTruthy());
+      expect(result.current.weatherData).toBeNull();
+    });
+  });
+
+  // Each loader stamps its request and checks the stamp before writing, so a
+  // slow first answer cannot land on top of a fast second one. A visitor who
+  // taps refresh twice would otherwise watch the newer reading be replaced by
+  // the older.
+  describe("overlapping requests", () => {
+    const deferred = () => {
+      let resolve;
+      const promise = new Promise((r) => {
+        resolve = r;
+      });
+      return { promise, resolve };
+    };
+
+    test.each([
+      ["weather", "loadWeatherRecommendation", "/api/weather", "weatherData"],
+      ["air quality", "loadAirQuality", "/api/air-quality", "airQualityData"]
+    ])("a superseded %s response is discarded", async (_label, method, path, key) => {
+      stubGeolocation();
+      const gates = [deferred(), deferred()];
+      let call = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) => {
+          if (!String(url).includes(path)) return jsonResponse({});
+          const gate = gates[Math.min(call, 1)];
+          call += 1;
+          return gate.promise;
+        })
+      );
+      const { result } = ambient();
+
+      let first;
+      let second;
+      await act(async () => {
+        first = result.current[method]();
+        second = result.current[method]();
+      });
+
+      // The second request answers first, then the stale first one arrives.
+      gates[1].resolve(jsonResponse({ marker: "second" }));
+      gates[0].resolve(jsonResponse({ marker: "first" }));
+      await act(async () => {
+        await Promise.all([first, second]);
+      });
+
+      await waitFor(() => expect(result.current[key]).toBeTruthy());
+      expect(result.current[key].marker).toBe("second");
+    });
+
+    test.each([
+      ["weather", "loadWeatherRecommendation", "/api/weather", "weatherData", "weatherError"],
+      ["air quality", "loadAirQuality", "/api/air-quality", "airQualityData", "airQualityError"]
+    ])(
+      "a superseded %s failure does not report over a fresh success",
+      async (_label, method, path, dataKey, errorKey) => {
+        // The guard in the catch block, not the one in the success path. A
+        // slow request that fails after a newer one succeeded would otherwise
+        // put an error banner over a reading that is perfectly good.
+        stubGeolocation();
+        const gates = [deferred(), deferred()];
+        let call = 0;
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url) => {
+            if (!String(url).includes(path)) return jsonResponse({});
+            const gate = gates[Math.min(call, 1)];
+            call += 1;
+            return gate.promise;
+          })
+        );
+        const { result } = ambient();
+
+        let first;
+        let second;
+        await act(async () => {
+          first = result.current[method]();
+          second = result.current[method]();
+        });
+
+        gates[1].resolve(jsonResponse({ marker: "second" }));
+        gates[0].resolve(jsonResponse({ error: "Stale failure." }, false));
+        await act(async () => {
+          await Promise.all([first, second]);
+        });
+
+        await waitFor(() => expect(result.current[dataKey]).toBeTruthy());
+        expect(result.current[dataKey].marker).toBe("second");
+        expect(result.current[errorKey]).toBe("");
+      }
+    );
   });
 
   describe("loading air quality", () => {
@@ -470,6 +638,162 @@ describe("ambient data", () => {
       await act(async () => result.current.loadAirQuality());
 
       await waitFor(() => expect(result.current.airQualityError).toMatch(/last update/i));
+    });
+
+    // Weather and air quality each carry their own copy of the geolocation
+    // error handling -- the same four codes, the same four messages, written
+    // out twice. Only the weather copy was covered, so the two could drift
+    // apart without anything noticing. These drive the air-quality copy
+    // directly and then assert the pair agree.
+    test.each([
+      [1, /permission was denied/i],
+      [2, /unavailable/i],
+      [3, /timed out/i],
+      [99, /unable to access location/i]
+    ])("turns geolocation error code %i into its own message", async (code, pattern) => {
+      stubGeolocation({ error: geoError(code) });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityError).toMatch(pattern));
+    });
+
+    test.each([[1], [2], [3], [99]])(
+      "code %i reads identically whichever reading asked for the location",
+      async (code) => {
+        // The visitor is refused once and told twice; two wordings for one
+        // refusal reads as two separate faults.
+        stubGeolocation({ error: geoError(code) });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => jsonResponse({}))
+        );
+        const { result } = ambient();
+
+        await act(async () => result.current.loadWeatherRecommendation());
+        await act(async () => result.current.loadAirQuality());
+
+        await waitFor(() => expect(result.current.airQualityError).toBeTruthy());
+        expect(result.current.airQualityError).toBe(result.current.weatherError);
+      }
+    );
+
+    test("says so when the browser has no geolocation at all", async () => {
+      vi.stubGlobal("navigator", {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() =>
+        expect(result.current.airQualityError).toMatch(/not available in this browser/i)
+      );
+    });
+
+    test("and still says so once a reading is already on screen", async () => {
+      // With no reading, the dedicated GEO_NOT_AVAILABLE branch and the
+      // general fallback produce the same sentence, so the branch cannot be
+      // told apart. With a reading present the fallback would instead say the
+      // data is stale -- which is wrong, since nothing was refreshed and
+      // nothing will be until the browser gains geolocation.
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ summary: { aqiUs: 42 } }))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+      await waitFor(() => expect(result.current.airQualityData).toBeTruthy());
+
+      vi.stubGlobal("navigator", {});
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() =>
+        expect(result.current.airQualityError).toMatch(/not available in this browser/i)
+      );
+      expect(result.current.airQualityError).not.toMatch(/last update/i);
+    });
+
+    test("surfaces the server's own message when nothing is cached", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/air-quality")
+            ? jsonResponse({ error: "Sensor offline." }, false)
+            : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityError).toBe("Sensor offline."));
+    });
+
+    test("falls back to a generic message when the error body carries none", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/air-quality") ? jsonResponse({}, false) : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() =>
+        expect(result.current.airQualityError).toMatch(/unable to load air quality/i)
+      );
+    });
+
+    test("falls back when the error body cannot be read at all", async () => {
+      // A proxy timeout returns an error status with an HTML body.
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).includes("/api/air-quality")
+            ? {
+                ok: false,
+                json: async () => {
+                  throw new Error("not json");
+                }
+              }
+            : jsonResponse({})
+        )
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() =>
+        expect(result.current.airQualityError).toMatch(/unable to load air quality/i)
+      );
+    });
+
+    test("a null body is stored as no reading rather than as an empty one", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse(null))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityLastUpdatedAt).toBeTruthy());
+      expect(result.current.airQualityData).toBeNull();
     });
   });
 
