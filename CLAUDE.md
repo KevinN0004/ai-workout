@@ -148,6 +148,18 @@ a measurement: 0 °C really is below the cold gate. Range checks can mask the bu
 `toPositiveInt` and `parseRedisPort` are safe only because `> 0` and a port range reject
 the accidental `0`. Don't rely on that in new code.
 
+**The class is not confined to the server.** `useBodyModel.js` carries its own
+`toFiniteNumber`, written the wrong way round — it calls `Number()` first and tests
+`Number.isFinite` after — and `defaultPersonalForm.bodyFat` is `""`. So an unentered body
+fat resolves to `0`, `clamp(0, 3, 60)` lifts it to `3`, and `explicitBodyFat ?? estimatedBodyFat`
+accepts the 3 as a real answer. A visitor who has entered height and weight but not body fat
+is modelled at **3% body fat**, leaner than an elite athlete, and the BMI-derived
+`estimatedBodyFat` beside it is never reached from the app at all. It also floors the
+silhouette's whole adiposity channel: `fatScore` clamps to `0` for an ordinary BMI-25.8
+profile. Covered by tests that pin the current behaviour; changing it is a product call.
+The same coercion makes both `??` fallbacks in that file's cross-unit height pick dead
+code — the left operand is `0`, never `null`, so neither ever fires.
+
 Conventions:
 
 - Keep files under 500 lines
@@ -190,7 +202,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **93.5%** / 85.1%.
+  server **88.8%** statements / 80.7% branches, client **93.5%** / 85.8%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -217,7 +229,7 @@ before the server or its test suite will work against it.
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
     `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) and `events.js` (100% / 99%).
+    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) and `useBodyModel.js` (100% / 99%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
@@ -303,6 +315,16 @@ before the server or its test suite will work against it.
     backslash-n inside a template literal. Not every survivor is a weak test either: removing the `!user?.hash` guard in
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
+    Dropping the `ageValue !== null` guard on `useBodyModel`'s age adjustment is another,
+    and the arithmetic is the proof rather than a run: the guard's else-branch is `0`, and
+    `clamp((null - 40) / 45, 0, 0.22)` is `clamp(-0.889, 0, 0.22)`, which is also `0`.
+    A mutant whose two sides you can evaluate on paper does not need a test written for it.
+  - **A score that survives every mutation may be scoring the wrong string.** Five fields in
+    `useBodyModel` are looked up in lower-case maps, and every value `HomePersonalStage`
+    stores is the option label verbatim — `"Moderate"`, `"HIIT"`, `"High-protein"`. A single
+    `toLowerText` joins them, so deleting it would drop all five to their defaults at once,
+    invisibly. The test suite missed it because the fixtures were written in lower case;
+    **build fixtures from what the form actually stores**, not from what the lookup expects.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, React Hook contract violations, import cycles and unresolved
   specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
