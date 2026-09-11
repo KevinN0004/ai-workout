@@ -202,7 +202,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **93.5%** / 85.8%.
+  server **88.8%** statements / 80.7% branches, client **93.5%** / 86.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -220,6 +220,23 @@ before the server or its test suite will work against it.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
+    Current ranking, re-measured 2026-09-11: `usePreviewDerivedData.js` (46),
+    `PreviewPage.jsx` (31, 0%), `outlineGeometry.js` (28),
+    `PreviewDashboardChapter.jsx` (28, 0%), `templateOutline.js` (26),
+    `HomePage.jsx` (25, 0%), `DashboardPage.jsx` (23), `App.jsx` (20),
+    `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
+    **`PreviewPage.jsx` is the largest genuinely untested surface** — 11 `useState`s,
+    5 `useEffect`s, scroll orchestration and timer cleanup, all at 0%. It was
+    previously written off here as "an orchestrator for hooks already covered",
+    which was wrong: the hooks are covered, the machine driving them is not.
+    **Correction to an earlier entry in this file.** `usePreviewDerivedData.js`
+    was recorded as wholly unreachable defensive code. Re-reading its uncovered
+    lines shows that is only true of about fifteen of its forty-six: lines
+    406-420 are a block of `String(x ?? "")` over static preview constants that
+    supply every field, so those `??` cannot fire. But lines 30-50 are locale
+    detection over `navigator.languages` and `Intl.DateTimeFormat`, which is a
+    boundary and is stubbed exactly as `SettingsView.test.jsx` already stubs it.
+    Do not skip the file on the old verdict.
     Done, and worth copying from: `SettingsView.jsx` (89%),
     `WorkoutResultPage.jsx` (100%), `MealView.jsx` (100%, which took the five
     `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
@@ -229,7 +246,7 @@ before the server or its test suite will work against it.
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
     `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) and `useBodyModel.js` (100% / 99%).
+    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) and `DashboardAtAGlance.jsx` (100% / 100%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
@@ -325,6 +342,12 @@ before the server or its test suite will work against it.
     `toLowerText` joins them, so deleting it would drop all five to their defaults at once,
     invisibly. The test suite missed it because the fixtures were written in lower case;
     **build fixtures from what the form actually stores**, not from what the lookup expects.
+  - **A deliberate survivor is how you prove a branch is dead.** `DashboardAtAGlance.jsx`
+    had two conditions whose arms were the same string — `weatherError ? "Unavailable" :
+"Unavailable"`, and the identical thing again for air quality. Deleting each condition
+    outright was added to the mutation list _expecting_ it to survive, and it did: nothing
+    observable depends on either test. That is a mechanical proof rather than a reading of
+    the code, and it costs one run. Reach for it whenever two arms look alike.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, React Hook contract violations, import cycles and unresolved
   specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
