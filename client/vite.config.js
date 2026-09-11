@@ -33,10 +33,10 @@ export default defineConfig({
       // tenth of a point is a safe margin, and whole percent would have let
       // this increment's gain evaporate without tripping anything.
       thresholds: {
-        statements: 86.3,
-        branches: 69.0,
-        functions: 71.0,
-        lines: 88.0
+        statements: 87.8,
+        branches: 71.8,
+        functions: 74.6,
+        lines: 89.3
       }
     }
   }
