@@ -189,10 +189,14 @@ before the server or its test suite will work against it.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-05:
-  server **88.8%** statements / 80.5% branches, client **66.8%** / 46.5%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
+  server **88.8%** statements / 80.7% branches, client **75.9%** / 58.2%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
+  **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
+  below the measured value. Raise them when coverage rises; never lower them to make a
+  build pass. Whole-percent floors were tried first and let a sub-point gain evaporate
+  without tripping anything.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
@@ -201,20 +205,35 @@ before the server or its test suite will work against it.
     **Every route file is at or above 81%, every route the user's data passes
     through is at 100%, and every service is at or above 82%.** What is left on
     the server is infrastructure rather than request handling.
-    On the client, worst first: `usePreviewChapterFlow.js` and
-    `usePreviewWeekParticleAnimation.js` (both 0%, both animation orchestration),
-    `TipsView.jsx` (0%), `useHomeStageFlow.js` (56%),
-    and `PlansView.jsx` (0%). Most `pages/dashboard/*View.jsx` are still at 0%.
+    On the client, ranked by **uncovered branches** rather than by percentage —
+    that is what says where the untested behaviour actually is:
+    `useHomeStageFlow.js` (96), `usePreviewWeekParticleAnimation.js` (91, 0%),
+    `usePreviewDerivedData.js` (83), `WorkoutsView.jsx` (78), `TipsView.jsx` (70),
+    `usePreviewChapterFlow.js` (68, 0%), `SummaryView.jsx` (60), `PlansView.jsx` (57),
+    then the preview chapter components (56 and 47, both 0%).
+    `SettingsView.jsx`, `WorkoutResultPage.jsx` and `MealView.jsx` are done —
+    89%, 100% and 100% statements, the last of which took the five `meal/*` panels
+    with it.
   - **Check before calling something untestable.** The animation hooks genuinely
     are limited — they measure real element rects, which jsdom does not provide —
     but `useMealDbSearch.js` sat at 0% and was described the same way for a while
     on nothing but proximity to them. It is a data-fetching hook and went to 97%
     without any layout at all.
-  - **Prefer the client's logic modules to its components.** `units.js`,
-    `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js` and
+  - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
+    `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
     `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
-    state machines, the request layer and every user action. A 450-line view
-    component is more lines for less risk than any of these.
+    state machines, the request layer and every user action. That part holds.
+    What did **not** hold is the corollary this file used to draw, that a view
+    component is therefore more lines for less risk. Five of them were tested in
+    2026-09 and each carried real derivation the rest of the tree does not:
+    `SettingsView` infers the measurement system from the visitor's locale (0% → 89%),
+    `WorkoutResultPage` transposes the plan table and derives every row label from the
+    line text (0% → 100% statements, 97% branches), `MealView` picks the recommendation
+    track from the goal text and the portion note from the calorie band, and took its
+    five `meal/*` panels with it (0% → 100%), `TipsView` owns two fetches and a
+    debounced search (0% → 44% branches), `PlansView` owns the saved-exercise paging
+    (0% → 42%). Judge a component by whether it _computes_ anything, not by its suffix.
+    A genuinely presentational view really is low value; these five were not.
   - **The auth path and the external routes are now covered**, and are the worked
     examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
     at 100% statements; the weather and air-quality routes are covered end to end.
