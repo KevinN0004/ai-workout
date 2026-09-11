@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **90.3%** / 79.8%.
+  server **88.8%** statements / 80.7% branches, client **91.1%** / 80.5%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -207,8 +207,7 @@ before the server or its test suite will work against it.
     the server is infrastructure rather than request handling.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    `DashboardPage.jsx` (44) -- wiring rather than derivation, and the last
-    file of any size.
+    Nothing above 44 uncovered branches remains; what is left is spread thin.
     Done, and worth copying from: `SettingsView.jsx` (89%),
     `WorkoutResultPage.jsx` (100%), `MealView.jsx` (100%, which took the five
     `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
@@ -218,7 +217,7 @@ before the server or its test suite will work against it.
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
     `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-    (100% / 100%) and `App.jsx` (92% / 73%).
+    (100% / 100%) `App.jsx` (92% / 73%) and `DashboardPage.jsx` (76% / 69%).
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
@@ -246,6 +245,20 @@ before the server or its test suite will work against it.
       (-30, -60), and gives you the `onComplete` to invoke directly.
 
     Reach for those before writing anything off.
+
+  - **`TZ` does not reach Node on this machine, so timezone claims cannot be
+    verified locally.** `TZ=Asia/Tokyo node -e 'process.env.TZ'` prints
+    `undefined` here, inline or exported, and the process keeps the system
+    zone. A suite re-run under several `TZ` values therefore proves nothing —
+    it is the same zone every time, and the passes are not independent. This
+    has already produced a false claim in a merged PR description.
+    What is actually available: the system zone (UTC-7) locally and **UTC in
+    CI**, which sit on opposite sides of the boundary that matters, so a test
+    that passes in both is genuinely exercised either side of midnight.
+    Beyond that, reason arithmetically rather than by running: `new Date("Y-M-D")`
+    is UTC midnight and `new Date(y, m, d)` is local midnight, and the signed
+    difference between them **is** the offset — which settles which side of a
+    comparison every zone falls on without needing to be in one.
 
   - **jsdom's CSSOM is not a faithful mirror, and guessing at it wastes a run.**
     `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`; `border: none` reads
