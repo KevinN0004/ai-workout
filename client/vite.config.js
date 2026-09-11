@@ -34,7 +34,7 @@ export default defineConfig({
       // this increment's gain evaporate without tripping anything.
       thresholds: {
         statements: 85.6,
-        branches: 65.5,
+        branches: 66.7,
         functions: 69.2,
         lines: 87.5
       }
