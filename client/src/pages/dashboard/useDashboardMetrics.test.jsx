@@ -142,11 +142,46 @@ describe("useDashboardMetrics", () => {
       expect(metrics.last7Workouts).toHaveLength(1);
     });
 
-    test("a full timestamp is still understood", () => {
+    test("a full timestamp is parsed, but a time of day falls outside today", () => {
+      // Pinning what it does rather than what it looks like it should. The
+      // window's upper bound is `todayDate`, which is local *midnight*, and
+      // the test is `<= todayDate` -- so any timestamp with a time of day on
+      // today is excluded from the last-7-days window.
+      //
+      // Latent rather than live: `toDateOnly` on the server slices every date
+      // to ten characters, so `date` is always a plain YYYY-MM-DD here and a
+      // timestamp cannot arrive through the normal path. Worth knowing before
+      // this hook is fed from anywhere else.
+      //
+      // This test also asserted the opposite at first and passed locally,
+      // because 08:00Z happens to be local midnight in this machine's zone.
+      // CI runs in UTC and caught it. Timestamps in these windows are
+      // timezone-dependent; plain dates are not, which is the whole reason
+      // parseDateValue has its own YYYY-MM-DD branch.
       const metrics = render({
         dashboard: {
-          workouts: [{ id: "w1", date: "2026-03-02T08:00:00.000Z", duration: 45 }]
+          workouts: [
+            { id: "w1", date: "2026-03-02T08:00:00.000Z", duration: 45 },
+            { id: "w2", date: "2026-02-27T08:00:00.000Z", duration: 45 }
+          ]
         }
+      });
+
+      // Both parse -- neither is discarded as unreadable. Only the older one
+      // is asserted to be in the window: it is comfortably inside at any
+      // offset, whereas today's timestamp lands on either side of local
+      // midnight depending on the zone, which is exactly the fragility being
+      // described. Asserting that one either way would re-introduce the bug
+      // this comment exists to record.
+      expect(metrics.workouts).toHaveLength(2);
+      expect(metrics.last7Workouts.map((item) => item.id)).toContain("w2");
+    });
+
+    test("a plain date for today is included wherever the clock is", () => {
+      // The contract the server actually provides, and the one that holds in
+      // every timezone.
+      const metrics = render({
+        dashboard: { workouts: [{ id: "w1", date: "2026-03-02", duration: 45 }] }
       });
 
       expect(metrics.last7Workouts).toHaveLength(1);
