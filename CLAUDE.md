@@ -190,7 +190,7 @@ before the server or its test suite will work against it.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **73.8%** / 55.2%.
+  server **88.8%** statements / 80.7% branches, client **75.9%** / 58.2%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -210,8 +210,10 @@ before the server or its test suite will work against it.
     `useHomeStageFlow.js` (96), `usePreviewWeekParticleAnimation.js` (91, 0%),
     `usePreviewDerivedData.js` (83), `WorkoutsView.jsx` (78), `TipsView.jsx` (70),
     `usePreviewChapterFlow.js` (68, 0%), `SummaryView.jsx` (60), `PlansView.jsx` (57),
-    and `MealView.jsx` (49, 0%). `SettingsView.jsx` and `WorkoutResultPage.jsx` are
-    done — 89% and 100% statements.
+    then the preview chapter components (56 and 47, both 0%).
+    `SettingsView.jsx`, `WorkoutResultPage.jsx` and `MealView.jsx` are done —
+    89%, 100% and 100% statements, the last of which took the five `meal/*` panels
+    with it.
   - **Check before calling something untestable.** The animation hooks genuinely
     are limited — they measure real element rects, which jsdom does not provide —
     but `useMealDbSearch.js` sat at 0% and was described the same way for a while
