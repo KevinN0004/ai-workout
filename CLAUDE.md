@@ -224,14 +224,16 @@ before the server or its test suite will work against it.
     `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
     state machines, the request layer and every user action. That part holds.
     What did **not** hold is the corollary this file used to draw, that a view
-    component is therefore more lines for less risk. Four of them were tested in
+    component is therefore more lines for less risk. Five of them were tested in
     2026-09 and each carried real derivation the rest of the tree does not:
     `SettingsView` infers the measurement system from the visitor's locale (0% → 89%),
     `WorkoutResultPage` transposes the plan table and derives every row label from the
-    line text (0% → 100% statements, 97% branches), `TipsView` owns two fetches and a
+    line text (0% → 100% statements, 97% branches), `MealView` picks the recommendation
+    track from the goal text and the portion note from the calorie band, and took its
+    five `meal/*` panels with it (0% → 100%), `TipsView` owns two fetches and a
     debounced search (0% → 44% branches), `PlansView` owns the saved-exercise paging
     (0% → 42%). Judge a component by whether it _computes_ anything, not by its suffix.
-    A genuinely presentational view really is low value; these four were not.
+    A genuinely presentational view really is low value; these five were not.
   - **The auth path and the external routes are now covered**, and are the worked
     examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
     at 100% statements; the weather and air-quality routes are covered end to end.
