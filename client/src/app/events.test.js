@@ -1124,3 +1124,93 @@ describe("openSignupWithPrefilledProfile", () => {
     expect(deps.setAuthError).toHaveBeenCalledWith("");
   });
 });
+
+// The last four fallbacks in this file, each the `|| default` side of an
+// expression whose other side every existing test supplies. All four are on
+// paths a visitor reaches: a plan that fails to generate, a sign-in that is
+// refused, and a signup weight entered in either unit.
+//
+// Worth knowing before any of this is tidied: every direct write action states
+// its default message twice, once where it throws and once where it catches,
+// and mutation testing singly and then in pairs says they are mutually
+// redundant. `throw new Error(payload?.error || "...")` produces an Error with
+// an empty message when the body carries none, and the catch's own
+// `err.message || "..."` then supplies the same sentence. Either can be
+// deleted on its own with this suite still green; deleting both is caught.
+describe("fallbacks when the other side is missing", () => {
+  test("a plan failure with no message still says something", async () => {
+    // An aborted or timed-out request rejects with an empty message, and an
+    // empty error banner tells the visitor nothing.
+    deps.apiFetch.mockImplementation(async () => {
+      throw new Error("");
+    });
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.setError).toHaveBeenCalledWith("Unable to generate plan.");
+  });
+
+  test("an auth failure with no message still says something", async () => {
+    deps.apiFetch.mockImplementation(async () => {
+      throw new Error("");
+    });
+
+    await build().onAuthSubmit(submitEvent());
+
+    expect(deps.setAuthError).toHaveBeenCalledWith("Unable to authenticate.");
+  });
+
+  test("an auth response with no user signs nobody in", async () => {
+    // The endpoint answers 200 with an empty body on at least one path; a
+    // `undefined` user would read as signed-in to every `user ?` check.
+    deps.apiFetch.mockResolvedValue(jsonResponse({}));
+
+    await build().onAuthSubmit(submitEvent());
+
+    // Asserted on the actual argument rather than with toHaveBeenCalledWith:
+    // that matcher is satisfied by *any* call, and another path calls
+    // setUser(null) too, so it passed whether or not this one coerced.
+    const [lastUser] = deps.setUser.mock.calls.at(-1);
+    expect(lastUser).toBeNull();
+    expect(lastUser).not.toBeUndefined();
+  });
+
+  test("and the signup path coerces it the same way", async () => {
+    // `setUser(data.user || null)` is written out twice, once per auth mode.
+    // The default deps sign in, so only the login copy was reached; the signup
+    // copy could have lost its coercion without a test noticing.
+    deps.apiFetch.mockResolvedValue(jsonResponse({}));
+
+    await build({ authMode: "signup" }).onAuthSubmit(submitEvent());
+
+    const [lastUser] = deps.setUser.mock.calls.at(-1);
+    expect(lastUser).toBeNull();
+    expect(lastUser).not.toBeUndefined();
+  });
+
+  test("a signup weight given in kilograms is sent as it stands", async () => {
+    deps.apiFetch.mockResolvedValue(jsonResponse({ user: { id: "u-1" } }));
+
+    await build({
+      authMode: "signup",
+      signupWeightUnit: "kg",
+      signupProfileForm: { ...deps.signupProfileForm, weight: "80", weightKg: "" }
+    }).onAuthSubmit(submitEvent());
+
+    const body = JSON.parse(deps.apiFetch.mock.calls.at(-1)[1].body);
+    expect(String(body.profile.weightKg ?? body.weightKg ?? body.weight)).toContain("80");
+  });
+
+  test("a signup with no typed weight falls back to the stored one", async () => {
+    deps.apiFetch.mockResolvedValue(jsonResponse({ user: { id: "u-1" } }));
+
+    await build({
+      authMode: "signup",
+      signupWeightUnit: "kg",
+      signupProfileForm: { ...deps.signupProfileForm, weight: "", weightKg: "72" }
+    }).onAuthSubmit(submitEvent());
+
+    const body = JSON.parse(deps.apiFetch.mock.calls.at(-1)[1].body);
+    expect(String(body.profile?.weightKg ?? body.weightKg ?? body.weight)).toContain("72");
+  });
+});
