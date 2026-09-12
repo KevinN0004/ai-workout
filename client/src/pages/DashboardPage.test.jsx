@@ -11,6 +11,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const glance = vi.hoisted(() => ({ props: null }));
 const header = vi.hoisted(() => ({ props: null }));
+const drawer = vi.hoisted(() => ({ props: null }));
+const bottomNav = vi.hoisted(() => ({ props: null }));
+const summary = vi.hoisted(() => ({ props: null }));
+const workoutsView = vi.hoisted(() => ({ props: null }));
+const plansView = vi.hoisted(() => ({ props: null }));
 
 vi.mock("./dashboard/DashboardAtAGlance", () => ({
   default: (props) => {
@@ -29,25 +34,40 @@ vi.mock("./dashboard/DashboardHeader", () => ({
 // vi.mock factories are hoisted above every local binding, so each stub is
 // built inline rather than by a shared helper.
 vi.mock("./dashboard/SummaryView", () => ({
-  default: () => <div data-testid="summary-view" />
+  default: (props) => {
+    summary.props = props;
+    return <div data-testid="summary-view" />;
+  }
 }));
 vi.mock("./dashboard/DashboardDrawer", () => ({
-  default: () => <div data-testid="drawer" />
+  default: (props) => {
+    drawer.props = props;
+    return <div data-testid="drawer" />;
+  }
 }));
 vi.mock("./dashboard/DashboardBottomNav", () => ({
-  default: () => <div data-testid="bottom-nav" />
+  default: (props) => {
+    bottomNav.props = props;
+    return <div data-testid="bottom-nav" />;
+  }
 }));
 vi.mock("./dashboard/DashboardWorkoutModal", () => ({
   default: () => <div data-testid="workout-modal" />
 }));
 vi.mock("./dashboard/WorkoutsView", () => ({
-  default: () => <div data-testid="workouts-view" />
+  default: (props) => {
+    workoutsView.props = props;
+    return <div data-testid="workouts-view" />;
+  }
 }));
 vi.mock("./dashboard/CaloriesView", () => ({
   default: () => <div data-testid="calories-view" />
 }));
 vi.mock("./dashboard/PlansView", () => ({
-  default: () => <div data-testid="plans-view" />
+  default: (props) => {
+    plansView.props = props;
+    return <div data-testid="plans-view" />;
+  }
 }));
 vi.mock("./dashboard/MealView", () => ({
   default: () => <div data-testid="meal-view" />
@@ -73,7 +93,8 @@ const renderPage = (props = {}) => {
     setDashNavOpen: vi.fn(),
     setWorkoutForm: vi.fn(),
     setWorkoutModalOpen: vi.fn(),
-    onLogout: vi.fn()
+    onLogout: vi.fn(),
+    clearDashboardToast: vi.fn()
   };
   const utils = render(
     <DashboardPage
@@ -472,6 +493,256 @@ describe("DashboardPage", () => {
       });
 
       expect(glance.props.caloriesGap).toBe(-300);
+    });
+  });
+
+  describe("which view it opens", () => {
+    // Six of the eight are lazy-loaded behind Suspense, so they arrive a tick
+    // after the render rather than with it.
+    //
+    // The suite freezes the clock for the tests that report how long ago a
+    // reading was taken. Nothing here depends on the time, and findBy* polls on
+    // timers, so a frozen clock would leave it waiting for a view that has
+    // already arrived.
+    beforeEach(() => {
+      vi.useRealTimers();
+    });
+    test.each([
+      ["summary", "summary-view"],
+      ["workouts", "workouts-view"],
+      ["calories", "calories-view"],
+      ["plans", "plans-view"],
+      ["meal", "meal-view"],
+      ["tips", "tips-view"],
+      ["settings", "settings-view"],
+      ["home", "home-view"]
+    ])("%s opens its own view", async (dashView, testId) => {
+      renderPage({ dashView });
+
+      expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    });
+
+    test("only the chosen view is mounted", async () => {
+      renderPage({ dashView: "plans" });
+      await screen.findByTestId("plans-view");
+
+      ["summary-view", "workouts-view", "calories-view", "meal-view", "tips-view"].forEach(
+        (testId) => expect(screen.queryByTestId(testId)).not.toBeInTheDocument()
+      );
+    });
+
+    test("a view name it does not know falls back to the summary", async () => {
+      // dashView comes from the route, so a stale or hand-typed URL reaches
+      // here. Falling through to a blank panel would look like a broken page.
+      renderPage({ dashView: "not-a-view" });
+
+      expect(await screen.findByTestId("summary-view")).toBeInTheDocument();
+    });
+  });
+
+  describe("navigating from the drawer and the bottom bar", () => {
+    test("the drawer sends the visitor on and closes itself behind them", () => {
+      const { go, setDashView, setDashNavOpen } = renderPage();
+
+      act(() => drawer.props.onNavigate("workouts"));
+
+      expect(setDashView).toHaveBeenCalledWith("workouts");
+      expect(go).toHaveBeenCalledWith("/dashboard/workouts");
+      expect(setDashNavOpen).toHaveBeenCalledWith(false);
+    });
+
+    test("the bottom bar sends them on but leaves the drawer alone", () => {
+      const { go, setDashView, setDashNavOpen } = renderPage();
+
+      act(() => bottomNav.props.onNavigate("meal"));
+
+      expect(setDashView).toHaveBeenCalledWith("meal");
+      expect(go).toHaveBeenCalledWith("/dashboard/meal");
+      expect(setDashNavOpen).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["summary", "/dashboard"],
+      ["calories", "/dashboard/calories"],
+      ["settings", "/dashboard/settings"],
+      ["home", "/dashboard/home"]
+    ])("%s routes to %s", (view, route) => {
+      const { go } = renderPage();
+
+      act(() => bottomNav.props.onNavigate(view));
+
+      expect(go).toHaveBeenCalledWith(route);
+    });
+
+    test("a view with no route of its own lands on the dashboard root", () => {
+      const { go } = renderPage();
+
+      act(() => bottomNav.props.onNavigate("not-a-view"));
+
+      expect(go).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  describe("what it says while loading and when something breaks", () => {
+    test("a first load shows a skeleton in place of the grid", () => {
+      renderPage({ dashLoading: true, dashboard: null });
+
+      expect(document.querySelector(".dashboard-loading-skeleton")).toBeTruthy();
+      expect(screen.queryByText("Refreshing dashboard data...")).toBeNull();
+    });
+
+    test("a refresh over existing data says so instead of blanking the page", () => {
+      renderPage({ dashLoading: true });
+
+      expect(document.querySelector(".dashboard-loading-skeleton")).toBeNull();
+      expect(screen.getByText("Refreshing dashboard data...")).toBeTruthy();
+    });
+
+    test("neither appears once the data has settled", () => {
+      renderPage();
+
+      expect(document.querySelector(".dashboard-loading-skeleton")).toBeNull();
+      expect(screen.queryByText("Refreshing dashboard data...")).toBeNull();
+    });
+
+    test("an error is shown to the visitor", () => {
+      renderPage({ dashError: "Could not reach the server" });
+
+      expect(screen.getByText("Could not reach the server")).toBeTruthy();
+    });
+
+    test("no error element when there is no error", () => {
+      renderPage();
+
+      expect(document.querySelector(".error")).toBeNull();
+    });
+  });
+
+  describe("the toast", () => {
+    const toastEl = () => document.querySelector(".dashboard-toast");
+
+    test("is absent until there is something to say", () => {
+      renderPage();
+
+      expect(toastEl()).toBeNull();
+    });
+
+    test("carries its message and defaults to the success tone", () => {
+      renderPage({ dashboardToast: { message: "Workout saved" } });
+
+      expect(toastEl().className).toContain("dashboard-toast-success");
+      expect(screen.getByText("Workout saved")).toBeTruthy();
+    });
+
+    test("uses the tone it is given", () => {
+      renderPage({ dashboardToast: { message: "Could not save", tone: "error" } });
+
+      expect(toastEl().className).toContain("dashboard-toast-error");
+      expect(toastEl().className).not.toContain("dashboard-toast-success");
+    });
+
+    test("offers an action, and dismisses itself before running it", () => {
+      // The handler is read out before the toast is cleared, so clearing it
+      // cannot pull the action out from under the click.
+      const onAction = vi.fn();
+      const { clearDashboardToast } = renderPage({
+        dashboardToast: { message: "Workout saved", actionLabel: "Undo", onAction }
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+      expect(onAction).toHaveBeenCalledTimes(1);
+      expect(clearDashboardToast).toHaveBeenCalledTimes(1);
+      expect(clearDashboardToast.mock.invocationCallOrder[0]).toBeLessThan(
+        onAction.mock.invocationCallOrder[0]
+      );
+    });
+
+    test("can be dismissed without running the action", () => {
+      const onAction = vi.fn();
+      const { clearDashboardToast } = renderPage({
+        dashboardToast: { message: "Workout saved", actionLabel: "Undo", onAction }
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss message" }));
+
+      expect(clearDashboardToast).toHaveBeenCalledTimes(1);
+      expect(onAction).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["a label with no handler", { message: "Saved", actionLabel: "Undo" }],
+      [
+        "a handler that is not callable",
+        { message: "Saved", actionLabel: "Undo", onAction: "nope" }
+      ],
+      ["a handler with no label", { message: "Saved", onAction: () => {} }]
+    ])("offers no action for %s", (_label, dashboardToast) => {
+      // A button that does nothing is worse than no button. Asserted on the
+      // element rather than on its accessible name: with the label missing the
+      // button would render nameless, and a name-based query would pass while
+      // an empty button sat there.
+      renderPage({ dashboardToast });
+
+      expect(document.querySelector(".dashboard-toast-action")).toBeNull();
+      expect(document.querySelector(".dashboard-toast-close")).toBeTruthy();
+    });
+  });
+
+  describe("the shortcuts each view offers", () => {
+    // Every view hands its own jump-off points back to the shell, and each one
+    // has to land somewhere different. These are the arrow functions defined
+    // inline in the render, so nothing ran them until now.
+    beforeEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("the summary jumps to the plan and the meal views", () => {
+      const { go } = renderPage({ dashView: "summary" });
+
+      act(() => summary.props.onOpenPlans());
+      expect(go).toHaveBeenCalledWith("/dashboard/plans");
+
+      act(() => summary.props.onOpenMeal());
+      expect(go).toHaveBeenCalledWith("/dashboard/meal");
+    });
+
+    test("the workouts view jumps to calories and the meal view", async () => {
+      const { go } = renderPage({ dashView: "workouts" });
+      await screen.findByTestId("workouts-view");
+
+      act(() => workoutsView.props.onOpenCalories());
+      expect(go).toHaveBeenCalledWith("/dashboard/calories");
+
+      act(() => workoutsView.props.onOpenMeal());
+      expect(go).toHaveBeenCalledWith("/dashboard/meal");
+    });
+
+    test("the plans view jumps to the guides", async () => {
+      const { go } = renderPage({ dashView: "plans" });
+      await screen.findByTestId("plans-view");
+
+      act(() => plansView.props.onOpenGuides());
+
+      expect(go).toHaveBeenCalledWith("/dashboard/tips");
+    });
+
+    test("the drawer can close itself without navigating", () => {
+      const { setDashNavOpen, go } = renderPage();
+
+      act(() => drawer.props.onClose());
+
+      expect(setDashNavOpen).toHaveBeenCalledWith(false);
+      expect(go).not.toHaveBeenCalled();
+    });
+
+    test("the header returns to the dashboard root before the account loads", () => {
+      // The signed-out branch renders its own header, with its own handler.
+      const { go } = renderPage({ user: null });
+
+      act(() => header.props.onNavigateSummary());
+
+      expect(go).toHaveBeenCalledWith("/dashboard");
     });
   });
 });
