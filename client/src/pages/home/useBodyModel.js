@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
+// Guards before it coerces, because `Number("")` and `Number(null)` are both 0
+// and both finite -- so testing afterwards turns an unfilled field into a real
+// measurement. Same shape as `toNumberOrNull` in the server's rowValues.js.
 const toFiniteNumber = (value) => {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };

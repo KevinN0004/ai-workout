@@ -148,17 +148,33 @@ a measurement: 0 °C really is below the cold gate. Range checks can mask the bu
 `toPositiveInt` and `parseRedisPort` are safe only because `> 0` and a port range reject
 the accidental `0`. Don't rely on that in new code.
 
-**The class is not confined to the server.** `useBodyModel.js` carries its own
-`toFiniteNumber`, written the wrong way round — it calls `Number()` first and tests
-`Number.isFinite` after — and `defaultPersonalForm.bodyFat` is `""`. So an unentered body
-fat resolves to `0`, `clamp(0, 3, 60)` lifts it to `3`, and `explicitBodyFat ?? estimatedBodyFat`
-accepts the 3 as a real answer. A visitor who has entered height and weight but not body fat
-is modelled at **3% body fat**, leaner than an elite athlete, and the BMI-derived
-`estimatedBodyFat` beside it is never reached from the app at all. It also floors the
-silhouette's whole adiposity channel: `fatScore` clamps to `0` for an ordinary BMI-25.8
-profile. Covered by tests that pin the current behaviour; changing it is a product call.
-The same coercion makes both `??` fallbacks in that file's cross-unit height pick dead
-code — the left operand is `0`, never `null`, so neither ever fires.
+**The class was not confined to the server, and the fourth instance is fixed.**
+`useBodyModel.js` carried its own `toFiniteNumber` written the wrong way round —
+`Number()` first, `Number.isFinite` after — while `defaultPersonalForm.bodyFat`
+is `""`. So an unentered body fat resolved to `0`, `clamp(0, 3, 60)` lifted it
+to `3`, and `explicitBodyFat ?? estimatedBodyFat` accepted that 3 as a real
+answer. Anyone who filled in height and weight but not body fat was modelled at
+**3% body fat**, leaner than an elite athlete, and the BMI-derived
+`estimatedBodyFat` sitting beside it was unreachable from the app. It also
+floored the silhouette's whole adiposity channel: `fatScore` clamped to `0` for
+an ordinary BMI-25.8 profile.
+
+The guard now runs before the coercion, copying `toNumberOrNull` in
+`repositories/rowValues.js`. Two things follow from that, and both are worth
+knowing:
+
+- **An unentered body fat now reaches the BMI estimate**, and `""`, `null` and
+  an absent key all agree. An entered `"0"` is still a measurement and still
+  clamps to the 3% floor — blank and zero are different answers.
+- **The cross-unit height fallback came back to life.** Both `??` in that pick
+  were dead for the same reason: the left operand was `0`, never `null`. A
+  profile carrying a height in only one of the two fields used to resolve to no
+  height at all; it now falls back to the other unit, which is what the
+  expression was written to do.
+
+Only `""` and `null` changed behaviour — `undefined` already returned null, and
+weight was unaffected because `toKg` returns `""` for a falsy value and the
+`> 0` check downstream rejected the `0` either way.
 
 Conventions:
 
