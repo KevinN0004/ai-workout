@@ -199,24 +199,31 @@ Postgres and Redis in containers while the app itself stays native. Both it and
 Compose starts an empty database, so `npm -w server run migrate:postgres` is required
 before the server or its test suite will work against it.
 
-**On Windows, running both does not conflict — it silently shadows the container**, so
-"alternatives" is not enforced by anything and you can believe you are on Docker while you
-are not. Measured on 2026-09-11: the native PostgreSQL 18 service binds `127.0.0.1:55432`
-and Docker binds `0.0.0.0:55432`, and both listeners coexist. `localhost` resolves to
-`127.0.0.1` first, so every connection — the app, the test suite, and
-`migrate:postgres` — reaches the **native** instance. `docker compose up -d` reports
-success, the migration prints `skipped 001_foundation.sql` because the _native_ database
-already had it, and the container's `ai_workout` sits at zero tables. Nothing errors.
-Check which one you are actually on before trusting a compose-based repro:
+**Both published ports bind `127.0.0.1` on purpose, and the prefix is load-bearing.**
+Docker's default is `0.0.0.0`, and `start-local-postgres.ps1` binds `127.0.0.1` — and on
+Windows those two do **not** collide. Before this was fixed, `docker compose up -d`
+succeeded while every `localhost` connection kept reaching the native instance: compose
+looked healthy, `migrate:postgres` printed `skipped 001_foundation.sql` because the
+_native_ database already had it, and the container sat at zero tables with no error
+anywhere. Measured both ways on 2026-09-12, holding `127.0.0.1:55432` with a dummy
+listener:
 
-```bash
-netstat -ano | grep -E ":55432" | grep LISTENING        # two rows means shadowed
-docker exec ai-workout-postgres psql -U postgres -d ai_workout -c '\dt'
-```
+- publishing `0.0.0.0:55432` — container starts, shadowing the native instance
+- publishing `127.0.0.1:55432` — `Error response from daemon: ports are not available`
 
-An empty `\dt` next to a passing test suite is the tell. The container itself is fine —
-piping `server/db/postgres/001_foundation.sql` into that same `docker exec` builds all
-seven tables — so this is a routing problem, not an image or migration problem.
+So the collision the comment in `docker-compose.yml` always claimed is now real, and
+picking the wrong one fails immediately instead of silently. Do not drop the prefix. It
+also stops publishing a development database on every interface; nothing needs that,
+because the app runs natively and connects over loopback.
+
+**The two instances do not share a password.** Compose uses `POSTGRES_PASSWORD`
+(default `ai_workout_dev`), which is what `env.example` already spells out:
+`postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout`. The PowerShell helper
+generates its own instead, so a `server/.env` written for one will fail against the other
+with `password authentication failed for user "postgres"` (SQLSTATE 28P01). That is the
+expected symptom of switching sides, not a broken container — and it was invisible until
+the port binding was fixed, because the shadowed connection was authenticating against
+the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
@@ -405,8 +412,11 @@ seven tables — so this is a routing problem, not an image or migration problem
   that went away when `jspdf` moved to a dynamic import. The main chunk is ~402 kB.
   If the warning reappears, something got pulled back onto the eager path.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
-- Server tests need Postgres: `npm run postgres:local:start -w server` first, or ~40 of
-  them fail with a connection error that is environmental, not a regression.
+- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **96** of
+  them fail with `Can't reach database server`, which is environmental, not a regression
+  (measured 2026-09-12; this entry said ~40 before). The compose database works just as
+  well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
+  **772** server tests green.
 
 ## Fresh Clone Setup
 
