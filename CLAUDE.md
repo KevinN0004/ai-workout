@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **96.7%** / 90.4%.
+  server **88.8%** statements / 80.7% branches, client **97.2%** / 90.9%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -246,12 +246,20 @@ the native instance all along.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
-    Current ranking, re-measured 2026-09-12: `CaloriesView.jsx` (16, 0%) and
-    `AuthPage.jsx` (15). Those two are all that is left above ten.
+    Current ranking, re-measured 2026-09-12: `AuthPage.jsx` (15) is the only
+    file left above ten uncovered branches.
     `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46),
     `PreviewDashboardChapter.jsx` (28), `HomePage.jsx` (25),
-    `DashboardPage.jsx` (23) and `App.jsx` (20) all used to head this list and
-    are done.
+    `DashboardPage.jsx` (23), `App.jsx` (20) and `CaloriesView.jsx` (16) all
+    used to head this list and are done.
+    **`CaloriesView.jsx`'s two guards on `progressMetrics` disagree.** The list
+    is guarded with `Array.isArray(progressMetrics) ? progressMetrics : []`, and
+    the empty state beneath it with `!progressMetrics?.length` — which a string
+    satisfies. So a malformed cached dashboard carrying a string renders no rows
+    _and_ suppresses the "No progress metrics logged yet." line, leaving a blank
+    area with nothing to explain it. A malformed cache is the only thing the
+    `Array.isArray` guard exists for, so whichever guard is right, the two
+    should be the same one. Pinned by a test; reported, not fixed.
     `PreviewDashboardChapter.jsx` and `HomePage.jsx` reached 100% on every metric.
     `DashboardPage.jsx`'s one remaining uncovered branch is unreachable, and so
     is the `return null` under it: `activeDashView` is constrained to the eight
