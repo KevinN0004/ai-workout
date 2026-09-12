@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **95.1%** / 87.5%.
+  server **88.8%** statements / 80.7% branches, client **95.3%** / 88.4%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -247,11 +247,13 @@ the native instance all along.
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
     Current ranking, re-measured 2026-09-12: `outlineGeometry.js` (28),
-    `PreviewDashboardChapter.jsx` (28, 0%), `templateOutline.js` (26),
+    `templateOutline.js` (26),
     `HomePage.jsx` (25, 0%), `DashboardPage.jsx` (23), `App.jsx` (20),
     `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
-    `PreviewPage.jsx` (31) and `usePreviewDerivedData.js` (46) both used to head
-    this list and are now done — see below for why neither can reach 100%.
+    `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46) and
+    `PreviewDashboardChapter.jsx` (28) all used to head this list and are done.
+    The last reached 100% on every metric; the first two cannot, for the reasons
+    below.
     **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
     statements and 100% functions, and its 41 remaining uncovered branches are
     **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
@@ -288,7 +290,7 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) and `PreviewPage.jsx` (94% / 65%).
+      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) and `PreviewDashboardChapter.jsx` (100% / 100%).
       `PreviewPage.jsx`'s 65% branches is the honest ceiling, not a gap: **every one
       of its eleven remaining uncovered branches is unreachable.** Eight are the
       chapter-body router's final `else` arm, and three are defensive guards that
