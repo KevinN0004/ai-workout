@@ -945,13 +945,228 @@ describe("usePreviewDerivedData", () => {
 
       expect(render().usesImperialUnits).toBe(false);
     });
+  });
 
-    test("a locale with no region falls back to the ambient one", () => {
-      // `en` alone says nothing about units, so the region has to come from
-      // somewhere else before defaulting.
-      useLocale("en");
+  describe("resolving the region when the locale will not say", () => {
+    // Every branch below decides whether the whole walkthrough is shown in
+    // pounds and feet or kilograms and centimetres, and the chain has four
+    // fallbacks before it gives up. The default when it does give up is "US",
+    // so a visitor whose browser says nothing useful is shown imperial.
+    // Must be a constructible function: the hook calls `new Intl.DateTimeFormat()`,
+    // and an arrow function throws there, which would silently land every one of
+    // these tests in the catch below instead of the branch it names.
+    const stubIntlLocale = (locale) =>
+      vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function stubbed() {
+        return { resolvedOptions: () => ({ locale }) };
+      });
 
-      expect(typeof render().usesImperialUnits).toBe("boolean");
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
+
+    test("no navigator at all is treated as en-US", () => {
+      // Server-side rendering or a stripped environment.
+      vi.stubGlobal("navigator", undefined);
+
+      expect(render().usesImperialUnits).toBe(true);
+    });
+
+    // Every step of the chain below ends at "US" when nothing else answers, so
+    // a test whose locale resolves to US cannot tell one step from the next.
+    // These pin the language list and the single language to *different*
+    // regions, and stub the ambient format to a metric one, so each fallback
+    // is distinguishable from the one after it.
+    const stubLanguages = (languages, language) => {
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
+      vi.spyOn(navigator, "language", "get").mockReturnValue(language);
+    };
+
+    test("the language list is preferred over the single language", () => {
+      stubLanguages(["en-GB"], "en-US");
+
+      expect(render().usesImperialUnits).toBe(false);
+    });
+
+    test("an empty first language falls through to the single language", () => {
+      stubLanguages([""], "en-GB");
+
+      expect(render().usesImperialUnits).toBe(false);
+    });
+
+    test("an empty language list falls through to the single language", () => {
+      stubLanguages([], "en-GB");
+
+      expect(render().usesImperialUnits).toBe(false);
+    });
+
+    test("a language list of empty strings ends at en-US, not at the ambient format", () => {
+      // The ambient format is metric here, so only the en-US default can make
+      // this imperial -- which is what separates "gave up" from "asked Intl".
+      stubLanguages([""], "");
+      stubIntlLocale("en-GB");
+
+      expect(render().usesImperialUnits).toBe(true);
+    });
+
+    test("an empty language list and no language ends at en-US too", () => {
+      stubLanguages([], "");
+      stubIntlLocale("en-GB");
+
+      expect(render().usesImperialUnits).toBe(true);
+    });
+
+    test.each([
+      ["an imperial ambient region", "en-US", true],
+      ["a metric ambient region", "en-GB", false]
+    ])("a region-less locale takes %s from the ambient format", (_label, locale, expected) => {
+      // "en" alone says nothing about units, so the region comes from the
+      // ambient date format instead. The old test here only asserted that the
+      // answer was a boolean, which every possible answer satisfies.
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(["en"]);
+      vi.spyOn(navigator, "language", "get").mockReturnValue("en");
+      stubIntlLocale(locale);
+
+      expect(render().usesImperialUnits).toBe(expected);
+    });
+
+    test("an ambient locale with no region of its own gives up and assumes US", () => {
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(["en"]);
+      vi.spyOn(navigator, "language", "get").mockReturnValue("en");
+      stubIntlLocale("en");
+
+      expect(render().usesImperialUnits).toBe(true);
+    });
+
+    test("an environment with no working Intl assumes US rather than throwing", () => {
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(["en"]);
+      vi.spyOn(navigator, "language", "get").mockReturnValue("en");
+      vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => {
+        throw new Error("Intl unavailable");
+      });
+
+      expect(render().usesImperialUnits).toBe(true);
+    });
+
+    test("the chosen system reaches the fields the visitor actually reads", () => {
+      // usesImperialUnits is not shown anywhere by itself; this is what it
+      // changes.
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
+      vi.spyOn(navigator, "language", "get").mockReturnValue("en-US");
+      const imperialLabels = render()
+        .previewChapters[0].fields.map((field) => field.label)
+        .join("|");
+
+      vi.restoreAllMocks();
+      vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
+      vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
+      const metricLabels = render()
+        .previewChapters[0].fields.map((field) => field.label)
+        .join("|");
+
+      expect(imperialLabels).toContain("Height (ft)");
+      expect(imperialLabels).not.toContain("Height (cm)");
+      expect(metricLabels).toContain("Height (cm)");
+      expect(metricLabels).not.toContain("Height (ft)");
+    });
+  });
+
+  describe("the sample profile is applied once, at the top", () => {
+    // activePreviewProfile spreads JOHN_DOE and then overrides every field with
+    // `personal.x || JOHN_DOE.x`. That makes the fields below non-empty for any
+    // input at all -- which is worth pinning, because roughly thirty branches
+    // further down this file re-apply the identical `|| JOHN_DOE.x` fallback to
+    // the same fields. Those second guards can never fire. If this test ever
+    // fails, they stop being dead and start being load-bearing.
+    const GUARANTEED_TEXT = [
+      "name",
+      "age",
+      "sex",
+      "activity",
+      "sleep",
+      "timeline",
+      "experience",
+      "nutrition",
+      "cardio",
+      "notes",
+      "goal",
+      "days",
+      "duration",
+      "environment"
+    ];
+    const GUARANTEED_LISTS = ["trainingDays", "equipment", "focuses"];
+
+    test.each([
+      ["nothing at all", { personal: {}, form: {} }],
+      [
+        "empty strings everywhere",
+        {
+          personal: {
+            name: "",
+            age: "",
+            sex: "",
+            activity: "",
+            sleep: "",
+            timeline: "",
+            experience: "",
+            nutrition: "",
+            cardio: "",
+            notes: "",
+            trainingDays: []
+          },
+          form: { goal: "", days: "", duration: "", environment: "", equipment: [], focuses: [] }
+        }
+      ],
+      [
+        "nulls everywhere",
+        {
+          personal: {
+            name: null,
+            age: null,
+            sex: null,
+            activity: null,
+            sleep: null,
+            timeline: null,
+            experience: null,
+            nutrition: null,
+            cardio: null,
+            notes: null,
+            trainingDays: null
+          },
+          form: {
+            goal: null,
+            days: null,
+            duration: null,
+            environment: null,
+            equipment: null,
+            focuses: null
+          }
+        }
+      ]
+    ])("every field survives %s", (_label, overrides) => {
+      const { activePreviewProfile } = render(overrides);
+
+      GUARANTEED_TEXT.forEach((key) => {
+        expect(String(activePreviewProfile[key] ?? "")).not.toBe("");
+      });
+      GUARANTEED_LISTS.forEach((key) => {
+        expect(Array.isArray(activePreviewProfile[key])).toBe(true);
+        expect(activePreviewProfile[key].length).toBeGreaterThan(0);
+      });
+    });
+
+    test("the visitor's own values still win over the sample", () => {
+      // The guarantee is a floor, not a replacement.
+      const { activePreviewProfile } = render({
+        personal: { name: "  Ada  ", cardio: "Running", trainingDays: ["Friday"] },
+        form: { goal: "Run a marathon", focuses: ["Endurance"] }
+      });
+
+      expect(activePreviewProfile.name).toBe("Ada");
+      expect(activePreviewProfile.cardio).toBe("Running");
+      expect(activePreviewProfile.trainingDays).toEqual(["Friday"]);
+      expect(activePreviewProfile.goal).toBe("Run a marathon");
+      expect(activePreviewProfile.focuses).toEqual(["Endurance"]);
     });
   });
 });
