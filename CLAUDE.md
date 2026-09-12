@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **93.5%** / 86.5%.
+  server **88.8%** statements / 80.7% branches, client **95.1%** / 87.4%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -246,15 +246,11 @@ the native instance all along.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
-    Current ranking, re-measured 2026-09-11: `usePreviewDerivedData.js` (46),
-    `PreviewPage.jsx` (31, 0%), `outlineGeometry.js` (28),
-    `PreviewDashboardChapter.jsx` (28, 0%), `templateOutline.js` (26),
-    `HomePage.jsx` (25, 0%), `DashboardPage.jsx` (23), `App.jsx` (20),
-    `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
-    **`PreviewPage.jsx` is the largest genuinely untested surface** — 11 `useState`s,
-    5 `useEffect`s, scroll orchestration and timer cleanup, all at 0%. It was
-    previously written off here as "an orchestrator for hooks already covered",
-    which was wrong: the hooks are covered, the machine driving them is not.
+    Current ranking, re-measured 2026-09-12: `usePreviewDerivedData.js` (46),
+    `outlineGeometry.js` (28), `PreviewDashboardChapter.jsx` (28, 0%),
+    `templateOutline.js` (26), `HomePage.jsx` (25, 0%), `DashboardPage.jsx` (23),
+    `App.jsx` (20), `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
+    `PreviewPage.jsx` was top of this list at 31 and is now done — see below.
     **Correction to an earlier entry in this file.** `usePreviewDerivedData.js`
     was recorded as wholly unreachable defensive code. Re-reading its uncovered
     lines shows that is only true of about fifteen of its forty-six: lines
@@ -272,7 +268,23 @@ the native instance all along.
     `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
     `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
     `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) and `DashboardAtAGlance.jsx` (100% / 100%).
+    (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) and `PreviewPage.jsx` (94% / 65%).
+    `PreviewPage.jsx`'s 65% branches is the honest ceiling, not a gap: **every one
+    of its eleven remaining uncovered branches is unreachable.** Eight are the
+    chapter-body router's final `else` arm, and three are defensive guards that
+    cannot fire (`!previewStageRef.current`, `!document.documentElement`).
+    That router arm is worth knowing about. It renders a generic grid of
+    textareas from `chapter.fields`, and `usePreviewDerivedData` builds exactly
+    four chapters — `personal-info`, `generate`, `workout-week`,
+    `dashboard-preview` — each of which the four arms above it already handle.
+    So the arm is dead, and it takes two things with it: every chapter's
+    `fields` array is write-only (`personal-info` builds nine field descriptors,
+    with `multiline` and `rows` metadata, that nothing renders), and
+    `getPreviewFieldRows` is a dead export. Verified by grepping every reader of
+    `.fields` and of that helper across all of `client/src`, tests included:
+    `PreviewPage.jsx:126` and `:127` are the only two, and both sit inside the
+    dead arm. `PreviewToc` reads only `id` and `title`. Reported, not deleted —
+    whether those field descriptors are meant for something is a product call.
     **There are no animation write-offs left.** All three hooks that were listed
     as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months
