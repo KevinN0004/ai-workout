@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **95.8%** / 89.2%.
+  server **88.8%** statements / 80.7% branches, client **96.5%** / 89.8%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -246,11 +246,16 @@ the native instance all along.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
-    Current ranking, re-measured 2026-09-12: `DashboardPage.jsx` (23),
-    `App.jsx` (20), `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
+    Current ranking, re-measured 2026-09-12: `App.jsx` (20),
+    `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
     `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46),
-    `PreviewDashboardChapter.jsx` (28) and `HomePage.jsx` (25) all used to head
-    this list and are done. The last two reached 100% on every metric.
+    `PreviewDashboardChapter.jsx` (28), `HomePage.jsx` (25) and
+    `DashboardPage.jsx` (23) all used to head this list and are done.
+    `PreviewDashboardChapter.jsx` and `HomePage.jsx` reached 100% on every metric.
+    `DashboardPage.jsx`'s one remaining uncovered branch is unreachable, and so
+    is the `return null` under it: `activeDashView` is constrained to the eight
+    names in `dashViewOrder` by the line that computes it, and the router below
+    handles all eight, so it never falls past the last `if`.
     **Three files are off this list for good, and none of them is worth
     revisiting.** Each was ranked high by uncovered branches and each turned out
     to be unreachable rather than untested:
@@ -307,7 +312,7 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
+      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
       `PreviewPage.jsx`'s 65% branches is the honest ceiling, not a gap: **every one
       of its eleven remaining uncovered branches is unreachable.** Eight are the
       chapter-body router's final `else` arm, and three are defensive guards that
