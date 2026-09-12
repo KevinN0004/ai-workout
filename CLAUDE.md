@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **97.4%** / 91.4%.
+  server **90.0%** statements / 81.6% branches, client **97.4%** / 91.4%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -238,8 +238,11 @@ the native instance all along.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
-  - Thin areas, worst first: `postgres.js` (53% — connection and pool setup),
-    `index.js` (68% — app bootstrap and wiring), and `httpCacheService.js` (77%).
+  - Thin areas, worst first: `index.js` (67% — app bootstrap and wiring) and
+    `httpCacheService.js` (77%). `postgres.js` was the worst at 53% and is now
+    at 100% on every metric; its redaction of the database password is the part
+    that mattered, and the fallback for a URL too malformed to parse had never
+    been exercised.
     **Every route file is at or above 81%, every route the user's data passes
     through is at 100%, and every service is at or above 82%.** What is left on
     the server is infrastructure rather than request handling.
