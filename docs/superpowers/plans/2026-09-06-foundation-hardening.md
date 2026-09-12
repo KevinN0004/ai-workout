@@ -2065,8 +2065,10 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 ## Final verification
 
-Run after all six PRs have landed. **Executed 2026-09-11 against `main` at `14706f7`.**
-Ten of the eleven pass; item 8 does not, and the reason is recorded in `CLAUDE.md`.
+Run after all six PRs have landed. **Executed 2026-09-11 against `main` at `14706f7`;
+item 8 fixed and re-verified 2026-09-12.** All eleven now pass. Item 8 was the one
+failure, and it failed silently -- the detail is kept below because the silence is the
+instructive part.
 
 - [x] `npx eslint .` — exit 0
 - [x] `npx prettier --check .` — exit 0
@@ -2081,16 +2083,28 @@ Ten of the eleven pass; item 8 does not, and the reason is recorded in `CLAUDE.m
       allowlisting" notice. It does print `Found vulnerable allowlisted advisories:
 GHSA-3f6p-5ww8-9rcr, GHSA-ggr8-5vv4-36mx`, which is the allowlist working.
 - [x] `node scripts/check-audit-allowlist.mjs` — exit 0, `Audit allowlist OK (2 entries).`
-- [ ] `docker compose up -d && npm -w server run migrate:postgres` — **does not give a
-      working dev database on this machine, and fails silently.** Compose starts both
-      containers and exits 0, but a native PostgreSQL 18 service is already bound to
-      `127.0.0.1:55432` while Docker binds `0.0.0.0:55432`. The two coexist on Windows,
-      `localhost` resolves to `127.0.0.1` first, and so the migration ran against the
-      _native_ database — printing `skipped 001_foundation.sql` because that one was
-      already migrated — while the container's `ai_workout` stayed at zero tables.
-      The container is not at fault: piping `server/db/postgres/001_foundation.sql` into
-      `docker exec ai-workout-postgres psql` builds all seven tables. This is a routing
-      problem, and the detection recipe is in `CLAUDE.md` under Build & Test.
+- [x] `docker compose up -d && npm -w server run migrate:postgres` — **fixed and verified
+      2026-09-12.** This was the one item that failed, and it failed silently: Docker
+      published `0.0.0.0:55432` while the native helper binds `127.0.0.1:55432`, the two
+      do not collide on Windows, and so every `localhost` connection kept reaching the
+      native instance. Compose exited 0, the migration printed
+      `skipped 001_foundation.sql` because the _native_ database already had it, and the
+      container sat at zero tables with nothing reporting an error.
+      The fix is one prefix per published port in `docker-compose.yml` — `127.0.0.1:55432`
+      and `127.0.0.1:6379` — which makes the collision real, so choosing the wrong one now
+      fails immediately. Proved by holding `127.0.0.1:55432` with a dummy listener and
+      publishing both ways: `0.0.0.0:55432` starts and shadows, `127.0.0.1:55432` gives
+      `Error response from daemon: ports are not available`.
+      End-to-end afterwards, from an empty volume: `docker compose up -d` → 0 tables →
+      `migrate:postgres` → `applied 001_foundation.sql` → 8 tables (seven domain tables
+      plus the migration bookkeeping table).
+      Use the `DATABASE_URL` in `env.example`. Compose and the PowerShell helper do not
+      share a password, so a `server/.env` written for one fails against the other with
+      `password authentication failed for user "postgres"`. That symptom was unreachable
+      before the binding was fixed, because the shadowed connection had been
+      authenticating against the native instance all along.
+      The compose database also serves the whole suite: with that `DATABASE_URL`, all 772
+      server tests pass against it.
 - [x] Booting with `DATABASE_URL` unset exits 1 with a readable message — verified by
       running `server/src/index.js` from a directory with no `.env`, since `dotenv.config()`
       reads the cwd. Output: `Environment validation failed:` /

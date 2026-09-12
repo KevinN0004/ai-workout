@@ -4,6 +4,16 @@
 #
 # Postgres publishes on 55432 to match server/scripts/start-local-postgres.ps1.
 # The two are alternatives, not complements: same port, so they collide.
+#
+# Both published ports are bound to 127.0.0.1 on purpose, and the loopback
+# prefix is load-bearing rather than cosmetic. Docker's default is 0.0.0.0,
+# and the local-Postgres helper binds 127.0.0.1 -- on Windows those two do
+# NOT collide, so `docker compose up -d` would succeed while every localhost
+# connection kept reaching the native instance. Compose looked healthy, the
+# migration reported "skipped", and the container sat at zero tables with no
+# error anywhere. Binding loopback here is what makes the collision real, and
+# therefore what makes the sentence above true. It also stops publishing a
+# development database on every interface.
 services:
   postgres:
     image: postgres:16
@@ -14,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_workout_dev}
       POSTGRES_DB: ai_workout
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +38,7 @@ services:
     container_name: ai-workout-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
