@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **90.0%** statements / 81.6% branches, client **97.4%** / 91.4%.
+  server **90.7%** statements / 82.3% branches, client **97.4%** / 91.4%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -238,14 +238,34 @@ the native instance all along.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
-  - Thin areas, worst first: `index.js` (67% — app bootstrap and wiring) and
-    `httpCacheService.js` (77%). `postgres.js` was the worst at 53% and is now
-    at 100% on every metric; its redaction of the database password is the part
-    that mattered, and the fallback for a URL too malformed to parse had never
-    been exercised.
+  - Thin areas, worst first: `index.js` (74% — app bootstrap and wiring) and
+    `httpCacheService.js` (77%). `index.js` is 772 lines, and a good part of
+    what is still uncovered in it is the bootstrap the suite deliberately does
+    not run: the env preflight sits behind `NODE_ENV !== "test" && !VITEST`, so
+    it is verified by booting the server rather than by the unit suite.
+    Its CORS layer is now covered end to end. `postgres.js` was the worst at 53%
+    and is now at 100% on every metric; its redaction of the database password
+    is the part that mattered, and the fallback for a URL too malformed to parse
+    had never been exercised.
     **Every route file is at or above 81%, every route the user's data passes
     through is at 100%, and every service is at or above 82%.** What is left on
     the server is infrastructure rather than request handling.
+  - **Re-importing a server module does not give you a clean environment.**
+    `index.js` and `prisma.js` both call `dotenv.config()` at module scope, and
+    dotenv fills in any key that is _absent_ from `process.env`. So
+    `delete process.env.CLIENT_ORIGIN` followed by `vi.resetModules()` and a
+    re-import hands the app whatever the environment file says, not the empty
+    value the test asked for. This is silent: the CORS suite's "no allowlist
+    configured" cases were really testing the file's allowlist, and only looked
+    wrong because `http://localhost:5173` happened to be in it while
+    `http://127.0.0.1:4173` was not. **Set the variable to an empty string
+    instead of deleting it** — a present-but-empty key is one dotenv leaves
+    alone. Restoring afterwards has the mirror-image trap: assigning `undefined`
+    back to `process.env` stores the string `"undefined"`, so a key that was
+    absent has to be deleted rather than assigned.
+    Re-importing is otherwise safe here: `index.js` exports `startServer` rather
+    than calling it, and `prisma.js` caches its client on `globalThis` outside
+    production, so no second database client is created.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Current ranking, re-measured 2026-09-12: **nothing is left above ten
