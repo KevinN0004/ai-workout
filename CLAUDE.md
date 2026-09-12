@@ -228,7 +228,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
-  server **88.8%** statements / 80.7% branches, client **95.3%** / 88.4%.
+  server **88.8%** statements / 80.7% branches, client **95.8%** / 89.2%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -246,32 +246,49 @@ the native instance all along.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Nothing above 44 uncovered branches remains; what is left is spread thin.
-    Current ranking, re-measured 2026-09-12: `outlineGeometry.js` (28),
-    `templateOutline.js` (26),
-    `HomePage.jsx` (25, 0%), `DashboardPage.jsx` (23), `App.jsx` (20),
-    `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
-    `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46) and
-    `PreviewDashboardChapter.jsx` (28) all used to head this list and are done.
-    The last reached 100% on every metric; the first two cannot, for the reasons
-    below.
-    **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
-    statements and 100% functions, and its 41 remaining uncovered branches are
-    **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
-    `JOHN_DOE_PREVIEW_PROFILE` and then overrides every field with
-    `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every field is non-empty for
-    any input — including all-null. Roughly thirty branches further down the file
-    then re-apply the _identical_ `|| JOHN_DOE_PREVIEW_PROFILE.x` to those same
-    fields (`focuses`, `equipment`, `environment`, `goal`, `trainingDays`), and
-    the block of `String(x ?? "")` at lines 406-420 does it a third time. None of
-    the second or third guards can ever take their fallback side. The invariant
-    that makes them dead is now pinned by a test, so if someone removes a guard
-    from `activePreviewProfile` the suite says so.
-    The locale block at lines 30-50 was the one genuinely reachable part, and it
-    is now covered: `navigator.languages`, `navigator.language` and
-    `Intl.DateTimeFormat` are all boundaries, stubbed exactly as
-    `SettingsView.test.jsx` stubs them. It decides whether the whole walkthrough
-    is shown in pounds and feet or kilograms and centimetres. Two notes from
-    doing it, both of which cost a run:
+    Current ranking, re-measured 2026-09-12: `DashboardPage.jsx` (23),
+    `App.jsx` (20), `CaloriesView.jsx` (16, 0%), `AuthPage.jsx` (15).
+    `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46),
+    `PreviewDashboardChapter.jsx` (28) and `HomePage.jsx` (25) all used to head
+    this list and are done. The last two reached 100% on every metric.
+    **Three files are off this list for good, and none of them is worth
+    revisiting.** Each was ranked high by uncovered branches and each turned out
+    to be unreachable rather than untested:
+    - `usePreviewDerivedData.js` (46) — double-guarded fallbacks, below.
+    - `outlineGeometry.js` (28) — its uncovered branches are null-guards inside
+      module-private helpers (`toPoint`, `appendPoint`, and the four
+      `chooseY`/`chooseX` pickers). Nothing exports them, and the anchor sets the
+      one caller builds always supply the points they guard against.
+    - `templateOutline.js` (26) — one export, `buildTemplateOutline`, and
+      everything else private. The remaining branches are
+      `!Array.isArray(points) || points.length < 3` guards on private helpers,
+      and the template is a **fixed SVG asset** with hundreds of points, so the
+      single entry point cannot drive any of them.
+      It also contains genuinely dead code: `pointsToPath` is called from exactly
+      one place, `buildCurvedPath`, whose guard is
+      `if (!Array.isArray(points) || points.length < 3) return pointsToPath(points)`
+      — character for character the same condition `pointsToPath` itself returns
+      `""` for on its first line. So `pointsToPath` can only ever return `""`;
+      its path-building body and the `round3` helper that exists to serve it are
+      unreachable. Reported, not deleted.
+      **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
+      statements and 100% functions, and its 41 remaining uncovered branches are
+      **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
+      `JOHN_DOE_PREVIEW_PROFILE` and then overrides every field with
+      `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every field is non-empty for
+      any input — including all-null. Roughly thirty branches further down the file
+      then re-apply the _identical_ `|| JOHN_DOE_PREVIEW_PROFILE.x` to those same
+      fields (`focuses`, `equipment`, `environment`, `goal`, `trainingDays`), and
+      the block of `String(x ?? "")` at lines 406-420 does it a third time. None of
+      the second or third guards can ever take their fallback side. The invariant
+      that makes them dead is now pinned by a test, so if someone removes a guard
+      from `activePreviewProfile` the suite says so.
+      The locale block at lines 30-50 was the one genuinely reachable part, and it
+      is now covered: `navigator.languages`, `navigator.language` and
+      `Intl.DateTimeFormat` are all boundaries, stubbed exactly as
+      `SettingsView.test.jsx` stubs them. It decides whether the whole walkthrough
+      is shown in pounds and feet or kilograms and centimetres. Two notes from
+      doing it, both of which cost a run:
     - **`new Intl.DateTimeFormat()` needs a constructible stub.** An arrow
       function in `mockImplementation` throws when called with `new`, which
       lands silently in the surrounding `catch` — so every test passes, but via
@@ -290,7 +307,7 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) and `PreviewDashboardChapter.jsx` (100% / 100%).
+      (100% / 100%) `App.jsx` (92% / 73%) `DashboardPage.jsx` (76% / 69%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
       `PreviewPage.jsx`'s 65% branches is the honest ceiling, not a gap: **every one
       of its eleven remaining uncovered branches is unreachable.** Eight are the
       chapter-body router's final `else` arm, and three are defensive guards that
