@@ -49,7 +49,11 @@ export default [
       // this list is separate -- and the reports carry their own
       // eslint-disable comments, which reportUnusedDisableDirectives turns
       // into errors the moment anyone runs coverage locally.
-      "**/coverage/**"
+      "**/coverage/**",
+      // Playwright run output. Same reasoning as coverage: generated, and
+      // gitignored and prettier-ignored separately from this list.
+      "test-results/**",
+      "playwright-report/**"
     ]
   },
 
@@ -135,6 +139,16 @@ export default [
       "no-unused-vars": ["error", { argsIgnorePattern: "^(_|next$)", varsIgnorePattern: "^_" }],
       ...importRules,
       "no-console": "error"
+    }
+  },
+
+  // ---- Playwright: its config reads process.env; the specs do not ---------
+  {
+    files: ["playwright.config.js", "e2e/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: "module",
+      globals: { ...globals.node }
     }
   },
 

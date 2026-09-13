@@ -281,9 +281,38 @@ npm run build            # builds the CLIENT only
 npm run start            # starts the server
 npm test                 # client tests, then server tests (Vitest)
 npm run test:coverage    # the same suites with a v8 coverage report
+npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
+npm run test:e2e:ui      # the same suite in Playwright's UI mode
 npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
+
+**The E2E suite is the only thing that runs both halves together.** Everything
+else tests one side of the wire — the client suite mocks `fetch`, the server
+suite drives express with supertest — so a defect in the wiring between them
+passes both. It is deliberately tiny: sign up, log a workout, reload, confirm it
+survived. Four things are worth knowing before touching it:
+
+- **It runs against the built bundle** via `vite preview` on 4173, not the dev
+  server, so `npm -w client run build` has to happen first. `vite preview` does
+  not inherit `server.proxy`, which is why `client/vite.config.js` carries a
+  separate `preview.proxy`.
+- **Do not set `NODE_ENV=test` for the server it starts.** `index.js` guards its
+  `startServer()` call with `NODE_ENV !== "test" && !VITEST` so the unit suite
+  can import `app` without binding a port. Set it and the process loads, exports,
+  and exits 0 with no output at all — which reads exactly like a crash.
+- **Geolocation is left denied**, so the dashboard takes its own "location
+  unavailable" path instead of reaching the live weather and air-quality
+  upstreams. Plan generation is out of scope for the same reason: it needs a
+  real Gemini key.
+- **Each run creates an account** (`e2e-<timestamp>@example.test`) and never
+  deletes it; there is no delete-account endpoint. Harmless in CI, but it
+  accumulates rows in a local database.
+
+It has its own CI job rather than living in `test`, so a flaky browser run
+cannot muddy the unit signal. It was verified by mutation rather than trusted:
+removing the client's CSRF header, and making the workout route answer 200
+without writing, are both caught — and both pass every other suite in the repo.
 
 Server-only helpers (run from `server/`):
 
