@@ -71,9 +71,14 @@ export default function DashboardAtAGlance({
                   ? "Outdoor friendly"
                   : weatherRecommendation?.workoutType === "indoor"
                     ? "Indoor suggested"
-                    : weatherError
-                      ? "Unavailable"
-                      : "Unavailable"}
+                    : // A failed lookup and a lookup that has not happened both read
+                      // as "Unavailable". This used to be written as
+                      // `weatherError ? "Unavailable" : "Unavailable"`, which looks
+                      // like it tells them apart and cannot. The note below does
+                      // carry the error text, so the difference is not lost --
+                      // giving this line its own wording is a copy decision nobody
+                      // has made.
+                      "Unavailable"}
             </p>
             <p className="muted">
               {weatherRecommendation?.summary || weatherError || "No weather update yet."}
@@ -93,7 +98,10 @@ export default function DashboardAtAGlance({
                 ? airSummary
                   ? "Refreshing..."
                   : "Checking..."
-                : airSummary?.level || (airQualityError ? "Unavailable" : "Unavailable")}
+                : // Same as the weather card above: the error and the no-reading
+                  // case share this wording, and the note below is what
+                  // distinguishes them.
+                  airSummary?.level || "Unavailable"}
             </p>
             <p className="muted">
               {airSummary?.guidance || airQualityError || "No air quality guidance available."}

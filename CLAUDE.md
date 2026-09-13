@@ -502,6 +502,22 @@ the native instance all along.
     outright was added to the mutation list _expecting_ it to survive, and it did: nothing
     observable depends on either test. That is a mechanical proof rather than a reading of
     the code, and it costs one run. Reach for it whenever two arms look alike.
+    Both conditions have since been collapsed to the single string they always
+    produced, so the mutations that proved them dead no longer have anything to
+    target; they were replaced with ones that protect the wording itself. The
+    wording is unchanged and the note under each card still carries the error
+    text, so a visitor sees exactly what they saw before. **Whether a failed
+    lookup should read differently from one that has not happened is a copy
+    decision, and it is still open** — collapsing the condition removed a
+    branch that could not make that distinction, not the question of whether to
+    make it.
+  - **A regex for "both arms are the same" needs care.** Sweeping the tree for
+    this pattern turned up a third hit in
+    `server/src/services/dashboardDataBuildersService.js`, which was a false
+    positive: the code is
+    `typeof item === "string" ? item : item?.name`, and a naive arm pattern
+    stops at the `?.` and reads both arms as `item`. Those two were the only
+    real instances in the repository.
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, React Hook contract violations, import cycles and unresolved
   specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
