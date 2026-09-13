@@ -2,8 +2,6 @@ import templateSvgRaw from "./assets/template-outline.svg?raw";
 import { clamp, toFiniteNumber } from "./math";
 import { buildSmoothClosedPath, selectImportantSegmentPoints } from "./outlineUtils";
 
-const round3 = (value) => Math.round(value * 1000) / 1000;
-
 const smoothstep = (edge0, edge1, value) => {
   if (value <= edge0) return 0;
   if (value >= edge1) return 1;
@@ -30,17 +28,6 @@ const interpolateScale = (bands, yValue) => {
     return current.s + (next.s - current.s) * progress;
   }
   return bands[bands.length - 1].s;
-};
-
-const pointsToPath = (points) => {
-  if (!Array.isArray(points) || points.length < 3) return "";
-  const [first, ...rest] = points;
-  const commands = [`M ${round3(first.x)} ${round3(first.y)}`];
-  rest.forEach((point) => {
-    commands.push(`L ${round3(point.x)} ${round3(point.y)}`);
-  });
-  commands.push("Z");
-  return commands.join(" ");
 };
 
 const smoothClosedContour = (points, options = {}) => {
@@ -79,7 +66,11 @@ const smoothClosedContour = (points, options = {}) => {
 };
 
 const buildCurvedPath = (points) => {
-  if (!Array.isArray(points) || points.length < 3) return pointsToPath(points);
+  // Too few points to curve through, so there is no path to draw. This used to
+  // call a pointsToPath helper that built M/L/Z commands, but its own first
+  // line returned "" for exactly this condition -- so it could only ever return
+  // "", and the command-building below it was unreachable.
+  if (!Array.isArray(points) || points.length < 3) return "";
   const reduced = selectImportantSegmentPoints(points, {
     minSpacing: 2.2,
     minDeviation: 0.24,

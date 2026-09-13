@@ -100,12 +100,6 @@ export default function usePreviewDerivedData({
     ? roundTo(clamp(Number(activePreviewProfile.bodyFat), 3, 60), 1)
     : roundTo(clamp(1.35 * previewBmi - 13.5, 3, 60), 1);
 
-  const formatWeightForLocale = (kgValue) => {
-    if (!usesImperialUnits) return `${Math.round(kgValue)} kg`;
-    const pounds = Number(toLb(String(Math.round(kgValue)), "kg"));
-    return Number.isFinite(pounds) ? `${Math.round(pounds)} lb` : "160 lb";
-  };
-
   const previewHeightSplit = toFeetInchesFromCm(String(Math.round(activeHeightCm)));
   const previewHeightFeet = previewHeightSplit?.feet || "5";
   const previewHeightInches = previewHeightSplit?.inches || "9";
@@ -125,11 +119,6 @@ export default function usePreviewDerivedData({
   const defaultName = activePreviewProfile.name;
   const defaultAge = activePreviewProfile.age;
   const defaultSex = activePreviewProfile.sex;
-  const defaultWeight = formatWeightForLocale(activeWeightKg);
-  const previewTrainingDaysList =
-    Array.isArray(activePreviewProfile.trainingDays) && activePreviewProfile.trainingDays.length
-      ? activePreviewProfile.trainingDays.join(", ")
-      : "Monday, Tuesday, Thursday, Saturday";
 
   const previewWeekPlan = useMemo(() => {
     const sourceTrainingDaysRaw =
@@ -488,71 +477,20 @@ export default function usePreviewDerivedData({
     previewInitialFillOrderRef.current = previewFillOrder;
   }
 
+  // Only the id and the title are read: PreviewPage routes on the id and the
+  // table of contents shows the title. Each chapter used to carry a `fields`
+  // array of label/value descriptors as well, built from the profile, but the
+  // only thing that ever read them was a fallback arm of PreviewPage's router
+  // that no chapter id could reach. With that gone the list is static, which is
+  // why the dependency array is now empty.
   const previewChapters = useMemo(
     () => [
-      {
-        id: "personal-info",
-        title: "Personal Info",
-        fields: [
-          { label: "Full name", value: defaultName },
-          { label: "Age", value: defaultAge },
-          ...(usesImperialUnits
-            ? [
-                { label: "Height (ft)", value: previewHeightFeet },
-                { label: "Height (in)", value: previewHeightInches }
-              ]
-            : [{ label: "Height (cm)", value: defaultHeightCm }]),
-          { label: "Weight", value: defaultWeight },
-          { label: "Sex", value: defaultSex },
-          { label: "Activity level", value: activePreviewProfile.activity },
-          { label: "Sleep", value: activePreviewProfile.sleep },
-          {
-            label: "Goal timeline",
-            value: activePreviewProfile.timeline,
-            multiline: true,
-            rows: 2
-          },
-          { label: "Training experience", value: activePreviewProfile.experience },
-          { label: "Nutrition preference", value: activePreviewProfile.nutrition },
-          { label: "Cardio preference", value: activePreviewProfile.cardio },
-          { label: "Training days", value: previewTrainingDaysList, multiline: true, rows: 2 },
-          { label: "Additional info", value: activePreviewProfile.notes, multiline: true, rows: 2 }
-        ]
-      },
-      {
-        id: "generate",
-        title: "Generate",
-        fields: []
-      },
-      {
-        id: "workout-week",
-        title: "Result",
-        fields: []
-      },
-      {
-        id: "dashboard-preview",
-        title: "Dashboard",
-        fields: []
-      }
+      { id: "personal-info", title: "Personal Info" },
+      { id: "generate", title: "Generate" },
+      { id: "workout-week", title: "Result" },
+      { id: "dashboard-preview", title: "Dashboard" }
     ],
-    [
-      defaultName,
-      defaultAge,
-      usesImperialUnits,
-      previewHeightFeet,
-      previewHeightInches,
-      defaultHeightCm,
-      defaultWeight,
-      defaultSex,
-      activePreviewProfile.activity,
-      activePreviewProfile.sleep,
-      activePreviewProfile.timeline,
-      activePreviewProfile.experience,
-      activePreviewProfile.nutrition,
-      activePreviewProfile.cardio,
-      previewTrainingDaysList,
-      activePreviewProfile.notes
-    ]
+    []
   );
 
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
@@ -588,16 +526,6 @@ export default function usePreviewDerivedData({
   const previewTocStyle = {
     "--preview-chip-expanded": previewChipExpandedWidth,
     "--preview-chip-collapsed": "44px"
-  };
-
-  const getPreviewFieldRows = (field) => {
-    if (Number.isFinite(Number(field.rows)) && Number(field.rows) > 0) {
-      return Number(field.rows);
-    }
-    const text = String(field.value ?? "").trim();
-    if (!text) return 1;
-    const estimatedRows = Math.ceil(text.length / 30);
-    return Math.max(1, Math.min(4, estimatedRows));
   };
 
   const getPreviewTextRows = (value, minRows = 1, maxRows = 4) => {
@@ -639,7 +567,6 @@ export default function usePreviewDerivedData({
     activePreviewChapter,
     previewStageStyle,
     previewTocStyle,
-    getPreviewFieldRows,
     getPreviewTextRows,
     getPreviewWeekHeaderTypedText,
     getPreviewWeekTypedText

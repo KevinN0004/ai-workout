@@ -58,7 +58,6 @@ export default function PreviewPage({
     activePreviewChapter,
     previewStageStyle,
     previewTocStyle,
-    getPreviewFieldRows,
     getPreviewTextRows,
     getPreviewWeekHeaderTypedText,
     getPreviewWeekTypedText
@@ -121,24 +120,11 @@ export default function PreviewPage({
         previewDashboardSummary={previewDashboardSummary}
         previewDashboardStage={previewDashboardStage}
       />
-    ) : (
-      <div className="preview-fields-grid">
-        {chapter.fields.map((field, fieldIndex) => {
-          const rows = field.multiline ? field.rows || 3 : getPreviewFieldRows(field);
-          return (
-            <label key={`${chapter.id}-${field.label}-${fieldIndex}`} className="preview-field-row">
-              <span>{field.label}</span>
-              <textarea
-                className={`preview-field-input ${rows > 1 ? "wrapped" : "single-line"}`}
-                value={String(field.value ?? "")}
-                rows={rows}
-                readOnly
-              />
-            </label>
-          );
-        })}
-      </div>
-    );
+    ) : // usePreviewDerivedData builds exactly these four chapters, so nothing
+    // reaches here. This used to render a generic grid of textareas from
+    // `chapter.fields`, which is why those arrays existed at all -- they were
+    // built for an arm that could not run and read nowhere else.
+    null;
 
   const scrollPreviewIntoView = () => {
     if (!previewStageRef.current) return;
