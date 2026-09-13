@@ -5,7 +5,12 @@ const disabledTracker = () => ({
   flush: async () => {}
 });
 
+// Guards before it coerces. Unlike `toPositiveInt` and `parseRedisPort`, whose
+// `> 0` and port-range checks reject the accidental 0 for free, 0 is a valid
+// sample rate here -- so `Number(null)` and `Number("")` would land on a real
+// "trace nothing" rather than on the caller's default.
 const toRate = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   if (parsed < 0) return 0;
@@ -76,3 +81,9 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
     };
   }
 };
+
+// Test-only access, following the `__testables` convention in index.js. `toRate`
+// stays private to the module: nothing in production reads it directly, and the
+// numeric-coercion contract test needs to assert its absent-input behaviour
+// without going through Sentry init.
+export const __testables = { toRate };

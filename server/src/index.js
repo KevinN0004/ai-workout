@@ -256,7 +256,12 @@ const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
+// Guards before it coerces. The `> 0` below already rejected the 0 that
+// `Number(null)` and `Number("")` produce, so this changes no answer -- it just
+// stops the safety being a side effect of the range. A later helper copying
+// this shape for a range that includes 0 would not have been so lucky.
 const toPositiveInt = (value, fallback) => {
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
@@ -743,6 +748,7 @@ export const __testables = {
   buildDashboard,
   cleanText,
   toNullableNumber,
+  toPositiveInt,
   toCleanArray,
   toCleanNameArray,
   buildWorkoutSessionEntry,

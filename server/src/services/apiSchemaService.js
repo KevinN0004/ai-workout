@@ -180,3 +180,8 @@ export const validateBody = (req, res, schema) => {
   res.status(400).json({ error: getValidationMessage(result.error) });
   return null;
 };
+
+// Test-only access, following the `__testables` convention in index.js.
+// `toNumberInput` is passed by reference to `z.preprocess` rather than called,
+// so it has no ordinary call site for a test to reach it through.
+export const __testables = { toNumberInput };
