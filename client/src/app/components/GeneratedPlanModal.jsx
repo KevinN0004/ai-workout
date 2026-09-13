@@ -11,10 +11,15 @@ export default function GeneratedPlanModal({
   downloadPlanPdf,
   go
 }) {
-  if (!planModalOpen || !result) return null;
+  if (!planModalOpen) return null;
+  // A generated plan is the modal's entire content, so there is nothing to show
+  // before one arrives. This is the only guard on that: passing the same
+  // condition to ModalPortal as well used to make both untestable, because
+  // either one alone produced an empty render.
+  if (!result) return null;
 
   return (
-    <ModalPortal open={Boolean(planModalOpen && result)}>
+    <ModalPortal open>
       <div className="modal-backdrop plan-modal-backdrop" role="dialog" aria-modal="true">
         <div className="modal plan-modal">
           <div className="modal-header">

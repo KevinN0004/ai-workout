@@ -121,10 +121,9 @@ export default function usePreviewDerivedData({
   const defaultSex = activePreviewProfile.sex;
 
   const previewWeekPlan = useMemo(() => {
-    const sourceTrainingDaysRaw =
-      Array.isArray(activePreviewProfile.trainingDays) && activePreviewProfile.trainingDays.length
-        ? activePreviewProfile.trainingDays
-        : JOHN_DOE_PREVIEW_PROFILE.trainingDays;
+    // No re-guard: activePreviewProfile already resolved this to a non-empty
+    // array, falling back to the sample profile if the visitor supplied none.
+    const sourceTrainingDaysRaw = activePreviewProfile.trainingDays;
     const trainingDaysSet = new Set(
       sourceTrainingDaysRaw.map((day) => normalizePreviewTrainingDay(day)).filter(Boolean)
     );
@@ -145,17 +144,12 @@ export default function usePreviewDerivedData({
         if (trainingDaysSet.size >= targetWorkoutDays) break;
       }
     }
-    const sourceFocuses =
-      Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
-        ? activePreviewProfile.focuses
-        : JOHN_DOE_PREVIEW_PROFILE.focuses;
+    const sourceFocuses = activePreviewProfile.focuses;
     const sessionDuration =
       Number(activePreviewProfile.duration) > 0
         ? `${Number(activePreviewProfile.duration)} min`
         : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
-    const environmentLabel = String(
-      activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment
-    );
+    const environmentLabel = String(activePreviewProfile.environment);
     const trainingTemplates = [
       "Upper Strength",
       "Lower Strength",
@@ -237,7 +231,7 @@ export default function usePreviewDerivedData({
     );
     const calorieDelta = Math.round(avgCalories - calorieGoal);
 
-    const goalText = String(activePreviewProfile.goal || JOHN_DOE_PREVIEW_PROFILE.goal);
+    const goalText = String(activePreviewProfile.goal);
     const goalTokens = goalText.toLowerCase();
     const targetWeightKg = (() => {
       if (/lose|cut|fat/.test(goalTokens)) return Math.max(activeWeightKg - 3.5, 45);
@@ -308,17 +302,9 @@ export default function usePreviewDerivedData({
         .split(" - ")[0]
         .trim()
     }));
-    const focusPicks =
-      Array.isArray(activePreviewProfile.focuses) && activePreviewProfile.focuses.length
-        ? activePreviewProfile.focuses.slice(0, 3)
-        : JOHN_DOE_PREVIEW_PROFILE.focuses.slice(0, 3);
-    const environmentText = String(
-      activePreviewProfile.environment || JOHN_DOE_PREVIEW_PROFILE.environment
-    );
-    const equipmentList =
-      Array.isArray(activePreviewProfile.equipment) && activePreviewProfile.equipment.length
-        ? activePreviewProfile.equipment.slice(0, 3)
-        : JOHN_DOE_PREVIEW_PROFILE.equipment.slice(0, 3);
+    const focusPicks = activePreviewProfile.focuses.slice(0, 3);
+    const environmentText = String(activePreviewProfile.environment);
+    const equipmentList = activePreviewProfile.equipment.slice(0, 3);
     const scheduleText = `${weeklyGoal} days - ${Number(activePreviewProfile.duration) || 50} min`;
     const avgDailyWorkouts = completedWorkouts / 7;
     const remainingWorkouts = Math.max(weeklyGoal - completedWorkouts, 0);
