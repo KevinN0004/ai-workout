@@ -22,8 +22,8 @@ export default defineConfig({
       // a point on the totals that a whole-percent floor would have rounded
       // most of away.
       thresholds: {
-        statements: 91.0,
-        branches: 82.5,
+        statements: 91.1,
+        branches: 82.8,
         functions: 93.9,
         lines: 92.5
       }
