@@ -22,6 +22,21 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const toText = (value) => (value === null || value === undefined ? "" : String(value).trim());
 
+// One coercion for every reading that gets summed, because the accumulation
+// loops and the averages below used to disagree about the same row: the loops
+// guarded with `Number.isNaN`, the averages folded `Number(x || 0)` unguarded.
+// A single unparseable value is enough -- `sum + NaN` stays NaN for the rest of
+// the fold -- and avgCalories is rendered directly and drives a progress-bar
+// width, so the card read "NaN" and the bar got `width: NaN%`.
+//
+// Contributing 0 is what the guarded loop already did with such a row. A
+// measured 0 is untouched: it is a real reading and still counts as a logged
+// day, so it must keep pulling the average down.
+const toMetricNumber = (value) => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const buildDedupedList = (items, fallbackKeyBuilder) => {
   const source = Array.isArray(items) ? items : [];
   const seen = new Set();
@@ -174,10 +189,7 @@ export default function useDashboardMetrics({
       const parsedDate = parseDateValue(item?.date);
       if (!parsedDate) continue;
       const key = toDateKey(parsedDate);
-      const nextCalories = Number(item?.calories || 0);
-      if (!Number.isNaN(nextCalories)) {
-        caloriesByDate[key] = (caloriesByDate[key] || 0) + nextCalories;
-      }
+      caloriesByDate[key] = (caloriesByDate[key] || 0) + toMetricNumber(item?.calories);
       if (inLast7Days(parsedDate)) {
         last7Calories.push(item);
       } else if (inPrevious7Days(parsedDate)) {
@@ -194,10 +206,7 @@ export default function useDashboardMetrics({
       if (!parsedDate) continue;
       const key = toDateKey(parsedDate);
       workoutsByDate[key] = (workoutsByDate[key] || 0) + 1;
-      const minutes = Number(item?.duration || 0);
-      if (!Number.isNaN(minutes)) {
-        workoutMinutesByDate[key] = (workoutMinutesByDate[key] || 0) + minutes;
-      }
+      workoutMinutesByDate[key] = (workoutMinutesByDate[key] || 0) + toMetricNumber(item?.duration);
       if (inLast7Days(parsedDate)) {
         last7Workouts.push(item);
       } else if (inPrevious7Days(parsedDate)) {
@@ -206,10 +215,10 @@ export default function useDashboardMetrics({
     }
 
     const avgCalories =
-      last7Calories.reduce((sum, item) => sum + Number(item?.calories || 0), 0) /
+      last7Calories.reduce((sum, item) => sum + toMetricNumber(item?.calories), 0) /
       (last7Calories.length || 1);
     const previousAvgCalories =
-      previous7Calories.reduce((sum, item) => sum + Number(item?.calories || 0), 0) /
+      previous7Calories.reduce((sum, item) => sum + toMetricNumber(item?.calories), 0) /
       (previous7Calories.length || 1);
     const weeklyGoal = Math.max(Number(goals.weeklyWorkouts || 3), 1);
     const workoutProgress = Math.min(100, Math.round((last7Workouts.length / weeklyGoal) * 100));

@@ -8,10 +8,14 @@ export default function ExerciseDetailsModal({
   isSaved,
   isSaving
 }) {
+  // The only guard on this. Passing the same condition to ModalPortal as well
+  // made both untestable: either one alone produced an empty render, so no test
+  // could tell a broken guard from a working one. Same fix as
+  // GeneratedPlanModal.jsx.
   if (!selectedExercise) return null;
 
   return (
-    <ModalPortal open={Boolean(selectedExercise)}>
+    <ModalPortal open>
       <div
         className="modal-backdrop dashboard-modal-backdrop"
         role="dialog"

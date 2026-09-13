@@ -640,4 +640,69 @@ describe("useDashboardMetrics", () => {
       });
     });
   });
+
+  // The accumulation loop and the weekly average disagreed about the same input.
+  // The loop guards with `Number.isNaN` before adding to caloriesByDate; the
+  // average reduced `sum + Number(item?.calories || 0)` with no guard at all.
+  //
+  // One unparseable reading is enough: `sum + NaN` stays NaN for the rest of the
+  // fold, so a single bad row takes the whole average with it -- and avgCalories
+  // is rendered directly (`Math.round(avgCalories)`) and drives the progress bar
+  // width (`width: ${calorieProgress}%`), so the UI shows "NaN" and an invalid
+  // style rather than degrading.
+  describe("an unparseable reading", () => {
+    const buildMetrics = (dashboard) =>
+      renderHook(() =>
+        useDashboardMetrics({
+          dashboard,
+          goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
+          formGoal: "Fat loss",
+          weekDays,
+          latestPlanByWeekday: {}
+        })
+      ).result.current;
+
+    test("does not poison the weekly calorie average", () => {
+      const metrics = buildMetrics({
+        calories: [
+          { id: "c1", date: "2026-03-01", calories: 2000 },
+          { id: "c2", date: "2026-03-02", calories: "not a number" }
+        ]
+      });
+
+      // It still counts as a day, contributing nothing -- which is what the
+      // accumulation loop already did with the same row.
+      expect(metrics.avgCalories).toBe(1000);
+      expect(Number.isNaN(metrics.calorieProgress)).toBe(false);
+    });
+
+    // Only the calorie average was exposed: workout minutes are guarded in their
+    // accumulation loop and every consumer reads them through `|| 0`, so there is
+    // no unguarded fold over them to poison. Asserting on a `metrics.avg...` key
+    // that does not exist would have passed while testing nothing.
+    test("still leaves the weekly trend averages finite", () => {
+      const metrics = buildMetrics({
+        calories: [
+          { id: "c1", date: "2026-03-01", calories: 2000 },
+          { id: "c2", date: "2026-03-02", calories: "not a number" }
+        ]
+      });
+
+      expect(Number.isNaN(metrics.trendRanges.week.avgCalories)).toBe(false);
+      expect(Number.isNaN(metrics.trendRanges.month.avgCalories)).toBe(false);
+    });
+
+    // The counterpart: a real zero is a measurement and still counts as a logged
+    // day, so it must keep pulling the average down rather than being skipped.
+    test("is not confused with a measured zero", () => {
+      const metrics = buildMetrics({
+        calories: [
+          { id: "c1", date: "2026-03-01", calories: 2000 },
+          { id: "c2", date: "2026-03-02", calories: 0 }
+        ]
+      });
+
+      expect(metrics.avgCalories).toBe(1000);
+    });
+  });
 });

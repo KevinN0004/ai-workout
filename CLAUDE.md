@@ -420,9 +420,17 @@ the native instance all along.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
     Current ranking, re-measured 2026-09-13: `usePreviewDerivedData.js` (34),
-    `outlineGeometry.js` (28), `templateOutline.js` (22),
-    `useDashboardMetrics.js` (15), `ExerciseDetailsModal.jsx` (14) and
-    `SettingsView.jsx` (11).
+    `outlineGeometry.js` (28), `templateOutline.js` (22), `SettingsView.jsx` (11),
+    `useDashboardMetrics.js` (11) and `useDashboardData.js` (10).
+    **The two geometry files at the top are the same dead-defensive pattern**:
+    `outlineGeometry.js`'s uncovered arms are the `top || bottom || null`
+    fallbacks in `chooseYUpper`/`chooseXOuter` and friends, reachable only with
+    asymmetric anchor data that `geometry.js` never produces. They are
+    closure-scoped, so reaching them means driving the outer function with
+    hand-built anchor sets. Left alone deliberately: unlike the duplicated
+    profile guards, these are cheap insurance in rendering code where the worst
+    case is a slightly wrong silhouette, and deleting them would make the file
+    more fragile to change rather than less.
     **This entry previously claimed "nothing is left above ten uncovered
     branches" and listed `usePreviewDerivedData.js` among the files that were
     done. Both were wrong** — it was the largest client gap at the time, and the
@@ -655,6 +663,20 @@ the native instance all along.
     collapse it: the early return is now the only guard and the portal just gets
     `open`. The same mutation is caught now. When a survivor looks like a test
     gap, check first whether something else is already enforcing the condition.
+    `ExerciseDetailsModal.jsx` carried the identical pair and got the identical
+    fix, so **if you add a modal, give it one guard, not two** — the second one
+    does nothing except make the first untestable.
+  - **Guard a value once, where it is summed.** `useDashboardMetrics.js` had the
+    same reading coerced two ways: the accumulation loops guarded with
+    `Number.isNaN` before adding to `caloriesByDate`, while `avgCalories` folded
+    `Number(item?.calories || 0)` with no guard at all. One unparseable row is
+    enough — `sum + NaN` stays NaN for the rest of the fold — and `avgCalories`
+    is rendered directly and drives a progress-bar width, so the card would read
+    "NaN" and the bar would get `width: NaN%`. Latent rather than shipped: the
+    calorie input is `type="number"` and the column is an Int, so nothing
+    currently feeds it a non-number. Both sites now share `toMetricNumber`,
+    which is the structural fix — two call sites that must agree will eventually
+    stop agreeing.
   - **A deliberate survivor is how you prove a branch is dead.** `DashboardAtAGlance.jsx`
     had two conditions whose arms were the same string — `weatherError ? "Unavailable" :
 "Unavailable"`, and the identical thing again for air quality. Deleting each condition
