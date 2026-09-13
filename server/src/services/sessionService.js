@@ -15,7 +15,11 @@ export const parseCookies = (cookieHeader = "") =>
     return acc;
   }, {});
 
+// Guards before it coerces. The 1..65535 range already rejected the 0 that
+// `Number(null)` and `Number("")` produce, so no answer changes here either;
+// see the note on `toPositiveInt` in index.js.
 export const parseRedisPort = (value) => {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) return null;
   if (parsed < 1 || parsed > 65535) return null;

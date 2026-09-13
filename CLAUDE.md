@@ -144,9 +144,39 @@ which tests `typeof value === "string"`.
 opposite answers for the same missing data — which is what made it hard to see.
 
 **Do not "fix" this with `!value`.** That swallows a genuine zero, and a measured zero is
-a measurement: 0 °C really is below the cold gate. Range checks can mask the bug too —
-`toPositiveInt` and `parseRedisPort` are safe only because `> 0` and a port range reject
-the accidental `0`. Don't rely on that in new code.
+a measurement: 0 °C really is below the cold gate. Range checks used to mask the bug too:
+`toPositiveInt` and `parseRedisPort` were safe only because `> 0` and a port range reject
+the accidental `0`, and `toRate` was safe only because its one caller passes `0` as the
+fallback, so the accidental zero and the intended default happened to coincide. All three
+now guard before they coerce, so the safety is intrinsic rather than a side effect of the
+range. `toRate` was the one that mattered: `0` is a valid sample rate, so nothing else was
+going to catch it if the default ever changed.
+
+**The invariant is now asserted, not just described here.**
+`server/src/numericCoercion.contract.test.js` and its client counterpart enumerate every
+numeric helper and pin three things: that `null`, `""` and `undefined` all agree, that a
+non-numeric string is absent, and that a measured `0` survives. **Add a row when you add a
+helper** — that is the whole mechanism, and it is why `toNumberOrNull`, the shape this
+section tells you to copy, is now tested directly rather than only incidentally through
+the dashboard integration suites.
+
+Two things the contract deliberately does not flatten:
+
+- **`toPositiveInt` and `parseRedisPort` exclude `0` from their domain**, so for them a
+  measured `0` correctly reads as absent. Asserting otherwise would be wrong, so each row
+  declares whether zero is meaningful for that helper.
+- **`toNumberInput` does not make the three absent forms agree**, and must not. It feeds
+  `z.preprocess`, where `undefined` has to stay `undefined` for `.optional()` to fire and
+  `null` has to stay `null` for `z.null()` to match — collapsing them would lose the
+  difference between a field omitted and a field explicitly cleared. It still honours the
+  part that matters: an empty field becomes `null`, never `0`.
+
+Mutation-tested rather than trusted, since a contract test over correct code passes on the
+first run either way. Removing the guard from `toNumberOrNull`, `toNullableNumber`,
+`toFiniteNumber` (both copies) or `toRate` is caught; so is switching any of them to
+`!value`. Removing it from `toPositiveInt` or `parseRedisPort` **survives, as predicted** —
+those two are equivalent mutants, which is the mechanical proof that reshaping them changed
+no answer.
 
 **The class was not confined to the server, and the fourth instance is fixed.**
 `useBodyModel.js` carried its own `toFiniteNumber` written the wrong way round —

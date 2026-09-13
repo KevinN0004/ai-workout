@@ -21,7 +21,7 @@ vi.mock("@sentry/node", () => {
   return { ...api, default: api };
 });
 
-const { initErrorTracking } = await import("./errorTrackingService.js");
+const { initErrorTracking, __testables } = await import("./errorTrackingService.js");
 
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
@@ -140,5 +140,34 @@ describe("initErrorTracking with a DSN", () => {
     await tracker.flush(1234);
 
     expect(sentry.flush).toHaveBeenCalledWith(1234);
+  });
+});
+
+// `toRate` is the one numeric helper on the server whose range check does not
+// protect it: `toPositiveInt` and `parseRedisPort` reject the accidental 0 with
+// `> 0` and a port range, but 0 is a legitimate sample rate, so a null or an
+// empty env var coerced straight to a real 0.
+//
+// It was not a live bug, because the only call site passes 0 as the fallback
+// and the two answers coincided. These pin the fallback apart from the
+// accidental zero so that stays true if the default ever changes.
+describe("toRate", () => {
+  const { toRate } = __testables;
+
+  test.each([
+    ["null", null],
+    ["an empty string", ""],
+    ["undefined", undefined]
+  ])("treats %s as absent and returns the fallback", (_label, value) => {
+    expect(toRate(value, 0.5)).toBe(0.5);
+  });
+
+  // The counterpart: 0 is a real sample rate meaning "trace nothing", and an
+  // operator who sets it deliberately must not silently get the default back.
+  test.each([
+    ["a number", 0],
+    ["a string", "0"]
+  ])("keeps an explicit zero given as %s", (_label, value) => {
+    expect(toRate(value, 0.5)).toBe(0);
   });
 });
