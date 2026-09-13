@@ -9,6 +9,15 @@ export default defineConfig({
       "/api": "http://localhost:5000"
     }
   },
+  // `vite preview` does not inherit `server.proxy`. The E2E suite runs against
+  // the built bundle rather than the dev server, so that it exercises the
+  // artifact that actually ships -- which needs the same /api proxy.
+  preview: {
+    port: 4173,
+    proxy: {
+      "/api": "http://localhost:5000"
+    }
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.js",
