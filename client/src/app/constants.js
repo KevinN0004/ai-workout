@@ -4,14 +4,6 @@ export const APP_BRAND_TAGLINE = "Your guide for this journey.";
 
 export const quickFocuses = ["Strength", "Weight Loss", "Mobility", "Recovery", "Cardio"];
 
-export const goalOptions = [
-  "Build lean strength and energy",
-  "Fat loss + conditioning",
-  "Mobility",
-  "Recovery",
-  "Cardio"
-];
-
 export const equipmentOptionsByEnv = {
   Home: [
     "Bodyweight only",

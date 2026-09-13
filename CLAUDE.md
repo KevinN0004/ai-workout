@@ -283,6 +283,7 @@ npm test                 # client tests, then server tests (Vitest)
 npm run test:coverage    # the same suites with a v8 coverage report
 npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
 npm run test:e2e:ui      # the same suite in Playwright's UI mode
+npm run knip             # unused files, exports and dependencies (exit 0 = clean)
 npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
@@ -313,6 +314,31 @@ It has its own CI job rather than living in `test`, so a flaky browser run
 cannot muddy the unit signal. It was verified by mutation rather than trusted:
 removing the client's CSRF header, and making the workout route answer 200
 without writing, are both caught — and both pass every other suite in the repo.
+
+**`npm run knip` is clean, and `knip.json` is what keeps it that way.** Two things
+about it are load-bearing:
+
+- **It must declare the hook scripts as entry points.** `codex-handoff.mjs`,
+  `scrub-junk-files.cjs` and `skill-router.mjs` are invoked from
+  `.claude/settings.json`, which knip cannot see — so without the config it
+  reports all three as unused files, then cascades and reports
+  `codex-handoff/*.mjs` too, because their only importer looks dead. **That is
+  six false positives inviting you to delete the whole hook wiring.** They are
+  live; see the Fresh Clone Setup checklist that runs them.
+- **"Unused export" usually means the export, not the value.** Of the 17 knip
+  originally reported, 12 were constants used inside their own module to derive
+  others that _are_ consumed — `PREVIEW_WEEK_LINE_DRAW_MS` feeds
+  `PREVIEW_WEEK_OUTLINE_DRAW_MS`, and so on. Those were narrowed to
+  module-private rather than deleted. Only `goalOptions` and the two meal
+  libraries were genuinely dead.
+
+**Deleting dead source does not necessarily shrink the bundle**, and assuming it
+does is how you overstate a cleanup. `MEAL_LIBRARY` and `EXTRA_MEAL_LIBRARY` were
+736 lines reachable only through a re-export nothing imported; removing them
+changed the built bundle by **zero bytes and not even the content hash**, because
+rollup was already tree-shaking them. Verified by grepping `client/dist` for a
+string from the file before and after. They were worth removing for the reading,
+not for the shipping. Measure the bundle rather than claiming it.
 
 Server-only helpers (run from `server/`):
 
