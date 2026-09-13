@@ -28,6 +28,8 @@ import {
 } from "./services/apiSchemaService.js";
 import { createExternalDataService } from "./services/externalDataService.js";
 import { initErrorTracking } from "./services/errorTrackingService.js";
+import { createExternalApiLatencyRecorder, createMetrics } from "./services/metricsService.js";
+import { createCorsPolicy } from "./corsPolicy.js";
 import { createHttpCacheService } from "./services/httpCacheService.js";
 import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
@@ -97,43 +99,9 @@ const parseCsvEnv = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const configuredClientOrigins = parseCsvEnv(
-  process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS
+const { corsOptions, isEmpty: corsAllowlistIsEmpty } = createCorsPolicy(
+  parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS)
 );
-const allowedCorsOrigins = new Set(configuredClientOrigins);
-
-// With credentials enabled, reflecting an arbitrary Origin would let any site
-// issue authenticated cross-origin calls, so an unset allowlist must fail closed.
-// The loopback fallback keeps `npm run dev` working without extra configuration;
-// any other deployment has to name its origins explicitly.
-const isLoopbackOrigin = (origin) => {
-  try {
-    const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-  } catch {
-    return false;
-  }
-};
-
-const isAllowedCorsOrigin = (origin) => {
-  if (allowedCorsOrigins.has(origin)) return true;
-  return allowedCorsOrigins.size === 0 && isLoopbackOrigin(origin);
-};
-
-const corsOptions = {
-  origin(origin, callback) {
-    // Same-origin and non-browser callers send no Origin header.
-    if (!origin) return callback(null, true);
-    if (isAllowedCorsOrigin(origin)) return callback(null, true);
-    // Tag as 4xx so a blocked origin is a client error, not a captured 5xx.
-    const corsError = new Error("Origin not allowed by CORS.");
-    corsError.status = 403;
-    return callback(corsError);
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "X-CSRF-Token"]
-};
 const logLevel = toShortText(process.env.LOG_LEVEL || "info", 20).toLowerCase() || "info";
 const defaultRedactedLogPaths = [
   "req.headers.authorization",
@@ -161,51 +129,14 @@ const logger = pino({
   }
 });
 
-if (allowedCorsOrigins.size === 0) {
+if (corsAllowlistIsEmpty) {
   logger.warn(
     { event: "cors_allowlist_missing" },
     "CLIENT_ORIGIN is not set. Allowing loopback origins only; set it before deploying."
   );
 }
 
-const initLatencyStats = () => ({
-  count: 0,
-  totalMs: 0,
-  maxMs: 0,
-  lastMs: 0
-});
-const metrics = {
-  requestsTotal: 0,
-  authFailures: 0,
-  rateLimited: 0,
-  requestLatencyMs: initLatencyStats(),
-  routeLatencyMs: {},
-  externalCache: {
-    hits: 0,
-    misses: 0,
-    staleHits: 0,
-    writes: 0,
-    evictions: 0
-  },
-  externalApiFailures: {
-    openMeteo: 0,
-    openAq: 0,
-    wger: 0,
-    mealDb: 0
-  },
-  externalApiRetries: {
-    openMeteo: 0,
-    openAq: 0,
-    wger: 0,
-    mealDb: 0
-  },
-  externalApiLatencyMs: {
-    openMeteo: initLatencyStats(),
-    openAq: initLatencyStats(),
-    wger: initLatencyStats(),
-    mealDb: initLatencyStats()
-  }
-};
+const metrics = createMetrics();
 let errorTracker = {
   enabled: false,
   configured: false,
@@ -266,22 +197,7 @@ const toPositiveInt = (value, fallback) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const recordLatencyStats = (bucket, durationMs) => {
-  if (!bucket || !Number.isFinite(durationMs) || durationMs < 0) return;
-  bucket.count = (bucket.count || 0) + 1;
-  bucket.totalMs = (bucket.totalMs || 0) + durationMs;
-  bucket.maxMs = Math.max(bucket.maxMs || 0, durationMs);
-  bucket.lastMs = durationMs;
-};
-
-const recordExternalApiLatency = (serviceName, durationMs) => {
-  const key = cleanText(serviceName, 32);
-  if (!key) return;
-  if (!metrics.externalApiLatencyMs[key]) {
-    metrics.externalApiLatencyMs[key] = initLatencyStats();
-  }
-  recordLatencyStats(metrics.externalApiLatencyMs[key], durationMs);
-};
+const recordExternalApiLatency = createExternalApiLatencyRecorder({ metrics, cleanText });
 
 const apiRateLimitWindowMs = toPositiveInt(process.env.API_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
 const apiRateLimitMax = toPositiveInt(process.env.API_RATE_LIMIT_MAX, 300);
