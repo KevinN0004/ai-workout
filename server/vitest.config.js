@@ -17,15 +17,15 @@ export default defineConfig({
       exclude: ["**/*.test.js", "src/generated/**"],
       reporter: ["text", "html"],
       // A ratchet, not a target -- see the note in client/vite.config.js.
-      // Measured 2026-09-12, floored one decimal below. Whole-percent floors
+      // Measured 2026-09-13, floored one decimal below. Whole-percent floors
       // were used here until postgres.js went from 53% to 100%, a gain of over
       // a point on the totals that a whole-percent floor would have rounded
       // most of away.
       thresholds: {
-        statements: 91.3,
-        branches: 82.9,
-        functions: 93.9,
-        lines: 92.6
+        statements: 93.6,
+        branches: 85.0,
+        functions: 95.1,
+        lines: 95.0
       }
     }
   }

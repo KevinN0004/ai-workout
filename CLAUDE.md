@@ -329,7 +329,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-12:
-  server **91.4%** statements / 83.0% branches, client **97.7%** / 91.8%.
+  server **93.6%** statements / 85.1% branches, client **97.7%** / 91.8%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -339,6 +339,16 @@ the native instance all along.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
+  - **A function being stubbed is not a function being tested.** `openAqRequest`
+    was 79 lines that never executed once — 53 uncovered branches, the largest
+    single gap on the server — because `airQualityRoutes.test.js` stubs it as its
+    network boundary. Stubbing it at every call site is what made it invisible:
+    the routes above it were at 100%, so nothing in the coverage table pointed
+    here. It is the request layer for the surface where the null-pm2.5-as-AQI-0
+    bug shipped. Now at 96.7% statements / 94.6% branches, covered in
+    `externalRequests.test.js` alongside the wger and MealDB wrappers.
+    When a test stubs a named function of this repo's own, check whether anything
+    else exercises it.
   - Thin areas, worst first: `index.js` (76% — app bootstrap and wiring) and
     `httpCacheService.js` (77%). `index.js` is ~697 lines, and nearly all of
     what is still uncovered in it is the bootstrap the suite deliberately does
