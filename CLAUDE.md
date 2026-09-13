@@ -243,7 +243,7 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-10:
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-12:
   server **90.7%** statements / 82.3% branches, client **97.4%** / 91.4%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
