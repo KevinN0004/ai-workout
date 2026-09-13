@@ -200,17 +200,30 @@ describe.each([
     });
 
     // The check is `Number(is_day) === 1`, not a truthiness test, and 1 and 0
-    // cannot tell those apart. Anything else is not a daylight flag and must
-    // not read as daytime.
+    // cannot tell those apart. A value that is present but is not the flag is
+    // still an answer, and it is not daytime.
     test.each([
       ["2", 2],
-      ["a string", "yes"],
-      ["null", null],
-      ["absent", undefined]
+      ["a string", "yes"]
     ])("does not read %s as daytime", async (_label, value) => {
       const response = await get(buildApp(upstream(payload({ is_day: value }))), path);
 
       expect(response.body.current.isDay).toBe(false);
+    });
+
+    // Absent is not night. `Number(null)` is 0 and `0 === 1` is false, so a
+    // payload carrying no daylight reading used to publish a confident "night"
+    // -- while `weatherCode` beside it correctly reported null, and the
+    // upstream-failure branch of this same route already reported isDay: null.
+    // The field now agrees with its siblings and with itself.
+    test.each([
+      ["null", null],
+      ["absent", undefined],
+      ["an empty string", ""]
+    ])("reports %s as unknown rather than as night", async (_label, value) => {
+      const response = await get(buildApp(upstream(payload({ is_day: value }))), path);
+
+      expect(response.body.current.isDay).toBeNull();
     });
 
     test("survives an upstream answer with no current block at all", async () => {
