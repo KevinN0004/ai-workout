@@ -689,6 +689,102 @@ describe("DashboardPage", () => {
     });
   });
 
+  describe("the props each child is handed", () => {
+    // A sweep found that 32 of the 43 prop lines in this file could be deleted
+    // without a single test noticing -- the seam between this page and the two
+    // components that read the most from it was almost entirely unguarded.
+    // Asserting the whole set at once catches a dropped line without needing an
+    // assertion per prop, and catches an added one too, which is the moment to
+    // decide whether it wants a test of its own.
+    const GLANCE_PROPS = [
+      "nextWorkout",
+      "caloriesGap",
+      "avgCalories",
+      "calorieGoal",
+      "weatherLoading",
+      "weatherRecommendation",
+      "weatherError",
+      "weatherLastUpdatedAt",
+      "refreshWeatherRecommendation",
+      "airQualityLoading",
+      "airSummary",
+      "airQualityError",
+      "airQualityLastUpdatedAt",
+      "refreshAirQuality",
+      "formatRelativeUpdatedAt",
+      "onAddWorkout",
+      "onOpenMeal",
+      "onOpenTips"
+    ];
+
+    const SUMMARY_PROPS = [
+      "form",
+      "openPlannerFromProfile",
+      "last7Workouts",
+      "avgCalories",
+      "goals",
+      "goalForm",
+      "weeklyGoal",
+      "workoutProgress",
+      "calorieGoal",
+      "calorieProgress",
+      "workouts",
+      "weeklyTrends",
+      "buildLinePath",
+      "trendRanges",
+      "todayRecommendation",
+      "weatherData",
+      "weatherLoading",
+      "weatherError",
+      "weatherLastUpdatedAt",
+      "refreshWeatherRecommendation",
+      "airQualityData",
+      "airQualityLoading",
+      "airQualityError",
+      "airQualityLastUpdatedAt",
+      "refreshAirQuality",
+      "onOpenPlans",
+      "onOpenMeal"
+    ];
+
+    test("the glance strip gets exactly the props it expects", () => {
+      renderPage();
+
+      expect(Object.keys(glance.props).sort()).toEqual([...GLANCE_PROPS].sort());
+    });
+
+    test("the summary view gets exactly the props it expects", () => {
+      renderPage({ dashView: "summary" });
+
+      expect(Object.keys(summary.props).sort()).toEqual([...SUMMARY_PROPS].sort());
+    });
+
+    test.each([
+      ["the glance strip", () => glance.props],
+      ["the summary view", () => summary.props]
+    ])("%s does not have its weather and air values crossed", (_label, propsOf) => {
+      // Every one of these pairs is the same shape, so a transposed line type
+      // checks fine and shows the wrong reading on the wrong card.
+      renderPage({
+        dashView: "summary",
+        weatherLoading: true,
+        weatherError: "weather is down",
+        weatherLastUpdatedAt: 1000,
+        airQualityLoading: false,
+        airQualityError: "air is down",
+        airQualityLastUpdatedAt: 2000
+      });
+      const props = propsOf();
+
+      expect(props.weatherError).toBe("weather is down");
+      expect(props.airQualityError).toBe("air is down");
+      expect(props.weatherLoading).toBe(true);
+      expect(props.airQualityLoading).toBe(false);
+      expect(props.weatherLastUpdatedAt).toBe(1000);
+      expect(props.airQualityLastUpdatedAt).toBe(2000);
+    });
+  });
+
   describe("what the glance strip is handed", () => {
     test("both ambient cards get their own refresh handler", () => {
       // The strip renders a Retry only when it has a handler, so a missing
