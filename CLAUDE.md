@@ -323,7 +323,10 @@ the native instance all along.
     are overwritten before anything observable, and inverting them changes no
     test and no pixel. Verified by inverting the ternary by hand: the suite
     stays green. If the two copies ever disagree, the effect's copy silently
-    wins. Reported, not fixed.
+    wins. **Deliberately left alone.** Removing the initializers would leave
+    `heightUnit` and `weightUnit` undefined on the first render, before the
+    effect runs, and `HomePage` receives them on that render. The redundancy is
+    harmless; the alternative is a regression.
     **Three files are off this list for good, and none of them is worth
     revisiting.** Each was ranked high by uncovered branches and each turned out
     to be unreachable rather than untested:
@@ -345,7 +348,7 @@ the native instance all along.
       path-building body and the `round3` helper that served it went with it; the
       guard now returns `""` directly.
       **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
-      statements and 100% functions, and its 41 remaining uncovered branches are
+      statements and 100% functions, and its 40 remaining uncovered branches are
       **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
       `JOHN_DOE_PREVIEW_PROFILE` and then overrides every field with
       `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every field is non-empty for
@@ -380,7 +383,7 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
+      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 100%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) `HomePage.jsx` (100% / 100%) `CaloriesView.jsx` (100% / 100%) and `AuthPage.jsx` (95% / 100%).
       `PreviewPage.jsx` had a chapter-body router whose final `else` arm no
       chapter id could reach: `usePreviewDerivedData` builds exactly
       `personal-info`, `generate`, `workout-week` and `dashboard-preview`, and
