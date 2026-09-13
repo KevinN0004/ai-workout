@@ -124,17 +124,15 @@ describe("DashboardAtAGlance", () => {
     });
 
     test("a failed lookup and no lookup at all are worded identically", () => {
-      // FINDING, pinned as current behaviour rather than fixed.
+      // A failed lookup and a lookup that has not happened share this wording,
+      // so the headline alone does not tell them apart. That used to be written
+      // as `weatherError ? "Unavailable" : "Unavailable"`, a condition that read
+      // as though it distinguished them and could not; the condition is gone and
+      // the wording is unchanged. The note underneath is what carries the
+      // difference, which the last two assertions check.
       //
-      //   : weatherError
-      //     ? "Unavailable"
-      //     : "Unavailable"
-      //
-      // Both arms are the same string, so the condition decides nothing and
-      // the visitor cannot tell "the service failed" from "we have no reading
-      // yet" in the headline. The note underneath does carry the error text,
-      // so the information is not lost entirely -- but the branch is dead, and
-      // what the failed case ought to say instead is a copy decision.
+      // Giving the failed case its own wording is a copy decision nobody has
+      // made. This test pins what it does today, either way.
       const { container: failed } = renderGlance({ weatherError: "Weather service unavailable" });
       const { container: neverRan } = renderGlance();
       const read = (container) => {
@@ -189,8 +187,8 @@ describe("DashboardAtAGlance", () => {
     });
 
     test("a failed lookup and no lookup at all are worded identically", () => {
-      // The same dead condition as the weather card, duplicated:
-      //   airSummary?.level || (airQualityError ? "Unavailable" : "Unavailable")
+      // The air card shares the weather card's wording for both cases, and
+      // carried the same dead condition until it was collapsed.
       renderGlance({ airQualityError: "Air quality service unavailable" });
 
       expect(headline("air")).toBe("Unavailable");
