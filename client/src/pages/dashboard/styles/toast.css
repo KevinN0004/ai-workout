@@ -61,3 +61,11 @@
 .dashboard-glance-updated {
   font-size: 0.75rem;
 }
+
+/* Sits between a failed card's note and its freshness line, so it needs to read
+   as an action without competing with the headline above it. */
+.dashboard-glance-retry {
+  align-self: flex-start;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+}

@@ -115,7 +115,7 @@ describe("DashboardAtAGlance", () => {
       [
         "a recommendation with no workout type",
         { weatherRecommendation: { summary: "Mild" } },
-        "Unavailable"
+        "Not checked yet"
       ]
     ])("reports %s", (_label, props, expected) => {
       renderGlance(props);
@@ -123,16 +123,10 @@ describe("DashboardAtAGlance", () => {
       expect(headline("weather")).toBe(expected);
     });
 
-    test("a failed lookup and no lookup at all are worded identically", () => {
-      // A failed lookup and a lookup that has not happened share this wording,
-      // so the headline alone does not tell them apart. That used to be written
-      // as `weatherError ? "Unavailable" : "Unavailable"`, a condition that read
-      // as though it distinguished them and could not; the condition is gone and
-      // the wording is unchanged. The note underneath is what carries the
-      // difference, which the last two assertions check.
-      //
-      // Giving the failed case its own wording is a copy decision nobody has
-      // made. This test pins what it does today, either way.
+    test("a failed lookup reads differently from one that never ran", () => {
+      // These shared the word "Unavailable" until the two states were given
+      // their own wording. The note underneath always differed; the headline,
+      // which is the line a visitor scans, did not.
       const { container: failed } = renderGlance({ weatherError: "Weather service unavailable" });
       const { container: neverRan } = renderGlance();
       const read = (container) => {
@@ -140,9 +134,10 @@ describe("DashboardAtAGlance", () => {
         return weatherCard.querySelector(".dashboard-glance-value").textContent;
       };
 
-      expect(read(failed)).toBe(read(neverRan));
-      expect(read(failed)).toBe("Unavailable");
-      // The note underneath is where the two states still differ.
+      expect(read(failed)).toBe("Couldn't check");
+      expect(read(neverRan)).toBe("Not checked yet");
+      expect(read(failed)).not.toBe(read(neverRan));
+      // The note still carries the detail behind each.
       expect(failed.textContent).toContain("Weather service unavailable");
       expect(neverRan.textContent).toContain("No weather update yet.");
     });
@@ -186,18 +181,22 @@ describe("DashboardAtAGlance", () => {
       expect(headline("air")).toBe(expected);
     });
 
-    test("a failed lookup and no lookup at all are worded identically", () => {
-      // The air card shares the weather card's wording for both cases, and
-      // carried the same dead condition until it was collapsed.
+    test("a failed lookup reads differently from one that never ran", () => {
       renderGlance({ airQualityError: "Air quality service unavailable" });
+      expect(headline("air")).toBe("Couldn't check");
 
-      expect(headline("air")).toBe("Unavailable");
+      renderGlance();
+      expect(screen.getAllByRole("article")[4 + CARDS.air].textContent).toContain(
+        "Not checked yet"
+      );
     });
 
-    test("a reading with no level falls through to the same wording", () => {
+    test("a reading with no level falls through to the not-checked wording", () => {
+      // The server always sets a level, so this is the component's contract
+      // rather than a state the app produces.
       renderGlance({ airSummary: { guidance: "Fine for outdoor training" } });
 
-      expect(headline("air")).toBe("Unavailable");
+      expect(headline("air")).toBe("Not checked yet");
     });
 
     test.each([
@@ -216,6 +215,75 @@ describe("DashboardAtAGlance", () => {
       renderGlance(props);
 
       expect(note("air")).toBe(expected);
+    });
+  });
+
+  describe("retrying after a failure", () => {
+    // The card had no way to act on an error: a visitor saw one and could do
+    // nothing. These handlers already existed on DashboardPage and were being
+    // passed to SummaryView, just not here.
+    test.each([
+      ["weather", { weatherError: "Lookup failed" }, "refreshWeatherRecommendation"],
+      ["air quality", { airQualityError: "Lookup failed" }, "refreshAirQuality"]
+    ])("the %s card offers a retry that calls its own handler", (_label, props, handlerName) => {
+      const handlers = {
+        refreshWeatherRecommendation: vi.fn(),
+        refreshAirQuality: vi.fn()
+      };
+      renderGlance({ ...props, ...handlers });
+
+      const retry = document.querySelector(".dashboard-glance-retry");
+      fireEvent.click(retry);
+
+      expect(handlers[handlerName]).toHaveBeenCalledTimes(1);
+      const other =
+        handlerName === "refreshAirQuality" ? "refreshWeatherRecommendation" : "refreshAirQuality";
+      expect(handlers[other]).not.toHaveBeenCalled();
+    });
+
+    test("no retry is offered when nothing failed", () => {
+      renderGlance({ refreshWeatherRecommendation: vi.fn(), refreshAirQuality: vi.fn() });
+
+      expect(document.querySelectorAll(".dashboard-glance-retry")).toHaveLength(0);
+    });
+
+    test("no retry is offered when there is no handler to call", () => {
+      // A button that does nothing is worse than no button.
+      renderGlance({ weatherError: "Lookup failed", airQualityError: "Lookup failed" });
+
+      expect(document.querySelectorAll(".dashboard-glance-retry")).toHaveLength(0);
+    });
+
+    test("each card only offers its own retry", () => {
+      renderGlance({
+        weatherError: "Lookup failed",
+        refreshWeatherRecommendation: vi.fn(),
+        refreshAirQuality: vi.fn()
+      });
+
+      expect(document.querySelectorAll(".dashboard-glance-retry")).toHaveLength(1);
+    });
+
+    test("the retry is disabled and renames itself while it runs", () => {
+      renderGlance({
+        weatherError: "Lookup failed",
+        weatherLoading: true,
+        refreshWeatherRecommendation: vi.fn()
+      });
+      const retry = document.querySelector(".dashboard-glance-retry");
+
+      expect(retry).toBeDisabled();
+      expect(retry.textContent).toBe("Retrying...");
+      expect(retry.getAttribute("aria-label")).toBe("Retrying weather");
+    });
+
+    test("the retry is enabled and named plainly when idle", () => {
+      renderGlance({ weatherError: "Lookup failed", refreshWeatherRecommendation: vi.fn() });
+      const retry = document.querySelector(".dashboard-glance-retry");
+
+      expect(retry).not.toBeDisabled();
+      expect(retry.textContent).toBe("Retry");
+      expect(retry.getAttribute("aria-label")).toBe("Retry weather");
     });
   });
 

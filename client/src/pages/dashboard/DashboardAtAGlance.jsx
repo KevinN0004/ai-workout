@@ -7,10 +7,12 @@ export default function DashboardAtAGlance({
   weatherRecommendation,
   weatherError,
   weatherLastUpdatedAt,
+  refreshWeatherRecommendation,
   airQualityLoading,
   airSummary,
   airQualityError,
   airQualityLastUpdatedAt,
+  refreshAirQuality,
   formatRelativeUpdatedAt,
   onAddWorkout,
   onOpenMeal,
@@ -71,18 +73,24 @@ export default function DashboardAtAGlance({
                   ? "Outdoor friendly"
                   : weatherRecommendation?.workoutType === "indoor"
                     ? "Indoor suggested"
-                    : // A failed lookup and a lookup that has not happened both read
-                      // as "Unavailable". This used to be written as
-                      // `weatherError ? "Unavailable" : "Unavailable"`, which looks
-                      // like it tells them apart and cannot. The note below does
-                      // carry the error text, so the difference is not lost --
-                      // giving this line its own wording is a copy decision nobody
-                      // has made.
-                      "Unavailable"}
+                    : weatherError
+                      ? "Couldn't check"
+                      : "Not checked yet"}
             </p>
             <p className="muted">
               {weatherRecommendation?.summary || weatherError || "No weather update yet."}
             </p>
+            {weatherError && typeof refreshWeatherRecommendation === "function" ? (
+              <button
+                type="button"
+                className="ghost dashboard-glance-retry"
+                onClick={refreshWeatherRecommendation}
+                disabled={weatherLoading}
+                aria-label={weatherLoading ? "Retrying weather" : "Retry weather"}
+              >
+                {weatherLoading ? "Retrying..." : "Retry"}
+              </button>
+            ) : null}
             <p className="muted dashboard-glance-updated">
               {formatRelativeUpdatedAt(weatherLastUpdatedAt)}
             </p>
@@ -98,14 +106,22 @@ export default function DashboardAtAGlance({
                 ? airSummary
                   ? "Refreshing..."
                   : "Checking..."
-                : // Same as the weather card above: the error and the no-reading
-                  // case share this wording, and the note below is what
-                  // distinguishes them.
-                  airSummary?.level || "Unavailable"}
+                : airSummary?.level || (airQualityError ? "Couldn't check" : "Not checked yet")}
             </p>
             <p className="muted">
               {airSummary?.guidance || airQualityError || "No air quality guidance available."}
             </p>
+            {airQualityError && typeof refreshAirQuality === "function" ? (
+              <button
+                type="button"
+                className="ghost dashboard-glance-retry"
+                onClick={refreshAirQuality}
+                disabled={airQualityLoading}
+                aria-label={airQualityLoading ? "Retrying air quality" : "Retry air quality"}
+              >
+                {airQualityLoading ? "Retrying..." : "Retry"}
+              </button>
+            ) : null}
             <p className="muted dashboard-glance-updated">
               {formatRelativeUpdatedAt(airQualityLastUpdatedAt)}
             </p>
