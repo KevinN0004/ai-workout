@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/codex-handoff.mjs",
+        "scripts/scrub-junk-files.cjs",
+        "scripts/skill-router.mjs",
+        "scripts/**/*.test.mjs",
+        "e2e/**/*.spec.js"
+      ],
+      "project": ["scripts/**/*.{mjs,cjs,js}", "e2e/**/*.js", "*.js"]
+    },
+    "client": { "project": "src/**/*.{js,jsx}" },
+    "server": { "project": "src/**/*.js" }
+  }
+}

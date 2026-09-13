@@ -6,7 +6,7 @@ const GENERIC_SERVER_ERROR = "Server error.";
  * Prisma and pg errors embed schema, constraint, and connection detail.
  * Client-caused (4xx) messages are already curated by the routes, so they pass through.
  */
-export const safeErrorMessage = (err, status = 500) => {
+const safeErrorMessage = (err, status = 500) => {
   if (status >= 500) return GENERIC_SERVER_ERROR;
   const message = typeof err?.message === "string" ? err.message.trim() : "";
   return message || GENERIC_SERVER_ERROR;

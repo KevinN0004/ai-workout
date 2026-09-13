@@ -21,7 +21,7 @@ export const APPROVAL_MODE_MAP = {
   "Plan → Execute": "--full-auto"
 };
 
-export const SUPERPOWERS_CONTROLLER_PROTOCOL = [
+const SUPERPOWERS_CONTROLLER_PROTOCOL = [
   "Superpowers-compatible controller protocol:",
   "- Treat the Claude-authored plan as the source of truth.",
   "- Execute one plan task at a time; do not start the next task until reviews pass.",
