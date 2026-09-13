@@ -176,6 +176,36 @@ Only `""` and `null` changed behaviour — `undefined` already returned null, an
 weight was unaffected because `toKg` returns `""` for a falsy value and the
 `> 0` check downstream rejected the `0` either way.
 
+**A fifth instance sat in `components/physique/math.js`, and it is fixed too.**
+That file carried a _third_ `toFiniteNumber`, the only one taking an explicit
+`fallback` argument, written the wrong way round like the others. It is the copy
+the silhouette runs on: about sixty calls across `geometry.js`,
+`templateOutline.js`, `outlineUtils.js` and `palette.js`.
+
+It was never reachable from the app — `useBodyModel`'s `silhouetteShape` puts
+every field through `clamp()` of a numeric expression, so the model it hands
+`PhysiqueSilhouette2D` carries only finite numbers. It was a trap for the next
+caller rather than a shipped bug. Two things let it survive the earlier sweep,
+and both are worth recognising elsewhere:
+
+- **Its test pinned the wrong behaviour with a comment that only explained the
+  mechanism.** `expect(toFiniteNumber(null, 7)).toBe(0)` was annotated
+  `// Number(null) is 0, which is finite` — true, and not a reason. Compare the
+  `is_day` test in `weatherRoutes.test.js`, which argues that anything other
+  than the flag "must not read as daytime". A comment that restates what the
+  code does cannot tell you whether it should.
+- **`geometry.test.js` already passed a `null` in and could not see it.** Its
+  non-numeric case includes `waistHalf: null`, but asserts only that the path
+  holds no `NaN` — true whichever way the null resolves. Exercising a value is
+  not the same as discriminating on it.
+
+The regression test now pins absent and zero apart at both levels. Note what the
+geometry-level one had to assert: a zeroed dimension does **not** simply clamp to
+its minimum bound, because `buildTemplateSizing` in `templateOutline.js` derives
+its width scale from the **raw** model value rather than from geometry's clamped
+local. Those unclamped scales are worth remembering before assuming the clamps in
+`buildPhysiqueSilhouetteGeometry` bound everything downstream of them.
+
 Conventions:
 
 - Keep files under 500 lines

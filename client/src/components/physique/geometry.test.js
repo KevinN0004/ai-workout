@@ -27,6 +27,38 @@ describe("buildPhysiqueSilhouetteGeometry", () => {
     expect(buildPhysiqueSilhouetteGeometry({}).outlinePath).toBe(bare.outlinePath);
   });
 
+  // A field that is present but absent must land on the same silhouette as a
+  // field that was never supplied. The "survives non-numeric input" case below
+  // exercises a null too, but only asserts the path holds no NaN -- which is
+  // true whether the null resolves to the fallback or to 0, so it cannot see
+  // this difference.
+  //
+  // The difference does reach the output. `buildTemplateSizing` in
+  // templateOutline.js derives its width scale from the RAW model value rather
+  // than from geometry's clamped local, so a dimension that coerces to 0
+  // contributes nothing to that scale and narrows the whole silhouette.
+  test.each([
+    ["null", null],
+    ["an empty string", ""]
+  ])("reads a %s dimension as absent, not as zero", (_label, absent) => {
+    const bare = buildPhysiqueSilhouetteGeometry();
+    const withAbsent = buildPhysiqueSilhouetteGeometry({ shoulderHalf: absent });
+    const withZero = buildPhysiqueSilhouetteGeometry({ shoulderHalf: 0 });
+
+    expect(withAbsent.outlinePath).toBe(bare.outlinePath);
+    expect(withAbsent.outlinePath).not.toBe(withZero.outlinePath);
+  });
+
+  // The counterpart, and the reason the guard tests for absence rather than
+  // falsiness: an explicit 0 is a measurement and must keep changing the
+  // silhouette.
+  test("still treats an explicitly zero dimension as a measurement", () => {
+    const bare = buildPhysiqueSilhouetteGeometry();
+    const withZero = buildPhysiqueSilhouetteGeometry({ shoulderHalf: 0 });
+
+    expect(withZero.outlinePath).not.toBe(bare.outlinePath);
+  });
+
   test("is deterministic for the same shape", () => {
     const shape = { shoulderHalf: 50, waistHalf: 25, fillHue: 200 };
     expect(buildPhysiqueSilhouetteGeometry(shape)).toEqual(buildPhysiqueSilhouetteGeometry(shape));

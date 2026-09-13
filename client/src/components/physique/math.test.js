@@ -40,10 +40,32 @@ describe("toFiniteNumber", () => {
 
   test("falls back for values that are not finite numbers", () => {
     expect(toFiniteNumber("abc", 7)).toBe(7);
-    expect(toFiniteNumber(undefined, 7)).toBe(7);
-    expect(toFiniteNumber(null, 7)).toBe(0); // Number(null) is 0, which is finite.
     expect(toFiniteNumber(Number.POSITIVE_INFINITY, 7)).toBe(7);
     expect(toFiniteNumber(Number.NaN, 7)).toBe(7);
+  });
+
+  // Absent input is rejected before the coercion, because Number(null) and
+  // Number("") are both 0 and both finite -- so testing afterwards turns a
+  // missing measurement into a real one. Same shape as toNumberOrNull in the
+  // server's rowValues.js and toFiniteNumber in useBodyModel.js.
+  //
+  // undefined already returned the fallback, so an omitted key and an explicit
+  // null used to give opposite answers for the same missing data. All three
+  // agree now, which is the point of the table.
+  test.each([
+    ["null", null],
+    ["an empty string", ""],
+    ["undefined", undefined]
+  ])("treats %s as absent and returns the fallback", (_label, value) => {
+    expect(toFiniteNumber(value, 7)).toBe(7);
+  });
+
+  // The counterpart, and the reason this is a guard rather than a truthiness
+  // test: a measured zero is a measurement. `sideFat: 0` means no adiposity,
+  // not "unspecified", and must not be replaced by the fallback.
+  test("keeps a genuine zero rather than reading it as absent", () => {
+    expect(toFiniteNumber(0, 7)).toBe(0);
+    expect(toFiniteNumber("0", 7)).toBe(0);
   });
 
   test("returns the fallback unchanged when it is undefined", () => {
