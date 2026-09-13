@@ -291,14 +291,24 @@ the native instance all along.
     `PreviewDashboardChapter.jsx` (28), `HomePage.jsx` (25),
     `DashboardPage.jsx` (23), `App.jsx` (20), `CaloriesView.jsx` (16) and
     `AuthPage.jsx` (15) all used to head this list and are done.
-    **`CaloriesView.jsx`'s two guards on `progressMetrics` disagree.** The list
-    is guarded with `Array.isArray(progressMetrics) ? progressMetrics : []`, and
-    the empty state beneath it with `!progressMetrics?.length` — which a string
-    satisfies. So a malformed cached dashboard carrying a string renders no rows
-    _and_ suppresses the "No progress metrics logged yet." line, leaving a blank
-    area with nothing to explain it. A malformed cache is the only thing the
-    `Array.isArray` guard exists for, so whichever guard is right, the two
-    should be the same one. Pinned by a test; reported, not fixed.
+    **`CaloriesView.jsx`'s two guards on `progressMetrics` used to disagree, and
+    the fix is worth copying.** The rows were guarded with `Array.isArray`, the
+    empty state beneath them with `?.length` — which a string satisfies — so a
+    non-array produced no rows _and_ suppressed the "No progress metrics logged
+    yet." line, leaving a blank panel with nothing to explain it. A third list
+    in the same file, `calories`, had no guard at all. Each list is now narrowed
+    once at the top of the component and both uses read that, so the two cannot
+    drift apart again; four mutation cases exist specifically to catch them
+    drifting back.
+    **A correction to how that was first reported.** PR #111 called the blank
+    panel "reachable only from a malformed cached dashboard". It is not
+    reachable at all: `useDashboardMetrics` narrows both lists with
+    `Array.isArray` before handing them over, and `buildDedupedList` narrows
+    again and returns an array it builds by pushing — so the props are
+    guaranteed arrays three times over, and `CaloriesView` has exactly one
+    caller. The inconsistency was real and worth removing; the user-visible
+    failure it implied was not. **Trace the producer before calling a guard's
+    disagreement reachable** — the guard may be the fourth in a chain.
     `PreviewDashboardChapter.jsx` and `HomePage.jsx` reached 100% on every metric.
     `DashboardPage.jsx`'s one remaining uncovered branch is unreachable, and so
     is the `return null` under it: `activeDashView` is constrained to the eight

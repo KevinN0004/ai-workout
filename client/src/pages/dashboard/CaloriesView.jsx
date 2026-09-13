@@ -21,6 +21,14 @@ export default function CaloriesView({
   setProgressForm,
   submitProgressMetric
 }) {
+  // Each list is narrowed once and then used for both the rows and the empty
+  // state beneath them. They used to be guarded separately and disagreed:
+  // `Array.isArray(...)` for the rows and `?.length` for the message, which a
+  // string satisfies -- so a non-array rendered no rows and no explanation
+  // either. Deriving them once means the two cannot drift apart again.
+  const calorieEntries = Array.isArray(calories) ? calories : [];
+  const metricEntries = Array.isArray(progressMetrics) ? progressMetrics : [];
+
   return (
     <section className="panel goal-view">
       <header className="panel-header">
@@ -91,7 +99,7 @@ export default function CaloriesView({
             </form>
 
             <div className="goal-list">
-              {calories.map((item) => (
+              {calorieEntries.map((item) => (
                 <div key={item.id} className="goal-list-row">
                   <div>
                     <strong>{item.date}</strong>
@@ -99,7 +107,7 @@ export default function CaloriesView({
                   </div>
                 </div>
               ))}
-              {!calories.length && <p className="muted">No calories logged yet.</p>}
+              {!calorieEntries.length && <p className="muted">No calories logged yet.</p>}
             </div>
           </section>
         </div>
@@ -275,7 +283,7 @@ export default function CaloriesView({
             </form>
 
             <div className="goal-list">
-              {(Array.isArray(progressMetrics) ? progressMetrics : []).slice(0, 6).map((item) => (
+              {metricEntries.slice(0, 6).map((item) => (
                 <div key={item.id} className="goal-list-row">
                   <div>
                     <strong>{item.date}</strong>
@@ -287,7 +295,7 @@ export default function CaloriesView({
                   </div>
                 </div>
               ))}
-              {!progressMetrics?.length && <p className="muted">No progress metrics logged yet.</p>}
+              {!metricEntries.length && <p className="muted">No progress metrics logged yet.</p>}
             </div>
           </section>
         </aside>
