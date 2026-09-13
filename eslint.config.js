@@ -4,6 +4,7 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import importX from "eslint-plugin-import-x";
 import prettierCompat from "eslint-config-prettier";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 
 // Extensions import-x/no-unresolved must try before it reports a miss. The
 // client is why they are needed: it imports .jsx without an extension, which
@@ -12,6 +13,41 @@ import prettierCompat from "eslint-config-prettier";
 // both blocks share the setting so the two cannot drift apart.
 const importResolverSettings = {
   "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } }
+};
+
+// jsx-a11y's recommended set, minus two rules that are wrong about this tree.
+// Measured before enabling, the way every other rule here was: recommended
+// reported 153 findings, and 128 of them came from these two.
+//
+// Both fire on `<label>Name <input /></label>`, which is how every form in this
+// app is written. Nesting alone is a valid association -- `label-has-for` is
+// deprecated upstream precisely because it demanded a matching `id` as well,
+// and `control-has-associated-label` does not see through the nesting either.
+// axe, running against the real rendered pages in e2e/a11y.spec.js, reports
+// zero violations on those same forms. When a linter and the accessibility
+// engine disagree about rendered output, the engine is the authority.
+//
+// The three interaction rules below are off for a different and narrower
+// reason. Their 20 findings are all one pattern: an overlay backdrop whose
+// onClick dismisses it, plus the inner panel's stopPropagation. Keyboard
+// dismissal for every one of those overlays is handled centrally by
+// `useCloseOnEscape` -- ModalPortal calls it for all six modals and
+// DashboardDrawer calls it directly -- so the backdrop click is a redundant
+// mouse affordance rather than the only way out. The rules cannot see that,
+// because it lives in a hook rather than on the element.
+//
+// This is a real trade: the rules would also catch a genuinely
+// keyboard-inaccessible control somewhere new. They are off as one recorded
+// decision rather than twenty inline disables, and the guard against that
+// regression is the axe scan in e2e/a11y.spec.js, which tests rendered output.
+// If a keyboard trap ever ships, that is what should catch it.
+const jsxA11yRules = {
+  ...jsxA11y.flatConfigs.recommended.rules,
+  "jsx-a11y/label-has-for": "off",
+  "jsx-a11y/control-has-associated-label": "off",
+  "jsx-a11y/click-events-have-key-events": "off",
+  "jsx-a11y/no-static-element-interactions": "off",
+  "jsx-a11y/no-noninteractive-element-interactions": "off"
 };
 
 // One list for both test blocks: one supplies the vitest globals, the other
@@ -82,7 +118,7 @@ export default [
         ecmaFeatures: { jsx: true }
       }
     },
-    plugins: { react, "react-hooks": reactHooks, "import-x": importX },
+    plugins: { react, "react-hooks": reactHooks, "import-x": importX, "jsx-a11y": jsxA11y },
     settings: { react: { version: "18.3" }, ...importResolverSettings },
     rules: {
       // Base no-unused-vars cannot see identifiers referenced only from JSX,
@@ -95,7 +131,8 @@ export default [
       ...importRules,
       "react/jsx-key": "error",
       "react/no-unstable-nested-components": "error",
-      "no-console": "error"
+      "no-console": "error",
+      ...jsxA11yRules
     }
   },
 

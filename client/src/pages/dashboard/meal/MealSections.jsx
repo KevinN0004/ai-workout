@@ -8,13 +8,12 @@ export default function MealSections({ displayedSections, onSelectMeal, handleIm
             <p className="muted">{section.subtitle}</p>
           </div>
           {Array.isArray(section.meals) && section.meals.length ? (
-            <div className="meal-grid" role="list" aria-label={`${section.title} suggestions`}>
+            <div className="meal-grid" role="group" aria-label={`${section.title} suggestions`}>
               {section.meals.map((meal) => (
                 <button
                   key={meal.id}
                   type="button"
                   className="meal-card"
-                  role="listitem"
                   onClick={() => onSelectMeal(meal.id)}
                 >
                   <img

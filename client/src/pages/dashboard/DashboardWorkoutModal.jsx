@@ -10,11 +10,12 @@ export default function DashboardWorkoutModal({
   if (!open) return null;
 
   return (
-    <ModalPortal open={open}>
+    <ModalPortal open={open} onClose={onClose}>
       <div
         className="modal-backdrop dashboard-modal-backdrop"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="workout-modal-title"
         onClick={onClose}
       >
         <div
@@ -23,7 +24,7 @@ export default function DashboardWorkoutModal({
         >
           <div className="modal-header dashboard-workout-modal-header">
             <div className="dashboard-workout-heading">
-              <h2>Log workout</h2>
+              <h2 id="workout-modal-title">Log workout</h2>
               <p className="muted">Save your session details and notes.</p>
             </div>
             <button

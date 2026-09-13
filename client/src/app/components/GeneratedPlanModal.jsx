@@ -19,11 +19,19 @@ export default function GeneratedPlanModal({
   if (!result) return null;
 
   return (
-    <ModalPortal open>
-      <div className="modal-backdrop plan-modal-backdrop" role="dialog" aria-modal="true">
+    <ModalPortal open onClose={() => setPlanModalOpen(false)}>
+      {/* Named by its own visible heading, so a screen reader announces what the
+          dialog is rather than just "dialog", and the name cannot drift from
+          what is on screen. */}
+      <div
+        className="modal-backdrop plan-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generated-plan-modal-title"
+      >
         <div className="modal plan-modal">
           <div className="modal-header">
-            <h2>Your {APP_BRAND_NAME} Plan</h2>
+            <h2 id="generated-plan-modal-title">Your {APP_BRAND_NAME} Plan</h2>
             <div className="modal-actions">
               <button
                 type="button"

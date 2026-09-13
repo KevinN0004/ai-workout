@@ -10,7 +10,7 @@ export default function MealDetailsModal({
   if (!activeMeal) return null;
 
   return (
-    <ModalPortal open={Boolean(activeMeal)}>
+    <ModalPortal open={Boolean(activeMeal)} onClose={onClose}>
       <div
         className="modal-backdrop dashboard-modal-backdrop"
         role="dialog"

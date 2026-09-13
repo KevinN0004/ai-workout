@@ -7,7 +7,7 @@ export default function PreviewToc({
   onSelectChapter
 }) {
   return (
-    <aside
+    <div
       className="preview-side-tab"
       role="tablist"
       aria-label="Preview sections"
@@ -35,6 +35,6 @@ export default function PreviewToc({
           </button>
         );
       })}
-    </aside>
+    </div>
   );
 }

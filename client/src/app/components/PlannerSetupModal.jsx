@@ -77,8 +77,13 @@ export default function PlannerSetupModal({
   const hasFullGymAccess = isCommercialEnvironment && form.equipment.includes("Full gym access");
 
   return (
-    <ModalPortal open={plannerOpen}>
-      <div className="modal-backdrop planner-backdrop" role="dialog" aria-modal="true">
+    <ModalPortal open={plannerOpen} onClose={closePlanner}>
+      <div
+        className="modal-backdrop planner-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="planner-setup-modal-title"
+      >
         <div className="modal planner-setup-modal">
           <div className="modal-header">
             {plannerStep > 1 ? (
@@ -106,7 +111,7 @@ export default function PlannerSetupModal({
             ) : (
               <span className="planner-header-spacer" aria-hidden="true" />
             )}
-            <h2>{plannerHeaderTitle}</h2>
+            <h2 id="planner-setup-modal-title">{plannerHeaderTitle}</h2>
             <button
               type="button"
               className="ghost icon-button planner-close-icon"
