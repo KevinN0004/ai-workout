@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { recordLatencyStats } from "../services/metricsService.js";
 
 const UNMATCHED_ROUTE_LABEL = "<unmatched>";
 
@@ -13,14 +14,6 @@ const sanitizeRoutePath = (req) => {
   return UNMATCHED_ROUTE_LABEL;
 };
 
-const recordLatency = (bucket, durationMs) => {
-  if (!bucket || !Number.isFinite(durationMs) || durationMs < 0) return;
-  bucket.count = (bucket.count || 0) + 1;
-  bucket.totalMs = (bucket.totalMs || 0) + durationMs;
-  bucket.maxMs = Math.max(bucket.maxMs || 0, durationMs);
-  bucket.lastMs = durationMs;
-};
-
 export const createRequestContextMiddleware =
   ({ metrics, logger, toShortText }) =>
   (req, res, next) => {
@@ -33,11 +26,11 @@ export const createRequestContextMiddleware =
     metrics.requestsTotal += 1;
     res.on("finish", () => {
       const durationMs = Date.now() - startedAt;
-      recordLatency(metrics.requestLatencyMs, durationMs);
+      recordLatencyStats(metrics.requestLatencyMs, durationMs);
       const routeKey = `${String(req.method || "GET").toUpperCase()} ${sanitizeRoutePath(req)}`;
       const byRoute = metrics.routeLatencyMs || (metrics.routeLatencyMs = {});
       byRoute[routeKey] = byRoute[routeKey] || {};
-      recordLatency(byRoute[routeKey], durationMs);
+      recordLatencyStats(byRoute[routeKey], durationMs);
       req.log.info({
         event: "http_request",
         method: req.method,
