@@ -293,24 +293,23 @@ describe("CaloriesView", () => {
       expect(document.querySelectorAll(".goal-list-row")).toHaveLength(0);
     });
 
-    test("a value that is not a list renders nothing at all, not even the message", () => {
-      // FINDING, pinned as current behaviour rather than fixed.
-      //
-      //   {(Array.isArray(progressMetrics) ? progressMetrics : []).slice(0, 6).map(...)}
-      //   {!progressMetrics?.length && <p>No progress metrics logged yet.</p>}
-      //
-      // The two guards disagree. The list guards with Array.isArray, so a
-      // string contributes no rows; the empty state guards with `?.length`,
-      // which a string satisfies, so the explanation is suppressed too. The
-      // visitor gets a blank area with nothing to say why.
-      //
-      // Reachable only from a malformed cached dashboard, which is also the
-      // only thing the Array.isArray guard is there for -- so whichever guard
-      // is right, they should be the same one.
+    test("a value that is not a list says so, like an empty one", () => {
+      // The rows and the empty state used to be guarded separately and
+      // disagreed: Array.isArray for the rows, `?.length` for the message --
+      // which a string satisfies, so a non-array produced neither rows nor an
+      // explanation. Both now read the same narrowed list.
       renderView({ progressMetrics: "not a list", calories: [] });
 
       expect(document.querySelectorAll(".goal-list-row")).toHaveLength(0);
-      expect(screen.queryByText("No progress metrics logged yet.")).toBeNull();
+      expect(screen.getByText("No progress metrics logged yet.")).toBeInTheDocument();
+    });
+
+    test("a calorie log that is not a list says so rather than throwing", () => {
+      // This list had no guard at all and would have thrown on .map. The
+      // producer never sends one, but the two lists in this view now behave
+      // the same way rather than three different ways.
+      expect(() => renderView({ calories: "not a list", progressMetrics: [] })).not.toThrow();
+      expect(screen.getByText("No calories logged yet.")).toBeInTheDocument();
     });
   });
 });
