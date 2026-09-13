@@ -1,4 +1,11 @@
+import useCloseOnEscape from "../../hooks/useCloseOnEscape";
+
 export default function DashboardDrawer({ open, dashView, items, onClose, onNavigate }) {
+  // The drawer is not portalled through ModalPortal, so it needs the same
+  // Escape handling directly. Called before the early return to keep the hook
+  // count stable across renders.
+  useCloseOnEscape(open, onClose);
+
   if (!open) return null;
 
   return (

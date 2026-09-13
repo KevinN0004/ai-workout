@@ -398,7 +398,7 @@ export default function PlansView({
       </div>
 
       {selectedDay && (
-        <ModalPortal open={Boolean(selectedDay)}>
+        <ModalPortal open={Boolean(selectedDay)} onClose={() => setSelectedDetail(null)}>
           <div
             className="modal-backdrop dashboard-modal-backdrop"
             role="dialog"

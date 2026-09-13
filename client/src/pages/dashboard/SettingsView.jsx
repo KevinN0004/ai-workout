@@ -170,7 +170,7 @@ export default function SettingsView({ user, personal }) {
         </div>
       </div>
       <div className="settings-shell">
-        <aside className="settings-tabs" role="tablist" aria-label="Profile sections">
+        <div className="settings-tabs" role="tablist" aria-label="Profile sections">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -186,7 +186,7 @@ export default function SettingsView({ user, personal }) {
               <small className="muted">{tab.description}</small>
             </button>
           ))}
-        </aside>
+        </div>
         <section
           className="panel settings-body"
           role="tabpanel"

@@ -380,33 +380,41 @@ export default function DashboardPage({
             onLogout();
           }}
         />
-        <p className="muted dashboard-header-note">
-          Visual summary of your progress and key metrics.
-        </p>
+        {/* A named section is a landmark, which is what puts this note and the
+            glance cards inside one. Without it they sit as bare children of the
+            page between <header> and <main>, and axe reports them as content
+            outside any landmark. No CSS targets either with a direct-child
+            selector, and .dashboard-page is plain block flow, so the wrapper
+            does not move anything. */}
+        <section aria-labelledby="dashboard-overview-note">
+          <p className="muted dashboard-header-note" id="dashboard-overview-note">
+            Visual summary of your progress and key metrics.
+          </p>
 
-        <DashboardAtAGlance
-          nextWorkout={nextWorkout}
-          caloriesGap={caloriesGap}
-          avgCalories={avgCalories}
-          calorieGoal={calorieGoal}
-          weatherLoading={weatherLoading}
-          weatherRecommendation={weatherRecommendation}
-          weatherError={weatherError}
-          weatherLastUpdatedAt={weatherLastUpdatedAt}
-          refreshWeatherRecommendation={refreshWeatherRecommendation}
-          airQualityLoading={airQualityLoading}
-          airSummary={airSummary}
-          airQualityError={airQualityError}
-          airQualityLastUpdatedAt={airQualityLastUpdatedAt}
-          refreshAirQuality={refreshAirQuality}
-          formatRelativeUpdatedAt={formatRelativeUpdatedAt}
-          onAddWorkout={() => {
-            setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
-            setWorkoutModalOpen(true);
-          }}
-          onOpenMeal={() => navigateDashView("meal")}
-          onOpenTips={() => navigateDashView("tips")}
-        />
+          <DashboardAtAGlance
+            nextWorkout={nextWorkout}
+            caloriesGap={caloriesGap}
+            avgCalories={avgCalories}
+            calorieGoal={calorieGoal}
+            weatherLoading={weatherLoading}
+            weatherRecommendation={weatherRecommendation}
+            weatherError={weatherError}
+            weatherLastUpdatedAt={weatherLastUpdatedAt}
+            refreshWeatherRecommendation={refreshWeatherRecommendation}
+            airQualityLoading={airQualityLoading}
+            airSummary={airSummary}
+            airQualityError={airQualityError}
+            airQualityLastUpdatedAt={airQualityLastUpdatedAt}
+            refreshAirQuality={refreshAirQuality}
+            formatRelativeUpdatedAt={formatRelativeUpdatedAt}
+            onAddWorkout={() => {
+              setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
+              setWorkoutModalOpen(true);
+            }}
+            onOpenMeal={() => navigateDashView("meal")}
+            onOpenTips={() => navigateDashView("tips")}
+          />
+        </section>
 
         <main className="dashboard-grid">
           {showInitialDashboardLoading && (

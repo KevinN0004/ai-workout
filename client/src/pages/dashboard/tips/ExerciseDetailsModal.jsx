@@ -15,11 +15,12 @@ export default function ExerciseDetailsModal({
   if (!selectedExercise) return null;
 
   return (
-    <ModalPortal open>
+    <ModalPortal open onClose={onClose}>
       <div
         className="modal-backdrop dashboard-modal-backdrop"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="exercise-modal-title"
         onClick={onClose}
       >
         <div
@@ -27,7 +28,7 @@ export default function ExerciseDetailsModal({
           onClick={(event) => event.stopPropagation()}
         >
           <div className="modal-header">
-            <h3>{selectedExercise.name}</h3>
+            <h3 id="exercise-modal-title">{selectedExercise.name}</h3>
             <button
               type="button"
               className="ghost icon-button"
