@@ -2,16 +2,27 @@ import { renderHook } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import useBodyModel from "./useBodyModel";
 
+// Stands in for app/units.js. The empty case matters and is easy to get wrong:
+// the real helper returns "" when neither field holds anything usable, not 0.
+// A stub that returned 0 would hand the hook a number where the app hands it an
+// empty string, which is exactly the difference the guard in toFiniteNumber
+// turns on -- so the stub would quietly test something the app never does.
 const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feet = Number(feetValue);
   const inches = Number(inchesValue);
-  if (!Number.isFinite(feet) && !Number.isFinite(inches)) return null;
-  return (Number.isFinite(feet) ? feet : 0) * 30.48 + (Number.isFinite(inches) ? inches : 0) * 2.54;
+  const totalCm =
+    (Number.isFinite(feet) ? feet : 0) * 30.48 + (Number.isFinite(inches) ? inches : 0) * 2.54;
+  return totalCm > 0 ? totalCm : "";
 };
 
+// Same care as above. The real helper returns "" only for a falsy value, and
+// the string "0" is not falsy -- so an entered zero reaches the hook as a zero
+// rather than as nothing, which is the distinction the `> 0` check downstream
+// exists to make.
 const toKg = (weightValue, unit) => {
+  if (!weightValue) return "";
   const weight = Number(weightValue);
-  if (!Number.isFinite(weight) || weight <= 0) return null;
+  if (!Number.isFinite(weight)) return "";
   return unit === "lb" ? weight * 0.45359237 : weight;
 };
 
@@ -155,25 +166,44 @@ describe("absent and unusable inputs", () => {
   const model = (overrides) => renderBodyModel(overrides).result.current;
 
   describe("body fat", () => {
-    // FINDING, pinned as current behaviour rather than fixed.
-    //
-    // `toFiniteNumber` here converts before it tests -- `Number("")` is 0 and
-    // `Number.isFinite(0)` is true -- so an unentered body fat resolves to 0
-    // rather than null, and `clamp(0, 3, 60)` turns it into 3%. The `??` below
-    // it then treats 3 as a real answer, so `estimatedBodyFat` is never
-    // consulted: a visitor who has entered height and weight but no body fat
-    // is modelled at 3% -- leaner than an elite athlete -- rather than at the
-    // BMI-derived estimate the code computes for exactly this case.
-    //
-    // The empty form supplies "" for this field, so this is the default state
-    // rather than an edge case. Whether to change it is a product call; that
-    // it happens is not.
-    test("an unentered body fat resolves to the 3% floor, not the BMI estimate", () => {
+    // This used to resolve to 3%, because `toFiniteNumber` converted before it
+    // tested: `Number("")` is 0 and `Number.isFinite(0)` is true, so an
+    // unentered body fat became an explicit 0, `clamp(0, 3, 60)` lifted it to
+    // 3, and the `??` below treated that as a real answer. The visitor was
+    // modelled leaner than an elite athlete and `estimatedBodyFat` was
+    // unreachable. The guard now runs before the coercion.
+    test("an unentered body fat falls back to the BMI estimate", () => {
       const withoutBodyFat = model({
         personal: { bodyFat: "", heightFeet: "5", heightInches: "11", weight: "180" }
       });
 
-      expect(withoutBodyFat.effectiveBodyFat).toBe(3);
+      // 5'11" and 180lb is a BMI around 25.1, which the estimate maps to ~20%.
+      expect(withoutBodyFat.effectiveBodyFat).toBeGreaterThan(15);
+      expect(withoutBodyFat.effectiveBodyFat).toBeLessThan(25);
+      expect(withoutBodyFat.effectiveBodyFat).not.toBe(3);
+    });
+
+    test("an unentered body fat and an absent one agree", () => {
+      // The two spellings of "not given" used to disagree, which is what made
+      // the old behaviour hard to see.
+      const personal = { ...BASE_PERSONAL, heightFeet: "5", heightInches: "11", weight: "180" };
+      delete personal.bodyFat;
+      const absent = renderHook(() =>
+        useBodyModel({
+          personal,
+          heightUnit: "ft",
+          weightUnit: "lb",
+          toCmFromFeetInches,
+          toKg,
+          silhouetteViewHeight: 430,
+          silhouetteFloorInset: 18
+        })
+      ).result.current;
+      const empty = model({
+        personal: { bodyFat: "", heightFeet: "5", heightInches: "11", weight: "180" }
+      });
+
+      expect(empty.effectiveBodyFat).toBe(absent.effectiveBodyFat);
     });
 
     test("an absent body fat key does reach the BMI estimate", () => {
@@ -194,6 +224,22 @@ describe("absent and unusable inputs", () => {
       );
 
       expect(result.current.effectiveBodyFat).toBeGreaterThan(10);
+    });
+
+    test("a body fat of null is treated as not given, like an empty one", () => {
+      // A restored or cached profile can carry null where the form carries "".
+      // These used to disagree: null coerced to 0 and became 3%.
+      const asNull = model({ personal: { bodyFat: null, weight: "180" } });
+      const asEmpty = model({ personal: { bodyFat: "", weight: "180" } });
+
+      expect(asNull.effectiveBodyFat).toBe(asEmpty.effectiveBodyFat);
+      expect(asNull.effectiveBodyFat).not.toBe(3);
+    });
+
+    test("an entered zero is a measurement, and is lifted to the floor", () => {
+      // Typing 0 is not the same as leaving it blank: it is a reading, and an
+      // implausible one, so the 3% floor applies rather than the estimate.
+      expect(model({ personal: { bodyFat: "0", weight: "180" } }).effectiveBodyFat).toBe(3);
     });
 
     test("an entered body fat is used as given", () => {
@@ -238,24 +284,16 @@ describe("absent and unusable inputs", () => {
       expect(result.resolvedHeightCm).toBeCloseTo(182.88, 2);
     });
 
-    test("does not in fact fall back across units, in either direction", () => {
-      // SECOND FINDING, same root cause as the body-fat one, pinned the same
-      // way.
-      //
-      // The source reads as a cross-unit fallback:
+    test("falls back across units rather than giving up, in either direction", () => {
+      // The fallback is written out twice:
       //
       //   heightUnit === "ft" ? (fromImperial ?? fromCm) : (fromCm ?? fromImperial)
       //
-      // but `??` only falls through on null or undefined, and the same
-      // convert-before-test coercion makes an empty field 0 rather than null.
-      // The left operand is therefore always a number, the right is never
-      // reached, and both fallbacks are dead. A profile carrying a height in
-      // only one of the two fields resolves to no height at all.
-      //
-      // Not a live bug as the app stands: the unit toggle in HomePersonalStage
-      // converts and writes the other field before switching, so both are
-      // populated in practice. It is defensive code that does not defend,
-      // which matters if anything ever sets one field without the other.
+      // Both halves used to be dead, because the same convert-before-test
+      // coercion made an empty field 0 rather than null, so the left operand
+      // was always a number and the right was never reached. A profile
+      // carrying a height in only one of the two fields resolved to no height
+      // at all. Fixing the coercion is what brought this back to life.
       const imperialOnlyInCmMode = model({
         personal: { heightCm: "", heightFeet: "6", heightInches: "0" },
         heightUnit: "cm"
@@ -265,8 +303,8 @@ describe("absent and unusable inputs", () => {
         heightUnit: "ft"
       });
 
-      expect(imperialOnlyInCmMode.resolvedHeightCm).toBeNull();
-      expect(metricOnlyInFtMode.resolvedHeightCm).toBeNull();
+      expect(imperialOnlyInCmMode.resolvedHeightCm).toBeCloseTo(182.88, 2);
+      expect(metricOnlyInFtMode.resolvedHeightCm).toBe(183);
     });
   });
 
@@ -463,12 +501,49 @@ describe("absent and unusable inputs", () => {
         expect(shape(noWeight).shoulderHalf).toBeGreaterThan(shape(veryLight).shoulderHalf);
       });
 
-      test("with neither a body fat nor a BMI, the build falls back to the middle", () => {
-        // An unreadable body fat leaves nothing at all to go on, so the mass
-        // estimate comes from the neutral BMI default rather than from zero.
+      test("an unreadable body fat and an unentered one are drawn the same", () => {
+        // These used to differ: an unentered body fat became 3% while an
+        // unreadable one became nothing, so the same absence of information
+        // produced two different bodies. Both now leave the mass estimate to
+        // the neutral BMI default.
         const unreadable = { weight: "", bodyFat: "unknown" };
 
-        expect(shape(unreadable).waistHalf).toBeGreaterThan(shape(noWeight).waistHalf);
+        expect(shape(unreadable).waistHalf).toBe(shape(noWeight).waistHalf);
+        expect(shape(unreadable).shoulderHalf).toBe(shape(noWeight).shoulderHalf);
+      });
+
+      test("with nothing measured the build sits between the extremes, not at one", () => {
+        // Three separate neutral defaults carry this case: the BMI mass score,
+        // the body-fat mass score, and the age adjustment. Asserting only that
+        // it differs from one extreme would pass with any of them collapsed to
+        // zero, so it is bracketed from both ends.
+        const nothing = { weight: "", heightFeet: "", heightInches: "", age: "" };
+        const veryLean = { weight: "125", bodyFat: "6" };
+        const veryHeavy = { weight: "300", bodyFat: "45" };
+
+        expect(shape(nothing).waistHalf).toBeGreaterThan(shape(veryLean).waistHalf);
+        expect(shape(nothing).waistHalf).toBeLessThan(shape(veryHeavy).waistHalf);
+      });
+
+      test("no body fat at all is not the same as a very low one", () => {
+        // With no BMI either, the mass estimate has to fall back to the
+        // neutral BMI default. Dropping that fallback would score the absence
+        // as zero -- which is what an actually-lean reading scores, so the two
+        // would become indistinguishable.
+        const nothingMeasured = { weight: "", heightFeet: "", heightInches: "" };
+        const measuredVeryLean = { weight: "", heightFeet: "", heightInches: "", bodyFat: "5" };
+
+        expect(shape(nothingMeasured).waistHalf).toBeGreaterThan(shape(measuredVeryLean).waistHalf);
+      });
+
+      test("an unreadable age is treated as no age rather than as zero", () => {
+        // Age only adds to the fat estimate above 40, so a zero would read as
+        // a young visitor -- the same answer the absent case gives. What must
+        // not happen is it reading as anything else.
+        const noAge = { age: "" };
+        const unreadableAge = { age: "grown up" };
+
+        expect(shape(unreadableAge).waistHalf).toBe(shape(noAge).waistHalf);
       });
 
       test("an empty profile still yields a silhouette rather than nothing", () => {
