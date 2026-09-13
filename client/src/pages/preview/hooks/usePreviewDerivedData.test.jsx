@@ -1151,3 +1151,49 @@ describe("usePreviewDerivedData", () => {
     });
   });
 });
+
+// The profile every derivation below reads has already been through these
+// guards: `activePreviewProfile` spreads JOHN_DOE and then overrides each field
+// with `personal.X || JOHN_DOE.X`, or an Array.isArray check for the list
+// fields. So no field is ever missing by the time a derivation reads it.
+//
+// These pin that, which is what allows the second copy of each guard -- applied
+// again 100+ lines downstream to a value that had already passed it -- to go.
+describe("falls back to the sample profile for anything the visitor left blank", () => {
+  test("an empty form and profile derive entirely from the sample", () => {
+    const { previewDashboardSummary } = render();
+
+    expect(previewDashboardSummary.focusPicks).toEqual(JOHN_DOE.focuses.slice(0, 3));
+    expect(previewDashboardSummary.equipmentList).toEqual(JOHN_DOE.equipment.slice(0, 3));
+    expect(previewDashboardSummary.environmentText).toBe(JOHN_DOE.environment);
+    expect(previewDashboardSummary.goalText).toBe(JOHN_DOE.goal);
+  });
+
+  // Empty arrays are the case these guards exist for at all: `[]` is truthy, so
+  // a plain `||` would pass one straight through to the derivations.
+  test("an empty array falls back rather than passing through as empty", () => {
+    const { previewDashboardSummary } = render({
+      personal: { trainingDays: [] },
+      form: { focuses: [], equipment: [] }
+    });
+
+    expect(previewDashboardSummary.focusPicks).toEqual(JOHN_DOE.focuses.slice(0, 3));
+    expect(previewDashboardSummary.equipmentList).toEqual(JOHN_DOE.equipment.slice(0, 3));
+  });
+
+  test("a supplied value is used instead of the sample", () => {
+    const { previewDashboardSummary } = render({
+      form: {
+        focuses: ["Mobility", "Power"],
+        equipment: ["Kettlebell"],
+        environment: "Garage",
+        goal: "Move better"
+      }
+    });
+
+    expect(previewDashboardSummary.focusPicks).toEqual(["Mobility", "Power"]);
+    expect(previewDashboardSummary.equipmentList).toEqual(["Kettlebell"]);
+    expect(previewDashboardSummary.environmentText).toBe("Garage");
+    expect(previewDashboardSummary.goalText).toBe("Move better");
+  });
+});

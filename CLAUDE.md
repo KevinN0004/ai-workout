@@ -419,13 +419,27 @@ the native instance all along.
     production, so no second database client is created.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    Current ranking, re-measured 2026-09-12: **nothing is left above ten
-    uncovered branches.** What remains is spread across many files in ones and
-    twos, so pick by risk rather than by count from here.
-    `PreviewPage.jsx` (31), `usePreviewDerivedData.js` (46),
-    `PreviewDashboardChapter.jsx` (28), `HomePage.jsx` (25),
-    `DashboardPage.jsx` (23), `App.jsx` (20), `CaloriesView.jsx` (16) and
-    `AuthPage.jsx` (15) all used to head this list and are done.
+    Current ranking, re-measured 2026-09-13: `usePreviewDerivedData.js` (34),
+    `outlineGeometry.js` (28), `templateOutline.js` (22),
+    `useDashboardMetrics.js` (15), `ExerciseDetailsModal.jsx` (14) and
+    `SettingsView.jsx` (11).
+    **This entry previously claimed "nothing is left above ten uncovered
+    branches" and listed `usePreviewDerivedData.js` among the files that were
+    done. Both were wrong** — it was the largest client gap at the time, and the
+    claim would have stopped the next reader looking. Re-measure before trusting
+    a ranking here; it goes stale every time anything lands.
+    `PreviewPage.jsx` (31), `PreviewDashboardChapter.jsx` (28),
+    `HomePage.jsx` (25), `DashboardPage.jsx` (23), `App.jsx` (20),
+    `CaloriesView.jsx` (16), `AuthPage.jsx` (15) and `GeneratedPlanModal.jsx`
+    (14, and the last client file at 0% on every metric) all used to head this
+    list and are done.
+    **Much of what is left is not a missing test.** `usePreviewDerivedData.js`
+    went 46 → 34 by deleting branches rather than covering them: seven guards
+    re-applied `activePreviewProfile.X || JOHN_DOE_PREVIEW_PROFILE.X` to a value
+    that had already been through that exact guard 100 lines earlier, where the
+    profile is built. The else arms could not fire. Check whether an uncovered
+    arm is reachable at all before writing a test to reach it — and see the
+    `GeneratedPlanModal` note below for how to tell.
     **`CaloriesView.jsx`'s two guards on `progressMetrics` used to disagree, and
     the fix is worth copying.** The rows were guarded with `Array.isArray`, the
     empty state beneath them with `?.length` — which a string satisfies — so a
@@ -631,6 +645,16 @@ the native instance all along.
     `toLowerText` joins them, so deleting it would drop all five to their defaults at once,
     invisibly. The test suite missed it because the fixtures were written in lower case;
     **build fixtures from what the form actually stores**, not from what the lookup expects.
+  - **An unexpected survivor can mean two guards are testing the same thing, not
+    that the test is weak.** `GeneratedPlanModal.jsx` opened with
+    `if (!planModalOpen || !result) return null` and then passed
+    `open={Boolean(planModalOpen && result)}` to `ModalPortal`. Mutating the
+    early return survived, because with no result the portal rendered nothing
+    anyway — the two guards are the same condition, so **no test could tell them
+    apart, which is a proof of duplication rather than a gap**. The fix was to
+    collapse it: the early return is now the only guard and the portal just gets
+    `open`. The same mutation is caught now. When a survivor looks like a test
+    gap, check first whether something else is already enforcing the condition.
   - **A deliberate survivor is how you prove a branch is dead.** `DashboardAtAGlance.jsx`
     had two conditions whose arms were the same string — `weatherError ? "Unavailable" :
 "Unavailable"`, and the identical thing again for air quality. Deleting each condition
