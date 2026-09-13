@@ -244,7 +244,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-12:
-  server **90.7%** statements / 82.3% branches, client **97.4%** / 91.4%.
+  server **90.7%** statements / 82.3% branches, client **97.6%** / 91.8%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -337,13 +337,13 @@ the native instance all along.
       `!Array.isArray(points) || points.length < 3` guards on private helpers,
       and the template is a **fixed SVG asset** with hundreds of points, so the
       single entry point cannot drive any of them.
-      It also contains genuinely dead code: `pointsToPath` is called from exactly
-      one place, `buildCurvedPath`, whose guard is
+      It used to contain genuinely dead code, now removed: `pointsToPath` was
+      called from exactly one place, `buildCurvedPath`, whose guard was
       `if (!Array.isArray(points) || points.length < 3) return pointsToPath(points)`
-      — character for character the same condition `pointsToPath` itself returns
-      `""` for on its first line. So `pointsToPath` can only ever return `""`;
-      its path-building body and the `round3` helper that exists to serve it are
-      unreachable. Reported, not deleted.
+      — character for character the same condition `pointsToPath` itself returned
+      `""` for on its first line. It could only ever return `""`, so its
+      path-building body and the `round3` helper that served it went with it; the
+      guard now returns `""` directly.
       **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
       statements and 100% functions, and its 41 remaining uncovered branches are
       **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
@@ -380,23 +380,24 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (94% / 65%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
-      `PreviewPage.jsx`'s 65% branches is the honest ceiling, not a gap: **every one
-      of its eleven remaining uncovered branches is unreachable.** Eight are the
-      chapter-body router's final `else` arm, and three are defensive guards that
-      cannot fire (`!previewStageRef.current`, `!document.documentElement`).
-      That router arm is worth knowing about. It renders a generic grid of
-      textareas from `chapter.fields`, and `usePreviewDerivedData` builds exactly
-      four chapters — `personal-info`, `generate`, `workout-week`,
-      `dashboard-preview` — each of which the four arms above it already handle.
-      So the arm is dead, and it takes two things with it: every chapter's
-      `fields` array is write-only (`personal-info` builds nine field descriptors,
-      with `multiline` and `rows` metadata, that nothing renders), and
-      `getPreviewFieldRows` is a dead export. Verified by grepping every reader of
-      `.fields` and of that helper across all of `client/src`, tests included:
-      `PreviewPage.jsx:126` and `:127` are the only two, and both sit inside the
-      dead arm. `PreviewToc` reads only `id` and `title`. Reported, not deleted —
-      whether those field descriptors are meant for something is a product call.
+      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 99%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) and `HomePage.jsx` (100% / 100%).
+      `PreviewPage.jsx` had a chapter-body router whose final `else` arm no
+      chapter id could reach: `usePreviewDerivedData` builds exactly
+      `personal-info`, `generate`, `workout-week` and `dashboard-preview`, and
+      the four arms above it handle all of them. That arm rendered a generic grid
+      of textareas from `chapter.fields`, which is the only reason those arrays
+      existed — every chapter built one and nothing read it. The arm, the arrays
+      and the `getPreviewFieldRows` helper that sized their rows are all gone,
+      which took the file from 94% / 65% to 97% / 87% by deletion rather than by
+      testing. Its remaining uncovered branches are the `: null` the router now
+      ends in, and two defensive guards that cannot fire
+      (`!previewStageRef.current`, `!document.documentElement`).
+      Removing them turned up something worth remembering. A test had been written
+      asserting that the visitor's locale "reaches the fields the visitor actually
+      reads", against `previewChapters[0].fields` — data nothing rendered.
+      **Dead data invites tests that assert on it**, and such a test looks exactly
+      like coverage of a real behaviour. That assertion now reads
+      `previewFillOrder`, which is the sequence the typing animation walks.
       **There are no animation write-offs left.** All three hooks that were listed
       as untestable are now at or above 94% branches.
   - **Check before calling something untestable.** This entry said for months

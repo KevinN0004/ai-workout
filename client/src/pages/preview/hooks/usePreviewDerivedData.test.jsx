@@ -178,24 +178,6 @@ describe("usePreviewDerivedData", () => {
       expect(getPreviewTextRows("x".repeat(5000))).toBe(4);
       expect(getPreviewTextRows("x".repeat(5000), 1, 8)).toBe(8);
     });
-
-    test("getPreviewFieldRows prefers an explicit row count over estimating", () => {
-      const { getPreviewFieldRows } = render();
-
-      expect(getPreviewFieldRows({ rows: 6, value: "x" })).toBe(6);
-      expect(getPreviewFieldRows({ value: "" })).toBe(1);
-      expect(getPreviewFieldRows({ value: "x".repeat(45) })).toBe(2);
-      expect(getPreviewFieldRows({ value: "x".repeat(5000) })).toBe(4);
-      // A nonsense rows value falls back to estimating rather than propagating.
-      expect(getPreviewFieldRows({ rows: 0, value: "" })).toBe(1);
-      expect(getPreviewFieldRows({ rows: "many", value: "" })).toBe(1);
-      // A field with no value at all, which is what an unfilled one is. The
-      // `?? ""` that handles it cannot be mutation-tested: without it the text
-      // becomes "undefined" or "null", both short enough to estimate a single
-      // row, so every input gives the same answer either way.
-      expect(getPreviewFieldRows({})).toBe(1);
-      expect(getPreviewFieldRows({ value: null })).toBe(1);
-    });
   });
 
   describe("week typing gates", () => {
@@ -1048,26 +1030,25 @@ describe("usePreviewDerivedData", () => {
       expect(render().usesImperialUnits).toBe(true);
     });
 
-    test("the chosen system reaches the fields the visitor actually reads", () => {
-      // usesImperialUnits is not shown anywhere by itself; this is what it
-      // changes.
+    test("the chosen system decides which height fields get typed", () => {
+      // usesImperialUnits is not shown anywhere by itself. This asserts on the
+      // fill order, which is the sequence the typing animation actually walks
+      // and so what the visitor watches being filled in. It used to assert on
+      // `previewChapters[0].fields`, which nothing rendered.
       vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
       vi.spyOn(navigator, "language", "get").mockReturnValue("en-US");
-      const imperialLabels = render()
-        .previewChapters[0].fields.map((field) => field.label)
-        .join("|");
+      const imperial = render().previewFillOrder;
 
       vi.restoreAllMocks();
       vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
       vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
-      const metricLabels = render()
-        .previewChapters[0].fields.map((field) => field.label)
-        .join("|");
+      const metric = render().previewFillOrder;
 
-      expect(imperialLabels).toContain("Height (ft)");
-      expect(imperialLabels).not.toContain("Height (cm)");
-      expect(metricLabels).toContain("Height (cm)");
-      expect(metricLabels).not.toContain("Height (ft)");
+      expect(imperial).toContain("heightFeet");
+      expect(imperial).toContain("heightInches");
+      expect(imperial).not.toContain("heightCm");
+      expect(metric).toContain("heightCm");
+      expect(metric).not.toContain("heightFeet");
     });
   });
 
