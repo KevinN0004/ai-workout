@@ -8,7 +8,7 @@ Paste the actual output, not a claim that it passed.
 
 - [ ] `npm run lint` — exit 0
 - [ ] `npm run format:check` — exit 0
-- [ ] `npm test` — 13 scripts, 655 client, 770 server
+- [ ] `npm test` — exit 0; record the counts you saw (scripts / client / server)
 - [ ] `npm run build` — exit 0
 
 ## Risk
