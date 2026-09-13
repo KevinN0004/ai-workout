@@ -1,6 +1,20 @@
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/errorResponseService.js";
 
+// `is_day` is a 0/1 flag rather than a measurement, so it does not go through
+// `toFiniteNumber` -- but it needs the same absent guard for the same reason.
+// `Number(null)` is 0 and `0 === 1` is false, so a payload carrying no daylight
+// reading published a confident "night", while `weatherCode` beside it
+// correctly reported null and the upstream-failure branch of this same route
+// already reported `isDay: null`.
+//
+// A value that is present but is not the flag (2, "yes") is still an answer,
+// and it is still not daytime.
+const toDayFlag = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  return Number(value) === 1;
+};
+
 export const registerWeatherRoutes = (app, deps) => {
   const {
     toNullableNumber,
@@ -42,7 +56,7 @@ export const registerWeatherRoutes = (app, deps) => {
           precipitationMm: toFiniteNumber(current.precipitation),
           windSpeedKmh: toFiniteNumber(current.wind_speed_10m),
           humidityPct: toFiniteNumber(current.relative_humidity_2m),
-          isDay: Number(current.is_day) === 1,
+          isDay: toDayFlag(current.is_day),
           weatherCode: toFiniteNumber(current.weather_code),
           weatherText: weatherCodeToText(current.weather_code)
         }
@@ -121,7 +135,7 @@ export const registerWeatherRoutes = (app, deps) => {
           precipitationMm: toFiniteNumber(current.precipitation),
           windSpeedKmh: toFiniteNumber(current.wind_speed_10m),
           humidityPct: toFiniteNumber(current.relative_humidity_2m),
-          isDay: Number(current.is_day) === 1,
+          isDay: toDayFlag(current.is_day),
           weatherCode: toFiniteNumber(current.weather_code),
           weatherText: weatherCodeToText(current.weather_code)
         },
