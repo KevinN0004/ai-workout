@@ -393,10 +393,12 @@ export default function DashboardPage({
           weatherRecommendation={weatherRecommendation}
           weatherError={weatherError}
           weatherLastUpdatedAt={weatherLastUpdatedAt}
+          refreshWeatherRecommendation={refreshWeatherRecommendation}
           airQualityLoading={airQualityLoading}
           airSummary={airSummary}
           airQualityError={airQualityError}
           airQualityLastUpdatedAt={airQualityLastUpdatedAt}
+          refreshAirQuality={refreshAirQuality}
           formatRelativeUpdatedAt={formatRelativeUpdatedAt}
           onAddWorkout={() => {
             setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));

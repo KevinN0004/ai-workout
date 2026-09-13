@@ -689,6 +689,36 @@ describe("DashboardPage", () => {
     });
   });
 
+  describe("what the glance strip is handed", () => {
+    test("both ambient cards get their own refresh handler", () => {
+      // The strip renders a Retry only when it has a handler, so a missing
+      // prop here would silently leave a failed card with no way out.
+      const refreshWeatherRecommendation = vi.fn();
+      const refreshAirQuality = vi.fn();
+      renderPage({ refreshWeatherRecommendation, refreshAirQuality });
+
+      glance.props.refreshWeatherRecommendation();
+      glance.props.refreshAirQuality();
+
+      expect(refreshWeatherRecommendation).toHaveBeenCalledTimes(1);
+      expect(refreshAirQuality).toHaveBeenCalledTimes(1);
+    });
+
+    test("the summary view gets them too", () => {
+      // Found by a mutation that removed this prop and survived: nothing
+      // covered the summary view copy of the same wiring, only the strip.
+      const refreshWeatherRecommendation = vi.fn();
+      const refreshAirQuality = vi.fn();
+      renderPage({ dashView: "summary", refreshWeatherRecommendation, refreshAirQuality });
+
+      summary.props.refreshWeatherRecommendation();
+      summary.props.refreshAirQuality();
+
+      expect(refreshWeatherRecommendation).toHaveBeenCalledTimes(1);
+      expect(refreshAirQuality).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("the shortcuts each view offers", () => {
     // Every view hands its own jump-off points back to the shell, and each one
     // has to land somewhere different. These are the arrow functions defined
