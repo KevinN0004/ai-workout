@@ -239,31 +239,45 @@ test("accepts and returns the training and lifestyle fields", async () => {
   const response = await request(app)
     .post("/api/profile")
     .send({
-      sleep: "7-8 hours",
+      sleep: "7 - 8 hours",
       timeline: "3 months",
       experience: "Intermediate",
       nutrition: "High-protein",
-      cardio: "HIIT",
+      cardio: "Mixed",
       goal: "Mobility",
       trainingDays: ["Monday", "Wednesday"]
     });
 
   expect(response.status).toBe(200);
   expect(response.body.profile).toMatchObject({
-    sleep: "7-8 hours",
+    sleep: "7 - 8 hours",
+    cardio: "Mixed",
     goal: "Mobility",
     trainingDays: ["Monday", "Wednesday"]
   });
 });
 
-test("rejects a goal outside the allowed list", async () => {
-  const response = await request(buildApp()).post("/api/profile").send({ goal: "Become a wizard" });
+// One per closed-set field. An allowlist that silently omits a real option is
+// the same defect class this whole change exists to close, so each field is
+// asserted separately rather than trusting one representative.
+test.each([
+  ["sleep", "Nine-ish"],
+  ["experience", "Wizard-tier"],
+  ["nutrition", "Junk only"],
+  ["cardio", "Interpretive dance"],
+  ["goal", "Become a wizard"]
+])("rejects a %s value outside the allowed list", async (field, value) => {
+  const response = await request(buildApp())
+    .post("/api/profile")
+    .send({ [field]: value });
 
   expect(response.status).toBe(400);
 });
 ```
 
 The surrounding block already builds an authenticated app; follow the existing `buildApp()` usage in that file rather than constructing a new one.
+
+**The fixture values above are exact and matter.** `sleep` is `"7 - 8 hours"` with spaces around the hyphen, and `cardio` is deliberately `"Mixed"` — the eighth option, the one most easily dropped from a hand-written allowlist. Both are taken from the `<option>` elements in `HomePersonalStage.jsx`. Do not "tidy" them. An earlier draft of this plan wrote `"7-8 hours"`, which is not a value the form can produce, and would have passed against a schema that was wrong in the same direction.
 
 - [ ] **Step 2: Run the test and watch it fail**
 
@@ -276,16 +290,20 @@ Expected: FAIL. The fields are stripped before reaching `buildProfile`, so `prof
 In `apiSchemaService.js`, add to the `profileInputSchema` object literal, after `notes`:
 
 ```js
-    sleep: optionalStringField(40),
+    sleep: z.union([z.enum(allowedSleepValues), z.literal("")]).optional(),
     timeline: optionalStringField(60),
-    experience: optionalStringField(40),
-    nutrition: optionalStringField(60),
-    cardio: optionalStringField(60),
+    experience: z.union([z.enum(allowedExperienceValues), z.literal("")]).optional(),
+    nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
+    cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
     goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
     trainingDays: optionalStringArrayField(7, 20)
 ```
 
-`optionalStringArrayField` is already defined in this file at line 28. Import `allowedGoalValues` from `./dashboardDataBuildersService.js` alongside the existing `allowedSexValues` / `allowedActivityValues` import.
+`optionalStringArrayField` is already defined in this file at line 28. Import the five `allowed*Values` lists from `./dashboardDataBuildersService.js` alongside the existing `allowedSexValues` / `allowedActivityValues` import. **Do not retype the option strings here** — import the lists Task 1 created, so the schema and `buildProfile` cannot disagree about what is valid.
+
+Only `timeline` is free text. The other five are closed-set `<select>` fields and are declared exactly the way `sex` already is in this same schema, so an invalid value is a 400 rather than a silent fallback to `""`. `buildProfile` still guards them independently; that double-guarding matches the existing `sex` precedent and is deliberate.
+
+`trainingDays` is the one asymmetry: the schema only cleans the strings, and `buildProfile` filters out anything that is not one of the seven day names. A request naming an unknown day therefore succeeds with that day dropped rather than returning 400. That is deliberate for a multiselect — one stray entry should not reject the whole save — but it is a silent drop, so it is called out here rather than left to be discovered.
 
 - [ ] **Step 4: Run the test and watch it pass**
 

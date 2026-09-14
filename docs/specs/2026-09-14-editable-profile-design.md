@@ -78,13 +78,39 @@ is required**. Three files change:
 
 - **`defaultProfile()`** — add `sleep`, `timeline`, `experience`, `nutrition`,
   `cardio`, `goal` as `""`, and `trainingDays` as `[]`.
-- **`buildProfile()`** — add the seven whitelist entries. The five free-text
-  fields use `cleanText`. `trainingDays` is narrowed to an array of clean
-  strings, capped at 7. `goal` is validated against `allowedGoalValues` and
-  falls back to `""`, mirroring how `sex` and `activity` already work.
-- **`profileInputSchema`** — five `optionalStringField`s, a
-  `z.array(z.string()).max(7).optional()` for `trainingDays`, and a
-  `z.union([z.enum(allowedGoalValues), z.literal("")]).optional()` for `goal`.
+- **`buildProfile()`** — add the seven whitelist entries. Only `timeline` is
+  free text and uses `cleanText`. `sleep`, `experience`, `nutrition`, `cardio`
+  and `goal` are each validated against an allowlist and fall back to `""`,
+  mirroring how `sex` and `activity` already work. `trainingDays` is cleaned,
+  deduped and filtered to the seven day names.
+- **`profileInputSchema`** — `optionalStringField(60)` for `timeline`, an
+  `optionalStringArrayField(7, 20)` for `trainingDays`, and a
+  `z.union([z.enum(allowedXValues), z.literal("")]).optional()` for each of the
+  five closed-set fields, matching how `sex` is already declared.
+
+**Correction, recorded because the first draft of this spec had it wrong.** An
+earlier version of this section called `sleep`, `experience`, `nutrition` and
+`cardio` free-text fields. They are not. All four are closed-set `<select>`
+dropdowns in `HomePersonalStage.jsx`, and `useBodyModel.js` resolves each one
+through an exact-match lowercased map to derive a body-model score — so they are
+structurally identical to `sex` and `activity`, which `buildProfile` already
+validates. Storing them as free text would let any caller other than the app's
+own form leave display-visible garbage in a profile, and would score it as the
+neutral fallback. There is no legacy data for these fields — they were never
+persisted before this work — so validating them from the outset costs nothing.
+
+Two consequences worth carrying forward:
+
+- **An allowlist that is missing a real option silently drops a legitimate
+  value**, which is the same defect class this work exists to close. The `cardio`
+  list has **eight** entries; `"Mixed"` is easy to miss and is scored `0.7` in
+  `useBodyModel`. Build each list from the `<option>` elements and cross-check it
+  against the lookup-map keys.
+- **`trainingDays` must be deduped and filtered before any cap, not after.**
+  `trainingDaysScore` keys on array length alone, so duplicates both inflate the
+  score and consume cap slots — capping first drops a real day off the end.
+  Filtering to the seven day names and deduping bounds the result at seven by
+  construction, which removes the cap rather than relocating it.
 
 `allowedGoalValues` is reinstated in `dashboardDataBuildersService.js` beside
 `allowedSexValues` and `allowedActivityValues`. The list is recovered verbatim
