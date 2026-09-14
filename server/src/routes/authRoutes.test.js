@@ -676,6 +676,23 @@ describe("profile", () => {
 
     expect(response.status).toBe(400);
   });
+
+  // Regression for a cap-before-filter bug: the schema used to slice
+  // trainingDays to 7 entries before buildProfile's day-name filter ever ran,
+  // so a valid day sitting past position 7 behind invalid entries was cut
+  // off silently and the request still returned 200. This is the test that
+  // would have caught it -- dashboardDataBuildersService.test.js calls
+  // buildProfile directly and bypasses the schema entirely, so it could not.
+  test("keeps a valid day past the seventh position instead of silently dropping it", async () => {
+    rows.push({ userId: "u-1", email: "a@b.com", profile: defaultProfile() });
+
+    const response = await request(buildApp())
+      .post("/api/profile")
+      .send({ trainingDays: ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "Monday"] });
+
+    expect(response.status).toBe(200);
+    expect(response.body.profile.trainingDays).toEqual(["Monday"]);
+  });
 });
 
 describe("POST /api/auth/logout", () => {

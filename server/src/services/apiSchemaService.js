@@ -64,7 +64,15 @@ const profileInputSchema = z
     nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
     cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
     goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
-    trainingDays: optionalStringArrayField(7, 20)
+    // 64, not 7: this only bounds the raw array before buildProfile's day-name
+    // filter runs. buildProfile derives the result by filtering
+    // allowedTrainingDayValues (seven entries, no duplicates possible), so the
+    // real cap is structural and lives there. Capping at 7 here would slice
+    // the raw array before that filter sees it, so junk entries ahead of a
+    // valid day (e.g. 7 invalid strings followed by "Monday") would silently
+    // drop the valid day and still return 200 -- the same cap-before-filter
+    // bug commit 0fe454e fixed inside buildProfile itself.
+    trainingDays: optionalStringArrayField(64, 20)
   })
   .passthrough();
 
