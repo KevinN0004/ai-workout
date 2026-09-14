@@ -362,10 +362,33 @@ git commit -m "feat(server): accept the new profile fields at the API boundary"
 
 ### Task 3: Client — the profile mapping module
 
+> **Rewritten before dispatch.** The first draft of this task was wrong in two
+> ways that verification against the tree caught, both worth understanding
+> before you start:
+>
+> - It mapped weight as `weightKg: toProfileNumber(personal.weight)`. That is
+>   flatly wrong. `personal.weight` is a single field holding the number **in
+>   whatever unit is currently active**, which is why `useBodyModel` resolves it
+>   as `toKg(personal.weight, weightUnit)`. Without the unit, a user weighing
+>   170 lb would have been stored as 170 kg.
+> - It picked height as `heightCm ?? cmFromFeetInches(...)`. The app does not do
+>   that. Both the signup flow and `useBodyModel` let the **active unit** decide
+>   which of the two inputs wins, because the other one goes stale as soon as
+>   the user types. Preferring `heightCm` unconditionally would ignore an edit
+>   made in feet and inches.
+>
+> Both functions therefore take the active units. Do not "simplify" that away.
+
 **Files:**
 
 - Create: `client/src/app/profileMapping.js`
 - Create: `client/src/app/profileMapping.test.js`
+
+**The rule this module exists to enforce:** `personal` is form state — every
+field is a string, and `""` means "not filled in". `profile` is stored state —
+numbers are numbers and `null` means "not set". Converting between them is
+exactly where `Number("")` turns an empty field into a measured zero, which is
+the bug that once modelled a user at 3% body fat. Guard before coercing.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -375,9 +398,15 @@ Create `client/src/app/profileMapping.test.js`:
 import { describe, expect, test } from "vitest";
 import { personalToProfile, profileToPersonal, toProfileNumber } from "./profileMapping";
 
-// The two shapes disagree on names and on how they spell "no value": `personal`
-// uses "" because it backs form inputs, `profile` uses null because it is
-// stored. Conflating those is the bug class that shipped a 3% body fat.
+// The two shapes disagree about names, about units, and about how they spell
+// "no value": `personal` uses "" because it backs form inputs, `profile` uses
+// null because it is stored.
+//
+// Units are the sharp edge. `personal.weight` is a single field holding the
+// number in whatever unit is active, so a mapper that ignores the unit stores
+// 170 lb as 170 kg. Height has the same problem in the other direction: the cm
+// field and the feet/inches fields both exist, and whichever one the user is
+// not currently typing into is stale.
 
 describe("toProfileNumber", () => {
   test.each([
@@ -388,8 +417,14 @@ describe("toProfileNumber", () => {
     expect(toProfileNumber(value)).toBeNull();
   });
 
-  test("keeps a measured zero", () => {
-    expect(toProfileNumber("0")).toBe(0);
+  // Both spellings matter. A guard written as `if (!value)` still passes the
+  // string "0", which is truthy, and only fails on the number -- so testing the
+  // string alone lets the forbidden falsiness guard through.
+  test.each([
+    ["a numeric string", "0"],
+    ["a number", 0]
+  ])("keeps a measured zero given as %s", (_label, value) => {
+    expect(toProfileNumber(value)).toBe(0);
   });
 
   test("parses a real measurement", () => {
@@ -409,44 +444,81 @@ describe("personalToProfile", () => {
     });
   });
 
-  test("renames weight to weightKg", () => {
-    expect(personalToProfile({ weight: "77" }).weightKg).toBe(77);
+  test("sends an unfilled body fat as null, not zero", () => {
+    expect(personalToProfile({ bodyFat: "" }).bodyFat).toBeNull();
   });
 
-  test("converts feet and inches to centimetres", () => {
-    expect(personalToProfile({ heightFeet: "5", heightInches: "10" }).heightCm).toBe(178);
+  test("keeps an entered body fat of zero", () => {
+    expect(personalToProfile({ bodyFat: "0" }).bodyFat).toBe(0);
   });
 
-  test("prefers an explicit heightCm over feet and inches", () => {
+  // The bug this signature exists to prevent: without the unit, 170 lb is
+  // stored as 170 kg, which is 375 lb.
+  test("converts pounds to kilograms before storing", () => {
+    expect(personalToProfile({ weight: "170" }, { weightUnit: "lb" }).weightKg).toBe(77);
+  });
+
+  test("stores kilograms unchanged", () => {
+    expect(personalToProfile({ weight: "77" }, { weightUnit: "kg" }).weightKg).toBe(77);
+  });
+
+  test("sends an unfilled weight as null", () => {
+    expect(personalToProfile({ weight: "" }, { weightUnit: "lb" }).weightKg).toBeNull();
+  });
+
+  // The active unit decides which height input wins, matching useBodyModel.
+  // The other field is stale whenever the user is typing in the first one.
+  test("takes height from feet and inches while the imperial unit is active", () => {
+    const profile = personalToProfile(
+      { heightCm: "180", heightFeet: "5", heightInches: "10" },
+      { heightUnit: "ft" }
+    );
+    expect(profile.heightCm).toBe(178);
+  });
+
+  test("takes height from centimetres while the metric unit is active", () => {
+    const profile = personalToProfile(
+      { heightCm: "180", heightFeet: "5", heightInches: "10" },
+      { heightUnit: "cm" }
+    );
+    expect(profile.heightCm).toBe(180);
+  });
+
+  test("falls back across units when the active unit's field is empty", () => {
     expect(
-      personalToProfile({ heightCm: "180", heightFeet: "5", heightInches: "10" }).heightCm
+      personalToProfile({ heightCm: "180", heightFeet: "", heightInches: "" }, { heightUnit: "ft" })
+        .heightCm
     ).toBe(180);
   });
 
-  test("sends an unfilled body fat as null, not zero", () => {
-    expect(personalToProfile({ bodyFat: "" }).bodyFat).toBeNull();
+  test("defaults to metric when no units are supplied", () => {
+    expect(personalToProfile({ weight: "77", heightCm: "180" }).weightKg).toBe(77);
   });
 
   test("carries the training and lifestyle fields straight through", () => {
     expect(
       personalToProfile({
-        sleep: "7-8 hours",
+        sleep: "7 - 8 hours",
         timeline: "3 months",
         experience: "Intermediate",
         nutrition: "High-protein",
-        cardio: "HIIT",
+        cardio: "Mixed",
         goal: "Mobility",
         trainingDays: ["Monday"]
       })
     ).toMatchObject({
-      sleep: "7-8 hours",
+      sleep: "7 - 8 hours",
       timeline: "3 months",
       experience: "Intermediate",
       nutrition: "High-protein",
-      cardio: "HIIT",
+      cardio: "Mixed",
       goal: "Mobility",
       trainingDays: ["Monday"]
     });
+  });
+
+  test("never sends a non-array trainingDays", () => {
+    expect(personalToProfile({ trainingDays: "Monday" }).trainingDays).toEqual([]);
   });
 });
 
@@ -469,6 +541,14 @@ describe("profileToPersonal", () => {
     expect(profileToPersonal({ bodyFat: 0 }).bodyFat).toBe("0");
   });
 
+  test("shows weight in pounds when the imperial unit is active", () => {
+    expect(profileToPersonal({ weightKg: 77 }, { weightUnit: "lb" }).weight).toBe("170");
+  });
+
+  test("shows weight in kilograms when the metric unit is active", () => {
+    expect(profileToPersonal({ weightKg: 77 }, { weightUnit: "kg" }).weight).toBe("77");
+  });
+
   test("fills both height representations", () => {
     const personal = profileToPersonal({ heightCm: 178 });
 
@@ -481,13 +561,52 @@ describe("profileToPersonal", () => {
     expect(profileToPersonal({ trainingDays: null }).trainingDays).toEqual([]);
   });
 
-  test("round-trips the training and lifestyle fields unchanged", () => {
+  test("supplies the rest of the personal form so callers get a complete shape", () => {
+    expect(profileToPersonal({})).toHaveProperty("notes", "");
+  });
+});
+
+describe("round trips", () => {
+  test("weight survives a metric round trip exactly", () => {
+    const personal = profileToPersonal({ weightKg: 77 }, { weightUnit: "kg" });
+    expect(personalToProfile(personal, { weightUnit: "kg" }).weightKg).toBe(77);
+  });
+
+  test("weight survives an imperial round trip exactly", () => {
+    const personal = profileToPersonal({ weightKg: 77 }, { weightUnit: "lb" });
+    expect(personalToProfile(personal, { weightUnit: "lb" }).weightKg).toBe(77);
+  });
+
+  test("height survives a metric round trip exactly", () => {
+    const personal = profileToPersonal({ heightCm: 181 });
+    expect(personalToProfile(personal, { heightUnit: "cm" }).heightCm).toBe(181);
+  });
+
+  // Imperial height is displayed to the nearest inch, so a stored centimetre
+  // value that is not exactly representable moves by at most 1cm the first time
+  // an imperial user saves. Measured across 140-210cm: 43 of 71 values shift,
+  // never by more than 1cm, and never again afterwards -- the second save is a
+  // fixed point. This is a property of showing height in whole inches, not a
+  // defect, and it is pinned here so nobody rediscovers it as a mystery.
+  test("imperial height moves by at most one centimetre, once", () => {
+    const first = personalToProfile(profileToPersonal({ heightCm: 181 }), {
+      heightUnit: "ft"
+    }).heightCm;
+    const second = personalToProfile(profileToPersonal({ heightCm: first }), {
+      heightUnit: "ft"
+    }).heightCm;
+
+    expect(Math.abs(first - 181)).toBeLessThanOrEqual(1);
+    expect(second).toBe(first);
+  });
+
+  test("the training and lifestyle fields survive a round trip unchanged", () => {
     const personal = {
-      sleep: "7-8 hours",
+      sleep: "7 - 8 hours",
       timeline: "3 months",
       experience: "Intermediate",
       nutrition: "High-protein",
-      cardio: "HIIT",
+      cardio: "Mixed",
       goal: "Mobility",
       trainingDays: ["Monday", "Wednesday"]
     };
@@ -508,7 +627,7 @@ Expected: FAIL, "Failed to resolve import ./profileMapping".
 Create `client/src/app/profileMapping.js`:
 
 ```js
-import { splitFullName, toCmFromFeetInches, toFeetInchesFromCm } from "./units";
+import { splitFullName, toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "./units";
 import { defaultPersonalForm } from "./constants";
 
 // Guards before it coerces. `Number("")` and `Number(null)` are both 0 and both
@@ -524,11 +643,21 @@ export const toProfileNumber = (value) => {
 // The mirror: a stored null is an empty form field, never the string "0".
 const toFormValue = (value) => (value === null || value === undefined ? "" : String(value));
 
-export const personalToProfile = (personal = {}) => {
+const toDayList = (value) => (Array.isArray(value) ? value : []);
+
+export const personalToProfile = (personal = {}, units = {}) => {
+  const { heightUnit = "cm", weightUnit = "kg" } = units;
   const { firstName, lastName } = splitFullName(personal.name);
-  const heightCm =
-    toProfileNumber(personal.heightCm) ??
-    toProfileNumber(toCmFromFeetInches(personal.heightFeet, personal.heightInches));
+
+  // Whichever unit is active is the one the user is typing into; the other
+  // field is whatever was last converted into it and may be stale. This is the
+  // same pick useBodyModel makes, deliberately -- the two must agree or the
+  // silhouette and the stored profile disagree about the same person.
+  const fromCm = toProfileNumber(personal.heightCm);
+  const fromImperial = toProfileNumber(
+    toCmFromFeetInches(personal.heightFeet, personal.heightInches)
+  );
+  const heightCm = heightUnit === "ft" ? (fromImperial ?? fromCm) : (fromCm ?? fromImperial);
 
   return {
     firstName,
@@ -536,7 +665,9 @@ export const personalToProfile = (personal = {}) => {
     name: personal.name || "",
     age: toProfileNumber(personal.age),
     heightCm,
-    weightKg: toProfileNumber(personal.weight),
+    // personal.weight is a bare number in the active unit, so the unit is not
+    // optional information -- without it 170 lb is stored as 170 kg.
+    weightKg: toProfileNumber(toKg(personal.weight, weightUnit)),
     sex: personal.sex || "",
     bodyFat: toProfileNumber(personal.bodyFat),
     activity: personal.activity || "",
@@ -547,16 +678,18 @@ export const personalToProfile = (personal = {}) => {
     nutrition: personal.nutrition || "",
     cardio: personal.cardio || "",
     goal: personal.goal || "",
-    trainingDays: Array.isArray(personal.trainingDays) ? personal.trainingDays : []
+    trainingDays: toDayList(personal.trainingDays)
   };
 };
 
-export const profileToPersonal = (profile = {}) => {
+export const profileToPersonal = (profile = {}, units = {}) => {
+  const { weightUnit = "kg" } = units;
   const name =
     [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || profile.name || "";
   // Already returns { feet: String, inches: String }, and { feet: "", inches: "" }
-  // for an absent height -- so these two need no further conversion.
+  // for an absent height, so these two need no further conversion.
   const { feet, inches } = toFeetInchesFromCm(profile.heightCm);
+  const storedWeight = toFormValue(profile.weightKg);
 
   return {
     ...defaultPersonalForm,
@@ -565,7 +698,7 @@ export const profileToPersonal = (profile = {}) => {
     heightCm: toFormValue(profile.heightCm),
     heightFeet: feet,
     heightInches: inches,
-    weight: toFormValue(profile.weightKg),
+    weight: weightUnit === "lb" ? toLb(storedWeight, "kg") : storedWeight,
     sex: profile.sex || "",
     bodyFat: toFormValue(profile.bodyFat),
     activity: profile.activity || defaultPersonalForm.activity,
@@ -576,7 +709,7 @@ export const profileToPersonal = (profile = {}) => {
     nutrition: profile.nutrition || "",
     cardio: profile.cardio || "",
     goal: profile.goal || "",
-    trainingDays: Array.isArray(profile.trainingDays) ? profile.trainingDays : []
+    trainingDays: toDayList(profile.trainingDays)
   };
 };
 ```
@@ -587,7 +720,7 @@ Run: `npx vitest run --root client src/app/profileMapping.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 6: Add the contract row**
+- [ ] **Step 5: Add the contract row**
 
 In `client/src/numericCoercion.contract.test.js`, add the import:
 
@@ -605,11 +738,24 @@ and a row to the `helpers` table:
   }
 ```
 
-- [ ] **Step 7: Run the contract test**
+- [ ] **Step 6: Run the contract test**
 
 Run: `npx vitest run --root client src/numericCoercion.contract.test.js`
 
 Expected: PASS, with the shared table now exercising both helpers.
+
+- [ ] **Step 7: Mutation-test the two unit rules**
+
+These are the assertions that matter most, and both would pass against wrong
+code if written carelessly. Apply each mutation, confirm the file changed on
+disk, run the suite, then revert:
+
+| Mutation                                                                | Must be caught by                             |
+| ----------------------------------------------------------------------- | --------------------------------------------- |
+| `weightKg: toProfileNumber(personal.weight)` (drop the unit)            | "converts pounds to kilograms before storing" |
+| Invert the height pick to `heightUnit === "cm" ? fromImperial : fromCm` | both height-pick tests                        |
+| `weight: storedWeight` in `profileToPersonal` (drop the unit)           | "shows weight in pounds..."                   |
+| Make `toProfileNumber` coerce before guarding                           | the contract test and the body-fat cases      |
 
 - [ ] **Step 8: Commit**
 
@@ -680,15 +826,41 @@ export const goalOptions = [
   "Cardio"
 ];
 
-// These two must match allowedSexValues / allowedActivityValues in the server's
-// dashboardDataBuildersService.js, which rejects anything else. They cannot be
-// imported across the wire, so the duplication is unavoidable -- but it is kept
-// to ONE copy on each side. AuthPage, HomePersonalStage and
+// Each of these must match its allowed*Values counterpart in the server's
+// dashboardDataBuildersService.js, which now rejects anything else with a 400.
+// They cannot be imported across the wire, so the duplication is unavoidable --
+// but it is kept to ONE copy on each side. AuthPage, HomePersonalStage and
 // PreviewPersonalChapter currently hardcode the same options as inline <option>
 // elements; migrating those three to read from here is worthwhile and is
 // deliberately out of scope for this plan.
+//
+// Copy these from the <option> elements in HomePersonalStage.jsx, not from
+// memory. Two of them are easy to get wrong: sleep is "7 - 8 hours" with spaces
+// around the hyphen, and cardio has EIGHT entries -- "Mixed" was missed once
+// already, and an allowlist missing a real option silently drops a legitimate
+// value, which is the defect class this whole change exists to close.
 export const sexOptions = ["Female", "Male", "Non-binary", "Prefer not to say"];
 export const activityOptions = ["Light", "Moderate", "High", "Very high"];
+export const sleepOptions = ["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"];
+export const experienceOptions = ["Beginner", "Intermediate", "Advanced"];
+export const nutritionOptions = [
+  "No preference",
+  "High-protein",
+  "Balanced",
+  "Low-carb",
+  "Vegetarian",
+  "Vegan"
+];
+export const cardioOptions = [
+  "None",
+  "Walking",
+  "Running",
+  "Cycling",
+  "Rowing",
+  "Swimming",
+  "HIIT",
+  "Mixed"
+];
 ```
 
 - [ ] **Step 4: Add `goal` to `defaultPersonalForm`**
@@ -722,8 +894,7 @@ git commit -m "feat(client): reinstate goalOptions and add goal to the personal 
 
 **Files:**
 
-- Modify: `client/src/app/units.js`
-- Modify: `client/src/pages/dashboard/views/SettingsView.jsx:1-32`
+- Modify: `client/src/pages/dashboard/views/SettingsView.jsx:1-32` — this is the only file that changes. `units.js` is already correct and must not be touched.
 
 - [ ] **Step 1: Confirm the two copies are identical before touching either**
 
@@ -741,11 +912,7 @@ Run: `npx vitest run --root client src/pages/dashboard/views/SettingsView.test.j
 
 Expected: PASS. Note the test count; it must be identical after this task.
 
-- [ ] **Step 3: Export the shared constant**
-
-In `client/src/app/units.js`, add `export` to the existing `IMPERIAL_REGION_CODES` declaration so `units.js` remains its single definition.
-
-- [ ] **Step 4: Delete the copies from SettingsView**
+- [ ] **Step 3: Delete the copies from SettingsView**
 
 Remove `IMPERIAL_REGION_CODES`, `getRegionFromLocale` and `getPreferredMeasurementSystem` from `SettingsView.jsx` and import instead:
 
@@ -755,16 +922,18 @@ import { getPreferredMeasurementSystem } from "../../../app/units";
 
 `getRegionFromLocale` is used only by `getPreferredMeasurementSystem`, so it does not need importing.
 
-- [ ] **Step 5: Run the tests and confirm nothing changed**
+**`IMPERIAL_REGION_CODES` does not need exporting, and must not be exported.** An earlier draft of this task said to export it. That was wrong: `getPreferredMeasurementSystem` closes over the copy already declared at the top of `units.js`, so importing the function is enough. Exporting the set as well would add an export nothing consumes, which `npm run knip` reports as an unused export and which CI now fails on.
+
+- [ ] **Step 4: Run the tests and confirm nothing changed**
 
 Run: `npx vitest run --root client src/pages/dashboard/views/SettingsView.test.jsx`
 
 Expected: PASS, same test count as Step 2. This is a pure refactor — a changed count means behaviour moved.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add client/src/app/units.js client/src/pages/dashboard/views/SettingsView.jsx
+git add client/src/pages/dashboard/views/SettingsView.jsx
 git commit -m "refactor(client): use the shared locale helpers in SettingsView"
 ```
 
@@ -772,12 +941,20 @@ git commit -m "refactor(client): use the shared locale helpers in SettingsView"
 
 ### Task 6: Client — field descriptors
 
-The tab `rows` array is currently the single declaration of what a tab shows. Keep it that way: add a descriptor to each row so the same array drives both read and edit rendering, rather than introducing a second list that can drift.
+> **Rewritten before dispatch.** The first draft declared height and weight as
+> plain number fields with metric bounds — `weight` as `min: 25, max: 400`. That
+> is wrong wherever the form renders in pounds, because 170 lb is a perfectly
+> ordinary weight that those bounds would reject, and 30 lb is not. Height has
+> the same problem: an imperial visitor types feet and inches, not centimetres.
+> The descriptors therefore carry bounds **per unit**, declared rather than
+> converted at runtime so there is nothing to drift.
 
 **Files:**
 
 - Create: `client/src/pages/dashboard/views/settingsFields.js`
 - Create: `client/src/pages/dashboard/views/settingsFields.test.js`
+
+The tab `rows` array is currently the single declaration of what a tab shows. Keep it that way — these descriptors drive both the read and the edit rendering, rather than introducing a second list that can drift out of step with the first.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -786,25 +963,37 @@ Create `client/src/pages/dashboard/views/settingsFields.test.js`:
 ```js
 import { describe, expect, test } from "vitest";
 import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
-import { sexOptions } from "../../../app/constants";
+import { activityOptions, goalOptions, sexOptions } from "../../../app/constants";
 
 describe("settingsFields", () => {
   test("marks exactly the three real tabs editable", () => {
     expect(EDITABLE_TABS).toEqual(["profile", "training", "lifestyle"]);
   });
 
-  test("gives every field a name and a type", () => {
+  test("gives every field a name and a known type", () => {
     for (const tab of EDITABLE_TABS) {
       for (const field of fieldsForTab(tab)) {
         expect(field.name).toBeTruthy();
-        expect(["text", "number", "select", "multiselect", "textarea"]).toContain(field.type);
+        expect([
+          "text",
+          "number",
+          "select",
+          "multiselect",
+          "textarea",
+          "height",
+          "weight"
+        ]).toContain(field.type);
       }
     }
   });
 
-  test("offers the allowed sex values on the sex field", () => {
-    const sex = fieldsForTab("profile").find((field) => field.name === "sex");
-    expect(sex.options).toEqual(sexOptions);
+  test("offers the shared option lists rather than its own copies", () => {
+    const profile = fieldsForTab("profile");
+    const training = fieldsForTab("training");
+
+    expect(profile.find((f) => f.name === "sex").options).toBe(sexOptions);
+    expect(training.find((f) => f.name === "activity").options).toBe(activityOptions);
+    expect(training.find((f) => f.name === "goal").options).toBe(goalOptions);
   });
 
   // weekDays is a list of { label, key } objects, not strings. The multiselect
@@ -812,12 +1001,47 @@ describe("settingsFields", () => {
   // options must be the keys rather than the whole objects.
   test("offers training days as plain day-name strings", () => {
     const days = fieldsForTab("training").find((field) => field.name === "trainingDays");
+
     expect(days.options).toContain("Monday");
     expect(days.options.every((option) => typeof option === "string")).toBe(true);
+    expect(days.options).toHaveLength(7);
+  });
+
+  // The bounds are per unit because the form renders in the visitor's locale
+  // units. Applying the kilogram range to a pounds input rejects 170 lb, an
+  // entirely ordinary weight, and accepts 30 lb, which is not.
+  test("declares weight bounds for both units", () => {
+    const weight = fieldsForTab("profile").find((field) => field.name === "weight");
+
+    expect(weight.type).toBe("weight");
+    expect(weight.bounds.kg).toEqual([25, 400]);
+    expect(weight.bounds.lb[0]).toBeGreaterThan(50);
+    expect(weight.bounds.lb[1]).toBeGreaterThan(800);
+  });
+
+  test("declares height bounds for both units", () => {
+    const height = fieldsForTab("profile").find((field) => field.name === "heightCm");
+
+    expect(height.type).toBe("height");
+    expect(height.bounds.cm).toEqual([100, 260]);
+    expect(height.bounds.ft).toEqual([3, 8]);
+    expect(height.bounds.in).toEqual([0, 11]);
+  });
+
+  // The metric bounds must be the same numbers the server enforces, or the form
+  // accepts input the API then rejects with a 400.
+  test("mirrors the server's metric ranges exactly", () => {
+    const profile = fieldsForTab("profile");
+
+    expect(profile.find((f) => f.name === "age").bounds).toEqual([10, 120]);
+    expect(profile.find((f) => f.name === "bodyFat").bounds).toEqual([3, 70]);
+    expect(profile.find((f) => f.name === "heightCm").bounds.cm).toEqual([100, 260]);
+    expect(profile.find((f) => f.name === "weight").bounds.kg).toEqual([25, 400]);
   });
 
   test("returns nothing for a read-only tab", () => {
     expect(fieldsForTab("privacy")).toEqual([]);
+    expect(fieldsForTab("nonsense")).toEqual([]);
   });
 });
 ```
@@ -830,7 +1054,7 @@ Expected: FAIL, "Failed to resolve import ./settingsFields".
 
 - [ ] **Step 3: Write the descriptors**
 
-Create `client/src/pages/dashboard/views/settingsFields.js`. Mirror the server ranges exactly — age 10-120, height 100-260 cm, weight 25-400 kg, body fat 3-70 — so the ordinary case never round-trips, and re-export the option lists so the form and the server cannot disagree about them:
+Create `client/src/pages/dashboard/views/settingsFields.js`:
 
 ```js
 import { activityOptions, goalOptions, sexOptions, weekDays } from "../../../app/constants";
@@ -844,15 +1068,22 @@ export const EDITABLE_TABS = ["profile", "training", "lifestyle"];
 const FIELDS_BY_TAB = {
   profile: [
     { name: "name", label: "Name", type: "text", maxLength: 80 },
-    { name: "age", label: "Age", type: "number", min: 10, max: 120 },
+    { name: "age", label: "Age", type: "number", bounds: [10, 120] },
     { name: "sex", label: "Sex", type: "select", options: sexOptions },
-    { name: "heightCm", label: "Height", type: "number", min: 100, max: 260, unit: "height" },
-    { name: "weight", label: "Weight", type: "number", min: 25, max: 400, unit: "weight" },
-    { name: "bodyFat", label: "Body fat", type: "number", min: 3, max: 70 }
+    // Bounds per unit, declared rather than converted, so the imperial and
+    // metric ranges cannot drift apart. The metric numbers are the server's.
+    {
+      name: "heightCm",
+      label: "Height",
+      type: "height",
+      bounds: { cm: [100, 260], ft: [3, 8], in: [0, 11] }
+    },
+    { name: "weight", label: "Weight", type: "weight", bounds: { kg: [25, 400], lb: [55, 882] } },
+    { name: "bodyFat", label: "Body fat", type: "number", bounds: [3, 70] }
   ],
   training: [
     { name: "timeline", label: "Timeline", type: "text", maxLength: 60 },
-    { name: "experience", label: "Experience", type: "text", maxLength: 40 },
+    { name: "experience", label: "Experience", type: "select", options: experienceOptions },
     {
       name: "trainingDays",
       label: "Training days",
@@ -863,9 +1094,9 @@ const FIELDS_BY_TAB = {
     { name: "goal", label: "Goal", type: "select", options: goalOptions }
   ],
   lifestyle: [
-    { name: "sleep", label: "Sleep", type: "text", maxLength: 40 },
-    { name: "nutrition", label: "Nutrition", type: "text", maxLength: 60 },
-    { name: "cardio", label: "Cardio", type: "text", maxLength: 60 },
+    { name: "sleep", label: "Sleep", type: "select", options: sleepOptions },
+    { name: "nutrition", label: "Nutrition", type: "select", options: nutritionOptions },
+    { name: "cardio", label: "Cardio", type: "select", options: cardioOptions },
     { name: "notes", label: "Notes", type: "textarea", maxLength: 500 }
   ]
 };
@@ -873,13 +1104,15 @@ const FIELDS_BY_TAB = {
 export const fieldsForTab = (tabId) => FIELDS_BY_TAB[tabId] || [];
 ```
 
+**`experience`, `sleep`, `nutrition` and `cardio` are selects, not text inputs.** Task 1 established that all four are closed sets validated server-side, and Task 2 made an out-of-list value a 400 — so a free-text input here would let a visitor type something the save then rejects. Task 4 adds `experienceOptions`, `sleepOptions`, `nutritionOptions` and `cardioOptions` to `constants.js` alongside `sexOptions`; import them here. If Task 4 has not been done yet, do it first — these two tasks are ordered wrongly if you hit a missing import.
+
 - [ ] **Step 4: Run the test and watch it pass**
 
 Run: `npx vitest run --root client src/pages/dashboard/views/settingsFields.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add client/src/pages/dashboard/views/settingsFields.js client/src/pages/dashboard/views/settingsFields.test.js
@@ -889,6 +1122,13 @@ git commit -m "feat(client): declare the editable settings fields"
 ---
 
 ### Task 7: Client — the edit form component
+
+> **Rewritten before dispatch,** for the same reason as Task 6: the first draft
+> rendered height and weight as plain number inputs, which is wrong for an
+> imperial visitor. This form renders in the units the visitor's locale implies
+> and reports which units it used, because the caller has to convert with the
+> same ones — see Task 8's note on why reading the app-level units instead would
+> store 170 lb as 170 kg.
 
 **Files:**
 
@@ -906,16 +1146,40 @@ import SettingsEditForm from "./SettingsEditForm";
 
 const FIELDS = [
   { name: "name", label: "Name", type: "text", maxLength: 80 },
-  { name: "age", label: "Age", type: "number", min: 10, max: 120 },
+  { name: "age", label: "Age", type: "number", bounds: [10, 120] },
   { name: "sex", label: "Sex", type: "select", options: ["Female", "Male"] },
-  { name: "trainingDays", label: "Training days", type: "multiselect", options: ["Mon", "Tue"] }
+  {
+    name: "heightCm",
+    label: "Height",
+    type: "height",
+    bounds: { cm: [100, 260], ft: [3, 8], in: [0, 11] }
+  },
+  { name: "weight", label: "Weight", type: "weight", bounds: { kg: [25, 400], lb: [55, 882] } },
+  {
+    name: "trainingDays",
+    label: "Training days",
+    type: "multiselect",
+    options: ["Monday", "Tuesday"]
+  }
 ];
+
+const VALUES = {
+  name: "Jordan",
+  age: "34",
+  sex: "Female",
+  heightCm: "178",
+  heightFeet: "5",
+  heightInches: "10",
+  weight: "77",
+  trainingDays: ["Monday"]
+};
 
 const renderForm = (overrides = {}) =>
   render(
     <SettingsEditForm
       fields={FIELDS}
-      values={{ name: "Jordan", age: "34", sex: "Female", trainingDays: ["Mon"] }}
+      values={VALUES}
+      measurementSystem="metric"
       onSave={() => {}}
       onCancel={() => {}}
       {...overrides}
@@ -931,7 +1195,7 @@ describe("SettingsEditForm", () => {
     expect(screen.getByLabelText("Sex")).toHaveValue("Female");
   });
 
-  test("applies the server range to a number field so the common case never round-trips", () => {
+  test("applies the server range to a plain number field", () => {
     renderForm();
     const age = screen.getByLabelText("Age");
 
@@ -946,17 +1210,79 @@ describe("SettingsEditForm", () => {
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Sam" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: "Sam" }));
+    expect(onSave).toHaveBeenCalled();
+    expect(onSave.mock.calls[0][0]).toMatchObject({ name: "Sam" });
+  });
+
+  test("reports the units it rendered with, so the caller converts the same way", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave, measurementSystem: "imperial" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][1]).toEqual({ heightUnit: "ft", weightUnit: "lb" });
+  });
+
+  test("reports metric units when the locale is metric", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][1]).toEqual({ heightUnit: "cm", weightUnit: "kg" });
+  });
+
+  test("shows one height input in centimetres for a metric visitor", () => {
+    renderForm();
+
+    expect(screen.getByLabelText("Height (cm)")).toHaveValue(178);
+    expect(screen.queryByLabelText("Height (ft)")).toBeNull();
+  });
+
+  test("shows feet and inches for an imperial visitor", () => {
+    renderForm({ measurementSystem: "imperial" });
+
+    expect(screen.getByLabelText("Height (ft)")).toHaveValue(5);
+    expect(screen.getByLabelText("Height (in)")).toHaveValue(10);
+    expect(screen.queryByLabelText("Height (cm)")).toBeNull();
+  });
+
+  test("writes feet and inches back to their own fields, not to centimetres", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave, measurementSystem: "imperial" });
+
+    fireEvent.change(screen.getByLabelText("Height (ft)"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][0]).toMatchObject({ heightFeet: "6", heightInches: "10" });
+  });
+
+  // 170 lb is an ordinary weight that the kilogram range would reject, and
+  // 30 lb is not a weight but would pass it.
+  test("bounds the weight input by the unit on screen", () => {
+    renderForm({ measurementSystem: "imperial" });
+    const weight = screen.getByLabelText("Weight (lb)");
+
+    expect(weight).toHaveAttribute("min", "55");
+    expect(weight).toHaveAttribute("max", "882");
+  });
+
+  test("bounds the weight input in kilograms for a metric visitor", () => {
+    renderForm();
+    const weight = screen.getByLabelText("Weight (kg)");
+
+    expect(weight).toHaveAttribute("min", "25");
+    expect(weight).toHaveAttribute("max", "400");
   });
 
   test("toggles a multiselect value on and off", () => {
     const onSave = vi.fn();
     renderForm({ onSave });
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Tue" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Tuesday" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ trainingDays: ["Mon", "Tue"] }));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ trainingDays: ["Monday", "Tuesday"] });
   });
 
   test("discards edits on cancel", () => {
@@ -995,13 +1321,27 @@ Expected: FAIL, "Failed to resolve import ./SettingsEditForm".
 
 - [ ] **Step 3: Write the component**
 
-Create `client/src/pages/dashboard/views/SettingsEditForm.jsx`. Wrap each control in its own `<label>` — that nesting is how every form in this app associates labels, and the axe scan is the authority on whether it is correct, not the linter:
+Create `client/src/pages/dashboard/views/SettingsEditForm.jsx`. Wrap each control in its own `<label>` — that nesting is how every form in this app associates labels, and the axe scan in `e2e/a11y.spec.js` is the authority on whether it is correct, not the linter:
 
 ```jsx
 import { useState } from "react";
 
-export default function SettingsEditForm({ fields, values, onSave, onCancel, error, saving }) {
+const unitsFor = (measurementSystem) =>
+  measurementSystem === "imperial"
+    ? { heightUnit: "ft", weightUnit: "lb" }
+    : { heightUnit: "cm", weightUnit: "kg" };
+
+export default function SettingsEditForm({
+  fields,
+  values,
+  measurementSystem,
+  onSave,
+  onCancel,
+  error,
+  saving
+}) {
   const [draft, setDraft] = useState(() => ({ ...values }));
+  const units = unitsFor(measurementSystem);
 
   const setField = (name, value) => setDraft((prev) => ({ ...prev, [name]: value }));
 
@@ -1014,62 +1354,115 @@ export default function SettingsEditForm({ fields, values, onSave, onCancel, err
       };
     });
 
+  const numberInput = (name, label, [min, max]) => (
+    <label>
+      {label}
+      <input
+        type="number"
+        value={draft[name] ?? ""}
+        min={min}
+        max={max}
+        onChange={(event) => setField(name, event.target.value)}
+      />
+    </label>
+  );
+
+  const renderField = (field) => {
+    if (field.type === "height") {
+      return units.heightUnit === "ft" ? (
+        <>
+          {numberInput("heightFeet", "Height (ft)", field.bounds.ft)}
+          {numberInput("heightInches", "Height (in)", field.bounds.in)}
+        </>
+      ) : (
+        numberInput("heightCm", "Height (cm)", field.bounds.cm)
+      );
+    }
+
+    if (field.type === "weight") {
+      return numberInput("weight", `Weight (${units.weightUnit})`, field.bounds[units.weightUnit]);
+    }
+
+    if (field.type === "multiselect") {
+      return (
+        <fieldset>
+          <legend>{field.label}</legend>
+          {field.options.map((option) => (
+            <label key={option}>
+              <input
+                type="checkbox"
+                checked={(draft[field.name] || []).includes(option)}
+                onChange={() => toggleInList(field.name, option)}
+              />
+              {option}
+            </label>
+          ))}
+        </fieldset>
+      );
+    }
+
+    if (field.type === "select") {
+      return (
+        <label>
+          {field.label}
+          <select
+            value={draft[field.name] || ""}
+            onChange={(event) => setField(field.name, event.target.value)}
+          >
+            <option value="">Not set</option>
+            {field.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    if (field.type === "textarea") {
+      return (
+        <label>
+          {field.label}
+          <textarea
+            value={draft[field.name] || ""}
+            maxLength={field.maxLength}
+            onChange={(event) => setField(field.name, event.target.value)}
+          />
+        </label>
+      );
+    }
+
+    if (field.type === "number") {
+      return numberInput(field.name, field.label, field.bounds);
+    }
+
+    return (
+      <label>
+        {field.label}
+        <input
+          type="text"
+          value={draft[field.name] ?? ""}
+          maxLength={field.maxLength}
+          onChange={(event) => setField(field.name, event.target.value)}
+        />
+      </label>
+    );
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSave(draft);
+    // The units go with the draft: the caller must convert with the same ones
+    // this form rendered in, and they are the visitor's locale units rather
+    // than the home flow's toggles.
+    onSave(draft, units);
   };
 
   return (
     <form className="settings-edit-form" onSubmit={handleSubmit}>
       {fields.map((field) => (
         <div key={field.name} className="settings-edit-row">
-          {field.type === "multiselect" ? (
-            <fieldset>
-              <legend>{field.label}</legend>
-              {field.options.map((option) => (
-                <label key={option}>
-                  <input
-                    type="checkbox"
-                    checked={(draft[field.name] || []).includes(option)}
-                    onChange={() => toggleInList(field.name, option)}
-                  />
-                  {option}
-                </label>
-              ))}
-            </fieldset>
-          ) : (
-            <label>
-              {field.label}
-              {field.type === "select" ? (
-                <select
-                  value={draft[field.name] || ""}
-                  onChange={(event) => setField(field.name, event.target.value)}
-                >
-                  <option value="">Not set</option>
-                  {field.options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : field.type === "textarea" ? (
-                <textarea
-                  value={draft[field.name] || ""}
-                  maxLength={field.maxLength}
-                  onChange={(event) => setField(field.name, event.target.value)}
-                />
-              ) : (
-                <input
-                  type={field.type === "number" ? "number" : "text"}
-                  value={draft[field.name] ?? ""}
-                  min={field.min}
-                  max={field.max}
-                  maxLength={field.maxLength}
-                  onChange={(event) => setField(field.name, event.target.value)}
-                />
-              )}
-            </label>
-          )}
+          {renderField(field)}
         </div>
       ))}
 
@@ -1092,9 +1485,21 @@ export default function SettingsEditForm({ fields, values, onSave, onCancel, err
 
 Run: `npx vitest run --root client src/pages/dashboard/views/SettingsEditForm.test.jsx`
 
-Expected: PASS, 7 tests.
+Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Mutation-test the unit rules**
+
+The unit behaviour is the part most likely to be silently wrong. Apply each, confirm the file changed on disk, run the suite, revert:
+
+| Mutation                                      | Must be caught by                                 |
+| --------------------------------------------- | ------------------------------------------------- |
+| `unitsFor` always returns the metric pair     | "reports the units it rendered with"              |
+| Height always renders the `cm` input          | "shows feet and inches for an imperial visitor"   |
+| Weight uses `field.bounds.kg` unconditionally | "bounds the weight input by the unit on screen"   |
+| `onSave(draft)` without the units             | "reports the units it rendered with"              |
+| Feet input writes to `heightCm`               | "writes feet and inches back to their own fields" |
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add client/src/pages/dashboard/views/SettingsEditForm.jsx client/src/pages/dashboard/views/SettingsEditForm.test.jsx
@@ -1134,6 +1539,43 @@ describe("submitProfile", () => {
     expect(deps.setPersonal).toHaveBeenCalled();
   });
 
+  // The handler is where units reach the mapper. Drop them and a user weighing
+  // 170 lb is stored as 170 kg -- so these assert the converted value, not just
+  // that a request was made.
+  test("falls back to the app's active units when the caller passes none", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setPersonal: vi.fn(),
+      setUser: vi.fn(),
+      weightUnit: "lb",
+      heightUnit: "ft"
+    });
+
+    await handlers.submitProfile({ weight: "170", heightFeet: "5", heightInches: "10" });
+
+    expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toMatchObject({
+      weightKg: 77,
+      heightCm: 178
+    });
+  });
+
+  // Settings renders in the visitor's locale units, which are not the home
+  // flow's toggles. If the caller's units were ignored in favour of the
+  // app-level ones, this stores 170 lb as 170 kg.
+  test("uses the caller's units over the app's when given them", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setPersonal: vi.fn(),
+      setUser: vi.fn(),
+      weightUnit: "kg",
+      heightUnit: "cm"
+    });
+
+    await handlers.submitProfile({ weight: "170" }, { weightUnit: "lb", heightUnit: "ft" });
+
+    expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toMatchObject({ weightKg: 77 });
+  });
+
   test("surfaces a server error and leaves personal alone", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () =>
@@ -1170,19 +1612,25 @@ import { personalToProfile, profileToPersonal } from "./profileMapping";
 Add the handler beside `submitGoals`, returning a result object rather than only setting state, so the form can keep itself open on failure:
 
 ```js
-const submitProfile = async (draft) => {
+// The units travel with the draft rather than being read from App state. The
+// app-level heightUnit/weightUnit belong to the home flow's toggles, while
+// Settings renders in whatever the visitor's locale implies -- so reading the
+// app-level ones here would convert a locale-imperial form with a metric unit
+// and store 170 lb as 170 kg. The app-level values remain the default for any
+// caller that does not pass units.
+const submitProfile = async (draft, units = { heightUnit, weightUnit }) => {
   try {
     const res = await apiFetch("/api/profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(personalToProfile(draft))
+      body: JSON.stringify(personalToProfile(draft, units))
     });
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
       throw new Error(payload?.error || "Unable to save profile.");
     }
     const data = await res.json();
-    setPersonal(profileToPersonal(data.profile));
+    setPersonal(profileToPersonal(data.profile, units));
     setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
     showDashboardToast("Profile updated.");
     return { ok: true };
@@ -1194,7 +1642,14 @@ const submitProfile = async (draft) => {
 };
 ```
 
-Add `submitProfile` to the object returned at the end of the factory, and add `setPersonal` / `setUser` to its destructured dependencies if they are not already there.
+**The units are not optional and must not be dropped.** `personal.weight` is a bare number in whatever unit is active, so `personalToProfile(draft)` without them would store 170 lb as 170 kg. `profileToPersonal` needs `weightUnit` for the same reason in reverse — it decides whether the form shows 77 or 170.
+
+Dependency check, verified against the file rather than assumed:
+
+- `heightUnit`, `weightUnit`, `personal`, `setUser`, `showDashboardToast`, `setDashError` and `apiFetch` are **already** destructured dependencies of `createAppEventHandlers`. Use them as-is; add nothing.
+- **`setPersonal` is not.** The factory takes `resetPersonalFlow`, which wraps it, but not the setter itself. Add `setPersonal` to the factory's destructured parameter list, and pass it at the call site in `App.jsx` where the other handlers are wired up — it is already in scope there as `const [personal, setPersonal] = useState(...)` at `App.jsx:102`.
+
+Add `submitProfile` to the object returned at the end of the factory.
 
 - [ ] **Step 4: Run the test and watch it pass**
 
@@ -1304,10 +1759,10 @@ const [editingTab, setEditingTab] = useState("");
 const [saveError, setSaveError] = useState("");
 const [saving, setSaving] = useState(false);
 
-const handleSave = async (draft) => {
+const handleSave = async (draft, units) => {
   setSaving(true);
   setSaveError("");
-  const result = await onSaveProfile({ ...personal, ...draft });
+  const result = await onSaveProfile({ ...personal, ...draft }, units);
   setSaving(false);
   if (result?.ok) {
     setEditingTab("");
@@ -1317,7 +1772,12 @@ const handleSave = async (draft) => {
 };
 ```
 
-Merging over `personal` rather than sending `draft` alone matters: each tab edits a subset, and `personalToProfile` builds a whole profile. Sending one tab's fields alone would clear the others.
+Two things here are load-bearing:
+
+- **Merging over `personal` rather than sending `draft` alone.** Each tab edits a subset, and `personalToProfile` builds a whole profile, so posting one tab's fields alone would clear the others.
+- **Forwarding `units` unchanged.** The form reports which units it rendered in, and `submitProfile` must convert with those same ones. Dropping the second argument here is exactly how 170 lb becomes 170 kg — the app-level `weightUnit` belongs to the home flow's toggle, not to this locale-driven form.
+
+`measurementSystem` is already computed in this component (`getPreferredMeasurementSystem()` behind a `useMemo`) for the read-only rows; pass that same value to the form rather than computing it a second time.
 
 - [ ] **Step 4: Render the form in place of the rows**
 
@@ -1329,6 +1789,7 @@ Where the active tab's rows are rendered, branch on the edit state. Add the Edit
     <SettingsEditForm
       fields={fieldsForTab(activeTab)}
       values={personal || {}}
+      measurementSystem={measurementSystem}
       onSave={handleSave}
       onCancel={() => {
         setEditingTab("");
@@ -1381,25 +1842,52 @@ git commit -m "feat(client): make the settings profile tabs editable"
 Append to `client/src/App.test.jsx`:
 
 ```jsx
-test("seeds the personal form from the signed-in user's stored profile", async () => {
-  renderAppWithUser({
-    profile: { firstName: "Jordan", lastName: "Fields", heightCm: 178, goal: "Mobility" }
+describe("hydrating from the stored profile", () => {
+  test("seeds the personal form from the signed-in user's profile", async () => {
+    stubSession(
+      sessionResponse({
+        user: {
+          email: "ada@example.com",
+          profile: { firstName: "Jordan", lastName: "Fields", heightCm: 178, goal: "Mobility" }
+        }
+      })
+    );
+    await renderSettled("/");
+
+    await waitFor(() => expect(home.props.personal.name).toBe("Jordan Fields"));
+    expect(home.props.personal.goal).toBe("Mobility");
+    expect(home.props.personal.heightCm).toBe("178");
   });
 
-  await waitFor(() => expect(screen.getByTestId("personal-stage")).toBeInTheDocument());
-  expect(stages.personal.personal.name).toBe("Jordan Fields");
-  expect(stages.personal.personal.goal).toBe("Mobility");
-});
+  test("seeds the planner goal from the stored profile", async () => {
+    stubSession(
+      sessionResponse({ user: { email: "ada@example.com", profile: { goal: "Recovery" } } })
+    );
+    await renderSettled("/");
 
-test("seeds the planner goal from the stored profile", async () => {
-  renderAppWithUser({ profile: { goal: "Recovery" } });
+    await waitFor(() => expect(home.props.form.goal).toBe("Recovery"));
+  });
 
-  await waitFor(() => expect(stages.personal).toBeTruthy());
-  expect(screen.getByTestId("planner-goal")).toHaveTextContent("Recovery");
+  test("leaves the planner on its default goal when the profile has none", async () => {
+    stubSession(sessionResponse({ user: { email: "ada@example.com", profile: {} } }));
+    await renderSettled("/");
+
+    expect(home.props.form.goal).toBe(goalOptions[0]);
+  });
+
+  test("leaves a signed-out visitor on the blank personal form", async () => {
+    stubSession(sessionResponse({}));
+    await renderSettled("/");
+
+    expect(home.props.personal.name).toBe("");
+    expect(home.props.form.goal).toBe(goalOptions[0]);
+  });
 });
 ```
 
-Use the file's existing render helper and `stages` capture object; `renderAppWithUser` may need adding alongside them, stubbing `/api/auth/me` to return the given user.
+**These use the helpers this file already has — verified, not assumed.** `stubSession`, `sessionResponse`, `renderSettled` and the hoisted `home` prop-capture object are all defined at the top of `App.test.jsx`; follow the existing `"signs in the user the server returns"` test for the exact shape. `App.jsx` passes both `form` and `personal` to `HomePage`, so `home.props.form.goal` and `home.props.personal` are directly assertable with no new mock.
+
+An earlier draft of this step invented `renderAppWithUser` and a `stages` capture object. Neither exists in `App.test.jsx` — `stages` belongs to `HomePage.test.jsx`, which is a different file mocking the individual stage components. Import `goalOptions` from `./app/constants` for the default-goal assertions.
 
 - [ ] **Step 2: Run the test and watch it fail**
 
