@@ -662,13 +662,17 @@ describe("profile", () => {
 
   // One per closed-set field. An allowlist that silently omits a real option is
   // the same defect class this whole change exists to close, so each field is
-  // asserted separately rather than trusting one representative.
+  // asserted separately rather than trusting one representative. trainingDays
+  // is included here (rather than only in its own tests below) specifically
+  // to prove it now rejects like every sibling closed-set field instead of
+  // silently dropping the unrecognised entry.
   test.each([
     ["sleep", "Nine-ish"],
     ["experience", "Wizard-tier"],
     ["nutrition", "Junk only"],
     ["cardio", "Interpretive dance"],
-    ["goal", "Become a wizard"]
+    ["goal", "Become a wizard"],
+    ["trainingDays", ["Blursday"]]
   ])("rejects a %s value outside the allowed list", async (field, value) => {
     const response = await request(buildApp())
       .post("/api/profile")
@@ -677,21 +681,45 @@ describe("profile", () => {
     expect(response.status).toBe(400);
   });
 
-  // Regression for a cap-before-filter bug: the schema used to slice
-  // trainingDays to 7 entries before buildProfile's day-name filter ever ran,
-  // so a valid day sitting past position 7 behind invalid entries was cut
-  // off silently and the request still returned 200. This is the test that
-  // would have caught it -- dashboardDataBuildersService.test.js calls
-  // buildProfile directly and bypasses the schema entirely, so it could not.
-  test("keeps a valid day past the seventh position instead of silently dropping it", async () => {
-    rows.push({ userId: "u-1", email: "a@b.com", profile: defaultProfile() });
+  test("rejects a trainingDays array of more than seven entries", async () => {
+    // All seven real day names plus one repeat -- eight entries, none of
+    // them invalid, so this isolates the length cap from the enum check
+    // above. z.array().max() rejects; it does not truncate the array down
+    // to seven and proceed.
+    const response = await request(buildApp())
+      .post("/api/profile")
+      .send({
+        trainingDays: [
+          "Monday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ]
+      });
 
+    expect(response.status).toBe(400);
+  });
+
+  // Regression for a cap-before-filter bug that was fixed twice at this
+  // layer. First the schema capped trainingDays at 7 raw strings ahead of
+  // buildProfile's day-name filter, so this exact payload returned 200 with
+  // trainingDays silently reduced to [] (the trailing "Monday" cut off by
+  // the cap before it could be checked). Widening the cap to 64 did not fix
+  // it -- it only moved the cliff from position 8 to 65. The real fix
+  // replaced the cap with z.array(z.enum(...)).max(7), which validates
+  // membership and length directly and has no slice step left to get wrong.
+  // This payload -- mixing junk with a valid day, and exceeding the length
+  // limit -- must now be rejected outright rather than silently trimmed.
+  test("rejects a payload mixing invalid entries with a valid day rather than silently dropping the valid one", async () => {
     const response = await request(buildApp())
       .post("/api/profile")
       .send({ trainingDays: ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "Monday"] });
 
-    expect(response.status).toBe(200);
-    expect(response.body.profile.trainingDays).toEqual(["Monday"]);
+    expect(response.status).toBe(400);
   });
 });
 

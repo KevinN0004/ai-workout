@@ -227,13 +227,17 @@ export const buildProfile = (input = {}) => {
     nutrition: allowedNutritions.has(input.nutrition) ? input.nutrition : "",
     cardio: allowedCardios.has(input.cardio) ? input.cardio : "",
     goal: allowedGoals.has(input.goal) ? input.goal : "",
-    // Iterate the seven canonical days rather than the input array: filtering
-    // and deduping *before* any cap means the result can never exceed seven,
-    // so there is no cap to separately get right. 64 only bounds the raw
-    // array passed to toCleanArray before membership is checked, which is
-    // why it is far larger than 7 -- it is not the day cap.
+    // Iterate the seven canonical days rather than the input array, with no
+    // cap on the input at all: the result is bounded and deduped by
+    // construction because it can only ever contain the seven canonical
+    // names. Capping the raw input first (this line has tried both 7 and 64)
+    // just slices it ahead of this membership check, silently discarding a
+    // valid day that happens to sit past the cut. Input size is already
+    // bounded upstream by express's request body limit.
     trainingDays: allowedTrainingDayValues.filter((day) =>
-      toCleanArray(input.trainingDays, 64, 20).includes(day)
+      (Array.isArray(input.trainingDays) ? input.trainingDays : []).some(
+        (entry) => cleanText(entry, 20) === day
+      )
     ),
     updatedAt: new Date().toISOString()
   };

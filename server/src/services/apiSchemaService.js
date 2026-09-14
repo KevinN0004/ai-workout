@@ -6,7 +6,8 @@ import {
   allowedGoalValues,
   allowedNutritionValues,
   allowedSexValues,
-  allowedSleepValues
+  allowedSleepValues,
+  allowedTrainingDayValues
 } from "./dashboardDataBuildersService.js";
 
 const toNumberInput = (value) => {
@@ -64,15 +65,15 @@ const profileInputSchema = z
     nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
     cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
     goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
-    // 64, not 7: this only bounds the raw array before buildProfile's day-name
-    // filter runs. buildProfile derives the result by filtering
-    // allowedTrainingDayValues (seven entries, no duplicates possible), so the
-    // real cap is structural and lives there. Capping at 7 here would slice
-    // the raw array before that filter sees it, so junk entries ahead of a
-    // valid day (e.g. 7 invalid strings followed by "Monday") would silently
-    // drop the valid day and still return 200 -- the same cap-before-filter
-    // bug commit 0fe454e fixed inside buildProfile itself.
-    trainingDays: optionalStringArrayField(64, 20)
+    // Validated as an enum array, not a bounded string array: any item cap
+    // that runs ahead of a membership check discards valid entries that
+    // happen to sit past the cut, and raising the number only moves the
+    // cliff rather than removing it (7 -> 64 still dropped a valid day at
+    // position 65). z.array(z.enum(...)).max(7) rejects instead -- an
+    // unknown day or more than seven entries is a 400, consistent with every
+    // other closed-set field in this schema, and there is no slice step left
+    // to get wrong.
+    trainingDays: z.array(z.enum(allowedTrainingDayValues)).max(7).optional()
   })
   .passthrough();
 

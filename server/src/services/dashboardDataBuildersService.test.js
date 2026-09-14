@@ -83,6 +83,20 @@ describe("buildProfile", () => {
     expect(buildProfile({ trainingDays: ["Monday", "Someday"] }).trainingDays).toEqual(["Monday"]);
   });
 
+  // The route now rejects an oversized or invalid trainingDays payload before
+  // it ever reaches buildProfile (profileInputSchema validates it as
+  // z.array(z.enum(...)).max(7)), so the route-level test for this can no
+  // longer exercise buildProfile's own handling of a long raw array -- it is
+  // asserted here instead, calling buildProfile directly the way any other
+  // caller (present or future) could. A cap-then-filter implementation here
+  // (this line has tried capping the raw input at both 7 and 64 before
+  // filtering) drops "Sunday" once it sits far enough past the cut; iterating
+  // the seven canonical names against the full, uncapped input cannot.
+  test("keeps a valid day found deep in an oversized raw array", () => {
+    const junkThenSunday = Array.from({ length: 64 }, (_, i) => `junk-${i}`).concat("Sunday");
+    expect(buildProfile({ trainingDays: junkThenSunday }).trainingDays).toEqual(["Sunday"]);
+  });
+
   test("dedupes repeated entries in trainingDays", () => {
     expect(buildProfile({ trainingDays: ["Monday", "Monday", "Tuesday"] }).trainingDays).toEqual([
       "Monday",
