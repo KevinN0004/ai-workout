@@ -25,10 +25,20 @@ export const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
 
 export const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
 export const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
+// Reinstated from commit c2c820f, which removed it as dead code. It is live
+// again because the profile now carries a goal and the planner seeds from it.
+export const allowedGoalValues = [
+  "Build lean strength and energy",
+  "Fat loss + conditioning",
+  "Mobility",
+  "Recovery",
+  "Cardio"
+];
 const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
 
 const allowedSexes = new Set(allowedSexValues);
 const allowedActivities = new Set(allowedActivityValues);
+const allowedGoals = new Set(allowedGoalValues);
 const allowedMealTypes = new Set(allowedMealTypeValues);
 
 export const defaultProfile = () => ({
@@ -42,6 +52,13 @@ export const defaultProfile = () => ({
   bodyFat: null,
   activity: "Moderate",
   notes: "",
+  sleep: "",
+  timeline: "",
+  experience: "",
+  nutrition: "",
+  cardio: "",
+  goal: "",
+  trainingDays: [],
   updatedAt: new Date().toISOString()
 });
 
@@ -163,6 +180,13 @@ export const buildProfile = (input = {}) => {
     bodyFat: toNullableNumber(input.bodyFat, 3, 70),
     activity: allowedActivities.has(input.activity) ? input.activity : base.activity,
     notes: cleanText(input.notes, 500),
+    sleep: cleanText(input.sleep, 40),
+    timeline: cleanText(input.timeline, 60),
+    experience: cleanText(input.experience, 40),
+    nutrition: cleanText(input.nutrition, 60),
+    cardio: cleanText(input.cardio, 60),
+    goal: allowedGoals.has(input.goal) ? input.goal : "",
+    trainingDays: toCleanArray(input.trainingDays, 7, 20),
     updatedAt: new Date().toISOString()
   };
 };
