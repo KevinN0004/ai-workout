@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
-import { prisma } from "../../../prisma.js";
+import { prisma } from "../../../db/prisma.js";
 
 // Pins the remaining User write paths against real Postgres before they move
 // off the Mongo compatibility shim: profile $set, goals $set with dotted paths,

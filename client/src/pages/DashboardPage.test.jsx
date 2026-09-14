@@ -17,14 +17,14 @@ const summary = vi.hoisted(() => ({ props: null }));
 const workoutsView = vi.hoisted(() => ({ props: null }));
 const plansView = vi.hoisted(() => ({ props: null }));
 
-vi.mock("./dashboard/DashboardAtAGlance", () => ({
+vi.mock("./dashboard/components/DashboardAtAGlance", () => ({
   default: (props) => {
     glance.props = props;
     return <div data-testid="at-a-glance" />;
   }
 }));
 
-vi.mock("./dashboard/DashboardHeader", () => ({
+vi.mock("./dashboard/components/DashboardHeader", () => ({
   default: (props) => {
     header.props = props;
     return <div data-testid="header" ref={props.profileMenuRef} />;
@@ -33,52 +33,52 @@ vi.mock("./dashboard/DashboardHeader", () => ({
 
 // vi.mock factories are hoisted above every local binding, so each stub is
 // built inline rather than by a shared helper.
-vi.mock("./dashboard/SummaryView", () => ({
+vi.mock("./dashboard/views/SummaryView", () => ({
   default: (props) => {
     summary.props = props;
     return <div data-testid="summary-view" />;
   }
 }));
-vi.mock("./dashboard/DashboardDrawer", () => ({
+vi.mock("./dashboard/components/DashboardDrawer", () => ({
   default: (props) => {
     drawer.props = props;
     return <div data-testid="drawer" />;
   }
 }));
-vi.mock("./dashboard/DashboardBottomNav", () => ({
+vi.mock("./dashboard/components/DashboardBottomNav", () => ({
   default: (props) => {
     bottomNav.props = props;
     return <div data-testid="bottom-nav" />;
   }
 }));
-vi.mock("./dashboard/DashboardWorkoutModal", () => ({
+vi.mock("./dashboard/components/DashboardWorkoutModal", () => ({
   default: () => <div data-testid="workout-modal" />
 }));
-vi.mock("./dashboard/WorkoutsView", () => ({
+vi.mock("./dashboard/views/WorkoutsView", () => ({
   default: (props) => {
     workoutsView.props = props;
     return <div data-testid="workouts-view" />;
   }
 }));
-vi.mock("./dashboard/CaloriesView", () => ({
+vi.mock("./dashboard/views/CaloriesView", () => ({
   default: () => <div data-testid="calories-view" />
 }));
-vi.mock("./dashboard/PlansView", () => ({
+vi.mock("./dashboard/views/PlansView", () => ({
   default: (props) => {
     plansView.props = props;
     return <div data-testid="plans-view" />;
   }
 }));
-vi.mock("./dashboard/MealView", () => ({
+vi.mock("./dashboard/views/MealView", () => ({
   default: () => <div data-testid="meal-view" />
 }));
-vi.mock("./dashboard/TipsView", () => ({
+vi.mock("./dashboard/views/TipsView", () => ({
   default: () => <div data-testid="tips-view" />
 }));
-vi.mock("./dashboard/SettingsView", () => ({
+vi.mock("./dashboard/views/SettingsView", () => ({
   default: () => <div data-testid="settings-view" />
 }));
-vi.mock("./dashboard/DashboardHomeView", () => ({
+vi.mock("./dashboard/views/DashboardHomeView", () => ({
   default: () => <div data-testid="home-view" />
 }));
 

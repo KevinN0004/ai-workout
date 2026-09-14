@@ -1,4 +1,4 @@
-import useCloseOnEscape from "../../hooks/useCloseOnEscape";
+import useCloseOnEscape from "../../../hooks/useCloseOnEscape";
 
 export default function DashboardDrawer({ open, dashView, items, onClose, onNavigate }) {
   // The drawer is not portalled through ModalPortal, so it needs the same

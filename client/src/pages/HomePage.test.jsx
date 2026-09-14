@@ -40,7 +40,7 @@ vi.mock("./home/components/HomeWorkoutMeasure", () => ({
 
 vi.mock("./home/hooks/useHomeStageFlow", () => ({ default: () => flow.state }));
 
-vi.mock("./home/useBodyModel", () => ({
+vi.mock("./home/hooks/useBodyModel", () => ({
   default: () => ({
     resolvedHeightCm: 178,
     resolvedWeightKg: 77,

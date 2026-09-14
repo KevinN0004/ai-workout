@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 22.13+/24 (ESM), npm workspaces, ESLint 9 flat config, Prettier 3, Vitest 4, `audit-ci`, Docker Compose, GitHub Actions.
 
-**Design spec:** [`docs/superpowers/specs/2026-09-06-foundation-hardening-design.md`](../specs/2026-09-06-foundation-hardening-design.md)
+**Design spec:** [`docs/specs/2026-09-06-foundation-hardening-design.md`](../specs/2026-09-06-foundation-hardening-design.md)
 
 ---
 

@@ -1,5 +1,5 @@
 ﻿import "./HomePage.css";
-import useBodyModel from "./home/useBodyModel";
+import useBodyModel from "./home/hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../app/constants";
 import useHomeStageFlow from "./home/hooks/useHomeStageFlow";
 import PreviewPage from "./PreviewPage";

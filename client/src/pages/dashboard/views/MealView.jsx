@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { detectTrack } from "./planUtils";
-import { COURSE_ALL_KEY } from "./meal/data";
-import { getCalorieBand, handleImageError } from "./meal/utils";
-import useMealDbSearch from "./meal/useMealDbSearch";
-import MealLogPanel from "./meal/MealLogPanel";
-import MealSearchPanel from "./meal/MealSearchPanel";
-import MealCoursePanel from "./meal/MealCoursePanel";
-import MealSections from "./meal/MealSections";
-import MealDetailsModal from "./meal/MealDetailsModal";
+import { detectTrack } from "../planUtils";
+import { COURSE_ALL_KEY } from "../meal/data";
+import { getCalorieBand, handleImageError } from "../meal/utils";
+import useMealDbSearch from "../meal/useMealDbSearch";
+import MealLogPanel from "../meal/MealLogPanel";
+import MealSearchPanel from "../meal/MealSearchPanel";
+import MealCoursePanel from "../meal/MealCoursePanel";
+import MealSections from "../meal/MealSections";
+import MealDetailsModal from "../meal/MealDetailsModal";
 import "./MealView.css";
 
 export default function MealView({

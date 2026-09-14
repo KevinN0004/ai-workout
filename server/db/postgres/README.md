@@ -34,7 +34,7 @@ make the runner re-apply every migration from scratch.
 
 ## How migrations run
 
-`server/src/postgresMigrations.js` applies each unapplied `.sql` file in filename order,
+`server/src/db/postgresMigrations.js` applies each unapplied `.sql` file in filename order,
 recording it in `schema_migrations`. Each file runs `begin`/SQL/`commit` on **one**
 checked-out connection, so a failure rolls back cleanly and the file is not recorded — a
 partial apply cannot be mistaken for a completed one.

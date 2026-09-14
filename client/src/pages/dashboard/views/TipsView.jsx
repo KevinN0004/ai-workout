@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { detectTrack } from "./planUtils";
-import ExerciseTile from "./tips/ExerciseTile";
-import ExerciseDetailsModal from "./tips/ExerciseDetailsModal";
+import { detectTrack } from "../planUtils";
+import ExerciseTile from "../tips/ExerciseTile";
+import ExerciseDetailsModal from "../tips/ExerciseDetailsModal";
 import {
   normalizeText,
   uniqueList,
@@ -12,7 +12,7 @@ import {
   detectInjuryFlags,
   scoreExercise,
   buildGuideCards
-} from "./tips/recommendationUtils";
+} from "../tips/recommendationUtils";
 import "./TipsView.css";
 
 const DEFAULT_LIMIT = 48;
