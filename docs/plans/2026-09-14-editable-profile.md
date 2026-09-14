@@ -62,6 +62,19 @@ Read these before starting. Each is a real constraint that has already caused a 
 
 ### Task 1: Server — the seven new profile fields
 
+> **Status: done, and the code blocks below are superseded.** They are kept as
+> written so the corrections are legible rather than erased. Three things in
+> this task turned out to be wrong and were fixed during implementation:
+> `sleep`/`experience`/`nutrition`/`cardio` are closed-set selects and are
+> validated against allowlists rather than stored as free text via `cleanText`;
+> the fixture `"7-8 hours"` is not a value the form can produce, the real option
+> being `"7 - 8 hours"`; and the `"caps trainingDays at seven days"` test below
+> is doubly obsolete — `trainingDays` is no longer capped at all, and that
+> fixture put its duplicate at the END of the array, past where the buggy slice
+> had already cut, so it could never have caught the bug it was named for. See
+> the `trainingDays` note in Task 2 for the full history. Read the committed
+> code, not this snippet.
+
 **Files:**
 
 - Modify: `server/src/services/dashboardDataBuildersService.js:26-46` and `:145-168`
@@ -309,14 +322,22 @@ In `apiSchemaService.js`, add to the `profileInputSchema` object literal, after 
     nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
     cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
     goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
-    trainingDays: optionalStringArrayField(7, 20)
+    trainingDays: z.array(z.enum(allowedTrainingDayValues)).max(7).optional()
 ```
 
-`optionalStringArrayField` is already defined in this file at line 28. Import the five `allowed*Values` lists from `./dashboardDataBuildersService.js` alongside the existing `allowedSexValues` / `allowedActivityValues` import. **Do not retype the option strings here** — import the lists Task 1 created, so the schema and `buildProfile` cannot disagree about what is valid.
+Import the six `allowed*Values` lists from `./dashboardDataBuildersService.js` alongside the existing `allowedSexValues` / `allowedActivityValues` import. **Do not retype the option strings here** — import the lists Task 1 created, so the schema and `buildProfile` cannot disagree about what is valid.
 
-Only `timeline` is free text. The other five are closed-set `<select>` fields and are declared exactly the way `sex` already is in this same schema, so an invalid value is a 400 rather than a silent fallback to `""`. `buildProfile` still guards them independently; that double-guarding matches the existing `sex` precedent and is deliberate.
+Only `timeline` is free text. Every other field here is closed-set and is declared the way `sex` already is, so an invalid value is a 400 rather than a silent fallback to `""`. `buildProfile` still guards each one independently; that double-guarding matches the existing `sex` precedent and is deliberate.
 
-`trainingDays` is the one asymmetry: the schema only cleans the strings, and `buildProfile` filters out anything that is not one of the seven day names. A request naming an unknown day therefore succeeds with that day dropped rather than returning 400. That is deliberate for a multiselect — one stray entry should not reject the whole save — but it is a silent drop, so it is called out here rather than left to be discovered.
+**`trainingDays` was got wrong three times before reaching the form above, and the history is the reason for the shape.** An earlier version of this plan said the schema should merely clean the strings and let `buildProfile` drop unknown days silently, justified as being kind to clients — one stray entry should not reject a whole save. That was wrong, and the sequence is worth knowing because the same instinct will recur:
+
+1. `buildProfile` capped the list to 7 before deduping, so selecting all seven days stored six.
+2. The schema then capped to 7 before `buildProfile`'s day filter, so `["x1".."x7","Monday"]` stored nothing at all — and returned 200.
+3. Widening that cap to 64 moved the identical failure to 65 entries rather than removing it.
+
+**A length cap placed in front of a membership filter silently discards valid data, and raising the number never fixes it.** The cure is to stop capping and start validating: with `z.enum`, an unknown day is a 400, and `z.array().max()` _rejects_ rather than truncating, so no silent drop remains anywhere in the path. It also makes `trainingDays` consistent with every sibling closed-set field instead of being the one that quietly discards bad input.
+
+`buildProfile` was changed to match — it no longer slices its input at all, and instead filters `allowedTrainingDayValues` against whatever it was given, so the result is bounded at seven and deduped by construction with no cap to place wrongly.
 
 - [ ] **Step 4: Run the test and watch it pass**
 

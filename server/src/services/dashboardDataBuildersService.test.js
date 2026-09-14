@@ -108,6 +108,18 @@ describe("buildProfile", () => {
     expect(buildProfile({ trainingDays: null }).trainingDays).toEqual([]);
   });
 
+  // A bare string is not a one-day selection. toCleanArray used to wrap a scalar
+  // into a single-element array, so this returned ["Monday"]; filtering the
+  // canonical days against the raw input does not, and that is the intended
+  // reading -- trainingDays is a multi-select and every other array field in
+  // this file already refuses to invent a list from a scalar. Unreachable over
+  // HTTP, where the schema rejects a non-array outright; pinned because a direct
+  // caller can still reach it and the null case above cannot tell the two
+  // implementations apart.
+  test("does not treat a bare string as a one-day selection", () => {
+    expect(buildProfile({ trainingDays: "Monday" }).trainingDays).toEqual([]);
+  });
+
   test("accepts a goal from the allowed list", () => {
     expect(buildProfile({ goal: allowedGoalValues[1] }).goal).toBe(allowedGoalValues[1]);
   });

@@ -83,10 +83,13 @@ is required**. Three files change:
   and `goal` are each validated against an allowlist and fall back to `""`,
   mirroring how `sex` and `activity` already work. `trainingDays` is cleaned,
   deduped and filtered to the seven day names.
-- **`profileInputSchema`** — `optionalStringField(60)` for `timeline`, an
-  `optionalStringArrayField(7, 20)` for `trainingDays`, and a
+- **`profileInputSchema`** — `optionalStringField(60)` for `timeline`, a
+  `z.array(z.enum(allowedTrainingDayValues)).max(7).optional()` for
+  `trainingDays`, and a
   `z.union([z.enum(allowedXValues), z.literal("")]).optional()` for each of the
-  five closed-set fields, matching how `sex` is already declared.
+  five closed-set scalar fields, matching how `sex` is already declared. Every
+  field except `timeline` rejects an unrecognised value with a 400 rather than
+  storing a fallback.
 
 **Correction, recorded because the first draft of this spec had it wrong.** An
 earlier version of this section called `sleep`, `experience`, `nutrition` and
@@ -106,11 +109,24 @@ Two consequences worth carrying forward:
   list has **eight** entries; `"Mixed"` is easy to miss and is scored `0.7` in
   `useBodyModel`. Build each list from the `<option>` elements and cross-check it
   against the lookup-map keys.
-- **`trainingDays` must be deduped and filtered before any cap, not after.**
-  `trainingDaysScore` keys on array length alone, so duplicates both inflate the
-  score and consume cap slots — capping first drops a real day off the end.
-  Filtering to the seven day names and deduping bounds the result at seven by
-  construction, which removes the cap rather than relocating it.
+- **A length cap placed in front of a membership filter silently discards valid
+  data, and raising the number never fixes it.** `trainingDays` got this wrong
+  three times: `buildProfile` capped to 7 before deduping, so all seven days
+  selected stored six; the schema then capped to 7 before `buildProfile`'s
+  filter, so `["x1".."x7","Monday"]` stored nothing and returned 200; widening
+  that cap to 64 moved the identical failure to 65 entries. The cure is to stop
+  capping and start validating — `z.enum` rejects an unknown day, and
+  `z.array().max()` rejects rather than truncating, so no silent drop is left.
+  `buildProfile` no longer slices at all: it filters the seven canonical day
+  names against its input, so the result is bounded and deduped by construction
+  with no cap to misplace.
+
+  The instinct that produced all three bugs was treating "cap the list" as
+  validation. It is not — it is an ordering hazard. The same instinct also
+  produced the justification that a stray entry should be dropped rather than
+  rejected "to be kind to clients", which made `trainingDays` the only
+  closed-set field in the schema that silently discarded bad input, in a change
+  whose whole purpose was eliminating silent data loss.
 
 `allowedGoalValues` is reinstated in `dashboardDataBuildersService.js` beside
 `allowedSexValues` and `allowedActivityValues`. The list is recovered verbatim
