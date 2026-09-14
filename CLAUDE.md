@@ -59,12 +59,17 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 
 - NEVER save to root folder
 - `client/src` — React 18 + Vite frontend source
-- `server/src` — Express 4 API, services, routes
+- `client/src/pages/<page>` — a page's own parts, in `views/`, `components/`, `hooks/`
+  and `styles/`. The page component itself still sits at `pages/<Page>Page.jsx`
+- `server/src` — Express 4 API, services, routes. Only the app bootstrap
+  (`index.js`, `corsPolicy.js`, `shutdown.js`) stays at this level
+- `server/src/db` — the Postgres pool, the Prisma client and the migration runner
 - `server/src/repositories` — **all Prisma data access lives here.** Routes and services
   call these; nothing else should touch `prisma.*` directly
 - `server/prisma` — Prisma schema and migrations
 - `server/scripts` — server operational scripts (local Postgres, migrations)
-- `docs/` — documentation and plans
+- `docs/plans` — implementation plans, one file per effort, named `YYYY-MM-DD-name.md`
+- `docs/specs` — design specs, named to match the plan they belong to
 - `scripts/` — repo-level tooling (Claude Code hook targets live here)
 
 ## Project Architecture
@@ -798,7 +803,7 @@ the native instance all along.
     paragraphs under its nested `- [x]` task-list items four spaces deeper, growing the
     file 280 bytes per run with no fixed point. Re-test after a Prettier upgrade by
     checking byte-stability across ~3 consecutive passes, not by a single clean `--check`.
-    Not every slow-converging file is that file. `docs/superpowers/plans/2026-09-06-foundation-hardening.md`
+    Not every slow-converging file is that file. `docs/plans/2026-09-06-foundation-hardening.md`
     needed **two** `--write` passes to settle (70,068 then 70,066 bytes, stable after) and
     is not excluded, because it has a fixed point. The pathological case grows without
     bound; a file that stops changing is merely awkward. Measure before excluding one.

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import request from "supertest";
 import { app } from "./index.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "./db/prisma.js";
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");

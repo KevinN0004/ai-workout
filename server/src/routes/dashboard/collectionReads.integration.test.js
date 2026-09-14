@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../index.js";
-import { prisma } from "../../prisma.js";
+import { prisma } from "../../db/prisma.js";
 
 // Pins the paginated dashboard collection reads against real Postgres before
 // loadCollectionPage is migrated off the Mongo compatibility shim.

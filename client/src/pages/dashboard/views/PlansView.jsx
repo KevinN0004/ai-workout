@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildWeeklyMealPlan } from "./planUtils";
-import ModalPortal from "../../components/ModalPortal";
+import { buildWeeklyMealPlan } from "../planUtils";
+import ModalPortal from "../../../components/ModalPortal";
 import "./PlansView.css";
 
 const SAVED_EXERCISE_PAGE_SIZE = 24;

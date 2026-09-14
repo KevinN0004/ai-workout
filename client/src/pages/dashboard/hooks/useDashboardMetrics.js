@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { buildWeeklyMealPlan } from "./planUtils";
+import { buildWeeklyMealPlan } from "../planUtils";
 
 const parseDateValue = (value) => {
   if (!value) return null;

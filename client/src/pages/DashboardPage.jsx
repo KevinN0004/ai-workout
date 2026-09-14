@@ -1,21 +1,21 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import SummaryView from "./dashboard/SummaryView";
-import DashboardHeader from "./dashboard/DashboardHeader";
-import DashboardDrawer from "./dashboard/DashboardDrawer";
-import DashboardBottomNav from "./dashboard/DashboardBottomNav";
-import DashboardAtAGlance from "./dashboard/DashboardAtAGlance";
-import DashboardWorkoutModal from "./dashboard/DashboardWorkoutModal";
-import useDashboardMetrics from "./dashboard/useDashboardMetrics";
+import SummaryView from "./dashboard/views/SummaryView";
+import DashboardHeader from "./dashboard/components/DashboardHeader";
+import DashboardDrawer from "./dashboard/components/DashboardDrawer";
+import DashboardBottomNav from "./dashboard/components/DashboardBottomNav";
+import DashboardAtAGlance from "./dashboard/components/DashboardAtAGlance";
+import DashboardWorkoutModal from "./dashboard/components/DashboardWorkoutModal";
+import useDashboardMetrics from "./dashboard/hooks/useDashboardMetrics";
 import { getLocalDateKey } from "../app/units";
 import "./DashboardPage.css";
 
-const WorkoutsView = lazy(() => import("./dashboard/WorkoutsView"));
-const CaloriesView = lazy(() => import("./dashboard/CaloriesView"));
-const PlansView = lazy(() => import("./dashboard/PlansView"));
-const MealView = lazy(() => import("./dashboard/MealView"));
-const TipsView = lazy(() => import("./dashboard/TipsView"));
-const SettingsView = lazy(() => import("./dashboard/SettingsView"));
-const DashboardHomeView = lazy(() => import("./dashboard/DashboardHomeView"));
+const WorkoutsView = lazy(() => import("./dashboard/views/WorkoutsView"));
+const CaloriesView = lazy(() => import("./dashboard/views/CaloriesView"));
+const PlansView = lazy(() => import("./dashboard/views/PlansView"));
+const MealView = lazy(() => import("./dashboard/views/MealView"));
+const TipsView = lazy(() => import("./dashboard/views/TipsView"));
+const SettingsView = lazy(() => import("./dashboard/views/SettingsView"));
+const DashboardHomeView = lazy(() => import("./dashboard/views/DashboardHomeView"));
 
 const DASH_VIEW_TO_ROUTE = {
   summary: "/dashboard",

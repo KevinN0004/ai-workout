@@ -19,7 +19,7 @@ Task:
 [fill in: one-sentence implementation objective]
 
 Plan Source:
-- [docs/superpowers/plans/YYYY-MM-DD-name.md OR pasted task text]
+- [docs/plans/YYYY-MM-DD-name.md OR pasted task text]
 - [task id/title from the plan]
 
 Scope:

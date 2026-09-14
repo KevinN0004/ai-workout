@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
-import { prisma } from "../prisma.js";
+import { prisma } from "../db/prisma.js";
 import { createUserReadRepository } from "./userReadRepository.js";
 import { createProgressMetricRepository } from "./progressMetricRepository.js";
 import { createDashboardCollectionRepository } from "./dashboardCollectionRepository.js";

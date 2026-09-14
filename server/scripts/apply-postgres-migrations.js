@@ -2,8 +2,8 @@ import path from "path";
 import { inspect } from "node:util";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import { closePostgres, connectPostgres, getPostgresPool } from "../src/postgres.js";
-import { applyMigrations } from "../src/postgresMigrations.js";
+import { closePostgres, connectPostgres, getPostgresPool } from "../src/db/postgres.js";
+import { applyMigrations } from "../src/db/postgresMigrations.js";
 
 dotenv.config();
 

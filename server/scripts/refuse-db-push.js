@@ -13,7 +13,7 @@
  * reason in the place someone looks when they go hunting for a push script,
  * rather than leaving them to find nothing and reach for the raw command.
  *
- * The actual detection lives in server/src/postgresUniqueIndexes.test.js, which
+ * The actual detection lives in server/src/db/postgresUniqueIndexes.test.js, which
  * asserts all eight still exist in the live database.
  */
 process.stderr.write(
@@ -32,7 +32,7 @@ process.stderr.write(
     "      npm run migrate:postgres -w server",
     "",
     "  If you genuinely need to change the schema, add SQL to",
-    "  server/db/postgres/ and let server/src/postgresUniqueIndexes.test.js",
+    "  server/db/postgres/ and let server/src/db/postgresUniqueIndexes.test.js",
     "  confirm the indexes survive.",
     ""
   ].join("\n") + "\n"

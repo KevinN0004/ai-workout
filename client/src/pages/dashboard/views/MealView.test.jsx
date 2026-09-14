@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import MealView from "./MealView";
-import { MEALDB_RECOMMENDATION_QUERIES } from "./meal/data";
+import { MEALDB_RECOMMENDATION_QUERIES } from "../meal/data";
 
 // MealView is the coordinator for the meal tab: it picks the recommendation
 // track from the account's goal text, derives the calorie band and the portion

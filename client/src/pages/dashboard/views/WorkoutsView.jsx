@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { getLocalDateKey } from "../../app/units";
+import { getLocalDateKey } from "../../../app/units";
 import "./WorkoutsView.css";
 
 const INITIAL_VISIBLE_ROWS = 40;

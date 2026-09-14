@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
-import { prisma } from "../../../prisma.js";
+import { prisma } from "../../../db/prisma.js";
 
 // Pins POST /api/dashboard/workouts and its /workout-sessions alias against real
 // Postgres before that route is migrated off the Mongo compatibility shim.

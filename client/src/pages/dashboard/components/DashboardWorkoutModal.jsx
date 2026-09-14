@@ -1,4 +1,4 @@
-import ModalPortal from "../../components/ModalPortal";
+import ModalPortal from "../../../components/ModalPortal";
 
 export default function DashboardWorkoutModal({
   open,
