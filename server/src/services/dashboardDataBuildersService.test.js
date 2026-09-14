@@ -5,6 +5,7 @@ import {
   allowedGoalValues,
   allowedNutritionValues,
   allowedSleepValues,
+  allowedTrainingDayValues,
   buildProfile,
   defaultProfile
 } from "./dashboardDataBuildersService";
@@ -59,20 +60,23 @@ describe("buildProfile", () => {
     ]);
   });
 
-  test("caps trainingDays at seven days", () => {
-    // trainingDays is validated against the seven day names, so an 8th entry
-    // has to be a repeat rather than an 8th distinct value -- there isn't one.
+  test("does not drop a day when an earlier duplicate would have consumed a cap slot", () => {
+    // A cap-then-dedupe implementation (toCleanArray's slice(0, 7) applied
+    // before the Set) drops Sunday here: the leading duplicate "Monday"
+    // occupies a slot within the first 7 entries, pushing Sunday past the
+    // cut before dedup ever runs. Validating against the seven canonical
+    // days by construction has no cap step to get this wrong.
     const eight = [
+      "Monday",
       "Monday",
       "Tuesday",
       "Wednesday",
       "Thursday",
       "Friday",
       "Saturday",
-      "Sunday",
-      "Monday"
+      "Sunday"
     ];
-    expect(buildProfile({ trainingDays: eight }).trainingDays).toHaveLength(7);
+    expect(buildProfile({ trainingDays: eight }).trainingDays).toEqual(allowedTrainingDayValues);
   });
 
   test("rejects a value in trainingDays that is not one of the seven days", () => {

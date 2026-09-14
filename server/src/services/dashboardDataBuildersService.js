@@ -80,7 +80,6 @@ const allowedSleeps = new Set(allowedSleepValues);
 const allowedExperiences = new Set(allowedExperienceValues);
 const allowedNutritions = new Set(allowedNutritionValues);
 const allowedCardios = new Set(allowedCardioValues);
-const allowedTrainingDays = new Set(allowedTrainingDayValues);
 const allowedMealTypes = new Set(allowedMealTypeValues);
 
 export const defaultProfile = () => ({
@@ -228,8 +227,13 @@ export const buildProfile = (input = {}) => {
     nutrition: allowedNutritions.has(input.nutrition) ? input.nutrition : "",
     cardio: allowedCardios.has(input.cardio) ? input.cardio : "",
     goal: allowedGoals.has(input.goal) ? input.goal : "",
-    trainingDays: [...new Set(toCleanArray(input.trainingDays, 7, 20))].filter((day) =>
-      allowedTrainingDays.has(day)
+    // Iterate the seven canonical days rather than the input array: filtering
+    // and deduping *before* any cap means the result can never exceed seven,
+    // so there is no cap to separately get right. 64 only bounds the raw
+    // array passed to toCleanArray before membership is checked, which is
+    // why it is far larger than 7 -- it is not the day cap.
+    trainingDays: allowedTrainingDayValues.filter((day) =>
+      toCleanArray(input.trainingDays, 64, 20).includes(day)
     ),
     updatedAt: new Date().toISOString()
   };
