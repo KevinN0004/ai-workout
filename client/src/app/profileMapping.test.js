@@ -123,6 +123,36 @@ describe("personalToProfile", () => {
   test("never sends a non-array trainingDays", () => {
     expect(personalToProfile({ trainingDays: "Monday" }).trainingDays).toEqual([]);
   });
+
+  test.each([
+    ["sex", "Female"],
+    ["activity", "High"],
+    ["notes", "Back injury, avoid deadlifts"]
+  ])("carries a populated %s through", (field, value) => {
+    expect(personalToProfile({ [field]: value })[field]).toBe(value);
+  });
+});
+
+// A default parameter only fires on undefined, and this is a shared module a
+// future caller can reach with an explicit null. Neither argument may throw.
+describe("defensive arguments", () => {
+  test.each([
+    ["no arguments at all", undefined, undefined],
+    ["a null subject", null, undefined],
+    ["null units", {}, null],
+    ["both null", null, null]
+  ])("personalToProfile survives %s", (_label, subject, units) => {
+    expect(() => personalToProfile(subject, units)).not.toThrow();
+  });
+
+  test.each([
+    ["no arguments at all", undefined, undefined],
+    ["a null subject", null, undefined],
+    ["null units", {}, null],
+    ["both null", null, null]
+  ])("profileToPersonal survives %s", (_label, subject, units) => {
+    expect(() => profileToPersonal(subject, units)).not.toThrow();
+  });
 });
 
 describe("profileToPersonal", () => {
@@ -162,6 +192,30 @@ describe("profileToPersonal", () => {
 
   test("defaults trainingDays to an array", () => {
     expect(profileToPersonal({ trainingDays: null }).trainingDays).toEqual([]);
+  });
+
+  // These three were carried correctly but nothing asserted it, so deleting any
+  // of them fell through to the defaultPersonalForm spread and every test still
+  // passed -- the defaults are "" and "Moderate", which is what the assertions
+  // would have seen anyway. Populated values are what discriminate.
+  test.each([
+    ["sex", "Female"],
+    ["notes", "Back injury, avoid deadlifts"]
+  ])("carries a populated %s through", (field, value) => {
+    expect(profileToPersonal({ [field]: value })[field]).toBe(value);
+  });
+
+  test("carries a populated activity through", () => {
+    expect(profileToPersonal({ activity: "High" }).activity).toBe("High");
+  });
+
+  // Not a round trip to "", and deliberately so: buildProfile falls an
+  // unrecognised activity back to "Moderate" while sex falls back to "". A
+  // cleared activity really is stored as "Moderate", so reading it back that way
+  // reports what happened rather than inventing it.
+  test("fills a cleared activity with the default, mirroring the server", () => {
+    expect(profileToPersonal({ activity: "" }).activity).toBe("Moderate");
+    expect(profileToPersonal({ sex: "" }).sex).toBe("");
   });
 
   test("supplies the rest of the personal form so callers get a complete shape", () => {
