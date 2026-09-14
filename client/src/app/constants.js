@@ -16,11 +16,18 @@ export const goalOptions = [
 
 // Each of these must match its allowed*Values counterpart in the server's
 // dashboardDataBuildersService.js, which now rejects anything else with a 400.
-// They cannot be imported across the wire, so the duplication is unavoidable --
-// but it is kept to ONE copy on each side. AuthPage, HomePersonalStage and
-// PreviewPersonalChapter currently hardcode the same options as inline <option>
-// elements; migrating those three to read from here is worthwhile and is
-// deliberately out of scope for this plan.
+// The running app cannot import across the wire, so the duplication is
+// unavoidable -- but constants.test.js imports the server lists directly and
+// asserts equality, so a divergence fails the suite rather than waiting to be
+// found as a 400 on a valid dropdown choice.
+//
+// Three views still hardcode these as inline <option> elements and are the
+// least guarded copies, since nothing pins their text against this file:
+// HomePersonalStage and PreviewPersonalChapter duplicate all six, and AuthPage
+// duplicates sex and activity only -- it has no sleep, experience, nutrition or
+// cardio select at all. None of the three renders a goal select, so goalOptions
+// above is not among the duplicated lists. Migrating them to map over these
+// exports is worthwhile and is deliberately out of scope for this plan.
 //
 // Copy these from the <option> elements in HomePersonalStage.jsx, not from
 // memory. Two of them are easy to get wrong: sleep is "7 - 8 hours" with spaces

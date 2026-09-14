@@ -10,6 +10,15 @@ import {
   sexOptions,
   sleepOptions
 } from "./constants";
+import {
+  allowedActivityValues,
+  allowedCardioValues,
+  allowedExperienceValues,
+  allowedGoalValues,
+  allowedNutritionValues,
+  allowedSexValues,
+  allowedSleepValues
+} from "../../../server/src/services/dashboardDataBuildersService.js";
 
 // Every list here is duplicated on the server, which rejects anything outside
 // it with a 400. A list that omits a real option therefore makes a legitimate
@@ -86,5 +95,31 @@ describe("the closed-set option lists", () => {
 describe("defaultPersonalForm", () => {
   test("declares goal so the generic change handler can set it", () => {
     expect(defaultPersonalForm).toHaveProperty("goal", "");
+  });
+});
+
+// The literal assertions above pin what these lists should say. This block pins
+// that the server agrees, which is a different failure and the one with teeth:
+// the server rejects an out-of-list value with a 400, so a divergence shows up
+// to a user as a valid dropdown choice they cannot save.
+//
+// The running app cannot import across the wire, but a test can. Verified to
+// pull the live arrays rather than resolving to something inert -- asserting a
+// deliberately wrong value reports the real eight cardio entries back.
+//
+// Both mistakes this plan actually made -- dropping "Mixed" from cardio, and
+// writing "7-8 hours" for "7 - 8 hours" -- would have failed here mechanically
+// instead of needing a human to spot them.
+describe("agreement with the server's allowlists", () => {
+  test.each([
+    ["sex", sexOptions, allowedSexValues],
+    ["activity", activityOptions, allowedActivityValues],
+    ["sleep", sleepOptions, allowedSleepValues],
+    ["experience", experienceOptions, allowedExperienceValues],
+    ["nutrition", nutritionOptions, allowedNutritionValues],
+    ["cardio", cardioOptions, allowedCardioValues],
+    ["goal", goalOptions, allowedGoalValues]
+  ])("the %s list matches the server exactly", (_label, client, server) => {
+    expect(client).toEqual(server);
   });
 });
