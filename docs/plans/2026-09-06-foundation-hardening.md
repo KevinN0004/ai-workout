@@ -10,6 +10,10 @@
 
 **Design spec:** [`docs/specs/2026-09-06-foundation-hardening-design.md`](../specs/2026-09-06-foundation-hardening-design.md)
 
+> **Paths below are as they were in September 2026.** `postgresMigrations.js`
+> moved from `server/src/` to `server/src/db/` in `97c93c3`; read the references
+> to it as historical.
+
 ---
 
 ## Baseline (must not regress)

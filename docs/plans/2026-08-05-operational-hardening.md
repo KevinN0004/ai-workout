@@ -14,6 +14,11 @@
 > Two items listed under Out of Scope below remain genuinely open and are worth
 > follow-ups: the Prisma/SQL unique-index drift, and the dependency CVEs.
 >
+> **Paths below are as they were in August 2026 and several no longer resolve.**
+> `postgres.js`, `postgresMigrations.js` and `prisma.js` moved from `server/src/`
+> to `server/src/db/` in `97c93c3`. The paths are left as written because this
+> plan records what was created at the time; read them as historical.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the three deploy-blocking operational defects found in the audit: unbounded metric cardinality, non-transactional migrations, and the absence of graceful shutdown.
