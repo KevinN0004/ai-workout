@@ -635,6 +635,47 @@ describe("profile", () => {
     expect(response.status).toBe(500);
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
   });
+
+  test("accepts and returns the training and lifestyle fields", async () => {
+    rows.push({ userId: "u-1", email: "a@b.com", profile: defaultProfile() });
+    const app = buildApp();
+    const response = await request(app)
+      .post("/api/profile")
+      .send({
+        sleep: "7 - 8 hours",
+        timeline: "3 months",
+        experience: "Intermediate",
+        nutrition: "High-protein",
+        cardio: "Mixed",
+        goal: "Mobility",
+        trainingDays: ["Monday", "Wednesday"]
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.profile).toMatchObject({
+      sleep: "7 - 8 hours",
+      cardio: "Mixed",
+      goal: "Mobility",
+      trainingDays: ["Monday", "Wednesday"]
+    });
+  });
+
+  // One per closed-set field. An allowlist that silently omits a real option is
+  // the same defect class this whole change exists to close, so each field is
+  // asserted separately rather than trusting one representative.
+  test.each([
+    ["sleep", "Nine-ish"],
+    ["experience", "Wizard-tier"],
+    ["nutrition", "Junk only"],
+    ["cardio", "Interpretive dance"],
+    ["goal", "Become a wizard"]
+  ])("rejects a %s value outside the allowed list", async (field, value) => {
+    const response = await request(buildApp())
+      .post("/api/profile")
+      .send({ [field]: value });
+
+    expect(response.status).toBe(400);
+  });
 });
 
 describe("POST /api/auth/logout", () => {

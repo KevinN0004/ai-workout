@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { allowedActivityValues, allowedSexValues } from "./dashboardDataBuildersService.js";
+import {
+  allowedActivityValues,
+  allowedCardioValues,
+  allowedExperienceValues,
+  allowedGoalValues,
+  allowedNutritionValues,
+  allowedSexValues,
+  allowedSleepValues
+} from "./dashboardDataBuildersService.js";
 
 const toNumberInput = (value) => {
   if (value === "") return null;
@@ -49,7 +57,14 @@ const profileInputSchema = z
     sex: z.union([z.enum(allowedSexValues), z.literal("")]).optional(),
     bodyFat: optionalNullableNumberField(3, 70),
     activity: z.union([z.enum(allowedActivityValues), z.literal("")]).optional(),
-    notes: optionalStringField(500)
+    notes: optionalStringField(500),
+    sleep: z.union([z.enum(allowedSleepValues), z.literal("")]).optional(),
+    timeline: optionalStringField(60),
+    experience: z.union([z.enum(allowedExperienceValues), z.literal("")]).optional(),
+    nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
+    cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
+    goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
+    trainingDays: optionalStringArrayField(7, 20)
   })
   .passthrough();
 
