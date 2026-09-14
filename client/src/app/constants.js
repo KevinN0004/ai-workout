@@ -4,6 +4,52 @@ export const APP_BRAND_TAGLINE = "Your guide for this journey.";
 
 export const quickFocuses = ["Strength", "Weight Loss", "Mobility", "Recovery", "Cardio"];
 
+// Removed as dead code in c2c820f and reinstated deliberately: the profile now
+// carries a goal, and createDefaultPlannerForm seeds from it.
+export const goalOptions = [
+  "Build lean strength and energy",
+  "Fat loss + conditioning",
+  "Mobility",
+  "Recovery",
+  "Cardio"
+];
+
+// Each of these must match its allowed*Values counterpart in the server's
+// dashboardDataBuildersService.js, which now rejects anything else with a 400.
+// They cannot be imported across the wire, so the duplication is unavoidable --
+// but it is kept to ONE copy on each side. AuthPage, HomePersonalStage and
+// PreviewPersonalChapter currently hardcode the same options as inline <option>
+// elements; migrating those three to read from here is worthwhile and is
+// deliberately out of scope for this plan.
+//
+// Copy these from the <option> elements in HomePersonalStage.jsx, not from
+// memory. Two of them are easy to get wrong: sleep is "7 - 8 hours" with spaces
+// around the hyphen, and cardio has EIGHT entries -- "Mixed" was missed once
+// already, and an allowlist missing a real option silently drops a legitimate
+// value, which is the defect class this whole change exists to close.
+export const sexOptions = ["Female", "Male", "Non-binary", "Prefer not to say"];
+export const activityOptions = ["Light", "Moderate", "High", "Very high"];
+export const sleepOptions = ["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"];
+export const experienceOptions = ["Beginner", "Intermediate", "Advanced"];
+export const nutritionOptions = [
+  "No preference",
+  "High-protein",
+  "Balanced",
+  "Low-carb",
+  "Vegetarian",
+  "Vegan"
+];
+export const cardioOptions = [
+  "None",
+  "Walking",
+  "Running",
+  "Cycling",
+  "Rowing",
+  "Swimming",
+  "HIIT",
+  "Mixed"
+];
+
 export const equipmentOptionsByEnv = {
   Home: [
     "Bodyweight only",
@@ -100,6 +146,7 @@ export const defaultPersonalForm = {
   sex: "",
   bodyFat: "",
   activity: "Moderate",
+  goal: "",
   sleep: "",
   timeline: "",
   experience: "",

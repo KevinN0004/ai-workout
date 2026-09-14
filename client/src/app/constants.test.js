@@ -1,0 +1,90 @@
+import { describe, expect, test } from "vitest";
+import {
+  activityOptions,
+  cardioOptions,
+  createDefaultPlannerForm,
+  defaultPersonalForm,
+  experienceOptions,
+  goalOptions,
+  nutritionOptions,
+  sexOptions,
+  sleepOptions
+} from "./constants";
+
+// Every list here is duplicated on the server, which rejects anything outside
+// it with a 400. A list that omits a real option therefore makes a legitimate
+// dropdown choice unsaveable -- which is the defect class this whole change
+// exists to close, and which has already happened once on this plan.
+//
+// These assertions also keep knip quiet: the lists have no importer until the
+// settings field descriptors land, and CI fails on an unused export.
+
+describe("goalOptions", () => {
+  test("offers the five goals the planner prompt understands", () => {
+    expect(goalOptions).toEqual([
+      "Build lean strength and energy",
+      "Fat loss + conditioning",
+      "Mobility",
+      "Recovery",
+      "Cardio"
+    ]);
+  });
+
+  // The planner's fallback must stay a member of the list, or a signed-out
+  // visitor gets a goal the profile select cannot represent.
+  test("the planner default is one of them", () => {
+    expect(goalOptions).toContain(createDefaultPlannerForm().goal);
+  });
+});
+
+describe("the closed-set option lists", () => {
+  test("offers the four sex values the server accepts", () => {
+    expect(sexOptions).toEqual(["Female", "Male", "Non-binary", "Prefer not to say"]);
+  });
+
+  test("offers the four activity levels the server accepts", () => {
+    expect(activityOptions).toEqual(["Light", "Moderate", "High", "Very high"]);
+  });
+
+  // The hyphen has spaces around it. "7-8 hours" is not a value the form can
+  // produce, and an earlier draft of this plan had it wrong.
+  test("spells the sleep bands exactly as the form does", () => {
+    expect(sleepOptions).toEqual(["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"]);
+  });
+
+  test("offers the three experience levels", () => {
+    expect(experienceOptions).toEqual(["Beginner", "Intermediate", "Advanced"]);
+  });
+
+  test("offers the six nutrition preferences", () => {
+    expect(nutritionOptions).toEqual([
+      "No preference",
+      "High-protein",
+      "Balanced",
+      "Low-carb",
+      "Vegetarian",
+      "Vegan"
+    ]);
+  });
+
+  // EIGHT, not seven. "Mixed" was dropped once already from a hand-written
+  // copy of this list, and useBodyModel scores it 0.7 like any other.
+  test("offers all eight cardio styles, including Mixed", () => {
+    expect(cardioOptions).toEqual([
+      "None",
+      "Walking",
+      "Running",
+      "Cycling",
+      "Rowing",
+      "Swimming",
+      "HIIT",
+      "Mixed"
+    ]);
+  });
+});
+
+describe("defaultPersonalForm", () => {
+  test("declares goal so the generic change handler can set it", () => {
+    expect(defaultPersonalForm).toHaveProperty("goal", "");
+  });
+});
