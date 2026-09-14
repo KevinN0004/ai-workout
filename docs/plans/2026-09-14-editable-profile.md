@@ -279,11 +279,24 @@ The surrounding block already builds an authenticated app; follow the existing `
 
 **The fixture values above are exact and matter.** `sleep` is `"7 - 8 hours"` with spaces around the hyphen, and `cardio` is deliberately `"Mixed"` — the eighth option, the one most easily dropped from a hand-written allowlist. Both are taken from the `<option>` elements in `HomePersonalStage.jsx`. Do not "tidy" them. An earlier draft of this plan wrote `"7-8 hours"`, which is not a value the form can produce, and would have passed against a schema that was wrong in the same direction.
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [ ] **Step 2: Run the tests and watch the right ones fail**
 
-Run: `npx vitest run --root server src/routes/authRoutes.test.js -t "training and lifestyle"`
+Run both:
 
-Expected: FAIL. The fields are stripped before reaching `buildProfile`, so `profile.sleep` is `""`.
+```bash
+npx vitest run --root server src/routes/authRoutes.test.js -t "training and lifestyle"
+npx vitest run --root server src/routes/authRoutes.test.js -t "rejects a"
+```
+
+Expected: the acceptance test **passes** already; the five rejection tests **fail**.
+
+That is not a mistake in the test — it is what this task actually fixes, and it is worth understanding before writing the schema. `profileInputSchema` is `.passthrough()`, and Zod's passthrough **keeps undeclared keys unvalidated rather than stripping them**. So once Task 1 taught `buildProfile` to read these seven fields, valid values were already arriving through the passthrough gap. The happy path needs no schema change.
+
+What was still broken is the invalid path. An out-of-list value reached `buildProfile`, which silently coerced it to `""` — data loss reported as a success. Declaring the fields turns that into a 400 at the boundary, before any write.
+
+The acceptance test is still worth keeping: it pins the schema and `buildProfile` agreeing about the valid values, which is the pairing the `"Mixed"` near-miss in Task 1 showed is easy to break. Just do not expect it to be the test that fails here.
+
+An earlier draft of this step claimed the fields were "stripped before reaching `buildProfile`". That was wrong on both counts — passthrough does not strip, and Task 1 had already landed.
 
 - [ ] **Step 3: Extend the schema**
 
