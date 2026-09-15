@@ -956,19 +956,25 @@ git commit -m "feat(client): reinstate goalOptions and add goal to the personal 
 
 `SettingsView.jsx:4-32` is a character-for-character copy of `units.js:17-44`, including the `IMPERIAL_REGION_CODES` set. Two copies of the same logic will eventually disagree, and this file is about to grow.
 
+**There is a third copy, and this task deliberately leaves it.** `pages/preview/constants.js:1` and `pages/preview/utils.js:16` carry the same set and the same `getRegionFromLocale`, character-for-character identical to `units.js`, consumed by `usePreviewDerivedData.js`. It is out of scope here because this task exists to stop `SettingsView` growing an edit mode on top of a duplicate, not to sweep the tree — but it should be folded into `units.js` too, and anyone touching the preview locale logic should do it then rather than adding a fourth.
+
 **Files:**
 
 - Modify: `client/src/pages/dashboard/views/SettingsView.jsx:1-32` — this is the only file that changes. `units.js` is already correct and must not be touched.
 
 - [ ] **Step 1: Confirm the two copies are identical before touching either**
 
-Run:
+The two copies are not contiguous blocks at matching offsets — `IMPERIAL_REGION_CODES` sits at the very top of `units.js`, far from the two functions — so compare the three pieces separately:
 
 ```bash
-diff <(sed -n '17,44p' client/src/app/units.js | sed 's/^export //') <(sed -n '6,32p' client/src/pages/dashboard/views/SettingsView.jsx)
+diff <(sed -n '1p'     client/src/app/units.js) <(sed -n '4p'     client/src/pages/dashboard/views/SettingsView.jsx)
+diff <(sed -n '17,29p' client/src/app/units.js | sed 's/^export //') <(sed -n '6,18p'  client/src/pages/dashboard/views/SettingsView.jsx)
+diff <(sed -n '31,44p' client/src/app/units.js | sed 's/^export //') <(sed -n '20,33p' client/src/pages/dashboard/views/SettingsView.jsx)
 ```
 
-Expected: no output beyond whitespace. If they differ, stop — the difference is behaviour and must be understood before deduplicating.
+Expected: no output from any of the three. If they differ, stop — the difference is behaviour and must be understood before deduplicating.
+
+An earlier draft of this step tried to do it as one `diff` over `17,44` against `6,32`, which straddles the gap in `units.js` and cuts the `SettingsView` block a line short. It reports a spurious one-line difference, so **a non-empty result there is not evidence of a real divergence** — re-derive the ranges rather than trusting the exit code either way.
 
 - [ ] **Step 2: Run the existing SettingsView tests and record the result**
 
