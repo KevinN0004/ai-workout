@@ -956,7 +956,19 @@ git commit -m "feat(client): reinstate goalOptions and add goal to the personal 
 
 `SettingsView.jsx:4-32` is a character-for-character copy of `units.js:17-44`, including the `IMPERIAL_REGION_CODES` set. Two copies of the same logic will eventually disagree, and this file is about to grow.
 
-**There is a third copy, and this task deliberately leaves it.** `pages/preview/constants.js:1` and `pages/preview/utils.js:16` carry the same set and the same `getRegionFromLocale`, character-for-character identical to `units.js`, consumed by `usePreviewDerivedData.js`. It is out of scope here because this task exists to stop `SettingsView` growing an edit mode on top of a duplicate, not to sweep the tree — but it should be folded into `units.js` too, and anyone touching the preview locale logic should do it then rather than adding a fourth.
+**There is a third copy, and this task deliberately leaves it — but it is not the same kind of copy.** `pages/preview/constants.js:1` and `pages/preview/utils.js:16` carry the same `IMPERIAL_REGION_CODES` and the same `getRegionFromLocale`, character-for-character identical to `units.js`, consumed by `usePreviewDerivedData.js`.
+
+What is duplicated there is the two **primitives**. The behaviour composed on top of them is **already different**, so folding the preview onto `getPreferredMeasurementSystem` would be a behaviour change rather than a dedupe:
+
+|                    | `units.js`                                 | `usePreviewDerivedData`                                       |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------- |
+| no `navigator`     | `"metric"`                                 | `"en-US"`, so imperial                                        |
+| locale list        | scans every entry of `navigator.languages` | only `navigator.languages[0]`                                 |
+| unparseable locale | `"metric"`                                 | falls back to `Intl.DateTimeFormat`, then `"US"`, so imperial |
+
+The preview's every-fallback-ends-at-`"US"` chain is deliberate and pinned by its own tests — CLAUDE.md records that a test whose locale resolves to US cannot tell one fallback from the next, which is why those tests stub different regions at each step.
+
+So the correct follow-up is to share the two primitives from `units.js` and leave each composition alone, **not** to replace the preview's logic with `getPreferredMeasurementSystem`. Anyone touching the preview locale code should do that rather than adding a fourth copy of the primitives.
 
 **Files:**
 
