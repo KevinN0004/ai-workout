@@ -1408,7 +1408,7 @@ describe("SettingsEditForm", () => {
     expect(weight).toHaveAttribute("max", "400");
   });
 
-  test("toggles a multiselect value on and off", () => {
+  test("adds a multiselect value that was not selected", () => {
     const onSave = vi.fn();
     renderForm({ onSave });
 
@@ -1416,6 +1416,27 @@ describe("SettingsEditForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave.mock.calls[0][0]).toMatchObject({ trainingDays: ["Monday", "Tuesday"] });
+  });
+
+  // Clicking an already-selected day has to remove it. Asserting only the add
+  // direction lets a toggle that can never unselect anything pass -- a visitor
+  // could add a training day but never drop one, and the earlier version of
+  // this test was named "on and off" while exercising only "on".
+  test("removes a multiselect value that was selected", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Monday" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][0]).toMatchObject({ trainingDays: [] });
+  });
+
+  test("reflects the selection state in the checkboxes", () => {
+    renderForm();
+
+    expect(screen.getByRole("checkbox", { name: "Monday" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Tuesday" })).not.toBeChecked();
   });
 
   test("discards edits on cancel", () => {
@@ -1624,13 +1645,19 @@ Expected: PASS.
 
 The unit behaviour is the part most likely to be silently wrong. Apply each, confirm the file changed on disk, run the suite, revert:
 
-| Mutation                                      | Must be caught by                                 |
-| --------------------------------------------- | ------------------------------------------------- |
-| `unitsFor` always returns the metric pair     | "reports the units it rendered with"              |
-| Height always renders the `cm` input          | "shows feet and inches for an imperial visitor"   |
-| Weight uses `field.bounds.kg` unconditionally | "bounds the weight input by the unit on screen"   |
-| `onSave(draft)` without the units             | "reports the units it rendered with"              |
-| Feet input writes to `heightCm`               | "writes feet and inches back to their own fields" |
+| Mutation                                      | Must be caught by                                  |
+| --------------------------------------------- | -------------------------------------------------- |
+| `unitsFor` always returns the metric pair     | "reports the units it rendered with"               |
+| Height always renders the `cm` input          | "shows feet and inches for an imperial visitor"    |
+| Weight uses `field.bounds.kg` unconditionally | "bounds the weight input by the unit on screen"    |
+| `onSave(draft)` without the units             | "reports the units it rendered with"               |
+| Feet input writes to `heightCm`               | "writes feet and inches back to their own fields"  |
+| `toggleInList` only appends, never removes    | "removes a multiselect value that was selected"    |
+| `useState(() => ({}))`, ignoring the values   | "renders a labelled control per field"             |
+| Drop `min`/`max` from the number input        | "applies the server range to a plain number field" |
+| Cancel also calls `onSave`                    | "discards edits on cancel"                         |
+
+All twelve of these were run against the code above before this task was dispatched, and all twelve are caught. The multiselect one is why the toggle test is split in two: a single test named "on and off" that only clicked an _unselected_ day let an append-only toggle pass, so a visitor could add a training day but never drop one.
 
 - [ ] **Step 6: Commit**
 
