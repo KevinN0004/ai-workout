@@ -1036,7 +1036,13 @@ git commit -m "refactor(client): use the shared locale helpers in SettingsView"
 - Create: `client/src/pages/dashboard/views/settingsFields.js`
 - Create: `client/src/pages/dashboard/views/settingsFields.test.js`
 
-The tab `rows` array is currently the single declaration of what a tab shows. Keep it that way — these descriptors drive both the read and the edit rendering, rather than introducing a second list that can drift out of step with the first.
+These descriptors declare what each editable tab contains, and the edit form in Task 7 renders from them.
+
+**Be honest about what this does and does not achieve.** An earlier draft of this task claimed the descriptors "drive both the read and the edit rendering, rather than introducing a second list that can drift". They do not, and Task 9 does not make them: it keeps `SettingsView`'s existing `rows` array for the read state and feeds `fieldsForTab` only to the edit form. So there **are** two lists, and they can drift.
+
+That is a deliberate limit rather than an oversight. The read rows carry things the edit form has no use for — the email row, which is not an editable profile field at all; the `"Not set"` fallbacks; and locale-formatted height and weight strings — and the descriptors carry things the read view has no use for, such as per-unit input bounds. Unifying them properly needs display metadata the descriptors do not have (body fat renders with a `%` suffix, which `SettingsView` currently hardcodes by field name).
+
+What guards the drift instead is a test in `settingsFields.test.js` naming the exact field set per tab, plus one asserting every descriptor name is a real key on `defaultPersonalForm`. Those catch the failure that actually matters — a field silently missing from the edit form, or bound to a key that does not exist — without pretending the two renderings share a source. Unifying them is worth doing later; claiming it is already done is worse than not doing it.
 
 - [ ] **Step 1: Write the failing test**
 

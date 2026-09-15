@@ -7,8 +7,10 @@ import {
   goalOptions,
   nutritionOptions,
   sexOptions,
-  sleepOptions
+  sleepOptions,
+  defaultPersonalForm
 } from "../../../app/constants";
+import { toLb } from "../../../app/units";
 
 describe("settingsFields", () => {
   test("marks exactly the three real tabs editable", () => {
@@ -63,13 +65,18 @@ describe("settingsFields", () => {
   // The bounds are per unit because the form renders in the visitor's locale
   // units. Applying the kilogram range to a pounds input rejects 170 lb, an
   // entirely ordinary weight, and accepts 30 lb, which is not.
-  test("declares weight bounds for both units", () => {
+  //
+  // Derived from the kilogram range rather than asserted loosely. Unlike height,
+  // pounds-to-kilograms is exact, so there is no reason to accept a range that
+  // is merely in the right neighbourhood -- and a loose assertion let a
+  // materially wrong `lb: [58, 850]` pass, which would reject weights the
+  // server accepts at both ends.
+  test("declares weight bounds for both units, the pound range converted from the kilogram one", () => {
     const weight = fieldsForTab("profile").find((field) => field.name === "weight");
 
     expect(weight.type).toBe("weight");
     expect(weight.bounds.kg).toEqual([25, 400]);
-    expect(weight.bounds.lb[0]).toBeGreaterThan(50);
-    expect(weight.bounds.lb[1]).toBeGreaterThan(800);
+    expect(weight.bounds.lb).toEqual(weight.bounds.kg.map((kg) => Number(toLb(String(kg), "kg"))));
   });
 
   test("declares height bounds for both units", () => {
@@ -115,5 +122,40 @@ describe("settingsFields", () => {
   test("returns nothing for a read-only tab", () => {
     expect(fieldsForTab("privacy")).toEqual([]);
     expect(fieldsForTab("nonsense")).toEqual([]);
+  });
+});
+
+// The generic shape test cannot see a field that is missing or misnamed: it only
+// walks the fields that ARE there. Deleting the name descriptor outright, so a
+// user could never edit their name again, passed the whole suite -- as did
+// renaming notes to note, which silently disconnects it from the profile. Both
+// are caught by naming the exact expected set.
+describe("the field set itself", () => {
+  test.each([
+    ["profile", ["name", "age", "sex", "heightCm", "weight", "bodyFat"]],
+    ["training", ["timeline", "experience", "trainingDays", "activity", "goal"]],
+    ["lifestyle", ["sleep", "nutrition", "cardio", "notes"]]
+  ])("the %s tab declares exactly its fields, in order", (tab, expected) => {
+    expect(fieldsForTab(tab).map((field) => field.name)).toEqual(expected);
+  });
+
+  // Every name must be a real key on the personal form state, or the edit form
+  // binds an input to nothing and the value silently fails to save.
+  test("every field name is a real key on the personal form", () => {
+    for (const tab of EDITABLE_TABS) {
+      for (const field of fieldsForTab(tab)) {
+        expect(Object.keys(defaultPersonalForm)).toContain(field.name);
+      }
+    }
+  });
+
+  // These mirror the cleanText limits in the server's buildProfile. A longer
+  // client limit lets a visitor type text the API then rejects with a 400.
+  test.each([
+    ["profile", "name", 80],
+    ["training", "timeline", 60],
+    ["lifestyle", "notes", 500]
+  ])("the %s tab's %s field stops at the server's limit", (tab, name, maxLength) => {
+    expect(fieldsForTab(tab).find((field) => field.name === name).maxLength).toBe(maxLength);
   });
 });
