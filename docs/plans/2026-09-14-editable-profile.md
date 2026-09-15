@@ -1656,6 +1656,9 @@ The unit behaviour is the part most likely to be silently wrong. Apply each, con
 | `useState(() => ({}))`, ignoring the values   | "renders a labelled control per field"             |
 | Drop `min`/`max` from the number input        | "applies the server range to a plain number field" |
 | Cancel also calls `onSave`                    | "discards edits on cancel"                         |
+| Weight label drops its unit suffix            | both "bounds the weight input…" tests              |
+| `saving` no longer disables the buttons       | "disables both controls while a save is in flight" |
+| The error paragraph is never rendered         | "shows a save error without closing the form"      |
 
 All twelve of these were run against the code above before this task was dispatched, and all twelve are caught. The multiselect one is why the toggle test is split in two: a single test named "on and off" that only clicked an _unselected_ day let an append-only toggle pass, so a visitor could add a training day but never drop one.
 
