@@ -1,36 +1,6 @@
 import { useMemo, useState } from "react";
+import { getPreferredMeasurementSystem } from "../../../app/units";
 import "./SettingsView.css";
-
-const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
-
-const getRegionFromLocale = (locale) => {
-  if (!locale || typeof locale !== "string") return "";
-  const localeParts = locale.split(/[-_]/).filter(Boolean);
-  if (localeParts.length > 1 && localeParts[1]) {
-    return localeParts[1].toUpperCase();
-  }
-  try {
-    const parsed = new Intl.Locale(locale);
-    return parsed.region ? parsed.region.toUpperCase() : "";
-  } catch {
-    return "";
-  }
-};
-
-const getPreferredMeasurementSystem = () => {
-  if (typeof navigator === "undefined") return "metric";
-  const locales =
-    Array.isArray(navigator.languages) && navigator.languages.length
-      ? navigator.languages
-      : [navigator.language];
-  for (const locale of locales) {
-    const region = getRegionFromLocale(locale);
-    if (IMPERIAL_REGION_CODES.has(region)) {
-      return "imperial";
-    }
-  }
-  return "metric";
-};
 
 const formatHeightByLocation = (heightCm, measurementSystem) => {
   const cmNum = Number(heightCm);
