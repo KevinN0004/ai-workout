@@ -1045,7 +1045,15 @@ Create `client/src/pages/dashboard/views/settingsFields.test.js`:
 ```js
 import { describe, expect, test } from "vitest";
 import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
-import { activityOptions, goalOptions, sexOptions } from "../../../app/constants";
+import {
+  activityOptions,
+  cardioOptions,
+  experienceOptions,
+  goalOptions,
+  nutritionOptions,
+  sexOptions,
+  sleepOptions
+} from "../../../app/constants";
 
 describe("settingsFields", () => {
   test("marks exactly the three real tabs editable", () => {
@@ -1069,13 +1077,21 @@ describe("settingsFields", () => {
     }
   });
 
-  test("offers the shared option lists rather than its own copies", () => {
-    const profile = fieldsForTab("profile");
-    const training = fieldsForTab("training");
-
-    expect(profile.find((f) => f.name === "sex").options).toBe(sexOptions);
-    expect(training.find((f) => f.name === "activity").options).toBe(activityOptions);
-    expect(training.find((f) => f.name === "goal").options).toBe(goalOptions);
+  // `toBe`, not `toEqual`: identity is the assertion. A descriptor that retyped
+  // the values would still be deeply equal today and would drift tomorrow, and
+  // these lists are already pinned against the server in constants.test.js.
+  // Covering all six also catches a list referenced but never imported, which
+  // is a ReferenceError at module load rather than a failing assertion.
+  test.each([
+    ["profile", "sex", () => sexOptions],
+    ["training", "activity", () => activityOptions],
+    ["training", "goal", () => goalOptions],
+    ["training", "experience", () => experienceOptions],
+    ["lifestyle", "sleep", () => sleepOptions],
+    ["lifestyle", "nutrition", () => nutritionOptions],
+    ["lifestyle", "cardio", () => cardioOptions]
+  ])("the %s tab's %s field reuses the shared list", (tab, name, expected) => {
+    expect(fieldsForTab(tab).find((field) => field.name === name).options).toBe(expected());
   });
 
   // weekDays is a list of { label, key } objects, not strings. The multiselect
@@ -1110,6 +1126,26 @@ describe("settingsFields", () => {
     expect(height.bounds.in).toEqual([0, 11]);
   });
 
+  // Feet and inches cannot express 100-260cm exactly: the range 3'0" to 8'11"
+  // is 91-272cm, looser at both ends. That is deliberate and it is the safe
+  // direction to be wrong. A client bound TIGHTER than the server's would make
+  // a legitimate height unenterable, which is the defect class this whole
+  // change exists to close; a looser one merely defers to the server, which
+  // answers 400 and renders the message inline. Pinned so nobody "corrects" it
+  // into a false precision.
+  test("keeps the imperial height range permissive rather than stricter", () => {
+    const {
+      ft,
+      in: inches,
+      cm
+    } = fieldsForTab("profile").find((field) => field.name === "heightCm").bounds;
+    const lowestImperialCm = Math.round(ft[0] * 30.48 + inches[0] * 2.54);
+    const highestImperialCm = Math.round(ft[1] * 30.48 + inches[1] * 2.54);
+
+    expect(lowestImperialCm).toBeLessThanOrEqual(cm[0]);
+    expect(highestImperialCm).toBeGreaterThanOrEqual(cm[1]);
+  });
+
   // The metric bounds must be the same numbers the server enforces, or the form
   // accepts input the API then rejects with a 400.
   test("mirrors the server's metric ranges exactly", () => {
@@ -1139,7 +1175,16 @@ Expected: FAIL, "Failed to resolve import ./settingsFields".
 Create `client/src/pages/dashboard/views/settingsFields.js`:
 
 ```js
-import { activityOptions, goalOptions, sexOptions, weekDays } from "../../../app/constants";
+import {
+  activityOptions,
+  cardioOptions,
+  experienceOptions,
+  goalOptions,
+  nutritionOptions,
+  sexOptions,
+  sleepOptions,
+  weekDays
+} from "../../../app/constants";
 
 // weekDays is [{ label: "Mon", key: "Monday" }, ...]. The stored trainingDays
 // are the keys, so the multiselect offers those rather than the objects.
