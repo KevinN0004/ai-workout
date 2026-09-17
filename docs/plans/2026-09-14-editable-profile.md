@@ -1908,6 +1908,22 @@ Expected: FAIL, no "Edit" button exists.
 
 - [ ] **Step 3: Add the edit state to SettingsView**
 
+**Do not offer Edit before the profile has hydrated.** `SettingsEditForm` seeds its draft once, with `useState(() => ({ ...values }))`, so a later change to `values` is ignored — which is correct for a short-lived editor but dangerous here. Task 10 hydrates `personal` from `/api/auth/me` asynchronously, so a visitor who reaches Settings and clicks Edit before that resolves seeds a draft full of `defaultPersonalForm` blanks. `handleSave` then posts `{ ...personal, ...draft }`, and those blanks win over the real stored values — a save that silently wipes the profile it was meant to edit.
+
+Guard it at the source by rendering the Edit button only once there is a profile to edit:
+
+```jsx
+{
+  EDITABLE_TABS.includes(activeTab) && user?.profile && editingTab !== activeTab && (
+    <button type="button" onClick={() => setEditingTab(activeTab)}>
+      Edit
+    </button>
+  );
+}
+```
+
+Add a test that the Edit button is absent for a user whose profile has not arrived yet, otherwise nothing stops this being reintroduced.
+
 Add the imports:
 
 ```jsx
