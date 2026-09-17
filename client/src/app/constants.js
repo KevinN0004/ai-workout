@@ -4,6 +4,59 @@ export const APP_BRAND_TAGLINE = "Your guide for this journey.";
 
 export const quickFocuses = ["Strength", "Weight Loss", "Mobility", "Recovery", "Cardio"];
 
+// Removed as dead code in c2c820f and reinstated deliberately: the profile now
+// carries a goal, and createDefaultPlannerForm seeds from it.
+export const goalOptions = [
+  "Build lean strength and energy",
+  "Fat loss + conditioning",
+  "Mobility",
+  "Recovery",
+  "Cardio"
+];
+
+// Each of these must match its allowed*Values counterpart in the server's
+// dashboardDataBuildersService.js, which now rejects anything else with a 400.
+// The running app cannot import across the wire, so the duplication is
+// unavoidable -- but constants.test.js imports the server lists directly and
+// asserts equality, so a divergence fails the suite rather than waiting to be
+// found as a 400 on a valid dropdown choice.
+//
+// Three views still hardcode these as inline <option> elements and are the
+// least guarded copies, since nothing pins their text against this file:
+// HomePersonalStage and PreviewPersonalChapter duplicate all six, and AuthPage
+// duplicates sex and activity only -- it has no sleep, experience, nutrition or
+// cardio select at all. None of the three renders a goal select, so goalOptions
+// above is not among the duplicated lists. Migrating them to map over these
+// exports is worthwhile and is deliberately out of scope for this plan.
+//
+// Copy these from the <option> elements in HomePersonalStage.jsx, not from
+// memory. Two of them are easy to get wrong: sleep is "7 - 8 hours" with spaces
+// around the hyphen, and cardio has EIGHT entries -- "Mixed" was missed once
+// already, and an allowlist missing a real option silently drops a legitimate
+// value, which is the defect class this whole change exists to close.
+export const sexOptions = ["Female", "Male", "Non-binary", "Prefer not to say"];
+export const activityOptions = ["Light", "Moderate", "High", "Very high"];
+export const sleepOptions = ["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"];
+export const experienceOptions = ["Beginner", "Intermediate", "Advanced"];
+export const nutritionOptions = [
+  "No preference",
+  "High-protein",
+  "Balanced",
+  "Low-carb",
+  "Vegetarian",
+  "Vegan"
+];
+export const cardioOptions = [
+  "None",
+  "Walking",
+  "Running",
+  "Cycling",
+  "Rowing",
+  "Swimming",
+  "HIIT",
+  "Mixed"
+];
+
 export const equipmentOptionsByEnv = {
   Home: [
     "Bodyweight only",
@@ -100,6 +153,7 @@ export const defaultPersonalForm = {
   sex: "",
   bodyFat: "",
   activity: "Moderate",
+  goal: "",
   sleep: "",
   timeline: "",
   experience: "",
@@ -109,8 +163,13 @@ export const defaultPersonalForm = {
   notes: ""
 };
 
-export const createDefaultPlannerForm = () => ({
-  goal: "Build lean strength and energy",
+// The goal comes from the signed-in visitor's profile. PlannerSetupModal never
+// exposes it -- it offers days, duration, level and injuries only -- so without
+// an argument here every generated plan carried the same hardcoded goal into
+// the Gemini prompt, whatever the visitor actually wanted. The fallback is for
+// a signed-out visitor, who has no profile to read.
+export const createDefaultPlannerForm = (goal) => ({
+  goal: goal || goalOptions[0],
   equipment: [],
   duration: "45",
   level: "Intermediate",

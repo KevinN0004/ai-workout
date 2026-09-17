@@ -188,10 +188,15 @@ export default function App() {
     setWeightUnit(preferredSystem === "imperial" ? "lb" : "kg");
   }, []);
 
+  // Seeded here rather than from an effect on `user`, because every path that
+  // opens the planner calls this first -- openPlannerFromProfile resets before
+  // it opens, and closePlanner resets on the way out. So the form always
+  // carries the current profile's goal without an effect that could clobber a
+  // half-filled planner when the user object changes.
   const resetPlannerFlow = useCallback(() => {
-    setForm(createDefaultPlannerForm());
+    setForm(createDefaultPlannerForm(user?.profile?.goal));
     setPlannerStep(1);
-  }, []);
+  }, [user]);
 
   const closePlanner = useCallback(() => {
     setPlannerOpen(false);
@@ -298,6 +303,7 @@ export default function App() {
     submitWorkout,
     submitCalories,
     submitGoals,
+    submitProfile,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
@@ -486,7 +492,6 @@ export default function App() {
     return (
       <DashboardPage
         user={user}
-        personal={personal}
         go={go}
         onLogout={onLogout}
         dashboard={mergedDashboard}
@@ -515,6 +520,7 @@ export default function App() {
         setProgressForm={setProgressForm}
         submitProgressMetric={submitProgressMetric}
         submitGoals={submitGoals}
+        onSaveProfile={submitProfile}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
         weatherData={weatherData}

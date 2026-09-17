@@ -92,4 +92,37 @@ test.describe.serial("accessibility", () => {
 
     await expect(page.getByRole("dialog", { name: "Log workout" })).toBeHidden();
   });
+
+  // The profile edit form is the newest form in the app and carries markup
+  // nothing else here does: two number inputs that together mean one height,
+  // and an inline error beside the controls rather than in a dialog. It is
+  // reached only by signing in and opening a tab, which is why it lives at the
+  // end of this serial run rather than in its own file.
+  test("the settings profile edit form has no violations", async () => {
+    await page.goto("/dashboard/settings");
+    await page.getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  // The training tab is the one with a checkbox group.
+  //
+  // The group's NAME is asserted explicitly rather than left to axe, because
+  // axe does not check it: removing the <legend> was mutation-tested here and
+  // survived the scan. Each checkbox keeps its own label either way, so a
+  // legend-less fieldset is not a violation by axe's default rules -- but it
+  // does cost a screen reader user the one piece of context that says what the
+  // seven checkboxes are FOR. getByRole("group", { name }) fails if the legend
+  // goes, which the scan alone would not.
+  test("the training day checkbox group is named and has no violations", async () => {
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("tab", { name: /Training/ }).click();
+    await page.getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("checkbox", { name: "Monday" })).toBeVisible();
+
+    await expect(page.getByRole("group", { name: "Training days" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
 });

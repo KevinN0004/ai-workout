@@ -452,3 +452,113 @@ describe("the direct write actions' fallback messages", () => {
     }
   );
 });
+
+describe("submitProfile", () => {
+  test("posts the mapped profile and refreshes the signed-in user", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () =>
+        jsonResponse({ profile: { firstName: "Sam", lastName: "Fields", heightCm: 178 } })
+      ),
+      setUser: vi.fn()
+    });
+
+    await handlers.submitProfile({ name: "Sam Fields", heightCm: "178" });
+
+    const [url, options] = deps.apiFetch.mock.calls[0];
+    expect(url).toBe("/api/profile");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toMatchObject({ firstName: "Sam", lastName: "Fields" });
+    expect(deps.setUser).toHaveBeenCalled();
+  });
+
+  // The handler is where units reach the mapper. Drop them and a user weighing
+  // 170 lb is stored as 170 kg -- so these assert the converted value, not just
+  // that a request was made.
+  test("falls back to the app's active units when the caller passes none", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setUser: vi.fn(),
+      weightUnit: "lb",
+      heightUnit: "ft"
+    });
+
+    await handlers.submitProfile({ weight: "170", heightFeet: "5", heightInches: "10" });
+
+    expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toMatchObject({
+      weightKg: 77,
+      heightCm: 178
+    });
+  });
+
+  // Settings renders in the visitor's locale units, which are not the home
+  // flow's toggles. If the caller's units were ignored in favour of the
+  // app-level ones, this stores 170 lb as 170 kg.
+  test("uses the caller's units over the app's when given them", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setUser: vi.fn(),
+      weightUnit: "kg",
+      heightUnit: "cm"
+    });
+
+    await handlers.submitProfile({ weight: "170" }, { weightUnit: "lb", heightUnit: "ft" });
+
+    expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toMatchObject({ weightKg: 77 });
+  });
+
+  // SettingsView closes the edit form on `ok`. Without this the save succeeds,
+  // the toast appears, and the form stays open as though it had failed.
+  test("reports success so the caller can close the form", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setUser: vi.fn()
+    });
+
+    await expect(handlers.submitProfile({})).resolves.toEqual({ ok: true });
+  });
+
+  // The read-only rows in Settings render from user.profile, not from personal,
+  // so leaving the user untouched shows the visitor their OLD values straight
+  // after a save that succeeded.
+  test("refreshes the signed-in user so the read rows are not stale", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: { name: "Sam Fields" } })),
+      setUser: vi.fn()
+    });
+
+    await handlers.submitProfile({});
+
+    const update = deps.setUser.mock.calls[0][0];
+    expect(update({ email: "a@b.c", profile: { name: "Jordan" } })).toEqual({
+      email: "a@b.c",
+      profile: { name: "Sam Fields" }
+    });
+  });
+
+  // Nobody signed in means nothing to refresh -- the updater must not conjure
+  // a user object out of a profile response.
+  test("leaves a signed-out visitor signed out", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
+      setUser: vi.fn()
+    });
+
+    await handlers.submitProfile({});
+
+    expect(deps.setUser.mock.calls[0][0](null)).toBeNull();
+  });
+
+  test("surfaces a server error and leaves the signed-in user alone", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () =>
+        jsonResponse({ error: "Age must be between 10 and 120." }, false)
+      ),
+      setUser: vi.fn()
+    });
+
+    const result = await handlers.submitProfile({ age: "3" });
+
+    expect(result).toMatchObject({ ok: false, error: "Age must be between 10 and 120." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+  });
+});
