@@ -293,10 +293,22 @@ npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
 
-**The E2E suite is the only thing that runs both halves together.** Everything
-else tests one side of the wire — the client suite mocks `fetch`, the server
-suite drives express with supertest — so a defect in the wiring between them
-passes both. It is deliberately tiny: sign up, log a workout, reload, confirm it
+**A client test can import server modules directly, and two do.** The running
+app cannot reach across the wire, but Vitest can resolve
+`../../../server/src/...` from `client/src`, so a contract between the two sides
+can be asserted without a browser or a database. `app/constants.test.js` pins the
+option lists against the server's `allowed*Values`, and
+`app/profileContract.test.js` walks a form draft through
+`personalToProfile` → `profileBodySchema` → `buildProfile` → `profileToPersonal`
+and back. Both were verified to catch divergence the owning side's own suite
+misses: narrowing the server's height range to 100-170 makes a 178cm profile
+store `null`, and the server's tests never try 178. Keep such imports to test
+files — confirmed they do not reach the bundle.
+
+**Otherwise the E2E suite is the only thing that runs both halves together.**
+Everything else tests one side of the wire — the client suite mocks `fetch`, the
+server suite drives express with supertest — so a defect in the wiring between
+them passes both. It is deliberately tiny: sign up, log a workout, reload, confirm it
 survived. Four things are worth knowing before touching it:
 
 - **It runs against the built bundle** via `vite preview` on 4173, not the dev
@@ -436,8 +448,8 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-12:
-  server **93.6%** statements / 85.1% branches, client **97.7%** / 91.8%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-17:
+  server **93.65%** statements / 85.35% branches, client **98.33%** / 93.21%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -813,14 +825,14 @@ the native instance all along.
   deliberate now carry an inline disable explaining why. A new warning means you
   introduced it.
 - **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
-  that went away when `jspdf` moved to a dynamic import. The main chunk is ~402 kB.
+  that went away when `jspdf` moved to a dynamic import. The main chunk is ~407 kB.
   If the warning reappears, something got pulled back onto the eager path.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
 - Server tests need Postgres: `npm run postgres:local:start -w server` first, or **96** of
   them fail with `Can't reach database server`, which is environmental, not a regression
   (measured 2026-09-12; this entry said ~40 before). The compose database works just as
   well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
-  **772** server tests green.
+  **966** server tests green.
 
 ## Fresh Clone Setup
 

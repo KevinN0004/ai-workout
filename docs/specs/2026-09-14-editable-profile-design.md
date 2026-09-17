@@ -1,6 +1,14 @@
 # Editable Profile — Design
 
-Status: approved, not yet implemented.
+Status: implemented on `feat/editable-profile`, via
+`docs/plans/2026-09-14-editable-profile.md`.
+
+Two sections below record where the shipped work diverged from what was approved,
+rather than being edited to look prescient: the four `sleep`/`experience`/
+`nutrition`/`cardio` fields turned out to be closed sets rather than free text,
+and the hydration mechanism was dropped entirely once `personal` proved
+unreachable for a signed-in visitor. The decisions the divergences serve are
+unchanged; the mechanisms are not what this document first described.
 
 ## Problem
 
@@ -56,7 +64,7 @@ So the goal line of every AI-generated plan, for every user, is a constant.
 | -------------------------------- | ------------------------------------------------------------- |
 | Scope                            | Profile tab **and** the unpersisted training/lifestyle fields |
 | Edit interaction                 | Per-tab Edit / Save / Cancel mode                             |
-| Source of truth                  | Stored profile; `personal` hydrates from it                   |
+| Source of truth                  | Stored profile. See the superseded-mechanism note below       |
 | Dead Goal row                    | Add `goal` as a real profile field                            |
 | Clearing a signup-required field | Allowed                                                       |
 
@@ -65,9 +73,11 @@ So the goal line of every AI-generated plan, for every user, is a constant.
 While asking about source of truth it was claimed that plan generation reads
 `personal`. **It does not.** `/api/generate` posts the planner form
 (`events.js:96`), which is separate state. `personal` feeds `HomePersonalStage`,
-`useBodyModel` and `SettingsView` only. Hydration is still the right call — the
-two-copies problem is real for height, weight and name — but the blast radius is
-smaller than stated at the time.
+`useBodyModel` and `SettingsView` only.
+
+That correction was itself incomplete. `personal` turned out to be unreachable
+state for a signed-in visitor, which removed the need for hydration entirely —
+see "Reading the profile" below for what shipped and why.
 
 ## Design
 
@@ -174,15 +184,41 @@ fields — `bodyFat` above all — behind the shipped 3%-body-fat bug. The mappe
 guards before it coerces, copying `toNumberOrNull` in `repositories/rowValues.js`,
 and gets a row in the client numeric-coercion contract test.
 
-### Hydration
+### Reading the profile — superseded during implementation
 
-- On sign-in and on the `/api/auth/me` response, seed `personal` from
-  `user.profile` through the mapper. The home flow arrives pre-filled with what
-  the user already told it.
-- A Settings save updates the server, then updates `personal` from the response,
-  so the silhouette and home flow reflect the edit without a reload.
-- `resetPersonalFlow()` resets to the saved profile when signed in, and to
-  `defaultPersonalForm` when not.
+**This section originally called for hydrating `personal` from the stored
+profile. That was built and then removed, and what shipped is simpler. The
+decision it served — the stored profile is the source of truth — is delivered;
+the mechanism is not what this section described.**
+
+The original plan was to seed `personal` from `user.profile` on sign-in, so that
+Settings, the home flow and the silhouette all read one hydrated copy. Tracing
+the consumers showed the premise was wrong:
+
+- `DashboardPage` passes `personal` to nothing except `SettingsView`.
+- `useBodyModel`, which drives the silhouette, is used only by `HomePage`.
+- App **redirects a signed-in visitor off `/`** before `HomePage` renders, so
+  they can never reach the home flow at all.
+
+So `personal` is home-flow state that no signed-in view reads, and hydrating it
+would have served exactly one consumer by a long route. Worse, six Settings rows
+were reading it, which meant they showed "Not set" for the very fields this work
+set out to persist — and the Edit guard checked `user.profile` while the form
+seeded from `personal`, so it opened blank over a real profile.
+
+What shipped instead: `SettingsView` derives everything it shows and edits from
+`user.profile` through `profileToPersonal`, the same mapper the save path uses in
+reverse. The guard and the form then read the same thing by construction, and
+`personal` is no longer passed to `SettingsView` or `DashboardPage` at all.
+
+`submitProfile` updates only the user. It briefly also wrote `personal`, which
+was removed once a mutation showed nothing observable depended on it: the only
+failing tests were the two asserting the write itself. Nothing hydrates
+`personal` on load, so that write left it correct right after a save and blank on
+the next page load — half-synced state reads as deliberate and is worse than
+none.
+
+`resetPersonalFlow` is therefore unchanged from before this work.
 
 ### Planner seeding
 
