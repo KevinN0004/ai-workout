@@ -1,5 +1,5 @@
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
-import { personalToProfile, profileToPersonal } from "./profileMapping";
+import { personalToProfile } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
 const buildOptimisticId = (type) =>
@@ -44,7 +44,6 @@ export const createAppEventHandlers = ({
   setDashView,
   go,
   personal,
-  setPersonal,
   heightUnit,
   weightUnit,
   setAuthForm,
@@ -417,7 +416,16 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to save profile.");
       }
       const data = await res.json();
-      setPersonal(profileToPersonal(data.profile, units));
+      // Only the user is updated, deliberately. `personal` is the home flow's
+      // form state, not account state: it is read by HomePage and the signup
+      // prefill, both of which only a signed-out visitor reaches, and it is
+      // blanked on logout. Settings reads user.profile.
+      //
+      // Writing it here used to look like keeping the two in sync, but nothing
+      // hydrates `personal` on load -- so it would have been correct right after
+      // a save and blank on the next page load. Half-synced state is worse than
+      // unsynced, and a mutation removing the write failed only the two tests
+      // that asserted the write itself.
       setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
       showDashboardToast("Profile updated.");
       return { ok: true };

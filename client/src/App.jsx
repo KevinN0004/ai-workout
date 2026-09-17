@@ -316,7 +316,6 @@ export default function App() {
     setDashView,
     go,
     personal,
-    setPersonal,
     heightUnit,
     weightUnit,
     setAuthForm,

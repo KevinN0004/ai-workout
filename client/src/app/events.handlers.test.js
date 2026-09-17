@@ -454,12 +454,11 @@ describe("the direct write actions' fallback messages", () => {
 });
 
 describe("submitProfile", () => {
-  test("posts the mapped profile and rehydrates personal", async () => {
+  test("posts the mapped profile and refreshes the signed-in user", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () =>
         jsonResponse({ profile: { firstName: "Sam", lastName: "Fields", heightCm: 178 } })
       ),
-      setPersonal: vi.fn(),
       setUser: vi.fn()
     });
 
@@ -469,7 +468,7 @@ describe("submitProfile", () => {
     expect(url).toBe("/api/profile");
     expect(options.method).toBe("POST");
     expect(JSON.parse(options.body)).toMatchObject({ firstName: "Sam", lastName: "Fields" });
-    expect(deps.setPersonal).toHaveBeenCalled();
+    expect(deps.setUser).toHaveBeenCalled();
   });
 
   // The handler is where units reach the mapper. Drop them and a user weighing
@@ -478,7 +477,6 @@ describe("submitProfile", () => {
   test("falls back to the app's active units when the caller passes none", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
-      setPersonal: vi.fn(),
       setUser: vi.fn(),
       weightUnit: "lb",
       heightUnit: "ft"
@@ -498,7 +496,6 @@ describe("submitProfile", () => {
   test("uses the caller's units over the app's when given them", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
-      setPersonal: vi.fn(),
       setUser: vi.fn(),
       weightUnit: "kg",
       heightUnit: "cm"
@@ -509,27 +506,11 @@ describe("submitProfile", () => {
     expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toMatchObject({ weightKg: 77 });
   });
 
-  // Asserting only that setPersonal was CALLED let the units be dropped on the
-  // way back: a visitor editing in pounds would save 170, and the form would
-  // then redisplay their weight as 77 without them touching it.
-  test("redisplays the saved weight in the unit the form used", async () => {
-    const { deps, handlers } = buildDeps({
-      apiFetch: vi.fn(async () => jsonResponse({ profile: { weightKg: 77 } })),
-      setPersonal: vi.fn(),
-      setUser: vi.fn()
-    });
-
-    await handlers.submitProfile({}, { weightUnit: "lb", heightUnit: "ft" });
-
-    expect(deps.setPersonal.mock.calls[0][0].weight).toBe("170");
-  });
-
   // SettingsView closes the edit form on `ok`. Without this the save succeeds,
   // the toast appears, and the form stays open as though it had failed.
   test("reports success so the caller can close the form", async () => {
     const { handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
-      setPersonal: vi.fn(),
       setUser: vi.fn()
     });
 
@@ -542,7 +523,6 @@ describe("submitProfile", () => {
   test("refreshes the signed-in user so the read rows are not stale", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({ profile: { name: "Sam Fields" } })),
-      setPersonal: vi.fn(),
       setUser: vi.fn()
     });
 
@@ -560,7 +540,6 @@ describe("submitProfile", () => {
   test("leaves a signed-out visitor signed out", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({ profile: {} })),
-      setPersonal: vi.fn(),
       setUser: vi.fn()
     });
 
@@ -569,18 +548,17 @@ describe("submitProfile", () => {
     expect(deps.setUser.mock.calls[0][0](null)).toBeNull();
   });
 
-  test("surfaces a server error and leaves personal alone", async () => {
+  test("surfaces a server error and leaves the signed-in user alone", async () => {
     const { deps, handlers } = buildDeps({
       apiFetch: vi.fn(async () =>
         jsonResponse({ error: "Age must be between 10 and 120." }, false)
       ),
-      setPersonal: vi.fn(),
       setUser: vi.fn()
     });
 
     const result = await handlers.submitProfile({ age: "3" });
 
     expect(result).toMatchObject({ ok: false, error: "Age must be between 10 and 120." });
-    expect(deps.setPersonal).not.toHaveBeenCalled();
+    expect(deps.setUser).not.toHaveBeenCalled();
   });
 });
