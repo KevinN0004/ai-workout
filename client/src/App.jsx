@@ -488,7 +488,6 @@ export default function App() {
     return (
       <DashboardPage
         user={user}
-        personal={personal}
         go={go}
         onLogout={onLogout}
         dashboard={mergedDashboard}

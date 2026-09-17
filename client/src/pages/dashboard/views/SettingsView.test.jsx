@@ -12,7 +12,7 @@ const useLocale = (...locales) => {
 };
 
 const renderView = (props = {}) =>
-  render(<SettingsView user={{ email: "a@b.c", profile: {} }} personal={{}} {...props} />);
+  render(<SettingsView user={{ email: "a@b.c", profile: {} }} {...props} />);
 
 // Reads the value cell sitting beside a row label.
 const rowValue = (label) => {
@@ -139,13 +139,45 @@ describe("SettingsView", () => {
   });
 });
 
+// Everything the view shows and edits comes from the stored profile. It used to
+// take a separate `personal` prop for six of the rows, which was blank for every
+// signed-in user -- see the comment in SettingsView for why.
 const renderEditable = (props = {}) =>
   renderView({
-    user: { email: "a@b.c", profile: { name: "Jordan Fields", age: 34 } },
-    personal: { name: "Jordan Fields", age: "34", trainingDays: [] },
+    user: {
+      email: "a@b.c",
+      profile: { firstName: "Jordan", lastName: "Fields", age: 34 }
+    },
     onSaveProfile: vi.fn().mockResolvedValue({ ok: true }),
     ...props
   });
+
+// The six fields Tasks 1 and 2 taught the server to persist were still being
+// read from App's in-memory `personal`, which is never populated for a
+// signed-in user: they are redirected off "/" to the dashboard before the home
+// flow that fills it can run. So Settings showed "Not set" for exactly the
+// fields this whole change set out to store.
+describe("the rows read the stored profile", () => {
+  const withProfile = (profile) =>
+    renderView({ user: { email: "a@b.c", profile }, onSaveProfile: vi.fn() });
+
+  test.each([
+    ["Training", "Timeline", { timeline: "12 weeks to lose 10 lb" }, "12 weeks to lose 10 lb"],
+    ["Training", "Experience", { experience: "Intermediate" }, "Intermediate"],
+    ["Training", "Goal", { goal: "Mobility" }, "Mobility"],
+    ["Lifestyle", "Training days", { trainingDays: ["Monday", "Friday"] }, "Monday, Friday"],
+    ["Lifestyle", "Nutrition", { nutrition: "High-protein" }, "High-protein"],
+    ["Lifestyle", "Cardio", { cardio: "Mixed" }, "Mixed"]
+  ])("shows a stored %s value for %s", (tab, label, profile, expected) => {
+    withProfile(profile);
+
+    fireEvent.click(
+      screen.getByRole("tab", { name: new RegExp(label === "Training days" ? "Training" : tab) })
+    );
+
+    expect(rowValue(label)).toBe(expected);
+  });
+});
 
 describe("editing a tab", () => {
   test("offers Edit on an editable tab", () => {
@@ -161,11 +193,11 @@ describe("editing a tab", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 
-  // The form seeds its draft once from `personal`. Task 10 hydrates that
-  // asynchronously, so offering Edit before the profile has arrived would seed
-  // blanks -- and handleSave posts { ...personal, ...draft }, letting those
-  // blanks overwrite the stored profile. A save that wipes what it was meant to
-  // edit is the worst failure available here, so the button is gated.
+  // The form's values are derived from the stored profile, so gating Edit on
+  // that profile existing gates on the same thing the form reads. An earlier
+  // version gated on user?.profile while the form seeded from App's in-memory
+  // `personal`, which a signed-in user never has -- so Edit appeared, the form
+  // opened blank, and saving wrote those blanks over a real profile.
   test("offers no Edit until the profile has arrived", () => {
     renderEditable({ user: { email: "a@b.c" } });
 
@@ -212,7 +244,7 @@ describe("editing a tab", () => {
     expect(screen.getByRole("tab", { name: /Training/ })).toBeEnabled();
   });
 
-  test("sends the whole personal form merged with the edits", async () => {
+  test("sends the whole stored profile merged with the edits", async () => {
     const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
     renderEditable({ onSaveProfile });
 
@@ -221,21 +253,24 @@ describe("editing a tab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
-    // Merged over `personal`, not the tab's fields alone -- each tab edits a
-    // subset and personalToProfile builds a whole profile, so sending one tab's
-    // fields would clear the others.
+    // Merged over the stored profile, not the tab's fields alone -- each tab
+    // edits a subset and personalToProfile builds a whole profile, so sending
+    // one tab's fields would clear the others.
     expect(onSaveProfile.mock.calls[0][0]).toMatchObject({ name: "Jordan Fields", age: "35" });
   });
 
   // The assertion above cannot tell the merge from the form: the draft is seeded
-  // FROM personal, so `name` is present either way. Only a field the edited tab
-  // does not render can distinguish them -- cardio lives on the lifestyle tab,
-  // so it reaches the payload solely through { ...personal, ...draft }. Without
-  // the merge, editing one tab would blank every field on the other two.
+  // from the same stored profile, so `name` is present either way. Only a field
+  // the edited tab does not render can distinguish them -- cardio lives on the
+  // lifestyle tab, so it reaches the payload solely through the spread. Without
+  // it, editing one tab would blank every field on the other two.
   test("preserves fields the edited tab does not show", async () => {
     const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
     renderEditable({
-      personal: { name: "Jordan Fields", age: "34", trainingDays: [], cardio: "Mixed" },
+      user: {
+        email: "a@b.c",
+        profile: { firstName: "Jordan", lastName: "Fields", age: 34, cardio: "Mixed" }
+      },
       onSaveProfile
     });
 
@@ -247,7 +282,7 @@ describe("editing a tab", () => {
   });
 
   // And this is what proves the form is seeded at all. Passing values={{}} left
-  // every other assertion green, because handleSave merges personal back in on
+  // every other assertion green, because handleSave merges the stored profile back in on
   // the way out -- so the payload looked right while the visitor stared at an
   // empty form.
   test("pre-fills the form with the values it is editing", () => {

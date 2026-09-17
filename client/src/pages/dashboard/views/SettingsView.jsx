@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
+import { profileToPersonal } from "../../../app/profileMapping";
 import SettingsEditForm from "./SettingsEditForm";
 import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
 import "./SettingsView.css";
@@ -32,20 +33,32 @@ const displayValue = (value) => {
   return String(value);
 };
 
-export default function SettingsView({ user, personal, onSaveProfile }) {
+export default function SettingsView({ user, onSaveProfile }) {
   // Both memoized because their fallback branches minted a fresh object/array
   // every render, defeating the tabs memo that depends on them.
   const profile = useMemo(() => user?.profile || {}, [user]);
   const measurementSystem = useMemo(() => getPreferredMeasurementSystem(), []);
-  const fullName =
-    personal?.name ||
-    [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() ||
-    profile.name ||
-    "";
-  const trainingDays = useMemo(
-    () => (Array.isArray(personal?.trainingDays) ? personal.trainingDays : []),
-    [personal]
+  const units = useMemo(
+    () =>
+      measurementSystem === "imperial"
+        ? { heightUnit: "ft", weightUnit: "lb" }
+        : { heightUnit: "cm", weightUnit: "kg" },
+    [measurementSystem]
   );
+
+  // Everything this view shows and edits comes from the stored profile, through
+  // the same mapper the save path uses in reverse.
+  //
+  // Six of these rows -- timeline, experience, trainingDays, goal, nutrition,
+  // cardio -- used to read App's in-memory `personal` instead. That was only
+  // ever correct while those fields were unpersisted, which is the defect this
+  // whole change set out to fix. A signed-in visitor's `personal` is never
+  // populated: they are redirected off "/" to the dashboard before the home
+  // flow that fills it can run. So those rows read "Not set" whatever the
+  // server had stored, and the edit form seeded blanks over a real profile.
+  const stored = useMemo(() => profileToPersonal(profile, units), [profile, units]);
+  const fullName = stored.name;
+  const trainingDays = stored.trainingDays;
 
   const [activeTab, setActiveTab] = useState("profile");
   const [editingTab, setEditingTab] = useState("");
@@ -81,11 +94,11 @@ export default function SettingsView({ user, personal, onSaveProfile }) {
         label: "Training",
         description: "Plan and workout preferences.",
         rows: [
-          { label: "Timeline", value: personal?.timeline },
-          { label: "Experience", value: personal?.experience },
+          { label: "Timeline", value: stored.timeline },
+          { label: "Experience", value: stored.experience },
           { label: "Training days", value: trainingDays },
           { label: "Activity level", value: profile?.activity },
-          { label: "Goal", value: personal?.goal || profile?.goal }
+          { label: "Goal", value: stored.goal }
         ]
       },
       {
@@ -93,8 +106,8 @@ export default function SettingsView({ user, personal, onSaveProfile }) {
         label: "Lifestyle",
         description: "Nutrition, cardio, and notes.",
         rows: [
-          { label: "Nutrition", value: personal?.nutrition },
-          { label: "Cardio", value: personal?.cardio },
+          { label: "Nutrition", value: stored.nutrition },
+          { label: "Cardio", value: stored.cardio },
           { label: "Notes", value: profile?.notes }
         ]
       },
@@ -132,24 +145,29 @@ export default function SettingsView({ user, personal, onSaveProfile }) {
         ]
       }
     ],
-    [fullName, measurementSystem, personal, profile, trainingDays, user?.email]
+    [fullName, measurementSystem, profile, stored, trainingDays, user?.email]
   );
   const activeTabData = tabs.find((tab) => tab.id === activeTab) || tabs[0];
 
   const isEditing = editingTab === activeTabData.id;
-  // Gated on the profile having arrived. SettingsEditForm seeds its draft once,
-  // so offering Edit before hydration would seed defaultPersonalForm blanks --
-  // and handleSave posts { ...personal, ...draft }, letting those blanks
-  // overwrite the stored profile. A save that wipes what it was meant to edit
-  // is the worst failure available here.
+  // Gated on the profile having arrived, which is now the same condition the
+  // form's values are derived from -- so there is no window where Edit opens a
+  // blank form over a real profile.
+  //
+  // An earlier version gated on user?.profile while the form seeded from App's
+  // `personal`, which is a different thing entirely: a signed-in visitor has a
+  // profile but an empty `personal`, so Edit appeared, the form opened blank,
+  // and saving wrote those blanks over the stored profile. Guarding one source
+  // while reading another is worse than not guarding at all, because it looks
+  // deliberate.
   const canEdit = EDITABLE_TABS.includes(activeTabData.id) && Boolean(user?.profile);
 
-  const handleSave = async (draft, units) => {
+  const handleSave = async (draft, formUnits) => {
     setSaving(true);
     setSaveError("");
-    // The spread over `personal` is deliberately redundant TODAY, and a mutation
+    // The spread over `stored` is deliberately redundant TODAY, and a mutation
     // removing it survives -- SettingsEditForm seeds its draft from the whole
-    // `personal` object rather than only the fields it renders, so `draft` is
+    // values object rather than only the fields it renders, so `draft` is
     // already a complete profile. That invariant is pinned in
     // SettingsEditForm.test.jsx ("carries fields it never rendered through to
     // the save"), because it is invisible from this side.
@@ -161,7 +179,7 @@ export default function SettingsView({ user, personal, onSaveProfile }) {
     //
     // The units are forwarded unchanged because submitProfile must convert with
     // the same ones the form rendered in.
-    const result = await onSaveProfile({ ...personal, ...draft }, units);
+    const result = await onSaveProfile({ ...stored, ...draft }, formUnits);
     setSaving(false);
     if (result?.ok) {
       setEditingTab("");
@@ -217,7 +235,7 @@ export default function SettingsView({ user, personal, onSaveProfile }) {
           {isEditing ? (
             <SettingsEditForm
               fields={fieldsForTab(activeTabData.id)}
-              values={personal || {}}
+              values={stored}
               measurementSystem={measurementSystem}
               onSave={handleSave}
               onCancel={() => {

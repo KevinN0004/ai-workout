@@ -40,7 +40,6 @@ const DASH_DRAWER_ITEMS = [
 
 export default function DashboardPage({
   user,
-  personal,
   go,
   onLogout,
   dashboard,
@@ -345,7 +344,7 @@ export default function DashboardPage({
     if (activeDashView === "settings") {
       return (
         <Suspense fallback={lazyDashboardViewFallback}>
-          <SettingsView user={user} personal={personal} onSaveProfile={onSaveProfile} />
+          <SettingsView user={user} onSaveProfile={onSaveProfile} />
         </Suspense>
       );
     }
