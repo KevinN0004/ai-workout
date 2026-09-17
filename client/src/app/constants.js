@@ -163,8 +163,13 @@ export const defaultPersonalForm = {
   notes: ""
 };
 
-export const createDefaultPlannerForm = () => ({
-  goal: "Build lean strength and energy",
+// The goal comes from the signed-in visitor's profile. PlannerSetupModal never
+// exposes it -- it offers days, duration, level and injuries only -- so without
+// an argument here every generated plan carried the same hardcoded goal into
+// the Gemini prompt, whatever the visitor actually wanted. The fallback is for
+// a signed-out visitor, who has no profile to read.
+export const createDefaultPlannerForm = (goal) => ({
+  goal: goal || goalOptions[0],
   equipment: [],
   duration: "45",
   level: "Intermediate",

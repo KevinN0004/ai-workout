@@ -44,6 +44,34 @@ describe("goalOptions", () => {
   test("the planner default is one of them", () => {
     expect(goalOptions).toContain(createDefaultPlannerForm().goal);
   });
+
+  // PlannerSetupModal never exposes goal -- it offers days, duration, level and
+  // injuries only -- so before this took an argument, every generated plan for
+  // every user carried the same hardcoded goal into the Gemini prompt. The
+  // profile's goal is what makes it the user's own.
+  test("takes the goal it is given", () => {
+    expect(createDefaultPlannerForm("Mobility").goal).toBe("Mobility");
+  });
+
+  test.each([
+    ["nothing", undefined],
+    ["an empty string", ""],
+    ["null", null]
+  ])("falls back to the first option when given %s", (_label, goal) => {
+    expect(createDefaultPlannerForm(goal).goal).toBe(goalOptions[0]);
+  });
+
+  test("leaves the rest of the planner form alone", () => {
+    expect(createDefaultPlannerForm("Recovery")).toMatchObject({
+      equipment: [],
+      duration: "45",
+      level: "Intermediate",
+      injuries: "None",
+      days: "3",
+      focuses: [],
+      environment: "Home"
+    });
+  });
 });
 
 describe("the closed-set option lists", () => {

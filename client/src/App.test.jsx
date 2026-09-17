@@ -35,6 +35,7 @@ vi.mock("./pages/WorkoutResultPage", () => ({
 }));
 
 import App from "./App";
+import { goalOptions } from "./app/constants";
 
 const setPath = (path) => {
   window.history.pushState({}, "", path);
@@ -324,6 +325,43 @@ describe("App", () => {
       act(() => home.props.openPlannerFromProfile());
 
       expect(screen.getByTestId("planner")).toBeInTheDocument();
+    });
+
+    // PlannerSetupModal offers days, duration, level and injuries -- never the
+    // goal -- so before the profile seeded it, every generated plan for every
+    // visitor carried the same hardcoded goal into the Gemini prompt.
+    //
+    // Seeded from resetPlannerFlow rather than an effect, because every path
+    // that opens the planner resets it first. That is why this asserts after
+    // opening rather than on arrival.
+    test("a signed-in visitor's planner starts on their own goal", async () => {
+      stubSession(
+        sessionResponse({ user: { email: "ada@example.com", profile: { goal: "Recovery" } } })
+      );
+      await renderSettled("/dashboard");
+      // The seed reads user.profile, so the session lookup has to have landed
+      // before the planner is opened -- otherwise this asserts the fallback and
+      // would pass against code that never reads the profile at all.
+      await waitFor(() => expect(dash.props.user).toBeTruthy());
+
+      act(() => dash.props.openPlannerFromProfile());
+
+      // Read from dash.props, not planner.props: the DashboardPage mock does not
+      // render props.plannerModal, so planner.props would be whatever the last
+      // HomePage-based test left behind. That stale value is the default goal,
+      // which means the fallback assertion below would pass against code that
+      // never reads the profile at all.
+      expect(dash.props.form.goal).toBe("Recovery");
+    });
+
+    test("a visitor with no stored goal gets the default", async () => {
+      stubSession(sessionResponse({ user: { email: "ada@example.com", profile: {} } }));
+      await renderSettled("/dashboard");
+      await waitFor(() => expect(dash.props.user).toBeTruthy());
+
+      act(() => dash.props.openPlannerFromProfile());
+
+      expect(dash.props.form.goal).toBe(goalOptions[0]);
     });
   });
 
