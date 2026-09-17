@@ -45,6 +45,7 @@ export default function DashboardPage({
   onLogout,
   dashboard,
   goalForm,
+  onSaveProfile,
   setGoalForm,
   dashView,
   setDashView,
@@ -344,7 +345,7 @@ export default function DashboardPage({
     if (activeDashView === "settings") {
       return (
         <Suspense fallback={lazyDashboardViewFallback}>
-          <SettingsView user={user} personal={personal} />
+          <SettingsView user={user} personal={personal} onSaveProfile={onSaveProfile} />
         </Suspense>
       );
     }

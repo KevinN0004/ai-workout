@@ -1831,112 +1831,167 @@ git commit -m "feat(client): add the profile save handler"
 
 ### Task 9: Client — wire the edit mode into SettingsView
 
+> **Rewritten before dispatch,** after reading the file as it now stands rather
+> than as the first draft imagined it. Three things were wrong:
+>
+> - It said to replace a `renderRows()` call. **There is no such function.**
+>   `SettingsView` renders `activeTabData.rows.map(...)` inline inside the tab
+>   panel.
+> - It compared against `activeTab`. The file derives
+>   `activeTabData = tabs.find(...) || tabs[0]` and uses `activeTabData.id`
+>   everywhere else, because `activeTab` alone has no fallback.
+> - It said to put the Edit button "beside the tab description". The description
+>   lives on the tab _button_ in the sidebar, not in the panel. The panel opens
+>   with `<h3>{activeTabData.label}</h3>`, which is where the control belongs.
+
 **Files:**
 
 - Modify: `client/src/pages/dashboard/views/SettingsView.jsx`
 - Modify: `client/src/pages/dashboard/views/SettingsView.test.jsx`
-- Modify: `client/src/pages/DashboardPage.jsx` (pass `personal` and `onSaveProfile` through)
+- Modify: `client/src/pages/DashboardPage.jsx:347` — add `onSaveProfile`; `personal` is already passed
+- Modify: `client/src/App.jsx` — pass `submitProfile` down as `onSaveProfile`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
-Append to `client/src/pages/dashboard/views/SettingsView.test.jsx`:
+Append to `client/src/pages/dashboard/views/SettingsView.test.jsx`. The file's existing helper is `renderView(props)` at line 14, which already supplies `user` and `personal`; extend it to forward `onSaveProfile`.
 
 ```jsx
-test("shows an Edit button on an editable tab", () => {
-  renderView();
-  expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-});
+const renderEditable = (props = {}) =>
+  renderView({
+    user: { email: "a@b.c", profile: { name: "Jordan Fields", age: 34 } },
+    personal: { name: "Jordan Fields", age: "34", trainingDays: [] },
+    onSaveProfile: vi.fn().mockResolvedValue({ ok: true }),
+    ...props
+  });
 
-test("swaps the rows for a form when Edit is clicked", () => {
-  renderView();
+describe("editing a tab", () => {
+  test("offers Edit on an editable tab", () => {
+    renderEditable();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
 
-  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  test("offers no Edit on a placeholder tab", () => {
+    renderEditable();
 
-  expect(screen.getByLabelText("Age")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
-});
+    fireEvent.click(screen.getByRole("tab", { name: /Privacy/ }));
 
-test("returns to the read view on cancel", () => {
-  renderView();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
 
-  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  // The form seeds its draft once from `personal`. Task 10 hydrates that
+  // asynchronously, so offering Edit before the profile has arrived would seed
+  // blanks -- and handleSave posts { ...personal, ...draft }, letting those
+  // blanks overwrite the stored profile. A save that wipes what it was meant to
+  // edit is the worst failure available here, so the button is gated.
+  test("offers no Edit until the profile has arrived", () => {
+    renderEditable({ user: { email: "a@b.c" } });
 
-  expect(screen.queryByLabelText("Age")).toBeNull();
-  expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-});
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
 
-test("calls onSaveProfile with the edited values", async () => {
-  const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
-  renderView({ onSaveProfile });
+  test("swaps the rows for a form when Edit is clicked", () => {
+    renderEditable();
 
-  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-  fireEvent.change(screen.getByLabelText("Age"), { target: { value: "35" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
-  await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
-  expect(onSaveProfile.mock.calls[0][0]).toMatchObject({ age: "35" });
-});
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
 
-test("keeps the form open and shows the error when the save fails", async () => {
-  const onSaveProfile = vi.fn().mockResolvedValue({ ok: false, error: "Age must be 10-120." });
-  renderView({ onSaveProfile });
+  test("returns to the read view on cancel", () => {
+    renderEditable();
 
-  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-  expect(await screen.findByText("Age must be 10-120.")).toBeInTheDocument();
-  expect(screen.getByLabelText("Age")).toBeInTheDocument();
-});
+    expect(screen.queryByLabelText("Age")).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
 
-test("offers no Edit button on a placeholder tab", () => {
-  renderView();
+  // Switching tabs mid-edit would unmount the form and silently discard the
+  // draft. Locking the other tabs makes the mode explicit instead of losing
+  // work without saying so.
+  test("locks the other tabs while editing", () => {
+    renderEditable();
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeEnabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Privacy" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
-  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeDisabled();
+  });
+
+  test("unlocks them again on cancel", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeEnabled();
+  });
+
+  test("sends the whole personal form merged with the edits, plus the units", async () => {
+    const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
+    renderEditable({ onSaveProfile });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Age"), { target: { value: "35" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
+    const [draft, units] = onSaveProfile.mock.calls[0];
+    // Merged over `personal`, not the tab's fields alone -- each tab edits a
+    // subset and personalToProfile builds a whole profile, so sending one tab's
+    // fields would clear the others.
+    expect(draft).toMatchObject({ name: "Jordan Fields", age: "35" });
+    expect(units).toEqual({ heightUnit: "cm", weightUnit: "kg" });
+  });
+
+  test("closes the form once the save succeeds", async () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByLabelText("Age")).toBeNull());
+  });
+
+  test("keeps the form open and shows the error when the save fails", async () => {
+    renderEditable({
+      onSaveProfile: vi.fn().mockResolvedValue({ ok: false, error: "Age must be 10-120." })
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Age must be 10-120.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+  });
 });
 ```
 
-`renderView(props)` is this file's existing helper, at line 14. Extend it to forward `onSaveProfile` and `personal` through to `SettingsView`; the snippets above already call it by that name.
+`waitFor` and `fireEvent` need adding to the file's `@testing-library/react` import if they are not already there.
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [ ] **Step 2: Run the tests and watch them fail**
 
 Run: `npx vitest run --root client src/pages/dashboard/views/SettingsView.test.jsx`
 
-Expected: FAIL, no "Edit" button exists.
+Expected: FAIL — there is no Edit button.
 
-- [ ] **Step 3: Add the edit state to SettingsView**
+- [ ] **Step 3: Add the edit state**
 
-**Do not offer Edit before the profile has hydrated.** `SettingsEditForm` seeds its draft once, with `useState(() => ({ ...values }))`, so a later change to `values` is ignored — which is correct for a short-lived editor but dangerous here. Task 10 hydrates `personal` from `/api/auth/me` asynchronously, so a visitor who reaches Settings and clicks Edit before that resolves seeds a draft full of `defaultPersonalForm` blanks. `handleSave` then posts `{ ...personal, ...draft }`, and those blanks win over the real stored values — a save that silently wipes the profile it was meant to edit.
-
-Guard it at the source by rendering the Edit button only once there is a profile to edit:
+Accept the new prop and add the state. `measurementSystem` is already computed in this component for the read rows; reuse it rather than deriving it twice.
 
 ```jsx
-{
-  EDITABLE_TABS.includes(activeTab) && user?.profile && editingTab !== activeTab && (
-    <button type="button" onClick={() => setEditingTab(activeTab)}>
-      Edit
-    </button>
-  );
-}
+export default function SettingsView({ user, personal, onSaveProfile }) {
 ```
-
-Add a test that the Edit button is absent for a user whose profile has not arrived yet, otherwise nothing stops this being reintroduced.
-
-Add the imports:
-
-```jsx
-import SettingsEditForm from "./SettingsEditForm";
-import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
-```
-
-Accept `personal` and `onSaveProfile` as props alongside `user`, and add:
 
 ```jsx
 const [editingTab, setEditingTab] = useState("");
 const [saveError, setSaveError] = useState("");
 const [saving, setSaving] = useState(false);
+
+const isEditing = editingTab === activeTabData.id;
+const canEdit = EDITABLE_TABS.includes(activeTabData.id) && Boolean(user?.profile);
 
 const handleSave = async (draft, units) => {
   setSaving(true);
@@ -1953,20 +2008,41 @@ const handleSave = async (draft, units) => {
 
 Two things here are load-bearing:
 
-- **Merging over `personal` rather than sending `draft` alone.** Each tab edits a subset, and `personalToProfile` builds a whole profile, so posting one tab's fields alone would clear the others.
-- **Forwarding `units` unchanged.** The form reports which units it rendered in, and `submitProfile` must convert with those same ones. Dropping the second argument here is exactly how 170 lb becomes 170 kg — the app-level `weightUnit` belongs to the home flow's toggle, not to this locale-driven form.
+- **Merging over `personal` rather than sending `draft` alone.** Each tab edits a subset and `personalToProfile` builds a whole profile, so posting one tab's fields would clear the others.
+- **Forwarding `units` unchanged.** The form reports which units it rendered in and `submitProfile` must convert with those same ones. Dropping the second argument is how 170 lb becomes 170 kg.
 
-`measurementSystem` is already computed in this component (`getPreferredMeasurementSystem()` behind a `useMemo`) for the read-only rows; pass that same value to the form rather than computing it a second time.
-
-- [ ] **Step 4: Render the form in place of the rows**
-
-Where the active tab's rows are rendered, branch on the edit state. Add the Edit button beside the tab description, rendered only when `EDITABLE_TABS.includes(activeTab)`:
+Add the imports:
 
 ```jsx
+import SettingsEditForm from "./SettingsEditForm";
+import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
+```
+
+- [ ] **Step 4: Lock the other tabs while editing**
+
+Switching tabs mid-edit unmounts the form and discards the draft with no warning. Disable the others instead, so the mode is visible rather than silently destructive. In the existing tab `<button>`:
+
+```jsx
+disabled={isEditing && tab.id !== activeTabData.id}
+```
+
+- [ ] **Step 5: Render the form in place of the rows**
+
+Put the Edit button beside the panel heading, and swap the existing inline `rows.map(...)` for the form while editing:
+
+```jsx
+<div className="settings-body-header">
+  <h3>{activeTabData.label}</h3>
+  {canEdit && !isEditing && (
+    <button type="button" onClick={() => setEditingTab(activeTabData.id)}>
+      Edit
+    </button>
+  )}
+</div>;
 {
-  editingTab === activeTab ? (
+  isEditing ? (
     <SettingsEditForm
-      fields={fieldsForTab(activeTab)}
+      fields={fieldsForTab(activeTabData.id)}
       values={personal || {}}
       measurementSystem={measurementSystem}
       onSave={handleSave}
@@ -1978,31 +2054,61 @@ Where the active tab's rows are rendered, branch on the edit state. Add the Edit
       saving={saving}
     />
   ) : (
-    renderRows()
+    <div className="settings-list">
+      {activeTabData.rows.map((row) => (
+        <div className="settings-list-row" key={`${activeTabData.id}-${row.label}`}>
+          <span className="muted">{row.label}</span>
+          <strong className="settings-value">{displayValue(row.value)}</strong>
+        </div>
+      ))}
+    </div>
   );
 }
 ```
 
-- [ ] **Step 5: Thread `onSaveProfile` through DashboardPage**
+The `rows.map` above is the file's existing markup moved into the false branch unchanged — do not rewrite it.
 
-`DashboardPage.jsx:347` already passes `personal`, so only the handler is missing. Change that line to:
+- [ ] **Step 6: Thread the handler through**
+
+`DashboardPage.jsx:347` already passes `personal`. Add the handler:
 
 ```jsx
 <SettingsView user={user} personal={personal} onSaveProfile={onSaveProfile} />
 ```
 
-Then add `onSaveProfile` to `DashboardPage`'s props and pass `submitProfile` down from `App.jsx` where the other event handlers are already threaded through. Follow that existing prop path rather than adding context.
+Add `onSaveProfile` to `DashboardPage`'s props, and in `App.jsx` destructure `submitProfile` from `createAppEventHandlers` and pass it down as `onSaveProfile` on the existing `DashboardPage` element. Follow the prop path the other handlers already use rather than adding context.
 
-- [ ] **Step 6: Run the tests and watch them pass**
+- [ ] **Step 7: Run the tests and watch them pass**
 
 Run: `npx vitest run --root client src/pages/dashboard/views/SettingsView.test.jsx`
 
-Expected: PASS.
+Expected: PASS, with the file's pre-existing tests still passing — the read view is unchanged when not editing.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Mutation-test the guards**
+
+| Mutation                                                          | Must be caught by                                     |
+| ----------------------------------------------------------------- | ----------------------------------------------------- |
+| Drop `Boolean(user?.profile)` from `canEdit`                      | "offers no Edit until the profile has arrived"        |
+| `handleSave` sends `draft` instead of `{ ...personal, ...draft }` | **nothing — this is an equivalent mutant.** See below |
+| `handleSave` drops the `units` argument                           | the same test's `units` assertion                     |
+| Close the form regardless of `result.ok`                          | "keeps the form open and shows the error"             |
+| Drop the `disabled` on the other tabs                             | "locks the other tabs while editing"                  |
+| `EDITABLE_TABS.includes(...)` always true                         | "offers no Edit on a placeholder tab"                 |
+| `values={personal}` becomes `values={{}}`                         | "pre-fills the form with the values it is editing"    |
+
+**The merge is an equivalent mutant, and that is worth understanding before you "fix" the test.** `SettingsEditForm` seeds its draft from the whole `values` object rather than only the fields it renders, so `draft` is already a complete profile and `{ ...personal, ...draft }` equals `draft`. No test can tell them apart, because there is no observable difference.
+
+It stays anyway: the cost is nothing, and the failure it guards is severe — if the form is ever narrowed to return only its own tab's fields, this is what stops editing one tab blanking the other two. What makes that honest rather than superstitious is that the invariant it leans on is pinned on the other side, by `SettingsEditForm.test.jsx`'s "carries fields it never rendered through to the save". Verified: narrowing the draft to the rendered fields fails that test.
+
+Two more things this task's tests got wrong on the first attempt, both worth avoiding:
+
+- **The units assertion depended on jsdom's ambient locale.** It asserted metric, and would have passed or failed on the environment rather than the code — jsdom defaults to `en-US`, which is imperial. Pin the locale with the file's `useLocale` helper and assert both directions.
+- **Asserting that `name` survives the save proves nothing about the merge**, because the draft is seeded from `personal` and carries `name` either way. Only a field the edited tab does not render can distinguish them, which is why the test uses `cardio` — a lifestyle field — while editing the profile tab.
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add client/src/pages/dashboard/views/SettingsView.jsx client/src/pages/dashboard/views/SettingsView.test.jsx client/src/pages/DashboardPage.jsx
+git add client/src/pages/dashboard/views/SettingsView.jsx client/src/pages/dashboard/views/SettingsView.test.jsx client/src/pages/DashboardPage.jsx client/src/App.jsx
 git commit -m "feat(client): make the settings profile tabs editable"
 ```
 

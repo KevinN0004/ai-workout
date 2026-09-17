@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
+import SettingsEditForm from "./SettingsEditForm";
+import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
 import "./SettingsView.css";
 
 const formatHeightByLocation = (heightCm, measurementSystem) => {
@@ -30,7 +32,7 @@ const displayValue = (value) => {
   return String(value);
 };
 
-export default function SettingsView({ user, personal }) {
+export default function SettingsView({ user, personal, onSaveProfile }) {
   // Both memoized because their fallback branches minted a fresh object/array
   // every render, defeating the tabs memo that depends on them.
   const profile = useMemo(() => user?.profile || {}, [user]);
@@ -46,6 +48,9 @@ export default function SettingsView({ user, personal }) {
   );
 
   const [activeTab, setActiveTab] = useState("profile");
+  const [editingTab, setEditingTab] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
   const tabs = useMemo(
     () => [
       {
@@ -131,6 +136,40 @@ export default function SettingsView({ user, personal }) {
   );
   const activeTabData = tabs.find((tab) => tab.id === activeTab) || tabs[0];
 
+  const isEditing = editingTab === activeTabData.id;
+  // Gated on the profile having arrived. SettingsEditForm seeds its draft once,
+  // so offering Edit before hydration would seed defaultPersonalForm blanks --
+  // and handleSave posts { ...personal, ...draft }, letting those blanks
+  // overwrite the stored profile. A save that wipes what it was meant to edit
+  // is the worst failure available here.
+  const canEdit = EDITABLE_TABS.includes(activeTabData.id) && Boolean(user?.profile);
+
+  const handleSave = async (draft, units) => {
+    setSaving(true);
+    setSaveError("");
+    // The spread over `personal` is deliberately redundant TODAY, and a mutation
+    // removing it survives -- SettingsEditForm seeds its draft from the whole
+    // `personal` object rather than only the fields it renders, so `draft` is
+    // already a complete profile. That invariant is pinned in
+    // SettingsEditForm.test.jsx ("carries fields it never rendered through to
+    // the save"), because it is invisible from this side.
+    //
+    // It stays because the cost is nothing and the failure it guards is severe:
+    // if the form is ever narrowed to return only its own tab's fields, this is
+    // what stops editing one tab blanking the other two. Kept as a known
+    // equivalent mutant rather than as an untested guard.
+    //
+    // The units are forwarded unchanged because submitProfile must convert with
+    // the same ones the form rendered in.
+    const result = await onSaveProfile({ ...personal, ...draft }, units);
+    setSaving(false);
+    if (result?.ok) {
+      setEditingTab("");
+      return;
+    }
+    setSaveError(result?.error || "Unable to save profile.");
+  };
+
   return (
     <section className="panel settings-view">
       <div className="panel-header">
@@ -151,6 +190,10 @@ export default function SettingsView({ user, personal }) {
               aria-controls={`settings-panel-${tab.id}`}
               id={`settings-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
+              // Switching tabs mid-edit would unmount the form and discard the
+              // draft with no warning. Locking the others makes the mode
+              // visible instead of silently losing work.
+              disabled={isEditing && tab.id !== activeTabData.id}
             >
               <span>{tab.label}</span>
               <small className="muted">{tab.description}</small>
@@ -163,15 +206,37 @@ export default function SettingsView({ user, personal }) {
           id={`settings-panel-${activeTabData.id}`}
           aria-labelledby={`settings-tab-${activeTabData.id}`}
         >
-          <h3>{activeTabData.label}</h3>
-          <div className="settings-list">
-            {activeTabData.rows.map((row) => (
-              <div className="settings-list-row" key={`${activeTabData.id}-${row.label}`}>
-                <span className="muted">{row.label}</span>
-                <strong className="settings-value">{displayValue(row.value)}</strong>
-              </div>
-            ))}
+          <div className="settings-body-header">
+            <h3>{activeTabData.label}</h3>
+            {canEdit && !isEditing && (
+              <button type="button" onClick={() => setEditingTab(activeTabData.id)}>
+                Edit
+              </button>
+            )}
           </div>
+          {isEditing ? (
+            <SettingsEditForm
+              fields={fieldsForTab(activeTabData.id)}
+              values={personal || {}}
+              measurementSystem={measurementSystem}
+              onSave={handleSave}
+              onCancel={() => {
+                setEditingTab("");
+                setSaveError("");
+              }}
+              error={saveError}
+              saving={saving}
+            />
+          ) : (
+            <div className="settings-list">
+              {activeTabData.rows.map((row) => (
+                <div className="settings-list-row" key={`${activeTabData.id}-${row.label}`}>
+                  <span className="muted">{row.label}</span>
+                  <strong className="settings-value">{displayValue(row.value)}</strong>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </section>

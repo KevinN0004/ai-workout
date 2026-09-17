@@ -164,6 +164,21 @@ describe("SettingsEditForm", () => {
     expect(screen.getByRole("checkbox", { name: "Tuesday" })).not.toBeChecked();
   });
 
+  // The draft is seeded from the WHOLE values object, not just the fields this
+  // form renders, so a tab-sized form still saves a whole profile. SettingsView
+  // depends on that: it is why editing one tab cannot blank the other two.
+  // Pinned here because the dependency is invisible from SettingsView's side --
+  // its { ...personal, ...draft } merge is a no-op precisely because of this,
+  // and a mutation removing that merge survives.
+  test("carries fields it never rendered through to the save", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave, values: { ...VALUES, cardio: "Mixed", notes: "Old injury" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][0]).toMatchObject({ cardio: "Mixed", notes: "Old injury" });
+  });
+
   test("discards edits on cancel", () => {
     const onCancel = vi.fn();
     const onSave = vi.fn();

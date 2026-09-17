@@ -298,6 +298,7 @@ export default function App() {
     submitWorkout,
     submitCalories,
     submitGoals,
+    submitProfile,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
@@ -516,6 +517,7 @@ export default function App() {
         setProgressForm={setProgressForm}
         submitProgressMetric={submitProgressMetric}
         submitGoals={submitGoals}
+        onSaveProfile={submitProfile}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
         weatherData={weatherData}
