@@ -18,7 +18,10 @@ const FIELDS = [
     label: "Training days",
     type: "multiselect",
     options: ["Monday", "Tuesday"]
-  }
+  },
+  // The real lifestyle tab ends in a textarea for notes. Leaving it out of this
+  // fixture left that entire branch of renderField unrendered by any test.
+  { name: "notes", label: "Notes", type: "textarea", maxLength: 500 }
 ];
 
 const VALUES = {
@@ -177,6 +180,20 @@ describe("SettingsEditForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave.mock.calls[0][0]).toMatchObject({ cardio: "Mixed", notes: "Old injury" });
+  });
+
+  test("renders a textarea for a long-form field and submits what is typed", () => {
+    const onSave = vi.fn();
+    renderForm({ onSave });
+    const notes = screen.getByLabelText("Notes");
+
+    expect(notes.tagName).toBe("TEXTAREA");
+    expect(notes).toHaveAttribute("maxlength", "500");
+
+    fireEvent.change(notes, { target: { value: "Shoulder injury, avoid overhead" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave.mock.calls[0][0].notes).toBe("Shoulder injury, avoid overhead");
   });
 
   test("discards edits on cancel", () => {

@@ -44,6 +44,20 @@ describe("SettingsView", () => {
       expect(rowValue("Weight")).toBe("84 kg");
     });
 
+    test("an imperial locale renders pounds", () => {
+      useLocale("en-US");
+      renderView({ user: { email: "a@b.c", profile: { weightKg: 84 } } });
+      expect(rowValue("Weight")).toBe("185 lb");
+    });
+
+    // 182cm is 71.65 inches: five feet plus 11.65, which rounds to twelve. The
+    // rollover turns that into 6 ft 0 in rather than the nonsense 5 ft 12 in.
+    test("twelve rounded inches roll over into the next foot", () => {
+      useLocale("en-US");
+      renderView({ user: { email: "a@b.c", profile: { heightCm: 182 } } });
+      expect(rowValue("Height")).toBe("6 ft 0 in");
+    });
+
     test("an underscore locale is parsed like a hyphenated one", () => {
       // Some browsers still report en_US.
       useLocale("en_US");
