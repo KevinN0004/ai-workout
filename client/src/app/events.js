@@ -1,4 +1,5 @@
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
+import { personalToProfile, profileToPersonal } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
 const buildOptimisticId = (type) =>
@@ -43,6 +44,7 @@ export const createAppEventHandlers = ({
   setDashView,
   go,
   personal,
+  setPersonal,
   heightUnit,
   weightUnit,
   setAuthForm,
@@ -397,6 +399,35 @@ export const createAppEventHandlers = ({
     }
   };
 
+  // The units travel with the draft rather than being read from App state. The
+  // app-level heightUnit/weightUnit belong to the home flow's toggles, while
+  // Settings renders in whatever the visitor's locale implies -- so reading the
+  // app-level ones here would convert a locale-imperial form with a metric unit
+  // and store 170 lb as 170 kg. The app-level values remain the default for any
+  // caller that does not pass units.
+  const submitProfile = async (draft, units = { heightUnit, weightUnit }) => {
+    try {
+      const res = await apiFetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(personalToProfile(draft, units))
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save profile.");
+      }
+      const data = await res.json();
+      setPersonal(profileToPersonal(data.profile, units));
+      setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
+      showDashboardToast("Profile updated.");
+      return { ok: true };
+    } catch (err) {
+      const message = err.message || "Unable to save profile.";
+      showDashboardToast(message, "error");
+      return { ok: false, error: message };
+    }
+  };
+
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
@@ -534,6 +565,7 @@ export const createAppEventHandlers = ({
     submitWorkout,
     submitCalories,
     submitGoals,
+    submitProfile,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
