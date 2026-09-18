@@ -188,6 +188,36 @@ client bundle and a Node server process.
 each restart and cannot work across more than one instance. The env plumbing is
 already built and tested; only the decision is missing.
 
+**Migrations must land before the new code starts, and nothing currently
+enforces that.** CI runs `migrate:postgres`, but there is no production deploy
+path at all, so the ordering has never had to be decided. From Phase 1 onwards
+this stops being academic: `002_password_changed_at.sql` adds a column that
+`userReadRepository` selects on **every** user read. Start a server carrying
+that code against a database that has not run `002` and every authenticated
+request fails, not just the new routes. Whatever platform is chosen, the
+migration step has to be ordered before the cutover, and a rollback has to be
+thought about in the same breath — the old code tolerates the new column, so
+migrate-then-deploy is safe in this direction, but that will not be true of
+every future migration.
+
+**Two fail-open edges in the session rule, both inherited from Phase 1.** The
+`passwordChangedAt` comparison decides whether a session survives, and it fails
+open in the direction of keeping sessions alive:
+
+- **Clock skew across instances.** `createSession` stamps `Date.now()` on the
+  app server. With more than one instance, a session created just after a
+  password change elsewhere can carry a later wall-clock time and survive. This
+  is a direct consequence of the Redis decision above — it cannot happen on one
+  instance, and appears the moment there are two.
+- **Precision truncation.** `timestamptz(6)` stores microseconds; the value
+  crosses a string boundary through `toIso`, which emits milliseconds and
+  truncates downward. The compared value is therefore never later than the true
+  change, so a session created within the same millisecond survives. Sub-
+  millisecond, and it exists only because of the string round trip.
+
+Neither is worth fixing before there is a deployment to measure them against.
+Both are worth naming here rather than discovering.
+
 The platform itself is deliberately unchosen in this document. It changes the
 artifacts enough to be worth deciding with the phase spec in front of you rather
 than guessing now.
