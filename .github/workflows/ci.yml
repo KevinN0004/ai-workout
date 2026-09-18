@@ -46,6 +46,13 @@ jobs:
       - name: Prettier
         run: npm run format:check
 
+      # knip.json declares the hook scripts in scripts/ as entry points. Nothing
+      # else can see that they are live -- they are invoked from
+      # .claude/settings.json -- so without this gate the config can rot
+      # unnoticed, and knip then reports the whole hook wiring as unused.
+      - name: Knip
+        run: npm run knip
+
       - name: Script Tests
         run: npm run test:scripts
 
