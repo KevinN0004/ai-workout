@@ -60,21 +60,29 @@ export const createUserRepository = ({ prisma }) => {
   };
 
   /**
-   * Used by the pbkdf2 -> argon2id upgrade on successful login, and by the
-   * user-initiated password change.
+   * Two callers: the silent pbkdf2 -> argon2id upgrade that runs on every
+   * successful login, and the user-initiated password change. Only the
+   * latter passes `stampPasswordChange: true`. The login-time rehash is
+   * invisible to the user, so if it moved the column an ordinary sign-in on
+   * a legacy-hash account would sign that user out of every other device --
+   * strictly worse than the stale-hash problem the rehash exists to fix.
    *
-   * `passwordChangedAt` is optional and written only when supplied. The upgrade
-   * path must NOT supply it: that rehash is invisible to the user, and stamping
-   * it would invalidate every other session belonging to any legacy-hash
-   * account, on an ordinary login they did not initiate.
+   * `stampPasswordChange` is an intent flag, not a value, and the repository
+   * reads its own clock rather than accepting one from the caller. A
+   * caller-supplied timestamp could be absent, malformed, or simply wrong,
+   * and an explicit `null` would clear the column outright -- resurrecting
+   * every session a real password change had invalidated, which is worse
+   * than never stamping at all. Owning the clock here also means two
+   * password changes racing each other resolve to whichever write lands
+   * last, never to whichever caller happened to read an earlier clock value.
    */
-  const updatePasswordHash = async ({ userId, salt, hash, passwordAlgo, passwordChangedAt }) => {
+  const updatePasswordHash = async ({ userId, salt, hash, passwordAlgo, stampPasswordChange }) => {
     const data = {
       passwordSalt: salt || "",
       passwordHash: hash,
       passwordAlgo: passwordAlgo || "argon2id"
     };
-    if (passwordChangedAt) data.passwordChangedAt = passwordChangedAt;
+    if (stampPasswordChange) data.passwordChangedAt = new Date();
     const { count } = await prisma.appUser.updateMany({
       where: userIdWhere(userId),
       data

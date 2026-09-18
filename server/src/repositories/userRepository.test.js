@@ -2,13 +2,13 @@ import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../db/prisma.js";
 import { createUserRepository } from "./userRepository.js";
 
-const { deleteUser } = createUserRepository({ prisma });
+const { deleteUser, updatePasswordHash } = createUserRepository({ prisma });
 
 const createUser = async (overrides = {}) =>
   prisma.appUser.create({
     data: {
       legacyUserId: overrides.legacyUserId ?? crypto.randomUUID(),
-      email: overrides.email ?? `delete-${crypto.randomUUID().slice(0, 8)}@example.com`,
+      email: overrides.email ?? `user-${crypto.randomUUID().slice(0, 8)}@example.com`,
       passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder"
     }
   });
@@ -68,5 +68,74 @@ describe("deleteUser", () => {
 
     expect(await prisma.appUser.findUnique({ where: { id: user.id } })).toBeNull();
     expect(await prisma.workoutSession.count({ where: { userId: user.id } })).toBe(0);
+  });
+});
+
+describe("updatePasswordHash", () => {
+  test("returns false for an id that matches no user", async () => {
+    expect(await updatePasswordHash({ userId: crypto.randomUUID(), hash: "x" })).toBe(false);
+  });
+
+  // The pbkdf2 -> argon2id upgrade on login calls this with no flag at all,
+  // and must not invalidate other sessions as a side effect of a rehash the
+  // user never asked for. A user-initiated password change is the only
+  // caller that should ever pass stampPasswordChange: true.
+  test("leaves passwordChangedAt unset when the caller omits the flag", async () => {
+    const user = await createUser();
+
+    await updatePasswordHash({ userId: user.id, hash: "rehashed-only" });
+
+    const after = await prisma.appUser.findUnique({
+      where: { id: user.id },
+      select: { passwordChangedAt: true }
+    });
+    expect(after.passwordChangedAt).toBeNull();
+  });
+
+  // This is the property the stampPasswordChange refactor exists for. Before
+  // it, updatePasswordHash took a passwordChangedAt *value*, and Prisma
+  // treats an explicit `null` in a data object as "clear this column" --
+  // which would silently resurrect every session a real password change had
+  // already invalidated. A boolean intent removes that input entirely: there
+  // is no longer any argument a caller can pass that clears an existing
+  // stamp, so a rehash landing on top of a real password change cannot erase
+  // it.
+  test("leaves an existing passwordChangedAt untouched when the caller omits the flag", async () => {
+    const user = await createUser();
+    const original = new Date("2026-09-01T00:00:00.000Z");
+    await prisma.appUser.update({
+      where: { id: user.id },
+      data: { passwordChangedAt: original }
+    });
+
+    await updatePasswordHash({ userId: user.id, hash: "rehashed-again" });
+
+    const after = await prisma.appUser.findUnique({
+      where: { id: user.id },
+      select: { passwordChangedAt: true }
+    });
+    expect(after.passwordChangedAt).toEqual(original);
+  });
+
+  test("stamps a fresh passwordChangedAt when the caller passes stampPasswordChange: true", async () => {
+    const user = await createUser();
+    const before = new Date("2026-09-01T00:00:00.000Z");
+    await prisma.appUser.update({
+      where: { id: user.id },
+      data: { passwordChangedAt: before }
+    });
+
+    await updatePasswordHash({
+      userId: user.id,
+      hash: "changed-by-user",
+      stampPasswordChange: true
+    });
+
+    const after = await prisma.appUser.findUnique({
+      where: { id: user.id },
+      select: { passwordChangedAt: true }
+    });
+    expect(after.passwordChangedAt).toBeInstanceOf(Date);
+    expect(after.passwordChangedAt.getTime()).toBeGreaterThan(before.getTime());
   });
 });

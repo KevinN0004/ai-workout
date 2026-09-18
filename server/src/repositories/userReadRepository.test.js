@@ -164,27 +164,6 @@ describe("userReadRepository", () => {
     expect(await updatePasswordHash({ userId, hash: "x" })).toBe(false);
   });
 
-  // The pbkdf2 -> argon2id upgrade on login calls this with no
-  // passwordChangedAt at all, and must not invalidate other sessions as a
-  // side effect of a rehash the user never asked for. A user-initiated
-  // password change is the only caller that should ever supply the field.
-  test("updatePasswordHash stamps passwordChangedAt only when the caller supplies it", async () => {
-    const doc = baseUserDoc();
-    await createUserWithDashboard(doc);
-
-    await updatePasswordHash({ userId: doc.userId, hash: "rehashed-only" });
-    expect((await findUserWithDashboard(doc.userId)).passwordChangedAt).toBeNull();
-
-    await updatePasswordHash({
-      userId: doc.userId,
-      hash: "changed-by-user",
-      passwordChangedAt: new Date("2026-09-18T10:00:00.000Z")
-    });
-    expect((await findUserWithDashboard(doc.userId)).passwordChangedAt).toBe(
-      "2026-09-18T10:00:00.000Z"
-    );
-  });
-
   // Saved-exercise writes moved to repositories/savedExerciseRepository.js.
   // This still spans both: the repository removes the row, and the shim's user
   // read has to stop reporting it.

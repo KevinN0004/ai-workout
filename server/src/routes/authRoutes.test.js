@@ -549,7 +549,7 @@ describe("POST /api/auth/login", () => {
     // assert nothing over an empty array.
     expect(updates.length).toBeGreaterThan(0);
     updates.forEach((args) => {
-      expect(args.passwordChangedAt).toBeUndefined();
+      expect(args.stampPasswordChange).toBeFalsy();
     });
   });
 
