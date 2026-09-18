@@ -25,10 +25,61 @@ export const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
 
 export const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
 export const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
+// Reinstated from commit c2c820f, which removed it as dead code. It is live
+// again because the profile now carries a goal and the planner seeds from it.
+export const allowedGoalValues = [
+  "Build lean strength and energy",
+  "Fat loss + conditioning",
+  "Mobility",
+  "Recovery",
+  "Cardio"
+];
+// sleep, experience, nutrition and cardio are closed-set <select> dropdowns in
+// HomePersonalStage.jsx, not free text -- useBodyModel.js looks each one up in
+// an exact-match lowercased map, same as sex/activity/goal above. Validated
+// the same way. timeline stays cleanText: it is a placeholder text input.
+export const allowedSleepValues = ["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"];
+export const allowedExperienceValues = ["Beginner", "Intermediate", "Advanced"];
+export const allowedNutritionValues = [
+  "No preference",
+  "High-protein",
+  "Balanced",
+  "Low-carb",
+  "Vegetarian",
+  "Vegan"
+];
+// Includes "Mixed": the cardio <select> in HomePersonalStage.jsx has 8 options,
+// not 7, and useBodyModel.js's cardioScore map scores "mixed" at 0.7 alongside
+// the other seven. Omitting it here would silently drop a legitimate value --
+// the exact bug class this task exists to close.
+export const allowedCardioValues = [
+  "None",
+  "Walking",
+  "Running",
+  "Cycling",
+  "Rowing",
+  "Swimming",
+  "HIIT",
+  "Mixed"
+];
+export const allowedTrainingDayValues = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday"
+];
 const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
 
 const allowedSexes = new Set(allowedSexValues);
 const allowedActivities = new Set(allowedActivityValues);
+const allowedGoals = new Set(allowedGoalValues);
+const allowedSleeps = new Set(allowedSleepValues);
+const allowedExperiences = new Set(allowedExperienceValues);
+const allowedNutritions = new Set(allowedNutritionValues);
+const allowedCardios = new Set(allowedCardioValues);
 const allowedMealTypes = new Set(allowedMealTypeValues);
 
 export const defaultProfile = () => ({
@@ -42,6 +93,13 @@ export const defaultProfile = () => ({
   bodyFat: null,
   activity: "Moderate",
   notes: "",
+  sleep: "",
+  timeline: "",
+  experience: "",
+  nutrition: "",
+  cardio: "",
+  goal: "",
+  trainingDays: [],
   updatedAt: new Date().toISOString()
 });
 
@@ -163,6 +221,24 @@ export const buildProfile = (input = {}) => {
     bodyFat: toNullableNumber(input.bodyFat, 3, 70),
     activity: allowedActivities.has(input.activity) ? input.activity : base.activity,
     notes: cleanText(input.notes, 500),
+    sleep: allowedSleeps.has(input.sleep) ? input.sleep : "",
+    timeline: cleanText(input.timeline, 60),
+    experience: allowedExperiences.has(input.experience) ? input.experience : "",
+    nutrition: allowedNutritions.has(input.nutrition) ? input.nutrition : "",
+    cardio: allowedCardios.has(input.cardio) ? input.cardio : "",
+    goal: allowedGoals.has(input.goal) ? input.goal : "",
+    // Iterate the seven canonical days rather than the input array, with no
+    // cap on the input at all: the result is bounded and deduped by
+    // construction because it can only ever contain the seven canonical
+    // names. Capping the raw input first (this line has tried both 7 and 64)
+    // just slices it ahead of this membership check, silently discarding a
+    // valid day that happens to sit past the cut. Input size is already
+    // bounded upstream by express's request body limit.
+    trainingDays: allowedTrainingDayValues.filter((day) =>
+      (Array.isArray(input.trainingDays) ? input.trainingDays : []).some(
+        (entry) => cleanText(entry, 20) === day
+      )
+    ),
     updatedAt: new Date().toISOString()
   };
 };

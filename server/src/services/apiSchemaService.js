@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { allowedActivityValues, allowedSexValues } from "./dashboardDataBuildersService.js";
+import {
+  allowedActivityValues,
+  allowedCardioValues,
+  allowedExperienceValues,
+  allowedGoalValues,
+  allowedNutritionValues,
+  allowedSexValues,
+  allowedSleepValues,
+  allowedTrainingDayValues
+} from "./dashboardDataBuildersService.js";
 
 const toNumberInput = (value) => {
   if (value === "") return null;
@@ -49,7 +58,22 @@ const profileInputSchema = z
     sex: z.union([z.enum(allowedSexValues), z.literal("")]).optional(),
     bodyFat: optionalNullableNumberField(3, 70),
     activity: z.union([z.enum(allowedActivityValues), z.literal("")]).optional(),
-    notes: optionalStringField(500)
+    notes: optionalStringField(500),
+    sleep: z.union([z.enum(allowedSleepValues), z.literal("")]).optional(),
+    timeline: optionalStringField(60),
+    experience: z.union([z.enum(allowedExperienceValues), z.literal("")]).optional(),
+    nutrition: z.union([z.enum(allowedNutritionValues), z.literal("")]).optional(),
+    cardio: z.union([z.enum(allowedCardioValues), z.literal("")]).optional(),
+    goal: z.union([z.enum(allowedGoalValues), z.literal("")]).optional(),
+    // Validated as an enum array, not a bounded string array: any item cap
+    // that runs ahead of a membership check discards valid entries that
+    // happen to sit past the cut, and raising the number only moves the
+    // cliff rather than removing it (7 -> 64 still dropped a valid day at
+    // position 65). z.array(z.enum(...)).max(7) rejects instead -- an
+    // unknown day or more than seven entries is a 400, consistent with every
+    // other closed-set field in this schema, and there is no slice step left
+    // to get wrong.
+    trainingDays: z.array(z.enum(allowedTrainingDayValues)).max(7).optional()
   })
   .passthrough();
 

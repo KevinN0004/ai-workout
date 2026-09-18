@@ -1,4 +1,5 @@
 import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
+import { personalToProfile } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
 const buildOptimisticId = (type) =>
@@ -397,6 +398,44 @@ export const createAppEventHandlers = ({
     }
   };
 
+  // The units travel with the draft rather than being read from App state. The
+  // app-level heightUnit/weightUnit belong to the home flow's toggles, while
+  // Settings renders in whatever the visitor's locale implies -- so reading the
+  // app-level ones here would convert a locale-imperial form with a metric unit
+  // and store 170 lb as 170 kg. The app-level values remain the default for any
+  // caller that does not pass units.
+  const submitProfile = async (draft, units = { heightUnit, weightUnit }) => {
+    try {
+      const res = await apiFetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(personalToProfile(draft, units))
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to save profile.");
+      }
+      const data = await res.json();
+      // Only the user is updated, deliberately. `personal` is the home flow's
+      // form state, not account state: it is read by HomePage and the signup
+      // prefill, both of which only a signed-out visitor reaches, and it is
+      // blanked on logout. Settings reads user.profile.
+      //
+      // Writing it here used to look like keeping the two in sync, but nothing
+      // hydrates `personal` on load -- so it would have been correct right after
+      // a save and blank on the next page load. Half-synced state is worse than
+      // unsynced, and a mutation removing the write failed only the two tests
+      // that asserted the write itself.
+      setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
+      showDashboardToast("Profile updated.");
+      return { ok: true };
+    } catch (err) {
+      const message = err.message || "Unable to save profile.";
+      showDashboardToast(message, "error");
+      return { ok: false, error: message };
+    }
+  };
+
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
@@ -534,6 +573,7 @@ export const createAppEventHandlers = ({
     submitWorkout,
     submitCalories,
     submitGoals,
+    submitProfile,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,

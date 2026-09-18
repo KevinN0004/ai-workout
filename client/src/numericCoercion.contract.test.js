@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "./components/physique/math";
+import { toProfileNumber } from "./app/profileMapping";
 
 // The client half of the invariant asserted in
 // server/src/numericCoercion.contract.test.js:
@@ -25,6 +26,11 @@ const helpers = [
     name: "toFiniteNumber (physique/math)",
     call: (value) => toFiniteNumber(value, 42),
     absent: 42
+  },
+  {
+    name: "toProfileNumber (app/profileMapping)",
+    call: (value) => toProfileNumber(value),
+    absent: null
   }
 ];
 

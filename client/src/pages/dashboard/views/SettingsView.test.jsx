@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import SettingsView from "./SettingsView";
 
@@ -12,7 +12,7 @@ const useLocale = (...locales) => {
 };
 
 const renderView = (props = {}) =>
-  render(<SettingsView user={{ email: "a@b.c", profile: {} }} personal={{}} {...props} />);
+  render(<SettingsView user={{ email: "a@b.c", profile: {} }} {...props} />);
 
 // Reads the value cell sitting beside a row label.
 const rowValue = (label) => {
@@ -42,6 +42,20 @@ describe("SettingsView", () => {
       useLocale("en-GB");
       renderView({ user: { email: "a@b.c", profile: { weightKg: 84 } } });
       expect(rowValue("Weight")).toBe("84 kg");
+    });
+
+    test("an imperial locale renders pounds", () => {
+      useLocale("en-US");
+      renderView({ user: { email: "a@b.c", profile: { weightKg: 84 } } });
+      expect(rowValue("Weight")).toBe("185 lb");
+    });
+
+    // 182cm is 71.65 inches: five feet plus 11.65, which rounds to twelve. The
+    // rollover turns that into 6 ft 0 in rather than the nonsense 5 ft 12 in.
+    test("twelve rounded inches roll over into the next foot", () => {
+      useLocale("en-US");
+      renderView({ user: { email: "a@b.c", profile: { heightCm: 182 } } });
+      expect(rowValue("Height")).toBe("6 ft 0 in");
     });
 
     test("an underscore locale is parsed like a hyphenated one", () => {
@@ -136,5 +150,201 @@ describe("SettingsView", () => {
       renderView();
       expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
     });
+  });
+});
+
+// Everything the view shows and edits comes from the stored profile. It used to
+// take a separate `personal` prop for six of the rows, which was blank for every
+// signed-in user -- see the comment in SettingsView for why.
+const renderEditable = (props = {}) =>
+  renderView({
+    user: {
+      email: "a@b.c",
+      profile: { firstName: "Jordan", lastName: "Fields", age: 34 }
+    },
+    onSaveProfile: vi.fn().mockResolvedValue({ ok: true }),
+    ...props
+  });
+
+// The six fields Tasks 1 and 2 taught the server to persist were still being
+// read from App's in-memory `personal`, which is never populated for a
+// signed-in user: they are redirected off "/" to the dashboard before the home
+// flow that fills it can run. So Settings showed "Not set" for exactly the
+// fields this whole change set out to store.
+describe("the rows read the stored profile", () => {
+  const withProfile = (profile) =>
+    renderView({ user: { email: "a@b.c", profile }, onSaveProfile: vi.fn() });
+
+  test.each([
+    ["Training", "Timeline", { timeline: "12 weeks to lose 10 lb" }, "12 weeks to lose 10 lb"],
+    ["Training", "Experience", { experience: "Intermediate" }, "Intermediate"],
+    ["Training", "Goal", { goal: "Mobility" }, "Mobility"],
+    ["Lifestyle", "Training days", { trainingDays: ["Monday", "Friday"] }, "Monday, Friday"],
+    ["Lifestyle", "Nutrition", { nutrition: "High-protein" }, "High-protein"],
+    ["Lifestyle", "Cardio", { cardio: "Mixed" }, "Mixed"]
+  ])("shows a stored %s value for %s", (tab, label, profile, expected) => {
+    withProfile(profile);
+
+    fireEvent.click(
+      screen.getByRole("tab", { name: new RegExp(label === "Training days" ? "Training" : tab) })
+    );
+
+    expect(rowValue(label)).toBe(expected);
+  });
+});
+
+describe("editing a tab", () => {
+  test("offers Edit on an editable tab", () => {
+    renderEditable();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  test("offers no Edit on a placeholder tab", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Privacy/ }));
+
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
+  // The form's values are derived from the stored profile, so gating Edit on
+  // that profile existing gates on the same thing the form reads. An earlier
+  // version gated on user?.profile while the form seeded from App's in-memory
+  // `personal`, which a signed-in user never has -- so Edit appeared, the form
+  // opened blank, and saving wrote those blanks over a real profile.
+  test("offers no Edit until the profile has arrived", () => {
+    renderEditable({ user: { email: "a@b.c" } });
+
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
+  test("swaps the rows for a form when Edit is clicked", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  test("returns to the read view on cancel", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByLabelText("Age")).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  // Switching tabs mid-edit would unmount the form and silently discard the
+  // draft. Locking the other tabs makes the mode explicit instead of losing
+  // work without saying so.
+  test("locks the other tabs while editing", () => {
+    renderEditable();
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeDisabled();
+  });
+
+  test("unlocks them again on cancel", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("tab", { name: /Training/ })).toBeEnabled();
+  });
+
+  test("sends the whole stored profile merged with the edits", async () => {
+    const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
+    renderEditable({ onSaveProfile });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Age"), { target: { value: "35" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
+    // Merged over the stored profile, not the tab's fields alone -- each tab
+    // edits a subset and personalToProfile builds a whole profile, so sending
+    // one tab's fields would clear the others.
+    expect(onSaveProfile.mock.calls[0][0]).toMatchObject({ name: "Jordan Fields", age: "35" });
+  });
+
+  // The assertion above cannot tell the merge from the form: the draft is seeded
+  // from the same stored profile, so `name` is present either way. Only a field
+  // the edited tab does not render can distinguish them -- cardio lives on the
+  // lifestyle tab, so it reaches the payload solely through the spread. Without
+  // it, editing one tab would blank every field on the other two.
+  test("preserves fields the edited tab does not show", async () => {
+    const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
+    renderEditable({
+      user: {
+        email: "a@b.c",
+        profile: { firstName: "Jordan", lastName: "Fields", age: 34, cardio: "Mixed" }
+      },
+      onSaveProfile
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
+    expect(onSaveProfile.mock.calls[0][0].cardio).toBe("Mixed");
+  });
+
+  // And this is what proves the form is seeded at all. Passing values={{}} left
+  // every other assertion green, because handleSave merges the stored profile back in on
+  // the way out -- so the payload looked right while the visitor stared at an
+  // empty form.
+  test("pre-fills the form with the values it is editing", () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByLabelText("Age")).toHaveValue(34);
+  });
+
+  // The units must follow the visitor's locale, not jsdom's ambient default.
+  // The first version of this test asserted metric and passed only by accident
+  // of what the environment happened to be -- it failed here because jsdom
+  // defaults to en-US, which is imperial. Pinning both directions is what makes
+  // the assertion about the code rather than about the test runner.
+  test.each([
+    ["en-GB", { heightUnit: "cm", weightUnit: "kg" }],
+    ["en-US", { heightUnit: "ft", weightUnit: "lb" }]
+  ])("saves with the units %s implies", async (locale, expected) => {
+    useLocale(locale);
+    const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
+    renderEditable({ onSaveProfile });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onSaveProfile).toHaveBeenCalled());
+    expect(onSaveProfile.mock.calls[0][1]).toEqual(expected);
+  });
+
+  test("closes the form once the save succeeds", async () => {
+    renderEditable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByLabelText("Age")).toBeNull());
+  });
+
+  test("keeps the form open and shows the error when the save fails", async () => {
+    renderEditable({
+      onSaveProfile: vi.fn().mockResolvedValue({ ok: false, error: "Age must be 10-120." })
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Age must be 10-120.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
   });
 });
