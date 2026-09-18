@@ -1,5 +1,17 @@
 # Baseline and Account Management Implementation Plan
 
+Status: shipped on `feat/account-management` (`ccf96e3`..`61bcd86`). Tasks 1-10
+landed as planned. Task 11 closed the branch out: a consolidated mutation pass
+across all ten tasks' guards found no regression, the client coverage floors
+were ratcheted to the newly measured 98.69 / 93.64 / 98.78 / 99.38, and the
+CLAUDE.md claims this work had made false — the E2E account-cleanup passage,
+the coverage figures, the server test count, and the uncovered-branch ranking —
+were corrected. This note records that outcome rather than editing the tasks
+below to look prescient; the one real design divergence already has its own
+note ahead of Task 2 (`updatePasswordHash`'s timestamp parameter became the
+`stampPasswordChange` intent flag in Task 4b), and the task text below is left
+as originally written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Measure the real baseline, then give a signed-in user a way to change their password and delete their account — the two things that gate deploying an app holding age, height, weight and body fat.

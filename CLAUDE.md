@@ -323,9 +323,14 @@ survived. Four things are worth knowing before touching it:
   unavailable" path instead of reaching the live weather and air-quality
   upstreams. Plan generation is out of scope for the same reason: it needs a
   real Gemini key.
-- **Each run creates an account** (`e2e-<timestamp>@example.test`) and never
-  deletes it; there is no delete-account endpoint. Harmless in CI, but it
-  accumulates rows in a local database.
+- **Each run creates an account** (`e2e-<timestamp>@example.test`) and now
+  deletes it before the file ends. `smoke.spec.js` deletes it as its last
+  test, the thing under test; `a11y.spec.js` deletes its own account
+  (`a11y-<timestamp>@example.test`) in `afterAll` instead, because its two
+  account scans stop at the delete confirmation reveal so axe can see that
+  state, rather than submitting it. A run that fails before reaching that
+  step still leaves the row behind — harmless in CI, but it accumulates in a
+  local database.
 
 It has its own CI job rather than living in `test`, so a flaky browser run
 cannot muddy the unit signal. It was verified by mutation rather than trusted:
@@ -449,7 +454,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-18:
-  server **93.65%** statements / 85.35% branches, client **98.67%** / 93.57%.
+  server **93.66%** statements / 85.6% branches, client **98.69%** / 93.64%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -833,7 +838,7 @@ the native instance all along.
   them fail with `Can't reach database server`, which is environmental, not a regression
   (measured 2026-09-12; this entry said ~40 before). The compose database works just as
   well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
-  **966** server tests green.
+  **999** server tests green.
 
 ## Fresh Clone Setup
 
