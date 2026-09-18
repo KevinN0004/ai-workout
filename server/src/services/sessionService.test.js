@@ -171,4 +171,26 @@ describe("passwordChangedAt invalidation", () => {
 
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
+
+  test("a session created in the same millisecond as the change survives", async () => {
+    // Task 5 mints a replacement session immediately after stamping
+    // passwordChangedAt, so the two can share a millisecond. Strict `<` is what
+    // lets that session live; `<=` would sign the user out the moment they
+    // changed their password.
+    let changedAt = null;
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: changedAt
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const session = await service.getSessionByToken(token);
+    changedAt = new Date(session.createdAt).toISOString();
+
+    const req = { headers: { cookie: `sid=${token}` } };
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
 });
