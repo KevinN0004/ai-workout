@@ -312,7 +312,20 @@ export const createSessionService = ({
       await deleteSession(token);
       return null;
     }
-    return findUserById(session.userId);
+    const user = await findUserById(session.userId);
+    if (!user) return null;
+
+    // Guard before comparing, not after. Date.parse of an absent value is NaN,
+    // and every comparison against NaN is false -- so an unparseable timestamp
+    // fails OPEN and silently stops invalidating anything. The finite check
+    // makes that explicit rather than incidental, and the "created before"
+    // test above is what proves the rule still bites.
+    const changedAtMs = Date.parse(user.passwordChangedAt ?? "");
+    if (Number.isFinite(changedAtMs) && session.createdAt < changedAtMs) {
+      await deleteSession(token);
+      return null;
+    }
+    return user;
   };
 
   const requireAuth = async (req, res, next) => {
@@ -403,6 +416,7 @@ export const createSessionService = ({
     setCsrfCookie,
     clearCsrfCookie,
     createSession,
+    getSessionByToken,
     deleteSession,
     getSessionUser,
     requireAuth,

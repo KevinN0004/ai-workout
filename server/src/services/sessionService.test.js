@@ -108,3 +108,67 @@ describe("initSessionStore", () => {
     expect(service.getRedisClient()).toBeNull();
   }, 15000);
 });
+
+describe("passwordChangedAt invalidation", () => {
+  test("a session created before the password changed is rejected and deleted", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: new Date(Date.now() + 5_000).toISOString()
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toBeNull();
+    // Rejecting is not enough -- the dead token must not linger in the store.
+    expect(await service.getSessionByToken(token)).toBeNull();
+  });
+
+  test("a session created after the password changed survives", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: new Date(Date.now() - 5_000).toISOString()
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+
+  test("a user who has never changed their password keeps their session", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: null
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+
+  test("an empty-string timestamp is treated as absent, not as epoch zero", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: ""
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+});
