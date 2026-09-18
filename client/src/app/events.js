@@ -436,6 +436,54 @@ export const createAppEventHandlers = ({
     }
   };
 
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    try {
+      const res = await apiFetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to change password.");
+      }
+      showDashboardToast("Password changed.");
+      return { ok: true };
+    } catch (err) {
+      const message = err.message || "Unable to change password.";
+      showDashboardToast(message, "error");
+      return { ok: false, error: message };
+    }
+  };
+
+  const deleteAccount = async (password) => {
+    try {
+      const res = await apiFetch("/api/auth/me", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to delete account.");
+      }
+    } catch (err) {
+      const message = err.message || "Unable to delete account.";
+      showDashboardToast(message, "error");
+      return { ok: false, error: message };
+    }
+    // Only past the request. Unlike onLogout, this must NOT clear local state
+    // when the call fails: a rejected password means the account is still
+    // there, and signing the user out anyway would look like it worked.
+    setUser(null);
+    clearOptimisticOperations();
+    clearDashboardDataState();
+    clearDashboardToast();
+    resetPersonalFlow();
+    go("/");
+    return { ok: true };
+  };
+
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
@@ -574,6 +622,8 @@ export const createAppEventHandlers = ({
     submitCalories,
     submitGoals,
     submitProfile,
+    changePassword,
+    deleteAccount,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,

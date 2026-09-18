@@ -562,3 +562,106 @@ describe("submitProfile", () => {
     expect(deps.setUser).not.toHaveBeenCalled();
   });
 });
+
+describe("changePassword", () => {
+  test("posts the two passwords and reports success", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "old-pass",
+      newPassword: "new-pass-123"
+    });
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword: "old-pass", newPassword: "new-pass-123" })
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("surfaces the server's message on failure", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Current password is incorrect." }, false))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Current password is incorrect." });
+  });
+});
+
+describe("deleteAccount", () => {
+  test("deletes, then clears local state and returns home", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ ok: true })),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("old-pass");
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/me", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "old-pass" })
+    });
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+    expect(deps.go).toHaveBeenCalledWith("/");
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("a rejected password leaves the user signed in", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Password is incorrect." }, false)),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    // This is the assertion that separates deleteAccount from onLogout. Logging
+    // out clears local state even when the request fails, deliberately. Deleting
+    // must not: a rejected password means the account is still there, and
+    // signing the user out anyway would look exactly like it had worked.
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, error: "Password is incorrect." });
+  });
+
+  test("a thrown apiFetch is reported, not swallowed, and does not sign the user out", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("Security token unavailable. Refresh and try again.");
+      }),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("old-pass");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Security token unavailable. Refresh and try again."
+    });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+});

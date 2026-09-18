@@ -304,6 +304,8 @@ export default function App() {
     submitCalories,
     submitGoals,
     submitProfile,
+    changePassword,
+    deleteAccount,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
@@ -521,6 +523,8 @@ export default function App() {
         submitProgressMetric={submitProgressMetric}
         submitGoals={submitGoals}
         onSaveProfile={submitProfile}
+        onChangePassword={changePassword}
+        onDeleteAccount={deleteAccount}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
         weatherData={weatherData}
