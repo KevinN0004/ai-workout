@@ -594,6 +594,53 @@ describe("changePassword", () => {
 
     expect(result).toEqual({ ok: false, error: "Current password is incorrect." });
   });
+
+  test("falls back to a generic message when the refusal carries no error field", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({}, false))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
+
+  test("falls back to a generic message when the refusal body is unreadable", async () => {
+    // A proxy timeout answers with an error status and an HTML body.
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => ({
+        ok: false,
+        json: async () => {
+          throw new Error("not json");
+        }
+      }))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
+
+  test("falls back to a generic message when the request throws without a message", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("");
+      })
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
 });
 
 describe("deleteAccount", () => {
@@ -661,6 +708,68 @@ describe("deleteAccount", () => {
       ok: false,
       error: "Security token unavailable. Refresh and try again."
     });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the refusal carries no error field", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({}, false)),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the refusal body is unreadable", async () => {
+    // A proxy timeout answers with an error status and an HTML body.
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => ({
+        ok: false,
+        json: async () => {
+          throw new Error("not json");
+        }
+      })),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the request throws without a message", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("");
+      }),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
     expect(deps.setUser).not.toHaveBeenCalled();
     expect(deps.go).not.toHaveBeenCalled();
   });
