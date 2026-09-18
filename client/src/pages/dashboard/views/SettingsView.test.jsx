@@ -151,6 +151,36 @@ describe("SettingsView", () => {
       expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
     });
   });
+
+  // The account tab carries real rows -- an email and a password indicator --
+  // plus the SettingsAccountPanel component beneath them, rendered only while
+  // that tab is active. EDITABLE_TABS deliberately excludes "account", so no
+  // Edit button should appear here.
+  describe("the account tab", () => {
+    test("shows the stored email and a password row, with no Edit button", () => {
+      useLocale("en-GB");
+      renderView({ user: { email: "a@b.c", profile: {} } });
+
+      fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
+
+      expect(rowValue("Email")).toBe("a@b.c");
+      expect(rowValue("Password")).toBe("••••••••");
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    });
+
+    test("renders the account panel beneath the rows, wired to the handlers passed in", () => {
+      useLocale("en-GB");
+      renderView({
+        onChangePassword: vi.fn(),
+        onDeleteAccount: vi.fn()
+      });
+
+      fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
+
+      expect(screen.getByLabelText("Current password")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete account" })).toBeInTheDocument();
+    });
+  });
 });
 
 // Everything the view shows and edits comes from the stored profile. It used to
