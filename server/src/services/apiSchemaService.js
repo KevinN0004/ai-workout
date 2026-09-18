@@ -104,6 +104,14 @@ export const passwordChangeBodySchema = z
   })
   .passthrough();
 
+// A current password being checked, same as loginBodySchema and
+// passwordChangeBodySchema's currentPassword: min 1, not min 8.
+export const accountDeleteBodySchema = z
+  .object({
+    password: z.string().min(1).max(256)
+  })
+  .passthrough();
+
 export const profileBodySchema = profileInputSchema;
 
 export const workoutSessionBodySchema = z

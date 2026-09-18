@@ -24,7 +24,9 @@ export const registerAuthRoutes = (app, deps) => {
     setCsrfCookie,
     loginBodySchema,
     passwordChangeBodySchema,
+    accountDeleteBodySchema,
     updatePasswordHash,
+    deleteUser,
     metrics,
     getDummyPasswordRecord,
     verifyPassword,
@@ -204,6 +206,32 @@ export const registerAuthRoutes = (app, deps) => {
       // rememberMe is not recoverable from the old session, which stores only
       // userId and createdAt. Defaulting to true matches signup and login.
       setSessionCookie(res, token, true);
+
+      res.json({ ok: true });
+    } catch (err) {
+      sendErrorResponse(req, res, err, 500);
+    }
+  });
+
+  app.delete("/api/auth/me", requireAuth, async (req, res) => {
+    try {
+      const body = validateBody(req, res, accountDeleteBodySchema);
+      if (!body) return;
+
+      const correct = await verifyPassword(body.password, req.user);
+      if (!correct) {
+        return res.status(401).json({ error: "Password is incorrect." });
+      }
+
+      // The six AppUser relations cascade, so this removes the workout
+      // sessions, meal logs, progress metrics, calorie entries, generated plans
+      // and saved exercises with it.
+      await deleteUser({ userId: req.user.id });
+
+      const token = parseCookies(req.headers.cookie || "").sid;
+      if (token) await deleteSession(token);
+      clearSessionCookie(res);
+      clearCsrfCookie(res);
 
       res.json({ ok: true });
     } catch (err) {

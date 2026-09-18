@@ -6,6 +6,7 @@ import { registerAuthRoutes } from "./authRoutes.js";
 import { createAuthUserService } from "../services/authUserService.js";
 import { parseCookies } from "../services/sessionService.js";
 import {
+  accountDeleteBodySchema,
   loginBodySchema,
   passwordChangeBodySchema,
   profileBodySchema,
@@ -139,6 +140,7 @@ beforeEach(() => {
     }),
     loginBodySchema,
     passwordChangeBodySchema,
+    accountDeleteBodySchema,
     metrics,
     getDummyPasswordRecord: authUserService.getDummyPasswordRecord,
     verifyPassword: authUserService.verifyPassword,
@@ -766,6 +768,146 @@ describe("POST /api/auth/password", () => {
       .expect(401);
 
     expect(JSON.stringify(res.body)).not.toMatch(/hash|argon|salt|pbkdf2/i);
+  });
+});
+
+describe("DELETE /api/auth/me", () => {
+  // Same problem, same fix, as POST /api/auth/password above: the shared
+  // `requireAuth` stub always resolves to a fixed { id: "u-1" } with no
+  // hash/salt, regardless of any cookie. This route verifies a password
+  // against req.user, and one of its tests specifically asserts that a
+  // session belonging to a deleted user stops authenticating -- against the
+  // shared stub that would pass unconditionally, proving nothing. So this
+  // block builds its own requireAuth that genuinely resolves the signed-in
+  // row from the cookie via the same sessions/rows fixtures, mirroring
+  // Task 5's realRequireAuth rather than reusing the shared stub.
+  const realRequireAuth = async (req, res, next) => {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const session = sessions.find((item) => item.token === cookies.sid);
+    const row = session && rows.find((item) => item.userId === session.userId);
+    if (!row) return res.status(401).json({ error: "Not signed in." });
+    req.user = deps.mapDbDocToUser(row);
+    next();
+  };
+
+  const deleteApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
+
+  // Same reasoning as signUpAndGetCookie in the password describe block: the
+  // shared setSessionCookie/setCsrfCookie mocks only record calls in
+  // cookieCalls, they never write a real Set-Cookie header, so the session
+  // cookie a signup or login produced is read back from cookieCalls.session
+  // rather than from a response header.
+  const signUpAndGetCookie = async (app) => {
+    await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
+    const { token } = cookieCalls.session[cookieCalls.session.length - 1];
+    return `sid=${token}`;
+  };
+
+  test("deletes the account and the old credentials stop working", async () => {
+    const deleted = [];
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        deleted.push(userId);
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(deleted).toHaveLength(1);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(401);
+  });
+
+  test("a wrong password is rejected and the account survives", async () => {
+    const deleted = [];
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        deleted.push(userId);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: "not-the-password" })
+      .expect(401);
+
+    expect(deleted).toHaveLength(0);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+  });
+
+  test("requires a signed-in user", async () => {
+    const app = deleteApp();
+    await request(app).delete("/api/auth/me").send({ password: "whatever" }).expect(401);
+  });
+
+  // cookieCalls is not an array of call names -- see the shared beforeEach
+  // above, which tracks clears as counters (clearedSession/clearedCsrf), the
+  // same shape the logout tests below already assert on.
+  test("clears the session and csrf cookies", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(cookieCalls.clearedSession).toBe(1);
+    expect(cookieCalls.clearedCsrf).toBe(1);
+  });
+
+  // The design spec's claim under test: does an orphaned session -- one
+  // whose user row is gone but whose session token was never touched by the
+  // delete request -- actually stop authenticating? That depends on
+  // requireAuth genuinely re-resolving the user on every request rather than
+  // trusting a cached value, which is exactly what realRequireAuth above
+  // does (session lookup, then a fresh row lookup) and the shared stub does
+  // not.
+  test("a session belonging to the deleted user no longer authenticates", async () => {
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
+    // Sign in twice, so there is a second live session the delete route never
+    // sees. The route clears only the cookie it was called with.
+    const firstCookie = await signUpAndGetCookie(app);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+    const secondCookie = `sid=${cookieCalls.session[cookieCalls.session.length - 1].token}`;
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", firstCookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    // The design spec assumed this degrades to a 401 because getSessionUser
+    // returns findUserById(...) and requireAuth rejects a falsy user. That was
+    // an inference about Prisma's findUnique, never run. This is the test that
+    // settles it -- an orphaned token must not still authenticate.
+    await request(app).get("/api/profile").set("Cookie", secondCookie).expect(401);
   });
 });
 
