@@ -112,5 +112,20 @@ export const createUserRepository = ({ prisma }) => {
     return true;
   };
 
-  return { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry };
+  /**
+   * Removes the account row. The six AppUser relations all carry
+   * onDelete: Cascade, so workout sessions, meal logs, progress metrics,
+   * calorie entries, generated plans and saved exercises go with it -- there is
+   * deliberately no hand-written cascade here to drift out of step with the
+   * schema.
+   *
+   * Goes through userIdWhere because a caller may hold either the UUID primary
+   * key or the legacy string id.
+   */
+  const deleteUser = async ({ userId }) => {
+    const { count } = await prisma.appUser.deleteMany({ where: userIdWhere(userId) });
+    return count > 0;
+  };
+
+  return { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser };
 };
