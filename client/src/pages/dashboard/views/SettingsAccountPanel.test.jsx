@@ -9,9 +9,7 @@ import SettingsAccountPanel from "./SettingsAccountPanel";
 // driven by the resolved value rather than by a thrown error.
 
 const renderPanel = (props = {}) =>
-  render(
-    <SettingsAccountPanel onChangePassword={vi.fn()} onDeleteAccount={vi.fn()} {...props} />
-  );
+  render(<SettingsAccountPanel onChangePassword={vi.fn()} onDeleteAccount={vi.fn()} {...props} />);
 
 describe("SettingsAccountPanel", () => {
   test("renders the password form and the initial delete button, with no confirmation showing", () => {
@@ -179,7 +177,9 @@ describe("SettingsAccountPanel", () => {
 
     test("shows the error when deletion fails", async () => {
       const user = userEvent.setup();
-      const onDeleteAccount = vi.fn().mockResolvedValue({ ok: false, error: "Incorrect password." });
+      const onDeleteAccount = vi
+        .fn()
+        .mockResolvedValue({ ok: false, error: "Incorrect password." });
       renderPanel({ onDeleteAccount });
 
       await user.click(screen.getByRole("button", { name: "Delete account" }));

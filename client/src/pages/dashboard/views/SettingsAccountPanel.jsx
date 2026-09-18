@@ -95,8 +95,8 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
       <div className="settings-account-danger">
         <h4>Delete account</h4>
         <p className="muted">
-          Deleting your account permanently removes it, along with every workout, meal, metric
-          and plan you have logged. This cannot be undone.
+          Deleting your account permanently removes it, along with every workout, meal, metric and
+          plan you have logged. This cannot be undone.
         </p>
         {!deleteRevealed ? (
           <button type="button" onClick={handleRevealDelete}>
