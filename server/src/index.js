@@ -13,12 +13,14 @@ import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
 import { createAuthUserService } from "./services/authUserService.js";
 import {
+  accountDeleteBodySchema,
   caloriesBodySchema,
   generatePlanBodySchema,
   getValidationMessage,
   goalsBodySchema,
   loginBodySchema,
   mealLogBodySchema,
+  passwordChangeBodySchema,
   profileBodySchema,
   progressMetricBodySchema,
   savedExerciseBodySchema,
@@ -267,9 +269,10 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
-const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } = createUserRepository({
-  prisma
-});
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser } =
+  createUserRepository({
+    prisma
+  });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 const {
   serializeCacheKeyPart,
@@ -567,6 +570,10 @@ registerApiRoutes(app, {
   updateProfile,
   updateGoals,
   saveCalorieEntry,
+  passwordChangeBodySchema,
+  accountDeleteBodySchema,
+  updatePasswordHash,
+  deleteUser,
   gemini,
   generatePlanBodySchema,
   saveGeneratedPlan,
