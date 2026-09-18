@@ -223,6 +223,38 @@ open in the direction of keeping sessions alive:
 Neither is worth fixing before there is a deployment to measure them against.
 Both are worth naming here rather than discovering.
 
+**Run the server process and the Postgres session in UTC, and decide it here.**
+Every `timestamptz` this application writes from JavaScript is currently stored
+offset by the host's UTC offset. Measured on a UTC-7 host: a
+`password_changed_at` written as a JS `Date` for the instant `14:13:34` stored
+as `21:13:34.887-07`, seven hours out, and Prisma's client-generated
+`created_at` the same. Postgres' own `now()` was correct. The driver sends UTC
+wall-clock digits with no offset and Postgres labels them with the session zone.
+
+This is pre-existing and schema-wide, not introduced by Phase 1, and it has
+never caused a visible problem for two reasons: reading drops the offset again,
+so a JS write followed by a JS read round-trips **exactly**; and CI runs in UTC,
+where the offset is zero, so no suite can see it.
+
+Phase 1 is what makes it matter. Before it, no timestamp comparison gated
+authentication; now one does, and storage uses the offset at **write** time
+while the compensating read uses the offset at **read** time. Across a DST
+transition those differ by an hour, so a password changed under one offset and
+compared under the other resolves an hour off — either a window of sessions
+wrongly surviving a password change, or a window wrongly signed out. Twice a
+year, only on a non-UTC server, invisible to every test.
+
+It also means any SQL-side reader is simply wrong: an admin query, a
+`now() > password_changed_at` comparison, or the scheduled prune Phase 3
+contemplates.
+
+Pinning both the Node process and the Postgres session to UTC is the likely
+fix, and it is a deployment configuration decision, which is why it is recorded
+here rather than patched in Phase 1. **It is not a verified fix**: `CLAUDE.md`
+records that `TZ` does not reach Node on this machine, so nobody has been able
+to confirm locally that UTC removes the shift. Confirm it on the deployment
+target before relying on it.
+
 The platform itself is deliberately unchosen in this document. It changes the
 artifacts enough to be worth deciding with the phase spec in front of you rather
 than guessing now.
