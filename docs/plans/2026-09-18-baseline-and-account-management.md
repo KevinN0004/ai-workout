@@ -1,6 +1,6 @@
 # Baseline and Account Management Implementation Plan
 
-Status: shipped on `feat/account-management` (`ccf96e3`..`61bcd86`). Tasks 1-10
+Status: shipped on `feat/account-management` (`ccf96e3^..bab6460`). Tasks 1-10
 landed as planned. Task 11 closed the branch out: a consolidated mutation pass
 across all ten tasks' guards found no regression, the client coverage floors
 were ratcheted to the newly measured 98.69 / 93.64 / 98.78 / 99.38, and the
@@ -11,6 +11,21 @@ below to look prescient; the one real design divergence already has its own
 note ahead of Task 2 (`updatePasswordHash`'s timestamp parameter became the
 `stampPasswordChange` intent flag in Task 4b), and the task text below is left
 as originally written.
+
+**One defect outlived all eleven tasks and was found by a whole-branch review
+afterwards.** The feature's central guarantee — that changing a password signs
+out the account's other sessions — had no test that could fail. Removing
+`passwordChangedAt` from `mapDbDocToUser`'s returned object left all 999 server
+tests green while the feature was entirely dead, because the guard fails open:
+the field becomes `undefined`, `Date.parse(undefined ?? "")` is `NaN`, and
+`getSessionUser` skips the comparison on every request. Three seams were each
+tested in isolation and their composition was tested nowhere — every existing
+test either stubbed `findUserById`, tested `mapUser` instead of
+`mapDbDocToUser`, or asserted only that the _initiating_ device survived, which
+is the half that passes with the rule switched off. `bab6460` adds the
+two-session test that discriminates. The lesson is the one this repository
+already records about stubs, one level up: a seam being tested on both sides is
+not the same as the join being tested.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -1,7 +1,12 @@
 # Development Roadmap — Design
 
-Status: approved, not started. This is a **roadmap**, not an implementation
-plan. It decomposes work that spans several independent efforts, and each phase
+Status: **Phases 0 and 1 shipped** on `feat/account-management`, via
+`docs/plans/2026-09-18-baseline-and-account-management.md`. Phases 2 through 6
+are approved but not started, and each still needs its own spec before any code.
+Two findings from Phase 1 have already been folded into Phase 2's section below
+— the migration-ordering hazard and the two fail-open edges in the session rule.
+
+This is a **roadmap**, not an implementation plan. It decomposes work that spans several independent efforts, and each phase
 below gets its own `docs/specs/` design and `docs/plans/` plan before any code
 is written. Approving this document approves the decomposition and the order,
 nothing more.
@@ -266,8 +271,11 @@ that vanishes on a phone is worse than no adherence feature.
 
 ### Phase 5 — Close the loop
 
-`002_*.sql` adds nullable `generated_plan_id` and `plan_day_index` to
-`workout_sessions`, with an index on the pair. Nullable is the point: a workout
+`003_*.sql` adds nullable `generated_plan_id` and `plan_day_index` to
+`workout_sessions`, with an index on the pair. (`002_password_changed_at.sql`
+was taken by Phase 1 — this document originally assigned `002_` to both, and the
+runner applies by sorted filename, so two files sharing the prefix would order
+alphabetically on the suffix rather than by intent.) Nullable is the point: a workout
 logged off-plan stays valid, so this is additive rather than a rewrite of
 logging.
 
