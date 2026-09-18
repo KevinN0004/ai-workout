@@ -38,7 +38,8 @@ let baseUrl = "";
 
 const WIRING_TEST_EMAILS = [
   "wiring-password-change@example.test",
-  "wiring-account-delete@example.test"
+  "wiring-account-delete@example.test",
+  "wiring-other-sessions@example.test"
 ];
 
 const extractCookieFromHeader = (headerValue, cookieName) => {
@@ -185,5 +186,65 @@ describe("account management routes are wired into the real app", () => {
       headers: { Cookie: sidCookie }
     });
     expect(meResponse.status).toBe(401);
+  });
+
+  // The reason this feature exists, and the only test in the repository that
+  // can fail when it breaks.
+  //
+  // Every other test covers one seam and stubs its neighbour, so the
+  // composition is untested three times over: sessionService.test.js stubs
+  // findUserById and hand-builds passwordChangedAt, so it never traverses
+  // mapDbDocToUser; userReadRepository.test.js tests mapUser directly rather
+  // than mapDbDocToUser; and authRoutes.test.js's realRequireAuth is a
+  // hand-rolled lookup over the `rows` fixture that never reads
+  // passwordChangedAt at all, so that harness structurally cannot see the rule.
+  // The two authenticated tests above, and the E2E suite, only assert that
+  // *this* device survives -- which is the half that still passes with the rule
+  // switched off entirely.
+  //
+  // Measured: deleting `passwordChangedAt` from mapDbDocToUser's returned object
+  // (authUserService.js) leaves every one of the 999 server tests green while
+  // the feature is completely dead. user.passwordChangedAt becomes undefined,
+  // Date.parse(undefined ?? "") is NaN, Number.isFinite rejects it, and
+  // getSessionUser skips the comparison on every request forever. The guard
+  // fails OPEN, so nothing throws and nothing goes red.
+  //
+  // This test discriminates: 200 under that mutation, 401 without it.
+  test("changing the password invalidates the account's other sessions", async () => {
+    const email = "wiring-other-sessions@example.test";
+    const firstSession = await signUp(email, "FirstPass123!");
+
+    const loginResponse = await withCsrf("/api/auth/login", "POST", {
+      body: { email, password: "FirstPass123!" }
+    });
+    expect(loginResponse.status).toBe(200);
+    const secondSession = extractCookieFromHeader(loginResponse.headers.get("set-cookie"), "sid");
+    expect(secondSession).toMatch(/^sid=/);
+    // Two genuinely distinct tokens, or the rest of this test proves nothing.
+    expect(secondSession).not.toBe(firstSession);
+
+    const meWith = async (cookie) =>
+      (await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookie } })).status;
+
+    expect(await meWith(firstSession)).toBe(200);
+    expect(await meWith(secondSession)).toBe(200);
+
+    const changeResponse = await withCsrf("/api/auth/password", "POST", {
+      sidCookie: secondSession,
+      body: { currentPassword: "FirstPass123!", newPassword: "SecondPass456!" }
+    });
+    expect(changeResponse.status).toBe(200);
+
+    // The session that did not initiate the change is now older than
+    // passwordChangedAt and must be rejected.
+    expect(await meWith(firstSession)).toBe(401);
+
+    // The initiating device keeps working, via the replacement token the route
+    // mints after stamping. Reusing the pre-change cookie would fail here,
+    // which is what makes the re-issue load-bearing rather than cosmetic.
+    const replacement = extractCookieFromHeader(changeResponse.headers.get("set-cookie"), "sid");
+    expect(replacement).toMatch(/^sid=/);
+    expect(replacement).not.toBe(secondSession);
+    expect(await meWith(replacement)).toBe(200);
   });
 });
