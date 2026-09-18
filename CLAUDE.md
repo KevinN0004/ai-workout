@@ -448,8 +448,8 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-17:
-  server **93.65%** statements / 85.35% branches, client **98.33%** / 93.21%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-18:
+  server **93.65%** statements / 85.35% branches, client **98.67%** / 93.57%.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
@@ -510,9 +510,10 @@ the native instance all along.
     production, so no second database client is created.
     On the client, ranked by **uncovered branches** rather than by percentage —
     that is what says where the untested behaviour actually is:
-    Current ranking, re-measured 2026-09-13: `usePreviewDerivedData.js` (34),
-    `outlineGeometry.js` (28), `templateOutline.js` (22), `SettingsView.jsx` (11),
-    `useDashboardMetrics.js` (11) and `useDashboardData.js` (10).
+    Current ranking, re-measured 2026-09-18: `usePreviewDerivedData.js` (33),
+    `outlineGeometry.js` (28), `templateOutline.js` (22), `useDashboardMetrics.js`
+    (11), and a three-way tie at 10: `useDashboardData.js`, `useMealDbSearch.js`
+    and `useHomeStageFlow.js`.
     **The two geometry files at the top are the same dead-defensive pattern**:
     `outlineGeometry.js`'s uncovered arms are the `top || bottom || null`
     fallbacks in `chooseYUpper`/`chooseXOuter` and friends, reachable only with
