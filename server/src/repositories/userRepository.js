@@ -59,15 +59,25 @@ export const createUserRepository = ({ prisma }) => {
     return count > 0;
   };
 
-  /** Used by the pbkdf2 -> argon2id upgrade on successful login. */
-  const updatePasswordHash = async ({ userId, salt, hash, passwordAlgo }) => {
+  /**
+   * Used by the pbkdf2 -> argon2id upgrade on successful login, and by the
+   * user-initiated password change.
+   *
+   * `passwordChangedAt` is optional and written only when supplied. The upgrade
+   * path must NOT supply it: that rehash is invisible to the user, and stamping
+   * it would invalidate every other session belonging to any legacy-hash
+   * account, on an ordinary login they did not initiate.
+   */
+  const updatePasswordHash = async ({ userId, salt, hash, passwordAlgo, passwordChangedAt }) => {
+    const data = {
+      passwordSalt: salt || "",
+      passwordHash: hash,
+      passwordAlgo: passwordAlgo || "argon2id"
+    };
+    if (passwordChangedAt) data.passwordChangedAt = passwordChangedAt;
     const { count } = await prisma.appUser.updateMany({
       where: userIdWhere(userId),
-      data: {
-        passwordSalt: salt || "",
-        passwordHash: hash,
-        passwordAlgo: passwordAlgo || "argon2id"
-      }
+      data
     });
     return count > 0;
   };

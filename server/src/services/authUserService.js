@@ -33,6 +33,7 @@ export const createAuthUserService = ({
       hash: source.hash,
       passwordAlgo: inferredAlgo,
       createdAt: source.createdAt,
+      passwordChangedAt: source.passwordChangedAt ?? null,
       profile: source.profile,
       dashboard: source.dashboard
     };

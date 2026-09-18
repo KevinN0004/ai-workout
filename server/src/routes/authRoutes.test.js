@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -56,6 +57,15 @@ const buildApp = (overrides = {}) => {
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
   return app;
+};
+
+// A real legacy record, hashed the way the pre-argon2 code did it -- the same
+// shape authUserService.test.js's identical helper builds, so verifyPassword's
+// real pbkdf2 branch accepts it rather than only a stubbed algo flag.
+const legacyPbkdf2Record = (password) => {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
+  return { salt, hash, passwordAlgo: "pbkdf2" };
 };
 
 const signupBody = (overrides = {}) => ({
@@ -496,6 +506,50 @@ describe("POST /api/auth/login", () => {
 
       expect(logError).toHaveBeenCalledTimes(1);
       expect(logError.mock.calls[0][0]).toMatchObject({ event: "password_upgrade_failed" });
+    });
+  });
+
+  // Regression pin for passwordChangedAt: the login rehash is invisible to the
+  // user, so it must never stamp the field -- doing so would sign a
+  // legacy-hash account out of every other device on an ordinary login it
+  // never asked to be rehashed by. Forcing shouldUpgradePasswordToArgon2id
+  // with a stub (as the describe block above does) would prove nothing about
+  // what upgradeUserPasswordToArgon2id itself passes downstream, so this
+  // drives a genuinely pbkdf2-hashed account through the real upgrade path
+  // instead, with its own authUserService wired to a spyable
+  // updatePasswordHash.
+  test("a pbkdf2 -> argon2id upgrade on login does not stamp passwordChangedAt", async () => {
+    const updates = [];
+    const upgradeUserPasswordToArgon2id = createAuthUserService({
+      cleanText,
+      argon2Options,
+      updatePasswordHash: async (args) => {
+        updates.push(args);
+        return true;
+      },
+      findUserWithDashboard,
+      findUserWithDashboardByEmail,
+      createUserWithDashboard
+    }).upgradeUserPasswordToArgon2id;
+
+    const app = buildApp({ upgradeUserPasswordToArgon2id });
+    await registered(app);
+
+    // Overwrite the freshly-signed-up argon2 row with a genuine pbkdf2 hash of
+    // the same password, so both shouldUpgradePasswordToArgon2id and the real
+    // pbkdf2 verifier see a legacy account rather than a forced flag.
+    Object.assign(rows[0], legacyPbkdf2Record("StrongPass123!"));
+
+    const response = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "person@example.com", password: "StrongPass123!" });
+
+    expect(response.status).toBe(200);
+    // Proves the upgrade genuinely fired -- otherwise the forEach below would
+    // assert nothing over an empty array.
+    expect(updates.length).toBeGreaterThan(0);
+    updates.forEach((args) => {
+      expect(args.passwordChangedAt).toBeUndefined();
     });
   });
 
