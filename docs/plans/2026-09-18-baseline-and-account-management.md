@@ -18,6 +18,20 @@ Read all of this before starting. Each item is a real constraint in this reposit
 
 **The roadmap spec left one decision open, and this plan takes it.** The spec listed three ways to make a password change affect other sessions and recommended the second. This plan implements it: a `passwordChangedAt` timestamp on `AppUser`, with `getSessionUser` rejecting any session created before it. The other two options — a user-to-token index, or accepting that other sessions survive — are not implemented. If you disagree, stop and raise it rather than improvising a third design mid-task.
 
+**Superseded during implementation — read this before Task 2's text below.** Task 2
+shipped as written, and a code review then measured what the guard actually does.
+**Prisma ignores `undefined` in a `data` object**, so the `if (passwordChangedAt)`
+guard could have been deleted entirely and the login rehash still would not have
+stamped the column — the protection was Prisma's, not ours, and so could not be
+tested. What the guard really prevented was an explicit `null` **clearing** the
+column, which would resurrect every session a password change had invalidated.
+Nothing tested that. Task 4b therefore replaced the timestamp parameter with a
+`stampPasswordChange` boolean and moved the clock into the repository, which
+removes every bad-value case by construction and makes deleting the guard a
+catchable mutation instead of an equivalent one. Task 2's text below is left as
+written rather than edited to look prescient; Tasks 5 and 11 carry the new
+signature.
+
 **There is a trap in `updatePasswordHash`, and Task 2 exists to avoid it.** That function is already wired, but for silently upgrading a pbkdf2 hash to argon2id **on every successful login** (`authUserService.js:115`). If it starts stamping `passwordChangedAt` unconditionally, then an ordinary login by a legacy-hash user would invalidate every one of their other sessions. So `passwordChangedAt` is an **optional** parameter, written only when the caller passes it, and the login-upgrade path must not pass it. Task 2 pins this with a test; do not delete that test.
 
 **Absent is not zero.** `Number(null)` and `Number("")` are both `0` and both finite, and this class has shipped five bugs in this repository. Guard **before** coercing, never after. It applies here to the `passwordChangedAt` comparison: parse first, check the result is finite, and only then compare. Note the failure direction — an unparseable timestamp means the session _survives_, so a broken guard fails open and silently stops invalidating anything. That is why Task 3 asserts a valid timestamp does invalidate, rather than only asserting that an absent one does not.
@@ -608,7 +622,7 @@ describe("POST /api/auth/password", () => {
       .expect(200);
 
     expect(updates).toHaveLength(1);
-    expect(updates[0].passwordChangedAt).toBeInstanceOf(Date);
+    expect(updates[0].stampPasswordChange).toBe(true);
   });
 
   test("issues a replacement session so this device stays signed in", async () => {
@@ -691,12 +705,14 @@ app.post("/api/auth/password", requireAuth, async (req, res) => {
     }
 
     const { salt, hash, passwordAlgo } = await hashPassword(newPassword);
+    // The flag is an intent, not a timestamp: the repository owns the clock, so
+    // no caller can supply an absent, invalid or backwards one. See Task 4b.
     await updatePasswordHash({
       userId: req.user.id,
       salt,
       hash,
       passwordAlgo,
-      passwordChangedAt: new Date()
+      stampPasswordChange: true
     });
 
     // Every other session is now older than passwordChangedAt and will be
@@ -1697,7 +1713,7 @@ Apply these six mutations one at a time, reverting each before the next:
 
 1. `server/src/services/sessionService.js` — change `session.createdAt < changedAtMs` to `session.createdAt <= changedAtMs`. **Expected to survive**: the two values differ by seconds in every test, so this is an equivalent mutant under the current fixtures. Recording it as expected is the point; an unexpected survivor is what you are hunting.
 2. `server/src/services/sessionService.js` — delete the `Number.isFinite(changedAtMs) &&` guard. Expected **caught** by the "never changed their password" test, because `Date.parse("")` is NaN and every comparison with NaN is false... verify which way this actually lands and record it. If it survives, that test is not discriminating and needs a real timestamp case.
-3. `server/src/repositories/userRepository.js` — change `if (passwordChangedAt)` to `data.passwordChangedAt = passwordChangedAt ?? new Date();`. Expected **caught** by the login-upgrade test in Task 2.
+3. `server/src/repositories/userRepository.js` — change `if (stampPasswordChange) data.passwordChangedAt = new Date();` to the unconditional `data.passwordChangedAt = new Date();`. Expected **caught** by the login-upgrade test in Task 2. Note this mutation was an _equivalent mutant_ before Task 4b and is catchable only because of it — Prisma ignores `undefined` in `data`, so while the parameter was a timestamp the guard protected nothing testable. Re-running it is how you confirm the refactor still holds.
 4. `server/src/routes/authRoutes.js` — make the password route skip `verifyPassword` and always proceed. Expected **caught** by "a wrong current password is rejected".
 5. `server/src/routes/authRoutes.js` — remove the `deleteSession` + `createSession` re-issue from the password route. Expected **caught** by "issues a replacement session".
 6. `client/src/pages/dashboard/views/SettingsAccountPanel.jsx` — remove the two `setCurrentPassword("")` / `setNewPassword("")` calls. Expected **caught** by "clears both fields on success".
