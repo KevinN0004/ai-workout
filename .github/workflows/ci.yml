@@ -196,10 +196,30 @@ jobs:
       - name: E2E
         run: npm run test:e2e
 
+      # Uploads on every non-cancelled run, not only on failure. `retries: 1`
+      # and `trace: "on-first-retry"` mean a test that fails once and passes on
+      # retry produces a trace -- and the job then succeeds, so `if: failure()`
+      # threw away the traces from exactly the runs worth investigating. It also
+      # keeps this step from being first exercised the moment e2e breaks.
+      # Measured: a green run writes a single 520 KB index.html; a run carrying a
+      # trace writes 1.9 MB, because the report bundles the trace viewer so it
+      # opens offline. Both compress well and expire in a week.
+      #
+      # `if-no-files-found: error` is what makes it a gate rather than a step
+      # that merely runs: the default is `warn`, which lets a missing report read
+      # as a pass. The HTML reporter is active whenever CI is set, so the file is
+      # always produced.
+      #
+      # The name carries the run attempt because artifacts are scoped to the
+      # workflow run and v7 fails on a name collision. Suffixing rather than
+      # setting `overwrite: true` is deliberate: the re-run you start to find out
+      # whether a failure was flaky would otherwise overwrite the failing report
+      # with a passing one, destroying the comparison worth having.
       - name: Upload Playwright Report
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-attempt-${{ github.run_attempt }}
           path: playwright-report/
           retention-days: 7
+          if-no-files-found: error
