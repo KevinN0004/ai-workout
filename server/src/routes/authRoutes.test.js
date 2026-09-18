@@ -7,6 +7,7 @@ import { createAuthUserService } from "../services/authUserService.js";
 import { parseCookies } from "../services/sessionService.js";
 import {
   loginBodySchema,
+  passwordChangeBodySchema,
   profileBodySchema,
   signupBodySchema,
   validateBody
@@ -137,11 +138,24 @@ beforeEach(() => {
       cookieCalls.csrf.push(token);
     }),
     loginBodySchema,
+    passwordChangeBodySchema,
     metrics,
     getDummyPasswordRecord: authUserService.getDummyPasswordRecord,
     verifyPassword: authUserService.verifyPassword,
     shouldUpgradePasswordToArgon2id: authUserService.shouldUpgradePasswordToArgon2id,
     upgradeUserPasswordToArgon2id: authUserService.upgradeUserPasswordToArgon2id,
+    // A stand-in for the Task 4b repository function: mutates the row's hash
+    // the same way, and only stamps passwordChangedAt when the caller passes
+    // the intent flag -- the repository owns the clock, so this fake mints
+    // its own timestamp rather than accepting one.
+    updatePasswordHash: vi.fn(async ({ userId, salt, hash, passwordAlgo, stampPasswordChange }) => {
+      const row = rows.find((item) => item.userId === userId);
+      if (row) {
+        Object.assign(row, { salt, hash, passwordAlgo });
+        if (stampPasswordChange) row.passwordChangedAt = new Date().toISOString();
+      }
+      return true;
+    }),
     toShortText: (value, maxLen = 160) =>
       typeof value === "string" ? value.trim().slice(0, maxLen) : "",
     parseCookies,
@@ -566,6 +580,192 @@ describe("POST /api/auth/login", () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
+  });
+});
+
+describe("POST /api/auth/password", () => {
+  // The shared `requireAuth` stub used everywhere else in this file always
+  // resolves to a fixed { id: "u-1" } with no hash, regardless of any cookie
+  // -- fine for routes that only read req.user.id, but this route verifies
+  // the current password against req.user.hash. These tests need a
+  // `requireAuth` that genuinely resolves the signed-in row from the cookie,
+  // the way index.js really wires it (getSessionUser -> findUserById), so it
+  // is built locally from the same `sessions` / `rows` fixtures rather than
+  // reusing the shared stub.
+  const realRequireAuth = async (req, res, next) => {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const session = sessions.find((item) => item.token === cookies.sid);
+    const row = session && rows.find((item) => item.userId === session.userId);
+    if (!row) return res.status(401).json({ error: "Not signed in." });
+    req.user = deps.mapDbDocToUser(row);
+    next();
+  };
+
+  const passwordApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
+
+  // The shared `setSessionCookie`/`setCsrfCookie` mocks only record calls in
+  // `cookieCalls`; they never write a real Set-Cookie header (see the logout
+  // tests below, which hardcode "sid=sess-1" rather than reading a response
+  // header for the same reason). So the session cookie a signup produced is
+  // read back from `cookieCalls.session`, not from `res.headers["set-cookie"]`.
+  const signUpAndGetCookie = async (app) => {
+    await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
+    const { token } = cookieCalls.session[cookieCalls.session.length - 1];
+    return `sid=${token}`;
+  };
+
+  test("changes the password and lets the new one log in", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: "BrandNewPass456!" })
+      .expect(200);
+  });
+
+  test("the old password stops working", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(401);
+  });
+
+  test("a wrong current password is rejected and changes nothing", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+  });
+
+  test("asks the repository to stamp the change so other sessions can be invalidated", async () => {
+    const updates = [];
+    const app = passwordApp({
+      updatePasswordHash: async (args) => {
+        updates.push(args);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0].stampPasswordChange).toBe(true);
+  });
+
+  // The shared mocks never write a real Set-Cookie header (see
+  // signUpAndGetCookie above), so "a replacement session was issued" is
+  // observed through the same cookieCalls.session record the rest of this
+  // file already trusts, rather than through the response headers.
+  test("issues a replacement session so this device stays signed in", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+    const sessionCallsBefore = cookieCalls.session.length;
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(cookieCalls.session.length).toBe(sessionCallsBefore + 1);
+  });
+
+  test("requires a signed-in user", async () => {
+    const app = passwordApp();
+    await request(app)
+      .post("/api/auth/password")
+      .send({ currentPassword: "whatever", newPassword: "BrandNewPass456!" })
+      .expect(401);
+  });
+
+  test("rejects a new password shorter than eight characters", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "short" })
+      .expect(400);
+  });
+
+  test("the replacement session is a different token from the one it replaces", async () => {
+    // Not cosmetic. If the route reused the old token, that token predates
+    // the stamp and Task 3's rule would reject it on the very next request --
+    // signing the user out the instant they changed their password.
+    //
+    // The shared createSession mock names tokens from sessions.length, which
+    // a real crypto-random token generator never would. Combined with this
+    // route's delete-then-create order, that scheme can regenerate the same
+    // string after the old session is removed -- a fixture artifact, not a
+    // real collision. A monotonic counter that survives deletions stands in
+    // for "every minted token is unique", which is what production actually
+    // guarantees.
+    let tokenCounter = 0;
+    const uniqueCreateSession = vi.fn(async (userId) => {
+      tokenCounter += 1;
+      const token = `unique-sess-${tokenCounter}`;
+      sessions.push({ token, userId });
+      return token;
+    });
+    const app = passwordApp({ createSession: uniqueCreateSession });
+    const cookie = await signUpAndGetCookie(app);
+    const originalToken = cookieCalls.session[cookieCalls.session.length - 1].token;
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    const replacementToken = cookieCalls.session[cookieCalls.session.length - 1].token;
+    expect(replacementToken).not.toBe(originalToken);
+  });
+
+  test("does not leak whether the failure was the password or the session", async () => {
+    // A 401 for a wrong current password must not be distinguishable in body
+    // text from any other 401 in a way that helps an attacker who has stolen
+    // a session cookie enumerate the real password.
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    const res = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    expect(JSON.stringify(res.body)).not.toMatch(/hash|argon|salt|pbkdf2/i);
   });
 });
 

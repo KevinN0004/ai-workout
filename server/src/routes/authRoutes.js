@@ -23,6 +23,8 @@ export const registerAuthRoutes = (app, deps) => {
     setSessionCookie,
     setCsrfCookie,
     loginBodySchema,
+    passwordChangeBodySchema,
+    updatePasswordHash,
     metrics,
     getDummyPasswordRecord,
     verifyPassword,
@@ -163,6 +165,47 @@ export const registerAuthRoutes = (app, deps) => {
           profile: user.profile || defaultProfile()
         }
       });
+    } catch (err) {
+      sendErrorResponse(req, res, err, 500);
+    }
+  });
+
+  app.post("/api/auth/password", requireAuth, async (req, res) => {
+    try {
+      const body = validateBody(req, res, passwordChangeBodySchema);
+      if (!body) return;
+
+      const { currentPassword, newPassword } = body;
+      // requireAuth has already put the mapped user on req.user, hash and all,
+      // so there is no second lookup to do here.
+      const correct = await verifyPassword(currentPassword, req.user);
+      if (!correct) {
+        return res.status(401).json({ error: "Current password is incorrect." });
+      }
+
+      const { salt, hash, passwordAlgo } = await hashPassword(newPassword);
+      // A stamp intent, not a timestamp: the repository owns the clock, so no
+      // caller can supply an absent, invalid or backwards one.
+      await updatePasswordHash({
+        userId: req.user.id,
+        salt,
+        hash,
+        passwordAlgo,
+        stampPasswordChange: true
+      });
+
+      // Every other session is now older than passwordChangedAt and will be
+      // rejected by getSessionUser. This device would be too, so it gets a
+      // fresh token -- minted after the stamp, and compared with a strict `<`,
+      // so it survives even in the same millisecond.
+      const previousToken = parseCookies(req.headers.cookie || "").sid;
+      if (previousToken) await deleteSession(previousToken);
+      const token = await createSession(req.user.id);
+      // rememberMe is not recoverable from the old session, which stores only
+      // userId and createdAt. Defaulting to true matches signup and login.
+      setSessionCookie(res, token, true);
+
+      res.json({ ok: true });
     } catch (err) {
       sendErrorResponse(req, res, err, 500);
     }
