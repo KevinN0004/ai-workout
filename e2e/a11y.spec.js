@@ -40,6 +40,20 @@ test.describe.serial("accessibility", () => {
   });
 
   test.afterAll(async () => {
+    // This suite signs up its own account and, unlike smoke.spec.js, never
+    // submits the delete confirmation as part of a test -- the two account
+    // scans below stop at "revealed" so axe can see that state. Without this
+    // the account would join the e2e-* leak CLAUDE.md describes. Reached via
+    // the UI rather than a direct API call so it exercises the same
+    // requireAuth + CSRF path the rest of this suite already went through,
+    // and does not depend on which test ran last.
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /^account/i }).click();
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await page.getByLabel("Password", { exact: true }).fill(account.password);
+    await page.getByRole("button", { name: "Confirm deletion" }).click();
+    await expect(page.getByRole("button", { name: "Get Started" })).toBeVisible();
+
     await context?.close();
   });
 
@@ -122,6 +136,27 @@ test.describe.serial("accessibility", () => {
     await expect(page.getByRole("checkbox", { name: "Monday" })).toBeVisible();
 
     await expect(page.getByRole("group", { name: "Training days" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  // The account tab is the newest surface in the app and the only one with a
+  // destructive, multi-step confirmation. Two states matter: as first shown,
+  // and with the confirmation revealed -- a different DOM with an extra
+  // labelled input, which is exactly the shape a missing label or a
+  // mis-scoped error region would hide in only one of the two.
+  test("the account tab has no violations", async () => {
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("tab", { name: /^account/i }).click();
+    await expect(page.getByRole("button", { name: "Delete account" })).toBeVisible();
+    await expect(page.getByLabel("Current password")).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  test("the delete confirmation step has no violations", async () => {
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 
     expectNoViolations(await analyze(page));
   });
