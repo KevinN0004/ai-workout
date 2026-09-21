@@ -157,6 +157,21 @@ describe("passwordChangedAt invalidation", () => {
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
 
+  test("a token whose account no longer exists is rejected and deleted", async () => {
+    // DELETE /api/auth/me clears only the cookie it was called with, so an
+    // account deleted from one device leaves that account's other tokens live
+    // in the store. Rejecting them is not enough: the two branches either side
+    // of this one both delete, and leaving a dead token to sit out its TTL was
+    // an unexplained asymmetry rather than a decision.
+    const service = buildService({ findUserById: async () => null });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toBeNull();
+    expect(await service.getSessionByToken(token)).toBeNull();
+  });
+
   test("an empty-string timestamp is treated as absent, not as epoch zero", async () => {
     const service = buildService({
       findUserById: async () => ({

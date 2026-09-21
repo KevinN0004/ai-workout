@@ -710,6 +710,25 @@ describe("POST /api/auth/password", () => {
       .expect(401);
   });
 
+  test("reports failure, and keeps the session, when the write matched no row", async () => {
+    // The account was deleted in another tab between requireAuth resolving the
+    // user and the update landing. Before this was checked the route answered
+    // 200 "Password changed." having changed nothing -- and worse, it had
+    // already destroyed the caller's session and minted a replacement for an
+    // account that no longer existed.
+    const app = passwordApp({ updatePasswordHash: async () => false });
+    const cookie = await signUpAndGetCookie(app);
+    const before = sessions.length;
+
+    const response = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "StrongPass123!", newPassword: "BrandNewPass456!" });
+
+    expect(response.status).toBe(401);
+    expect(sessions.length).toBe(before);
+  });
+
   test("rejects a new password shorter than eight characters", async () => {
     const app = passwordApp();
     const cookie = await signUpAndGetCookie(app);

@@ -313,7 +313,18 @@ export const createSessionService = ({
       return null;
     }
     const user = await findUserById(session.userId);
-    if (!user) return null;
+    if (!user) {
+      // The account is gone -- deleted while this token was still live. Drop
+      // the token rather than leaving it to expire, matching the TTL branch
+      // above and the passwordChangedAt branch below, which both delete.
+      //
+      // Safe because null here means "no row": findUserById resolves through
+      // loadWithCollections, which returns null only when findFirst matches
+      // nothing. A database failure throws instead and never reaches this
+      // line, so a transient outage cannot cost a valid session its token.
+      await deleteSession(token);
+      return null;
+    }
 
     // Guard before comparing, not after. Date.parse of an absent value is NaN,
     // and every comparison against NaN is false -- so an unparseable timestamp

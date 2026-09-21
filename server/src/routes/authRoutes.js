@@ -189,13 +189,27 @@ export const registerAuthRoutes = (app, deps) => {
       const { salt, hash, passwordAlgo } = await hashPassword(newPassword);
       // A stamp intent, not a timestamp: the repository owns the clock, so no
       // caller can supply an absent, invalid or backwards one.
-      await updatePasswordHash({
+      const stored = await updatePasswordHash({
         userId: req.user.id,
         salt,
         hash,
         passwordAlgo,
         stampPasswordChange: true
       });
+
+      // Checked, unlike deleteUser's boolean in the route below. The reasoning
+      // that makes ignoring that one correct -- an idempotent delete reporting
+      // success when the account is already gone -- does not transfer: a
+      // password change that matched no row changed nothing, and there is no
+      // sense in which that succeeded. The row can only vanish between
+      // requireAuth and here if the account was deleted in another tab.
+      //
+      // Returning before the session swap is the point. Destroying the old
+      // session first would sign the caller out AND mint a replacement for an
+      // account that no longer exists, while answering 200.
+      if (!stored) {
+        return res.status(401).json({ error: "Account is no longer available." });
+      }
 
       // Every other session is now older than passwordChangedAt and will be
       // rejected by getSessionUser. This device would be too, so it gets a
