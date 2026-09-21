@@ -1,0 +1,78 @@
+# Render blueprint for the free stack: this service on Render, Postgres on
+# Neon, Redis on Upstash. See the Deployment section of README.md for why the
+# database and cache come from elsewhere -- Render's own free Postgres expires
+# after 30 days and its free Key Value loses data on restart, which would sign
+# every user out, since Redis is what holds sessions here.
+#
+# One service, not two. The client bundle is served by this process from its
+# own origin; a separately-hosted bundle cannot reach the API at all. See
+# server/src/staticClient.js.
+
+services:
+  - name: ai-workout
+    type: web
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # /api/ready, not /api/health. The liveness endpoint answers 200 without
+    # touching anything, so it cannot tell whether Postgres is connected.
+    #
+    # This is safe to gate deploys on, which is worth stating because it is
+    # not obviously true: index.js awaits connectPostgres, connectPrisma and
+    # initSessionStore BEFORE app.listen, so the process accepts no connection
+    # until its dependencies have settled. By the time Render can reach this
+    # path it reports the truth rather than a race.
+    #
+    # Consequence worth knowing: if Redis is configured but unreachable, the
+    # app falls back to in-memory sessions and this path reports not_ready
+    # permanently, so the deploy fails health checks even though the process is
+    # up. That is the intended signal -- in-memory sessions on a tier that
+    # spins down every 15 minutes means users are signed out constantly. If a
+    # deploy fails here, check REDIS_URL first.
+    healthCheckPath: /api/ready
+
+    # Off, deliberately. Migrations must land before the new code starts:
+    # 002_password_changed_at.sql adds a column userReadRepository selects on
+    # every user read, so a server started against an unmigrated database
+    # fails every authenticated request, not just the new routes. Deploys are
+    # triggered by .github/workflows/deploy.yml AFTER it has migrated.
+    autoDeployTrigger: "off"
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # PORT is injected by Render and read by index.js; do not set it here.
+
+      # Neon. Include ?sslmode=require -- the Prisma adapter takes no separate
+      # ssl option, so TLS has to ride the URL. Use Neon's POOLED connection
+      # string: this process holds a pool of its own.
+      - key: DATABASE_URL
+        sync: false
+
+      # Required when NODE_ENV=production, and the preflight refuses to start
+      # without it. Same-origin serving means CORS is barely exercised, but the
+      # check is unconditional. Set it to this service's own URL, e.g.
+      # https://ai-workout.onrender.com
+      - key: CLIENT_ORIGIN
+        sync: false
+
+      # Upstash. Use the rediss:// URL so the connection is TLS.
+      #
+      # Not optional in practice on this plan. Free instances spin down after
+      # 15 minutes idle, and the in-memory session fallback is lost on every
+      # spin-down -- so without Redis every visitor is signed out several times
+      # a day.
+      - key: REDIS_URL
+        sync: false
+
+      # Plan generation returns an error without it; everything else works.
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # POSTGRES_STARTUP_REQUIRED defaults to true when NODE_ENV=production,
+      # which is what we want: a server that cannot reach its database should
+      # fail loudly at boot rather than serve 500s.

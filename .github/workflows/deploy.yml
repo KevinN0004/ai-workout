@@ -1,0 +1,105 @@
+name: Deploy
+
+# Migrations run here, before the deploy is triggered, and that ordering is the
+# whole reason this workflow exists rather than letting Render deploy on push.
+#
+# 002_password_changed_at.sql adds a column userReadRepository selects on every
+# user read. A server started against an unmigrated database therefore fails
+# every authenticated request, not just the new routes. render.yaml sets
+# autoDeployTrigger: off so nothing can start before this has run.
+#
+# Requires three repository secrets:
+#   PRODUCTION_DATABASE_URL  Neon pooled connection string, with ?sslmode=require
+#   RENDER_DEPLOY_HOOK_URL   Render dashboard -> the service -> Settings -> Deploy Hook
+#   RENDER_SERVICE_URL       e.g. https://ai-workout.onrender.com, for the smoke check
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrate, then deploy
+    runs-on: ubuntu-latest
+    # Never deploy a red build. workflow_run fires whatever the outcome, so the
+    # conclusion has to be checked explicitly -- it is not implied by the
+    # trigger. A manual dispatch has no upstream run and is allowed through.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      # Applies every unapplied .sql in server/db/postgres in filename order and
+      # records each in schema_migrations, so re-running is a no-op. Failing
+      # here stops the deploy, which is the point: the old code tolerates the
+      # new column, so migrate-then-deploy is safe in this direction, but
+      # deploy-then-migrate is not.
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: npm run migrate:postgres -w server
+
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL is not set."
+            exit 1
+          fi
+          # Fail the step on a non-2xx rather than reporting a deploy that was
+          # never accepted.
+          curl --fail --silent --show-error -X POST "$HOOK" > /dev/null
+          echo "Deploy triggered."
+
+      # Render builds and health-checks asynchronously, so the hook returning
+      # 200 means "accepted", not "live". This waits for the new code to answer.
+      - name: Wait for the service to come back ready
+        env:
+          SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          if [ -z "$SERVICE_URL" ]; then
+            echo "RENDER_SERVICE_URL is not set; skipping the smoke check."
+            exit 0
+          fi
+          # Free instances spin down and cold-start in 30-60s, and a Docker
+          # build takes longer still, so this is patient on purpose.
+          for i in $(seq 1 60); do
+            body=$(curl --silent --max-time 10 "$SERVICE_URL/api/ready" || true)
+            case "$body" in
+              *'"status":"ready"'*)
+                echo "Ready after ~$((i * 15))s."
+                exit 0
+                ;;
+            esac
+            echo "attempt $i: not ready yet"
+            sleep 15
+          done
+          echo "Service did not report ready within ~15 minutes."
+          echo "If /api/ready reports not_ready with postgres healthy, check REDIS_URL:"
+          echo "a configured-but-unreachable Redis falls back to in-memory sessions"
+          echo "and this endpoint stays not_ready by design."
+          exit 1
