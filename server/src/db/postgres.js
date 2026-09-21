@@ -61,6 +61,12 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
     const { Pool } = await import("pg");
     postgresPool = new Pool({
       connectionString: config.databaseUrl,
+      // Same reason as prisma.js: without this the session takes the host's
+      // zone, and a JS-written timestamp is stored offset by it. This pool
+      // runs the migrations and stamps schema_migrations.applied_at, so it
+      // must agree with the app's connection or the two write different
+      // instants for the same moment.
+      options: "-c timezone=UTC",
       ssl: config.ssl
         ? {
             rejectUnauthorized: config.sslRejectUnauthorized
