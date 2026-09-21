@@ -211,6 +211,65 @@ npm run prisma:generate -w server
 npm run prisma:validate -w server
 ```
 
+## Deployment
+
+**The client and the API must be served from one origin.** This is a constraint,
+not a preference, and deploying the bundle to a static host separate from the API
+does not work:
+
+- every request the client makes is a relative path — there are 16 `/api/...`
+  literals in `client/src` and no base-URL constant — so a bundle served from
+  another host sends `/api/auth/me` to that host, and CORS is never reached
+- both the session and CSRF cookies are `SameSite=Lax`, so even with an absolute
+  URL the session would not be attached to a cross-site request
+
+The `/api` proxy that makes development work lives in `client/vite.config.js` and
+covers the dev server and `vite preview` only. Nothing proxies in production.
+
+The server therefore serves `client/dist` itself, so one process is the whole
+deployable. Set `CLIENT_DIST_PATH` only if the bundle is not at `client/dist`.
+If the build is missing the server logs `client_bundle_missing` and serves the
+API alone, which is what `npm run dev:server` does every day.
+
+### Container
+
+`Dockerfile` builds one image containing the API and the bundle. It is
+deliberately platform-agnostic — `docker-compose.yml` is for local Postgres and
+Redis and does not build it.
+
+```bash
+docker build -t ai-workout .
+docker run --rm -p 5000:5000 --env-file server/.env ai-workout
+```
+
+### Release order
+
+**Run migrations before starting the new code, not after.**
+`002_password_changed_at.sql` adds a column `userReadRepository` selects on
+every user read, so a server started against an unmigrated database fails every
+authenticated request, not only the new routes:
+
+```bash
+npm run migrate:postgres -w server   # release step, before the cutover
+```
+
+The image does not run migrations itself, so that ordering stays explicit.
+
+### What production needs
+
+| Setting                     | Why                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                   |
+| `DATABASE_URL`              | Required. Add `?sslmode=require` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL |
+| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                     |
+| `REDIS_URL`                 | Without it sessions are in-memory: every restart signs everyone out, and it cannot work across more than one instance   |
+| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                             |
+| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                |
+
+Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
+reports Postgres and Redis and is the one a load balancer should gate traffic
+on.
+
 ## More Docs
 
 - [Client README](client/README.md)

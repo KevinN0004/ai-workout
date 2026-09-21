@@ -1,0 +1,32 @@
+# Keeps the build context small and, more importantly, keeps secrets and host
+# state out of the image. `COPY . .` in the build stage would otherwise pull in
+# server/.env, which holds the Gemini key and the Postgres connection string.
+
+.env
+.env.*
+**/.env
+**/.env.*
+
+node_modules
+**/node_modules
+
+.git
+.github
+.githooks
+.claude
+.claude-flow
+
+client/dist
+coverage
+**/coverage
+test-results
+playwright-report
+blob-report
+
+.postgres-data
+.postgres-pw
+
+docs
+e2e
+*.md
+!README.md

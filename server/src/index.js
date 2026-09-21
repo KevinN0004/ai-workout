@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -11,6 +12,7 @@ import { createShutdownHandler } from "./shutdown.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
+import { registerClientStatic, resolveClientDistPath } from "./staticClient.js";
 import { createAuthUserService } from "./services/authUserService.js";
 import {
   accountDeleteBodySchema,
@@ -614,6 +616,16 @@ registerApiRoutes(app, {
   saveGeneratedPlan,
   toCleanArray
 });
+// After the API routes so /api keeps its own 404s, and before the error
+// handler so a sendFile failure still reaches it. See staticClient.js for why
+// the client must be served from this origin rather than deployed separately.
+registerClientStatic(app, {
+  express,
+  existsSync,
+  distPath: resolveClientDistPath(process.env.CLIENT_DIST_PATH),
+  logger
+});
+
 app.use(
   createErrorHandler({
     logger,
