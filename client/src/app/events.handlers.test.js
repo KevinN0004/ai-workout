@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "./events.js";
+import { buildScopedCacheKey } from "./cache.js";
+import {
+  AIR_QUALITY_CACHE_PREFIX,
+  DASHBOARD_CACHE_PREFIX,
+  WEATHER_CACHE_PREFIX
+} from "./constants";
 
 const jsonResponse = (body, ok = true) => ({
   ok,
@@ -772,5 +778,98 @@ describe("deleteAccount", () => {
     expect(result).toEqual({ ok: false, error: "Unable to delete account." });
     expect(deps.setUser).not.toHaveBeenCalled();
     expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  // The panel promises deletion "cannot be undone", and the server honours that
+  // -- six onDelete: Cascade relations take the account's data with the row.
+  // The browser did not: clearDashboardDataState is pure setState and touches
+  // no storage, so the full dashboard stayed in localStorage under a key
+  // scoped by EMAIL. Signing up again with the same address on the same
+  // browser rehydrated the deleted account's workouts, meals, metrics and
+  // goals into the new one. Shared machines are exactly where someone deletes
+  // an account.
+  describe("scoped cache", () => {
+    const user = { email: "person@example.com" };
+    const scopedKeys = [DASHBOARD_CACHE_PREFIX, WEATHER_CACHE_PREFIX, AIR_QUALITY_CACHE_PREFIX].map(
+      (prefix) => buildScopedCacheKey(prefix, user)
+    );
+
+    const seedCache = () => {
+      scopedKeys.forEach((key) => window.localStorage.setItem(key, JSON.stringify({ a: 1 })));
+    };
+
+    const clearDeps = () => ({
+      user,
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    afterEach(() => {
+      scopedKeys.forEach((key) => window.localStorage.removeItem(key));
+    });
+
+    test("a successful deletion removes every scoped key", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      await handlers.deleteAccount("old-pass");
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).toBeNull());
+    });
+
+    test("a rejected password leaves the cache alone", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ error: "Password is incorrect." }, false))
+      });
+
+      // The account still exists, so destroying its cache would be wrong.
+      await handlers.deleteAccount("wrong");
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).not.toBeNull());
+    });
+
+    test("deletion still succeeds when removeItem throws", async () => {
+      seedCache();
+      vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => {
+        throw new Error("storage disabled");
+      });
+      const deps = clearDeps();
+      const { handlers } = buildDeps({
+        ...deps,
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      // Private mode and blocked site data must not make an account
+      // undeletable.
+      const result = await handlers.deleteAccount("old-pass");
+
+      expect(result).toEqual({ ok: true });
+      expect(deps.go).toHaveBeenCalledWith("/");
+      vi.restoreAllMocks();
+    });
+
+    test("onLogout leaves the cache in place", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      // Pinned so nobody later "harmonises" the two handlers. Logging out is
+      // the same account coming back, and the cache is a deliberate fast
+      // rehydrate for it. Deleting is that account ceasing to exist.
+      await handlers.onLogout();
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).not.toBeNull());
+    });
   });
 });

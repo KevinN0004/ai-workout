@@ -312,6 +312,7 @@ export default function App() {
     removeSavedExercise
   } = createAppEventHandlers({
     apiFetch,
+    user,
     form,
     setLoading,
     setError,
