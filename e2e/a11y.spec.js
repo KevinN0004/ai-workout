@@ -146,7 +146,12 @@ test.describe.serial("accessibility", () => {
   // labelled input, which is exactly the shape a missing label or a
   // mis-scoped error region would hide in only one of the two.
   test("the account tab has no violations", async () => {
-    await page.getByRole("button", { name: "Cancel" }).click();
+    // Navigates rather than dismissing whatever the previous test left open.
+    // This used to open with a Cancel click that only worked because the test
+    // before it ended with the profile edit form on screen -- legal under
+    // describe.serial, but it made reordering or inserting a test break this
+    // one with a failure that pointed nowhere near the cause.
+    await page.goto("/dashboard/settings");
     await page.getByRole("tab", { name: /^account/i }).click();
     await expect(page.getByRole("button", { name: "Delete account" })).toBeVisible();
     await expect(page.getByLabel("Current password")).toBeVisible();
@@ -159,5 +164,24 @@ test.describe.serial("accessibility", () => {
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 
     expectNoViolations(await analyze(page));
+  });
+
+  // A third state, and the one the other two cannot reach: an error rendered.
+  // The panel's failures live in a `.error` element, whose contrast against
+  // the panel background nothing in this suite had ever measured -- the two
+  // scans above both run with no error on screen. `.error` is shared app-wide,
+  // so this is likely fine; "likely" is what a gate is supposed to replace.
+  test("the account panel's error state has no violations", async () => {
+    await page.getByLabel("Password", { exact: true }).fill("definitely-not-the-password");
+    await page.getByRole("button", { name: "Confirm deletion" }).click();
+
+    // The server answers 401 and the panel renders the message in role="alert".
+    await expect(page.getByRole("alert")).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+
+    // Leave the panel closed so the afterAll deletion starts from a known
+    // state rather than inheriting this failed attempt.
+    await page.getByRole("button", { name: "Cancel" }).click();
   });
 });

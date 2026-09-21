@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./SettingsAccountPanel.css";
 
 // Two independent forms: changing a password and deleting the account.
@@ -15,6 +15,18 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteSaving, setDeleteSaving] = useState(false);
+
+  // Revealing the confirmation unmounts the button that was focused, so focus
+  // falls to <body>: a keyboard user has to Tab from the top of the document
+  // to reach the field they just asked for, and a screen reader announces
+  // nothing at all. axe cannot see this -- it audits a static tree, and the
+  // a11y spec scans the revealed state without asking where focus went -- so
+  // it is structurally invisible to this branch's own accessibility gate.
+  // WCAG 2.4.3. The hook-based precedent here is useCloseOnEscape.
+  const deletePasswordRef = useRef(null);
+  useEffect(() => {
+    if (deleteRevealed) deletePasswordRef.current?.focus();
+  }, [deleteRevealed]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -107,6 +119,7 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
             <label>
               Password
               <input
+                ref={deletePasswordRef}
                 type="password"
                 autoComplete="current-password"
                 value={deletePassword}

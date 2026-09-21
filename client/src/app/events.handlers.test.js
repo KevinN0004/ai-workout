@@ -601,6 +601,21 @@ describe("changePassword", () => {
     expect(result).toEqual({ ok: false, error: "Current password is incorrect." });
   });
 
+  test("reports a failure once, not twice", async () => {
+    // SettingsAccountPanel renders the returned error in a role="alert" region
+    // on the form itself. Raising a toast as well announced every failure
+    // twice -- assertive inline, polite toast -- so these two handlers return
+    // the message and stay silent. Pinned because the toast is what every
+    // neighbouring handler does, and re-adding it here would look like a fix.
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Current password is incorrect." }, false))
+    });
+
+    await handlers.changePassword({ currentPassword: "wrong", newPassword: "new-pass-123" });
+
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
+  });
+
   test("falls back to a generic message when the refusal carries no error field", async () => {
     const { handlers } = buildDeps({
       apiFetch: vi.fn(async () => jsonResponse({}, false))
@@ -778,6 +793,9 @@ describe("deleteAccount", () => {
     expect(result).toEqual({ ok: false, error: "Unable to delete account." });
     expect(deps.setUser).not.toHaveBeenCalled();
     expect(deps.go).not.toHaveBeenCalled();
+    // Announced by the panel's role="alert" region, not also by a toast --
+    // see the matching assertion in changePassword.
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
   });
 
   // The panel promises deletion "cannot be undone", and the server honours that

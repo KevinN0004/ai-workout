@@ -161,6 +161,21 @@ describe("SettingsAccountPanel", () => {
       await waitFor(() => expect(onDeleteAccount).toHaveBeenCalledWith("correct-secret"));
     });
 
+    test("moves focus to the confirmation field when it is revealed", async () => {
+      // Revealing unmounts the focused button, so without this focus falls to
+      // <body>: a keyboard user Tabs from the top of the document to reach the
+      // field they just asked for, and a screen reader announces nothing.
+      // axe cannot catch it -- it audits a static tree and never asks where
+      // focus went -- so this assertion is the only thing guarding WCAG 2.4.3
+      // on this panel.
+      const user = userEvent.setup();
+      renderPanel({});
+
+      await user.click(screen.getByRole("button", { name: "Delete account" }));
+
+      await waitFor(() => expect(screen.getByLabelText("Password")).toHaveFocus());
+    });
+
     test("cancelling the confirmation backs out without deleting, and the confirmation input disappears", async () => {
       const user = userEvent.setup();
       const onDeleteAccount = vi.fn();

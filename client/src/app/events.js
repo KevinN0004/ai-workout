@@ -458,8 +458,13 @@ export const createAppEventHandlers = ({
       showDashboardToast("Password changed.");
       return { ok: true };
     } catch (err) {
+      // No error toast, deliberately. SettingsAccountPanel renders this same
+      // string in a role="alert" region attached to the form the visitor is
+      // looking at. The toast is role="status" aria-live="polite", so raising
+      // both announced every failure twice, at two politeness levels. The
+      // inline region is the one that survives: it is tied to the field that
+      // needs correcting, and it stays put instead of timing out.
       const message = err.message || "Unable to change password.";
-      showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
   };
@@ -476,8 +481,9 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to delete account.");
       }
     } catch (err) {
+      // Announced inline by the panel's role="alert" region, not by a toast --
+      // see the note in changePassword above.
       const message = err.message || "Unable to delete account.";
-      showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
     // Only past the request. Unlike onLogout, this must NOT clear local state
