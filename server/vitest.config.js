@@ -8,6 +8,11 @@ export default defineConfig({
     // on, which surfaced as intermittent 500s on dashboard write routes.
     // Serialize files so DB state stays owned by one suite at a time.
     fileParallelism: false,
+    // Refuses to run against a non-local database. Twelve call sites here
+    // truncate app_users with no `where`, and every relation cascades, so a
+    // server/.env pointing at staging or production would lose every account.
+    // See the file for why it has no escape hatch.
+    setupFiles: ["./vitest.setup.js"],
     coverage: {
       provider: "v8",
       // Everything under src is measured. Only the tests themselves and the
