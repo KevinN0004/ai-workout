@@ -754,6 +754,32 @@ describe("POST /api/auth/password", () => {
     expect(replacementToken).not.toBe(originalToken);
   });
 
+  test("counts a wrong current password as an auth failure", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    expect(metrics.authFailures).toBe(1);
+  });
+
+  test("does not count a successful password change", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(metrics.authFailures).toBe(0);
+  });
+
   test("does not leak whether the failure was the password or the session", async () => {
     // A 401 for a wrong current password must not be distinguishable in body
     // text from any other 401 in a way that helps an attacker who has stolen
@@ -849,6 +875,32 @@ describe("DELETE /api/auth/me", () => {
       .post("/api/auth/login")
       .send({ email: signupBody().email, password: signupBody().password })
       .expect(200);
+  });
+
+  test("counts a wrong password as an auth failure", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: "not-the-password" })
+      .expect(401);
+
+    expect(metrics.authFailures).toBe(1);
+  });
+
+  test("does not count a successful deletion", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(metrics.authFailures).toBe(0);
   });
 
   test("requires a signed-in user", async () => {

@@ -182,6 +182,7 @@ export const registerAuthRoutes = (app, deps) => {
       // so there is no second lookup to do here.
       const correct = await verifyPassword(currentPassword, req.user);
       if (!correct) {
+        metrics.authFailures += 1;
         return res.status(401).json({ error: "Current password is incorrect." });
       }
 
@@ -220,6 +221,7 @@ export const registerAuthRoutes = (app, deps) => {
 
       const correct = await verifyPassword(body.password, req.user);
       if (!correct) {
+        metrics.authFailures += 1;
         return res.status(401).json({ error: "Password is incorrect." });
       }
 
