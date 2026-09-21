@@ -23,10 +23,19 @@ Three strands the recent work left open, sequenced into one order:
 
 Read this before trusting any quality claim below.
 
-Every structural claim in this document was verified by reading the file cited.
-Nothing was executed: no test suite, no lint, no build, no database query. So
-each coverage figure, each "lint is clean", each "the suite is green" is
-`CLAUDE.md`'s claim as of 2026-09-17, not a measurement taken here.
+**This section has itself been superseded, and says so rather than being
+quietly rewritten.** As first written it read: "Nothing was executed: no test
+suite, no lint, no build, no database query," and every quality figure was
+`CLAUDE.md`'s claim as of 2026-09-17 rather than a measurement.
+
+That is no longer true. Phase 0 ran every gate and corrected the figures.
+Phase 1 shipped, and its findings were measured: the cascade was verified
+against live Postgres rather than read off `schema.prisma`, the credential rate
+limit was measured by counting responses, and the timezone section under Phase 2
+comes from probes run against the live database on one pinned connection.
+
+What is still only a reading rather than a measurement is called out inline.
+Treat a claim here as measured only where it says so.
 
 That is not a formality. `CLAUDE.md` twice warns about itself — _"Re-measure
 before trusting a ranking here; it goes stale every time anything lands"_ — and
@@ -36,9 +45,12 @@ later phase is planned against the numbers.
 
 Two claims in this document are inferences, flagged again where they appear:
 
-- that `findUserById` returns a falsy value for a deleted row, which is what
-  makes an orphaned session token degrade to a 401 rather than something worse.
-  Standard `findUnique` behaviour, not run.
+- ~~that `findUserById` returns a falsy value for a deleted row, which is what
+  makes an orphaned session token degrade to a 401 rather than something worse.~~
+  **Settled in Phase 1.** It does, and `authRoutes.test.js` now pins it by
+  opening two sessions, deleting the account through one, and asserting the
+  other no longer authenticates. `getSessionUser` also deletes that token now
+  rather than leaving it to expire.
 - that the weekday-prefix parse in `plans.js` is the only thing giving a plan
   day its identity. Grepped for `planId`, `generatedPlanId` and `fromPlan`
   across `client/src` and `server/src` with zero hits, but absence by grep is
@@ -223,37 +235,61 @@ open in the direction of keeping sessions alive:
 Neither is worth fixing before there is a deployment to measure them against.
 Both are worth naming here rather than discovering.
 
-**Run the server process and the Postgres session in UTC, and decide it here.**
-Every `timestamptz` this application writes from JavaScript is currently stored
-offset by the host's UTC offset. Measured on a UTC-7 host: a
-`password_changed_at` written as a JS `Date` for the instant `14:13:34` stored
-as `21:13:34.887-07`, seven hours out, and Prisma's client-generated
-`created_at` the same. Postgres' own `now()` was correct. The driver sends UTC
-wall-clock digits with no offset and Postgres labels them with the session zone.
+**Pin the Postgres session to UTC — and do it before the first deploy, not
+after.** This is the one item here with a deadline, because its cost is
+currently zero and becomes a data migration the moment real rows exist.
 
-This is pre-existing and schema-wide, not introduced by Phase 1, and it has
-never caused a visible problem for two reasons: reading drops the offset again,
-so a JS write followed by a JS read round-trips **exactly**; and CI runs in UTC,
-where the offset is zero, so no suite can see it.
+The database holds **two mutually inconsistent timestamp conventions**, and
+which one a value gets depends on who wrote it. All figures below were measured
+against the live database on a UTC-7 host:
 
-Phase 1 is what makes it matter. Before it, no timestamp comparison gated
-authentication; now one does, and storage uses the offset at **write** time
-while the compensating read uses the offset at **read** time. Across a DST
-transition those differ by an hour, so a password changed under one offset and
-compared under the other resolves an hour off — either a window of sessions
-wrongly surviving a password change, or a window wrongly signed out. Twice a
-year, only on a non-UTC server, invisible to every test.
+| Written by                                          | Stored instant | Reads back     |
+| --------------------------------------------------- | -------------- | -------------- |
+| Prisma client (`created_at`, `password_changed_at`) | **+7h wrong**  | correct (0 ms) |
+| Postgres (`set_updated_at` trigger's `now()`)       | correct        | **−7h wrong**  |
 
-It also means any SQL-side reader is simply wrong: an admin query, a
-`now() > password_changed_at` comparison, or the scheduled prune Phase 3
-contemplates.
+The driver sends UTC wall-clock digits with no offset and Postgres labels them
+with the session zone, which is where the +7h comes from. The driver then
+_ignores_ the offset again on read, symmetrically — which is exactly why
+client-written values round-trip to the millisecond and nothing has ever caught
+this. Database-written values do not round-trip: `updated_at` after an update
+came back **−25,200,027 ms**.
 
-Pinning both the Node process and the Postgres session to UTC is the likely
-fix, and it is a deployment configuration decision, which is why it is recorded
-here rather than patched in Phase 1. **It is not a verified fix**: `CLAUDE.md`
-records that `TZ` does not reach Node on this machine, so nobody has been able
-to confirm locally that UTC removes the shift. Confirm it on the deployment
-target before relying on it.
+Note that `created_at` is client-written despite the DDL declaring
+`default now()`: Prisma's `@default(now())` supplies the value rather than
+letting the column default fire. Measured, not assumed.
+
+**User-visible impact today is nil**, which is why this is not a Phase 1 bug
+fix. `updated_at` is exposed on exactly one mapper — calorie entries — and
+nothing in the client renders it. What is broken is any comparison that crosses
+the two conventions, which today means SQL-side readers: an admin query, a
+`now() > password_changed_at` check, or the prune Phase 3 contemplates. All are
+off by the host's offset.
+
+**The fix is verified.** `SET TIME ZONE 'UTC'` on the session makes a fresh
+write store `...+00` and round-trip with **0 ms** skew. Pinning the Node process
+is not required; the session zone is what labels the digits.
+
+**But it cannot simply be switched on, and that is the part the deadline turns
+on.** The same row that reads back 0 ms under a UTC-7 session reads back
+**+7h under a UTC session** — measured on one pinned connection. Flipping the
+session zone re-interprets every previously client-written timestamp. So this
+needs one of:
+
+- do it **before any production data exists**, where it costs a connection
+  parameter and nothing else, or
+- do it afterwards and migrate, which means reconstructing each row's
+  _write-time_ DST offset from the row itself — recoverable but fiddly, and
+  wrong in the hour either side of a transition.
+
+There is no production database yet, so the first option is available and free.
+It stops being available on the day of the first deploy.
+
+Phase 1 is also why it stops being cosmetic: before it, no timestamp comparison
+gated authentication. Now one does, and across a DST transition the write-time
+and read-time offsets differ by an hour — a window of sessions wrongly
+surviving a password change, or wrongly signed out. Twice a year, only on a
+non-UTC server, invisible to every test because CI runs in UTC.
 
 The platform itself is deliberately unchosen in this document. It changes the
 artifacts enough to be worth deciding with the phase spec in front of you rather
