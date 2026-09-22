@@ -83,14 +83,36 @@ Redis you would be signed out several times a day.
 2. Connect the GitHub repository and select the `main` branch. Render reads
    [`render.yaml`](../render.yaml) and proposes one web service named
    `ai-workout`.
-3. It will prompt for four values. Three you have:
+3. It will prompt for the values `render.yaml` marks `sync: false`. Two you
+   already have; the rest are explained beneath the table:
 
-   | Key              | Value                                     |
-   | ---------------- | ----------------------------------------- |
-   | `DATABASE_URL`   | The Neon string from step 1               |
-   | `REDIS_URL`      | The Upstash string from step 2            |
-   | `GEMINI_API_KEY` | Your Google AI Studio key, or leave blank |
-   | `CLIENT_ORIGIN`  | See below — you may not know it yet       |
+   | Key              | Value                                |
+   | ---------------- | ------------------------------------ |
+   | `DATABASE_URL`   | The Neon string from step 1          |
+   | `REDIS_URL`      | The Upstash string from step 2       |
+   | `CLIENT_ORIGIN`  | See below — you may not know it yet  |
+   | `GEMINI_API_KEY` | Google AI Studio key, or blank       |
+   | `SENTRY_DSN`     | See below — strongly recommended     |
+   | `OPENAQ_API_KEY` | See below — required for air quality |
+   | `METRICS_TOKEN`  | Any long random string, or blank     |
+
+   **`SENTRY_DSN`** — sign up at [sentry.io](https://sentry.io), create a Node
+   project, copy the DSN. The error tracking is already built and tested; this
+   is the only thing it was missing. Without it a production 500 exists only in
+   Render's log viewer, which on the free tier is thin. You will not know when
+   the app breaks.
+
+   **`OPENAQ_API_KEY`** — free key from
+   [openaq.org](https://openaq.org). Not optional: the service throws
+   `"OpenAQ API key is not configured"` without one. The route catches it and
+   the dashboard shows an error card rather than breaking, so the symptom is a
+   permanently dead air-quality panel rather than an outage.
+
+   **`METRICS_TOKEN`** — guards `/api/metrics`, which reports `authFailures`,
+   per-route latency and request totals. Generate any long random string and
+   send it as the `X-Metrics-Token` header to read metrics. **Leaving it blank
+   closes the endpoint in production** rather than publishing it, so blank is
+   safe — the choice is between "closed" and "readable by you".
 
 4. **`CLIENT_ORIGIN` is the awkward one.** It must be this service's own public
    URL, which Render assigns when the service is created. If you can see the
@@ -207,6 +229,88 @@ That is the whole reason for the third service.
 
 **750 instance hours per month** on Render's free tier. With spin-down you will
 not approach it.
+
+---
+
+## Uptime monitoring, and optionally killing the cold starts
+
+On a tier that spins down, **you cannot tell "asleep" from "broken" by looking**.
+A monitor is what distinguishes them.
+
+Either free tier works — [UptimeRobot](https://uptimerobot.com) gives 50
+monitors at 5-minute intervals, [Better Stack](https://betterstack.com) gives 10
+at 3 minutes. You need one. Point it at:
+
+```text
+https://YOUR-APP.onrender.com/api/health
+```
+
+**`/api/health`, not `/api/ready`.** Health is liveness and touches nothing.
+Ready reports Postgres and Redis, so a brief database blip would page you about
+something that recovers on its own. Use ready for deploys, health for uptime.
+
+### The side effect, which may be the point
+
+Any interval under 15 minutes stops the service ever spinning down, which
+**eliminates the 30–60 second cold start**. That is not free, and the arithmetic
+is tight:
+
+|                                  | Hours   |
+| -------------------------------- | ------- |
+| Render free allowance            | 750     |
+| A 30-day month, always awake     | 720     |
+| A **31-day month**, always awake | **744** |
+
+So permanent warmth fits, with **6 hours of headroom in a 31-day month**. That
+covers one service and nothing else. If you ever add a second free service, or
+a month runs long, you will exceed it and Render suspends until the reset.
+
+If that is too tight, monitor on a schedule instead — say 07:00 to 23:00, which
+is roughly 496 hours a month and leaves real slack. You get alerting all day and
+accept a cold start for the first visitor each morning.
+
+**Decide deliberately rather than by accident.** Adding a 5-minute monitor
+without noticing it consumes your entire allowance is the kind of thing that
+surfaces as an unexplained outage three weeks later.
+
+---
+
+## When a deploy goes wrong
+
+**Code rolls back. Migrations do not.** That asymmetry is the whole of this
+section.
+
+Render keeps previous deploys: **your service → Deploys → the last good one →
+Rollback**. That restores the container in a minute or two and is the right
+first move when the new code is bad.
+
+But the database is still migrated. Whether that is safe depends on the
+migration:
+
+- **Additive** — a new nullable column, which is all of `001`–`003` — is safe to
+  roll back past. The old code ignores the column.
+- **Destructive** — dropping or narrowing a column — is **not**. The old code
+  expects what the migration removed, so rolling back the container leaves you
+  worse off than the bad deploy.
+
+So before writing any migration that is not purely additive, work out what
+rolling back would do. The safe pattern is two deploys: add the new shape, ship
+code using it, and only remove the old shape once nothing reads it.
+
+### Restoring data
+
+Neon free includes **6 hours** of point-in-time restore history, or 1 GB of
+changes, whichever comes first — plus **one manual snapshot**.
+
+Six hours is short. If someone deletes data on Friday and you notice on Monday,
+point-in-time will not reach it.
+
+**Take the manual snapshot once the first deploy is verified**, from the Neon
+console. It is the only thing that will still be there next week.
+
+To restore: Neon console → your branch → **Restore**, pick a timestamp within
+the window. It restores to a point in time rather than applying a backup file,
+so it is quick.
 
 ---
 

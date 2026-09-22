@@ -73,6 +73,26 @@ services:
       - key: GEMINI_API_KEY
         sync: false
 
+      # Without this a production 500 exists only in Render's log viewer, which
+      # on the free tier is thin and ephemeral. The error tracking is already
+      # built and tested; this is the only thing it was missing.
+      - key: SENTRY_DSN
+        sync: false
+
+      # Required, not optional: externalDataService throws "OpenAQ API key is
+      # not configured" without it. The route catches it and the dashboard
+      # shows an error card rather than breaking, so the failure is a
+      # permanently dead air-quality panel rather than an outage.
+      - key: OPENAQ_API_KEY
+        sync: false
+
+      # Guards /api/metrics, which otherwise reports authFailures and per-route
+      # latency to anyone. Generate any long random string. Leaving it unset in
+      # production closes the endpoint rather than publishing it, so this is a
+      # choice between "closed" and "readable by you".
+      - key: METRICS_TOKEN
+        sync: false
+
       # POSTGRES_STARTUP_REQUIRED defaults to true when NODE_ENV=production,
       # which is what we want: a server that cannot reach its database should
       # fail loudly at boot rather than serve 500s.

@@ -540,6 +540,10 @@ registerApiRoutes(app, {
   postgresStatusRef: getPostgresStatus,
   errorTrackingConfigured: () => Boolean(cleanText(process.env.SENTRY_DSN || "", 500)),
   errorTrackingEnabled: () => Boolean(errorTracker?.enabled),
+  // Gate for /api/metrics. Absent in production closes the endpoint rather
+  // than opening it -- see the note on metricsGuard in systemRoutes.js.
+  metricsToken: cleanText(process.env.METRICS_TOKEN || "", 200),
+  isProduction: process.env.NODE_ENV === "production",
   isUpstreamFailureStatus,
   toNullableNumber,
   fetchOpenMeteo,
