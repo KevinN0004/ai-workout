@@ -1,3 +1,17 @@
+import crypto from "crypto";
+
+/**
+ * Constant-time comparison, so a wrong token cannot be narrowed by timing.
+ * Length is compared first because timingSafeEqual throws on a mismatch, and
+ * the length of a secret is not the part worth protecting.
+ */
+const tokenMatches = (provided, expected) => {
+  const a = Buffer.from(String(provided || ""), "utf8");
+  const b = Buffer.from(String(expected || ""), "utf8");
+  if (a.length === 0 || b.length === 0 || a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
+
 export const registerSystemRoutes = (app, deps) => {
   const {
     metrics,
@@ -7,7 +21,9 @@ export const registerSystemRoutes = (app, deps) => {
     redisClient,
     postgresStatusRef,
     errorTrackingConfigured,
-    errorTrackingEnabled
+    errorTrackingEnabled,
+    metricsToken = "",
+    isProduction = false
   } = deps;
   const toAvg = (totalMs, count) => (count > 0 ? Number((totalMs / count).toFixed(2)) : 0);
   const summarizeLatencyBucket = (bucket = {}) => ({
@@ -65,7 +81,28 @@ export const registerSystemRoutes = (app, deps) => {
     return res.status(503).json(payload);
   });
 
-  app.get("/api/metrics", (req, res) => {
+  // Unauthenticated, this reported authFailures, per-route latency and request
+  // totals to anyone who asked -- enough for someone brute-forcing a password
+  // to watch their own attempts land, and enough to map the route surface.
+  //
+  // Secure by default rather than opt-in: with no METRICS_TOKEN set it stays
+  // open in development, where it is a debugging convenience and the process is
+  // on loopback, and is refused in production, where it is exposed to the
+  // internet. Getting the deployment wrong therefore closes the endpoint rather
+  // than opening it.
+  //
+  // 404 rather than 401, so an unconfigured deployment does not advertise that
+  // the endpoint exists and is merely locked.
+  const metricsGuard = (req, res, next) => {
+    if (metricsToken) {
+      if (tokenMatches(req.get("x-metrics-token"), metricsToken)) return next();
+      return res.status(404).json({ error: "Not found." });
+    }
+    if (isProduction) return res.status(404).json({ error: "Not found." });
+    return next();
+  };
+
+  app.get("/api/metrics", metricsGuard, (req, res) => {
     const cacheLookups = (metrics.externalCache?.hits || 0) + (metrics.externalCache?.misses || 0);
     const cacheHitRatio =
       cacheLookups > 0
