@@ -20,6 +20,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 const LIMIT_KEYS = [
   "API_RATE_LIMIT_MAX",
   "AUTH_RATE_LIMIT_MAX",
+  "CREDENTIAL_RATE_LIMIT_MAX",
   "GENERATE_RATE_LIMIT_MAX",
   "ANON_GENERATE_RATE_LIMIT_MAX"
 ];
@@ -69,6 +70,13 @@ const post = (baseUrl, path) =>
     body: JSON.stringify({})
   });
 
+const del = (baseUrl, path) =>
+  fetch(`${baseUrl}${path}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  });
+
 afterEach(async () => {
   await Promise.all(
     running.map((server) => new Promise((resolve) => server.close(() => resolve())))
@@ -113,6 +121,52 @@ describe("rate limiters", () => {
 
     expect(limited.status).toBe(429);
     expect((await limited.json()).error).toBe("Too many sign-in attempts. Please try again later.");
+  });
+
+  // Finding 1: the password-change and account-deletion routes previously had
+  // only the global /api budget behind them, ~8x looser than login for a
+  // guess that costs the same argon2id verify. This is the credential
+  // limiter's own regression coverage.
+  test("the credential limiter answers repeated password-verification attempts with 429", async () => {
+    const baseUrl = await startApp("CREDENTIAL_RATE_LIMIT_MAX");
+
+    await post(baseUrl, "/api/auth/password");
+    const limited = await post(baseUrl, "/api/auth/password");
+
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({
+      error: "Too many attempts. Please try again later."
+    });
+  });
+
+  // Registered on both POST /api/auth/password and DELETE /api/auth/me with
+  // the same limiter instance, so exhausting it on one must limit the other --
+  // otherwise an attacker holding a stolen session could double their guess
+  // budget by alternating the two credential checks.
+  test("the credential limiter budget is shared between password change and account deletion", async () => {
+    const baseUrl = await startApp("CREDENTIAL_RATE_LIMIT_MAX");
+
+    await post(baseUrl, "/api/auth/password");
+    const limited = await del(baseUrl, "/api/auth/me");
+
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error).toBe("Too many attempts. Please try again later.");
+  });
+
+  // The regression this finding explicitly warns against: binding the
+  // credential limiter to the whole /api/auth/me path (app.use) rather than
+  // to DELETE alone would also throttle this GET, which the client calls on
+  // every page load to check the session.
+  test("GET /api/auth/me is not subject to the credential limiter", async () => {
+    const baseUrl = await startApp("CREDENTIAL_RATE_LIMIT_MAX");
+
+    const responses = [];
+    for (let i = 0; i < 5; i += 1) {
+      responses.push(await fetch(`${baseUrl}/api/auth/me`));
+    }
+
+    expect(responses.some((res) => res.status === 429)).toBe(false);
+    expect(responses.every((res) => res.status === 401)).toBe(true);
   });
 
   test("the generate limiter answers with its own message", async () => {

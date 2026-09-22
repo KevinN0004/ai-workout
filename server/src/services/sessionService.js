@@ -312,7 +312,31 @@ export const createSessionService = ({
       await deleteSession(token);
       return null;
     }
-    return findUserById(session.userId);
+    const user = await findUserById(session.userId);
+    if (!user) {
+      // The account is gone -- deleted while this token was still live. Drop
+      // the token rather than leaving it to expire, matching the TTL branch
+      // above and the passwordChangedAt branch below, which both delete.
+      //
+      // Safe because null here means "no row": findUserById resolves through
+      // loadWithCollections, which returns null only when findFirst matches
+      // nothing. A database failure throws instead and never reaches this
+      // line, so a transient outage cannot cost a valid session its token.
+      await deleteSession(token);
+      return null;
+    }
+
+    // Guard before comparing, not after. Date.parse of an absent value is NaN,
+    // and every comparison against NaN is false -- so an unparseable timestamp
+    // fails OPEN and silently stops invalidating anything. The finite check
+    // makes that explicit rather than incidental, and the "created before"
+    // test above is what proves the rule still bites.
+    const changedAtMs = Date.parse(user.passwordChangedAt ?? "");
+    if (Number.isFinite(changedAtMs) && session.createdAt < changedAtMs) {
+      await deleteSession(token);
+      return null;
+    }
+    return user;
   };
 
   const requireAuth = async (req, res, next) => {
@@ -403,6 +427,7 @@ export const createSessionService = ({
     setCsrfCookie,
     clearCsrfCookie,
     createSession,
+    getSessionByToken,
     deleteSession,
     getSessionUser,
     requireAuth,

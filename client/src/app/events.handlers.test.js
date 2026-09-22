@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "./events.js";
+import { buildScopedCacheKey } from "./cache.js";
+import {
+  AIR_QUALITY_CACHE_PREFIX,
+  DASHBOARD_CACHE_PREFIX,
+  WEATHER_CACHE_PREFIX
+} from "./constants";
 
 const jsonResponse = (body, ok = true) => ({
   ok,
@@ -560,5 +566,328 @@ describe("submitProfile", () => {
 
     expect(result).toMatchObject({ ok: false, error: "Age must be between 10 and 120." });
     expect(deps.setUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("changePassword", () => {
+  test("posts the two passwords and reports success", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "old-pass",
+      newPassword: "new-pass-123"
+    });
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword: "old-pass", newPassword: "new-pass-123" })
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("surfaces the server's message on failure", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Current password is incorrect." }, false))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Current password is incorrect." });
+  });
+
+  test("reports a failure once, not twice", async () => {
+    // SettingsAccountPanel renders the returned error in a role="alert" region
+    // on the form itself. Raising a toast as well announced every failure
+    // twice -- assertive inline, polite toast -- so these two handlers return
+    // the message and stay silent. Pinned because the toast is what every
+    // neighbouring handler does, and re-adding it here would look like a fix.
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Current password is incorrect." }, false))
+    });
+
+    await handlers.changePassword({ currentPassword: "wrong", newPassword: "new-pass-123" });
+
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the refusal carries no error field", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({}, false))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
+
+  test("falls back to a generic message when the refusal body is unreadable", async () => {
+    // A proxy timeout answers with an error status and an HTML body.
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => ({
+        ok: false,
+        json: async () => {
+          throw new Error("not json");
+        }
+      }))
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
+
+  test("falls back to a generic message when the request throws without a message", async () => {
+    const { handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("");
+      })
+    });
+
+    const result = await handlers.changePassword({
+      currentPassword: "wrong",
+      newPassword: "new-pass-123"
+    });
+
+    expect(result).toEqual({ ok: false, error: "Unable to change password." });
+  });
+});
+
+describe("deleteAccount", () => {
+  test("deletes, then clears local state and returns home", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ ok: true })),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("old-pass");
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/me", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "old-pass" })
+    });
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+    expect(deps.go).toHaveBeenCalledWith("/");
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("a rejected password leaves the user signed in", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Password is incorrect." }, false)),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    // This is the assertion that separates deleteAccount from onLogout. Logging
+    // out clears local state even when the request fails, deliberately. Deleting
+    // must not: a rejected password means the account is still there, and
+    // signing the user out anyway would look exactly like it had worked.
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, error: "Password is incorrect." });
+  });
+
+  test("a thrown apiFetch is reported, not swallowed, and does not sign the user out", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("Security token unavailable. Refresh and try again.");
+      }),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("old-pass");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Security token unavailable. Refresh and try again."
+    });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the refusal carries no error field", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({}, false)),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the refusal body is unreadable", async () => {
+    // A proxy timeout answers with an error status and an HTML body.
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => ({
+        ok: false,
+        json: async () => {
+          throw new Error("not json");
+        }
+      })),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("falls back to a generic message when the request throws without a message", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => {
+        throw new Error("");
+      }),
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    const result = await handlers.deleteAccount("wrong");
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete account." });
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+    // Announced by the panel's role="alert" region, not also by a toast --
+    // see the matching assertion in changePassword.
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
+  });
+
+  // The panel promises deletion "cannot be undone", and the server honours that
+  // -- six onDelete: Cascade relations take the account's data with the row.
+  // The browser did not: clearDashboardDataState is pure setState and touches
+  // no storage, so the full dashboard stayed in localStorage under a key
+  // scoped by EMAIL. Signing up again with the same address on the same
+  // browser rehydrated the deleted account's workouts, meals, metrics and
+  // goals into the new one. Shared machines are exactly where someone deletes
+  // an account.
+  describe("scoped cache", () => {
+    const user = { email: "person@example.com" };
+    const scopedKeys = [DASHBOARD_CACHE_PREFIX, WEATHER_CACHE_PREFIX, AIR_QUALITY_CACHE_PREFIX].map(
+      (prefix) => buildScopedCacheKey(prefix, user)
+    );
+
+    const seedCache = () => {
+      scopedKeys.forEach((key) => window.localStorage.setItem(key, JSON.stringify({ a: 1 })));
+    };
+
+    const clearDeps = () => ({
+      user,
+      go: vi.fn(),
+      setUser: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    });
+
+    afterEach(() => {
+      scopedKeys.forEach((key) => window.localStorage.removeItem(key));
+    });
+
+    test("a successful deletion removes every scoped key", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      await handlers.deleteAccount("old-pass");
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).toBeNull());
+    });
+
+    test("a rejected password leaves the cache alone", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ error: "Password is incorrect." }, false))
+      });
+
+      // The account still exists, so destroying its cache would be wrong.
+      await handlers.deleteAccount("wrong");
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).not.toBeNull());
+    });
+
+    test("deletion still succeeds when removeItem throws", async () => {
+      seedCache();
+      vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => {
+        throw new Error("storage disabled");
+      });
+      const deps = clearDeps();
+      const { handlers } = buildDeps({
+        ...deps,
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      // Private mode and blocked site data must not make an account
+      // undeletable.
+      const result = await handlers.deleteAccount("old-pass");
+
+      expect(result).toEqual({ ok: true });
+      expect(deps.go).toHaveBeenCalledWith("/");
+      vi.restoreAllMocks();
+    });
+
+    test("onLogout leaves the cache in place", async () => {
+      seedCache();
+      const { handlers } = buildDeps({
+        ...clearDeps(),
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+
+      // Pinned so nobody later "harmonises" the two handlers. Logging out is
+      // the same account coming back, and the cache is a deliberate fast
+      // rehydrate for it. Deleting is that account ceasing to exist.
+      await handlers.onLogout();
+
+      scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).not.toBeNull());
+    });
   });
 });

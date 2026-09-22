@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -5,7 +6,9 @@ import { registerAuthRoutes } from "./authRoutes.js";
 import { createAuthUserService } from "../services/authUserService.js";
 import { parseCookies } from "../services/sessionService.js";
 import {
+  accountDeleteBodySchema,
   loginBodySchema,
+  passwordChangeBodySchema,
   profileBodySchema,
   signupBodySchema,
   validateBody
@@ -56,6 +59,15 @@ const buildApp = (overrides = {}) => {
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
   return app;
+};
+
+// A real legacy record, hashed the way the pre-argon2 code did it -- the same
+// shape authUserService.test.js's identical helper builds, so verifyPassword's
+// real pbkdf2 branch accepts it rather than only a stubbed algo flag.
+const legacyPbkdf2Record = (password) => {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
+  return { salt, hash, passwordAlgo: "pbkdf2" };
 };
 
 const signupBody = (overrides = {}) => ({
@@ -127,11 +139,25 @@ beforeEach(() => {
       cookieCalls.csrf.push(token);
     }),
     loginBodySchema,
+    passwordChangeBodySchema,
+    accountDeleteBodySchema,
     metrics,
     getDummyPasswordRecord: authUserService.getDummyPasswordRecord,
     verifyPassword: authUserService.verifyPassword,
     shouldUpgradePasswordToArgon2id: authUserService.shouldUpgradePasswordToArgon2id,
     upgradeUserPasswordToArgon2id: authUserService.upgradeUserPasswordToArgon2id,
+    // A stand-in for the Task 4b repository function: mutates the row's hash
+    // the same way, and only stamps passwordChangedAt when the caller passes
+    // the intent flag -- the repository owns the clock, so this fake mints
+    // its own timestamp rather than accepting one.
+    updatePasswordHash: vi.fn(async ({ userId, salt, hash, passwordAlgo, stampPasswordChange }) => {
+      const row = rows.find((item) => item.userId === userId);
+      if (row) {
+        Object.assign(row, { salt, hash, passwordAlgo });
+        if (stampPasswordChange) row.passwordChangedAt = new Date().toISOString();
+      }
+      return true;
+    }),
     toShortText: (value, maxLen = 160) =>
       typeof value === "string" ? value.trim().slice(0, maxLen) : "",
     parseCookies,
@@ -499,6 +525,50 @@ describe("POST /api/auth/login", () => {
     });
   });
 
+  // Regression pin for passwordChangedAt: the login rehash is invisible to the
+  // user, so it must never stamp the field -- doing so would sign a
+  // legacy-hash account out of every other device on an ordinary login it
+  // never asked to be rehashed by. Forcing shouldUpgradePasswordToArgon2id
+  // with a stub (as the describe block above does) would prove nothing about
+  // what upgradeUserPasswordToArgon2id itself passes downstream, so this
+  // drives a genuinely pbkdf2-hashed account through the real upgrade path
+  // instead, with its own authUserService wired to a spyable
+  // updatePasswordHash.
+  test("a pbkdf2 -> argon2id upgrade on login does not stamp passwordChangedAt", async () => {
+    const updates = [];
+    const upgradeUserPasswordToArgon2id = createAuthUserService({
+      cleanText,
+      argon2Options,
+      updatePasswordHash: async (args) => {
+        updates.push(args);
+        return true;
+      },
+      findUserWithDashboard,
+      findUserWithDashboardByEmail,
+      createUserWithDashboard
+    }).upgradeUserPasswordToArgon2id;
+
+    const app = buildApp({ upgradeUserPasswordToArgon2id });
+    await registered(app);
+
+    // Overwrite the freshly-signed-up argon2 row with a genuine pbkdf2 hash of
+    // the same password, so both shouldUpgradePasswordToArgon2id and the real
+    // pbkdf2 verifier see a legacy account rather than a forced flag.
+    Object.assign(rows[0], legacyPbkdf2Record("StrongPass123!"));
+
+    const response = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "person@example.com", password: "StrongPass123!" });
+
+    expect(response.status).toBe(200);
+    // Proves the upgrade genuinely fired -- otherwise the forEach below would
+    // assert nothing over an empty array.
+    expect(updates.length).toBeGreaterThan(0);
+    updates.forEach((args) => {
+      expect(args.stampPasswordChange).toBeFalsy();
+    });
+  });
+
   test("answers 500 without detail when the lookup fails", async () => {
     const app = buildApp({
       findUserByEmail: async () => {
@@ -512,6 +582,403 @@ describe("POST /api/auth/login", () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
+  });
+});
+
+describe("POST /api/auth/password", () => {
+  // The shared `requireAuth` stub used everywhere else in this file always
+  // resolves to a fixed { id: "u-1" } with no hash, regardless of any cookie
+  // -- fine for routes that only read req.user.id, but this route verifies
+  // the current password against req.user.hash. These tests need a
+  // `requireAuth` that genuinely resolves the signed-in row from the cookie,
+  // the way index.js really wires it (getSessionUser -> findUserById), so it
+  // is built locally from the same `sessions` / `rows` fixtures rather than
+  // reusing the shared stub.
+  const realRequireAuth = async (req, res, next) => {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const session = sessions.find((item) => item.token === cookies.sid);
+    const row = session && rows.find((item) => item.userId === session.userId);
+    if (!row) return res.status(401).json({ error: "Not signed in." });
+    req.user = deps.mapDbDocToUser(row);
+    next();
+  };
+
+  const passwordApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
+
+  // The shared `setSessionCookie`/`setCsrfCookie` mocks only record calls in
+  // `cookieCalls`; they never write a real Set-Cookie header (see the logout
+  // tests below, which hardcode "sid=sess-1" rather than reading a response
+  // header for the same reason). So the session cookie a signup produced is
+  // read back from `cookieCalls.session`, not from `res.headers["set-cookie"]`.
+  const signUpAndGetCookie = async (app) => {
+    await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
+    const { token } = cookieCalls.session[cookieCalls.session.length - 1];
+    return `sid=${token}`;
+  };
+
+  test("changes the password and lets the new one log in", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: "BrandNewPass456!" })
+      .expect(200);
+  });
+
+  test("the old password stops working", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(401);
+  });
+
+  test("a wrong current password is rejected and changes nothing", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+  });
+
+  test("asks the repository to stamp the change so other sessions can be invalidated", async () => {
+    const updates = [];
+    const app = passwordApp({
+      updatePasswordHash: async (args) => {
+        updates.push(args);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0].stampPasswordChange).toBe(true);
+  });
+
+  // The shared mocks never write a real Set-Cookie header (see
+  // signUpAndGetCookie above), so "a replacement session was issued" is
+  // observed through the same cookieCalls.session record the rest of this
+  // file already trusts, rather than through the response headers.
+  test("issues a replacement session so this device stays signed in", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+    const sessionCallsBefore = cookieCalls.session.length;
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(cookieCalls.session.length).toBe(sessionCallsBefore + 1);
+  });
+
+  test("requires a signed-in user", async () => {
+    const app = passwordApp();
+    await request(app)
+      .post("/api/auth/password")
+      .send({ currentPassword: "whatever", newPassword: "BrandNewPass456!" })
+      .expect(401);
+  });
+
+  test("reports failure, and keeps the session, when the write matched no row", async () => {
+    // The account was deleted in another tab between requireAuth resolving the
+    // user and the update landing. Before this was checked the route answered
+    // 200 "Password changed." having changed nothing -- and worse, it had
+    // already destroyed the caller's session and minted a replacement for an
+    // account that no longer existed.
+    const app = passwordApp({ updatePasswordHash: async () => false });
+    const cookie = await signUpAndGetCookie(app);
+    const before = sessions.length;
+
+    const response = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "StrongPass123!", newPassword: "BrandNewPass456!" });
+
+    expect(response.status).toBe(401);
+    expect(sessions.length).toBe(before);
+  });
+
+  test("rejects a new password shorter than eight characters", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "short" })
+      .expect(400);
+  });
+
+  test("the replacement session is a different token from the one it replaces", async () => {
+    // Not cosmetic. If the route reused the old token, that token predates
+    // the stamp and Task 3's rule would reject it on the very next request --
+    // signing the user out the instant they changed their password.
+    //
+    // The shared createSession mock names tokens from sessions.length, which
+    // a real crypto-random token generator never would. Combined with this
+    // route's delete-then-create order, that scheme can regenerate the same
+    // string after the old session is removed -- a fixture artifact, not a
+    // real collision. A monotonic counter that survives deletions stands in
+    // for "every minted token is unique", which is what production actually
+    // guarantees.
+    let tokenCounter = 0;
+    const uniqueCreateSession = vi.fn(async (userId) => {
+      tokenCounter += 1;
+      const token = `unique-sess-${tokenCounter}`;
+      sessions.push({ token, userId });
+      return token;
+    });
+    const app = passwordApp({ createSession: uniqueCreateSession });
+    const cookie = await signUpAndGetCookie(app);
+    const originalToken = cookieCalls.session[cookieCalls.session.length - 1].token;
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    const replacementToken = cookieCalls.session[cookieCalls.session.length - 1].token;
+    expect(replacementToken).not.toBe(originalToken);
+  });
+
+  test("counts a wrong current password as an auth failure", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    expect(metrics.authFailures).toBe(1);
+  });
+
+  test("does not count a successful password change", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" })
+      .expect(200);
+
+    expect(metrics.authFailures).toBe(0);
+  });
+
+  test("does not leak whether the failure was the password or the session", async () => {
+    // A 401 for a wrong current password must not be distinguishable in body
+    // text from any other 401 in a way that helps an attacker who has stolen
+    // a session cookie enumerate the real password.
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+
+    const res = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: "not-the-password", newPassword: "BrandNewPass456!" })
+      .expect(401);
+
+    expect(JSON.stringify(res.body)).not.toMatch(/hash|argon|salt|pbkdf2/i);
+  });
+});
+
+describe("DELETE /api/auth/me", () => {
+  // Same problem, same fix, as POST /api/auth/password above: the shared
+  // `requireAuth` stub always resolves to a fixed { id: "u-1" } with no
+  // hash/salt, regardless of any cookie. This route verifies a password
+  // against req.user, and one of its tests specifically asserts that a
+  // session belonging to a deleted user stops authenticating -- against the
+  // shared stub that would pass unconditionally, proving nothing. So this
+  // block builds its own requireAuth that genuinely resolves the signed-in
+  // row from the cookie via the same sessions/rows fixtures, mirroring
+  // Task 5's realRequireAuth rather than reusing the shared stub.
+  const realRequireAuth = async (req, res, next) => {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const session = sessions.find((item) => item.token === cookies.sid);
+    const row = session && rows.find((item) => item.userId === session.userId);
+    if (!row) return res.status(401).json({ error: "Not signed in." });
+    req.user = deps.mapDbDocToUser(row);
+    next();
+  };
+
+  const deleteApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
+
+  // Same reasoning as signUpAndGetCookie in the password describe block: the
+  // shared setSessionCookie/setCsrfCookie mocks only record calls in
+  // cookieCalls, they never write a real Set-Cookie header, so the session
+  // cookie a signup or login produced is read back from cookieCalls.session
+  // rather than from a response header.
+  const signUpAndGetCookie = async (app) => {
+    await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
+    const { token } = cookieCalls.session[cookieCalls.session.length - 1];
+    return `sid=${token}`;
+  };
+
+  test("deletes the account and the old credentials stop working", async () => {
+    const deleted = [];
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        deleted.push(userId);
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(deleted).toHaveLength(1);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(401);
+  });
+
+  test("a wrong password is rejected and the account survives", async () => {
+    const deleted = [];
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        deleted.push(userId);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: "not-the-password" })
+      .expect(401);
+
+    expect(deleted).toHaveLength(0);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+  });
+
+  test("counts a wrong password as an auth failure", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: "not-the-password" })
+      .expect(401);
+
+    expect(metrics.authFailures).toBe(1);
+  });
+
+  test("does not count a successful deletion", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(metrics.authFailures).toBe(0);
+  });
+
+  test("requires a signed-in user", async () => {
+    const app = deleteApp();
+    await request(app).delete("/api/auth/me").send({ password: "whatever" }).expect(401);
+  });
+
+  // cookieCalls is not an array of call names -- see the shared beforeEach
+  // above, which tracks clears as counters (clearedSession/clearedCsrf), the
+  // same shape the logout tests below already assert on.
+  test("clears the session and csrf cookies", async () => {
+    const app = deleteApp({ deleteUser: async () => true });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(cookieCalls.clearedSession).toBe(1);
+    expect(cookieCalls.clearedCsrf).toBe(1);
+  });
+
+  // The design spec's claim under test: does an orphaned session -- one
+  // whose user row is gone but whose session token was never touched by the
+  // delete request -- actually stop authenticating? That depends on
+  // requireAuth genuinely re-resolving the user on every request rather than
+  // trusting a cached value, which is exactly what realRequireAuth above
+  // does (session lookup, then a fresh row lookup) and the shared stub does
+  // not.
+  test("a session belonging to the deleted user no longer authenticates", async () => {
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
+    // Sign in twice, so there is a second live session the delete route never
+    // sees. The route clears only the cookie it was called with.
+    const firstCookie = await signUpAndGetCookie(app);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: signupBody().email, password: signupBody().password })
+      .expect(200);
+    const secondCookie = `sid=${cookieCalls.session[cookieCalls.session.length - 1].token}`;
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", firstCookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    // The design spec assumed this degrades to a 401 because getSessionUser
+    // returns findUserById(...) and requireAuth rejects a falsy user. That was
+    // an inference about Prisma's findUnique, never run. This is the test that
+    // settles it -- an orphaned token must not still authenticate.
+    await request(app).get("/api/profile").set("Cookie", secondCookie).expect(401);
   });
 });
 

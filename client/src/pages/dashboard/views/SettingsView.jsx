@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";
 import SettingsEditForm from "./SettingsEditForm";
+import SettingsAccountPanel from "./SettingsAccountPanel";
 import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
 import "./SettingsView.css";
 
@@ -33,7 +34,7 @@ const displayValue = (value) => {
   return String(value);
 };
 
-export default function SettingsView({ user, onSaveProfile }) {
+export default function SettingsView({ user, onSaveProfile, onChangePassword, onDeleteAccount }) {
   // Both memoized because their fallback branches minted a fresh object/array
   // every render, defeating the tabs memo that depends on them.
   const profile = useMemo(() => user?.profile || {}, [user]);
@@ -109,6 +110,15 @@ export default function SettingsView({ user, onSaveProfile }) {
           { label: "Nutrition", value: stored.nutrition },
           { label: "Cardio", value: stored.cardio },
           { label: "Notes", value: profile?.notes }
+        ]
+      },
+      {
+        id: "account",
+        label: "Account",
+        description: "Credentials and account deletion.",
+        rows: [
+          { label: "Email", value: user?.email },
+          { label: "Password", value: "••••••••" }
         ]
       },
       {
@@ -246,14 +256,22 @@ export default function SettingsView({ user, onSaveProfile }) {
               saving={saving}
             />
           ) : (
-            <div className="settings-list">
-              {activeTabData.rows.map((row) => (
-                <div className="settings-list-row" key={`${activeTabData.id}-${row.label}`}>
-                  <span className="muted">{row.label}</span>
-                  <strong className="settings-value">{displayValue(row.value)}</strong>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="settings-list">
+                {activeTabData.rows.map((row) => (
+                  <div className="settings-list-row" key={`${activeTabData.id}-${row.label}`}>
+                    <span className="muted">{row.label}</span>
+                    <strong className="settings-value">{displayValue(row.value)}</strong>
+                  </div>
+                ))}
+              </div>
+              {activeTabData.id === "account" && (
+                <SettingsAccountPanel
+                  onChangePassword={onChangePassword}
+                  onDeleteAccount={onDeleteAccount}
+                />
+              )}
+            </>
           )}
         </section>
       </div>

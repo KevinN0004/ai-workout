@@ -49,7 +49,7 @@ const COLLECTION_LIMITS = {
   savedExercises: 200
 };
 
-const mapUser = (row, related = {}) => {
+export const mapUser = (row, related = {}) => {
   if (!row) return null;
   const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
 
@@ -60,6 +60,10 @@ const mapUser = (row, related = {}) => {
     hash: row.passwordHash,
     passwordAlgo: row.passwordAlgo || "argon2id",
     createdAt: toIso(row.createdAt),
+    // toIso(null) returns "", not null, and "" is not "never changed" -- the
+    // absent/zero rule applies to timestamps too, so this is guarded before
+    // toIso rather than trusting its return value.
+    passwordChangedAt: row.passwordChangedAt ? toIso(row.passwordChangedAt) : null,
     profile: toJsonObject(row.profile),
     dashboard: {
       workouts: workoutSessions.slice(0, COLLECTION_LIMITS.workoutSessions),

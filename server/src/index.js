@@ -13,12 +13,14 @@ import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
 import { createAuthUserService } from "./services/authUserService.js";
 import {
+  accountDeleteBodySchema,
   caloriesBodySchema,
   generatePlanBodySchema,
   getValidationMessage,
   goalsBodySchema,
   loginBodySchema,
   mealLogBodySchema,
+  passwordChangeBodySchema,
   profileBodySchema,
   progressMetricBodySchema,
   savedExerciseBodySchema,
@@ -203,6 +205,15 @@ const apiRateLimitWindowMs = toPositiveInt(process.env.API_RATE_LIMIT_WINDOW_MS,
 const apiRateLimitMax = toPositiveInt(process.env.API_RATE_LIMIT_MAX, 300);
 const authRateLimitWindowMs = toPositiveInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10 * 60 * 1000);
 const authRateLimitMax = toPositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 25);
+// Guards the two routes that re-verify a signed-in caller's own password.
+// Those requests arrive with a valid session already in hand, so the shared
+// login/signup budget above does not apply to them, and the global /api
+// limiter alone is far too loose a bound on a per-guess argon2id verify.
+const credentialRateLimitWindowMs = toPositiveInt(
+  process.env.CREDENTIAL_RATE_LIMIT_WINDOW_MS,
+  10 * 60 * 1000
+);
+const credentialRateLimitMax = toPositiveInt(process.env.CREDENTIAL_RATE_LIMIT_MAX, 10);
 const generateRateLimitWindowMs = toPositiveInt(
   process.env.GENERATE_RATE_LIMIT_WINDOW_MS,
   10 * 60 * 1000
@@ -267,9 +278,10 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
-const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } = createUserRepository({
-  prisma
-});
+const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser } =
+  createUserRepository({
+    prisma
+  });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 const {
   serializeCacheKeyPart,
@@ -435,6 +447,30 @@ const authLimiter = rateLimit({
   }
 });
 
+// Bound by method rather than by path: GET /api/auth/me is the session check
+// the client calls on every page load and must never share this budget, so
+// this is applied to the POST and DELETE routes individually below instead of
+// with app.use("/api/auth/me", ...), which would also throttle that GET.
+const credentialLimiter = rateLimit({
+  windowMs: credentialRateLimitWindowMs,
+  max: credentialRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "credential",
+        method: req.method,
+        path: req.originalUrl || req.url
+      },
+      "Credential verification rate limited."
+    );
+    res.status(429).json({ error: "Too many attempts. Please try again later." });
+  }
+});
+
 const generateLimiter = rateLimit({
   windowMs: generateRateLimitWindowMs,
   max: generateRateLimitMax,
@@ -486,6 +522,8 @@ const anonGenerateLimiter = rateLimit({
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
+app.post("/api/auth/password", credentialLimiter);
+app.delete("/api/auth/me", credentialLimiter);
 app.use("/api/generate", attachOptionalUser, anonGenerateLimiter, generateLimiter);
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
@@ -567,6 +605,10 @@ registerApiRoutes(app, {
   updateProfile,
   updateGoals,
   saveCalorieEntry,
+  passwordChangeBodySchema,
+  accountDeleteBodySchema,
+  updatePasswordHash,
+  deleteUser,
   gemini,
   generatePlanBodySchema,
   saveGeneratedPlan,

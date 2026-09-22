@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../db/prisma.js";
-import { createUserReadRepository } from "./userReadRepository.js";
+import { createUserReadRepository, mapUser } from "./userReadRepository.js";
 import { createProgressMetricRepository } from "./progressMetricRepository.js";
 import { createDashboardCollectionRepository } from "./dashboardCollectionRepository.js";
 import { createSavedExerciseRepository } from "./savedExerciseRepository.js";
@@ -197,6 +197,38 @@ describe("userReadRepository", () => {
     const userId = crypto.randomUUID();
     expect(await saveExercise({ userId, entry: { name: "Squat" } })).toBeNull();
     expect(await removeExercise({ userId, entryId: "whatever" })).toBe(0);
+  });
+});
+
+// mapUser is the row -> API shape mapper at the heart of this file. These two
+// exercise it directly rather than through Postgres, because the property
+// under test -- an unset column reading back as null rather than "" -- is a
+// mapping concern, not a storage one.
+describe("passwordChangedAt", () => {
+  test("is carried through as an ISO string when set", () => {
+    const mapped = mapUser({
+      id: "00000000-0000-0000-0000-000000000001",
+      email: "person@example.com",
+      passwordHash: "$argon2id$hash",
+      passwordAlgo: "argon2id",
+      passwordChangedAt: new Date("2026-09-18T10:00:00.000Z"),
+      profile: {},
+      goals: {}
+    });
+    expect(mapped.passwordChangedAt).toBe("2026-09-18T10:00:00.000Z");
+  });
+
+  test("is null when the column has never been written", () => {
+    const mapped = mapUser({
+      id: "00000000-0000-0000-0000-000000000001",
+      email: "person@example.com",
+      passwordHash: "$argon2id$hash",
+      passwordAlgo: "argon2id",
+      passwordChangedAt: null,
+      profile: {},
+      goals: {}
+    });
+    expect(mapped.passwordChangedAt).toBeNull();
   });
 });
 

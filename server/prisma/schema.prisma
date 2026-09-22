@@ -7,16 +7,17 @@ datasource db {
 }
 
 model AppUser {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  legacyUserId String?  @unique @map("legacy_user_id")
-  email        String
-  passwordHash String   @map("password_hash")
-  passwordSalt String   @default("") @map("password_salt")
-  passwordAlgo String   @default("argon2id") @map("password_algo")
-  profile      Json     @default("{}")
-  goals        Json     @default("{}")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  legacyUserId      String?   @unique @map("legacy_user_id")
+  email             String
+  passwordHash      String    @map("password_hash")
+  passwordSalt      String    @default("") @map("password_salt")
+  passwordAlgo      String    @default("argon2id") @map("password_algo")
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+  profile           Json      @default("{}")
+  goals             Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   calorieEntries  CalorieEntry[]
   generatedPlans  GeneratedPlan[]

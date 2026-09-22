@@ -108,3 +108,104 @@ describe("initSessionStore", () => {
     expect(service.getRedisClient()).toBeNull();
   }, 15000);
 });
+
+describe("passwordChangedAt invalidation", () => {
+  test("a session created before the password changed is rejected and deleted", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: new Date(Date.now() + 5_000).toISOString()
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toBeNull();
+    // Rejecting is not enough -- the dead token must not linger in the store.
+    expect(await service.getSessionByToken(token)).toBeNull();
+  });
+
+  test("a session created after the password changed survives", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: new Date(Date.now() - 5_000).toISOString()
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+
+  test("a user who has never changed their password keeps their session", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: null
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+
+  test("a token whose account no longer exists is rejected and deleted", async () => {
+    // DELETE /api/auth/me clears only the cookie it was called with, so an
+    // account deleted from one device leaves that account's other tokens live
+    // in the store. Rejecting them is not enough: the two branches either side
+    // of this one both delete, and leaving a dead token to sit out its TTL was
+    // an unexplained asymmetry rather than a decision.
+    const service = buildService({ findUserById: async () => null });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toBeNull();
+    expect(await service.getSessionByToken(token)).toBeNull();
+  });
+
+  test("an empty-string timestamp is treated as absent, not as epoch zero", async () => {
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: ""
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const req = { headers: { cookie: `sid=${token}` } };
+
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+
+  test("a session created in the same millisecond as the change survives", async () => {
+    // Task 5 mints a replacement session immediately after stamping
+    // passwordChangedAt, so the two can share a millisecond. Strict `<` is what
+    // lets that session live; `<=` would sign the user out the moment they
+    // changed their password.
+    let changedAt = null;
+    const service = buildService({
+      findUserById: async () => ({
+        id: "user-1",
+        email: "person@example.com",
+        passwordChangedAt: changedAt
+      })
+    });
+    await service.initSessionStore({});
+    const token = await service.createSession("user-1");
+    const session = await service.getSessionByToken(token);
+    changedAt = new Date(session.createdAt).toISOString();
+
+    const req = { headers: { cookie: `sid=${token}` } };
+    expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
+  });
+});

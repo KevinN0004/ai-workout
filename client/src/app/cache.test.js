@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { buildScopedCacheKey, readCookie, readJsonCache, writeJsonCache } from "./cache.js";
+import {
+  buildScopedCacheKey,
+  readCookie,
+  readJsonCache,
+  removeJsonCache,
+  writeJsonCache
+} from "./cache.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,6 +75,34 @@ describe("writeJsonCache", () => {
       throw new Error("QuotaExceededError");
     });
     expect(() => writeJsonCache("k", { a: 1 })).not.toThrow();
+  });
+});
+
+describe("removeJsonCache", () => {
+  test("removes the stored value", () => {
+    window.localStorage.setItem("k", JSON.stringify({ a: 1 }));
+    removeJsonCache("k");
+    expect(window.localStorage.getItem("k")).toBeNull();
+  });
+
+  test("does nothing without a key", () => {
+    window.localStorage.setItem("k", JSON.stringify({ a: 1 }));
+    removeJsonCache("");
+    expect(window.localStorage.getItem("k")).not.toBeNull();
+  });
+
+  test("does nothing when localStorage is unavailable", () => {
+    // Private browsing and some embedded webviews have no localStorage.
+    vi.spyOn(window, "localStorage", "get").mockReturnValue(undefined);
+    expect(() => removeJsonCache("k")).not.toThrow();
+  });
+
+  test("swallows a removal failure instead of breaking the caller", () => {
+    // A deletion must succeed even when storage itself is unavailable.
+    vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => {
+      throw new Error("storage disabled");
+    });
+    expect(() => removeJsonCache("k")).not.toThrow();
   });
 });
 

@@ -304,12 +304,15 @@ export default function App() {
     submitCalories,
     submitGoals,
     submitProfile,
+    changePassword,
+    deleteAccount,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
     removeSavedExercise
   } = createAppEventHandlers({
     apiFetch,
+    user,
     form,
     setLoading,
     setError,
@@ -521,6 +524,8 @@ export default function App() {
         submitProgressMetric={submitProgressMetric}
         submitGoals={submitGoals}
         onSaveProfile={submitProfile}
+        onChangePassword={changePassword}
+        onDeleteAccount={deleteAccount}
         weekDays={weekDays}
         latestPlanByWeekday={latestPlanByWeekday}
         weatherData={weatherData}

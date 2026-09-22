@@ -94,6 +94,24 @@ export const loginBodySchema = z
   })
   .passthrough();
 
+// The asymmetry is deliberate and matches the schemas above: signupBodySchema
+// requires 8 for a password being set, loginBodySchema requires 1 for one
+// being checked. A current password is being checked.
+export const passwordChangeBodySchema = z
+  .object({
+    currentPassword: z.string().min(1).max(256),
+    newPassword: z.string().min(8).max(256)
+  })
+  .passthrough();
+
+// A current password being checked, same as loginBodySchema and
+// passwordChangeBodySchema's currentPassword: min 1, not min 8.
+export const accountDeleteBodySchema = z
+  .object({
+    password: z.string().min(1).max(256)
+  })
+  .passthrough();
+
 export const profileBodySchema = profileInputSchema;
 
 export const workoutSessionBodySchema = z

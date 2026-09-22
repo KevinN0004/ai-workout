@@ -33,6 +33,11 @@ export const createAuthUserService = ({
       hash: source.hash,
       passwordAlgo: inferredAlgo,
       createdAt: source.createdAt,
+      // mapUser already guarantees string | null for every real caller, so
+      // this only matters for a hand-built source (a test fixture that omits
+      // the key); keeping it stops that undefined from leaking out instead
+      // of the null the rest of the app expects.
+      passwordChangedAt: source.passwordChangedAt ?? null,
       profile: source.profile,
       dashboard: source.dashboard
     };
@@ -46,6 +51,9 @@ export const createAuthUserService = ({
       hash: user.hash,
       passwordAlgo: cleanText(user.passwordAlgo, 24) || "pbkdf2",
       createdAt: user.createdAt || new Date().toISOString()
+      // No passwordChangedAt here: this only feeds createUser, and a brand
+      // new account deliberately leaves the column NULL. Do not add it to
+      // "fix" the asymmetry with mapDbDocToUser.
     };
     if (user.profile !== undefined) doc.profile = user.profile;
     if (user.dashboard !== undefined) doc.dashboard = user.dashboard;

@@ -1,4 +1,11 @@
-import { defaultAuthForm, defaultSignupProfileForm } from "./constants";
+import { buildScopedCacheKey, removeJsonCache } from "./cache";
+import {
+  AIR_QUALITY_CACHE_PREFIX,
+  DASHBOARD_CACHE_PREFIX,
+  WEATHER_CACHE_PREFIX,
+  defaultAuthForm,
+  defaultSignupProfileForm
+} from "./constants";
 import { personalToProfile } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
@@ -33,6 +40,7 @@ const downloadPlanPdfFromText = async (planText) => {
 
 export const createAppEventHandlers = ({
   apiFetch,
+  user,
   form,
   setLoading,
   setError,
@@ -436,6 +444,83 @@ export const createAppEventHandlers = ({
     }
   };
 
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    try {
+      const res = await apiFetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to change password.");
+      }
+      showDashboardToast("Password changed.");
+      return { ok: true };
+    } catch (err) {
+      // No error toast, deliberately. SettingsAccountPanel renders this same
+      // string in a role="alert" region attached to the form the visitor is
+      // looking at. The toast is role="status" aria-live="polite", so raising
+      // both announced every failure twice, at two politeness levels. The
+      // inline region is the one that survives: it is tied to the field that
+      // needs correcting, and it stays put instead of timing out.
+      const message = err.message || "Unable to change password.";
+      return { ok: false, error: message };
+    }
+  };
+
+  const deleteAccount = async (password) => {
+    try {
+      const res = await apiFetch("/api/auth/me", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to delete account.");
+      }
+    } catch (err) {
+      // Announced inline by the panel's role="alert" region, not by a toast --
+      // see the note in changePassword above.
+      const message = err.message || "Unable to delete account.";
+      return { ok: false, error: message };
+    }
+    // Only past the request. Unlike onLogout, this must NOT clear local state
+    // when the call fails: a rejected password means the account is still
+    // there, and signing the user out anyway would look like it worked.
+    //
+    // The scoped cache is removed here and NOT in onLogout, which is the
+    // distinction worth protecting: logging out is the same account coming
+    // back, and the cache is a deliberate fast rehydrate for it. Deleting is
+    // that account ceasing to exist. `buildScopedCacheKey` scopes on
+    // `user?.userId || user?.email`, and the server's auth responses carry no
+    // `userId`, so the key is the EMAIL -- signing up again with the same
+    // address on the same browser would otherwise rehydrate the deleted
+    // account's dashboard, weather and air-quality snapshots into the new one.
+    //
+    // The keys are built before setUser(null) for readability only. `user` is
+    // a parameter of createAppEventHandlers, so it is a closure constant:
+    // setUser sets React state and cannot reassign it, and nothing here does
+    // either. Reading it after the reset would give the same value. Do not
+    // reorder this on the belief that the position is load-bearing -- it is
+    // not, and an earlier draft of this comment wrongly claimed it was.
+    const scopedCacheKeysToClear = [
+      DASHBOARD_CACHE_PREFIX,
+      WEATHER_CACHE_PREFIX,
+      AIR_QUALITY_CACHE_PREFIX
+    ].map((prefix) => buildScopedCacheKey(prefix, user));
+
+    setUser(null);
+    clearOptimisticOperations();
+    clearDashboardDataState();
+    clearDashboardToast();
+    resetPersonalFlow();
+    scopedCacheKeysToClear.forEach(removeJsonCache);
+    go("/");
+    return { ok: true };
+  };
+
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
@@ -574,6 +659,8 @@ export const createAppEventHandlers = ({
     submitCalories,
     submitGoals,
     submitProfile,
+    changePassword,
+    deleteAccount,
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,

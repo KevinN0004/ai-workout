@@ -40,6 +40,20 @@ test.describe.serial("accessibility", () => {
   });
 
   test.afterAll(async () => {
+    // This suite signs up its own account and, unlike smoke.spec.js, never
+    // submits the delete confirmation as part of a test -- the two account
+    // scans below stop at "revealed" so axe can see that state. Without this
+    // the account would join the e2e-* leak CLAUDE.md describes. Reached via
+    // the UI rather than a direct API call so it exercises the same
+    // requireAuth + CSRF path the rest of this suite already went through,
+    // and does not depend on which test ran last.
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /^account/i }).click();
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await page.getByLabel("Password", { exact: true }).fill(account.password);
+    await page.getByRole("button", { name: "Confirm deletion" }).click();
+    await expect(page.getByRole("button", { name: "Get Started" })).toBeVisible();
+
     await context?.close();
   });
 
@@ -124,5 +138,50 @@ test.describe.serial("accessibility", () => {
     await expect(page.getByRole("group", { name: "Training days" })).toBeVisible();
 
     expectNoViolations(await analyze(page));
+  });
+
+  // The account tab is the newest surface in the app and the only one with a
+  // destructive, multi-step confirmation. Two states matter: as first shown,
+  // and with the confirmation revealed -- a different DOM with an extra
+  // labelled input, which is exactly the shape a missing label or a
+  // mis-scoped error region would hide in only one of the two.
+  test("the account tab has no violations", async () => {
+    // Navigates rather than dismissing whatever the previous test left open.
+    // This used to open with a Cancel click that only worked because the test
+    // before it ended with the profile edit form on screen -- legal under
+    // describe.serial, but it made reordering or inserting a test break this
+    // one with a failure that pointed nowhere near the cause.
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /^account/i }).click();
+    await expect(page.getByRole("button", { name: "Delete account" })).toBeVisible();
+    await expect(page.getByLabel("Current password")).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  test("the delete confirmation step has no violations", async () => {
+    await page.getByRole("button", { name: "Delete account" }).click();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  // A third state, and the one the other two cannot reach: an error rendered.
+  // The panel's failures live in a `.error` element, whose contrast against
+  // the panel background nothing in this suite had ever measured -- the two
+  // scans above both run with no error on screen. `.error` is shared app-wide,
+  // so this is likely fine; "likely" is what a gate is supposed to replace.
+  test("the account panel's error state has no violations", async () => {
+    await page.getByLabel("Password", { exact: true }).fill("definitely-not-the-password");
+    await page.getByRole("button", { name: "Confirm deletion" }).click();
+
+    // The server answers 401 and the panel renders the message in role="alert".
+    await expect(page.getByRole("alert")).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+
+    // Leave the panel closed so the afterAll deletion starts from a known
+    // state rather than inheriting this failed attempt.
+    await page.getByRole("button", { name: "Cancel" }).click();
   });
 });

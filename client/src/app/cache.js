@@ -23,6 +23,16 @@ export const writeJsonCache = (key, value) => {
   }
 };
 
+export const removeJsonCache = (key) => {
+  if (!key || typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore cache removal failures (private mode, storage disabled, etc.) --
+    // a deletion must not fail because storage is unavailable.
+  }
+};
+
 export const readCookie = (name) => {
   if (!name || typeof document === "undefined") return "";
   const key = `${name}=`;
