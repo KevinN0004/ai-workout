@@ -211,6 +211,110 @@ npm run prisma:generate -w server
 npm run prisma:validate -w server
 ```
 
+## Deployment
+
+**The client and the API must be served from one origin.** This is a constraint,
+not a preference, and deploying the bundle to a static host separate from the API
+does not work:
+
+- every request the client makes is a relative path — there are 16 `/api/...`
+  literals in `client/src` and no base-URL constant — so a bundle served from
+  another host sends `/api/auth/me` to that host, and CORS is never reached
+- both the session and CSRF cookies are `SameSite=Lax`, so even with an absolute
+  URL the session would not be attached to a cross-site request
+
+The `/api` proxy that makes development work lives in `client/vite.config.js` and
+covers the dev server and `vite preview` only. Nothing proxies in production.
+
+The server therefore serves `client/dist` itself, so one process is the whole
+deployable. Set `CLIENT_DIST_PATH` only if the bundle is not at `client/dist`.
+If the build is missing the server logs `client_bundle_missing` and serves the
+API alone, which is what `npm run dev:server` does every day.
+
+### Container
+
+`Dockerfile` builds one image containing the API and the bundle. It is
+deliberately platform-agnostic — `docker-compose.yml` is for local Postgres and
+Redis and does not build it.
+
+```bash
+docker build -t ai-workout .
+docker run --rm -p 5000:5000 --env-file server/.env ai-workout
+```
+
+### Release order
+
+**Run migrations before starting the new code, not after.**
+`002_password_changed_at.sql` adds a column `userReadRepository` selects on
+every user read, so a server started against an unmigrated database fails every
+authenticated request, not only the new routes:
+
+```bash
+npm run migrate:postgres -w server   # release step, before the cutover
+```
+
+The image does not run migrations itself, so that ordering stays explicit.
+
+### Free deployment: Render + Neon + Upstash
+
+Three services, none needing a card. They are split because **Render's own free
+database and cache are both unusable here** — its free Postgres expires after 30
+days, and its free Key Value loses data on restart, which would empty the
+session store and sign every user out.
+
+| Layer    | Service            | Free terms                           |
+| -------- | ------------------ | ------------------------------------ |
+| App      | Render web service | Docker, 512 MB, 750 h/month          |
+| Postgres | Neon               | scale-to-zero at 5 min, ~570 ms wake |
+| Redis    | Upstash            | 256 MB, 500k commands/month          |
+
+512 MB is enough: argon2id is configured at 19 MiB per hash.
+
+**Setup, in order:**
+
+1. **Neon** — create a project, copy the **pooled** connection string, and append
+   `?sslmode=require`. Pooled because this process keeps a pool of its own; the
+   `sslmode` because the Prisma adapter takes no separate `ssl` option.
+2. **Upstash** — create a Redis database and copy the `rediss://` URL, which is
+   already TLS.
+3. **Render** — New → Blueprint, point it at this repo. `render.yaml` declares
+   the service; Render will prompt for the four secrets it marks `sync: false`.
+   Set `CLIENT_ORIGIN` to the service's own URL once Render assigns it, e.g.
+   `https://ai-workout.onrender.com` — the production preflight refuses to start
+   without it, even though same-origin serving means CORS is barely exercised.
+4. **GitHub** — add three repository secrets: `PRODUCTION_DATABASE_URL` (the same
+   Neon URL), `RENDER_DEPLOY_HOOK_URL` (Render → the service → Settings → Deploy
+   Hook) and `RENDER_SERVICE_URL`.
+
+**Deploys are triggered by CI, not by pushing.** `render.yaml` sets
+`autoDeployTrigger: "off"` and `.github/workflows/deploy.yml` applies migrations
+first, then calls the deploy hook, then waits for `/api/ready`. That ordering is
+the point — see the release-order note above.
+
+**Two behaviours worth expecting rather than debugging:**
+
+- **The first request after 15 minutes idle takes 30–60 seconds.** Free instances
+  spin down. Neon adds ~570 ms on top, waking from its own idle.
+- **If a deploy fails its health check, check `REDIS_URL` first.** A configured
+  but unreachable Redis makes the app fall back to in-memory sessions, and
+  `/api/ready` then reports `not_ready` permanently by design. The process is
+  up; it is telling you sessions would not survive a spin-down.
+
+### What production needs
+
+| Setting                     | Why                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                   |
+| `DATABASE_URL`              | Required. Add `?sslmode=require` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL |
+| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                     |
+| `REDIS_URL`                 | Without it sessions are in-memory: every restart signs everyone out, and it cannot work across more than one instance   |
+| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                             |
+| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                |
+
+Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
+reports Postgres and Redis and is the one a load balancer should gate traffic
+on.
+
 ## More Docs
 
 - [Client README](client/README.md)
