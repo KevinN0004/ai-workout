@@ -1,10 +1,16 @@
 # Development Roadmap — Design
 
-Status: **Phases 0 and 1 shipped** on `feat/account-management`, via
-`docs/plans/2026-09-18-baseline-and-account-management.md`. Phases 2 through 6
-are approved but not started, and each still needs its own spec before any code.
-Two findings from Phase 1 have already been folded into Phase 2's section below
-— the migration-ordering hazard and the two fail-open edges in the session rule.
+Status: **Phases 0 and 1 shipped** (PR #144, via
+`docs/plans/2026-09-18-baseline-and-account-management.md`). **Phase 2's
+deployable is built and merged** (PR #146) but **nothing is deployed** — that
+needs three account signups and four repository secrets. Phases 3 through 6 are
+approved and not started; each still needs its own spec before any code.
+
+Phase 2's section below has been rewritten against what actually shipped, and it
+quotes the claim it originally made rather than hiding it: the plan assumed two
+deployable artifacts, a static bundle and a server, and that turned out to be
+impossible for this client. The correction is recorded there because it is the
+part worth reading.
 
 This is a **roadmap**, not an implementation plan. It decomposes work that spans several independent efforts, and each phase
 below gets its own `docs/specs/` design and `docs/plans/` plan before any code
@@ -57,6 +63,12 @@ Two claims in this document are inferences, flagged again where they appear:
   weaker than a trace.
 
 ## Problem
+
+**Read this section as of 2026-09-18, not as of now.** It is the state that
+motivated the roadmap, written in the present tense, and Phases 0 to 2 have since
+changed parts of it — §2 and §4 in particular. It is left standing because
+deleting it would remove the reason the work happened; each phase below records
+what it actually changed.
 
 The repository is in good order — `main` is clean, all 20 remote branches are
 merged, and there is not one `TODO` or `FIXME` in `client/src` or `server/src`.
@@ -190,32 +202,85 @@ inside a hook that exists.
 
 ### Phase 2 — Deploy
 
-Two artifacts, because nothing serves `client/dist` from Express: a static
-client bundle and a Node server process.
+**Status: the deployable is built and merged; nothing is deployed.** What remains
+is three account signups and four repository secrets, which are not work this
+document can describe away. The rest of this section is what shipped and why it
+differs from what was planned.
 
-- a deploy workflow beside the existing `quality`, `test` and `build` jobs, and
-  gated on them
-- migrations as a deploy step, through the raw-SQL runner that applies every
-  unapplied `.sql` in `server/db/postgres/` in filename order
-- real values for `CLIENT_ORIGIN`, `POSTGRES_STARTUP_REQUIRED=true`,
-  `REDIS_URL`, `SENTRY_DSN` and `GEMINI_API_KEY`
-- a post-deploy smoke check against `/api/health` and `/api/ready`, which exist
+**This section previously opened with a claim that was wrong**, and it is quoted
+rather than deleted because the correction is the useful part:
+
+> Two artifacts, because nothing serves `client/dist` from Express: a static
+> client bundle and a Node server process.
+
+The first half was true — nothing served the bundle — and the conclusion drawn
+from it was not. **Two artifacts cannot work here**, established three
+independent ways while specifying this phase:
+
+- Every request the client makes is a relative path. There are 16 `/api/...`
+  literals in `client/src` and no base-URL constant, so a bundle served from
+  another host sends `/api/auth/me` to that host. CORS is never consulted,
+  because the URL never points at the API.
+- Both the session and CSRF cookies are `SameSite=Lax`, so even with an absolute
+  URL the session would not be attached to a cross-site fetch. Relaxing that to
+  `SameSite=None` is the direction browsers are removing.
+- The `/api` proxy that makes development work lives in `client/vite.config.js`
+  and covers the dev server and `vite preview` only. Nothing proxies in
+  production.
+
+So same origin is a constraint rather than a preference, and `staticClient.js`
+now serves `client/dist` from the API process — one artifact, which is also what
+keeps the platform choice cheap to change.
+
+**What shipped:**
+
+- `staticClient.js`, serving the bundle with a fallback that excludes `/api` so
+  an unknown endpoint still 404s rather than answering 200 with the SPA shell
+- `Dockerfile` and `.dockerignore` — one image containing both halves
+- a `Container image` CI job that builds **and runs** it, then asserts it serves
+  the client, answers the API, and 404s an unknown `/api` path. Building alone
+  would not catch the failures that only appear at runtime, since the image runs
+  as the non-root `node` user
+- `render.yaml` with `healthCheckPath: /api/ready` and `autoDeployTrigger: "off"`
+- `.github/workflows/deploy.yml`, which migrates, then triggers the deploy, then
+  waits for `/api/ready`
+- both Postgres connections pinned to UTC, closing the offset described below
+
+**The platform is no longer unchosen.** Constrained to free tiers with no card:
+Render for the app, Neon for Postgres, Upstash for Redis. Render's own free
+Postgres expires after 30 days and its free Key Value loses data on restart —
+the latter would empty the session store — so the database and cache come from
+elsewhere. Fly has no free tier in 2026, only a two-hour trial.
 
 **Redis stops being optional here.** In-memory sessions sign every user out on
-each restart and cannot work across more than one instance. The env plumbing is
-already built and tested; only the decision is missing.
+each restart and cannot work across more than one instance. On a free tier that
+spins down after 15 minutes idle, that means a visitor is signed out several
+times a day, so it is load-bearing rather than a scaling concern.
 
-**Migrations must land before the new code starts, and nothing currently
-enforces that.** CI runs `migrate:postgres`, but there is no production deploy
-path at all, so the ordering has never had to be decided. From Phase 1 onwards
-this stops being academic: `002_password_changed_at.sql` adds a column that
-`userReadRepository` selects on **every** user read. Start a server carrying
-that code against a database that has not run `002` and every authenticated
-request fails, not just the new routes. Whatever platform is chosen, the
-migration step has to be ordered before the cutover, and a rollback has to be
-thought about in the same breath — the old code tolerates the new column, so
-migrate-then-deploy is safe in this direction, but that will not be true of
-every future migration.
+**`/api/ready` is safe to gate deploys on, and that is not obvious.** `index.js`
+awaits `connectPostgres`, `connectPrisma` and `initSessionStore` **before**
+`app.listen`, so the process accepts no connection until its dependencies have
+settled. Render's documented trap — a health endpoint answering 200 before the
+database is up — cannot occur. The consequence worth knowing is the inverse: a
+configured-but-unreachable Redis leaves this path reporting `not_ready`
+permanently, so a deploy fails its health check while the process is up. That is
+the intended signal.
+
+**Migrations must land before the new code starts, and this is now enforced in
+two places.** `002_password_changed_at.sql` adds a column that
+`userReadRepository` selects on **every** user read, so a server carrying that
+code against a database which has not run `002` fails every authenticated
+request, not just the new routes.
+
+`render.yaml` sets `autoDeployTrigger: "off"` so a push cannot start the new code
+on its own, and `.github/workflows/deploy.yml` applies migrations before calling
+the deploy hook. The `Container image` CI job rehearses the same order on every
+push: migrations from the runner, then the image starts.
+
+The rollback direction still has to be thought about per migration. The old code
+tolerates the new column, so migrate-then-deploy is safe **in this direction**,
+and that will not be true of every future one — a migration that removes or
+narrows a column inverts it.
 
 **Two fail-open edges in the session rule, both inherited from Phase 1.** The
 `passwordChangedAt` comparison decides whether a session survives, and it fails
@@ -291,9 +356,11 @@ and read-time offsets differ by an hour — a window of sessions wrongly
 surviving a password change, or wrongly signed out. Twice a year, only on a
 non-UTC server, invisible to every test because CI runs in UTC.
 
-The platform itself is deliberately unchosen in this document. It changes the
-artifacts enough to be worth deciding with the phase spec in front of you rather
-than guessing now.
+The platform was left unchosen while this document was being written, on the
+grounds that it changes the artifacts. It turned out to change them less than
+expected: the same-origin constraint means one Node process is the whole
+deployable whatever runs it, and the `Dockerfile` runs anywhere. The free-tier
+constraint then chose it — see the status note at the top of this section.
 
 ### Phase 3 — Production data growth
 
