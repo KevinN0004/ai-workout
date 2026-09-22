@@ -7,28 +7,22 @@ dotenv.config();
 const prismaLog = process.env.NODE_ENV === "production" ? ["warn", "error"] : ["warn", "error"];
 
 const globalPrisma = globalThis.__aiWorkoutPrismaClient;
-// The session timezone is pinned in code rather than left to the connection
-// string, because getting it wrong is silent and the failure is invisible in
-// CI.
+// The session timezone is UTC, and it is set by the DATABASE rather than here
+// -- see server/db/postgres/003_utc_timezone.sql.
 //
-// The driver sends a JS Date as UTC wall-clock digits with no offset, and
-// Postgres labels them with whatever the session zone is. Measured on a UTC-7
-// host: an instant of 05:06:49Z stored as `05:06:49-07`, seven hours out. It
-// has never surfaced because the driver drops the offset again on read, so a
-// JS write followed by a JS read round-trips exactly -- and CI runs in UTC,
-// where the offset is zero, so no suite could see it. What does NOT round-trip
-// is anything Postgres itself writes: the set_updated_at trigger's now() came
-// back 25,200,027 ms early, because the two conventions disagree.
+// This connection briefly carried `options: "-c timezone=UTC"` instead. That
+// works against a direct Postgres connection and **fails against a pooled
+// one**: PgBouncer tracks only client_encoding, datestyle, timezone and
+// standard_conforming_strings in startup packets and errors on anything else,
+// and `options` is not on that list. Every managed Postgres worth deploying on
+// fronts the database with exactly that, so the parameter was a deploy blocker
+// hiding behind a local setup that had no pooler.
 //
-// With the session pinned, both conventions agree and every stored instant is
-// the real one. Measured: tz=UTC, skew 0ms.
-//
-// Note this is the app's own connection. postgres.js builds a second pool for
-// migrations and the readiness probe, and carries the same option for the same
-// reason.
+// Do not reintroduce it. If the timezone is ever wrong, the database default
+// is the thing to check -- `show timezone` on a new connection --  and
+// prisma.test.js asserts it on every run.
 const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL || "",
-  options: "-c timezone=UTC"
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL || ""
 });
 
 export const prisma =

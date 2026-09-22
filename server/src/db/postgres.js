@@ -61,12 +61,11 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
     const { Pool } = await import("pg");
     postgresPool = new Pool({
       connectionString: config.databaseUrl,
-      // Same reason as prisma.js: without this the session takes the host's
-      // zone, and a JS-written timestamp is stored offset by it. This pool
-      // runs the migrations and stamps schema_migrations.applied_at, so it
-      // must agree with the app's connection or the two write different
-      // instants for the same moment.
-      options: "-c timezone=UTC",
+      // No `options: "-c timezone=UTC"` here, deliberately -- PgBouncer rejects
+      // that startup parameter and this pool is what applies the migrations, so
+      // carrying it would make the schema unreachable on any pooled database.
+      // UTC comes from the database default instead; see
+      // server/db/postgres/003_utc_timezone.sql.
       ssl: config.ssl
         ? {
             rejectUnauthorized: config.sslRejectUnauthorized
