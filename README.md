@@ -327,5 +327,7 @@ on.
 
 ## More Docs
 
+- [Deploy runbook](docs/deploy-runbook.md) — step-by-step first deployment on the
+  free tier, and what to check when it goes wrong
 - [Client README](client/README.md)
 - [Server README](server/README.md)
