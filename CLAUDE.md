@@ -810,15 +810,29 @@ the native instance all along.
   `no-unexpected-multiline`, which is an ASI-hazard defect rule rather than a style rule.
   The repo-wide reformat is commit `86621a3` (173 files, ~7,200 lines), recorded in
   `.git-blame-ignore-revs`.
-  - `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md` is excluded from Prettier.
-    Version 3.9.6 **never converges** on it: every `--write` pass indents the continuation
-    paragraphs under its nested `- [x]` task-list items four spaces deeper, growing the
-    file 280 bytes per run with no fixed point. Re-test after a Prettier upgrade by
-    checking byte-stability across ~3 consecutive passes, not by a single clean `--check`.
-    Not every slow-converging file is that file. `docs/plans/2026-09-06-foundation-hardening.md`
+  - **Nothing is excluded from Prettier any more, and the way that was noticed is the
+    point.** `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md` used to be:
+    Prettier **3.9.6 never converged** on it, indenting the continuation paragraphs under
+    its nested `- [x]` task-list items four spaces deeper on every `--write` and growing
+    the file 280 bytes per run with no fixed point. **3.9.8 fixed it** — measured over five
+    consecutive passes, it reformats once (15,691 → 16,547 bytes) and is then byte-identical.
+    The exclusion and the file are both gone from `.prettierignore`.
+
+    An exclusion like that should not outlive its upstream bug, and nothing routine would
+    have prompted anyone to revisit it: a Dependabot Prettier bump shows only a lockfile
+    diff, and `prettier --check` stays green precisely because the file is ignored. So
+    `scripts/repo-invariants.test.mjs` carried a test asserting the exclusion still
+    **earned its place** — that the file still failed to converge — designed to fail the
+    moment it stopped. It did exactly that on the 3.9.6 → 3.9.8 bump, which is how this
+    entry came to be rewritten. That test is now deleted too; it had no remaining subject.
+    **If you ever exclude a file from a formatter here, write the guard that retires the
+    exclusion for you.**
+
+    Not every slow-converging file was that file. `docs/plans/2026-09-06-foundation-hardening.md`
     needed **two** `--write` passes to settle (70,068 then 70,066 bytes, stable after) and
-    is not excluded, because it has a fixed point. The pathological case grows without
-    bound; a file that stops changing is merely awkward. Measure before excluding one.
+    was never excluded, because it had a fixed point. The pathological case grows without
+    bound; a file that stops changing is merely awkward. Measure before excluding one, and
+    check byte-stability across ~3 consecutive passes rather than a single clean `--check`.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
   `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were

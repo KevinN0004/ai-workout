@@ -10,7 +10,7 @@
 > task below — worth reading before trusting a plan of this kind again.
 >
 > **The one defect found along the way is now fixed too:** meal logs reach the
-> calories view again. See *Defect found during Task 3*.
+> calories view again. See _Defect found during Task 3_.
 
 **Goal:** Replace `server/src/services/prismaDataModels.js` — a MongoDB-shaped
 API implemented on top of Prisma — with direct Prisma calls, and delete the shim.
@@ -42,36 +42,36 @@ Measured against the tree at `7ccbec0`, not assumed.
 **Surface actually used.** The shim exposes four models. Not every model
 implements every method:
 
-| Model | Methods used by callers |
-| --- | --- |
-| `User` | `findOne`, `create`, `updateOne`, `findOneAndUpdate` |
-| `WorkoutSession` | `findOneAndUpdate`, `find` |
-| `MealLog` | `findOneAndUpdate`, `find`, **`aggregate`** |
-| `ProgressMetric` | `findOneAndUpdate`, `find` |
+| Model            | Methods used by callers                              |
+| ---------------- | ---------------------------------------------------- |
+| `User`           | `findOne`, `create`, `updateOne`, `findOneAndUpdate` |
+| `WorkoutSession` | `findOneAndUpdate`, `find`                           |
+| `MealLog`        | `findOneAndUpdate`, `find`, **`aggregate`**          |
+| `ProgressMetric` | `findOneAndUpdate`, `find`                           |
 
 **Call sites.** 18 outside the shim, across 6 files:
 
-| File | Calls |
-| --- | --- |
-| `services/authUserService.js` | 2 × `findOne`, `create`, `updateOne` |
-| `routes/dashboard/write/registerWorkoutAndGoalRoutes.js` | 5 |
-| `routes/dashboard/write/registerMealAndMetricRoutes.js` | 5 (incl. the aggregate) |
-| `routes/dashboard/write/registerSavedExerciseRoutes.js` | 2 |
-| `routes/authRoutes.js` | 1 |
-| `routes/generateRoutes.js` | 1 |
-| `services/dashboardCollectionService.js` | the `find().sort().limit()` chain, × 3 models |
+| File                                                     | Calls                                         |
+| -------------------------------------------------------- | --------------------------------------------- |
+| `services/authUserService.js`                            | 2 × `findOne`, `create`, `updateOne`          |
+| `routes/dashboard/write/registerWorkoutAndGoalRoutes.js` | 5                                             |
+| `routes/dashboard/write/registerMealAndMetricRoutes.js`  | 5 (incl. the aggregate)                       |
+| `routes/dashboard/write/registerSavedExerciseRoutes.js`  | 2                                             |
+| `routes/authRoutes.js`                                   | 1                                             |
+| `routes/generateRoutes.js`                               | 1                                             |
+| `services/dashboardCollectionService.js`                 | the `find().sort().limit()` chain, × 3 models |
 
 **Mongo operators leaking into route code.** These are the actual migration
 units — each needs a Prisma equivalent chosen deliberately:
 
-| Operator | Uses outside the shim |
-| --- | --- |
-| `$set` | 9 |
-| `$slice` | 6 |
-| `$push` | 2 |
-| `$each` | 2 |
-| `$position` | 2 |
-| `$pull` | 1 |
+| Operator    | Uses outside the shim |
+| ----------- | --------------------- |
+| `$set`      | 9                     |
+| `$slice`    | 6                     |
+| `$push`     | 2                     |
+| `$each`     | 2                     |
+| `$position` | 2                     |
+| `$pull`     | 1                     |
 
 **The two hard parts.** Most of the above is mechanical. Two are not:
 
@@ -150,6 +150,7 @@ first where behaviour is being pinned rather than merely moved.
       remaining effort is smaller than the counts suggest — and every pipeline
       should be checked against the shim's actual branches before being
       treated as behaviour to preserve.
+
 - [x] **Task 3 — `MealLog`, including the aggregate.** Done.
 
       The null-handling trap this plan warned about was **already handled**:
@@ -162,6 +163,7 @@ first where behaviour is being pinned rather than merely moved.
       ran, so meal logs contribute nothing to the calories view. The dead
       pipeline was removed; `sumCaloriesForDate` — the half that works — was
       kept in the repository for whoever fixes the feature.
+
 - [x] **Task 3b — the shared read chain, all three models at once.** Done.
       Moved to `repositories/dashboardCollectionRepository.js`, keyed by
       collection name rather than by a passed-in model object.
@@ -201,6 +203,7 @@ write call sites across four files — profile `$set`, goals `$set`, calories
 
       The shim is now `findOne`, `create`, and a `findOneAndUpdate` handling
       exactly one thing: the generated-plan push that Task 5 owns.
+
 - [x] **Task 5 — the capped plan list.** Done, and **the design question this
       plan promised does not exist.**
 
@@ -225,6 +228,7 @@ write call sites across four files — profile `$set`, goals `$set`, calories
       deleted. **There is now no executable Mongo syntax anywhere in
       `server/src`** — the only `$operator` mentions left are in comments
       explaining what was removed.
+
 - [x] **Task 6 — delete the shim.** Done. `prismaDataModels.js` is gone; what
       remained of it moved to `repositories/userReadRepository.js` under names
       that describe the work: `findUserWithDashboard`,
@@ -255,11 +259,11 @@ what was wrong and how the intended behaviour was recovered.
 The three questions this section listed turned out to have answers rather than
 needing invention:
 
-1. *Should a meal log create the entry?* — yes; the dead pipeline's whole
+1. _Should a meal log create the entry?_ — yes; the dead pipeline's whole
    purpose.
-2. *Should a manual entry suppress it?* — yes; `hasManualCaloriesForDay` tested
+2. _Should a manual entry suppress it?_ — yes; `hasManualCaloriesForDay` tested
    exactly that.
-3. *What happens on delete?* — **moot.** There is no meal-log delete endpoint;
+3. _What happens on delete?_ — **moot.** There is no meal-log delete endpoint;
    only `GET` and `POST` exist. The hardest question was about a scenario the
    API cannot reach.
 
@@ -296,15 +300,15 @@ derived calorie entry is missing.
 Task 3 removed the dead pipeline and **preserved the working half** as
 `sumCaloriesForDate` in `repositories/mealLogRepository.js`, tested including
 the all-NULL case. Wiring it up is a small change whenever the behaviour is
-wanted. The decision to make is what *should* happen:
+wanted. The decision to make is what _should_ happen:
 
 - should a meal log create or update a `meal_logs`-sourced calorie entry?
 - should a manual entry for that day suppress it, as the dead code intended?
 - should removing a meal log recompute or remove that entry? The dead code
   never handled deletion at all, so this was unspecified even in intent.
 
-Current behaviour is pinned by a test named *"does not currently create a
-calorie entry from a meal log"*, so changing it is deliberate and visible.
+Current behaviour is pinned by a test named _"does not currently create a
+calorie entry from a meal log"_, so changing it is deliberate and visible.
 
 ## Risks
 
