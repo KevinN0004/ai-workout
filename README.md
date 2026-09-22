@@ -273,8 +273,18 @@ session store and sign every user out.
 **Setup, in order:**
 
 1. **Neon** — create a project, copy the **pooled** connection string, and append
-   `?sslmode=require`. Pooled because this process keeps a pool of its own; the
-   `sslmode` because the Prisma adapter takes no separate `ssl` option.
+   `?sslmode=require`. The `sslmode` because the Prisma adapter takes no separate
+   `ssl` option, so TLS has to ride the URL.
+
+   Pooled works because nothing here asks the connection for a startup parameter
+   PgBouncer refuses. That is deliberate: the session timezone is set by the
+   database (`003_utc_timezone.sql`) rather than per connection. An earlier
+   version passed `options=-c timezone=UTC`, which PgBouncer rejects outright —
+   it tracks only `client_encoding`, `datestyle`, `timezone` and
+   `standard_conforming_strings` and errors on anything else. **Do not add
+   startup options to this URL**; a pooled endpoint will refuse the connection
+   rather than ignore them.
+
 2. **Upstash** — create a Redis database and copy the `rediss://` URL, which is
    already TLS.
 3. **Render** — New → Blueprint, point it at this repo. `render.yaml` declares
