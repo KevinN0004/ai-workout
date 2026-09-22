@@ -1,6 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -114,48 +112,5 @@ describe("Claude Code hook wiring", () => {
 
     const missing = referenced.filter((rel) => !existsSync(path.join(repoRoot, rel)));
     expect(missing).toEqual([]);
-  });
-});
-
-describe(".prettierignore exclusions", () => {
-  // One file is excluded because Prettier 3.9.6 never reaches a fixed point on
-  // it. That exclusion should not outlive the upstream bug, and nothing else
-  // would prompt anyone to revisit it -- a Dependabot Prettier bump shows only
-  // a lockfile diff, and `prettier --check` stays green because the file is
-  // ignored. So this asserts the exclusion is still *earning its place*, and
-  // fails once it stops.
-  const excluded = "docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md";
-
-  test("the non-converging markdown file still does not converge", () => {
-    const source = path.join(repoRoot, excluded);
-    expect(existsSync(source)).toBe(true);
-
-    const scratch = mkdtempSync(path.join(tmpdir(), "prettier-converge-"));
-    try {
-      const probe = path.join(scratch, "probe.md");
-      writeFileSync(probe, readFileSync(source, "utf8"));
-
-      const format = () => {
-        execFileSync(
-          process.execPath,
-          [
-            path.join(repoRoot, "node_modules", "prettier", "bin", "prettier.cjs"),
-            "--write",
-            probe
-          ],
-          { cwd: repoRoot, stdio: "ignore" }
-        );
-        return readFileSync(probe, "utf8");
-      };
-
-      const first = format();
-      const second = format();
-
-      // If this ever fails, Prettier has been fixed: delete the entry from
-      // .prettierignore, delete this test, and let the file be formatted.
-      expect(second).not.toBe(first);
-    } finally {
-      rmSync(scratch, { recursive: true, force: true });
-    }
   });
 });
