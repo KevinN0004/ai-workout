@@ -309,12 +309,32 @@ files — confirmed they do not reach the bundle.
 Everything else tests one side of the wire — the client suite mocks `fetch`, the
 server suite drives express with supertest — so a defect in the wiring between
 them passes both. It is deliberately tiny: sign up, log a workout, reload, confirm it
-survived. Four things are worth knowing before touching it:
+survived. Five things are worth knowing before touching it:
 
 - **It runs against the built bundle** via `vite preview` on 4173, not the dev
   server, so `npm -w client run build` has to happen first. `vite preview` does
   not inherit `server.proxy`, which is why `client/vite.config.js` carries a
   separate `preview.proxy`.
+- **There are two projects, and the split is load-bearing.** `vite preview` is
+  the shipped _bundle_ but not the shipped _server_: it has no helmet, so no
+  response header express sets is visible through it, and it proxies only
+  `/api`. So the `deployable` project points a browser at the express origin
+  (5000) instead, which is what actually deploys; everything else runs under
+  `chromium` against the preview origin.
+
+  This exists because its absence shipped a blank page. `default-src 'none'`
+  was correct while the process served JSON only; once `staticClient.js` began
+  serving the SPA, the CSP blocked the bundle's own script and stylesheet.
+  **Every check passed** — `/api/ready` answered 200, and the CI container job
+  smoke-tests the deployable with `curl | grep 'id="root"'`, which cannot
+  enforce CSP. Only a browser on that origin can see it.
+
+  Mutation-tested rather than trusted: reverting `script-src` is caught by
+  three of its five tests, dropping `font-src` by exactly one, and each caching
+  mutation by exactly one. `server/src/index.securityHeaders.test.js` is the
+  cheap companion guard, but a well-formed header can still be wrong — the
+  browser project is the one that proves the page runs.
+
 - **Do not set `NODE_ENV=test` for the server it starts.** `index.js` guards its
   `startServer()` call with `NODE_ENV !== "test" && !VITEST` so the unit suite
   can import `app` without binding a port. Set it and the process loads, exports,
@@ -454,7 +474,7 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-22:
-  server **93.79%** statements / 85.64% branches, client **98.69%** / 93.62%.
+  server **93.89%** statements / 86.18% branches, client **98.69%** / 93.62%.
   The client's branch figure went **down** 0.02 from the previous reading and the ratchet
   correctly did not trip, which is the floor doing its job rather than failing at it: it
   sits one decimal below the measurement, so a rounding-scale movement is tolerated while
@@ -856,7 +876,7 @@ the native instance all along.
   them fail with `Can't reach database server`, which is environmental, not a regression
   (measured 2026-09-12; this entry said ~40 before). The compose database works just as
   well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
-  **1022** server tests green.
+  **1042** server tests green. The E2E suite is **19** across two projects.
 
 ## Fresh Clone Setup
 

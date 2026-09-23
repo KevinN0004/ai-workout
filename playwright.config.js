@@ -12,6 +12,13 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 4173;
 const baseURL = `http://localhost:${PORT}`;
 
+// The express origin. `vite preview` above is the shipped bundle; this is the
+// shipped *server*, which serves that same bundle itself in production. The
+// two differ in every response header, so the deployable project needs its own
+// base URL rather than the proxy's.
+const SERVER_PORT = 5000;
+const serverURL = `http://localhost:${SERVER_PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   // These share one database and one account namespace, so they run in order.
@@ -38,12 +45,30 @@ export default defineConfig({
   // Chromium only. This suite checks wiring, not rendering, so a browser matrix
   // would triple the CI time for very little extra signal. Add one if a
   // browser-specific defect ever actually shows up.
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  //
+  // Two projects, because they point at two different origins. Everything
+  // except deployable.spec.js runs against `vite preview`, which is the
+  // shipped bundle but NOT the shipped server -- preview has no helmet, so a
+  // response header set by express is invisible to it. `deployable` closes
+  // that by pointing a browser at the express origin, which is the thing
+  // actually deployed. See e2e/deployable.spec.js.
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: /deployable\.spec\.js/,
+      use: { ...devices["Desktop Chrome"] }
+    },
+    {
+      name: "deployable",
+      testMatch: /deployable\.spec\.js/,
+      use: { ...devices["Desktop Chrome"], baseURL: serverURL }
+    }
+  ],
 
   webServer: [
     {
       command: "npm run start -w server",
-      url: "http://localhost:5000/api/health",
+      url: `${serverURL}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {
@@ -55,11 +80,13 @@ export default defineConfig({
         // Without it the env preflight runs, which is the point: it needs
         // DATABASE_URL, and `npm run -w server` is what puts the CWD in
         // server/ so dotenv finds server/.env.
-        PORT: "5000",
-        CLIENT_ORIGIN: baseURL,
-        // The browser talks to the preview server, which proxies /api, so the
-        // server never sees a cross-origin request here. CORS is covered
-        // directly by index.cors.test.js.
+        PORT: String(SERVER_PORT),
+        // Both origins: the chromium project reaches the API through the
+        // preview proxy, so the server sees no cross-origin request from it,
+        // but the deployable project talks to the server directly and its
+        // origin has to be allowed. CORS itself is covered by
+        // index.cors.test.js.
+        CLIENT_ORIGIN: `${baseURL},${serverURL}`,
         LOG_LEVEL: "warn"
       }
     },

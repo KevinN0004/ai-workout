@@ -55,6 +55,18 @@ export const registerSystemRoutes = (app, deps) => {
     // This endpoint is unauthenticated so load balancers and uptime probes can
     // reach it. It therefore reports liveness booleans only: connection strings
     // and driver error text name internal hosts, so they stay in the logs.
+    //
+    // Note the asymmetry, which is deliberate. Redis is live -- `isReady` is
+    // the client's own current state -- while postgres is a BOOT SNAPSHOT,
+    // written once by connectPostgres() and never re-probed. So this answers
+    // "did this instance start against a reachable database", not "is the
+    // database reachable now".
+    //
+    // That is the right question for a deploy gate, and re-probing here would
+    // be actively harmful on the free stack: the host polls this path
+    // continuously, so a query per poll would hold Neon awake permanently,
+    // defeating its scale-to-zero and burning the compute allowance. If you
+    // ever want live dependency state, add it somewhere nothing polls.
     const payload = {
       status: ready ? "ready" : "not_ready",
       requestId: req.requestId || "",

@@ -27,6 +27,24 @@ export const resolveClientDistPath = (override = "") =>
   override ? path.resolve(override) : DEFAULT_CLIENT_DIST;
 
 /**
+ * Cache policy for one built file.
+ *
+ * Vite writes content-addressed filenames into `assets/`, so those can be
+ * cached indefinitely -- the name changes whenever the bytes do. Everything
+ * else, the shell above all, must revalidate: a cached shell pointing at a
+ * hashed bundle that no longer exists is a blank page that only a hard refresh
+ * clears.
+ *
+ * Matched on `assets` as a path SEGMENT, via path.sep, so it behaves the same
+ * on a Windows dev box and in the Linux image. A plain `includes("assets")`
+ * would also match a project checked out under, say, `D:\assets\ai-workout`.
+ */
+const cacheControlFor = (filePath) => {
+  const segments = String(filePath).split(path.sep);
+  return segments.includes("assets") ? "public, max-age=31536000, immutable" : "no-cache";
+};
+
+/**
  * Registers static serving and the single-page fallback.
  *
  * Returns true when the build was found and mounted, false when it was not --
@@ -56,7 +74,19 @@ export const registerClientStatic = (
   // `index: false` because the fallback below owns index.html. Left on, the
   // static layer would answer "/" itself and the two would diverge the moment
   // the fallback gained any behaviour.
-  app.use(express.static(distPath, { index: false }));
+  //
+  // `setHeaders` rather than the `maxAge`/`immutable` options, because those
+  // apply to every file equally and these files do not want the same policy.
+  // It runs before send sets Cache-Control, and send only sets its own
+  // `if (!res.getHeader("Cache-Control"))`, so what is set here wins.
+  app.use(
+    express.static(distPath, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        res.setHeader("Cache-Control", cacheControlFor(filePath));
+      }
+    })
+  );
 
   // GET/HEAD only -- app.get covers both -- so a POST to an unknown path still
   // falls through to the 404 rather than being handed an HTML page.
@@ -65,6 +95,11 @@ export const registerClientStatic = (
     // Without this guard every typo'd API call would answer 200 with the SPA
     // shell, and a fetch would fail on JSON parsing rather than on the status.
     if (req.path === "/api" || req.path.startsWith("/api/")) return next();
+    // Explicit, not inherited: this path does not go through express.static,
+    // so the policy above never reaches it. Without this the shell is served
+    // with sendFile's default and a visitor can hold a cached page pointing at
+    // a bundle the next deploy has already replaced.
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(indexPath);
   });
 

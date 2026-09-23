@@ -111,6 +111,9 @@ const defaultRedactedLogPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
   "req.headers.x-csrf-token",
+  // Guards /api/metrics. Belongs here with the other credential headers --
+  // it was the one bearer token the list missed.
+  "req.headers.x-metrics-token",
   "authorization",
   "cookie",
   "set-cookie",
@@ -162,14 +165,33 @@ app.use(
 
 app.use(
   helmet({
-    // Every response here is JSON, so nothing legitimately loads a subresource.
+    // This process serves the SPA as well as the API, so the document needs to
+    // be able to load its own bundle. `default-src 'none'` alone blocked the
+    // script and the stylesheet and rendered a blank page.
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {
         "default-src": ["'none'"],
+        "script-src": ["'self'"],
+        // The built CSS @imports Google Fonts, which then loads the font files
+        // from fonts.gstatic.com.
+        "style-src": ["'self'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
+        // wger and placehold.co serve exercise imagery, themealdb the meal
+        // thumbnails; blob:/data: are the PDF export path.
+        "img-src": [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://wger.de",
+          "https://placehold.co",
+          "https://www.themealdb.com"
+        ],
+        "connect-src": ["'self'"],
         "frame-ancestors": ["'none'"],
-        "base-uri": ["'none'"],
-        "form-action": ["'none'"]
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+        "object-src": ["'none'"]
       }
     },
     // The SPA is served from its own origin, so the default same-origin CORP
@@ -679,10 +701,10 @@ const startServer = async () => {
       );
     }
     const httpServer = app.listen(port, () => {
-      logger.info(
-        { event: "server_started", port },
-        `Server listening on http://localhost:${port}`
-      );
+      // The port, not a URL. This binds every interface, and in a container
+      // "localhost" names the container rather than anything reachable -- a
+      // deploy log inviting you to open a host that is not the one serving.
+      logger.info({ event: "server_started", port }, `Server listening on port ${port}`);
     });
 
     const handleShutdown = createShutdownHandler({

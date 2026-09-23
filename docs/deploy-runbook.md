@@ -37,13 +37,22 @@ Set aside about 30 minutes. Most of it is waiting for the first Docker build.
 2. On the project dashboard find the connection string. **Choose the pooled
    one** — Neon labels it "Pooled connection", and it usually has `-pooler` in
    the hostname.
-3. Append `?sslmode=require` if it is not already there.
+3. Append `?sslmode=verify-full` (replacing `?sslmode=require` if Neon supplied
+   that).
 
 You want something shaped like:
 
 ```text
-postgresql://USER:PASSWORD@ep-something-pooler.region.aws.neon.tech/neondb?sslmode=require
+postgresql://USER:PASSWORD@ep-something-pooler.region.aws.neon.tech/neondb?sslmode=verify-full
 ```
+
+**Why `verify-full` rather than the `require` Neon hands you.** Today they are
+the same connection: `pg` treats `require` as an alias for `verify-full`, and
+both resolve to a verified TLS session — measured, not assumed. But `pg` warns
+on every boot that its next major adopts libpq semantics, where `require`
+encrypts **without verifying the certificate**. Writing `verify-full` now pins
+the behaviour you already have, and silences the warning. It is not a change of
+behaviour; it is the same behaviour spelled so it cannot drift.
 
 **Do not add any other query parameters.** The pooled endpoint is PgBouncer,
 which accepts only four startup parameters and errors on anything else. An
@@ -181,12 +190,35 @@ curl https://YOUR-APP.onrender.com/api/ready
 
 - `/api/health` — liveness. Returns `{"status":"ok",...}` and touches no
   dependency.
-- `/api/ready` — the real check. Should report `"status":"ready"` with
+- `/api/ready` — the deploy gate. Should report `"status":"ready"` with
   `postgres` and `redis` both connected.
 
-Then open the site and sign up. A successful signup exercises the whole stack:
-Postgres write, argon2 hash, session in Redis, and the client bundle served from
-the same origin.
+**Know what `/api/ready` does and does not tell you.** The `redis` flag is live.
+The `postgres` flag is a **boot snapshot** — written once when the process
+started and never re-probed, so after a successful start it reads `connected`
+forever, including while the database is down. That is deliberate: this path is
+polled continuously, and a query per poll would hold Neon awake and consume its
+free compute allowance. It answers "did this instance start correctly", which is
+exactly what a deploy needs, and nothing more.
+
+**Then check the app actually runs, in a browser.** This is the step that
+matters and the one easiest to skip:
+
+```bash
+curl -s https://YOUR-APP.onrender.com/ | grep -q 'id="root"' && echo "shell served"
+```
+
+That proves only that the HTML arrived. **curl does not execute anything**, so
+it cannot tell a working app from a blank page. Open the site, and confirm you
+see the landing content and **an empty browser console**. A response-header
+mistake — a Content-Security-Policy that blocks the app's own bundle, say —
+produces a 200, a valid shell, a passing health check and a white screen. That
+exact defect shipped once here, which is why `e2e/deployable.spec.js` now loads
+this page in a real browser on every CI run.
+
+Then sign up. A successful signup exercises the whole stack: Postgres write,
+argon2 hash, session in Redis, and the client bundle served from the same
+origin.
 
 ---
 
@@ -206,7 +238,7 @@ Never deploy by hitting the Render hook directly; that skips the migration.
 Something added a startup option to `DATABASE_URL`. Neon's pooled endpoint
 rejects anything outside `client_encoding`, `datestyle`, `timezone` and
 `standard_conforming_strings`. Strip it back to the plain string plus
-`?sslmode=require`.
+`?sslmode=verify-full`.
 
 **The server will not start, complaining about environment.**
 The production preflight requires `DATABASE_URL` and `CLIENT_ORIGIN`, and reports

@@ -4,7 +4,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const prismaLog = process.env.NODE_ENV === "production" ? ["warn", "error"] : ["warn", "error"];
+// Was a ternary whose two arms were the same list, so the condition decided
+// nothing. Queries are deliberately not logged in either environment: they
+// carry user data and, on the server, would defeat the logger's redaction.
+const prismaLog = ["warn", "error"];
 
 const globalPrisma = globalThis.__aiWorkoutPrismaClient;
 // The session timezone is UTC, and it is set by the DATABASE rather than here
