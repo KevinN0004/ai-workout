@@ -57,7 +57,7 @@ jobs:
         run: npm run test:scripts
 
       - name: Dependency Audit
-        run: npx --yes audit-ci@7.1.0 --config .audit-ci.json
+        run: npx --yes audit-ci@7.1.0 --config security/audit-ci.json
 
   test:
     name: Tests (Node ${{ matrix.node }})
