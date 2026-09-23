@@ -97,7 +97,7 @@ onto the eager path.
 
 Tests use Vitest, jsdom, and Testing Library. The setup file is `src/test/setup.js`.
 
-**Mocking a module the app constructs with `new`.** `app/events.test.js` mocks `jspdf`,
+**Mocking a module the app constructs with `new`.** `app/__tests__/events.test.js` mocks `jspdf`,
 which `events.js` loads on demand and calls as `new jsPDF(...)`. `vi.fn()` returns an
 arrow function, and arrows are not constructable — so a factory of the shape
 `vi.mock("jspdf", () => ({ jsPDF: vi.fn(...) }))` throws _"is not a constructor"_ before

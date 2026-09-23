@@ -42,7 +42,7 @@ dist
 # it adds @neon/* to the root package.json and, on its second run, silenced the
 # resulting knip failure by adding ignoreDependencies to knip.json. That is the
 # dangerous case -- a green gate shipping unused packages -- so it is pinned in
-# scripts/repo-invariants.test.mjs instead.
+# scripts/__tests__/repo-invariants.test.mjs instead.
 /neon.ts
 /hello.ts
 /skills-lock.json

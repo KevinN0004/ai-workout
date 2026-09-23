@@ -3,7 +3,7 @@ import { toFiniteNumber } from "../components/physique/math";
 import { toProfileNumber } from "../app/profileMapping";
 
 // The client half of the invariant asserted in
-// server/src/numericCoercion.contract.test.js:
+// server/src/__tests__/numericCoercion.contract.test.js:
 //
 //   Absent input must never become a measured zero.
 //
