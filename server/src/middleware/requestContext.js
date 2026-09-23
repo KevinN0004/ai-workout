@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { recordLatencyStats } from "../services/metricsService.js";
+import { recordLatencyStats } from "../services/platform/metricsService.js";
 
 const UNMATCHED_ROUTE_LABEL = "<unmatched>";
 

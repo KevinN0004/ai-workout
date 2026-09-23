@@ -1,4 +1,4 @@
-import { sendErrorResponse } from "../../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 export const registerMealAndMetricRoutes = (app, deps) => {
   const {
     requireAuth,

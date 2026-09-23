@@ -13,7 +13,7 @@ import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
 import { registerClientStatic, resolveClientDistPath } from "./staticClient.js";
-import { createAuthUserService } from "./services/authUserService.js";
+import { createAuthUserService } from "./services/auth/authUserService.js";
 import {
   accountDeleteBodySchema,
   caloriesBodySchema,
@@ -29,14 +29,17 @@ import {
   signupBodySchema,
   validateBody,
   workoutSessionBodySchema
-} from "./services/apiSchemaService.js";
-import { createExternalDataService } from "./services/externalDataService.js";
-import { initErrorTracking } from "./services/errorTrackingService.js";
-import { createExternalApiLatencyRecorder, createMetrics } from "./services/metricsService.js";
+} from "./services/http/apiSchemaService.js";
+import { createExternalDataService } from "./services/external/externalDataService.js";
+import { initErrorTracking } from "./services/platform/errorTrackingService.js";
+import {
+  createExternalApiLatencyRecorder,
+  createMetrics
+} from "./services/platform/metricsService.js";
 import { createCorsPolicy } from "./corsPolicy.js";
-import { createHttpCacheService } from "./services/httpCacheService.js";
-import { isUpstreamFailureStatus } from "./services/platformHealthService.js";
-import { createDashboardCollectionService } from "./services/dashboardCollectionService.js";
+import { createHttpCacheService } from "./services/external/httpCacheService.js";
+import { isUpstreamFailureStatus } from "./services/platform/platformHealthService.js";
+import { createDashboardCollectionService } from "./services/dashboard/dashboardCollectionService.js";
 import { createUserReadRepository } from "./repositories/userReadRepository.js";
 import { createProgressMetricRepository } from "./repositories/progressMetricRepository.js";
 import { createWorkoutSessionRepository } from "./repositories/workoutSessionRepository.js";
@@ -60,14 +63,14 @@ import {
   toCleanArray,
   toCleanNameArray,
   toNullableNumber
-} from "./services/dashboardDataBuildersService.js";
+} from "./services/dashboard/dashboardDataBuildersService.js";
 import {
   createSessionService,
   parseCookies,
   parseEnvBoolean,
   parseRedisPort
-} from "./services/sessionService.js";
-import { validateEnv } from "./services/envValidationService.js";
+} from "./services/auth/sessionService.js";
+import { validateEnv } from "./services/platform/envValidationService.js";
 
 dotenv.config();
 

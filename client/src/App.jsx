@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import AuthPage from "./pages/AuthPage";
-import DashboardPage from "./pages/DashboardPage";
-import HomePage from "./pages/HomePage";
-import WorkoutResultPage from "./pages/WorkoutResultPage";
+import AuthPage from "./pages/auth/AuthPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import HomePage from "./pages/home/HomePage";
+import WorkoutResultPage from "./pages/workout-result/WorkoutResultPage";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
@@ -33,7 +33,7 @@ import {
   toKg,
   toLb
 } from "./app/units";
-import "./App.css";
+import "./styles/app.css";
 
 export default function App() {
   const [personalMode, setPersonalMode] = useState("basic");

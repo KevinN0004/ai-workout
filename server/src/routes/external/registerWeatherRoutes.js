@@ -1,5 +1,5 @@
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
-import { sendErrorResponse } from "../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 // `is_day` is a 0/1 flag rather than a measurement, so it does not go through
 // `toFiniteNumber` -- but it needs the same absent guard for the same reason.

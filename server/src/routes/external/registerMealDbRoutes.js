@@ -1,6 +1,6 @@
-import { validateSchemaInput } from "../../services/requestValidationService.js";
+import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { mealDbSearchQuerySchema, validateQuery } from "./validation.js";
-import { sendErrorResponse } from "../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 export const registerMealDbRoutes = (app, deps) => {
   const { mealDbRequest, mapMealDbMeal, cleanText, isUpstreamFailureStatus } = deps;

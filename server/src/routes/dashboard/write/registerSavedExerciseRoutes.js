@@ -1,5 +1,5 @@
 import { savedExerciseParamsSchema, validateParams } from "../validation.js";
-import { sendErrorResponse } from "../../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 
 export const registerSavedExerciseRoutes = (app, deps) => {
   const {

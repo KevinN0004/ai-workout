@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { sendErrorResponse } from "../../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {
