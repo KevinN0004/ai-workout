@@ -5,15 +5,15 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "postgres:local:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-postgres.ps1",
     "migrate:postgres": "node scripts/apply-postgres-migrations.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "node scripts/refuse-db-push.js",
     "prisma:validate": "prisma validate",
-    "prisma:studio": "prisma studio",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
