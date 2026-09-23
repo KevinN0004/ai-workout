@@ -305,6 +305,34 @@ accept a cold start for the first visitor each morning.
 without noticing it consumes your entire allowance is the kind of thing that
 surfaces as an unexplained outage three weeks later.
 
+### Why the warm-up does not also exhaust Neon
+
+Keeping the app awake does **not** keep the database awake, and that is the only
+reason this trick is affordable. Neon's free plan allows **100 CU-hours per
+project per month** — [its own docs put that at "enough to run a 0.25 CU compute
+for 400 hours per month"](https://neon.com/faqs/free-plan-limits-and-quotas),
+against roughly 730 hours in a month. So Neon cannot be awake continuously on
+the free plan; it has to spend most of the month suspended.
+
+It does, because nothing the monitor touches reaches the database:
+
+- `/api/health` returns a static object — no Postgres, no Redis.
+- `/api/ready` reports a **boot snapshot**, so it does not query either.
+- There is no periodic or background database work anywhere in the server.
+
+Neon therefore wakes only on real user traffic and suspends five minutes later,
+and no CU-hours accrue while it is suspended.
+
+**This is load-bearing, and it is easy to break without noticing.** If
+`/api/ready` is ever changed to run a live `select 1` — which looks like an
+obvious improvement, and is the first thing anyone would reach for — a
+five-minute monitor would poll it about 8,600 times a month and the database
+would never suspend. At the 0.25 CU minimum that is roughly **182 CU-hours
+against a 100 CU-hour cap: exhausted in about 17 days, every month.**
+
+So if you ever want live dependency state, put it on a path that nothing polls.
+`server/src/routes/systemRoutes.js` records the same warning next to the code.
+
 ---
 
 ## When a deploy goes wrong
@@ -348,9 +376,53 @@ so it is quick.
 
 ## Limits worth knowing before you rely on it
 
-- **Neon free**: scale-to-zero after 5 minutes, automatic wake. Data persists.
-- **Upstash free**: 256 MB, 500k commands/month. Data persists.
-- **Render free**: 512 MB RAM, spins down, no shell access.
+Verified against the providers' current terms on 2026-09-23. The ones that bite
+are not the headline numbers — they are the metered allowances underneath.
+
+**Neon free** — scale-to-zero after 5 minutes, automatic wake, data persists.
+
+- **100 CU-hours per project per month**, which is 400 hours of awake time at
+  the 0.25 CU minimum. See the section above for why the uptime monitor does
+  not spend these.
+- **0.5 GB storage per project, and exceeding it blocks writes.** Not a slow
+  degradation — the app stops being able to save anything.
+- 6 hours of point-in-time history, plus one manual snapshot.
+
+**Upstash free** — 256 MB, 500k commands/month, 10 GB/month bandwidth, TLS
+included. Data persists. Roughly one command per authenticated request, so the
+command budget is generous for personal use.
+
+**Render free** — 512 MB RAM, spins down after 15 minutes, ~1 minute to wake, no
+shell access. Docker services are supported on this tier.
+
+- **750 instance hours per _workspace_ per month**, not per service.
+- **Outbound bandwidth and build pipeline minutes also draw on the workspace
+  allowance.** This is the only limit here that can produce an actual charge:
+  exceeding bandwidth is billed, or suspends the service if no payment method
+  is on file. Exceeding pipeline minutes disables new builds until the reset.
+  Every merge to `main` triggers a full Docker build, so builds are the thing
+  to watch.
+
+**Sentry free (Developer)** — 5k errors/month, **one user**, 30-day retention,
+unlimited projects, email alerts. Ample for an app this size; the single seat is
+the limit you would hit first if anyone joined you.
+
+**GitHub Actions** — **2,000 minutes/month and 500 MB of artifact storage,
+because this repository is private.** Public repositories are unlimited. Measured
+on a real run, CI costs about **13 billed minutes** (six jobs, each rounded up),
+and a working deploy adds up to ~16 more, because `Wait for the service to come
+back ready` polls for 15 minutes. A pull request plus its merge is therefore
+roughly 30–45 minutes, or about 45–65 full cycles a month.
+
+Two consequences worth holding onto:
+
+- **Nothing prunes the database.** Collection caps are applied on _read_
+  (`take:` in `userReadRepository.js`), and the only deletes are user-initiated.
+  Rows accumulate indefinitely while the UI looks bounded, and the destination
+  is Neon's write-blocking 0.5 GB cap. Years away at personal scale, but it ends
+  in a hard failure rather than a warning.
+- **Making the repository public would remove the Actions limit entirely.**
+  That is a decision about your code being public, not a technical one.
 
 If the app becomes something you actually depend on, the first thing to pay for
 is Render, to stop the cold starts.
