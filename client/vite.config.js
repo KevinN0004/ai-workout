@@ -3,12 +3,19 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+
+  // ---- Dev server (npm run dev:client) -------------------------------------
+  // /api goes to the Express server, so the client calls relative paths in
+  // development exactly as it does in production, where one process serves
+  // both the bundle and the API.
   server: {
     port: 5173,
     proxy: {
       "/api": "http://localhost:5000"
     }
   },
+
+  // ---- Preview server (npm run preview, and the E2E suite) -----------------
   // `vite preview` does not inherit `server.proxy`. The E2E suite runs against
   // the built bundle rather than the dev server, so that it exercises the
   // artifact that actually ships -- which needs the same /api proxy.
@@ -18,9 +25,12 @@ export default defineConfig({
       "/api": "http://localhost:5000"
     }
   },
+
+  // ---- Tests and coverage (npm run test -w client) -------------------------
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.js",
+    // Suites may use describe / test / expect without importing them.
     globals: true,
     coverage: {
       provider: "v8",
@@ -30,17 +40,16 @@ export default defineConfig({
       include: ["src/**"],
       exclude: ["**/*.test.{js,jsx}", "src/test/**"],
       reporter: ["text", "html"],
-      // A ratchet, not a target. These are the numbers this suite actually
-      // produced on 2026-09-10, floored to whole percent -- so they never fail
-      // a green tree, and they fail the moment coverage slips. Raise them when
-      // coverage rises; never lower them to make a build pass.
+      // A ratchet, not a target: each floor is the measured value floored to
+      // one decimal, so a green tree never fails and a real slip does. Raise
+      // them when coverage rises; never lower them to make a build pass. The
+      // measured values and their dates are recorded in CLAUDE.md.
       //
       // Aspirational values would block every PR from day one, which is how
-      // coverage gates get deleted instead of met.
-      // One decimal, floored from the measured value. These suites are
-      // deterministic -- no randomness, no timing-dependent branches -- so a
-      // tenth of a point is a safe margin, and whole percent would have let
-      // this increment's gain evaporate without tripping anything.
+      // coverage gates get deleted instead of met. Whole percent was tried
+      // first and let a sub-point gain evaporate without tripping anything;
+      // these suites are deterministic -- no randomness, no timing-dependent
+      // branches -- so a tenth of a point is a safe margin.
       thresholds: {
         statements: 98.6,
         branches: 93.6,
