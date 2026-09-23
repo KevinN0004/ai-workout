@@ -114,3 +114,56 @@ describe("Claude Code hook wiring", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("Neon agent-skills scaffolding stays out of the build", () => {
+  // The Neon skill installer scaffolds a Neon project into this repo: a config
+  // declaring Neon Auth, three object-storage buckets and a serverless
+  // function, a sample function, and @neon/* added to the ROOT package.json as
+  // runtime dependencies. This app uses Neon only as a managed Postgres host,
+  // so nothing in client/src or server/src imports any of it.
+  //
+  // The files it creates are gitignored. These two checks exist because
+  // .gitignore cannot help with package.json and knip.json, which are tracked
+  // -- and that is the case that actually matters. On its first run knip caught
+  // the unused dependencies and failed CI, which is the system working. On its
+  // second run the installer ALSO added ignoreDependencies to knip.json,
+  // silencing that gate: a green build shipping two unused packages into the
+  // image via `npm ci --omit=dev`.
+  //
+  // So the dangerous artefact is not the dependency, it is the suppression.
+
+  const readJson = (relativePath) =>
+    JSON.parse(readFileSync(path.join(repoRoot, relativePath), "utf8"));
+
+  test("no workspace declares an @neon/* dependency", () => {
+    const manifests = ["package.json", "client/package.json", "server/package.json"];
+
+    const offenders = manifests.flatMap((manifest) => {
+      const pkg = readJson(manifest);
+      const declared = {
+        ...(pkg.dependencies ?? {}),
+        ...(pkg.devDependencies ?? {}),
+        ...(pkg.optionalDependencies ?? {})
+      };
+      return Object.keys(declared)
+        .filter((name) => name.startsWith("@neon/"))
+        .map((name) => `${manifest}: ${name}`);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  test("knip.json does not suppress an unused @neon/* dependency", () => {
+    // Scoped to @neon rather than banning ignoreDependencies outright: a
+    // genuine knip false positive is a legitimate reason to add one, and this
+    // should not stand in the way of that. It exists to catch the entry being
+    // re-added on our behalf.
+    const knipConfig = readJson("knip.json");
+
+    const ignored = Object.values(knipConfig.workspaces ?? {}).flatMap(
+      (workspace) => workspace.ignoreDependencies ?? []
+    );
+
+    expect(ignored.filter((name) => String(name).startsWith("@neon/"))).toEqual([]);
+  });
+});
