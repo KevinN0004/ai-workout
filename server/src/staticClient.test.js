@@ -49,6 +49,42 @@ const buildApp = () => {
   return { app, mounted };
 };
 
+// Vite's asset filenames are content-addressed, so they can be cached
+// indefinitely -- but the shell must never be, or a visitor holds a cached
+// page pointing at a hashed bundle the next deploy has already removed, and
+// only a hard refresh clears it. The two policies have to differ, which is why
+// this goes through setHeaders rather than the blanket maxAge option.
+describe("cache headers", () => {
+  test("hashed assets are immutable for a year", async () => {
+    const { app } = buildApp();
+    const response = await request(app).get("/assets/app.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toContain("immutable");
+    expect(response.headers["cache-control"]).toContain("max-age=31536000");
+  });
+
+  test("the shell is not cached", async () => {
+    const { app } = buildApp();
+    const response = await request(app).get("/");
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain("SPA_SHELL_MARKER");
+    // Express's default here is `public, max-age=0`, which revalidates but is
+    // still a cache entry. no-cache is the explicit instruction.
+    expect(response.headers["cache-control"]).toContain("no-cache");
+  });
+
+  test("a client route served by the fallback is not cached either", async () => {
+    // The fallback does not pass through express.static, so it needs its own
+    // header -- a route that is cached is the same defect as a cached shell.
+    const response = await request(buildApp().app).get("/dashboard/settings");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toContain("no-cache");
+  });
+});
+
 describe("registerClientStatic", () => {
   test("mounts when the bundle is present", () => {
     expect(buildApp().mounted).toBe(true);
