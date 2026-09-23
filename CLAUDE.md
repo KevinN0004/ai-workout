@@ -58,12 +58,14 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 ## File Organization
 
 - NEVER save to root folder
-- `client/src` — React 18 + Vite frontend source. Only `main.jsx` and `App.jsx` sit at
-  this level; global CSS is in `client/src/styles/`
+- `client/src` — React 18 + Vite frontend source. The only files at this level are
+  `main.jsx` and `App.jsx` (their tests are in `client/src/__tests__/`); global CSS is in
+  `client/src/styles/`
 - `client/src/pages/<page>` — one folder per page: the page component
-  (`<Name>Page.jsx` and its `.css`) plus its own parts in `views/`, `components/`,
-  `hooks/` and `styles/`. Folder names are lowercase, kebab-case where needed
-  (`workout-result/`)
+  (`<Name>Page.jsx` and its `.css`) plus its own parts, usually `views/`, `components/`,
+  `hooks/` and `styles/`. The larger pages also hold feature folders
+  (`dashboard/meal/`, `dashboard/tips/`) and page-level helpers (`preview/utils.js`).
+  Folder names are lowercase, kebab-case where needed (`workout-result/`)
 - `server/src` — Express 4 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
 - `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`

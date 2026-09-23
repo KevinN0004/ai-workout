@@ -43,8 +43,12 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |-- scripts/                  # repo tooling and Claude Code hook targets
 |-- security/                 # audit-ci allowlist and advisory reviews
 |-- docs/                     # deploy runbook, implementation plans, design specs
-|-- .github/                  # CI and deploy workflows, Dependabot, CODEOWNERS
+|-- .github/                  # CI and deploy workflows, Dependabot, PR template, CODEOWNERS
 |-- .vscode/                  # hides generated output from the file tree
+|-- .claude/settings.json     # Claude Code hook wiring and permission allowlist
+|-- .githooks/                # pre-commit guard against committing agent scaffolding
+|-- .mcp.json                 # MCP servers for Claude Code sessions
+|-- CLAUDE.md                 # working notes and rules for Claude Code sessions
 |-- Dockerfile                # production image: API plus client bundle
 |-- docker-compose.yml        # local Postgres and Redis only
 |-- render.yaml               # Render blueprint
@@ -58,6 +62,10 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 ```
 
 Tests live in a `__tests__/` folder beside the code they cover.
+
+Other root dotfiles (`.gitignore`, `.gitattributes`, `.npmrc`, `.nvmrc`, `.dockerignore`,
+`.prettierignore`, `.git-blame-ignore-revs`) stay at the root because that is where git,
+npm, nvm, Docker, Prettier and GitHub look for them.
 
 ## Prerequisites
 
