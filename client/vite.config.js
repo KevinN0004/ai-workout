@@ -42,8 +42,8 @@ export default defineConfig({
       reporter: ["text", "html"],
       // A ratchet, not a target: each floor is the measured value floored to
       // one decimal, so a green tree never fails and a real slip does. Raise
-      // them when coverage rises; never lower them to make a build pass. The
-      // measured values and their dates are recorded in CLAUDE.md.
+      // them when coverage rises; never lower them to make a build pass.
+      // Re-measure with `npm run test:coverage -w client` before changing them.
       //
       // Aspirational values would block every PR from day one, which is how
       // coverage gates get deleted instead of met. Whole percent was tried
