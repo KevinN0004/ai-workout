@@ -405,7 +405,7 @@ asserting nothing: removing a modal's `aria-labelledby`, removing the landmark
 wrapper, and disabling the Escape handler are all caught, and all three pass
 every unit suite.
 
-**`npm run knip` is clean, and `knip.json` is what keeps it that way.** Two things
+**`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
 about it are load-bearing:
 
 - **It must declare the hook scripts as entry points.** `codex-handoff.mjs`,

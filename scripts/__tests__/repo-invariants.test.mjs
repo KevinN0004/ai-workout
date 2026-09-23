@@ -5,6 +5,40 @@ import { describe, expect, test } from "vitest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// knip.jsonc may hold comments, which JSON.parse rejects. Stripped with a
+// scanner rather than a regex because the globs themselves contain "/*"
+// ("scripts/**/*.test.mjs"), and the $schema URL contains "//" -- a regex
+// would read both as comment openers.
+const stripJsonComments = (text) => {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (inString) {
+      out += char;
+      if (char === "\\") {
+        out += text[i + 1] ?? "";
+        i += 1;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else if (char === '"') {
+      inString = true;
+      out += char;
+    } else if (char === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i += 1;
+      out += "\n";
+    } else if (char === "/" && text[i + 1] === "*") {
+      i = text.indexOf("*/", i + 2);
+      if (i === -1) throw new Error("Unterminated block comment");
+      i += 1;
+    } else {
+      out += char;
+    }
+  }
+  return out;
+};
+
 describe("the qs security override", () => {
   // The audit-ci gate is set to `high`, but the qs DoS advisories are
   // *moderate* -- so if this override were ever dropped, the vulnerability we
@@ -123,7 +157,7 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
   // so nothing in client/src or server/src imports any of it.
   //
   // The files it creates are gitignored. These two checks exist because
-  // .gitignore cannot help with package.json and knip.json, which are tracked
+  // .gitignore cannot help with package.json and knip.jsonc, which are tracked
   // -- and that is the case that actually matters. On its first run knip caught
   // the unused dependencies and failed CI, which is the system working. On its
   // second run the installer ALSO added ignoreDependencies to knip.json,
@@ -133,7 +167,7 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
   // So the dangerous artefact is not the dependency, it is the suppression.
 
   const readJson = (relativePath) =>
-    JSON.parse(readFileSync(path.join(repoRoot, relativePath), "utf8"));
+    JSON.parse(stripJsonComments(readFileSync(path.join(repoRoot, relativePath), "utf8")));
 
   test("no workspace declares an @neon/* dependency", () => {
     const manifests = ["package.json", "client/package.json", "server/package.json"];
@@ -153,17 +187,52 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("knip.json does not suppress an unused @neon/* dependency", () => {
+  test("knip.jsonc does not suppress an unused @neon/* dependency", () => {
     // Scoped to @neon rather than banning ignoreDependencies outright: a
     // genuine knip false positive is a legitimate reason to add one, and this
     // should not stand in the way of that. It exists to catch the entry being
     // re-added on our behalf.
-    const knipConfig = readJson("knip.json");
+    const knipConfig = readJson("knip.jsonc");
 
     const ignored = Object.values(knipConfig.workspaces ?? {}).flatMap(
       (workspace) => workspace.ignoreDependencies ?? []
     );
 
     expect(ignored.filter((name) => String(name).startsWith("@neon/"))).toEqual([]);
+  });
+
+  test("knip.jsonc is the only knip config", () => {
+    // knip looks for knip.json BEFORE knip.jsonc, so a knip.json re-created
+    // on our behalf would silently replace this config -- hook entries and
+    // all -- rather than fail. It also merges a "knip" key from package.json
+    // into whichever file it loads.
+    const competitors = [
+      "knip.json",
+      ".knip.json",
+      ".knip.jsonc",
+      "knip.ts",
+      "knip.js",
+      "knip.config.ts",
+      "knip.config.js"
+    ].filter((name) => existsSync(path.join(repoRoot, name)));
+
+    expect(competitors).toEqual([]);
+    expect(existsSync(path.join(repoRoot, "knip.jsonc"))).toBe(true);
+    expect(readJson("package.json").knip).toBeUndefined();
+  });
+
+  test("knip.jsonc still declares the hook scripts as entry points", () => {
+    // Also proves the comment stripping leaves "/*" inside a string alone:
+    // "scripts/**/*.test.mjs" would not survive a naive regex.
+    const entries = readJson("knip.jsonc").workspaces["."].entry;
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        "scripts/codex-handoff.mjs",
+        "scripts/scrub-junk-files.cjs",
+        "scripts/skill-router.mjs",
+        "scripts/**/*.test.mjs"
+      ])
+    );
   });
 });

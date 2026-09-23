@@ -2,6 +2,11 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "workspaces": {
     ".": {
+      // The first three are Claude Code hook targets, invoked from
+      // .claude/settings.json, which knip cannot see. Without them knip reports
+      // all three as unused files, then cascades to scripts/codex-handoff/*.mjs
+      // because their only importer looks dead -- six false positives inviting
+      // you to delete live hook wiring.
       "entry": [
         "scripts/codex-handoff.mjs",
         "scripts/scrub-junk-files.cjs",
@@ -9,6 +14,7 @@
         "scripts/**/*.test.mjs",
         "e2e/**/*.spec.js"
       ],
+      // Repo tooling, the E2E suite, and the config files at the root.
       "project": ["scripts/**/*.{mjs,cjs,js}", "e2e/**/*.js", "*.js"]
     },
     "client": { "project": "src/**/*.{js,jsx}" },
