@@ -180,12 +180,18 @@ export default [
   },
 
   // ---- Playwright: its config reads process.env; the specs do not ---------
+  //
+  // Both global sets, because a spec file legitimately contains code for two
+  // runtimes: the test body runs in node, while the callback handed to
+  // `page.evaluate` is serialised and executed in the browser, where
+  // `document` and `getComputedStyle` are the whole point. With node globals
+  // alone, every such callback is a no-undef error.
   {
     files: ["playwright.config.js", "e2e/**/*.js"],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: "module",
-      globals: { ...globals.node }
+      globals: { ...globals.node, ...globals.browser }
     }
   },
 
