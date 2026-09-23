@@ -97,8 +97,8 @@ Common server variables:
 | `PORT`                                                                      | API server port                                                                            | `5000`                                                      |
 | `DATABASE_URL` / `POSTGRES_URL`                                             | Postgres connection string                                                                 | unset                                                       |
 | `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                    | `true` in production, otherwise `false`                     |
-| `POSTGRES_SSL`                                                              | Enable TLS for Postgres connections                                                        | `false`                                                     |
-| `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted Postgres TLS certificates                                                 | `true`                                                      |
+| `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins       | `false`                                                     |
+| `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`                | `true`                                                      |
 | `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated                                                      | loopback origins only when unset; set this before deploying |
 | `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                    | unset                                                       |
 | `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                         | `3`                                                         |
@@ -273,8 +273,10 @@ session store and sign every user out.
 **Setup, in order:**
 
 1. **Neon** — create a project, copy the **pooled** connection string, and append
-   `?sslmode=require`. The `sslmode` because the Prisma adapter takes no separate
-   `ssl` option, so TLS has to ride the URL.
+   `?sslmode=verify-full`. The `sslmode` because the Prisma adapter takes no
+   separate `ssl` option, so TLS has to ride the URL; `verify-full` rather than
+   `require` because `pg` resolves them identically today but warns that its
+   next major weakens `require` to skip certificate verification.
 
    Pooled works because nothing here asks the connection for a startup parameter
    PgBouncer refuses. That is deliberate: the session timezone is set by the
@@ -312,14 +314,14 @@ the point — see the release-order note above.
 
 ### What production needs
 
-| Setting                     | Why                                                                                                                     |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                   |
-| `DATABASE_URL`              | Required. Add `?sslmode=require` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL |
-| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                     |
-| `REDIS_URL`                 | Without it sessions are in-memory: every restart signs everyone out, and it cannot work across more than one instance   |
-| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                             |
-| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                |
+| Setting                     | Why                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                       |
+| `DATABASE_URL`              | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL |
+| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                         |
+| `REDIS_URL`                 | Without it sessions are in-memory: every restart signs everyone out, and it cannot work across more than one instance       |
+| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                                 |
+| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                    |
 
 Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
 reports Postgres and Redis and is the one a load balancer should gate traffic

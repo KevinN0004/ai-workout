@@ -47,9 +47,12 @@ services:
 
       # PORT is injected by Render and read by index.js; do not set it here.
 
-      # Neon. Include ?sslmode=require -- the Prisma adapter takes no separate
-      # ssl option, so TLS has to ride the URL. Use Neon's POOLED connection
-      # string: this process holds a pool of its own.
+      # Neon. Include ?sslmode=verify-full -- the Prisma adapter takes no
+      # separate ssl option, so TLS has to ride the URL. verify-full rather
+      # than the require Neon suggests: pg resolves them identically today, but
+      # warns that its next major weakens require to skip certificate
+      # verification. Use Neon's POOLED connection string: this process holds a
+      # pool of its own.
       - key: DATABASE_URL
         sync: false
 
