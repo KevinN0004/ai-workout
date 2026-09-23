@@ -15,11 +15,49 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ```text
 .
-|-- client/          # React/Vite app
-|-- server/          # Express API, services, routes, tests
-|-- package.json     # npm workspaces and root scripts
-`-- package-lock.json
+|-- client/                   # React 18 + Vite app (npm workspace)
+|   |-- vite.config.js        # dev and preview proxy, client test and coverage config
+|   `-- src/
+|       |-- main.jsx          # entry point
+|       |-- App.jsx           # top-level routing and state
+|       |-- app/              # app-wide logic: API client, cache, events, routing, units
+|       |-- assets/           # static images
+|       |-- components/       # shared components: modal portal, physique silhouette
+|       |-- hooks/            # shared hooks: scroll lock, close on Escape
+|       |-- pages/            # one folder per page: auth, dashboard, home, preview,
+|       |                     #   workout-result
+|       |-- styles/           # global CSS
+|       `-- test/             # Vitest setup
+|-- server/                   # Express 4 API (npm workspace)
+|   |-- db/postgres/          # SQL migrations, applied in order
+|   |-- prisma/               # Prisma schema
+|   |-- scripts/              # local Postgres, migration runner, db push guard
+|   `-- src/
+|       |-- index.js          # app bootstrap, with corsPolicy, shutdown, staticClient
+|       |-- db/               # Postgres pool, Prisma client, migration runner
+|       |-- middleware/       # request context, error handler
+|       |-- repositories/     # all Prisma data access
+|       |-- routes/           # auth, dashboard, external APIs, generate, system
+|       `-- services/         # auth, dashboard, external, http, platform
+|-- e2e/                      # Playwright suites: smoke, a11y, deployable
+|-- scripts/                  # repo tooling and Claude Code hook targets
+|-- security/                 # audit-ci allowlist and advisory reviews
+|-- docs/                     # deploy runbook, implementation plans, design specs
+|-- .github/                  # CI and deploy workflows, Dependabot, CODEOWNERS
+|-- .vscode/                  # hides generated output from the file tree
+|-- Dockerfile                # production image: API plus client bundle
+|-- docker-compose.yml        # local Postgres and Redis only
+|-- render.yaml               # Render blueprint
+|-- env.example               # template for server/.env
+|-- eslint.config.js          # lint rules (defect classes, not style)
+|-- .prettierrc.yaml          # formatting
+|-- knip.jsonc                # unused files, exports and dependencies
+|-- playwright.config.js      # E2E runner
+|-- vitest.config.js          # tests for scripts/
+`-- package.json              # npm workspaces and root scripts
 ```
+
+Tests live in a `__tests__/` folder beside the code they cover.
 
 ## Prerequisites
 

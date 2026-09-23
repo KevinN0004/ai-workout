@@ -58,19 +58,35 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 ## File Organization
 
 - NEVER save to root folder
-- `client/src` — React 18 + Vite frontend source
-- `client/src/pages/<page>` — a page's own parts, in `views/`, `components/`, `hooks/`
-  and `styles/`. The page component itself still sits at `pages/<Page>Page.jsx`
+- `client/src` — React 18 + Vite frontend source. Only `main.jsx` and `App.jsx` sit at
+  this level; global CSS is in `client/src/styles/`
+- `client/src/pages/<page>` — one folder per page: the page component
+  (`<Name>Page.jsx` and its `.css`) plus its own parts in `views/`, `components/`,
+  `hooks/` and `styles/`. Folder names are lowercase, kebab-case where needed
+  (`workout-result/`)
 - `server/src` — Express 4 API, services, routes. Only the app bootstrap
-  (`index.js`, `corsPolicy.js`, `shutdown.js`) stays at this level
+  (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
+- `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`
+  (request validation, API schemas, error responses) and `platform/` (metrics, error
+  tracking, health, env validation)
 - `server/src/db` — the Postgres pool, the Prisma client and the migration runner
 - `server/src/repositories` — **all Prisma data access lives here.** Routes and services
   call these; nothing else should touch `prisma.*` directly
-- `server/prisma` — Prisma schema and migrations
+- `server/prisma` — the Prisma schema
+- `server/db/postgres` — the SQL migrations, applied in order by `migrate:postgres`
 - `server/scripts` — server operational scripts (local Postgres, migrations)
+- **Tests live in a `__tests__/` folder beside the code they cover** —
+  `views/__tests__/MealView.test.jsx` tests `views/MealView.jsx`. Every test config
+  (Vitest, ESLint, coverage, knip) finds tests by the `*.test.*` name, not the folder,
+  so a new `__tests__/` needs no config change. `e2e/` is the exception: it is already
+  a test-only folder
 - `docs/plans` — implementation plans, one file per effort, named `YYYY-MM-DD-name.md`
 - `docs/specs` — design specs, named to match the plan they belong to
 - `scripts/` — repo-level tooling (Claude Code hook targets live here)
+- `security/` — the audit-ci allowlist (`audit-ci.json`) and the advisory reviews it is
+  checked against
+- The root holds only what a tool requires there. `CODEOWNERS` is in `.github/`, and
+  `.vscode/settings.json` hides generated output from the file tree
 
 ## Project Architecture
 
