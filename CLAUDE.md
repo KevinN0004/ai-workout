@@ -491,12 +491,13 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-22:
-  server **93.89%** statements / 86.18% branches, client **98.69%** / 93.62%.
-  The client's branch figure went **down** 0.02 from the previous reading and the ratchet
-  correctly did not trip, which is the floor doing its job rather than failing at it: it
-  sits one decimal below the measurement, so a rounding-scale movement is tolerated while
-  a real regression is not. Do not "fix" a small dip by raising the floor to meet it.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-23:
+  server **93.89%** statements / 86.18% branches, client **98.69%** / 93.65%.
+  On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
+  before it, and the ratchet correctly did not trip, which is the floor doing its job
+  rather than failing at it: it sits one decimal below the measurement, so a
+  rounding-scale movement is tolerated while a real regression is not. Do not "fix" a
+  small dip by raising the floor to meet it.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
