@@ -1,5 +1,5 @@
-import { validateSchemaInput } from "../../services/requestValidationService.js";
-import { sendErrorResponse } from "../../services/errorResponseService.js";
+import { validateSchemaInput } from "../../services/http/requestValidationService.js";
+import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {
   validateParams,
   validateQuery,

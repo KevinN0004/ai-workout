@@ -3,7 +3,7 @@
  * Enforces the expiry dates on the audit-ci allowlist.
  *
  * audit-ci has no native expiry support, so a suppression added once would
- * otherwise stay forever. This cross-checks .audit-ci.json against
+ * otherwise stay forever. This cross-checks security/audit-ci.json against
  * security/advisory-reviews.json and fails the build when an entry is past its
  * reviewBy date, has no justification, or has gone stale.
  */
@@ -60,7 +60,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     const entry = byAdvisory.get(advisory);
     if (!entry) {
       errors.push(
-        `${advisory} is allowlisted in .audit-ci.json but has no entry in security/advisory-reviews.json.`
+        `${advisory} is allowlisted in security/audit-ci.json but has no entry in security/advisory-reviews.json.`
       );
       continue;
     }
@@ -97,7 +97,7 @@ const readJson = (filePath) => JSON.parse(readFileSync(filePath, "utf8"));
 
 const main = () => {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const auditConfig = readJson(path.join(repoRoot, ".audit-ci.json"));
+  const auditConfig = readJson(path.join(repoRoot, "security", "audit-ci.json"));
   const reviewFile = readJson(path.join(repoRoot, "security", "advisory-reviews.json"));
   // UTC is deliberate -- do not "fix" this to local time. CI runners are UTC,
   // so a local-time today would let the same commit pass in one timezone and

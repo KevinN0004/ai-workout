@@ -2,20 +2,26 @@
 # state out of the image. `COPY . .` in the build stage would otherwise pull in
 # server/.env, which holds the Gemini key and the Postgres connection string.
 
+# ---- Secrets ----------------------------------------------------------------
 .env
 .env.*
 **/.env
 **/.env.*
 
+# ---- Dependencies -----------------------------------------------------------
+# The image installs its own with `npm ci`.
 node_modules
 **/node_modules
 
+# ---- Repository and agent tooling -------------------------------------------
 .git
 .github
 .githooks
 .claude
 .claude-flow
 
+# ---- Build and test output --------------------------------------------------
+# client/dist is rebuilt inside the image by `npm run build`.
 client/dist
 coverage
 **/coverage
@@ -23,9 +29,12 @@ test-results
 playwright-report
 blob-report
 
+# ---- Local Postgres state ---------------------------------------------------
 .postgres-data
 .postgres-pw
 
+# ---- Not needed at runtime --------------------------------------------------
+# The negation re-includes README.md, so it has to stay after `*.md`.
 docs
 e2e
 *.md

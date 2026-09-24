@@ -46,7 +46,7 @@ jobs:
       - name: Prettier
         run: npm run format:check
 
-      # knip.json declares the hook scripts in scripts/ as entry points. Nothing
+      # knip.jsonc declares the hook scripts in scripts/ as entry points. Nothing
       # else can see that they are live -- they are invoked from
       # .claude/settings.json -- so without this gate the config can rot
       # unnoticed, and knip then reports the whole hook wiring as unused.
@@ -57,7 +57,7 @@ jobs:
         run: npm run test:scripts
 
       - name: Dependency Audit
-        run: npx --yes audit-ci@7.1.0 --config .audit-ci.json
+        run: npx --yes audit-ci@7.1.0 --config security/audit-ci.json
 
   test:
     name: Tests (Node ${{ matrix.node }})

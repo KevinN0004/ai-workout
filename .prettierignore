@@ -1,14 +1,28 @@
+# Paths `npm run format` and `npm run format:check` skip. The check gates every
+# PR, so anything listed here is exempt from that gate as well.
+
+# ---- Dependencies, build and test output ------------------------------------
 node_modules
 dist
 coverage
-.claude
-.claude-flow
-.githooks
-.postgres-data
-.postgres-pw
-package-lock.json
-server/db/**/*.sql
-
 test-results
 playwright-report
 blob-report
+
+# ---- Agent tooling and git hooks --------------------------------------------
+# .claude-flow holds session-state JSON; a routine `npm run format` once walked
+# into it and rewrote local state.
+.claude
+.claude-flow
+.githooks
+
+# ---- Local Postgres state ---------------------------------------------------
+.postgres-data
+.postgres-pw
+
+# ---- Byte-sensitive or tool-owned files -------------------------------------
+# npm writes the lockfile itself.
+package-lock.json
+# A no-op today, since Prettier has no SQL parser, but migration files are
+# byte-sensitive and this records the intent.
+server/db/**/*.sql

@@ -17,7 +17,7 @@ Seven tables: `app_users`, `workout_sessions`, `meal_logs`, `progress_metrics`,
 payloads are kept in `jsonb`; everything else is relational with foreign keys and indexes.
 
 **Auth sessions are not in Postgres.** They live in Redis when it is configured and in
-process memory otherwise — see `services/sessionService.js`. The `workout_sessions` table
+process memory otherwise — see `services/auth/sessionService.js`. The `workout_sessions` table
 is a training log, not a session store.
 
 ## Two things that will bite you

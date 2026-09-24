@@ -1,5 +1,5 @@
 import { dashboardPaginationQuerySchema, validateQuery } from "./validation.js";
-import { sendErrorResponse } from "../../services/errorResponseService.js";
+import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 export const registerDashboardReadRoutes = (app, deps) => {
   const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollections } =

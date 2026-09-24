@@ -1,0 +1,26 @@
+{
+  // Generated output and local machine state, hidden from the explorer only.
+  // Everything here still exists on disk and is gitignored.
+  "files.exclude": {
+    // VS Code's own default, repeated so this file does not depend on how
+    // workspace settings merge with user settings.
+    "**/.git": true,
+
+    // Test and coverage reports (npm run test:coverage, npm run test:e2e)
+    "**/coverage": true,
+    "test-results": true,
+    "playwright-report": true,
+    "blob-report": true,
+
+    // Build output (npm run build)
+    "client/dist": true,
+
+    // Local Postgres data and password (server/scripts/start-local-postgres.ps1)
+    ".postgres-data": true,
+    ".postgres-pw": true,
+
+    // Agent tooling state
+    "**/.claude-flow": true,
+    "skills-lock.json": true
+  }
+}

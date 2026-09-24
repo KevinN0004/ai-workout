@@ -58,19 +58,37 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 ## File Organization
 
 - NEVER save to root folder
-- `client/src` — React 18 + Vite frontend source
-- `client/src/pages/<page>` — a page's own parts, in `views/`, `components/`, `hooks/`
-  and `styles/`. The page component itself still sits at `pages/<Page>Page.jsx`
+- `client/src` — React 18 + Vite frontend source. The only files at this level are
+  `main.jsx` and `App.jsx` (their tests are in `client/src/__tests__/`); global CSS is in
+  `client/src/styles/`
+- `client/src/pages/<page>` — one folder per page: the page component
+  (`<Name>Page.jsx` and its `.css`) plus its own parts, usually `views/`, `components/`,
+  `hooks/` and `styles/`. The larger pages also hold feature folders
+  (`dashboard/meal/`, `dashboard/tips/`) and page-level helpers (`preview/utils.js`).
+  Folder names are lowercase, kebab-case where needed (`workout-result/`)
 - `server/src` — Express 4 API, services, routes. Only the app bootstrap
-  (`index.js`, `corsPolicy.js`, `shutdown.js`) stays at this level
+  (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
+- `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`
+  (request validation, API schemas, error responses) and `platform/` (metrics, error
+  tracking, health, env validation)
 - `server/src/db` — the Postgres pool, the Prisma client and the migration runner
 - `server/src/repositories` — **all Prisma data access lives here.** Routes and services
   call these; nothing else should touch `prisma.*` directly
-- `server/prisma` — Prisma schema and migrations
+- `server/prisma` — the Prisma schema
+- `server/db/postgres` — the SQL migrations, applied in order by `migrate:postgres`
 - `server/scripts` — server operational scripts (local Postgres, migrations)
+- **Tests live in a `__tests__/` folder beside the code they cover** —
+  `views/__tests__/MealView.test.jsx` tests `views/MealView.jsx`. Every test config
+  (Vitest, ESLint, coverage, knip) finds tests by the `*.test.*` name, not the folder,
+  so a new `__tests__/` needs no config change. `e2e/` is the exception: it is already
+  a test-only folder
 - `docs/plans` — implementation plans, one file per effort, named `YYYY-MM-DD-name.md`
 - `docs/specs` — design specs, named to match the plan they belong to
 - `scripts/` — repo-level tooling (Claude Code hook targets live here)
+- `security/` — the audit-ci allowlist (`audit-ci.json`) and the advisory reviews it is
+  checked against
+- The root holds only what a tool requires there. `CODEOWNERS` is in `.github/`, and
+  `.vscode/settings.json` hides generated output from the file tree
 
 ## Project Architecture
 
@@ -158,7 +176,7 @@ range. `toRate` was the one that mattered: `0` is a valid sample rate, so nothin
 going to catch it if the default ever changed.
 
 **The invariant is now asserted, not just described here.**
-`server/src/numericCoercion.contract.test.js` and its client counterpart enumerate every
+`server/src/__tests__/numericCoercion.contract.test.js` and its client counterpart enumerate every
 numeric helper and pin three things: that `null`, `""` and `undefined` all agree, that a
 non-numeric string is absent, and that a measured `0` survives. **Add a row when you add a
 helper** — that is the whole mechanism, and it is why `toNumberOrNull`, the shape this
@@ -258,7 +276,7 @@ Conventions:
 
   `index.js` was the exception — genuinely several things — and it was split for
   that reason rather than for its length, which is why the pieces that came out
-  (`services/metricsService.js`, `corsPolicy.js`) are cohesive rather than
+  (`services/platform/metricsService.js`, `corsPolicy.js`) are cohesive rather than
   arbitrary. It is still the largest server file and still over 500 lines. That is
   fine; it is the app bootstrap, and the remainder is wiring that belongs together.
 
@@ -295,10 +313,10 @@ npm run lint:fix         # eslint . --fix
 
 **A client test can import server modules directly, and two do.** The running
 app cannot reach across the wire, but Vitest can resolve
-`../../../server/src/...` from `client/src`, so a contract between the two sides
-can be asserted without a browser or a database. `app/constants.test.js` pins the
+`../../../../server/src/...` from `client/src/app/__tests__`, so a contract between the two sides
+can be asserted without a browser or a database. `app/__tests__/constants.test.js` pins the
 option lists against the server's `allowed*Values`, and
-`app/profileContract.test.js` walks a form draft through
+`app/__tests__/profileContract.test.js` walks a form draft through
 `personalToProfile` → `profileBodySchema` → `buildProfile` → `profileToPersonal`
 and back. Both were verified to catch divergence the owning side's own suite
 misses: narrowing the server's height range to 100-170 makes a 178cm profile
@@ -331,7 +349,7 @@ survived. Five things are worth knowing before touching it:
 
   Mutation-tested rather than trusted: reverting `script-src` is caught by
   three of its five tests, dropping `font-src` by exactly one, and each caching
-  mutation by exactly one. `server/src/index.securityHeaders.test.js` is the
+  mutation by exactly one. `server/src/__tests__/index.securityHeaders.test.js` is the
   cheap companion guard, but a well-formed header can still be wrong — the
   browser project is the one that proves the page runs.
 
@@ -405,7 +423,7 @@ asserting nothing: removing a modal's `aria-labelledby`, removing the landmark
 wrapper, and disabling the Escape handler are all caught, and all three pass
 every unit suite.
 
-**`npm run knip` is clean, and `knip.json` is what keeps it that way.** Two things
+**`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
 about it are load-bearing:
 
 - **It must declare the hook scripts as entry points.** `codex-handoff.mjs`,
@@ -815,7 +833,7 @@ the native instance all along.
     make it.
   - **A regex for "both arms are the same" needs care.** Sweeping the tree for
     this pattern turned up a third hit in
-    `server/src/services/dashboardDataBuildersService.js`, which was a false
+    `server/src/services/dashboard/dashboardDataBuildersService.js`, which was a false
     positive: the code is
     `typeof item === "string" ? item : item?.name`, and a naive arm pattern
     stops at the `?.` and reads both arms as `item`. Those two were the only
@@ -851,7 +869,7 @@ the native instance all along.
     An exclusion like that should not outlive its upstream bug, and nothing routine would
     have prompted anyone to revisit it: a Dependabot Prettier bump shows only a lockfile
     diff, and `prettier --check` stays green precisely because the file is ignored. So
-    `scripts/repo-invariants.test.mjs` carried a test asserting the exclusion still
+    `scripts/__tests__/repo-invariants.test.mjs` carried a test asserting the exclusion still
     **earned its place** — that the file still failed to converge — designed to fail the
     moment it stopped. It did exactly that on the 3.9.6 → 3.9.8 bump, which is how this
     entry came to be rewritten. That test is now deleted too; it had no remaining subject.

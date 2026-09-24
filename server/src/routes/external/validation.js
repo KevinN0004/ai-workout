@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { validateSchemaInput } from "../../services/requestValidationService.js";
+import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 
 export const coordinateQuerySchema = z
   .object({

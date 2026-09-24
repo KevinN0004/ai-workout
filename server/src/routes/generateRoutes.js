@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { sendErrorResponse } from "../services/errorResponseService.js";
+import { sendErrorResponse } from "../services/http/errorResponseService.js";
 
 const HOME_ACCESS_CAPABILITY_MAP = {
   "bodyweight only": ["bodyweight training", "mobility work", "floor/core work"],
