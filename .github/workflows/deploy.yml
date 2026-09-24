@@ -9,9 +9,17 @@ name: Deploy
 # autoDeployTrigger: off so nothing can start before this has run.
 #
 # Requires three repository secrets:
-#   PRODUCTION_DATABASE_URL  Neon pooled connection string, with ?sslmode=require
+#   PRODUCTION_DATABASE_URL  Neon pooled connection string, with ?sslmode=verify-full
+#                            (docs/deploy-runbook.md, Step 1 says why not `require`)
 #   RENDER_DEPLOY_HOOK_URL   Render dashboard -> the service -> Settings -> Deploy Hook
 #   RENDER_SERVICE_URL       e.g. https://ai-workout.onrender.com, for the smoke check
+#
+# Automatic deploys after CI on main also need the repository variable
+# AUTO_DEPLOY set to "true" (Settings -> Secrets and variables -> Actions ->
+# Variables). Until it is set, those runs are skipped rather than failed, so a
+# repository with no deployment configured does not go red on every merge. A
+# manual "Run workflow" is never gated: that is how the first deploy is done,
+# and with the secrets missing it should fail loudly.
 
 on:
   workflow_dispatch:
@@ -33,10 +41,13 @@ jobs:
     runs-on: ubuntu-latest
     # Never deploy a red build. workflow_run fires whatever the outcome, so the
     # conclusion has to be checked explicitly -- it is not implied by the
-    # trigger. A manual dispatch has no upstream run and is allowed through.
+    # trigger. A manual dispatch has no upstream run and is allowed through,
+    # and AUTO_DEPLOY does not gate it: switching automatic deploys on is a
+    # separate, later decision (see the header).
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (vars.AUTO_DEPLOY == 'true' &&
+      github.event.workflow_run.conclusion == 'success')
     environment: production
 
     steps:
