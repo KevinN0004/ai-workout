@@ -176,8 +176,15 @@ app selects on _every_ user read, so a server started against an unmigrated
 database fails every authenticated request — not just the new routes. Migration
 failure stops the deploy.
 
-After the first time, the workflow also runs automatically when CI passes on
-`main`.
+**Then turn on automatic deploys.** Once that manual run reports ready, add a
+repository variable (a variable, not a secret): Repository → **Settings →
+Secrets and variables → Actions → Variables → New repository variable**, named
+`AUTO_DEPLOY` with the value `true`. From then on the workflow also runs
+automatically whenever CI passes on `main`.
+
+Until it is set, those automatic runs are skipped rather than failed, which is
+what keeps `main` from showing a red Deploy after every merge before any of this
+exists. A manual run is never gated by the variable.
 
 ---
 
