@@ -184,18 +184,18 @@ and more expensive to attack.
 
 Dashboard pagination and external-API behaviour.
 
-| Variable                             | Purpose                                       | Default      |
-| ------------------------------------ | --------------------------------------------- | ------------ |
-| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one | `50`         |
-| `DASHBOARD_COLLECTION_MAX_LIMIT`     | Largest page size a request may ask for       | `200`        |
-| `EXTERNAL_API_RETRIES`               | Retry attempts per upstream call              | `2`          |
-| `EXTERNAL_API_RETRY_BASE_DELAY_MS`   | Base backoff between retries                  | `250`        |
-| `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-process upstream cache | `500`        |
-| `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served    | `21600` (6h) |
-| `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                | `300`        |
-| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality            | `180`        |
-| `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data          | `900`        |
-| `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search            | `900`        |
+| Variable                             | Purpose                                                                                                | Default      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------ |
+| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one                                                          | `50`         |
+| `DASHBOARD_COLLECTION_MAX_LIMIT`     | Largest page size a request may ask for                                                                | `200`        |
+| `EXTERNAL_API_RETRIES`               | Retry attempts per upstream call                                                                       | `2`          |
+| `EXTERNAL_API_RETRY_BASE_DELAY_MS`   | Base backoff between retries                                                                           | `250`        |
+| `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-memory fallback cache; with `REDIS_URL` set the cache is bounded by TTL instead | `500`        |
+| `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served                                                             | `21600` (6h) |
+| `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                                                                         | `300`        |
+| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality                                                                     | `180`        |
+| `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data                                                                   | `900`        |
+| `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search                                                                     | `900`        |
 
 `NODE_ENV` is read directly rather than configured: `production` enables HSTS, `Secure`
 cookies and `trust proxy`, and makes Postgres required at startup. `VITEST` is set by the

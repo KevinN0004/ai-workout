@@ -56,6 +56,13 @@ export const createHttpCacheService = ({
   const buildExternalCacheKey = (serviceName, parts = {}) =>
     `${serviceName}:${serializeCacheKeyPart(parts)}`;
 
+  // Both `maxEntries` and the `evictions` metric describe the in-memory fallback
+  // only. On the Redis path nothing evicts: a key disappears when its own TTL
+  // closes the stale window, which no process observes, so a read that finds
+  // nothing counts as an ordinary miss. Incrementing `evictions` from an expired
+  // Redis read was considered and rejected -- keys that expire unread would never
+  // be counted, so the number would be a systematic undercount presented as a
+  // count. Redis is bounded by TTL rather than by entry count.
   const pruneResponseCache = (now = Date.now()) => {
     for (const [key, entry] of responseCache.entries()) {
       if (now <= entry.staleUntilMs) continue;
