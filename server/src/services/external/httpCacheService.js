@@ -12,15 +12,17 @@ export const createHttpCacheService = ({
   getRedisClient = () => null
 }) => {
   const responseCache = new Map();
-  let redisOutageReported = false;
+  // Per operation, because reads and writes fail independently. One shared flag
+  // let a succeeding write re-arm a failing read, which logged on every request.
+  const redisOutageReported = { read: false, write: false };
 
   const redisReady = () => Boolean(getRedisClient()?.isReady);
 
   const redisCacheKey = (cacheKey) => `extcache:${cacheKey}`;
 
   const reportRedisOutage = (err, operation) => {
-    if (redisOutageReported) return;
-    redisOutageReported = true;
+    if (redisOutageReported[operation]) return;
+    redisOutageReported[operation] = true;
     logger.warn({
       event: "external_cache_redis_error",
       operation,
@@ -78,12 +80,14 @@ export const createHttpCacheService = ({
     if (redisReady()) {
       try {
         const raw = await getRedisClient().get(redisCacheKey(cacheKey));
-        // A key past its stale window is gone by TTL, so absence is the only miss.
-        if (!raw) return null;
-        const entry = JSON.parse(raw);
-        if (now > entry.staleUntilMs) return null;
-        redisOutageReported = false;
-        return entryToResult(entry, now);
+        redisOutageReported.read = false;
+        if (raw) {
+          const entry = JSON.parse(raw);
+          if (now <= entry.staleUntilMs) return entryToResult(entry, now);
+        }
+        // Nothing usable in Redis. Memory is still consulted rather than assumed
+        // empty: a failing Redis write falls back to it, and without this the
+        // entry it wrote could never be read, silently disabling the cache.
       } catch (err) {
         reportRedisOutage(err, "read");
       }
@@ -130,7 +134,7 @@ export const createHttpCacheService = ({
           PX: ttlMs + staleMs
         });
         metrics.externalCache.writes += 1;
-        redisOutageReported = false;
+        redisOutageReported.write = false;
         return;
       } catch (err) {
         reportRedisOutage(err, "write");

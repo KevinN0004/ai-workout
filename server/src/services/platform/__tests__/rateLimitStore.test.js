@@ -106,3 +106,72 @@ describe("createRateLimitStore when Redis fails mid-request", () => {
     expect(errors[0].error).toBe("connection lost");
   });
 });
+
+describe("createRateLimitStore delegation for the other store methods", () => {
+  test("passes decrement and resetKey through to Redis", async () => {
+    const redis = spyStore();
+    const store = createRateLimitStore({
+      getClient: readyClient,
+      createRedisStore: () => redis
+    });
+    store.init({ windowMs: 60_000 });
+
+    await store.decrement("ip-1");
+    await store.resetKey("ip-2");
+
+    expect(redis.calls).toEqual([
+      ["decrement", "ip-1"],
+      ["resetKey", "ip-2"]
+    ]);
+  });
+
+  test("passes decrement and resetKey to memory when there is no client", async () => {
+    const store = createRateLimitStore({ getClient: () => null });
+    store.init({ windowMs: 60_000 });
+
+    await store.increment("ip-1");
+    await store.increment("ip-1");
+    await store.decrement("ip-1");
+    const afterDecrement = (await store.increment("ip-1")).totalHits;
+
+    await store.resetKey("ip-1");
+    const afterReset = (await store.increment("ip-1")).totalHits;
+
+    expect(afterDecrement).toBe(2);
+    expect(afterReset).toBe(1);
+  });
+});
+
+describe("createRateLimitStore default Redis store", () => {
+  // Every test above injects a fake factory, which left the real one -- the code
+  // that actually ships -- unexecuted. Exercising it here is the point: it proves
+  // sendCommand reaches the client that getClient returns.
+  test("wires sendCommand to the client getClient returns", async () => {
+    const sent = [];
+    const client = {
+      isReady: true,
+      async sendCommand(args) {
+        sent.push(args);
+        const [verb, sub] = args;
+        // RedisStore loads its Lua scripts in the constructor, fire-and-forget, and
+        // rejects unhandled if SCRIPT LOAD does not answer with a sha.
+        if (verb === "SCRIPT" && sub === "LOAD") return "a".repeat(40);
+        // What the increment script returns: [totalHits, timeToExpire].
+        if (verb === "EVALSHA" || verb === "EVAL") return [1, 60_000];
+        return "OK";
+      }
+    };
+
+    const store = createRateLimitStore({ getClient: () => client });
+    store.init({ windowMs: 60_000 });
+
+    const result = await store.increment("ip-1");
+
+    // The real RedisStore was built and reached the client rather than a stub.
+    expect(sent.length).toBeGreaterThan(0);
+    // Whether the script round-trip succeeds against this stand-in or falls back
+    // to memory, a usable count must come back either way.
+    expect(typeof result.totalHits).toBe("number");
+    expect(result.totalHits).toBeGreaterThanOrEqual(1);
+  });
+});

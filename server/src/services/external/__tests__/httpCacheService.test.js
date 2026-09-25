@@ -183,3 +183,124 @@ describe("httpCacheService backed by Redis", () => {
     expect(second.data).toEqual({ tempC: 21 });
   });
 });
+
+const redisEntry = ({ freshForMs, staleForMs, payload }) => {
+  const now = Date.now();
+  return JSON.stringify({
+    payload,
+    createdAtMs: now,
+    expiresAtMs: now + freshForMs,
+    staleUntilMs: now + freshForMs + staleForMs
+  });
+};
+
+describe("httpCacheService when Redis misbehaves", () => {
+  test("falls back to memory and warns once when reads fail", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        throw new Error("redis down");
+      },
+      async set() {}
+    };
+    const { cache, logger } = createRedisCacheHarness(client);
+
+    await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:a",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 1 })
+    });
+    await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:a",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 1 })
+    });
+
+    const outages = logger.warn.mock.calls.filter(
+      ([fields]) => fields?.event === "external_cache_redis_error"
+    );
+    expect(outages).toHaveLength(1);
+    expect(outages[0][0].operation).toBe("read");
+  });
+
+  test("writes to memory when the Redis write fails, so the next read still hits", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        return null;
+      },
+      async set() {
+        throw new Error("write refused");
+      }
+    };
+    const { cache } = createRedisCacheHarness(client);
+
+    const first = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:b",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 2 })
+    });
+    const second = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:b",
+      ttlSec: 60,
+      requestFn: async () => {
+        throw new Error("upstream must not be called");
+      }
+    });
+
+    expect(first.cache).toBe("miss");
+    expect(second.cache).toBe("hit");
+    expect(second.data).toEqual({ ok: 2 });
+  });
+
+  test("treats an entry past its stale window as absent", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        // Both windows already closed.
+        return redisEntry({ freshForMs: -5000, staleForMs: -1000, payload: { old: true } });
+      },
+      async set() {}
+    };
+    const { cache } = createRedisCacheHarness(client);
+
+    const result = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:c",
+      ttlSec: 60,
+      requestFn: async () => ({ fresh: true })
+    });
+
+    expect(result.cache).toBe("miss");
+    expect(result.data).toEqual({ fresh: true });
+  });
+
+  test("serves a stale Redis entry when the upstream fails", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        // Fresh window closed, stale window still open.
+        return redisEntry({ freshForMs: -1000, staleForMs: 60_000, payload: { cached: true } });
+      },
+      async set() {}
+    };
+    const { cache, metrics } = createRedisCacheHarness(client);
+
+    const result = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:d",
+      ttlSec: 60,
+      requestFn: async () => {
+        throw new Error("upstream unavailable");
+      }
+    });
+
+    expect(result.cache).toBe("stale");
+    expect(result.data).toEqual({ cached: true });
+    expect(metrics.externalCache.staleHits).toBe(1);
+  });
+});
