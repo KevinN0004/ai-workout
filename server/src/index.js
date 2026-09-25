@@ -71,6 +71,7 @@ import {
   parseRedisPort
 } from "./services/auth/sessionService.js";
 import { validateEnv } from "./services/platform/envValidationService.js";
+import { createRateLimitStore } from "./services/platform/rateLimitStore.js";
 
 dotenv.config();
 
@@ -310,6 +311,11 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, delete
     prisma
   });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
+// The cache is built here but sessionService, which owns the Redis client, is not
+// created until further down. This indirection is set once that happens; reaching
+// for `sessionService` directly from here would be a temporal dead zone hazard.
+let getSessionRedisClient = () => null;
+
 const {
   serializeCacheKeyPart,
   buildExternalCacheKey,
@@ -321,7 +327,8 @@ const {
   toShortText,
   toPositiveInt,
   maxEntries: externalCacheMaxEntries,
-  defaultStaleTtlSec: externalCacheDefaultStaleTtlSec
+  defaultStaleTtlSec: externalCacheDefaultStaleTtlSec,
+  getRedisClient: () => getSessionRedisClient()
 });
 
 const externalDataService = createExternalDataService({
@@ -423,6 +430,12 @@ const {
   ensureCsrfTokenCookie,
   requireCsrfToken
 } = sessionService;
+
+// Hand the external-response cache the same Redis client the sessions use, now
+// that it exists. Until this runs the cache stays in memory, which is also what
+// it falls back to whenever Redis is unavailable.
+getSessionRedisClient = sessionService.getRedisClient;
+
 const dashboardCollectionService = createDashboardCollectionService({
   cleanText,
   toNullableNumber,
@@ -434,9 +447,21 @@ const dashboardCollectionService = createDashboardCollectionService({
 const { parseDashboardPagination, getDashboardCollections, buildDashboardResponse } =
   dashboardCollectionService;
 
+// Counters live in Redis when it is up, so they survive a restart or the free
+// tier's 15-minute idle spin-down -- the same reason sessions moved off memory.
+// Each limiter gets its own store and prefix so their counts stay separate, and
+// each falls back to memory on its own if Redis is unavailable.
+const rateLimitStore = (scope) =>
+  createRateLimitStore({
+    getClient: sessionService.getRedisClient,
+    prefix: `rl:${scope}:`,
+    logger
+  });
+
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
   max: apiRateLimitMax,
+  store: rateLimitStore("api_global"),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -457,6 +482,7 @@ const apiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: authRateLimitWindowMs,
   max: authRateLimitMax,
+  store: rateLimitStore("auth"),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -481,6 +507,7 @@ const authLimiter = rateLimit({
 const credentialLimiter = rateLimit({
   windowMs: credentialRateLimitWindowMs,
   max: credentialRateLimitMax,
+  store: rateLimitStore("credential"),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -501,6 +528,7 @@ const credentialLimiter = rateLimit({
 const generateLimiter = rateLimit({
   windowMs: generateRateLimitWindowMs,
   max: generateRateLimitMax,
+  store: rateLimitStore("generate"),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -525,6 +553,7 @@ const generateLimiter = rateLimit({
 const anonGenerateLimiter = rateLimit({
   windowMs: anonGenerateRateLimitWindowMs,
   max: anonGenerateRateLimitMax,
+  store: rateLimitStore("generate_anonymous"),
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => Boolean(req.user),
