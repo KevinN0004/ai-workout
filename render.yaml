@@ -66,9 +66,11 @@ services:
       # Upstash. Use the rediss:// URL so the connection is TLS.
       #
       # Not optional in practice on this plan. Free instances spin down after
-      # 15 minutes idle, and the in-memory session fallback is lost on every
-      # spin-down -- so without Redis every visitor is signed out several times
-      # a day.
+      # 15 minutes idle, and every in-memory fallback is lost on each spin-down.
+      # Without Redis that means visitors are signed out several times a day,
+      # rate limit counters reset (including the anonymous generate quota that
+      # guards the Gemini key), and the external cache loses its stale window --
+      # the six-hour buffer that serves old data when an upstream is down.
       - key: REDIS_URL
         sync: false
 

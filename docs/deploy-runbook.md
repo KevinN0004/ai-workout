@@ -12,20 +12,22 @@ of [`README.md`](../README.md). This file is the doing.
 
 You need three accounts, none of which require a card:
 
-| Service                            | What it runs     |
-| ---------------------------------- | ---------------- |
-| [neon.com](https://neon.com)       | Postgres         |
-| [upstash.com](https://upstash.com) | Redis (sessions) |
-| [render.com](https://render.com)   | The app itself   |
+| Service                            | What it runs   |
+| ---------------------------------- | -------------- |
+| [neon.com](https://neon.com)       | Postgres       |
+| [upstash.com](https://upstash.com) | Redis          |
+| [render.com](https://render.com)   | The app itself |
 
 Plus a Google AI Studio key for plan generation, if you want that working. The
 app runs without it; `/api/generate` returns an error and nothing else is
 affected.
 
 Three services rather than one because **Render's own free Postgres expires
-after 30 days** and **its free Redis loses data on restart**. Redis holds
-sessions here, so a store that empties on restart signs everyone out — which is
-the exact problem Redis was added to solve.
+after 30 days** and **its free Redis loses data on restart**. Redis holds three
+things here — sessions, rate limit counters, and the cache of upstream API
+responses — so a store that empties on restart signs everyone out, resets every
+quota, and drops the cache's stale window, which is the exact problem Redis was
+added to solve.
 
 Set aside about 30 minutes. Most of it is waiting for the first Docker build.
 
@@ -77,12 +79,25 @@ Keep this string. You will paste it twice — once into Render, once into GitHub
 rediss://default:PASSWORD@something.upstash.io:6379
 ```
 
-Free tier is 256 MB and 500,000 commands per month. Each authenticated request
-does roughly one session read, so this is generous for personal use.
+Use a database dedicated to this deployment rather than one you already point a
+local `server/.env` at. Sharing one means a development credential becomes a
+production credential, and rotating it later stops being a choice you remember
+to make.
+
+Free tier is 256 MB and 500,000 commands per month. Budget more than one command
+per request: the global rate limiter costs one on every `/api` call, an
+authenticated request adds a session read, and a route backed by an upstream API
+adds a cache read plus a write on a miss. Still generous for personal use, but
+not the one-read-per-request it was when Redis only held sessions.
+
+Size is not the constraint. Cached upstream responses are the largest entries at
+roughly 15 KB, and the cache is capped well below the 256 MB ceiling.
 
 **This is not optional in practice.** Render's free tier spins down after 15
-minutes idle, and the in-memory session fallback is lost on every wake — without
-Redis you would be signed out several times a day.
+minutes idle, and every in-memory fallback is lost on each wake. Without Redis
+you would be signed out several times a day, the anonymous plan-generation quota
+that guards the Gemini key would reset each time, and the cache would lose the
+six-hour buffer that serves old data when an upstream is down.
 
 ---
 

@@ -105,3 +105,202 @@ describe("httpCacheService", () => {
     expect(cache.mergeCacheStatuses("miss", "stale", "hit")).toBe("stale");
   });
 });
+
+// A fake Redis that behaves like the commands the cache uses. Shared between two
+// service instances, it stands in for a process restart: the Map-backed cache is
+// per-instance, so only a Redis-backed one can survive the second construction.
+const createFakeRedis = () => {
+  const store = new Map();
+  return {
+    isReady: true,
+    store,
+    async get(key) {
+      const entry = store.get(key);
+      if (!entry) return null;
+      if (entry.expiresAtMs <= Date.now()) {
+        store.delete(key);
+        return null;
+      }
+      return entry.value;
+    },
+    async set(key, value, options = {}) {
+      const ttlMs = options.PX ?? 60_000;
+      store.set(key, { value, expiresAtMs: Date.now() + ttlMs });
+      return "OK";
+    }
+  };
+};
+
+const createRedisCacheHarness = (client) => {
+  const metrics = {
+    externalCache: { hits: 0, misses: 0, staleHits: 0, writes: 0, evictions: 0 }
+  };
+  const logger = { warn: vi.fn(), error: vi.fn() };
+  const toPositiveInt = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  };
+  return {
+    metrics,
+    logger,
+    cache: createHttpCacheService({
+      metrics,
+      logger,
+      toShortText: (value) => String(value || ""),
+      toPositiveInt,
+      maxEntries: 5,
+      defaultStaleTtlSec: 60,
+      getRedisClient: () => client
+    })
+  };
+};
+
+describe("httpCacheService backed by Redis", () => {
+  test("serves a payload cached by a previous instance", async () => {
+    const client = createFakeRedis();
+
+    const before = createRedisCacheHarness(client);
+    const first = await before.cache.readThroughExternalCache({
+      serviceName: "open-meteo",
+      cacheKey: "open-meteo:{lat:1,lon:2}",
+      ttlSec: 300,
+      requestFn: async () => ({ tempC: 21 })
+    });
+    expect(first.cache).toBe("miss");
+
+    // A new instance: no shared Map, only the shared Redis.
+    const after = createRedisCacheHarness(client);
+    const second = await after.cache.readThroughExternalCache({
+      serviceName: "open-meteo",
+      cacheKey: "open-meteo:{lat:1,lon:2}",
+      ttlSec: 300,
+      requestFn: async () => {
+        throw new Error("upstream must not be called on a hit");
+      }
+    });
+
+    expect(second.cache).toBe("hit");
+    expect(second.data).toEqual({ tempC: 21 });
+  });
+});
+
+const redisEntry = ({ freshForMs, staleForMs, payload }) => {
+  const now = Date.now();
+  return JSON.stringify({
+    payload,
+    createdAtMs: now,
+    expiresAtMs: now + freshForMs,
+    staleUntilMs: now + freshForMs + staleForMs
+  });
+};
+
+describe("httpCacheService when Redis misbehaves", () => {
+  test("falls back to memory and warns once when reads fail", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        throw new Error("redis down");
+      },
+      async set() {}
+    };
+    const { cache, logger } = createRedisCacheHarness(client);
+
+    await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:a",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 1 })
+    });
+    await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:a",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 1 })
+    });
+
+    const outages = logger.warn.mock.calls.filter(
+      ([fields]) => fields?.event === "external_cache_redis_error"
+    );
+    expect(outages).toHaveLength(1);
+    expect(outages[0][0].operation).toBe("read");
+  });
+
+  test("writes to memory when the Redis write fails, so the next read still hits", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        return null;
+      },
+      async set() {
+        throw new Error("write refused");
+      }
+    };
+    const { cache } = createRedisCacheHarness(client);
+
+    const first = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:b",
+      ttlSec: 60,
+      requestFn: async () => ({ ok: 2 })
+    });
+    const second = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:b",
+      ttlSec: 60,
+      requestFn: async () => {
+        throw new Error("upstream must not be called");
+      }
+    });
+
+    expect(first.cache).toBe("miss");
+    expect(second.cache).toBe("hit");
+    expect(second.data).toEqual({ ok: 2 });
+  });
+
+  test("treats an entry past its stale window as absent", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        // Both windows already closed.
+        return redisEntry({ freshForMs: -5000, staleForMs: -1000, payload: { old: true } });
+      },
+      async set() {}
+    };
+    const { cache } = createRedisCacheHarness(client);
+
+    const result = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:c",
+      ttlSec: 60,
+      requestFn: async () => ({ fresh: true })
+    });
+
+    expect(result.cache).toBe("miss");
+    expect(result.data).toEqual({ fresh: true });
+  });
+
+  test("serves a stale Redis entry when the upstream fails", async () => {
+    const client = {
+      isReady: true,
+      async get() {
+        // Fresh window closed, stale window still open.
+        return redisEntry({ freshForMs: -1000, staleForMs: 60_000, payload: { cached: true } });
+      },
+      async set() {}
+    };
+    const { cache, metrics } = createRedisCacheHarness(client);
+
+    const result = await cache.readThroughExternalCache({
+      serviceName: "wger",
+      cacheKey: "wger:d",
+      ttlSec: 60,
+      requestFn: async () => {
+        throw new Error("upstream unavailable");
+      }
+    });
+
+    expect(result.cache).toBe("stale");
+    expect(result.data).toEqual({ cached: true });
+    expect(metrics.externalCache.staleHits).toBe(1);
+  });
+});

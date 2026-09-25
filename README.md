@@ -117,7 +117,7 @@ DATABASE_URL=postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout
 
 Compose and `npm run postgres:local:start -w server` both bind **55432** and are therefore mutually exclusive — use one or the other, not both.
 
-Redis is opt-in: the server falls back to in-memory sessions unless `REDIS_URL` is set, so starting the container alone changes nothing. To use it, set `REDIS_URL=redis://127.0.0.1:6379`.
+Redis is opt-in: without `REDIS_URL` the server keeps sessions, rate limit counters and the external response cache in memory, so starting the container alone changes nothing. To use it, set `REDIS_URL=redis://127.0.0.1:6379`.
 
 ## Root Scripts
 
@@ -138,30 +138,30 @@ reports every problem at once, rather than failing on the first one it happens t
 
 Common server variables:
 
-| Variable                                                                    | Purpose                                                                                    | Default                                                     |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| `PORT`                                                                      | API server port                                                                            | `5000`                                                      |
-| `DATABASE_URL` / `POSTGRES_URL`                                             | Postgres connection string                                                                 | unset                                                       |
-| `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                    | `true` in production, otherwise `false`                     |
-| `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins       | `false`                                                     |
-| `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`                | `true`                                                      |
-| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated                                                      | loopback origins only when unset; set this before deploying |
-| `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                    | unset                                                       |
-| `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                         | `3`                                                         |
-| `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                  | `86400000` (24h)                                            |
-| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                        | `gemini-1.5-flash`                                          |
-| `REDIS_URL`                                                                 | Redis connection URL for sessions                                                          | unset                                                       |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`)                              | unset                                                       |
-| `REDIS_CONNECT_TIMEOUT_MS`                                                  | How long startup waits for Redis before falling back to in-memory sessions                 | `10000`                                                     |
-| `REDIS_STARTUP_REQUIRED`                                                    | Fail startup when Redis is configured but unreachable, instead of using in-memory sessions | `false`                                                     |
-| `SHUTDOWN_TIMEOUT_MS`                                                       | Grace period for draining requests and closing connections on SIGTERM/SIGINT               | `10000`                                                     |
-| `SENTRY_DSN`                                                                | Enables Sentry error tracking                                                              | unset                                                       |
-| `SENTRY_ENVIRONMENT`                                                        | Environment tag sent to Sentry                                                             | `NODE_ENV`, else `development`                              |
-| `SENTRY_RELEASE`                                                            | Release tag sent to Sentry                                                                 | unset                                                       |
-| `SENTRY_TRACES_SAMPLE_RATE`                                                 | Sentry trace sampling, clamped to 0–1                                                      | `0`                                                         |
-| `SENTRY_SHUTDOWN_TIMEOUT_MS`                                                | How long shutdown waits for Sentry to flush                                                | `2000`                                                      |
-| `LOG_LEVEL`                                                                 | Pino log level                                                                             | `info`                                                      |
-| `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                          | unset                                                       |
+| Variable                                                                    | Purpose                                                                                  | Default                                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `PORT`                                                                      | API server port                                                                          | `5000`                                                      |
+| `DATABASE_URL` / `POSTGRES_URL`                                             | Postgres connection string                                                               | unset                                                       |
+| `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                  | `true` in production, otherwise `false`                     |
+| `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins     | `false`                                                     |
+| `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`              | `true`                                                      |
+| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated                                                    | loopback origins only when unset; set this before deploying |
+| `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                  | unset                                                       |
+| `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                       | `3`                                                         |
+| `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                | `86400000` (24h)                                            |
+| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                      | `gemini-1.5-flash`                                          |
+| `REDIS_URL`                                                                 | Redis URL backing sessions, rate limit counters and the external cache                   | unset                                                       |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`)                            | unset                                                       |
+| `REDIS_CONNECT_TIMEOUT_MS`                                                  | How long startup waits for Redis before falling back to memory                           | `10000`                                                     |
+| `REDIS_STARTUP_REQUIRED`                                                    | Fail startup when Redis is configured but unreachable, instead of falling back to memory | `false`                                                     |
+| `SHUTDOWN_TIMEOUT_MS`                                                       | Grace period for draining requests and closing connections on SIGTERM/SIGINT             | `10000`                                                     |
+| `SENTRY_DSN`                                                                | Enables Sentry error tracking                                                            | unset                                                       |
+| `SENTRY_ENVIRONMENT`                                                        | Environment tag sent to Sentry                                                           | `NODE_ENV`, else `development`                              |
+| `SENTRY_RELEASE`                                                            | Release tag sent to Sentry                                                               | unset                                                       |
+| `SENTRY_TRACES_SAMPLE_RATE`                                                 | Sentry trace sampling, clamped to 0–1                                                    | `0`                                                         |
+| `SENTRY_SHUTDOWN_TIMEOUT_MS`                                                | How long shutdown waits for Sentry to flush                                              | `2000`                                                      |
+| `LOG_LEVEL`                                                                 | Pino log level                                                                           | `info`                                                      |
+| `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                        | unset                                                       |
 
 Rate limiting. Each bucket is separate; a request can be counted by more than one.
 
@@ -184,18 +184,18 @@ and more expensive to attack.
 
 Dashboard pagination and external-API behaviour.
 
-| Variable                             | Purpose                                       | Default      |
-| ------------------------------------ | --------------------------------------------- | ------------ |
-| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one | `50`         |
-| `DASHBOARD_COLLECTION_MAX_LIMIT`     | Largest page size a request may ask for       | `200`        |
-| `EXTERNAL_API_RETRIES`               | Retry attempts per upstream call              | `2`          |
-| `EXTERNAL_API_RETRY_BASE_DELAY_MS`   | Base backoff between retries                  | `250`        |
-| `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-process upstream cache | `500`        |
-| `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served    | `21600` (6h) |
-| `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                | `300`        |
-| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality            | `180`        |
-| `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data          | `900`        |
-| `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search            | `900`        |
+| Variable                             | Purpose                                                                                                | Default      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------ |
+| `DASHBOARD_COLLECTION_DEFAULT_LIMIT` | Page size when a request does not ask for one                                                          | `50`         |
+| `DASHBOARD_COLLECTION_MAX_LIMIT`     | Largest page size a request may ask for                                                                | `200`        |
+| `EXTERNAL_API_RETRIES`               | Retry attempts per upstream call                                                                       | `2`          |
+| `EXTERNAL_API_RETRY_BASE_DELAY_MS`   | Base backoff between retries                                                                           | `250`        |
+| `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-memory fallback cache; with `REDIS_URL` set the cache is bounded by TTL instead | `500`        |
+| `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served                                                             | `21600` (6h) |
+| `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                                                                         | `300`        |
+| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality                                                                     | `180`        |
+| `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data                                                                   | `900`        |
+| `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search                                                                     | `900`        |
 
 `NODE_ENV` is read directly rather than configured: `production` enables HSTS, `Secure`
 cookies and `trust proxy`, and makes Postgres required at startup. `VITEST` is set by the
@@ -363,14 +363,14 @@ green CI is skipped, and the first deploy is started by hand (see
 
 ### What production needs
 
-| Setting                     | Why                                                                                                                         |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                       |
-| `DATABASE_URL`              | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL |
-| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                         |
-| `REDIS_URL`                 | Without it sessions are in-memory: every restart signs everyone out, and it cannot work across more than one instance       |
-| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                                 |
-| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                    |
+| Setting                     | Why                                                                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                                                             |
+| `DATABASE_URL`              | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                       |
+| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                                                               |
+| `REDIS_URL`                 | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window |
+| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                                                                       |
+| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                                                          |
 
 Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
 reports Postgres and Redis and is the one a load balancer should gate traffic

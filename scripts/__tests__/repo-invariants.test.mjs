@@ -236,3 +236,69 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
     );
   });
 });
+
+describe("the rate-limit-redis / express-rate-limit pairing", () => {
+  // rate-limit-redis is held at 4.x because 5.x needs express-rate-limit >= 8.5
+  // and 6.x needs >= 8.6, while this repo is on 7.x. Bumping the store alone
+  // fails `npm ci` with ERESOLVE, which is loud and needs no help from here.
+  //
+  // The quiet direction is the other one. 4.x declares its peer as ">= 6", so
+  // express-rate-limit 8 SATISFIES it and resolves cleanly -- while v8 renames
+  // `max` to `limit` and changes the Store contract rateLimitStore.js implements.
+  // Nothing about resolution would object.
+  //
+  // Quieter still is a forced install: legacy-peer-deps, or an override on either
+  // package, lets any mismatch through in silence. That is the same shape as the
+  // Neon case above, where the dangerous artefact was not the dependency but the
+  // thing hiding it.
+  //
+  // Majors this repo has actually run. Bumping either side fails here until the
+  // table is updated, which is the point -- it forces the pairing to be re-checked
+  // rather than assumed from a loose peer range.
+  const KNOWN_GOOD_MAJORS = [
+    { store: 4, limiter: [6, 7] },
+    { store: 5, limiter: [8] },
+    { store: 6, limiter: [8] }
+  ];
+
+  const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
+  const entryFor = (name) => lock.packages[`node_modules/${name}`];
+  const majorOf = (name) => Number(entryFor(name).version.split(".")[0]);
+
+  test("both packages are in the lockfile", () => {
+    // Without this the checks below would pass vacuously on a typo.
+    expect(entryFor("express-rate-limit")?.version).toBeDefined();
+    expect(entryFor("rate-limit-redis")?.version).toBeDefined();
+  });
+
+  test("the installed express-rate-limit satisfies the store's declared peer range", () => {
+    const peer = entryFor("rate-limit-redis").peerDependencies?.["express-rate-limit"];
+    expect(peer).toBeDefined();
+
+    const minimumMajor = Number(peer.replace(/[^0-9.]/g, "").split(".")[0]);
+    expect(Number.isInteger(minimumMajor)).toBe(true);
+    expect(majorOf("express-rate-limit")).toBeGreaterThanOrEqual(minimumMajor);
+  });
+
+  test("the installed majors are a pairing recorded here", () => {
+    const storeMajor = majorOf("rate-limit-redis");
+    const limiterMajor = majorOf("express-rate-limit");
+
+    const recorded = KNOWN_GOOD_MAJORS.find((row) => row.store === storeMajor);
+    expect(
+      recorded,
+      `rate-limit-redis ${storeMajor}.x is not a pairing recorded in this test`
+    ).toBeDefined();
+    expect(recorded.limiter).toContain(limiterMajor);
+  });
+
+  test("nothing suppresses a peer mismatch", () => {
+    const npmrc = readFileSync(path.join(repoRoot, ".npmrc"), "utf8");
+    expect(npmrc).not.toMatch(/^\s*legacy-peer-deps\s*=\s*true/im);
+
+    const overrides =
+      JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).overrides ?? {};
+    expect(Object.keys(overrides)).not.toContain("express-rate-limit");
+    expect(Object.keys(overrides)).not.toContain("rate-limit-redis");
+  });
+});

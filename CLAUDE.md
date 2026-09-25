@@ -500,10 +500,14 @@ the native instance all along.
   small dip by raising the floor to meet it.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
-  **The client thresholds in `client/vite.config.js` are a ratchet**, floored one decimal
-  below the measured value. Raise them when coverage rises; never lower them to make a
-  build pass. Whole-percent floors were tried first and let a sub-point gain evaporate
-  without tripping anything.
+  **Both sides carry a ratchet**, floored one decimal below the measured value — the
+  client's in `client/vite.config.js`, the server's in `server/vitest.config.js`. Raise
+  them when coverage rises; never lower them to make a build pass. Whole-percent floors
+  were tried first and let a sub-point gain evaporate without tripping anything.
+  **This entry used to name only the client's**, and the omission cost a CI cycle: a
+  change was verified with `npm test`, which runs no coverage at all, while CI runs
+  `test:coverage` and tripped the server floor on lines, functions and statements. Run
+  `npm run test:coverage`, not `npm test`, before claiming a change is ready.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.
