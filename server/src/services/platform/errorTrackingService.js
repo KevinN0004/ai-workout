@@ -18,6 +18,30 @@ const toRate = (value, fallback = 0) => {
   return parsed;
 };
 
+// v11 replaced `sendDefaultPii` with `dataCollection`, and left unset it now
+// collects request bodies, cookies, user info and query data by default. Here a
+// request body is a sign-in password or a profile's weight and body fat, and a
+// cookie is a session token. Measured with the real SDK on an error from a POST:
+// with this unset, the password and the weight were both in the event sent.
+//
+// This is the configuration Sentry's migration guide gives for reproducing v10's
+// default (`sendDefaultPii: false`), which is what this server ran on before.
+const PII_HEADER_DENY = ["forwarded", "-ip", "remote-", "via", "-user"];
+const DATA_COLLECTION = {
+  userInfo: false,
+  cookies: false,
+  httpHeaders: {
+    request: { deny: PII_HEADER_DENY },
+    response: { deny: PII_HEADER_DENY }
+  },
+  httpBodies: [],
+  urlQueryParams: { deny: PII_HEADER_DENY },
+  genAI: { inputs: false, outputs: false },
+  databaseQueryData: false,
+  queues: false,
+  graphQL: { document: false, variables: false }
+};
+
 export const initErrorTracking = async ({ logger, toShortText }) => {
   const dsn = toShortText(process.env.SENTRY_DSN || "", 500);
   if (!dsn) {
@@ -38,7 +62,8 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
         80
       ),
       release: toShortText(process.env.SENTRY_RELEASE || "", 120) || undefined,
-      tracesSampleRate
+      tracesSampleRate,
+      dataCollection: DATA_COLLECTION
     });
     logger.info(
       {
@@ -86,4 +111,4 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
 // stays private to the module: nothing in production reads it directly, and the
 // numeric-coercion contract test needs to assert its absent-input behaviour
 // without going through Sentry init.
-export const __testables = { toRate };
+export const __testables = { toRate, DATA_COLLECTION };
