@@ -190,8 +190,19 @@ It does three things in order:
 1. **Applies migrations** against `PRODUCTION_DATABASE_URL`. Every unapplied
    `.sql` in `server/db/postgres/`, in filename order, recorded in a
    `schema_migrations` table so re-running is a no-op.
-2. **Triggers the Render deploy** via the hook.
-3. **Waits for `/api/ready`** to report `ready`, polling for up to ~15 minutes.
+2. **Triggers the Render deploy** via the hook, after recording the uptime of
+   the instance serving now.
+3. **Waits for the new instance** to report `ready` on `/api/ready`, polling for
+   up to ~15 minutes.
+
+**"Ready" alone would not mean the deploy is live.** Render keeps the previous
+instance serving until the new one passes its health check, so straight after
+the hook it is the _old_ code that answers `/api/ready` — and it answers ready.
+On one deploy it did so three seconds after the hook, from an instance 907
+seconds old; the new one took over about 95 seconds later. So the wait only
+accepts an instance younger than the old one would now be, and a new build that
+never passes its health check fails the step instead of passing on the old
+code.
 
 **The ordering is the point.** `002_password_changed_at.sql` adds a column the
 app selects on _every_ user read, so a server started against an unmigrated
@@ -222,8 +233,9 @@ RENDER_SERVICE_URL="https://..." \
   node scripts/manual-deploy.mjs --dry-run   # check the inputs, change nothing
 ```
 
-Drop `--dry-run` to migrate, trigger the hook, and poll `/api/ready`. It never
-prints the values it reads. Migration failure stops it before the hook is
+Drop `--dry-run` to migrate, trigger the hook, and wait for the new instance to
+report ready — the same switch-over check the workflow makes, from the same
+code. It never prints the values it reads. Migration failure stops it before the hook is
 POSTed, which is the same ordering guarantee the workflow gives.
 
 It also checks the things the workflow does not, because a bad `DATABASE_URL`

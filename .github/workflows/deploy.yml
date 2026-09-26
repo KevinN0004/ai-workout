@@ -73,6 +73,30 @@ jobs:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: npm run migrate:postgres -w server
 
+      # Render keeps the previous instance serving until the new one passes its
+      # health check, so a bare "ready" straight after the hook comes from the
+      # OLD code -- on the #160 deploy it answered 3 s after the hook, 907 s old.
+      # Record the serving instance's uptime here, as close to the hook as
+      # possible; the wait below only accepts an instance younger than it.
+      # The logic lives in scripts/manual-deploy.mjs, tested, and is shared with
+      # the manual deploy, so the two cannot disagree about what "live" means.
+      - name: Record the instance serving now
+        id: baseline
+        env:
+          SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          if [ -z "$SERVICE_URL" ]; then
+            echo "baseline=null" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node --input-type=module -e '
+            import { appendFileSync } from "node:fs";
+            import { readBaseline } from "./scripts/manual-deploy.mjs";
+            const baseline = await readBaseline(process.env.SERVICE_URL.replace(/\/+$/, ""));
+            console.log(baseline ? `Serving now: uptime ${baseline.uptimeSec}s.` : "Nothing answering; the first ready response will count.");
+            appendFileSync(process.env.GITHUB_OUTPUT, `baseline=${JSON.stringify(baseline)}\n`);
+          '
+
       - name: Trigger Render deploy
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
@@ -87,30 +111,34 @@ jobs:
           echo "Deploy triggered."
 
       # Render builds and health-checks asynchronously, so the hook returning
-      # 200 means "accepted", not "live". This waits for the new code to answer.
-      - name: Wait for the service to come back ready
+      # 200 means "accepted", not "live". This waits for the NEW instance --
+      # younger than the one recorded above -- to report ready. Polls every
+      # 15 s for ~15 minutes: a free instance cold-starts in 30-60 s, and a
+      # Docker build takes longer still.
+      - name: Wait for the new instance to report ready
         env:
           SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+          BASELINE: ${{ steps.baseline.outputs.baseline }}
         run: |
           if [ -z "$SERVICE_URL" ]; then
             echo "RENDER_SERVICE_URL is not set; skipping the smoke check."
             exit 0
           fi
-          # Free instances spin down and cold-start in 30-60s, and a Docker
-          # build takes longer still, so this is patient on purpose.
-          for i in $(seq 1 60); do
-            body=$(curl --silent --max-time 10 "$SERVICE_URL/api/ready" || true)
-            case "$body" in
-              *'"status":"ready"'*)
-                echo "Ready after ~$((i * 15))s."
-                exit 0
-                ;;
-            esac
-            echo "attempt $i: not ready yet"
-            sleep 15
-          done
-          echo "Service did not report ready within ~15 minutes."
-          echo "If /api/ready reports not_ready with postgres healthy, check REDIS_URL:"
-          echo "a configured-but-unreachable Redis falls back to in-memory sessions"
-          echo "and this endpoint stays not_ready by design."
-          exit 1
+          node --input-type=module -e '
+            import { waitForNewInstance } from "./scripts/manual-deploy.mjs";
+            const result = await waitForNewInstance({
+              serviceUrl: process.env.SERVICE_URL.replace(/\/+$/, ""),
+              baseline: JSON.parse(process.env.BASELINE || "null")
+            });
+            if (result.ok) {
+              console.log(`Live: the new instance reported ready (attempt ${result.attempt}).`);
+              process.exit(0);
+            }
+            console.log("The new instance did not report ready within ~15 minutes.");
+            console.log("If the attempts said the old instance is still serving, the new build");
+            console.log("never passed the health check on Render -- read the logs of that deploy there.");
+            console.log("If /api/ready reports not_ready with postgres healthy, check REDIS_URL:");
+            console.log("a configured-but-unreachable Redis falls back to in-memory sessions");
+            console.log("and this endpoint stays not_ready by design.");
+            process.exit(1);
+          '
