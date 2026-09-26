@@ -44,10 +44,20 @@ jobs:
     # trigger. A manual dispatch has no upstream run and is allowed through,
     # and AUTO_DEPLOY does not gate it: switching automatic deploys on is a
     # separate, later decision (see the header).
+    #
+    # Only a CI run for a push to THIS repository may deploy. The repository is
+    # public, and `branches: [main]` above matches the triggering run's head
+    # branch NAME -- so a pull request from a fork whose branch is called `main`
+    # also matches, and its CI run completes in this repository's context, with
+    # these secrets. The job would deploy our main rather than the fork's code,
+    # but anyone could trigger production deploys at will and spend the Render
+    # build allowance. The event and repository checks close that.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (vars.AUTO_DEPLOY == 'true' &&
-      github.event.workflow_run.conclusion == 'success')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     environment: production
 
     steps:

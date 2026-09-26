@@ -302,3 +302,41 @@ describe("the rate-limit-redis / express-rate-limit pairing", () => {
     expect(Object.keys(overrides)).not.toContain("rate-limit-redis");
   });
 });
+
+describe("the Deploy workflow deploys only this repository's own pushes", () => {
+  // The repository is public, and deploy.yml's `branches: [main]` filter matches
+  // the triggering CI run's head branch NAME -- a pull request from a fork whose
+  // branch is called `main` matches too, and its CI run completes in this
+  // repository's context, with the production secrets. The job condition is
+  // what stops a stranger triggering production deploys. Read as text rather
+  // than parsed: the yaml package is not a declared dependency, and knip would
+  // rightly flag importing it.
+  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "deploy.yml"), "utf8");
+  const condition = (
+    (workflow.match(/^ {4}if: >-\r?\n([\s\S]*?)^ {4}environment:/m) || [])[1] ?? ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const [manual, automatic = ""] = condition.split(" || (");
+
+  test("the job condition was found", () => {
+    // Guards the regex: if the block moves, the tests below must not pass
+    // vacuously on an empty string.
+    expect(manual).toBe("github.event_name == 'workflow_dispatch'");
+    expect(automatic).not.toBe("");
+  });
+
+  test("an automatic deploy requires a green CI run for a push to this repository", () => {
+    expect(automatic).toContain("vars.AUTO_DEPLOY == 'true'");
+    expect(automatic).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(automatic).toContain("github.event.workflow_run.event == 'push'");
+    expect(automatic).toContain(
+      "github.event.workflow_run.head_repository.full_name == github.repository"
+    );
+  });
+
+  test("those requirements are all required, not alternatives", () => {
+    // One `||` inside the automatic branch would let any single check through.
+    expect(automatic).not.toContain("||");
+  });
+});
