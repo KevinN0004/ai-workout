@@ -4,7 +4,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ## Tech Stack
 
-- React 18 and Vite for the frontend
+- React 19 and Vite for the frontend
 - Express 5 for the API server
 - Postgres with Prisma Client for user and dashboard data
 - Optional Redis-backed sessions with in-memory fallback
@@ -15,7 +15,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ```text
 .
-|-- client/                   # React 18 + Vite app (npm workspace)
+|-- client/                   # React 19 + Vite app (npm workspace)
 |   |-- vite.config.js        # dev and preview proxy, client test and coverage config
 |   `-- src/
 |       |-- main.jsx          # entry point

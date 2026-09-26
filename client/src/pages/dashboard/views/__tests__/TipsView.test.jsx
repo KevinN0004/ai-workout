@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import TipsView from "../TipsView";
 
@@ -178,11 +178,17 @@ describe("TipsView", () => {
       // asserted: nothing goes out part-way through the debounce window, and
       // exactly one request goes out after it -- not one per keystroke, which
       // is what dropping the clearTimeout would give.
+      //
+      // Every advance is inside act(). The debounce timer's setState happens
+      // during the advance, and React 19 holds an update made outside act
+      // until act flushes it -- so an unwrapped advance fires the timer but
+      // the request never goes out before the assertion. React 18 happened to
+      // flush it anyway.
       vi.useFakeTimers();
       try {
         const fetchMock = withExercises([]);
         renderView();
-        await vi.advanceTimersByTimeAsync(400);
+        await act(() => vi.advanceTimersByTimeAsync(400));
         const exerciseCalls = () =>
           fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/wger/exercises"))
             .length;
@@ -190,17 +196,24 @@ describe("TipsView", () => {
 
         const input = screen.getByPlaceholderText("e.g. row, squat, plank");
         fireEvent.change(input, { target: { value: "r" } });
-        await vi.advanceTimersByTimeAsync(100);
+        await act(() => vi.advanceTimersByTimeAsync(100));
         fireEvent.change(input, { target: { value: "ro" } });
-        await vi.advanceTimersByTimeAsync(100);
+        await act(() => vi.advanceTimersByTimeAsync(100));
         fireEvent.change(input, { target: { value: "row" } });
-        await vi.advanceTimersByTimeAsync(100);
+        await act(() => vi.advanceTimersByTimeAsync(100));
 
         // 300ms of typing and still nothing, because each keystroke restarts
         // the timer rather than adding one.
         expect(exerciseCalls()).toBe(before);
 
-        await vi.advanceTimersByTimeAsync(400);
+        // In 50ms steps, each its own act(), so every timer that fires is
+        // rendered before the next one -- as in a browser, where each timer is
+        // its own task. One act() over the whole 400ms batches all three
+        // keystrokes' timers into a single render, and a missing clearTimeout
+        // then sends one request instead of three and passes.
+        for (let elapsed = 0; elapsed < 400; elapsed += 50) {
+          await act(() => vi.advanceTimersByTimeAsync(50));
+        }
 
         expect(exerciseCalls()).toBe(before + 1);
         expect(lastExerciseParams(fetchMock).get("q")).toBe("row");
@@ -217,7 +230,7 @@ describe("TipsView", () => {
         fireEvent.change(screen.getByPlaceholderText("e.g. row, squat, plank"), {
           target: { value: "  row  " }
         });
-        await vi.advanceTimersByTimeAsync(400);
+        await act(() => vi.advanceTimersByTimeAsync(400));
 
         expect(lastExerciseParams(fetchMock).get("q")).toBe("row");
       } finally {

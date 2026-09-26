@@ -58,7 +58,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 ## File Organization
 
 - NEVER save to root folder
-- `client/src` — React 18 + Vite frontend source. The only files at this level are
+- `client/src` — React 19 + Vite frontend source. The only files at this level are
   `main.jsx` and `App.jsx` (their tests are in `client/src/__tests__/`); global CSS is in
   `client/src/styles/`
 - `client/src/pages/<page>` — one folder per page: the page component
@@ -94,7 +94,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 
 AI Workout is a full-stack fitness planning app using **npm workspaces** (`client`, `server`).
 
-- **Client**: React 18 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
+- **Client**: React 19 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
 - **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
 - **Sessions**: Redis-backed when `REDIS_URL` is set, with in-memory fallback
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
@@ -895,8 +895,11 @@ the native instance all along.
   deliberate now carry an inline disable explaining why. A new warning means you
   introduced it.
 - **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
-  that went away when `jspdf` moved to a dynamic import. The main chunk is ~407 kB.
-  If the warning reappears, something got pulled back onto the eager path.
+  that went away when `jspdf` moved to a dynamic import. The main chunk is ~487 kB,
+  which leaves only ~13 kB before the warning. It was ~407 kB until React 19, which
+  alone added the difference -- measured by building with nothing else changed, not
+  estimated. If the warning appears, check first whether something got pulled onto
+  the eager path; if nothing did, the margin simply ran out.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
 - Server tests need Postgres: `npm run postgres:local:start -w server` first, or **96** of
   them fail with `Can't reach database server`, which is environmental, not a regression
