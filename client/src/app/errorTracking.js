@@ -64,7 +64,11 @@ export const initErrorTracking = async (dsn = import.meta.env.VITE_SENTRY_DSN, l
     // running, in development and in production alike. Naming targets
     // replaces that default, so a list matching "localhost" would trace the
     // dev server and silently stop tracing the deployed one.
-    tracesSampleRate: 1.0,
+    //
+    // One page load in ten. Errors are not sampled by this -- every error is
+    // still reported -- it only thins the performance traces, which at 1.0
+    // sent one per page load into the free plan's quota. Enough for trends.
+    tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0
   });
