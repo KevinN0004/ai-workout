@@ -102,7 +102,11 @@ export const createSessionService = ({
   const closeRedisClientQuietly = async (client) => {
     if (!client) return;
     try {
-      await client.disconnect();
+      // destroy(), not disconnect(): node-redis 5 renamed it, and 6 keeps
+      // disconnect() only as a deprecated alias. The catch below swallows a
+      // missing method too, so losing the alias would leave a failed client
+      // retrying and logging forever with nothing to show for it.
+      await client.destroy();
     } catch {
       // The client may never have connected; nothing to clean up.
     }
@@ -153,8 +157,12 @@ export const createSessionService = ({
         connectTimeout: redisConnectTimeoutMs,
         reconnectStrategy: redisReconnectStrategy
       };
+      // RESP2, pinned: node-redis 6 defaults to RESP3, which this app gains
+      // nothing from, and Upstash's docs do not say it speaks RESP3. A failed
+      // handshake there would drop every session to memory.
       client = hasSocketConfig
         ? createClient({
+            RESP: 2,
             username: redisUsername,
             password: redisPassword || undefined,
             socket: {
@@ -164,7 +172,7 @@ export const createSessionService = ({
               tls: redisTls
             }
           })
-        : createClient({ url: redisUrl, socket: socketOptions });
+        : createClient({ RESP: 2, url: redisUrl, socket: socketOptions });
 
       client.on("error", (err) => {
         redisLastError = cleanText(err?.message || String(err), 260);

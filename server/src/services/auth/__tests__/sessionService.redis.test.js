@@ -32,7 +32,7 @@ const buildFakeRedis = (overrides = {}) => {
       handlers[event] = handler;
     }),
     connect: vi.fn(async () => {}),
-    disconnect: vi.fn(async () => {}),
+    destroy: vi.fn(async () => {}),
     set: vi.fn(async (key, value) => {
       store.set(key, value);
       return "OK";
@@ -120,6 +120,19 @@ describe("connecting", () => {
     expect(options.socket.tls).toBe(true);
   });
 
+  // node-redis 6 defaults to RESP3. Production is Upstash, whose docs do not
+  // say it speaks RESP3, and a failed handshake would drop every session to
+  // memory -- so both configuration shapes pin the protocol this app has
+  // always used.
+  test.each([
+    ["a url", { REDIS_URL: "redis://localhost:6379" }],
+    ["a host and port", { REDIS_HOST: "cache.internal", REDIS_PORT: "6380" }]
+  ])("pins RESP2 when configured with %s", async (_label, env) => {
+    await connected({}, env);
+
+    expect(createClient.mock.calls[0][0].RESP).toBe(2);
+  });
+
   test("sends no password when none was configured", async () => {
     await connected({}, { REDIS_HOST: "cache.internal", REDIS_PORT: "6380" });
 
@@ -165,7 +178,7 @@ describe("connecting", () => {
 
     await connected();
 
-    expect(fakeRedis.disconnect).toHaveBeenCalledTimes(1);
+    expect(fakeRedis.destroy).toHaveBeenCalledTimes(1);
   });
 
   test("records an error the client reports later", async () => {
@@ -380,7 +393,7 @@ describe("closeSessionStore", () => {
 
     await service.closeSessionStore();
 
-    expect(fakeRedis.disconnect).toHaveBeenCalled();
+    expect(fakeRedis.destroy).toHaveBeenCalled();
     expect(service.isRedisSessionsEnabled()).toBe(false);
     expect(service.getRedisClient()).toBeNull();
   });
