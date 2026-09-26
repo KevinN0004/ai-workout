@@ -80,6 +80,21 @@ describe("validateDeployInputs", () => {
     expect(warnings.some((warning) => warning.includes("options"))).toBe(true);
   });
 
+  test("does not warn about channel_binding, which the driver handles", () => {
+    // `neon connection-string --pooled` emits this by default. It is resolved by
+    // the driver during SCRAM rather than sent on as a startup parameter, so
+    // PgBouncer never sees it -- confirmed by connecting with pg 8.23. Warning
+    // about the string Neon's own CLI produces would teach a reader to ignore
+    // these warnings, which is worse than saying nothing.
+    const { errors, warnings } = validateDeployInputs({
+      ...VALID,
+      databaseUrl: `${NEON}?sslmode=verify-full&channel_binding=require`
+    });
+
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
   test("strips a trailing slash from the service URL", () => {
     // Left on, every polled URL would contain "//api/ready".
     const { serviceUrl } = validateDeployInputs({

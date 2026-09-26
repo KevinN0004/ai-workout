@@ -97,7 +97,16 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
   // The pooled endpoint is PgBouncer, which accepts four startup parameters and
   // errors on anything else. An earlier version of this app passed
   // options=-c timezone=UTC and would have been refused outright.
-  const extraParams = [...database.searchParams.keys()].filter((key) => key !== "sslmode");
+  //
+  // Both allowed names below are handled by the driver rather than sent on as a
+  // startup parameter, so PgBouncer never sees them. channel_binding is on the
+  // list because `neon connection-string` emits it by default: warning about the
+  // string Neon's own CLI produces would teach a reader to ignore these warnings.
+  // Verified by connecting with pg 8.23, the driver @prisma/adapter-pg drives.
+  const DRIVER_SIDE_PARAMS = new Set(["sslmode", "channel_binding"]);
+  const extraParams = [...database.searchParams.keys()].filter(
+    (key) => !DRIVER_SIDE_PARAMS.has(key)
+  );
   if (extraParams.length) {
     warnings.push(`extra query params the pooled endpoint may reject: ${extraParams.join(", ")}`);
   }
