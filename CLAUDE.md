@@ -66,7 +66,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   `hooks/` and `styles/`. The larger pages also hold feature folders
   (`dashboard/meal/`, `dashboard/tips/`) and page-level helpers (`preview/utils.js`).
   Folder names are lowercase, kebab-case where needed (`workout-result/`)
-- `server/src` — Express 4 API, services, routes. Only the app bootstrap
+- `server/src` — Express 5 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
 - `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`
   (request validation, API schemas, error responses) and `platform/` (metrics, error
@@ -95,7 +95,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 AI Workout is a full-stack fitness planning app using **npm workspaces** (`client`, `server`).
 
 - **Client**: React 18 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
-- **Server**: Express 4 on `http://localhost:5000`, Postgres via Prisma Client
+- **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
 - **Sessions**: Redis-backed when `REDIS_URL` is set, with in-memory fallback
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
