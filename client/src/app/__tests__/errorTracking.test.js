@@ -89,7 +89,7 @@ describe("initErrorTracking", () => {
 
     const config = initConfig();
     expect(config.integrations).toEqual([{ name: "BrowserTracing" }, { name: "Replay" }]);
-    expect(config.tracesSampleRate).toBe(1.0);
+    expect(config.tracesSampleRate).toBe(0.1);
     expect(config.replaysSessionSampleRate).toBe(0.1);
     expect(config.replaysOnErrorSampleRate).toBe(1.0);
   });
