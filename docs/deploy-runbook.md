@@ -208,6 +208,29 @@ Until it is set, those automatic runs are skipped rather than failed, which is
 what keeps `main` from showing a red Deploy after every merge before any of this
 exists. A manual run is never gated by the variable.
 
+### If Actions cannot run it
+
+A billing block, a GitHub outage, or a deploy from a machine rather than CI all
+leave the workflow unable to start — and it is the only thing that applies
+migrations, so the deploy is blocked with it. `scripts/manual-deploy.mjs` does
+the same four things in the same order from a terminal:
+
+```bash
+PRODUCTION_DATABASE_URL="..." \
+RENDER_DEPLOY_HOOK_URL="..." \
+RENDER_SERVICE_URL="https://..." \
+  node scripts/manual-deploy.mjs --dry-run   # check the inputs, change nothing
+```
+
+Drop `--dry-run` to migrate, trigger the hook, and poll `/api/ready`. It never
+prints the values it reads. Migration failure stops it before the hook is
+POSTed, which is the same ordering guarantee the workflow gives.
+
+It also checks the things the workflow does not, because a bad `DATABASE_URL`
+there fails after the point of no return: a localhost host is refused outright,
+and a missing `sslmode=verify-full`, a non-pooled endpoint, or a query parameter
+PgBouncer would reject each warn.
+
 ---
 
 ## Verifying it worked
