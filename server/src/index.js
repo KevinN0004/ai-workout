@@ -73,7 +73,10 @@ import {
 import { validateEnv } from "./services/platform/envValidationService.js";
 import { createRateLimitStore } from "./services/platform/rateLimitStore.js";
 
-dotenv.config();
+// quiet: dotenv 17+ prints "injected env (N) from .env" to stderr on every
+// call, as an unstructured line beside pino's JSON. prisma.js, the migration
+// script and vitest.setup.js pass it for the same reason.
+dotenv.config({ quiet: true });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Must run before any other module-scope code reads process.env below
