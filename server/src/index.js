@@ -167,6 +167,25 @@ app.use(
   })
 );
 
+// The client reports to Sentry when it is built with VITE_SENTRY_DSN (see
+// client/src/app/errorTracking.js). Render hands a service's variables to both
+// the Docker build and this process, so the policy derives the one ingest
+// origin from the same value instead of allowing every sentry.io host.
+// connect-src is where an injected script would exfiltrate to; a wildcard
+// would let it report into anyone's project. `.origin` also drops the key the
+// DSN carries as userinfo. Anything that does not parse as http(s) adds
+// nothing -- the client's SDK rejects the same value, so both sides stay off.
+const sentryIngestOrigin = (() => {
+  const dsn = process.env.VITE_SENTRY_DSN;
+  if (!dsn) return null;
+  try {
+    const url = new URL(dsn);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+})();
+
 app.use(
   helmet({
     // This process serves the SPA as well as the API, so the document needs to
@@ -191,7 +210,10 @@ app.use(
           "https://placehold.co",
           "https://www.themealdb.com"
         ],
-        "connect-src": ["'self'"],
+        "connect-src": ["'self'", ...(sentryIngestOrigin ? [sentryIngestOrigin] : [])],
+        // Session Replay compresses in a worker it starts from a blob: URL.
+        // Only needed, so only allowed, when the client reports at all.
+        ...(sentryIngestOrigin ? { "worker-src": ["'self'", "blob:"] } : {}),
         "frame-ancestors": ["'none'"],
         "base-uri": ["'self'"],
         "form-action": ["'self'"],

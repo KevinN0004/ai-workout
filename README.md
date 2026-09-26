@@ -160,6 +160,7 @@ Common server variables:
 | `SENTRY_RELEASE`                                                            | Release tag sent to Sentry                                                               | unset                                                       |
 | `SENTRY_TRACES_SAMPLE_RATE`                                                 | Sentry trace sampling, clamped to 0–1                                                    | `0`                                                         |
 | `SENTRY_SHUTDOWN_TIMEOUT_MS`                                                | How long shutdown waits for Sentry to flush                                              | `2000`                                                      |
+| `VITE_SENTRY_DSN`                                                           | Browser Sentry DSN, read by the client **build** and by the server's CSP                 | unset                                                       |
 | `LOG_LEVEL`                                                                 | Pino log level                                                                           | `info`                                                      |
 | `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                        | unset                                                       |
 

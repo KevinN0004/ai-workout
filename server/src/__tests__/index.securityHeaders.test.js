@@ -1,5 +1,5 @@
 import request from "supertest";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { app } from "../index.js";
 
 // The CSP had no test at all, which is how it came to block the application's
@@ -89,5 +89,51 @@ describe("the content security policy", () => {
 
     expect(directive(policy, "frame-ancestors")).toBe("'none'");
     expect(directive(policy, "object-src")).toBe("'none'");
+  });
+});
+
+describe("the policy's Sentry allowances", () => {
+  // The client's DSN is read once at import, so each case gets a freshly
+  // imported app. The key is always assigned, never deleted: index.js calls
+  // dotenv.config() at module scope and dotenv fills in absent keys, so a
+  // deleted one would hand the app whatever server/.env says.
+  const cspWithClientDsn = async (value) => {
+    vi.resetModules();
+    const previous = process.env.VITE_SENTRY_DSN;
+    process.env.VITE_SENTRY_DSN = value;
+    try {
+      const { app: freshApp } = await import("../index.js");
+      const response = await request(freshApp).get("/api/health");
+      return String(response.headers["content-security-policy"] || "");
+    } finally {
+      // Assigning undefined stores the string "undefined", so an absent key
+      // has to be deleted rather than assigned back.
+      if (previous === undefined) delete process.env.VITE_SENTRY_DSN;
+      else process.env.VITE_SENTRY_DSN = previous;
+    }
+  };
+
+  test("name the one ingest host the client was built to report to", async () => {
+    const policy = await cspWithClientDsn("https://publickey@o123.ingest.us.sentry.io/456");
+
+    // Exactly that origin: not a sentry.io wildcard, which would let an
+    // injected script report into any project, and not the key or the path.
+    expect(directive(policy, "connect-src")).toBe("'self' https://o123.ingest.us.sentry.io");
+    expect(policy).not.toContain("publickey");
+    // Replay's compression worker is started from a blob: URL.
+    expect(directive(policy, "worker-src")).toBe("'self' blob:");
+  });
+
+  test.each([
+    ["unset", ""],
+    ["not a URL", "not a dsn"],
+    // Parses, but its origin is the string "null" -- which must not reach
+    // the policy as a source.
+    ["not http(s)", "javascript:alert(1)"]
+  ])("add nothing when the DSN is %s", async (_label, value) => {
+    const policy = await cspWithClientDsn(value);
+
+    expect(directive(policy, "connect-src")).toBe("'self'");
+    expect(directive(policy, "worker-src")).toBe("");
   });
 });
