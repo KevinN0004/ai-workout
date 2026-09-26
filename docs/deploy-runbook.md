@@ -478,12 +478,23 @@ shell access. Docker services are supported on this tier.
 unlimited projects, email alerts. Ample for an app this size; the single seat is
 the limit you would hit first if anyone joined you.
 
-**GitHub Actions** — **2,000 minutes/month and 500 MB of artifact storage,
-because this repository is private.** Public repositories are unlimited. Measured
-on a real run, CI costs about **13 billed minutes** (six jobs, each rounded up),
-and a working deploy adds up to ~16 more, because `Wait for the service to come
-back ready` polls for 15 minutes. A pull request plus its merge is therefore
-roughly 30–45 minutes, or about 45–65 full cycles a month.
+**GitHub Actions** — **unlimited on standard runners, because this repository
+is public.** It was made public on 2026-09-26. Before that it was private, capped
+at 2,000 minutes a month, and every CI job failed within seconds with _"the job
+was not started because recent account payments have failed or your spending
+limit needs to be increased"_ — no step ran, so it looks like a broken workflow
+and is not one.
+
+If it is ever made private again, the cap returns. Measured on real runs, CI
+costs about **13 billed minutes** (six jobs, each rounded up), and a deploy about
+**2 more**: the job took 1 min 40 s, 77 s of it waiting for Render to switch to
+the new instance. The wait can run to 15 minutes, but only when a new build
+never becomes healthy.
+
+`main` is protected: all six CI jobs must pass before a pull request can merge,
+and force pushes and deletion are refused. Admins can still bypass it
+deliberately, so a CI outage cannot lock the repository — but `gh pr merge`
+without `--admin` refuses a red pull request, which is the point.
 
 Two consequences worth holding onto:
 
@@ -492,8 +503,11 @@ Two consequences worth holding onto:
   Rows accumulate indefinitely while the UI looks bounded, and the destination
   is Neon's write-blocking 0.5 GB cap. Years away at personal scale, but it ends
   in a hard failure rather than a warning.
-- **Making the repository public would remove the Actions limit entirely.**
-  That is a decision about your code being public, not a technical one.
+- **Everything in the repository is public, history included.** A secret
+  committed once is exposed even after it is deleted from the tree. Keep them in
+  Render's environment and GitHub's secrets only. A pattern scan of the full
+  history when the repository went public found no real credentials — only the
+  placeholders in this runbook and the test fixtures.
 
 If the app becomes something you actually depend on, the first thing to pay for
 is Render, to stop the cold starts.
