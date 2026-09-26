@@ -273,7 +273,11 @@ const main = async () => {
   }
 
   console.log("\n== applying migrations (must precede the deploy) ==");
-  const migrate = spawnSync("npm", ["run", "migrate:postgres", "-w", "server"], {
+  // One command string, not a command plus an argument array. `shell: true` is
+  // needed because npm is a .cmd on Windows, and with it Node deprecates the
+  // array form (DEP0190): the arguments are concatenated unescaped. Every part
+  // here is a constant, so there is nothing to escape either way.
+  const migrate = spawnSync("npm run migrate:postgres -w server", {
     cwd: repoRoot,
     env: { ...process.env, DATABASE_URL: databaseUrl },
     stdio: "inherit",
