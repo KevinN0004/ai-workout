@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import { closePostgres, connectPostgres, getPostgresStatus } from "./db/postgres.js";
@@ -231,7 +231,12 @@ app.use(
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
-const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// Built only when a key is configured. The key is optional by design, and the
+// SDK console.warns on every keyless construction, bypassing pino. With no
+// client, /api/generate answers its own "Missing GEMINI_API_KEY." 500.
+const gemini = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
 const redisSessionKeyPrefix = "session:sid:";
 const csrfCookieName = "csrfToken";
 const csrfHeaderName = "x-csrf-token";
