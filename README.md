@@ -347,7 +347,9 @@ session store and sign every user out.
 
 **Deploys are triggered by CI, not by pushing.** `render.yaml` sets
 `autoDeployTrigger: "off"` and `.github/workflows/deploy.yml` applies migrations
-first, then calls the deploy hook, then waits for `/api/ready`. That ordering is
+first, then calls the deploy hook, then waits for the _new_ instance to report
+ready on `/api/ready` — Render keeps the old one answering until the new one
+passes its health check, so a bare ready proves nothing. That ordering is
 the point — see the release-order note above. Automatic deploys stay off until the
 repository variable `AUTO_DEPLOY` is set to `true`; until then the run after each
 green CI is skipped, and the first deploy is started by hand (see
