@@ -745,10 +745,13 @@ the native instance all along.
     comparison every zone falls on without needing to be in one.
 
   - **jsdom's CSSOM is not a faithful mirror, and guessing at it wastes a run.**
-    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`; `border: none` reads
-    back as `""`, not `"none"`; and an unstyled element's computed `color` is
-    `canvastext` rather than empty, so a `style.color || fallback` branch can
-    never take its fallback here. Check what it stores before asserting on it.
+    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`, and an unstyled
+    element's computed `color` is `rgb(0, 0, 0)` rather than empty, so a
+    `style.color || fallback` branch can never take its fallback here. Check
+    what it stores before asserting on it. **It changed under jsdom 29**, which
+    rewrote the CSSOM: `border: none` used to read back as `""` and now reads
+    `"none"`, as Chromium does, and the computed `color` above used to be
+    `canvastext`. A test that pinned the old answer failed on the upgrade.
   - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
     `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
     `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,

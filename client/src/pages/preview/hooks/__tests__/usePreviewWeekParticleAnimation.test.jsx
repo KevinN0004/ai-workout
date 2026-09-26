@@ -339,9 +339,10 @@ describe("usePreviewWeekParticleAnimation", () => {
 
     test.each([
       [0.9, "50%", "solid"],
-      // jsdom drops `border: none` rather than storing the keyword, so the
-      // unbordered chunk reads back as no border style at all.
-      [0.1, "1px", ""]
+      // "none", not "": an unset border would also read back as "", so only
+      // the keyword proves the unbordered branch ran. jsdom before 29 dropped
+      // `border: none` and this could not be asserted; Chromium reads "none".
+      [0.1, "1px", "none"]
     ])("a random draw of %s shapes the debris", (draw, radius, borderStyle) => {
       // Both the particle shape and whether a chunk carries a border are coin
       // flips. Pinning the draw is the only way either side is ever seen.
