@@ -213,7 +213,14 @@ failure stops the deploy.
 repository variable (a variable, not a secret): Repository → **Settings →
 Secrets and variables → Actions → Variables → New repository variable**, named
 `AUTO_DEPLOY` with the value `true`. From then on the workflow also runs
-automatically whenever CI passes on `main`.
+automatically whenever CI passes for a push to `main` in this repository.
+
+That last qualification matters because the repository is public. The
+workflow's `branches: [main]` filter matches the triggering run's branch _name_,
+so a pull request from a fork whose branch is called `main` would match as well.
+The job condition also requires the triggering run to be a push from this
+repository, so a stranger's pull request cannot start a production deploy.
+`scripts/__tests__/repo-invariants.test.mjs` fails if either check is dropped.
 
 Until it is set, those automatic runs are skipped rather than failed, which is
 what keeps `main` from showing a red Deploy after every merge before any of this
