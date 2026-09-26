@@ -31,6 +31,12 @@ COPY . .
 # The schema lives in server/prisma and the client is generated into
 # node_modules, so this must happen after the source copy and before the build.
 RUN npm run prisma:generate -w server
+
+# Render passes a service's variables to the build as build args, but only the
+# ones declared here. Vite bakes this into the bundle, which is fine for a DSN:
+# it is public by design and ships to every browser anyway. Unset, the client
+# builds with error tracking off.
+ARG VITE_SENTRY_DSN
 RUN npm run build
 
 # ---- runtime ----------------------------------------------------------------

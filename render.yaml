@@ -84,6 +84,13 @@ services:
       - key: SENTRY_DSN
         sync: false
 
+      # The browser's DSN, from a React project. Used twice: the Docker build
+      # bakes it into the bundle, and the server adds its ingest host to the
+      # CSP's connect-src at runtime -- one value, so the two cannot drift.
+      # Unset, the client reports nothing.
+      - key: VITE_SENTRY_DSN
+        sync: false
+
       # Required, not optional: externalDataService throws "OpenAQ API key is
       # not configured" without it. The route catches it and the dashboard
       # shows an error card rather than breaking, so the failure is a
