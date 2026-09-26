@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@sentry/react": "^11.0.0",
     "animejs": "^4.5.0",
     "jspdf": "^4.2.1",
     "react": "^18.3.1",

@@ -110,21 +110,28 @@ six-hour buffer that serves old data when an upstream is down.
 3. It will prompt for the values `render.yaml` marks `sync: false`. Two you
    already have; the rest are explained beneath the table:
 
-   | Key              | Value                                |
-   | ---------------- | ------------------------------------ |
-   | `DATABASE_URL`   | The Neon string from step 1          |
-   | `REDIS_URL`      | The Upstash string from step 2       |
-   | `CLIENT_ORIGIN`  | See below — you may not know it yet  |
-   | `GEMINI_API_KEY` | Google AI Studio key, or blank       |
-   | `SENTRY_DSN`     | See below — strongly recommended     |
-   | `OPENAQ_API_KEY` | See below — required for air quality |
-   | `METRICS_TOKEN`  | Any long random string, or blank     |
+   | Key               | Value                                |
+   | ----------------- | ------------------------------------ |
+   | `DATABASE_URL`    | The Neon string from step 1          |
+   | `REDIS_URL`       | The Upstash string from step 2       |
+   | `CLIENT_ORIGIN`   | See below — you may not know it yet  |
+   | `GEMINI_API_KEY`  | Google AI Studio key, or blank       |
+   | `SENTRY_DSN`      | See below — strongly recommended     |
+   | `VITE_SENTRY_DSN` | See below — optional                 |
+   | `OPENAQ_API_KEY`  | See below — required for air quality |
+   | `METRICS_TOKEN`   | Any long random string, or blank     |
 
    **`SENTRY_DSN`** — sign up at [sentry.io](https://sentry.io), create a Node
    project, copy the DSN. The error tracking is already built and tested; this
    is the only thing it was missing. Without it a production 500 exists only in
    Render's log viewer, which on the free tier is thin. You will not know when
    the app breaks.
+
+   **`VITE_SENTRY_DSN`** — the same for the browser: create a React project and
+   copy its DSN. It is read twice, by the Docker build (which bakes it into the
+   bundle) and by the server (which adds its ingest host to the CSP), so a
+   change only takes effect on a fresh build, not a restart. Leave it blank and
+   the client reports nothing.
 
    **`OPENAQ_API_KEY`** — free key from
    [openaq.org](https://openaq.org). Not optional: the service throws
