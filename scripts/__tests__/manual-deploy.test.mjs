@@ -86,10 +86,10 @@ describe("validateDeployInputs", () => {
     expect(warnings.some((warning) => warning.includes("options"))).toBe(true);
   });
 
-  test("does not warn about channel_binding, which the driver handles", () => {
-    // `neon connection-string --pooled` emits this by default. It is resolved by
-    // the driver during SCRAM rather than sent on as a startup parameter, so
-    // PgBouncer never sees it -- confirmed by connecting with pg 8.23. Warning
+  test("does not warn about channel_binding, which never reaches PgBouncer", () => {
+    // `neon connection-string --pooled` emits this by default. pg does not read
+    // it at all, so it is never sent on as a startup parameter and PgBouncer
+    // never sees it -- the connection works, confirmed with pg 8.23. Warning
     // about the string Neon's own CLI produces would teach a reader to ignore
     // these warnings, which is worse than saying nothing.
     const { errors, warnings } = validateDeployInputs({

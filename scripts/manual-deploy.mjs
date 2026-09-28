@@ -106,11 +106,18 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
   // errors on anything else. An earlier version of this app passed
   // options=-c timezone=UTC and would have been refused outright.
   //
-  // Both allowed names below are handled by the driver rather than sent on as a
-  // startup parameter, so PgBouncer never sees them. channel_binding is on the
-  // list because `neon connection-string` emits it by default: warning about the
-  // string Neon's own CLI produces would teach a reader to ignore these warnings.
-  // Verified by connecting with pg 8.23, the driver @prisma/adapter-pg drives.
+  // Neither name below reaches PgBouncer. pg (8.23, the driver
+  // @prisma/adapter-pg drives) builds its startup packet from a fixed list --
+  // user, database, application_name, replication, options and three timeouts --
+  // and neither is on it. sslmode is consumed client-side to configure TLS.
+  // channel_binding is not read by pg at all: it neither reaches the server nor
+  // turns channel binding on, which pg does only for `enableChannelBinding` in
+  // the config object, and this app does not set that. The server is still
+  // authenticated, by sslmode=verify-full, which is checked above.
+  //
+  // It is allowed anyway because `neon connection-string` emits it by default:
+  // warning about the string Neon's own CLI produces would teach a reader to
+  // ignore these warnings.
   const DRIVER_SIDE_PARAMS = new Set(["sslmode", "channel_binding"]);
   const extraParams = [...database.searchParams.keys()].filter(
     (key) => !DRIVER_SIDE_PARAMS.has(key)
