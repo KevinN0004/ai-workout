@@ -40,7 +40,9 @@ Set aside about 30 minutes. Most of it is waiting for the first Docker build.
    one** — Neon labels it "Pooled connection", and it usually has `-pooler` in
    the hostname.
 3. Append `?sslmode=verify-full` (replacing `?sslmode=require` if Neon supplied
-   that).
+   that). If the string also carries `channel_binding=require`, it can stay or
+   go: `pg` ignores it, so it is neither sent to PgBouncer nor enforced. Give
+   `sslmode` once — with two, `pg` uses the last.
 
 You want something shaped like:
 
@@ -57,9 +59,11 @@ the behaviour you already have, and silences the warning. It is not a change of
 behaviour; it is the same behaviour spelled so it cannot drift.
 
 **Do not add any other query parameters.** The pooled endpoint is PgBouncer,
-which accepts only four startup parameters and errors on anything else. An
-earlier version of this app passed `options=-c timezone=UTC` and would have been
-refused outright; the timezone is now set by the database instead
+which accepts only four startup parameters and errors on anything else. Not
+every query parameter becomes one: `pg` consumes `sslmode` itself and ignores
+`channel_binding`, but forwards others such as `options`. An earlier version of
+this app passed `options=-c timezone=UTC` and would have been refused outright;
+the timezone is now set by the database instead
 (`server/db/postgres/003_utc_timezone.sql`).
 
 The `sslmode` is required because the Prisma adapter takes no separate `ssl`
