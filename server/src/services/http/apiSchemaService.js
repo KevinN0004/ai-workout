@@ -9,6 +9,7 @@ import {
   allowedSleepValues,
   allowedTrainingDayValues
 } from "../dashboard/dashboardDataBuildersService.js";
+import { validationMessage } from "./validationMessages.js";
 
 const toNumberInput = (value) => {
   if (value === "") return null;
@@ -217,7 +218,7 @@ export const getValidationMessage = (error) => {
 };
 
 export const validateBody = (req, res, schema) => {
-  const result = schema.safeParse(req.body || {});
+  const result = schema.safeParse(req.body || {}, { error: validationMessage });
   if (result.success) return result.data;
   res.status(400).json({ error: getValidationMessage(result.error) });
   return null;
