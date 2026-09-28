@@ -22,15 +22,17 @@ export default defineConfig({
       exclude: ["**/*.test.js", "src/generated/**"],
       reporter: ["text", "html"],
       // A ratchet, not a target -- see the note in client/vite.config.js.
-      // Measured 2026-09-13, floored one decimal below. Whole-percent floors
-      // were used here until postgres.js went from 53% to 100%, a gain of over
-      // a point on the totals that a whole-percent floor would have rounded
-      // most of away.
+      // Measured 2026-09-28 (94.32 / 86.67 / 95.47 / 95.67), floored one
+      // decimal below. Branches read 87.10 in CI and 86.67 locally, so the
+      // floor follows the lower of the two. Whole-percent floors were used
+      // here until postgres.js went from 53% to 100%, a gain of over a point
+      // on the totals that a whole-percent floor would have rounded most of
+      // away.
       thresholds: {
-        statements: 93.6,
-        branches: 85.3,
-        functions: 95.2,
-        lines: 95.0
+        statements: 94.3,
+        branches: 86.6,
+        functions: 95.4,
+        lines: 95.6
       }
     }
   }
