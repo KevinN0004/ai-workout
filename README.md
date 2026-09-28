@@ -411,17 +411,17 @@ green CI is skipped, and the first deploy is started by hand (see
 
 ### What production needs
 
-| Setting                          | Why                                                                                                                                                               |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV=production`            | Enables the env preflight and the production defaults                                                                                                             |
-| `DATABASE_URL`                   | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                       |
-| `CLIENT_ORIGIN`                  | Required when `NODE_ENV=production`                                                                                                                               |
-| `REDIS_URL`                      | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window |
-| `GEMINI_API_KEY`                 | Plan generation returns an error without it                                                                                                                       |
-| `OPENAQ_API_KEY`                 | Without it air quality always reads as unavailable. The route answers 200 with `fallback: true`, so nothing looks like an error; nothing else is affected         |
-| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Server and browser error reporting. Unset, production errors reach only the host's logs                                                                           |
-| `METRICS_TOKEN`                  | Opens `/api/metrics` to callers who send it; unset, the endpoint stays closed in production                                                                       |
-| `POSTGRES_STARTUP_REQUIRED`      | Defaults to true in production; leave it                                                                                                                          |
+| Setting                          | Why                                                                                                                                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`            | Enables the env preflight and the production defaults                                                                                                                                               |
+| `DATABASE_URL`                   | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                                                         |
+| `CLIENT_ORIGIN`                  | Required when `NODE_ENV=production`                                                                                                                                                                 |
+| `REDIS_URL`                      | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window                                   |
+| `GEMINI_API_KEY`                 | Plan generation returns an error without it                                                                                                                                                         |
+| `OPENAQ_API_KEY`                 | Without it air quality always reads as unavailable. The route answers 200 with `fallback: true`, so the browser sees no error; the server logs `external_api_retry` warnings naming the missing key |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Server and browser error reporting. Unset, production errors reach only the host's logs                                                                                                             |
+| `METRICS_TOKEN`                  | Opens `/api/metrics` to callers who send it; unset, the endpoint stays closed in production                                                                                                         |
+| `POSTGRES_STARTUP_REQUIRED`      | Defaults to true in production; leave it                                                                                                                                                            |
 
 Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
 reports Postgres and Redis and is the one a load balancer should gate traffic
