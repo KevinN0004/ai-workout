@@ -67,6 +67,42 @@ describe("validateDeployInputs", () => {
     expect(warnings.some((warning) => warning.includes("verify-full"))).toBe(true);
   });
 
+  // Allowing channel_binding must not blanket the check: beside a parameter
+  // PgBouncer would reject, the warning still fires and names only that one.
+  test("still names a rejected parameter that sits beside channel_binding", () => {
+    const { warnings } = validateDeployInputs({
+      ...VALID,
+      databaseUrl: `${NEON}?sslmode=verify-full&channel_binding=require&options=-c%20timezone%3DUTC`
+    });
+
+    expect(warnings).toEqual([expect.stringContaining("options")]);
+    expect(warnings[0]).not.toContain("channel_binding");
+  });
+
+  // pg reads the LAST sslmode in a URL (pg-connection-string assigns each query
+  // param in turn), so that is the one that decides whether TLS is used.
+  test("judges sslmode by the value pg uses, the last one", () => {
+    const { warnings } = validateDeployInputs({
+      ...VALID,
+      databaseUrl: `${NEON}?sslmode=verify-full&sslmode=disable`
+    });
+
+    // pg connects with TLS off here. Reading the first value passed this clean.
+    expect(warnings.some((warning) => warning.includes('sslmode is "disable"'))).toBe(true);
+  });
+
+  test("warns when sslmode is given more than once", () => {
+    const { errors, warnings } = validateDeployInputs({
+      ...VALID,
+      databaseUrl: `${NEON}?sslmode=disable&sslmode=verify-full`
+    });
+
+    // pg would use verify-full, so this connects safely -- but a URL that says
+    // two things about TLS is one edit away from saying the wrong one.
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([expect.stringContaining("sslmode is given 2 times")]);
+  });
+
   test("warns when the host is not the pooled endpoint", () => {
     const { warnings } = validateDeployInputs({
       ...VALID,

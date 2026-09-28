@@ -92,7 +92,15 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
     errors.push("PRODUCTION_DATABASE_URL points at localhost -- that is the dev database.");
   }
 
-  const sslmode = database.searchParams.get("sslmode");
+  // pg reads the LAST sslmode in the URL -- pg-connection-string assigns each
+  // query param in turn -- so that is the value judged here. Reading the first
+  // passed ?sslmode=verify-full&sslmode=disable clean while pg connected with
+  // TLS off.
+  const sslmodes = database.searchParams.getAll("sslmode");
+  const sslmode = sslmodes.at(-1) ?? null;
+  if (sslmodes.length > 1) {
+    warnings.push(`sslmode is given ${sslmodes.length} times; pg uses the last ("${sslmode}")`);
+  }
   if (sslmode !== "verify-full") {
     // Not an error: `pg` treats require as an alias for verify-full today. The
     // runbook wants it spelled out so the behaviour cannot drift on a major bump.
@@ -106,8 +114,9 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
   // errors on anything else. An earlier version of this app passed
   // options=-c timezone=UTC and would have been refused outright.
   //
-  // Neither name below reaches PgBouncer. pg (8.23, the driver
-  // @prisma/adapter-pg drives) builds its startup packet from a fixed list --
+  // Neither name below reaches PgBouncer. pg 8.23 -- used directly by the
+  // migration runner, and through @prisma/adapter-pg by the app -- builds its
+  // startup packet from a fixed list --
   // user, database, application_name, replication, options and three timeouts --
   // and neither is on it. sslmode is consumed client-side to configure TLS.
   // channel_binding is not read by pg at all: it neither reaches the server nor
@@ -118,9 +127,9 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
   // It is allowed anyway because `neon connection-string` emits it by default:
   // warning about the string Neon's own CLI produces would teach a reader to
   // ignore these warnings.
-  const DRIVER_SIDE_PARAMS = new Set(["sslmode", "channel_binding"]);
+  const NOT_SENT_AS_STARTUP_PARAMS = new Set(["sslmode", "channel_binding"]);
   const extraParams = [...database.searchParams.keys()].filter(
-    (key) => !DRIVER_SIDE_PARAMS.has(key)
+    (key) => !NOT_SENT_AS_STARTUP_PARAMS.has(key)
   );
   if (extraParams.length) {
     warnings.push(`extra query params the pooled endpoint may reject: ${extraParams.join(", ")}`);
