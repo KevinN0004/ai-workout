@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";
-import SettingsEditForm from "./SettingsEditForm";
-import SettingsAccountPanel from "./SettingsAccountPanel";
-import { EDITABLE_TABS, fieldsForTab } from "./settingsFields";
+import SettingsEditForm from "../settings/SettingsEditForm";
+import SettingsAccountPanel from "../settings/SettingsAccountPanel";
+import { EDITABLE_TABS, fieldsForTab } from "../settings/settingsFields";
 import "./SettingsView.css";
 
 const formatHeightByLocation = (heightCm, measurementSystem) => {
