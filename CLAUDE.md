@@ -491,8 +491,9 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-23:
-  server **93.89%** statements / 86.18% branches, client **98.69%** / 93.65%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-28:
+  server **94.32%** statements / 86.67% branches (87.10% in CI), client **98.68%** /
+  93.62%.
   On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
   before it, and the ratchet correctly did not trip, which is the floor doing its job
   rather than failing at it: it sits one decimal below the measurement, so a
@@ -901,11 +902,14 @@ the native instance all along.
   estimated. If the warning appears, check first whether something got pulled onto
   the eager path; if nothing did, the margin simply ran out.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
-- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **96** of
-  them fail with `Can't reach database server`, which is environmental, not a regression
-  (measured 2026-09-12; this entry said ~40 before). The compose database works just as
-  well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
-  **1042** server tests green. The E2E suite is **19** across two projects.
+- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **107**
+  of the **1083** fail (and 27 skip) with `Can't reach database server`, which is
+  environmental, not a regression (measured 2026-09-28; it was 96 of 1042 on 2026-09-12,
+  and this entry said ~40 before that). The compose database works just as well —
+  `docker compose up -d`, `npm -w server run migrate:postgres`, then the `DATABASE_URL`
+  from `env.example`. It ran all 1042 server tests green on Postgres 16 when measured;
+  compose is on 18 now, and CI runs the full suite on that same `postgres:18` image. The
+  E2E suite is **19** across two projects.
 
 ## Fresh Clone Setup
 

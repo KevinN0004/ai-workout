@@ -299,8 +299,9 @@ patch.
 
 ## Testing Notes
 
-Server tests run against a real Postgres — there are no database mocks. Start one first
-or roughly 40 tests fail with a connection error that is environmental, not a regression:
+Server tests run against a real Postgres — there are no database mocks. Start one first,
+or 107 of the 1083 tests fail (and 27 skip) with `Can't reach database server` — measured
+2026-09-28, and environmental, not a regression:
 
 ```bash
 npm run postgres:local:start -w server

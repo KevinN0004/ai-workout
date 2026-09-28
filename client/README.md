@@ -1,6 +1,6 @@
 # AI Workout Client
 
-The client is a React 18 + Vite application for the AI Workout user experience. It includes the profile onboarding flow, responsive dashboard, workout plan UI, meal and exercise discovery views, and client-side API helpers.
+The client is a React 19 + Vite application for the AI Workout user experience. It includes the profile onboarding flow, responsive dashboard, workout plan UI, meal and exercise discovery views, and client-side API helpers.
 
 ## Main Features
 
@@ -81,17 +81,18 @@ Use `src/app/network.js` when a request should have an explicit timeout.
 
 ## Bundle Notes
 
-The main chunk is ~402 kB (~128 kB gzipped) and the build emits no size warning. Two
-things keep it there:
+The main chunk is ~487 kB (~149 kB gzipped) and the build emits no size warning, but
+only ~13 kB separates it from the 500 kB threshold. It was ~407 kB until React 19, which
+alone added the difference. Two things keep it under:
 
 - **`jspdf` is imported dynamically**, inside the export handler in `app/events.js`.
-  It is ~386 kB on its own — roughly half the bundle — and most sessions never export a
-  PDF. Turning that back into a static import would undo the split silently, since the
-  build would still succeed.
+  It is ~399 kB on its own and most sessions never export a PDF. Turning that back into
+  a static import would push the main chunk far past the threshold and undo the split
+  silently, since the build would still succeed.
 - **Dashboard views are `React.lazy`-loaded**, so each is fetched on first visit.
 
-If `npm run build` starts warning about chunks over 500 kB, something was pulled back
-onto the eager path.
+If `npm run build` starts warning about chunks over 500 kB, check first whether
+something was pulled back onto the eager path; if nothing was, the margin ran out.
 
 ## Testing Notes
 
@@ -126,11 +127,12 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`, currently 64.9% statements / 44.6%
-branches. Prefer the logic modules to the view components when adding tests —
-`app/units.js`, `app/plans.js`, `pages/dashboard/tips/recommendationUtils.js`,
-`app/hooks/useOptimisticLogs.js` and `app/hooks/useApiClient.js` are all at or above
-95% and were worth far more than their line count.
+Coverage is `npm run test:coverage -w client`: 98.68% statements / 93.62% branches as
+of 2026-09-28, against a ratchet in `vite.config.js` that must be raised, never
+lowered. Judge where a test is worth writing by whether the code _computes_ anything,
+not by its file suffix: several `*View.jsx` components carry real derivation, and
+`CLAUDE.md` records which files' remaining uncovered branches are unreachable rather
+than untested.
 
 ## Requests and Sign-out
 
