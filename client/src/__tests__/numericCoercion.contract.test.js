@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { toFiniteNumber } from "../components/physique/math";
+import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toProfileNumber } from "../app/profileMapping";
 
 // The client half of the invariant asserted in

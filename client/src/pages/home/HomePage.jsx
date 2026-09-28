@@ -2,7 +2,7 @@
 import useBodyModel from "./hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../../app/constants";
 import useHomeStageFlow from "./hooks/useHomeStageFlow";
-import PreviewPage from "../preview/PreviewPage";
+import PreviewPage from "./preview/PreviewPage";
 import HomeIntroStage from "./components/HomeIntroStage";
 import HomePersonalStage from "./components/HomePersonalStage";
 import HomeVisualizerStage from "./components/HomeVisualizerStage";

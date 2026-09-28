@@ -1,7 +1,5 @@
 import { useEffect } from "react";
-import PhysiqueSilhouette2D, {
-  SILHOUETTE_GEOMETRY_REV
-} from "../../../components/PhysiqueSilhouette2D";
+import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "./PhysiqueSilhouette2D";
 
 export default function HomeVisualizerStage({
   visualPanelRef,

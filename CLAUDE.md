@@ -64,7 +64,14 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 - `client/src/pages/<page>` — one folder per page: the page component
   (`<Name>Page.jsx` and its `.css`) plus its own parts, usually `views/`, `components/`,
   `hooks/` and `styles/`. The larger pages also hold feature folders
-  (`dashboard/meal/`, `dashboard/tips/`) and page-level helpers (`preview/utils.js`).
+  (`dashboard/meal/`, `dashboard/settings/`, `dashboard/tips/`) and page-level helpers
+  (`dashboard/planUtils.js`). A folder here is a **route**: something only one page
+  renders lives inside that page, which is why the preview walkthrough (a stage of
+  `HomePage`, not a route) is `home/preview/` and the physique silhouette (drawn only
+  by `HomeVisualizerStage`) is `home/components/PhysiqueSilhouette2D.jsx`, with its
+  geometry in `home/components/physique/`. `client/src/components/`
+  and `client/src/hooks/` hold only shared code: used from more than one page, or by
+  another shared module (`useBodyScrollLock` serves `ModalPortal`).
   Folder names are lowercase, kebab-case where needed (`workout-result/`)
 - `server/src` — Express 5 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
@@ -229,7 +236,7 @@ Only `""` and `null` changed behaviour — `undefined` already returned null, an
 weight was unaffected because `toKg` returns `""` for a falsy value and the
 `> 0` check downstream rejected the `0` either way.
 
-**A fifth instance sat in `components/physique/math.js`, and it is fixed too.**
+**A fifth instance sat in `pages/home/components/physique/math.js`, and it is fixed too.**
 That file carried a _third_ `toFiniteNumber`, the only one taking an explicit
 `fallback` argument, written the wrong way round like the others. It is the copy
 the silhouette runs on: about sixty calls across `geometry.js`,
