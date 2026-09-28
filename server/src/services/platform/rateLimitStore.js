@@ -68,6 +68,11 @@ export const createRateLimitStore = ({
   };
 
   return {
+    // Read by express-rate-limit's double-count check, which tells stores
+    // apart by prefix. Without it every one of these wrappers looks like the
+    // same store, and a request through two limiters is reported as counted
+    // twice when it was not.
+    prefix,
     init(options) {
       initOptions = options;
       memoryStore.init(options);
