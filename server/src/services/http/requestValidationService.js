@@ -1,3 +1,5 @@
+import { validationMessage } from "./validationMessages.js";
+
 const toShortError = (value, maxLen = 240) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
@@ -11,7 +13,7 @@ export const getSchemaValidationMessage = (error, fallbackPath = "request") => {
 };
 
 export const validateSchemaInput = (schema, input, fallbackPath = "request") => {
-  const result = schema.safeParse(input);
+  const result = schema.safeParse(input, { error: validationMessage });
   if (result.success) return { data: result.data, error: "" };
   return {
     data: null,
