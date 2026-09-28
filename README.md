@@ -69,7 +69,7 @@ npm, nvm, Docker, Prettier and GitHub look for them.
 
 ## Prerequisites
 
-- Node.js `^22.13 || >=24` (see `.nvmrc`; development is on Node 24)
+- Node.js `^22.22.2 || ^24.15.0 || >=26` (see `.nvmrc`; development is on Node 24). Node 25 is not supported: vitest 5 and jsdom 30 both reject it, and `.npmrc` sets `engine-strict`, so `npm ci` fails on it
 - npm
 - Postgres running locally, or use the workspace-owned local Postgres helper
 - Optional: Redis for persistent sessions across server restarts
