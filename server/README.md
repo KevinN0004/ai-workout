@@ -105,7 +105,7 @@ POSTGRES_STARTUP_REQUIRED=false
 CLIENT_ORIGIN=http://localhost:5173
 LOG_LEVEL=info
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 Optional Redis session storage:
