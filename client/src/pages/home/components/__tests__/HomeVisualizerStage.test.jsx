@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import HomeVisualizerStage from "../HomeVisualizerStage";
-import { SILHOUETTE_GEOMETRY_REV } from "../../../../components/PhysiqueSilhouette2D";
+import { SILHOUETTE_GEOMETRY_REV } from "../PhysiqueSilhouette2D";
 
 // The physique stage. The part worth pinning is the scroll lock: this stage
 // fills the viewport, so it hides overflow on mount and puts back whatever was
