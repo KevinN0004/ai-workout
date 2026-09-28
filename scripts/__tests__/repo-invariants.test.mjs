@@ -39,16 +39,18 @@ const stripJsonComments = (text) => {
   return out;
 };
 
-describe("the qs security override", () => {
+describe("qs stays on a patched release", () => {
   // The audit-ci gate is set to `high`, but the qs DoS advisories are
-  // *moderate* -- so if this override were ever dropped, the vulnerability we
-  // fixed would come straight back and the gate would stay green. Raising the
-  // whole gate to `moderate` would fail the build on unrelated transitive
-  // noise, so the fix that regressed is pinned directly instead.
+  // *moderate* -- so if a vulnerable qs ever came back, the gate would stay
+  // green. Raising the whole gate to `moderate` would fail the build on
+  // unrelated transitive noise, so the fix is pinned directly instead.
   //
-  // No Express 4 release reaches a patched qs: 4.22.2 pins qs ~6.15.1 and the
-  // vulnerable range runs to 6.15.3. The override is the only thing holding
-  // this, which is exactly why it needs its own assertion.
+  // This used to be a package.json override, because no Express 4 release
+  // reached a patched qs (4.22.2 pinned ~6.15.1; the vulnerable range runs to
+  // 6.15.3). Express 5 asks for ^6.14.0, which admits the patched line, so the
+  // override was dropped as dead weight -- removing it changed nothing in the
+  // lockfile. The assertion below was always the real guard: it fails if any
+  // resolution ever lands below 6.16.0 again, override or not.
   const MINIMUM = [6, 16, 0];
 
   const atLeastMinimum = (version) => {
@@ -59,12 +61,6 @@ describe("the qs security override", () => {
     }
     return true;
   };
-
-  test("package.json still declares the override", () => {
-    const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-    expect(pkg.overrides?.qs).toBeDefined();
-    expect(atLeastMinimum(pkg.overrides.qs.replace(/^[^0-9]*/, ""))).toBe(true);
-  });
 
   test("every resolved qs in the lockfile is at or above 6.16.0", () => {
     const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
@@ -238,14 +234,15 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
 });
 
 describe("the rate-limit-redis / express-rate-limit pairing", () => {
-  // rate-limit-redis is held at 4.x because 5.x needs express-rate-limit >= 8.5
-  // and 6.x needs >= 8.6, while this repo is on 7.x. Bumping the store alone
-  // fails `npm ci` with ERESOLVE, which is loud and needs no help from here.
+  // The two move together: rate-limit-redis 5.x needs express-rate-limit >= 8.5
+  // and 6.x needs >= 8.6. Bumping the store without the limiter fails `npm ci`
+  // with ERESOLVE, which is loud and needs no help from here.
   //
-  // The quiet direction is the other one. 4.x declares its peer as ">= 6", so
-  // express-rate-limit 8 SATISFIES it and resolves cleanly -- while v8 renames
-  // `max` to `limit` and changes the Store contract rateLimitStore.js implements.
-  // Nothing about resolution would object.
+  // The quiet direction is the other one. 4.x declared its peer as ">= 6", so
+  // express-rate-limit 8 satisfied it and resolved cleanly -- while v8 renamed
+  // `max` to `limit` and changed the Store contract rateLimitStore.js
+  // implements. Nothing about resolution would have objected. This repo moved
+  // to 6.x on 8.x together in e15c445, checked against a real Redis.
   //
   // Quieter still is a forced install: legacy-peer-deps, or an override on either
   // package, lets any mismatch through in silence. That is the same shape as the
@@ -257,7 +254,6 @@ describe("the rate-limit-redis / express-rate-limit pairing", () => {
   // rather than assumed from a loose peer range.
   const KNOWN_GOOD_MAJORS = [
     { store: 4, limiter: [6, 7] },
-    { store: 5, limiter: [8] },
     { store: 6, limiter: [8] }
   ];
 
@@ -300,5 +296,43 @@ describe("the rate-limit-redis / express-rate-limit pairing", () => {
       JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).overrides ?? {};
     expect(Object.keys(overrides)).not.toContain("express-rate-limit");
     expect(Object.keys(overrides)).not.toContain("rate-limit-redis");
+  });
+});
+
+describe("the Deploy workflow deploys only this repository's own pushes", () => {
+  // The repository is public, and deploy.yml's `branches: [main]` filter matches
+  // the triggering CI run's head branch NAME -- a pull request from a fork whose
+  // branch is called `main` matches too, and its CI run completes in this
+  // repository's context, with the production secrets. The job condition is
+  // what stops a stranger triggering production deploys. Read as text rather
+  // than parsed: the yaml package is not a declared dependency, and knip would
+  // rightly flag importing it.
+  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "deploy.yml"), "utf8");
+  const condition = (
+    (workflow.match(/^ {4}if: >-\r?\n([\s\S]*?)^ {4}environment:/m) || [])[1] ?? ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const [manual, automatic = ""] = condition.split(" || (");
+
+  test("the job condition was found", () => {
+    // Guards the regex: if the block moves, the tests below must not pass
+    // vacuously on an empty string.
+    expect(manual).toBe("github.event_name == 'workflow_dispatch'");
+    expect(automatic).not.toBe("");
+  });
+
+  test("an automatic deploy requires a green CI run for a push to this repository", () => {
+    expect(automatic).toContain("vars.AUTO_DEPLOY == 'true'");
+    expect(automatic).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(automatic).toContain("github.event.workflow_run.event == 'push'");
+    expect(automatic).toContain(
+      "github.event.workflow_run.head_repository.full_name == github.repository"
+    );
+  });
+
+  test("those requirements are all required, not alternatives", () => {
+    // One `||` inside the automatic branch would let any single check through.
+    expect(automatic).not.toContain("||");
   });
 });

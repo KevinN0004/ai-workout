@@ -5,7 +5,6 @@
   color: #fff;
   background-color: #000;
   --font-body: 16px;
-  --font-body-large: 18px;
   --font-small: 14px;
   --font-caption: 14px;
   --font-button: 16px;
@@ -253,11 +252,6 @@ select:focus {
   cursor: pointer;
   font-family: inherit;
   font-weight: 600;
-}
-
-.ghost-inline {
-  padding: 4px 10px;
-  font-size: var(--font-caption);
 }
 
 .cta {

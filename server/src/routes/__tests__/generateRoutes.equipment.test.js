@@ -17,10 +17,8 @@ import {
 // Only the Gemini client is stubbed. Everything else is the real injected
 // function, so the prompt under test is the one that would be sent.
 
-const generateContent = vi.fn(async () => ({
-  response: { text: () => "Monday - Push\nBench press" }
-}));
-const gemini = { getGenerativeModel: vi.fn(() => ({ generateContent })) };
+const generateContent = vi.fn(async () => ({ text: "Monday - Push\nBench press" }));
+const gemini = { models: { generateContent } };
 
 let saveGeneratedPlan;
 
@@ -48,15 +46,12 @@ const buildApp = (overrides = {}, { user } = {}) => {
 const body = (overrides = {}) => ({ goal: "Build strength", days: 4, ...overrides });
 
 // The text actually handed to the model.
-const promptSent = () => generateContent.mock.calls[0][0];
+const promptSent = () => generateContent.mock.calls[0][0].contents;
 
 beforeEach(() => {
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   generateContent.mockClear();
-  gemini.getGenerativeModel.mockClear();
-  generateContent.mockResolvedValue({
-    response: { text: () => "Monday - Push\nBench press" }
-  });
+  generateContent.mockResolvedValue({ text: "Monday - Push\nBench press" });
   saveGeneratedPlan = vi.fn(async () => null);
 });
 
@@ -220,20 +215,35 @@ describe("POST /api/generate", () => {
     expect(generateContent).not.toHaveBeenCalled();
   });
 
+  // index.js builds no client when the key is unset at boot, so a key that
+  // appears later must still be refused rather than dereference null.
+  test("refuses to run when no client was built", async () => {
+    const response = await post(buildApp({ gemini: null }));
+
+    expect(response.status).toBe(500);
+    expect(response.body.error).toMatch(/missing gemini_api_key/i);
+  });
+
   test("uses the configured model", async () => {
-    vi.stubEnv("GEMINI_MODEL", "gemini-2.0-pro");
+    vi.stubEnv("GEMINI_MODEL", "gemini-3.8-flash");
 
     await post(buildApp());
 
-    expect(gemini.getGenerativeModel).toHaveBeenCalledWith({ model: "gemini-2.0-pro" });
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gemini-3.8-flash" })
+    );
   });
 
+  // gemini-1.5-flash was the default until Google shut it down on 2025-09-29,
+  // after which every request relying on the default failed.
   test("falls back to a default model", async () => {
     vi.stubEnv("GEMINI_MODEL", "");
 
     await post(buildApp());
 
-    expect(gemini.getGenerativeModel).toHaveBeenCalledWith({ model: "gemini-1.5-flash" });
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gemini-3.5-flash-lite" })
+    );
   });
 
   describe("what the model is told", () => {
@@ -383,10 +393,10 @@ describe("POST /api/generate", () => {
 
   describe("when generation fails", () => {
     test.each([
-      ["an empty plan", () => ""],
-      ["no text function at all", undefined]
-    ])("answers 502 for %s", async (_label, text) => {
-      generateContent.mockResolvedValue({ response: text ? { text } : {} });
+      ["an empty plan", { text: "" }],
+      ["no text at all", {}]
+    ])("answers 502 for %s", async (_label, result) => {
+      generateContent.mockResolvedValue(result);
 
       const response = await post(buildApp());
 
@@ -395,7 +405,7 @@ describe("POST /api/generate", () => {
     });
 
     test("saves nothing when no plan came back", async () => {
-      generateContent.mockResolvedValue({ response: { text: () => "" } });
+      generateContent.mockResolvedValue({ text: "" });
       const app = buildApp({}, { user: { id: "u-1" } });
 
       await post(app);

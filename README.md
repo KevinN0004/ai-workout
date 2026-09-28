@@ -4,8 +4,8 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ## Tech Stack
 
-- React 18 and Vite for the frontend
-- Express 4 for the API server
+- React 19 and Vite for the frontend
+- Express 5 for the API server
 - Postgres with Prisma Client for user and dashboard data
 - Optional Redis-backed sessions with in-memory fallback
 - Google Gemini for weekly workout plan generation
@@ -15,7 +15,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 
 ```text
 .
-|-- client/                   # React 18 + Vite app (npm workspace)
+|-- client/                   # React 19 + Vite app (npm workspace)
 |   |-- vite.config.js        # dev and preview proxy, client test and coverage config
 |   `-- src/
 |       |-- main.jsx          # entry point
@@ -28,7 +28,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |       |                     #   workout-result
 |       |-- styles/           # global CSS
 |       `-- test/             # Vitest setup
-|-- server/                   # Express 4 API (npm workspace)
+|-- server/                   # Express 5 API (npm workspace)
 |   |-- db/postgres/          # SQL migrations, applied in order
 |   |-- prisma/               # Prisma schema
 |   |-- scripts/              # local Postgres, migration runner, db push guard
@@ -69,7 +69,7 @@ npm, nvm, Docker, Prettier and GitHub look for them.
 
 ## Prerequisites
 
-- Node.js `^22.13 || >=24` (see `.nvmrc`; development is on Node 24)
+- Node.js `^22.22.2 || ^24.15.0 || >=26` (see `.nvmrc`; development is on Node 24). Node 25 is not supported: vitest 5 and jsdom 30 both reject it, and `.npmrc` sets `engine-strict`, so `npm ci` fails on it
 - npm
 - Postgres running locally, or use the workspace-owned local Postgres helper
 - Optional: Redis for persistent sessions across server restarts
@@ -149,7 +149,7 @@ Common server variables:
 | `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                  | unset                                                       |
 | `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                       | `3`                                                         |
 | `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                | `86400000` (24h)                                            |
-| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                      | `gemini-1.5-flash`                                          |
+| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                      | `gemini-3.5-flash-lite`                                     |
 | `REDIS_URL`                                                                 | Redis URL backing sessions, rate limit counters and the external cache                   | unset                                                       |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`)                            | unset                                                       |
 | `REDIS_CONNECT_TIMEOUT_MS`                                                  | How long startup waits for Redis before falling back to memory                           | `10000`                                                     |
@@ -163,6 +163,7 @@ Common server variables:
 | `VITE_SENTRY_DSN`                                                           | Browser Sentry DSN, read by the client **build** and by the server's CSP                 | unset                                                       |
 | `LOG_LEVEL`                                                                 | Pino log level                                                                           | `info`                                                      |
 | `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                        | unset                                                       |
+| `METRICS_TOKEN`                                                             | Guards `/api/metrics` via `x-metrics-token`; unset, it is closed in production           | unset                                                       |
 
 Rate limiting. Each bucket is separate; a request can be counted by more than one.
 
@@ -347,7 +348,9 @@ session store and sign every user out.
 
 **Deploys are triggered by CI, not by pushing.** `render.yaml` sets
 `autoDeployTrigger: "off"` and `.github/workflows/deploy.yml` applies migrations
-first, then calls the deploy hook, then waits for `/api/ready`. That ordering is
+first, then calls the deploy hook, then waits for the _new_ instance to report
+ready on `/api/ready` — Render keeps the old one answering until the new one
+passes its health check, so a bare ready proves nothing. That ordering is
 the point — see the release-order note above. Automatic deploys stay off until the
 repository variable `AUTO_DEPLOY` is set to `true`; until then the run after each
 green CI is skipped, and the first deploy is started by hand (see

@@ -90,7 +90,10 @@ export const registerClientStatic = (
 
   // GET/HEAD only -- app.get covers both -- so a POST to an unknown path still
   // falls through to the 404 rather than being handed an HTML page.
-  app.get("*", (req, res, next) => {
+  //
+  // "/{*splat}", not "*": Express 5's path-to-regexp refuses a bare "*" at
+  // registration, and the braces make the wildcard optional so "/" matches too.
+  app.get("/{*splat}", (req, res, next) => {
     // An unmatched /api path is a missing endpoint, not a client route.
     // Without this guard every typo'd API call would answer 200 with the SPA
     // shell, and a fetch would fail on JSON parsing rather than on the status.

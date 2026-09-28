@@ -136,7 +136,8 @@ export const registerGenerateRoutes = (app, deps) => {
   // attachOptionalUser, so a signed-in caller still gets their plan persisted.
   app.post("/api/generate", async (req, res) => {
     try {
-      if (!process.env.GEMINI_API_KEY) {
+      // `gemini` is null when no key was configured at boot; see index.js.
+      if (!process.env.GEMINI_API_KEY || !gemini) {
         return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
       }
 
@@ -152,7 +153,7 @@ export const registerGenerateRoutes = (app, deps) => {
       const environment = cleanText(body.environment, 40) || "Home";
       const focuses = toCleanArray(body.focuses, 8, 60);
 
-      const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+      const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
       const focusLine = focuses.join(", ") || "General fitness";
       const equipmentContext = buildGenerationEquipmentContext({
         environment,
@@ -162,9 +163,11 @@ export const registerGenerateRoutes = (app, deps) => {
       const prompt = `You are an expert fitness coach. Create a weekly workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment/space profile: ${equipmentContext.profileLine}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Use weekday headings exactly as: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.\n- For each day include: Warmup, Main lifts, Accessories, and Finisher/conditioning with sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- End with a section labeled "Coach Notes:" containing tips and recovery guidance.\n- Output in clean plain text with clear headings.`;
       const promptWithContext = `${prompt}\n\nEnvironment: ${environment}\nFocuses: ${focusLine}\nTraining days target: ${days}\nAvailable capabilities: ${equipmentContext.capabilityLine}\nPlanning guidance: ${equipmentContext.planningGuidance}`;
 
-      const model = gemini.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(promptWithContext);
-      const plan = result?.response?.text?.() || "";
+      const result = await gemini.models.generateContent({
+        model: modelName,
+        contents: promptWithContext
+      });
+      const plan = result?.text || "";
 
       if (!plan) {
         return res.status(502).json({ error: "No plan generated." });

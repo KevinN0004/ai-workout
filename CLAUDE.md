@@ -58,7 +58,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 ## File Organization
 
 - NEVER save to root folder
-- `client/src` — React 18 + Vite frontend source. The only files at this level are
+- `client/src` — React 19 + Vite frontend source. The only files at this level are
   `main.jsx` and `App.jsx` (their tests are in `client/src/__tests__/`); global CSS is in
   `client/src/styles/`
 - `client/src/pages/<page>` — one folder per page: the page component
@@ -66,7 +66,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   `hooks/` and `styles/`. The larger pages also hold feature folders
   (`dashboard/meal/`, `dashboard/tips/`) and page-level helpers (`preview/utils.js`).
   Folder names are lowercase, kebab-case where needed (`workout-result/`)
-- `server/src` — Express 4 API, services, routes. Only the app bootstrap
+- `server/src` — Express 5 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
 - `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`
   (request validation, API schemas, error responses) and `platform/` (metrics, error
@@ -94,8 +94,8 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 
 AI Workout is a full-stack fitness planning app using **npm workspaces** (`client`, `server`).
 
-- **Client**: React 18 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
-- **Server**: Express 4 on `http://localhost:5000`, Postgres via Prisma Client
+- **Client**: React 19 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
+- **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
 - **Sessions**: Redis-backed when `REDIS_URL` is set, with in-memory fallback
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
@@ -491,8 +491,9 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-23:
-  server **93.89%** statements / 86.18% branches, client **98.69%** / 93.65%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-28:
+  server **94.32%** statements / 86.67% branches (87.10% in CI), client **98.68%** /
+  93.62%.
   On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
   before it, and the ratchet correctly did not trip, which is the floor doing its job
   rather than failing at it: it sits one decimal below the measurement, so a
@@ -745,10 +746,13 @@ the native instance all along.
     comparison every zone falls on without needing to be in one.
 
   - **jsdom's CSSOM is not a faithful mirror, and guessing at it wastes a run.**
-    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`; `border: none` reads
-    back as `""`, not `"none"`; and an unstyled element's computed `color` is
-    `canvastext` rather than empty, so a `style.color || fallback` branch can
-    never take its fallback here. Check what it stores before asserting on it.
+    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`, and an unstyled
+    element's computed `color` is `rgb(0, 0, 0)` rather than empty, so a
+    `style.color || fallback` branch can never take its fallback here. Check
+    what it stores before asserting on it. **It changed under jsdom 29**, which
+    rewrote the CSSOM: `border: none` used to read back as `""` and now reads
+    `"none"`, as Chromium does, and the computed `color` above used to be
+    `canvastext`. A test that pinned the old answer failed on the upgrade.
   - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
     `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
     `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
@@ -892,14 +896,20 @@ the native instance all along.
   deliberate now carry an inline disable explaining why. A new warning means you
   introduced it.
 - **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
-  that went away when `jspdf` moved to a dynamic import. The main chunk is ~407 kB.
-  If the warning reappears, something got pulled back onto the eager path.
+  that went away when `jspdf` moved to a dynamic import. The main chunk is ~487 kB,
+  which leaves only ~13 kB before the warning. It was ~407 kB until React 19, which
+  alone added the difference -- measured by building with nothing else changed, not
+  estimated. If the warning appears, check first whether something got pulled onto
+  the eager path; if nothing did, the margin simply ran out.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
-- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **96** of
-  them fail with `Can't reach database server`, which is environmental, not a regression
-  (measured 2026-09-12; this entry said ~40 before). The compose database works just as
-  well — `docker compose up -d` and then the `DATABASE_URL` from `env.example` runs all
-  **1042** server tests green. The E2E suite is **19** across two projects.
+- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **107**
+  of the **1083** fail (and 27 skip) with `Can't reach database server`, which is
+  environmental, not a regression (measured 2026-09-28; it was 96 of 1042 on 2026-09-12,
+  and this entry said ~40 before that). The compose database works just as well —
+  `docker compose up -d`, `npm -w server run migrate:postgres`, then the `DATABASE_URL`
+  from `env.example`. It ran all 1042 server tests green on Postgres 16 when measured;
+  compose is on 18 now, and CI runs the full suite on that same `postgres:18` image. The
+  E2E suite is **19** across two projects.
 
 ## Fresh Clone Setup
 

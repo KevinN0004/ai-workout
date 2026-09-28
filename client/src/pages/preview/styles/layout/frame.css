@@ -56,7 +56,6 @@
 
 .preview-side-tab {
   --preview-chip-collapsed: 44px;
-  --preview-toc-width-ms: 900ms;
   position: fixed;
   left: 0;
   top: clamp(47px, 11.1vh, 128px);
@@ -206,19 +205,6 @@
   transition:
     opacity var(--preview-motion-medium) var(--preview-motion-ease),
     visibility 0s linear 0s;
-}
-
-.preview-card-page.is-entering {
-  animation: preview-card-page-in var(--preview-motion-medium) var(--preview-motion-ease) both;
-}
-
-.preview-card-page.is-leaving {
-  opacity: 0;
-  visibility: visible;
-  pointer-events: none;
-  transform: none;
-  filter: none;
-  z-index: 2;
 }
 
 @keyframes preview-card-page-in {

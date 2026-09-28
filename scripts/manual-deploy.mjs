@@ -8,8 +8,8 @@
  *
  *   1. Validate the inputs                (the workflow does NOT do this)
  *   2. Apply migrations                   <- must precede the deploy
- *   3. POST the Render deploy hook
- *   4. Poll /api/ready until it reports ready
+ *   3. Record the instance serving now, then POST the Render deploy hook
+ *   4. Poll /api/ready until the NEW instance reports ready
  *
  * The ordering is the reason the workflow exists rather than letting Render
  * deploy on push: 002_password_changed_at.sql adds a column userReadRepository
@@ -25,8 +25,10 @@
  *   node scripts/manual-deploy.mjs --dry-run   # check inputs, change nothing
  *   node scripts/manual-deploy.mjs             # migrate, deploy, wait
  *
- * The validation is exported and tested; the steps that change something run
- * only when this file is invoked directly, so importing it is inert.
+ * The validation and the switch-over wait are exported and tested -- the Deploy
+ * workflow imports the wait too, so the two cannot disagree about what "live"
+ * means. The steps that change something run only when this file is invoked
+ * directly, so importing it is inert.
  */
 
 import { spawnSync } from "node:child_process";
@@ -36,6 +38,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const POLL_ATTEMPTS = 60;
 const POLL_INTERVAL_MS = 15_000;
 const READY_TIMEOUT_MS = 10_000;
+// A sleeping free instance takes 30-60 s to answer its first request, and the
+// baseline read is often that request.
+const BASELINE_TIMEOUT_MS = 90_000;
+// Slack for uptimeSec being rounded and for request latency. A real switch-over
+// clears it by the length of a Docker build.
+const SWITCH_MARGIN_SEC = 5;
 
 /**
  * Checks the three inputs before anything is changed.
@@ -127,6 +135,118 @@ export const validateDeployInputs = ({ databaseUrl = "", hookUrl = "", serviceUr
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Reads `uptimeSec` out of a /api/health or /api/ready body.
+ *
+ * Guards before it coerces: an absent, null or non-numeric uptime is unknown
+ * (null), never 0. A 0 here would read as a freshly started instance and end
+ * the wait on the old one. A measured 0 is a real uptime and survives.
+ */
+export const readUptimeSec = (body) => {
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  const value = parsed?.uptimeSec;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+};
+
+/**
+ * Whether the instance that just answered started after the baseline was taken.
+ *
+ * Render keeps the previous instance serving until the new one passes its
+ * health check, so straight after the hook it is the OLD instance that answers
+ * /api/ready -- and it answers ready. Measured on the #160 deploy: "ready" came
+ * back three seconds after the hook, from an instance 907 s old; the new one
+ * took over about 95 s later. Readiness alone therefore proves nothing.
+ *
+ * What does: the old instance's uptime keeps counting from the baseline, while
+ * a new instance's starts again from zero. An answer younger than the old
+ * instance would now be is a different process. With no baseline -- nothing was
+ * answering before the hook -- any instance that answers is the new one.
+ *
+ * A crash-restart of the old instance would also reset its uptime and pass
+ * this; on the single free instance that is rare, and it fails towards a
+ * restarted process answering ready, not towards a broken one.
+ */
+export const isNewInstance = ({
+  baseline,
+  observedUptimeSec,
+  nowMs,
+  marginSec = SWITCH_MARGIN_SEC
+}) => {
+  if (!baseline) return true;
+  if (typeof observedUptimeSec !== "number") return false;
+  const oldInstanceUptimeNow = baseline.uptimeSec + (nowMs - baseline.atMs) / 1000;
+  return observedUptimeSec < oldInstanceUptimeNow - marginSec;
+};
+
+/**
+ * Records the instance serving now: its uptime, and when it was read. Taken
+ * immediately before the hook. Null when nothing answers with an uptime -- no
+ * live deploy, or a service that is down -- in which case any ready counts.
+ */
+export const readBaseline = async (
+  serviceUrl,
+  { fetchImpl = fetch, now = Date.now, timeoutMs = BASELINE_TIMEOUT_MS } = {}
+) => {
+  try {
+    const response = await fetchImpl(`${serviceUrl}/api/health`, {
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    const uptimeSec = readUptimeSec(await response.text());
+    return uptimeSec === null ? null : { uptimeSec, atMs: now() };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Polls /api/ready until an instance younger than the baseline reports ready.
+ * Resolves { ok: true, attempt, body } or { ok: false } after the last attempt.
+ * The clock, fetch and sleep are injectable so the tests can drive a
+ * switch-over without a network or a real 15-second wait.
+ */
+export const waitForNewInstance = async ({
+  serviceUrl,
+  baseline,
+  attempts = POLL_ATTEMPTS,
+  intervalMs = POLL_INTERVAL_MS,
+  fetchImpl = fetch,
+  now = Date.now,
+  sleepImpl = sleep,
+  log = console.log
+}) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let body = "";
+    try {
+      const response = await fetchImpl(`${serviceUrl}/api/ready`, {
+        signal: AbortSignal.timeout(READY_TIMEOUT_MS)
+      });
+      body = await response.text();
+    } catch {
+      body = "";
+    }
+
+    const ready = body.includes('"status":"ready"');
+    const uptimeSec = readUptimeSec(body);
+    if (ready && isNewInstance({ baseline, observedUptimeSec: uptimeSec, nowMs: now() })) {
+      return { ok: true, attempt, body };
+    }
+
+    const state = ready
+      ? `the old instance is still serving (uptime ${uptimeSec ?? "unknown"}s)`
+      : body.includes('"status"')
+        ? body.slice(0, 160)
+        : "(no response yet)";
+    log(`  attempt ${attempt}/${attempts}: ${state}`);
+    if (attempt < attempts) await sleepImpl(intervalMs);
+  }
+  return { ok: false };
+};
+
 const main = async () => {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const dryRun = process.argv.includes("--dry-run");
@@ -162,7 +282,11 @@ const main = async () => {
   }
 
   console.log("\n== applying migrations (must precede the deploy) ==");
-  const migrate = spawnSync("npm", ["run", "migrate:postgres", "-w", "server"], {
+  // One command string, not a command plus an argument array. `shell: true` is
+  // needed because npm is a .cmd on Windows, and with it Node deprecates the
+  // array form (DEP0190): the arguments are concatenated unescaped. Every part
+  // here is a constant, so there is nothing to escape either way.
+  const migrate = spawnSync("npm run migrate:postgres -w server", {
     cwd: repoRoot,
     env: { ...process.env, DATABASE_URL: databaseUrl },
     stdio: "inherit",
@@ -174,6 +298,16 @@ const main = async () => {
     return;
   }
   console.log("  migrations applied.");
+
+  // Immediately before the hook, so the old instance's uptime is extrapolated
+  // over as short a gap as possible.
+  console.log("\n== recording the instance serving now ==");
+  const baseline = await readBaseline(serviceUrl);
+  console.log(
+    baseline
+      ? `  uptime ${baseline.uptimeSec}s. The deploy is live once a younger instance answers ready.`
+      : "  nothing answering with an uptime. The first ready response will count."
+  );
 
   console.log("\n== triggering the Render deploy ==");
   let hookResponse;
@@ -191,31 +325,17 @@ const main = async () => {
   }
   console.log(`  accepted (HTTP ${hookResponse.status}). A hook 200 means queued, not live.`);
 
-  console.log("\n== waiting for /api/ready ==");
-  for (let attempt = 1; attempt <= POLL_ATTEMPTS; attempt += 1) {
-    let body = "";
-    try {
-      const response = await fetch(`${serviceUrl}/api/ready`, {
-        signal: AbortSignal.timeout(READY_TIMEOUT_MS)
-      });
-      body = await response.text();
-    } catch {
-      body = "";
-    }
-
-    if (body.includes('"status":"ready"')) {
-      console.log(`\n  READY after ~${attempt * (POLL_INTERVAL_MS / 1000)}s`);
-      console.log(`  ${body.slice(0, 300)}`);
-      return;
-    }
-
-    console.log(
-      `  attempt ${attempt}/${POLL_ATTEMPTS}: ${body.includes('"status"') ? body.slice(0, 160) : "(no response yet)"}`
-    );
-    await sleep(POLL_INTERVAL_MS);
+  console.log("\n== waiting for the new instance to report ready ==");
+  const result = await waitForNewInstance({ serviceUrl, baseline });
+  if (result.ok) {
+    console.log(`\n  LIVE: the new instance reported ready (attempt ${result.attempt})`);
+    console.log(`  ${result.body.slice(0, 300)}`);
+    return;
   }
 
-  console.error("\n  Service did not report ready within ~15 minutes.");
+  console.error("\n  The new instance did not report ready within ~15 minutes.");
+  console.error("  If the attempts said the old instance is still serving, the new build");
+  console.error("  never passed Render's health check -- read that deploy's logs in Render.");
   console.error("  If /api/ready says not_ready with postgres healthy, check REDIS_URL:");
   console.error("  a configured-but-unreachable Redis falls back to in-memory sessions,");
   console.error("  and that endpoint stays not_ready by design.");

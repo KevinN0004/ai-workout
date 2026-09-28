@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Was a ternary whose two arms were the same list, so the condition decided
 // nothing. Queries are deliberately not logged in either environment: they

@@ -74,8 +74,24 @@ describe("initErrorTracking with a DSN", () => {
       dsn,
       environment: "staging",
       release: "v1.2.3",
-      tracesSampleRate: 0.25
+      tracesSampleRate: 0.25,
+      dataCollection: __testables.DATA_COLLECTION
     });
+  });
+
+  // v11 collects request bodies and cookies unless told not to. On this server a
+  // body is a password or a profile, and a cookie is a session token. Checked
+  // against the real SDK with a failing POST: without this, the password and the
+  // weight were both in the event that left the process.
+  test("keeps request bodies, cookies and user data out of events", async () => {
+    vi.stubEnv("SENTRY_DSN", dsn);
+    await initErrorTracking({ logger: createLogger(), toShortText });
+
+    const { dataCollection } = sentry.init.mock.calls[0][0];
+    expect(dataCollection.httpBodies).toEqual([]);
+    expect(dataCollection.cookies).toBe(false);
+    expect(dataCollection.userInfo).toBe(false);
+    expect(dataCollection.databaseQueryData).toBe(false);
   });
 
   test("sends release as undefined rather than an empty string", async () => {

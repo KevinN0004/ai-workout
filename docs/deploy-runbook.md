@@ -190,8 +190,19 @@ It does three things in order:
 1. **Applies migrations** against `PRODUCTION_DATABASE_URL`. Every unapplied
    `.sql` in `server/db/postgres/`, in filename order, recorded in a
    `schema_migrations` table so re-running is a no-op.
-2. **Triggers the Render deploy** via the hook.
-3. **Waits for `/api/ready`** to report `ready`, polling for up to ~15 minutes.
+2. **Triggers the Render deploy** via the hook, after recording the uptime of
+   the instance serving now.
+3. **Waits for the new instance** to report `ready` on `/api/ready`, polling for
+   up to ~15 minutes.
+
+**"Ready" alone would not mean the deploy is live.** Render keeps the previous
+instance serving until the new one passes its health check, so straight after
+the hook it is the _old_ code that answers `/api/ready` — and it answers ready.
+On one deploy it did so three seconds after the hook, from an instance 907
+seconds old; the new one took over about 95 seconds later. So the wait only
+accepts an instance younger than the old one would now be, and a new build that
+never passes its health check fails the step instead of passing on the old
+code.
 
 **The ordering is the point.** `002_password_changed_at.sql` adds a column the
 app selects on _every_ user read, so a server started against an unmigrated
@@ -202,7 +213,14 @@ failure stops the deploy.
 repository variable (a variable, not a secret): Repository → **Settings →
 Secrets and variables → Actions → Variables → New repository variable**, named
 `AUTO_DEPLOY` with the value `true`. From then on the workflow also runs
-automatically whenever CI passes on `main`.
+automatically whenever CI passes for a push to `main` in this repository.
+
+That last qualification matters because the repository is public. The
+workflow's `branches: [main]` filter matches the triggering run's branch _name_,
+so a pull request from a fork whose branch is called `main` would match as well.
+The job condition also requires the triggering run to be a push from this
+repository, so a stranger's pull request cannot start a production deploy.
+`scripts/__tests__/repo-invariants.test.mjs` fails if either check is dropped.
 
 Until it is set, those automatic runs are skipped rather than failed, which is
 what keeps `main` from showing a red Deploy after every merge before any of this
@@ -222,8 +240,9 @@ RENDER_SERVICE_URL="https://..." \
   node scripts/manual-deploy.mjs --dry-run   # check the inputs, change nothing
 ```
 
-Drop `--dry-run` to migrate, trigger the hook, and poll `/api/ready`. It never
-prints the values it reads. Migration failure stops it before the hook is
+Drop `--dry-run` to migrate, trigger the hook, and wait for the new instance to
+report ready — the same switch-over check the workflow makes, from the same
+code. It never prints the values it reads. Migration failure stops it before the hook is
 POSTed, which is the same ordering guarantee the workflow gives.
 
 It also checks the things the workflow does not, because a bad `DATABASE_URL`
@@ -459,12 +478,23 @@ shell access. Docker services are supported on this tier.
 unlimited projects, email alerts. Ample for an app this size; the single seat is
 the limit you would hit first if anyone joined you.
 
-**GitHub Actions** — **2,000 minutes/month and 500 MB of artifact storage,
-because this repository is private.** Public repositories are unlimited. Measured
-on a real run, CI costs about **13 billed minutes** (six jobs, each rounded up),
-and a working deploy adds up to ~16 more, because `Wait for the service to come
-back ready` polls for 15 minutes. A pull request plus its merge is therefore
-roughly 30–45 minutes, or about 45–65 full cycles a month.
+**GitHub Actions** — **unlimited on standard runners, because this repository
+is public.** It was made public on 2026-09-26. Before that it was private, capped
+at 2,000 minutes a month, and every CI job failed within seconds with _"the job
+was not started because recent account payments have failed or your spending
+limit needs to be increased"_ — no step ran, so it looks like a broken workflow
+and is not one.
+
+If it is ever made private again, the cap returns. Measured on real runs, CI
+costs about **13 billed minutes** (six jobs, each rounded up), and a deploy about
+**2 more**: the job took 1 min 40 s, 77 s of it waiting for Render to switch to
+the new instance. The wait can run to 15 minutes, but only when a new build
+never becomes healthy.
+
+`main` is protected: all six CI jobs must pass before a pull request can merge,
+and force pushes and deletion are refused. Admins can still bypass it
+deliberately, so a CI outage cannot lock the repository — but `gh pr merge`
+without `--admin` refuses a red pull request, which is the point.
 
 Two consequences worth holding onto:
 
@@ -473,8 +503,11 @@ Two consequences worth holding onto:
   Rows accumulate indefinitely while the UI looks bounded, and the destination
   is Neon's write-blocking 0.5 GB cap. Years away at personal scale, but it ends
   in a hard failure rather than a warning.
-- **Making the repository public would remove the Actions limit entirely.**
-  That is a decision about your code being public, not a technical one.
+- **Everything in the repository is public, history included.** A secret
+  committed once is exposed even after it is deleted from the tree. Keep them in
+  Render's environment and GitHub's secrets only. A pattern scan of the full
+  history when the repository went public found no real credentials — only the
+  placeholders in this runbook and the test fixtures.
 
 If the app becomes something you actually depend on, the first thing to pay for
 is Render, to stop the cold starts.

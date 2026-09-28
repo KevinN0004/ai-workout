@@ -6,9 +6,6 @@
     "client",
     "server"
   ],
-  "overrides": {
-    "qs": "^6.16.0"
-  },
   "scripts": {
     "dev": "concurrently \"npm run dev -w client\" \"npm run dev -w server\"",
     "dev:client": "npm run dev -w client",
@@ -32,7 +29,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.63.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.2",
     "concurrently": "^10.0.5",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
@@ -42,11 +39,11 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.12.0",
-    "knip": "^6.37.0",
-    "prettier": "^3.9.8",
-    "vitest": "^4.1.11"
+    "knip": "^6.38.0",
+    "prettier": "^3.9.9",
+    "vitest": "^5.0.2"
   },
   "engines": {
-    "node": "^22.13 || >=24"
+    "node": "^22.22.2 || ^24.15.0 || >=26"
   }
 }

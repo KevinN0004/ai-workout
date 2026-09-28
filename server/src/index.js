@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import rateLimit from "express-rate-limit";
 import pino from "pino";
 import { closePostgres, connectPostgres, getPostgresStatus } from "./db/postgres.js";
@@ -73,7 +73,10 @@ import {
 import { validateEnv } from "./services/platform/envValidationService.js";
 import { createRateLimitStore } from "./services/platform/rateLimitStore.js";
 
-dotenv.config();
+// quiet: dotenv 17+ prints "injected env (N) from .env" to stderr on every
+// call, as an unstructured line beside pino's JSON. prisma.js, the migration
+// script and vitest.setup.js pass it for the same reason.
+dotenv.config({ quiet: true });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Must run before any other module-scope code reads process.env below
@@ -231,7 +234,12 @@ app.use(
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
-const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// Built only when a key is configured. The key is optional by design, and the
+// SDK console.warns on every keyless construction, bypassing pino. With no
+// client, /api/generate answers its own "Missing GEMINI_API_KEY." 500.
+const gemini = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
 const redisSessionKeyPrefix = "session:sid:";
 const csrfCookieName = "csrfToken";
 const csrfHeaderName = "x-csrf-token";
@@ -482,7 +490,7 @@ const rateLimitStore = (scope) =>
 
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
-  max: apiRateLimitMax,
+  limit: apiRateLimitMax,
   store: rateLimitStore("api_global"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -503,7 +511,7 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: authRateLimitWindowMs,
-  max: authRateLimitMax,
+  limit: authRateLimitMax,
   store: rateLimitStore("auth"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -528,7 +536,7 @@ const authLimiter = rateLimit({
 // with app.use("/api/auth/me", ...), which would also throttle that GET.
 const credentialLimiter = rateLimit({
   windowMs: credentialRateLimitWindowMs,
-  max: credentialRateLimitMax,
+  limit: credentialRateLimitMax,
   store: rateLimitStore("credential"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -549,7 +557,7 @@ const credentialLimiter = rateLimit({
 
 const generateLimiter = rateLimit({
   windowMs: generateRateLimitWindowMs,
-  max: generateRateLimitMax,
+  limit: generateRateLimitMax,
   store: rateLimitStore("generate"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -574,7 +582,7 @@ const generateLimiter = rateLimit({
 // generator so IPv6 clients are bucketed by prefix rather than by single address.
 const anonGenerateLimiter = rateLimit({
   windowMs: anonGenerateRateLimitWindowMs,
-  max: anonGenerateRateLimitMax,
+  limit: anonGenerateRateLimitMax,
   store: rateLimitStore("generate_anonymous"),
   standardHeaders: true,
   legacyHeaders: false,

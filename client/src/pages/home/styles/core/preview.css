@@ -8,7 +8,6 @@
   --preview-body-width: 66.666vw;
   --preview-header-top: clamp(62px, 9vh, 86px);
   --preview-header-height: clamp(56px, 8vh, 78px);
-  --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 10px);
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -252,14 +251,6 @@
   word-break: break-word;
   overflow-x: hidden;
   resize: none;
-}
-
-.preview-field-row .preview-field-input.single-line {
-  min-height: 44px;
-}
-
-.preview-field-row .preview-field-input.wrapped {
-  min-height: 84px;
 }
 
 .preview-field-row .preview-field-input[readonly] {

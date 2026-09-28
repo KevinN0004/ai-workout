@@ -244,20 +244,6 @@ html.preview-smooth-scroll {
   }
 }
 
-@keyframes stage-enter-backward {
-  from {
-    opacity: 0;
-    transform: scale(0.992);
-    filter: blur(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
-
 @keyframes stage-content-rise {
   from {
     opacity: 0;

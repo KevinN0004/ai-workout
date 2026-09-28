@@ -81,8 +81,7 @@
   }
 
   .dashboard-workout-field-full,
-  .dashboard-workout-field-half,
-  .dashboard-workout-field-third {
+  .dashboard-workout-field-half {
     grid-column: 1 / -1;
   }
 

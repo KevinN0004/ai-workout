@@ -10,7 +10,7 @@
 # runs Vite and node --watch natively, which CLAUDE.md records as a decision.
 
 # ---- build ------------------------------------------------------------------
-# Node 24 to match the engines field (^22.13 || >=24) and .nvmrc.
+# Node 24 to match the engines field (^22.22.2 || ^24.15.0 || >=26) and .nvmrc.
 FROM node:24-slim AS build
 
 WORKDIR /app
