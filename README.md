@@ -21,7 +21,6 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |       |-- main.jsx          # entry point
 |       |-- App.jsx           # top-level routing and state
 |       |-- app/              # app-wide logic: API client, cache, events, routing, units
-|       |-- assets/           # static images
 |       |-- components/       # shared components: modal portal
 |       |-- hooks/            # shared hooks: scroll lock, close on Escape
 |       |-- pages/            # one folder per route: auth, dashboard, home,

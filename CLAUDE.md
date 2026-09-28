@@ -71,7 +71,11 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   by `HomeVisualizerStage`) is `home/components/PhysiqueSilhouette2D.jsx`, with its
   geometry in `home/components/physique/`. `client/src/components/`
   and `client/src/hooks/` hold only shared code: used from more than one page, or by
-  another shared module (`useBodyScrollLock` serves `ModalPortal`).
+  another shared module (`useBodyScrollLock` serves `ModalPortal`). Images follow the
+  same rule, in an `assets/` folder beside the code that imports them
+  (`client/src/app/assets/planner-thumbs/`,
+  `client/src/pages/home/components/physique/assets/`); there is no top-level
+  `client/src/assets/`.
   Folder names are lowercase, kebab-case where needed (`workout-result/`)
 - `server/src` — Express 5 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level

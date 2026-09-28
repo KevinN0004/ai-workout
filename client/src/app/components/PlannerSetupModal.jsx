@@ -1,20 +1,20 @@
 import ModalPortal from "../../components/ModalPortal";
 import { equipmentOptionsByEnv, injuryOptions, quickFocuses } from "../constants";
-import thumbHomeBodyweight from "../../assets/planner-thumbs/home-bodyweight.svg";
-import thumbHomeDumbbells from "../../assets/planner-thumbs/home-dumbbells.svg";
-import thumbHomeKettlebell from "../../assets/planner-thumbs/home-kettlebell.svg";
-import thumbHomePullup from "../../assets/planner-thumbs/home-pullup.svg";
-import thumbHomeBands from "../../assets/planner-thumbs/home-bands.svg";
-import thumbHomeBench from "../../assets/planner-thumbs/home-bench.svg";
-import thumbHomeYogaMat from "../../assets/planner-thumbs/home-yoga-mat.svg";
-import thumbCommercialFullGym from "../../assets/planner-thumbs/commercial-full-gym.svg";
-import thumbCommercialStrengthFloor from "../../assets/planner-thumbs/commercial-strength-floor.svg";
-import thumbCommercialCardioDeck from "../../assets/planner-thumbs/commercial-cardio-deck.svg";
-import thumbCommercialFunctionalZone from "../../assets/planner-thumbs/commercial-functional-zone.svg";
-import thumbCommercialGroupStudio from "../../assets/planner-thumbs/commercial-group-studio.svg";
-import thumbCommercialPool from "../../assets/planner-thumbs/commercial-pool.svg";
-import thumbCommercialCourt from "../../assets/planner-thumbs/commercial-court.svg";
-import thumbCommercialRecovery from "../../assets/planner-thumbs/commercial-recovery.svg";
+import thumbHomeBodyweight from "../assets/planner-thumbs/home-bodyweight.svg";
+import thumbHomeDumbbells from "../assets/planner-thumbs/home-dumbbells.svg";
+import thumbHomeKettlebell from "../assets/planner-thumbs/home-kettlebell.svg";
+import thumbHomePullup from "../assets/planner-thumbs/home-pullup.svg";
+import thumbHomeBands from "../assets/planner-thumbs/home-bands.svg";
+import thumbHomeBench from "../assets/planner-thumbs/home-bench.svg";
+import thumbHomeYogaMat from "../assets/planner-thumbs/home-yoga-mat.svg";
+import thumbCommercialFullGym from "../assets/planner-thumbs/commercial-full-gym.svg";
+import thumbCommercialStrengthFloor from "../assets/planner-thumbs/commercial-strength-floor.svg";
+import thumbCommercialCardioDeck from "../assets/planner-thumbs/commercial-cardio-deck.svg";
+import thumbCommercialFunctionalZone from "../assets/planner-thumbs/commercial-functional-zone.svg";
+import thumbCommercialGroupStudio from "../assets/planner-thumbs/commercial-group-studio.svg";
+import thumbCommercialPool from "../assets/planner-thumbs/commercial-pool.svg";
+import thumbCommercialCourt from "../assets/planner-thumbs/commercial-court.svg";
+import thumbCommercialRecovery from "../assets/planner-thumbs/commercial-recovery.svg";
 
 const plannerHeaderTitleByStep = {
   1: "Enviroment",
