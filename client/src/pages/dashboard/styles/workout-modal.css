@@ -136,8 +136,7 @@
   gap: 10px 12px;
 }
 
-.dashboard-workout-grid-basics .dashboard-workout-field-half,
-.dashboard-workout-grid-basics .dashboard-workout-field-third {
+.dashboard-workout-grid-basics .dashboard-workout-field-half {
   grid-column: auto;
 }
 
@@ -167,8 +166,7 @@
 
 .dashboard-workout-grid-metrics .dashboard-workout-field,
 .dashboard-workout-grid-metrics .dashboard-workout-field-half,
-.dashboard-workout-grid-metrics .dashboard-workout-field-full,
-.dashboard-workout-grid-metrics .dashboard-workout-field-third {
+.dashboard-workout-grid-metrics .dashboard-workout-field-full {
   grid-column: auto;
   align-content: end;
 }
@@ -187,10 +185,6 @@
 
 .dashboard-workout-field-half {
   grid-column: span 6;
-}
-
-.dashboard-workout-field-third {
-  grid-column: span 4;
 }
 
 .dashboard-workout-actions {

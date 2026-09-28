@@ -21,10 +21,6 @@
     box-sizing: border-box;
   }
 
-  .split-panel {
-    grid-template-columns: 1fr;
-  }
-
   .preview-combine-shell {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -121,7 +117,6 @@
   .preview-stage-panel {
     --preview-header-top: 62px;
     --preview-header-height: 70px;
-    --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 8px);
   }
 
   .preview-stage-header {
@@ -238,10 +233,6 @@
     justify-content: flex-start;
   }
 
-  .split-panel {
-    grid-template-columns: 1fr;
-  }
-
   .visualizer-only-actions {
     justify-content: center;
   }
@@ -290,10 +281,6 @@
     width: 100%;
     height: 100%;
     max-width: 100%;
-  }
-
-  .physique-footnote {
-    text-align: center;
   }
 
   .day-toggle-grid {

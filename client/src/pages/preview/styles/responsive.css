@@ -10,7 +10,6 @@
 
   .preview-stage-panel {
     width: 100%;
-    --preview-toc-reserve: calc((var(--preview-chip-expanded) * 2) + 16px);
   }
 
   .preview-scroll-story {
@@ -66,10 +65,6 @@
 @media (max-width: 720px) {
   .preview-stage-panel {
     --preview-body-copy-size: 0.62rem;
-    --preview-view-frame-width: min(
-      var(--preview-body-width),
-      calc(100% - (var(--home-shell-gutter) * 2))
-    );
     --preview-content-height: clamp(
       420px,
       calc(100vh - var(--preview-header-top) - var(--preview-header-height) - 24px),
@@ -111,10 +106,8 @@
   }
 
   .preview-stage-panel {
-    --preview-toc-reserve: 0px;
     --preview-header-top: 125px;
     --preview-header-height: 70px;
-    --preview-body-top: calc(var(--preview-header-top) + var(--preview-header-height) + 8px);
   }
 
   .preview-stage-header {
@@ -288,10 +281,7 @@
     transition: none;
   }
 
-  .preview-stage-header.is-entering,
-  .preview-stage-title.is-entering,
-  .preview-stage-title.is-sliding-in-right,
-  .preview-stage-title-ghost.is-leaving {
+  .preview-stage-title.is-sliding-in-right {
     animation: none;
   }
 
@@ -321,13 +311,6 @@
   .preview-personal-sequence.builder-stage-3 .preview-builder-plus.plus-one.is-visible,
   .preview-personal-sequence.builder-stage-3 .preview-builder-slot.env.is-visible,
   .preview-builder-plus.from-bottom.is-visible {
-    animation: none;
-  }
-
-  .preview-week-plan.is-digitizing .preview-week-table-wrap,
-  .preview-week-plan.is-digitizing .preview-week-table-wrap::before,
-  .preview-week-plan.is-digitizing .preview-week-table-wrap::after,
-  .preview-week-plan.is-digitizing .preview-week-table :is(th, td, p, li) {
     animation: none;
   }
 
