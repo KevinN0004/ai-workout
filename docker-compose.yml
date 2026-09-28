@@ -16,7 +16,9 @@
 # development database on every interface.
 services:
   postgres:
-    image: postgres:16
+    # 18 to match production (Neon), CI, and the native helper, which prefers
+    # the newest install it finds.
+    image: postgres:18
     container_name: ai-workout-postgres
     restart: unless-stopped
     environment:
@@ -25,8 +27,13 @@ services:
       POSTGRES_DB: ai_workout
     ports:
       - "127.0.0.1:55432:5432"
+    # The 18 image keeps its data under /var/lib/postgresql/18/docker and
+    # expects the volume one level up; mounted at the old .../data path, the
+    # data would land in an anonymous volume and vanish with the container.
+    # A new volume name, too: the old postgres-data holds 16-format files the
+    # 18 server cannot open, and it is left untouched rather than reused.
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres18-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ai_workout"]
       interval: 5s
@@ -34,7 +41,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: ai-workout-redis
     restart: unless-stopped
     ports:
@@ -46,4 +53,4 @@ services:
       retries: 10
 
 volumes:
-  postgres-data:
+  postgres18-data:
