@@ -25,8 +25,8 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |       |-- components/       # shared components: modal portal
 |       |-- hooks/            # shared hooks: scroll lock, close on Escape
 |       |-- pages/            # one folder per route: auth, dashboard, home,
-|       |                     #   workout-result (home holds the preview walkthrough
-|       |                     #   and the physique silhouette, its only user)
+|       |                     #   workout-result; home also holds the preview
+|       |                     #   walkthrough and physique silhouette, which only it uses
 |       |-- styles/           # global CSS
 |       `-- test/             # Vitest setup
 |-- server/                   # Express 5 API (npm workspace)

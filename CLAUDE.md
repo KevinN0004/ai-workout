@@ -68,7 +68,8 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   (`dashboard/planUtils.js`). A folder here is a **route**: something only one page
   renders lives inside that page, which is why the preview walkthrough (a stage of
   `HomePage`, not a route) is `home/preview/` and the physique silhouette (drawn only
-  by `HomeVisualizerStage`) is `home/components/physique/`. `client/src/components/`
+  by `HomeVisualizerStage`) is `home/components/PhysiqueSilhouette2D.jsx`, with its
+  geometry in `home/components/physique/`. `client/src/components/`
   and `client/src/hooks/` hold only shared code: used from more than one page, or by
   another shared module (`useBodyScrollLock` serves `ModalPortal`).
   Folder names are lowercase, kebab-case where needed (`workout-result/`)
