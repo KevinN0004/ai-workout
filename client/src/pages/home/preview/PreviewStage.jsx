@@ -8,9 +8,9 @@ import usePreviewWeekOutline from "./hooks/usePreviewWeekOutline";
 import usePreviewChapterFlow from "./hooks/usePreviewChapterFlow";
 import usePreviewWeekParticleAnimation from "./hooks/usePreviewWeekParticleAnimation";
 import usePreviewDerivedData from "./hooks/usePreviewDerivedData";
-import "./PreviewPage.css";
+import "./PreviewStage.css";
 
-export default function PreviewPage({
+export default function PreviewStage({
   personal,
   form,
   heightUnit,

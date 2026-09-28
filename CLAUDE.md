@@ -592,7 +592,7 @@ the native instance all along.
     done. Both were wrong** — it was the largest client gap at the time, and the
     claim would have stopped the next reader looking. Re-measure before trusting
     a ranking here; it goes stale every time anything lands.
-    `PreviewPage.jsx` (31), `PreviewDashboardChapter.jsx` (28),
+    `PreviewStage.jsx` (31), `PreviewDashboardChapter.jsx` (28),
     `HomePage.jsx` (25), `DashboardPage.jsx` (23), `App.jsx` (20),
     `CaloriesView.jsx` (16), `AuthPage.jsx` (15) and `GeneratedPlanModal.jsx`
     (14, and the last client file at 0% on every metric) all used to head this
@@ -696,8 +696,8 @@ the native instance all along.
       `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
       `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
       `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 100%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewPage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) `HomePage.jsx` (100% / 100%) `CaloriesView.jsx` (100% / 100%) and `AuthPage.jsx` (95% / 100%).
-      `PreviewPage.jsx` had a chapter-body router whose final `else` arm no
+      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 100%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewStage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) `HomePage.jsx` (100% / 100%) `CaloriesView.jsx` (100% / 100%) and `AuthPage.jsx` (95% / 100%).
+      `PreviewStage.jsx` (then `PreviewPage.jsx`) had a chapter-body router whose final `else` arm no
       chapter id could reach: `usePreviewDerivedData` builds exactly
       `personal-info`, `generate`, `workout-week` and `dashboard-preview`, and
       the four arms above it handle all of them. That arm rendered a generic grid

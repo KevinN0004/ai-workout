@@ -463,10 +463,10 @@ export default function usePreviewDerivedData({
     previewInitialFillOrderRef.current = previewFillOrder;
   }
 
-  // Only the id and the title are read: PreviewPage routes on the id and the
+  // Only the id and the title are read: PreviewStage routes on the id and the
   // table of contents shows the title. Each chapter used to carry a `fields`
   // array of label/value descriptors as well, built from the profile, but the
-  // only thing that ever read them was a fallback arm of PreviewPage's router
+  // only thing that ever read them was a fallback arm of PreviewStage's router
   // that no chapter id could reach. With that gone the list is static, which is
   // why the dependency array is now empty.
   const previewChapters = useMemo(

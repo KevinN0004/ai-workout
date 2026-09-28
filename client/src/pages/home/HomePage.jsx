@@ -2,7 +2,7 @@
 import useBodyModel from "./hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../../app/constants";
 import useHomeStageFlow from "./hooks/useHomeStageFlow";
-import PreviewPage from "./preview/PreviewPage";
+import PreviewStage from "./preview/PreviewStage";
 import HomeIntroStage from "./components/HomeIntroStage";
 import HomePersonalStage from "./components/HomePersonalStage";
 import HomeVisualizerStage from "./components/HomeVisualizerStage";
@@ -154,7 +154,7 @@ export default function HomePage({
             } ${isStageTransitioning ? "stage-transition-hidden" : ""}`}
           >
             {homeStage === "preview" && (
-              <PreviewPage
+              <PreviewStage
                 personal={personal}
                 form={form}
                 heightUnit={heightUnit}

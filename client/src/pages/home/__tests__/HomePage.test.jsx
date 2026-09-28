@@ -15,7 +15,7 @@ vi.mock("../components/HomeIntroStage", () => ({
     <div data-testid="intro-stage" data-direction={String(props.stageDirection)} />
   )
 }));
-vi.mock("../preview/PreviewPage", () => ({
+vi.mock("../preview/PreviewStage", () => ({
   default: () => <div data-testid="preview-stage" />
 }));
 vi.mock("../components/HomePersonalStage", () => ({
