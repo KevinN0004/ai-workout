@@ -1,3 +1,6 @@
+import express from "express";
+import rateLimit from "express-rate-limit";
+import request from "supertest";
 import { describe, expect, test } from "vitest";
 import { createRateLimitStore } from "../rateLimitStore.js";
 
@@ -173,5 +176,33 @@ describe("createRateLimitStore default Redis store", () => {
     // to memory, a usable count must come back either way.
     expect(typeof result.totalHits).toBe("number");
     expect(result.totalHits).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// index.js layers limiters on one request -- /api, then the two on
+// /api/generate -- each with its own store and prefix. express-rate-limit's
+// double-count check tells stores apart by their prefix, so a store that does
+// not expose one looks like every other store of the same class, and the first
+// request through two limiters was logged as ERR_ERL_DOUBLE_COUNT: a false
+// alarm, since the counts were always kept apart.
+describe("createRateLimitStore beside another limiter", () => {
+  test("two limiters on one request are not reported as double counting", async () => {
+    const reported = [];
+    const logger = { error: (error) => reported.push(error), warn: () => {} };
+    const limiter = (scope) =>
+      rateLimit({
+        windowMs: 60_000,
+        limit: 100,
+        logger,
+        store: createRateLimitStore({ getClient: () => null, prefix: `rl:${scope}:` })
+      });
+    const app = express();
+    app.use(limiter("first"), limiter("second"));
+    app.get("/", (_req, res) => res.sendStatus(204));
+
+    const response = await request(app).get("/");
+
+    expect(response.status).toBe(204);
+    expect(reported.map((error) => error?.code)).not.toContain("ERR_ERL_DOUBLE_COUNT");
   });
 });
