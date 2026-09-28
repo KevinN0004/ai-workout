@@ -20,8 +20,10 @@ client/
 |-- src/
 |   |-- App.jsx                 # Top-level routing and app state
 |   |-- app/                    # Shared constants, hooks, routing, cache, API helpers
-|   |-- components/             # Shared UI and visualization components
-|   |-- pages/                  # Page-level views
+|   |-- components/             # Shared UI components
+|   |-- hooks/                  # Shared hooks
+|   |-- pages/                  # One folder per route, with its own parts
+|   |-- styles/                 # Global CSS
 |   `-- test/                   # Vitest setup
 `-- package.json
 ```
@@ -116,7 +118,7 @@ vi.mock("jspdf", () => ({
 }));
 ```
 
-`components/physique/geometry.js` guards its HMR block on `import.meta.hot?.data`, not
+`pages/home/components/physique/geometry.js` guards its HMR block on `import.meta.hot?.data`, not
 on `import.meta.hot`. That is deliberate and load-bearing for tests: under vitest
 `import.meta.hot` is truthy while its data bag is undefined, so the unguarded version
 threw on import and made the module — and everything importing it — impossible to test.
