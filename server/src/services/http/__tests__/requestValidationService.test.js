@@ -15,8 +15,12 @@ describe("requestValidationService", () => {
 
     expect(result.success).toBe(false);
     const message = getSchemaValidationMessage(result.error);
-    expect(message).toMatch(/profile\.age/i);
-    expect(message).toMatch(/greater than or equal to 18/i);
+    // The wording is zod's and changes between majors (zod 3 said "greater
+    // than or equal to 18", zod 4 says ">=18"), so pin only what this module
+    // owns: the dotted path joined to zod's message. The bound itself reaches
+    // the reader in both.
+    expect(message).toBe(`profile.age: ${result.error.issues[0].message}`);
+    expect(message).toMatch(/18/);
   });
 
   test("validateSchemaInput returns parsed data on success", () => {

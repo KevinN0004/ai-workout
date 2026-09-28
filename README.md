@@ -5,7 +5,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 ## Tech Stack
 
 - React 18 and Vite for the frontend
-- Express 4 for the API server
+- Express 5 for the API server
 - Postgres with Prisma Client for user and dashboard data
 - Optional Redis-backed sessions with in-memory fallback
 - Google Gemini for weekly workout plan generation
@@ -28,7 +28,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |       |                     #   workout-result
 |       |-- styles/           # global CSS
 |       `-- test/             # Vitest setup
-|-- server/                   # Express 4 API (npm workspace)
+|-- server/                   # Express 5 API (npm workspace)
 |   |-- db/postgres/          # SQL migrations, applied in order
 |   |-- prisma/               # Prisma schema
 |   |-- scripts/              # local Postgres, migration runner, db push guard

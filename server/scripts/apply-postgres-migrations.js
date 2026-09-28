@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { closePostgres, connectPostgres, getPostgresPool } from "../src/db/postgres.js";
 import { applyMigrations } from "../src/db/postgresMigrations.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
