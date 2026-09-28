@@ -39,16 +39,18 @@ const stripJsonComments = (text) => {
   return out;
 };
 
-describe("the qs security override", () => {
+describe("qs stays on a patched release", () => {
   // The audit-ci gate is set to `high`, but the qs DoS advisories are
-  // *moderate* -- so if this override were ever dropped, the vulnerability we
-  // fixed would come straight back and the gate would stay green. Raising the
-  // whole gate to `moderate` would fail the build on unrelated transitive
-  // noise, so the fix that regressed is pinned directly instead.
+  // *moderate* -- so if a vulnerable qs ever came back, the gate would stay
+  // green. Raising the whole gate to `moderate` would fail the build on
+  // unrelated transitive noise, so the fix is pinned directly instead.
   //
-  // No Express 4 release reaches a patched qs: 4.22.2 pins qs ~6.15.1 and the
-  // vulnerable range runs to 6.15.3. The override is the only thing holding
-  // this, which is exactly why it needs its own assertion.
+  // This used to be a package.json override, because no Express 4 release
+  // reached a patched qs (4.22.2 pinned ~6.15.1; the vulnerable range runs to
+  // 6.15.3). Express 5 asks for ^6.14.0, which admits the patched line, so the
+  // override was dropped as dead weight -- removing it changed nothing in the
+  // lockfile. The assertion below was always the real guard: it fails if any
+  // resolution ever lands below 6.16.0 again, override or not.
   const MINIMUM = [6, 16, 0];
 
   const atLeastMinimum = (version) => {
@@ -59,12 +61,6 @@ describe("the qs security override", () => {
     }
     return true;
   };
-
-  test("package.json still declares the override", () => {
-    const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-    expect(pkg.overrides?.qs).toBeDefined();
-    expect(atLeastMinimum(pkg.overrides.qs.replace(/^[^0-9]*/, ""))).toBe(true);
-  });
 
   test("every resolved qs in the lockfile is at or above 6.16.0", () => {
     const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
@@ -238,14 +234,15 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
 });
 
 describe("the rate-limit-redis / express-rate-limit pairing", () => {
-  // rate-limit-redis is held at 4.x because 5.x needs express-rate-limit >= 8.5
-  // and 6.x needs >= 8.6, while this repo is on 7.x. Bumping the store alone
-  // fails `npm ci` with ERESOLVE, which is loud and needs no help from here.
+  // The two move together: rate-limit-redis 5.x needs express-rate-limit >= 8.5
+  // and 6.x needs >= 8.6. Bumping the store without the limiter fails `npm ci`
+  // with ERESOLVE, which is loud and needs no help from here.
   //
-  // The quiet direction is the other one. 4.x declares its peer as ">= 6", so
-  // express-rate-limit 8 SATISFIES it and resolves cleanly -- while v8 renames
-  // `max` to `limit` and changes the Store contract rateLimitStore.js implements.
-  // Nothing about resolution would object.
+  // The quiet direction is the other one. 4.x declared its peer as ">= 6", so
+  // express-rate-limit 8 satisfied it and resolved cleanly -- while v8 renamed
+  // `max` to `limit` and changed the Store contract rateLimitStore.js
+  // implements. Nothing about resolution would have objected. This repo moved
+  // to 6.x on 8.x together in e15c445, checked against a real Redis.
   //
   // Quieter still is a forced install: legacy-peer-deps, or an override on either
   // package, lets any mismatch through in silence. That is the same shape as the
@@ -257,7 +254,6 @@ describe("the rate-limit-redis / express-rate-limit pairing", () => {
   // rather than assumed from a loose peer range.
   const KNOWN_GOOD_MAJORS = [
     { store: 4, limiter: [6, 7] },
-    { store: 5, limiter: [8] },
     { store: 6, limiter: [8] }
   ];
 

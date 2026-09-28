@@ -163,6 +163,7 @@ Common server variables:
 | `VITE_SENTRY_DSN`                                                           | Browser Sentry DSN, read by the client **build** and by the server's CSP                 | unset                                                       |
 | `LOG_LEVEL`                                                                 | Pino log level                                                                           | `info`                                                      |
 | `LOG_REDACT_PATHS`                                                          | Extra comma-separated log paths to redact, on top of the defaults                        | unset                                                       |
+| `METRICS_TOKEN`                                                             | Guards `/api/metrics` via `x-metrics-token`; unset, it is closed in production           | unset                                                       |
 
 Rate limiting. Each bucket is separate; a request can be counted by more than one.
 

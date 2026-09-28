@@ -52,10 +52,6 @@
   width: 100%;
 }
 
-.dashboard-view-shell.is-hidden {
-  display: none;
-}
-
 .dashboard-loading-card {
   min-height: 260px;
   display: grid;

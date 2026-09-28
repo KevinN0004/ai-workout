@@ -490,7 +490,7 @@ const rateLimitStore = (scope) =>
 
 const apiLimiter = rateLimit({
   windowMs: apiRateLimitWindowMs,
-  max: apiRateLimitMax,
+  limit: apiRateLimitMax,
   store: rateLimitStore("api_global"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -511,7 +511,7 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: authRateLimitWindowMs,
-  max: authRateLimitMax,
+  limit: authRateLimitMax,
   store: rateLimitStore("auth"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -536,7 +536,7 @@ const authLimiter = rateLimit({
 // with app.use("/api/auth/me", ...), which would also throttle that GET.
 const credentialLimiter = rateLimit({
   windowMs: credentialRateLimitWindowMs,
-  max: credentialRateLimitMax,
+  limit: credentialRateLimitMax,
   store: rateLimitStore("credential"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -557,7 +557,7 @@ const credentialLimiter = rateLimit({
 
 const generateLimiter = rateLimit({
   windowMs: generateRateLimitWindowMs,
-  max: generateRateLimitMax,
+  limit: generateRateLimitMax,
   store: rateLimitStore("generate"),
   standardHeaders: true,
   legacyHeaders: false,
@@ -582,7 +582,7 @@ const generateLimiter = rateLimit({
 // generator so IPv6 clients are bucketed by prefix rather than by single address.
 const anonGenerateLimiter = rateLimit({
   windowMs: anonGenerateRateLimitWindowMs,
-  max: anonGenerateRateLimitMax,
+  limit: anonGenerateRateLimitMax,
   store: rateLimitStore("generate_anonymous"),
   standardHeaders: true,
   legacyHeaders: false,

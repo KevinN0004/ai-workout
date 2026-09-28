@@ -46,14 +46,6 @@
   word-break: break-word;
 }
 
-.preview-field-row .preview-field-input.single-line {
-  min-height: 40px;
-}
-
-.preview-field-row .preview-field-input.wrapped {
-  min-height: 72px;
-}
-
 .preview-field-row .preview-field-input[readonly] {
   opacity: 1;
 }
