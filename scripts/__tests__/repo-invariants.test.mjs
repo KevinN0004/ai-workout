@@ -234,14 +234,15 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
 });
 
 describe("the rate-limit-redis / express-rate-limit pairing", () => {
-  // rate-limit-redis is held at 4.x because 5.x needs express-rate-limit >= 8.5
-  // and 6.x needs >= 8.6, while this repo is on 7.x. Bumping the store alone
-  // fails `npm ci` with ERESOLVE, which is loud and needs no help from here.
+  // The two move together: rate-limit-redis 5.x needs express-rate-limit >= 8.5
+  // and 6.x needs >= 8.6. Bumping the store without the limiter fails `npm ci`
+  // with ERESOLVE, which is loud and needs no help from here.
   //
-  // The quiet direction is the other one. 4.x declares its peer as ">= 6", so
-  // express-rate-limit 8 SATISFIES it and resolves cleanly -- while v8 renames
-  // `max` to `limit` and changes the Store contract rateLimitStore.js implements.
-  // Nothing about resolution would object.
+  // The quiet direction is the other one. 4.x declared its peer as ">= 6", so
+  // express-rate-limit 8 satisfied it and resolved cleanly -- while v8 renamed
+  // `max` to `limit` and changed the Store contract rateLimitStore.js
+  // implements. Nothing about resolution would have objected. This repo moved
+  // to 6.x on 8.x together in e15c445, checked against a real Redis.
   //
   // Quieter still is a forced install: legacy-peer-deps, or an override on either
   // package, lets any mismatch through in silence. That is the same shape as the
@@ -253,7 +254,6 @@ describe("the rate-limit-redis / express-rate-limit pairing", () => {
   // rather than assumed from a loose peer range.
   const KNOWN_GOOD_MAJORS = [
     { store: 4, limiter: [6, 7] },
-    { store: 5, limiter: [8] },
     { store: 6, limiter: [8] }
   ];
 
