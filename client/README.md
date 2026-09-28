@@ -48,8 +48,9 @@ The app serves on `http://localhost:5173`. Vite proxies `/api` to `http://localh
 npm run dev        # Start Vite
 npm run build      # Build production assets
 npm run preview    # Preview the production build
-npm run test       # Run Vitest once
-npm run test:watch # Run Vitest in watch mode
+npm run test          # Run Vitest once
+npm run test:watch    # Run Vitest in watch mode
+npm run test:coverage # Run with coverage and its floors -- what CI runs
 ```
 
 ## Routing

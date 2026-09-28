@@ -139,9 +139,12 @@ six-hour buffer that serves old data when an upstream is down.
 
    **`OPENAQ_API_KEY`** — free key from
    [openaq.org](https://openaq.org). Not optional: the service throws
-   `"OpenAQ API key is not configured"` without one. The route catches it and
-   the dashboard shows an error card rather than breaking, so the symptom is a
-   permanently dead air-quality panel rather than an outage.
+   `"OpenAQ API key is not configured"` without one. The route treats that
+   like an upstream outage and answers 200 with `fallback: true`, so the
+   dashboard shows "Air quality data is unavailable" rather than breaking. The
+   symptom is a permanently dead air-quality panel rather than an outage, and
+   the place to spot it is the server log: `external_api_retry` warnings that
+   name the missing key.
 
    **`METRICS_TOKEN`** — guards `/api/metrics`, which reports `authFailures`,
    per-route latency and request totals. Generate any long random string and

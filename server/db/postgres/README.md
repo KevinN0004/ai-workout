@@ -10,6 +10,18 @@ npm run migrate:postgres -w server
 npm run prisma:generate -w server
 ```
 
+## The migrations
+
+| File                          | What it does                                                                                                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_foundation.sql`          | The seven tables, their indexes and `updated_at` triggers                                                                                                                                                  |
+| `002_password_changed_at.sql` | Adds `app_users.password_changed_at`, set only when a user deliberately changes their password, so sessions issued before it can be rejected. The silent pbkdf2 → argon2id rehash on login does not set it |
+| `003_utc_timezone.sql`        | Makes UTC the database's timezone. It used to be set per connection with `options=-c timezone=UTC`, which the pooled (PgBouncer) endpoint refuses                                                          |
+
+**The server reads `password_changed_at` on every user read**, so migrations must run
+before new code starts; a server started against an unmigrated database fails every
+authenticated request.
+
 ## What is modelled
 
 Seven tables: `app_users`, `workout_sessions`, `meal_logs`, `progress_metrics`,

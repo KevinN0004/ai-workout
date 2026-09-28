@@ -92,9 +92,12 @@ services:
         sync: false
 
       # Required, not optional: externalDataService throws "OpenAQ API key is
-      # not configured" without it. The route catches it and the dashboard
-      # shows an error card rather than breaking, so the failure is a
-      # permanently dead air-quality panel rather than an outage.
+      # not configured" without it. The route treats that like an upstream
+      # outage and answers 200 with `fallback: true` and no readings, so the
+      # dashboard shows air quality as unavailable rather than breaking -- a
+      # permanently dead air-quality panel rather than an outage. The browser
+      # sees no error status; the server log is where it shows, as
+      # `external_api_retry` warnings naming the missing key.
       - key: OPENAQ_API_KEY
         sync: false
 
