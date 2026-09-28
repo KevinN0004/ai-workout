@@ -24,10 +24,13 @@ server/
 |-- prisma/schema.prisma        # Prisma model mapping for Postgres tables
 |-- src/
 |   |-- index.js                # Express app setup, wiring, and server boot
-|   |-- postgres.js             # Postgres readiness probe
-|   |-- prisma.js               # Prisma Client setup
-|   |-- postgresMigrations.js   # Transactional SQL migration runner
+|   |-- corsPolicy.js           # Allowed-origin rules for CORS
+|   |-- staticClient.js         # Serves client/dist from the same origin as the API
 |   |-- shutdown.js             # Graceful shutdown sequence
+|   |-- db/
+|   |   |-- postgres.js         # Postgres pool and readiness probe
+|   |   |-- prisma.js           # Prisma Client setup
+|   |   `-- postgresMigrations.js # Transactional SQL migration runner
 |   |-- middleware/             # Request context and error handling
 |   |-- routes/                 # API route registration
 |   |-- repositories/           # All Prisma data access (see below)
@@ -87,6 +90,7 @@ npm run dev                           # Start with node --watch
 npm run start                         # Start normally
 npm run test                          # Run Vitest once
 npm run test:watch                    # Run Vitest in watch mode
+npm run test:coverage                 # Run with coverage and its floors -- what CI runs
 npm run postgres:local:start          # Start workspace-local Postgres on 55432
 npm run migrate:postgres              # Apply Postgres SQL migrations
 npm run prisma:validate               # Validate the Prisma schema
@@ -94,13 +98,18 @@ npm run prisma:generate               # Generate Prisma Client
 npm run prisma:studio                 # Open Prisma Studio
 ```
 
+`npm run prisma:push` exists only to refuse: `prisma db push` would drop tables the Prisma
+schema does not declare. Change the schema with a new SQL migration in `db/postgres/`.
+
 ## Environment Variables
 
-Create `server/.env` for local development. Useful defaults:
+Create `server/.env` from the template (`cp env.example server/.env` at the repository
+root); the root README's environment table documents every variable. The ones that
+matter most locally:
 
 ```env
 PORT=5000
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
+DATABASE_URL=postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout
 POSTGRES_STARTUP_REQUIRED=false
 CLIENT_ORIGIN=http://localhost:5173
 LOG_LEVEL=info
@@ -127,15 +136,17 @@ REDIS_TLS=false
 Optional Postgres settings:
 
 ```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
 POSTGRES_STARTUP_REQUIRED=false
 POSTGRES_SSL=false
 POSTGRES_SSL_REJECT_UNAUTHORIZED=true
 ```
 
+The two `POSTGRES_SSL*` settings apply only when `DATABASE_URL` carries no `sslmode`.
+
 Postgres is the active application database. Startup probes Postgres and `/api/ready` reports its status.
 
-For local development with the workspace-owned Postgres cluster:
+For local development with the workspace-owned Postgres cluster, which binds 55432 and
+writes its own `DATABASE_URL` (with a generated password) into `server/.env`:
 
 ```bash
 npm run postgres:local:start
@@ -143,7 +154,12 @@ npm run migrate:postgres
 npm run prisma:generate
 ```
 
-Optional third-party settings:
+`docker compose up -d` at the repository root is the alternative: Postgres 18 on the same
+port, matching the `DATABASE_URL` above. Use one or the other.
+
+Third-party settings. Without `OPENAQ_API_KEY` the air-quality route takes its
+upstream-outage path for good, answering 200 with `fallback: true` and no readings, so
+the panel always shows air quality as unavailable. The rest are optional:
 
 ```env
 OPENAQ_API_KEY=
@@ -169,6 +185,8 @@ Auth and profile:
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `POST /api/auth/password` (re-verifies the current password)
+- `DELETE /api/auth/me` (re-verifies the password, then deletes the account)
 - `GET /api/profile`
 - `POST /api/profile`
 
@@ -273,8 +291,10 @@ patch.
   be mistaken for a completed one.
 - **Never run `prisma db push` against a real database.** It drops tables the schema does
   not declare. `schema_migrations` is declared as a model purely to protect it from that.
-- **The upstream cache is per process.** Each replica keeps its own and multiplies
-  upstream load; it is not shared state.
+- **The upstream cache is shared only through Redis.** With `REDIS_URL` set it lives in
+  Redis and survives a restart, which is what keeps the six-hour stale window through a
+  spin-down. Without Redis, or while Redis is unreachable, it is a per-process map: each
+  replica keeps its own and multiplies upstream load.
 - **Every external route answers `200` on an upstream outage, not an error.** Air quality,
   both weather routes, all three wger routes and the mealdb search each return
   `fallback: true` with empty or null readings, so the panel degrades instead of failing.

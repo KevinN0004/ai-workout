@@ -83,20 +83,26 @@ Install dependencies from the repository root:
 npm install
 ```
 
-Create `server/.env` and start with:
-
-```env
-PORT=5000
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_workout
-CLIENT_ORIGIN=http://localhost:5173
-GEMINI_API_KEY=
-```
-
-Run the full app in development:
+Create `server/.env` from the template, start a local Postgres, apply the migrations and
+run the app:
 
 ```bash
+cp env.example server/.env
+npm run postgres:local:start -w server   # or: docker compose up -d (see below)
+npm -w server run migrate:postgres       # a new database starts empty
 npm run dev
 ```
+
+There are two ways to run Postgres locally. Both bind **55432**, so use one or the other:
+
+- **`npm run postgres:local:start -w server`** starts a workspace-owned Postgres from a
+  local install (it prefers 18, then 17, then 16) and writes its own `DATABASE_URL`, with
+  a generated password, into `server/.env`.
+- **`docker compose up -d`** starts Postgres 18 in a container. The `DATABASE_URL` in
+  `env.example` already matches it.
+
+Plan generation needs a `GEMINI_API_KEY` in `server/.env`; everything else works without
+one.
 
 The client runs on `http://localhost:5173` and proxies `/api` requests to the server on `http://localhost:5000`.
 
@@ -105,11 +111,11 @@ The client runs on `http://localhost:5173` and proxies `/api` requests to the se
 `docker-compose.yml` brings up Postgres and Redis only. The app is deliberately not containerised, so Vite and `node --watch` keep running natively.
 
 ```bash
-docker compose up -d               # Postgres on 55432, Redis on 6379
+docker compose up -d               # Postgres 18 on 55432, Redis 8 on 6379
 npm -w server run migrate:postgres # the container starts empty
 ```
 
-Then set in `server/.env`:
+`server/.env` needs the `DATABASE_URL` from `env.example`:
 
 ```text
 DATABASE_URL=postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout
@@ -117,18 +123,34 @@ DATABASE_URL=postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout
 
 Compose and `npm run postgres:local:start -w server` both bind **55432** and are therefore mutually exclusive — use one or the other, not both.
 
+Compose keeps its data in the `postgres18-data` volume. A volume left over from before the
+move to Postgres 18 (`postgres-data`) holds files the 18 server cannot read, so it is not
+reused. Remove it with `docker volume rm ai-workout_postgres-data` if you no longer need it.
+
 Redis is opt-in: without `REDIS_URL` the server keeps sessions, rate limit counters and the external response cache in memory, so starting the container alone changes nothing. To use it, set `REDIS_URL=redis://127.0.0.1:6379`.
 
 ## Root Scripts
 
 ```bash
-npm run dev          # Run client and server together
-npm run dev:client   # Run only the Vite client
-npm run dev:server   # Run only the Express server
-npm run build        # Build the client
-npm run start        # Start the server
-npm run test         # Run client and server tests
+npm run dev            # Run client and server together
+npm run dev:client     # Run only the Vite client
+npm run dev:server     # Run only the Express server (node --watch)
+npm run build          # Build the client
+npm run start          # Start the server
+npm test               # Scripts, client and server tests
+npm run test:scripts   # Tests for scripts/ only
+npm run test:coverage  # Client and server tests with coverage floors -- what CI runs
+npm run test:e2e       # Playwright E2E and accessibility suites (build first)
+npm run test:e2e:ui    # The same in Playwright's UI mode
+npm run lint           # ESLint across the repository
+npm run lint:fix       # ESLint with fixes applied
+npm run format         # Prettier --write
+npm run format:check   # Prettier check -- what CI runs
+npm run knip           # Unused files, exports and dependencies
 ```
+
+Workspace scripts are listed in the [client](client/README.md) and
+[server](server/README.md) READMEs.
 
 ## Environment Variables
 
@@ -203,27 +225,28 @@ Dashboard pagination and external-API behaviour.
 cookies and `trust proxy`, and makes Postgres required at startup. `VITEST` is set by the
 test runner and suppresses the automatic `startServer()` call.
 
-The upstream cache is **per process and in memory**, so each replica keeps its own and
-multiplies upstream load accordingly.
+The upstream cache lives in Redis when `REDIS_URL` is set, so replicas share it and it
+survives a restart. Without Redis it is **per process and in memory**: each replica keeps
+its own and multiplies upstream load accordingly.
 
 External API variables:
 
-| Variable                | Purpose                  | Default                 |
-| ----------------------- | ------------------------ | ----------------------- |
-| `OPEN_METEO_BASE_URL`   | Weather API base URL     | Open-Meteo forecast API |
-| `OPENAQ_BASE_URL`       | Air quality API base URL | OpenAQ v3               |
-| `OPENAQ_API_KEY`        | Optional OpenAQ key      | unset                   |
-| `WGER_BASE_URL`         | Exercise API base URL    | wger API                |
-| `WGER_API_TOKEN`        | Optional wger token      | unset                   |
-| `WGER_DEFAULT_LANGUAGE` | wger language ID         | `2`                     |
-| `MEALDB_BASE_URL`       | Meal search API base URL | TheMealDB v1            |
+| Variable                | Purpose                                                        | Default                 |
+| ----------------------- | -------------------------------------------------------------- | ----------------------- |
+| `OPEN_METEO_BASE_URL`   | Weather API base URL                                           | Open-Meteo forecast API |
+| `OPENAQ_BASE_URL`       | Air quality API base URL                                       | OpenAQ v3               |
+| `OPENAQ_API_KEY`        | OpenAQ key; without it air quality always reads as unavailable | unset                   |
+| `WGER_BASE_URL`         | Exercise API base URL                                          | wger API                |
+| `WGER_API_TOKEN`        | Optional wger token                                            | unset                   |
+| `WGER_DEFAULT_LANGUAGE` | wger language ID                                               | `2`                     |
+| `MEALDB_BASE_URL`       | Meal search API base URL                                       | TheMealDB v1            |
 
 ## API Overview
 
 The server exposes:
 
 - System: `GET /api/health`, `GET /api/ready`, `GET /api/metrics`, `GET /api/csrf-token`
-- Auth/profile: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET/POST /api/profile`
+- Auth/profile: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`, `DELETE /api/auth/me`, `GET/POST /api/profile`
 - Dashboard: `GET /api/dashboard`, `GET /api/dashboard/workout-sessions`, `GET /api/dashboard/meal-logs`, `GET /api/dashboard/progress-metrics`
 - Dashboard writes: workout sessions, workout aliases, calories, goals, meal logs, progress metrics, and saved exercises under `/api/dashboard`
 - Generation: `POST /api/generate`
@@ -236,7 +259,7 @@ Unsafe API methods require a CSRF token. The frontend obtains it from `/api/csrf
 Run all tests:
 
 ```bash
-npm run test
+npm test
 ```
 
 Run one workspace:
@@ -244,6 +267,25 @@ Run one workspace:
 ```bash
 npm run test -w client
 npm run test -w server
+```
+
+The server tests need a running Postgres; without one, about a hundred of them fail
+with `Can't reach database server`, which is environmental, not a regression.
+
+Before calling a change ready, run what CI runs. `npm test` measures no coverage, and
+both workspaces enforce coverage floors:
+
+```bash
+npm run test:coverage
+npm run lint && npm run format:check && npm run knip
+```
+
+The E2E and accessibility suites run the client and server together against the built
+bundle; see [`e2e/README.md`](e2e/README.md):
+
+```bash
+npm -w client run build
+npm run test:e2e
 ```
 
 Run the Postgres migration after setting `DATABASE_URL` or `POSTGRES_URL`:
@@ -265,8 +307,8 @@ npm run prisma:validate -w server
 not a preference, and deploying the bundle to a static host separate from the API
 does not work:
 
-- every request the client makes is a relative path — there are 16 `/api/...`
-  literals in `client/src` and no base-URL constant — so a bundle served from
+- every request the client makes is a relative path — each `/api/...` call in
+  `client/src` is a literal, with no base-URL constant — so a bundle served from
   another host sends `/api/auth/me` to that host, and CORS is never reached
 - both the session and CSRF cookies are `SameSite=Lax`, so even with an absolute
   URL the session would not be attached to a cross-site request
@@ -338,7 +380,9 @@ session store and sign every user out.
 2. **Upstash** — create a Redis database and copy the `rediss://` URL, which is
    already TLS.
 3. **Render** — New → Blueprint, point it at this repo. `render.yaml` declares
-   the service; Render will prompt for the four secrets it marks `sync: false`.
+   the service; Render will prompt for each secret it marks `sync: false`, and a
+   comment beside each one in `render.yaml` says what it is for and whether it is
+   required.
    Set `CLIENT_ORIGIN` to the service's own URL once Render assigns it, e.g.
    `https://ai-workout.onrender.com` — the production preflight refuses to start
    without it, even though same-origin serving means CORS is barely exercised.
@@ -367,14 +411,17 @@ green CI is skipped, and the first deploy is started by hand (see
 
 ### What production needs
 
-| Setting                     | Why                                                                                                                                                               |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV=production`       | Enables the env preflight and the production defaults                                                                                                             |
-| `DATABASE_URL`              | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                       |
-| `CLIENT_ORIGIN`             | Required when `NODE_ENV=production`                                                                                                                               |
-| `REDIS_URL`                 | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window |
-| `GEMINI_API_KEY`            | Plan generation returns an error without it                                                                                                                       |
-| `POSTGRES_STARTUP_REQUIRED` | Defaults to true in production; leave it                                                                                                                          |
+| Setting                          | Why                                                                                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV=production`            | Enables the env preflight and the production defaults                                                                                                             |
+| `DATABASE_URL`                   | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                       |
+| `CLIENT_ORIGIN`                  | Required when `NODE_ENV=production`                                                                                                                               |
+| `REDIS_URL`                      | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window |
+| `GEMINI_API_KEY`                 | Plan generation returns an error without it                                                                                                                       |
+| `OPENAQ_API_KEY`                 | Without it air quality always reads as unavailable. The route answers 200 with `fallback: true`, so nothing looks like an error; nothing else is affected         |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Server and browser error reporting. Unset, production errors reach only the host's logs                                                                           |
+| `METRICS_TOKEN`                  | Opens `/api/metrics` to callers who send it; unset, the endpoint stays closed in production                                                                       |
+| `POSTGRES_STARTUP_REQUIRED`      | Defaults to true in production; leave it                                                                                                                          |
 
 Probes: `/api/health` is liveness and touches no dependency; `/api/ready`
 reports Postgres and Redis and is the one a load balancer should gate traffic
@@ -386,3 +433,11 @@ on.
   free tier, and what to check when it goes wrong
 - [Client README](client/README.md)
 - [Server README](server/README.md)
+- [Migrations README](server/db/postgres/README.md) — the schema, and the two things
+  about it that will bite you
+- [E2E README](e2e/README.md) — the browser suites, and how to run them
+- [Scripts README](scripts/README.md) — repo tooling and Claude Code hook targets
+- [Security README](security/README.md) — how audit findings are accepted and expire
+- [Docs index](docs/README.md) — the runbook, plans and specs
+- [`CLAUDE.md`](CLAUDE.md) — working notes and the reasoning behind the non-obvious
+  decisions
