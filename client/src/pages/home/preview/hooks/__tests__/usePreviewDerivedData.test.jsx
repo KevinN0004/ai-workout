@@ -632,6 +632,33 @@ describe("usePreviewDerivedData", () => {
       expect(previewDashboardSummary.nextTrainingPlan?.isTraining).toBe(true);
     });
 
+    describe("the next session", () => {
+      // Found by walking forward from today, so where it lands depends on the
+      // date. Left to the real clock, the walk only stepped over a rest day on
+      // some weekdays: on a Tuesday or a Sunday no test reached that path, and
+      // the client's branch coverage fell below its floor on those days alone.
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      test("skips the rest days after today", () => {
+        // 2026-09-18 is a Friday; training Monday to Friday leaves the weekend
+        // in between as rest.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-18T09:00:00"));
+
+        const { previewDashboardSummary, previewWeekPlan } = render({
+          personal: { trainingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
+          form: { days: "5" }
+        });
+        const trainsOn = (day) => previewWeekPlan.find((plan) => plan.day === day)?.isTraining;
+
+        expect(previewDashboardSummary.todayName).toBe("Friday");
+        expect([trainsOn("Saturday"), trainsOn("Sunday")]).toEqual([false, false]);
+        expect(previewDashboardSummary.nextTrainingPlan.day).toBe("Monday");
+      });
+    });
+
     test("reports a streak of at least a day", () => {
       const { previewDashboardSummary } = render();
 
