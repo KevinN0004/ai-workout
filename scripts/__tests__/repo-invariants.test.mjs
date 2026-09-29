@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -334,5 +335,68 @@ describe("the Deploy workflow deploys only this repository's own pushes", () => 
   test("those requirements are all required, not alternatives", () => {
     // One `||` inside the automatic branch would let any single check through.
     expect(automatic).not.toContain("||");
+  });
+});
+
+describe("every source file opens with a header comment", () => {
+  // docs/code-readability-sop.md asks every non-test source file to open with a
+  // comment saying what it is for. This checks presence only; whether a header
+  // is any good is review's job.
+  //
+  // file-header-allowlist.json lists the files that had no header when this
+  // check arrived. It only shrinks: a file that gains a header must leave the
+  // list (the third test), and so must a path that stops being an in-scope file
+  // (the fourth), so no entry can outlive the file it excuses. At zero entries
+  // the list allows nothing and could be deleted along with the third and
+  // fourth tests, which exist only to keep it honest.
+  const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
+  const isInScope = (file) =>
+    /\.(js|jsx|mjs|cjs|css)$/.test(file) &&
+    !/\.(test|spec)\.|(^|\/)__tests__\/|^client\/src\/test\/setup\.js$/.test(file) &&
+    (IN_SCOPE_DIRS.some((dir) => file.startsWith(`${dir}/`)) ||
+      /(^|\/)[^/]+\.config\.js$/.test(file));
+  // Tracked files, not a directory walk, so stray local files cannot fail it.
+  const sources = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
+    .split("\0")
+    .filter((file) => file && isInScope(file) && existsSync(path.join(repoRoot, file)));
+
+  // After a byte-order mark and a shebang, the first non-blank line must be a
+  // comment -- and not a tool directive, which tells a reader nothing.
+  const TOOL_DIRECTIVE =
+    /^\s*(\/\/|\/\*+)\s*(eslint|global\s|prettier-ignore|istanbul|c8\s|@vitest-environment)/;
+  const hasHeader = (file) => {
+    const text = readFileSync(path.join(repoRoot, file), "utf8")
+      .replace(/^\uFEFF/, "")
+      .replace(/^#!.*\r?\n/, "");
+    const first = text.split(/\r?\n/).find((line) => line.trim() !== "") ?? "";
+    return /^\s*(\/\/|\/\*)/.test(first) && !TOOL_DIRECTIVE.test(first);
+  };
+
+  const allowlist = JSON.parse(
+    readFileSync(path.join(repoRoot, "scripts", "__tests__", "file-header-allowlist.json"), "utf8")
+  );
+  const allowed = new Set(allowlist);
+
+  test("the sweep found the source tree", () => {
+    // Guards the scope: a broken filter must not pass vacuously on no files.
+    expect(sources.length).toBeGreaterThan(150);
+    expect(sources).toContain("server/src/index.js");
+    expect(sources).toContain("client/src/styles/base.css");
+  });
+
+  test("every source file not on the allowlist opens with a header", () => {
+    const missing = sources.filter((file) => !allowed.has(file) && !hasHeader(file));
+    expect(missing).toEqual([]);
+  });
+
+  test("every allowlisted file still lacks one, so the list only shrinks", () => {
+    const done = allowlist.filter((file) => sources.includes(file) && hasHeader(file));
+    expect(done).toEqual([]);
+  });
+
+  test("every allowlisted path is an in-scope tracked file, listed once", () => {
+    const stale = allowlist.filter((file) => !sources.includes(file));
+    expect(stale).toEqual([]);
+    expect(allowed.size).toBe(allowlist.length);
   });
 });
