@@ -346,10 +346,12 @@ describe("every source file opens with a header comment", () => {
   // file-header-allowlist.json lists the files that had no header when this
   // check arrived, and it only shrinks. ALLOWLIST_SIZE pins its length, so a new
   // entry fails "the allowlist has exactly ALLOWLIST_SIZE entries" unless the
-  // constant is raised in the same diff -- the line a reviewer should refuse. An
-  // entry whose file gains a header, or stops being an in-scope file, fails the
-  // tests named for those cases, so no entry outlives the file it excuses. When
-  // entries are removed, lower ALLOWLIST_SIZE in the same change.
+  // constant is raised in the same diff -- the line a reviewer should refuse.
+  // (Swapping one entry for another keeps the length; only the allowlist's own
+  // diff shows that, as an added line.) An entry whose file gains a header, or
+  // stops being an in-scope file, fails the tests named for those cases, so no
+  // entry outlives the file it excuses. When entries are removed, lower
+  // ALLOWLIST_SIZE in the same change.
   const ALLOWLIST_SIZE = 185;
 
   const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
@@ -365,16 +367,20 @@ describe("every source file opens with a header comment", () => {
 
   // A comment that only instructs a tool tells a reader nothing, so it is not a
   // header. The rule reads the comment's first line of content, which also
-  // catches a directive split across lines ("/*\n eslint-disable */"). "global"
-  // is a directive only to ESLint, so a stylesheet may open "/* global tokens */".
+  // catches a directive split across lines ("/*\n eslint-disable */"). ESLint
+  // reads a rule setting and a globals list only in a block comment, and
+  // "global" only in JS, so "// global error handler" and a stylesheet's
+  // "/* global tokens */" are both headers.
   const TOOL_DIRECTIVE =
-    /^(eslint-(disable|enable|env)\b|eslint\s+[\w@/-]+\s*:|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
-  const JS_ONLY_DIRECTIVE = /^globals?\s/;
+    /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
+  const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
+  const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
   // True when, after a byte-order mark and a shebang line, the text opens with a
   // comment whose first line of content is not a tool directive.
   const hasHeaderText = (file, text) => {
     const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
     const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
+    const isBlock = body.startsWith("/*");
     let lines;
     if (body.startsWith("//")) {
       lines = [];
@@ -382,8 +388,8 @@ describe("every source file opens with a header comment", () => {
         if (!line.trimStart().startsWith("//")) break;
         lines.push(line.trimStart().slice(2));
       }
-    } else if (body.startsWith("/*")) {
-      const end = body.indexOf("*/");
+    } else if (isBlock) {
+      const end = body.indexOf("*/", 2);
       lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
     } else {
       return false;
@@ -391,7 +397,9 @@ describe("every source file opens with a header comment", () => {
     const content =
       lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
     if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
-    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_ONLY_DIRECTIVE.test(content));
+    if (!isBlock) return true;
+    if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
+    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
   };
   const hasHeader = (file) => hasHeaderText(file, readFileSync(path.join(repoRoot, file), "utf8"));
 
@@ -406,12 +414,30 @@ describe("every source file opens with a header comment", () => {
     ["a line comment", "a.js", "// Does a thing.\nexport const a = 1;\n", true],
     ["a CSS comment after a byte-order mark", "a.css", `${BOM}/* The drawer. */\n.a {}\n`, true],
     ["a header after a shebang", "a.mjs", "#!/usr/bin/env node\n// A tool.\n", true],
+    [
+      "a byte-order mark, then a shebang, then a header",
+      "a.mjs",
+      `${BOM}#!/usr/bin/env node\n// A tool.\n`,
+      true
+    ],
     ["CRLF line endings", "a.js", "/**\r\n * Does a thing.\r\n */\r\n", true],
     ["a licence comment", "a.js", "/*! Licensed MIT */\n", true],
     [
       "a stylesheet header that starts with the word global",
       "a.css",
       "/* global resets and tokens */\n",
+      true
+    ],
+    [
+      "a line comment that starts with the word global",
+      "a.js",
+      "// global error handler for every route\n",
+      true
+    ],
+    [
+      "a line comment that starts with eslint and a colon",
+      "a.js",
+      "// eslint config: flat, scoped to defect classes\n",
       true
     ],
     ["an import first", "a.js", 'import x from "y";\n// late\n', false],
@@ -423,6 +449,12 @@ describe("every source file opens with a header comment", () => {
     ],
     ["a directive split across lines", "a.js", "/*\n  eslint-disable no-console\n*/\n", false],
     ["an ESLint globals comment", "a.js", "/* globals window */\n", false],
+    [
+      "an ESLint globals comment broken after the keyword",
+      "a.js",
+      "/* globals\n  window */\n",
+      false
+    ],
     ["a coverage directive", "a.js", "/* v8 ignore next */\n", false],
     ["a TypeScript check directive", "a.js", "// @ts-check\n", false],
     ["an empty comment", "a.js", "//\nexport const a = 1;\n", false],
