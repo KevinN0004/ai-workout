@@ -814,12 +814,26 @@ the native instance all along.
     uncaught one both read as "tests passed". Check the file changed, not just the exit
     code. Five things have silently prevented a match so far: shell escaping eating a
     backslash, indentation not matching, an apostrophe in the pattern, **CRLF line
-    endings** (some files here use them — match on `\r?\n`), and a **heredoc collapsing
-    `\\n` to `\n`** even with a quoted delimiter. Three of those five are the shell, so
-    **write mutation scripts with the Write tool rather than a heredoc**, and use
-    `String.raw` for any pattern containing a backslash. The prompt in
-    `generateRoutes.js` is the awkward case: its newlines are the two characters
-    backslash-n inside a template literal. Not every survivor is a weak test either: removing the `!user?.hash` guard in
+    endings**, and a **heredoc collapsing `\\n` to `\n`** even with a quoted delimiter.
+    Three of those five are the shell, so **write mutation scripts with the Write tool
+    rather than a heredoc**, and use `String.raw` for any pattern containing a
+    backslash. The prompt in `generateRoutes.js` is the awkward case: its newlines are
+    the two characters backslash-n inside a template literal.
+    **On CRLF:** no committed file is, or ever was, CRLF — none of the 2457 blobs in
+    the history holds a carriage return, and `.gitattributes` stores text as LF (`.bat`
+    and `.cmd` excepted; none are tracked). A working copy can still be CRLF, and git
+    hides one of the two ways it gets there. A CRLF rewrite that has not been staged
+    shows as modified, with an empty `git diff`. A file committed while CRLF is stored as LF
+    but stays CRLF on disk, `git status` calls it clean, and `git checkout -- <file>`
+    and `git reset --hard` both leave it CRLF, because git skips a file whose stat
+    still matches the index; delete it and check it out again. So match on `\r?\n`
+    anyway, and check a file with `git ls-files --eol` (`w/crlf`) or count with
+    `tr -cd '\r' < file | wc -c`. Not with `grep -c $'\r'`, which is wrong here both
+    ways: this grep strips carriage returns before matching unless given `-U`, so it
+    reads 0 on a CRLF file, and inside a `$(…)` this bash drops the carriage return
+    from `$'\r'`, leaving an empty pattern that matches every line, so it reads the
+    line count. The second is what put a false CRLF claim in #177's description.
+    Not every survivor is a weak test either: removing the `!user?.hash` guard in
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
     Dropping the `ageValue !== null` guard on `useBodyModel`'s age adjustment is another,
