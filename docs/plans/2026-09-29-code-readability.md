@@ -37,9 +37,16 @@ Scratch tools do the measuring and proving. They are written out in full below, 
   - If an edit has to include a line that already holds an escape, as the six non-breaking-space escapes in `PreviewWorkoutWeekChapter.jsx` do, end the edit's `old_string` and `new_string` short of that line.
   - After any edit that writes an escape, run `node "$TOOLS/restore-escapes.mjs" <file>`.
   - Before **every** commit in Tasks 2–13, run `node "$TOOLS/escapes-intact.mjs" "$REPO"` (Task 0, Step 11). It must exit 0. ESLint cannot stand in for it, because it does not look inside strings.
+  - An escape removed on purpose, such as one replaced by `String.fromCharCode`, is reported too. PR 0 did exactly that: `escapes 1 -> 0, invisible characters 0 -> 0`. Confirm the invisible count did not rise, and name the removal in the PR.
 - **Postgres.** It must be up for the server suite (`npm run postgres:local:start -w server`, or `docker compose up -d`). Without it, 107 server tests fail with `Can't reach database server`, which says nothing about the change.
 - **Commit trailer.** Every commit message ends with `Co-Authored-By: claude-flow <ruv@ruv.net>`.
-- **One PR at a time, in order.** Every PR edits `scripts/__tests__/file-header-allowlist.json`. Branch each PR from an up-to-date `main` after the previous one merges. If two are ever open together, regenerate the allowlist after rebasing (Task 0, Step 6's tool does it) instead of hand-merging the JSON.
+- **The PRs are stacked, one at a time, in order.** Every PR edits `scripts/__tests__/file-header-allowlist.json`, so each PR's branch starts from the previous PR's branch, and each PR is opened against `main`. The owner merges them in order, and nobody else merges. If a branch ever has to be rebased, regenerate the allowlist with Task 0, Step 6's tool instead of hand-merging the JSON.
+- **The allowlist and `ALLOWLIST_SIZE` move together.** `pr_allowlist` shrinks the list and lowers the constant in `scripts/__tests__/repo-invariants.test.mjs`, so its numstat shows two lines:
+  - the allowlist as `0	N`, removals only;
+  - the test as `1	1`, the constant.
+
+  Every area commit stages both files, as the steps below do. If the allowlist line's first column is above 0, an entry was added: stop. If `make-allowlist.mjs` exits 1 and lists files, those files lack a header, so give each one a header. Never add them to the list.
+
 - **Checklist line numbers** come from the baseline scan of `9b85b7d`. They drift as a file is edited, so re-run `area.mjs` for current ones.
 - **"Move header to top"** means the scanner found a comment before the file's first statement but not at line 1. Read it before moving it:
   - If it describes the module, move it above the imports.
@@ -75,6 +82,14 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
    - **The controller is not immune.** One Write kept all 11 of this plan's escapes. The Edits that first added this finding decoded 6 of theirs, and `escapes-intact.mjs` caught them on its first run.
 
    `same-code.mjs` catches a decoded escape in a comments commit, because the literal's `raw` text changes. Nothing else did: ESLint passes a decoded non-breaking space inside a string, and `same-code` does not check a code-moving commit. Hence `escapes-intact.mjs`, `restore-escapes.mjs`, and the Conventions rule above.
+
+10. **Code review changed the ratchet before PR 0 was done** (commits `44c74a1` and `7fc83a3`). Task 1 and Task 0's tool listings show the result.
+    - **"Only shrinks" was not enforced.** A new file with no header, plus an allowlist entry for it, passed every test. Two things fix it:
+      - `ALLOWLIST_SIZE` pins the list's exact length, so growing it means raising a constant in the same diff.
+      - `make-allowlist.mjs` only removes entries.
+    - **The rule is a pure `hasHeaderText(file, text)` with 20 fixture rows,** so it stays tested once the list is empty. The spec's "three assertions" became five tests plus that table.
+    - **Directives are matched on the comment's first line of content.** That catches a directive split across lines. ESLint's rule settings and `global(s)` lists count only inside block comments, and `global(s)` only in JS. So `// global error handler` and a stylesheet's `/* global tokens */` are both headers.
+    - **One gap is accepted by design.** Swapping one entry for another keeps the length, and only the allowlist's own diff shows the added line. Closing that would need CI to compare against the base branch's history.
 
 ## Baseline (from the scanner, `9b85b7d`)
 
@@ -164,16 +179,38 @@ const DIRECTIVE = /^\s*(eslint[- ]|global\s|@vitest-environment|prettier-ignore|
 const HISTORY =
   /Task \d+\b|docs\/(plans|specs)\/|\bPR #?\d+|\(#\d+\)|`[0-9a-f]{7,12}`|\bcommit [0-9a-f]{7}|\b(previously|used to|formerly|reinstated)\b/i;
 
-const headerFirst = (text) => {
-  const body = text.replace(/^\uFEFF/, "").replace(/^#!.*\r?\n/, "");
-  const first = body.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
-  return (
-    /^\s*(\/\/|\/\*)/.test(first) &&
-    !/^\s*(\/\/|\/\*+)\s*(eslint|global\s|prettier-ignore|istanbul|c8\s|@vitest-environment)/.test(
-      first
-    )
-  );
+// ---- the ratchet's header rule, copied verbatim -----------------------------
+const TOOL_DIRECTIVE =
+  /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
+// ESLint reads a rule setting and a globals list only in a block comment, and
+// "global" only in JS, so "// global error handler" is a header.
+const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
+const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
+const hasHeaderText = (file, text) => {
+  const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
+  const isBlock = body.startsWith("/*");
+  let lines;
+  if (body.startsWith("//")) {
+    lines = [];
+    for (const line of body.split(/\r?\n/)) {
+      if (!line.trimStart().startsWith("//")) break;
+      lines.push(line.trimStart().slice(2));
+    }
+  } else if (isBlock) {
+    const end = body.indexOf("*/", 2);
+    lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
+  } else {
+    return false;
+  }
+  const content =
+    lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
+  if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
+  if (!isBlock) return true;
+  if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
+  return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
 };
+// -----------------------------------------------------------------------------
 
 const isFn = (n) =>
   !!n && ["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(n.type);
@@ -367,7 +404,7 @@ const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "
   .filter((f) => f && inScope(f) && existsSync(path.join(root, f)));
 const records = tracked.map((file) => {
   const text = readFileSync(path.join(root, file), "utf8");
-  const base = { file, headerFirst: headerFirst(text), bom: text.charCodeAt(0) === 0xfeff };
+  const base = { file, headerFirst: hasHeaderText(file, text), bom: text.charCodeAt(0) === 0xfeff };
   return file.endsWith(".css")
     ? { ...base, lang: "css", ...scanCss(text) }
     : { ...base, lang: "js", ...scanJs(file, text) };
@@ -641,17 +678,21 @@ for (const { file, find, text, mode = "replace" } of edits) {
 
 - [ ] **Step 6: Write `$TOOLS/make-allowlist.mjs`**
 
-Its scope and header rule are copied verbatim from the ratchet (Task 1, Step 3). If you change one, change the other.
+Its scope and header rule are copied verbatim from the ratchet (Task 1, Step 3). If you change one, change the other. It only ever removes entries, and lowers `ALLOWLIST_SIZE` in the test to match. A file that lacks a header and is not listed makes it exit 1, because such a file needs a header, never an entry. `--bootstrap` is for Task 1 alone.
 
 ```js
 /**
- * Writes scripts/__tests__/file-header-allowlist.json: every in-scope source
- * file that does not open with a header today. The scope and the header rule
- * are copied verbatim from the ratchet in repo-invariants.test.mjs, so the
- * list this writes is the list that test accepts.
+ * Maintains scripts/__tests__/file-header-allowlist.json and the ALLOWLIST_SIZE
+ * constant beside it in repo-invariants.test.mjs. It only ever removes entries:
+ * a listed file that now has a header, or is no longer an in-scope tracked
+ * file, is dropped, and ALLOWLIST_SIZE is lowered to match. A file that lacks a
+ * header and is NOT listed is an error -- it needs a header, never an entry.
+ * The scope and the header rule are copied verbatim from the ratchet.
  *
- * Usage: node make-allowlist.mjs <repoRoot> [--check]
- *   --check prints the count and the three ratchet assertions instead of writing.
+ * Usage: node make-allowlist.mjs <repoRoot> [--check | --bootstrap]
+ *   (no flag)    shrink the list and lower ALLOWLIST_SIZE
+ *   --check      print what the ratchet's tests would see, change nothing
+ *   --bootstrap  write every file that lacks a header (PR 0 only)
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -659,6 +700,7 @@ import path from "node:path";
 
 const [repoRoot = "D:/ai-workout", flag] = process.argv.slice(2);
 const allowlistPath = path.join(repoRoot, "scripts", "__tests__", "file-header-allowlist.json");
+const testPath = path.join(repoRoot, "scripts", "__tests__", "repo-invariants.test.mjs");
 
 // ---- copied from the ratchet ------------------------------------------------
 const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
@@ -667,45 +709,92 @@ const isInScope = (file) =>
   !/\.(test|spec)\.|(^|\/)__tests__\/|^client\/src\/test\/setup\.js$/.test(file) &&
   (IN_SCOPE_DIRS.some((dir) => file.startsWith(`${dir}/`)) ||
     /(^|\/)[^/]+\.config\.js$/.test(file));
-const sources = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
-  .split("\0")
-  .filter((file) => file && isInScope(file) && existsSync(path.join(repoRoot, file)));
 const TOOL_DIRECTIVE =
-  /^\s*(\/\/|\/\*+)\s*(eslint|global\s|prettier-ignore|istanbul|c8\s|@vitest-environment)/;
-const hasHeader = (file) => {
-  const text = readFileSync(path.join(repoRoot, file), "utf8")
-    .replace(/^\uFEFF/, "")
-    .replace(/^#!.*\r?\n/, "");
-  const first = text.split(/\r?\n/).find((line) => line.trim() !== "") ?? "";
-  return /^\s*(\/\/|\/\*)/.test(first) && !TOOL_DIRECTIVE.test(first);
+  /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
+// ESLint reads a rule setting and a globals list only in a block comment, and
+// "global" only in JS, so "// global error handler" is a header.
+const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
+const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
+const hasHeaderText = (file, text) => {
+  const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
+  const isBlock = body.startsWith("/*");
+  let lines;
+  if (body.startsWith("//")) {
+    lines = [];
+    for (const line of body.split(/\r?\n/)) {
+      if (!line.trimStart().startsWith("//")) break;
+      lines.push(line.trimStart().slice(2));
+    }
+  } else if (isBlock) {
+    const end = body.indexOf("*/", 2);
+    lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
+  } else {
+    return false;
+  }
+  const content =
+    lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
+  if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
+  if (!isBlock) return true;
+  if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
+  return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
 };
 // -----------------------------------------------------------------------------
 
+const sources = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
+  .split("\0")
+  .filter((file) => file && isInScope(file) && existsSync(path.join(repoRoot, file)));
+const hasHeader = (file) => hasHeaderText(file, readFileSync(path.join(repoRoot, file), "utf8"));
 const lacking = sources.filter((file) => !hasHeader(file)).sort();
-if (flag !== "--check") {
-  writeFileSync(allowlistPath, `${JSON.stringify(lacking, null, 2)}\n`);
-  console.log(`wrote ${lacking.length} entries to ${allowlistPath}`);
-} else {
-  const allowlist = existsSync(allowlistPath)
-    ? JSON.parse(readFileSync(allowlistPath, "utf8"))
-    : lacking;
-  const allowed = new Set(allowlist);
+const listed = existsSync(allowlistPath) ? JSON.parse(readFileSync(allowlistPath, "utf8")) : [];
+const sizeMatch = readFileSync(testPath, "utf8").match(/const ALLOWLIST_SIZE = (\d+);/);
+const size = sizeMatch ? Number(sizeMatch[1]) : null;
+
+if (flag === "--check") {
+  const allowed = new Set(listed);
   console.log(
     `in scope ${sources.length}, with a header ${sources.length - lacking.length}, lacking ${lacking.length}`
   );
+  console.log(`allowlist ${listed.length} entries, ALLOWLIST_SIZE ${size}`);
   console.log(
-    "1 missing, not allowlisted:",
-    sources.filter((f) => !allowed.has(f) && !hasHeader(f))
+    "missing, not allowlisted:",
+    lacking.filter((f) => !allowed.has(f))
   );
   console.log(
-    "2 allowlisted but done:",
-    allowlist.filter((f) => sources.includes(f) && hasHeader(f))
+    "allowlisted but done:",
+    listed.filter((f) => sources.includes(f) && hasHeader(f))
   );
   console.log(
-    "3 allowlisted but not an in-scope file:",
-    allowlist.filter((f) => !sources.includes(f))
+    "allowlisted but not an in-scope file:",
+    listed.filter((f) => !sources.includes(f))
+  );
+  process.exit(0);
+}
+
+let next;
+if (flag === "--bootstrap") {
+  next = lacking;
+} else {
+  const unlisted = lacking.filter((f) => !listed.includes(f));
+  if (unlisted.length) {
+    console.error("These files lack a header and are not allowlisted. Give each one a header;");
+    console.error("never add them to the allowlist:");
+    for (const f of unlisted) console.error(`  ${f}`);
+    process.exit(1);
+  }
+  next = listed.filter((f) => sources.includes(f) && !hasHeader(f));
+}
+writeFileSync(allowlistPath, `${JSON.stringify(next, null, 2)}\n`);
+if (sizeMatch) {
+  const test = readFileSync(testPath, "utf8");
+  writeFileSync(
+    testPath,
+    test.replace(/const ALLOWLIST_SIZE = \d+;/, `const ALLOWLIST_SIZE = ${next.length};`)
   );
 }
+console.log(
+  `wrote ${next.length} entries; ALLOWLIST_SIZE ${size} -> ${sizeMatch ? next.length : "(not in the test yet)"}`
+);
 ```
 
 - [ ] **Step 7: Write `$TOOLS/pr.sh`** — the steps every area PR repeats, as named shell functions
@@ -742,10 +831,11 @@ pr_dist_same() {
   echo "dist identical exit=$? (0 = byte-identical)"
 }
 
-# Regenerate the ratchet's allowlist, then show that lines were only removed.
+# Shrink the ratchet's allowlist and lower ALLOWLIST_SIZE to match, then show
+# that allowlist lines were only removed and the test changed on one line.
 pr_allowlist() {
   node "$TOOLS/make-allowlist.mjs" "$REPO"
-  git diff --numstat -- scripts/__tests__/file-header-allowlist.json
+  git diff --numstat -- scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs
 }
 
 # Every gate CI runs, each with its own exit code.
@@ -1029,11 +1119,16 @@ describe("every source file opens with a header comment", () => {
   // is any good is review's job.
   //
   // file-header-allowlist.json lists the files that had no header when this
-  // check arrived. It only shrinks: a file that gains a header must leave the
-  // list (the third test), and so must a path that stops being an in-scope file
-  // (the fourth), so no entry can outlive the file it excuses. At zero entries
-  // the list allows nothing and could be deleted along with the third and
-  // fourth tests, which exist only to keep it honest.
+  // check arrived, and it only shrinks. ALLOWLIST_SIZE pins its length, so a new
+  // entry fails "the allowlist has exactly ALLOWLIST_SIZE entries" unless the
+  // constant is raised in the same diff -- the line a reviewer should refuse.
+  // (Swapping one entry for another keeps the length; only the allowlist's own
+  // diff shows that, as an added line.) An entry whose file gains a header, or
+  // stops being an in-scope file, fails the tests named for those cases, so no
+  // entry outlives the file it excuses. When entries are removed, lower
+  // ALLOWLIST_SIZE in the same change.
+  const ALLOWLIST_SIZE = 185;
+
   const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
   const isInScope = (file) =>
     /\.(js|jsx|mjs|cjs|css)$/.test(file) &&
@@ -1045,44 +1140,150 @@ describe("every source file opens with a header comment", () => {
     .split("\0")
     .filter((file) => file && isInScope(file) && existsSync(path.join(repoRoot, file)));
 
-  // After a byte-order mark and a shebang, the first non-blank line must be a
-  // comment -- and not a tool directive, which tells a reader nothing.
+  // A comment that only instructs a tool tells a reader nothing, so it is not a
+  // header. The rule reads the comment's first line of content, which also
+  // catches a directive split across lines ("/*\n eslint-disable */"). ESLint
+  // reads a rule setting and a globals list only in a block comment, and
+  // "global" only in JS, so "// global error handler" and a stylesheet's
+  // "/* global tokens */" are both headers.
   const TOOL_DIRECTIVE =
-    /^\s*(\/\/|\/\*+)\s*(eslint|global\s|prettier-ignore|istanbul|c8\s|@vitest-environment)/;
-  const hasHeader = (file) => {
-    const text = readFileSync(path.join(repoRoot, file), "utf8")
-      .replace(/^\uFEFF/, "")
-      .replace(/^#!.*\r?\n/, "");
-    const first = text.split(/\r?\n/).find((line) => line.trim() !== "") ?? "";
-    return /^\s*(\/\/|\/\*)/.test(first) && !TOOL_DIRECTIVE.test(first);
+    /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
+  const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
+  const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
+  // True when, after a byte-order mark and a shebang line, the text opens with a
+  // comment whose first line of content is not a tool directive.
+  const hasHeaderText = (file, text) => {
+    const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+    const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
+    const isBlock = body.startsWith("/*");
+    let lines;
+    if (body.startsWith("//")) {
+      lines = [];
+      for (const line of body.split(/\r?\n/)) {
+        if (!line.trimStart().startsWith("//")) break;
+        lines.push(line.trimStart().slice(2));
+      }
+    } else if (isBlock) {
+      const end = body.indexOf("*/", 2);
+      lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
+    } else {
+      return false;
+    }
+    const content =
+      lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
+    if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
+    if (!isBlock) return true;
+    if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
+    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
   };
+  const hasHeader = (file) => hasHeaderText(file, readFileSync(path.join(repoRoot, file), "utf8"));
 
   const allowlist = JSON.parse(
     readFileSync(path.join(repoRoot, "scripts", "__tests__", "file-header-allowlist.json"), "utf8")
   );
   const allowed = new Set(allowlist);
+  const BOM = String.fromCharCode(0xfeff);
+
+  test.each([
+    ["a block comment", "a.js", '/**\n * Does a thing.\n */\nimport x from "y";\n', true],
+    ["a line comment", "a.js", "// Does a thing.\nexport const a = 1;\n", true],
+    ["a CSS comment after a byte-order mark", "a.css", `${BOM}/* The drawer. */\n.a {}\n`, true],
+    ["a header after a shebang", "a.mjs", "#!/usr/bin/env node\n// A tool.\n", true],
+    [
+      "a byte-order mark, then a shebang, then a header",
+      "a.mjs",
+      `${BOM}#!/usr/bin/env node\n// A tool.\n`,
+      true
+    ],
+    ["CRLF line endings", "a.js", "/**\r\n * Does a thing.\r\n */\r\n", true],
+    ["a licence comment", "a.js", "/*! Licensed MIT */\n", true],
+    [
+      "a stylesheet header that starts with the word global",
+      "a.css",
+      "/* global resets and tokens */\n",
+      true
+    ],
+    [
+      "a line comment that starts with the word global",
+      "a.js",
+      "// global error handler for every route\n",
+      true
+    ],
+    [
+      "a line comment that starts with eslint and a colon",
+      "a.js",
+      "// eslint config: flat, scoped to defect classes\n",
+      true
+    ],
+    ["an import first", "a.js", 'import x from "y";\n// late\n', false],
+    [
+      "a directive above the header",
+      "a.js",
+      "// eslint-disable-next-line no-console\n/** Header. */\n",
+      false
+    ],
+    ["a directive split across lines", "a.js", "/*\n  eslint-disable no-console\n*/\n", false],
+    ["an ESLint globals comment", "a.js", "/* globals window */\n", false],
+    [
+      "an ESLint globals comment broken after the keyword",
+      "a.js",
+      "/* globals\n  window */\n",
+      false
+    ],
+    ["a coverage directive", "a.js", "/* v8 ignore next */\n", false],
+    ["a TypeScript check directive", "a.js", "// @ts-check\n", false],
+    ["an empty comment", "a.js", "//\nexport const a = 1;\n", false],
+    ["use strict first", "a.cjs", '"use strict";\n// late\n', false],
+    ["an empty file", "a.js", "", false]
+  ])("the header rule: %s", (_label, file, text, expected) => {
+    expect(hasHeaderText(file, text)).toBe(expected);
+  });
 
   test("the sweep found the source tree", () => {
-    // Guards the scope: a broken filter must not pass vacuously on no files.
+    // Guards the scope: a broken filter must not pass vacuously, so one file
+    // from each part of it must be present.
     expect(sources.length).toBeGreaterThan(150);
-    expect(sources).toContain("server/src/index.js");
-    expect(sources).toContain("client/src/styles/base.css");
+    for (const file of [
+      "server/src/index.js",
+      "client/src/styles/base.css",
+      "scripts/manual-deploy.mjs",
+      "server/scripts/refuse-db-push.js",
+      "playwright.config.js"
+    ]) {
+      expect(sources).toContain(file);
+    }
   });
 
   test("every source file not on the allowlist opens with a header", () => {
     const missing = sources.filter((file) => !allowed.has(file) && !hasHeader(file));
-    expect(missing).toEqual([]);
+    expect(
+      missing,
+      "give each file a header comment (docs/code-readability-sop.md, rule 1); never add it to file-header-allowlist.json"
+    ).toEqual([]);
   });
 
   test("every allowlisted file still lacks one, so the list only shrinks", () => {
     const done = allowlist.filter((file) => sources.includes(file) && hasHeader(file));
-    expect(done).toEqual([]);
+    expect(
+      done,
+      "these files have a header now: delete them from file-header-allowlist.json and lower ALLOWLIST_SIZE"
+    ).toEqual([]);
   });
 
   test("every allowlisted path is an in-scope tracked file, listed once", () => {
     const stale = allowlist.filter((file) => !sources.includes(file));
-    expect(stale).toEqual([]);
-    expect(allowed.size).toBe(allowlist.length);
+    expect(
+      stale,
+      "these are not in-scope tracked files: delete them from file-header-allowlist.json and lower ALLOWLIST_SIZE"
+    ).toEqual([]);
+    expect(allowed.size, "an entry is listed twice").toBe(allowlist.length);
+  });
+
+  test("the allowlist has exactly ALLOWLIST_SIZE entries", () => {
+    expect(
+      allowlist.length,
+      "lower ALLOWLIST_SIZE when entries are removed; never raise it -- give the new file a header instead"
+    ).toBe(ALLOWLIST_SIZE);
   });
 });
 ```
@@ -1094,15 +1295,20 @@ npm run test:scripts > "$SCRATCH/pr0-red.txt" 2>&1; echo "exit=$?"
 sed 's/\x1b\[[0-9;]*m//g' "$SCRATCH/pr0-red.txt" | grep -E "FAIL|✓|×|Tests " | head -20
 ```
 
-Expected: `exit=1`, and exactly one failing test: `every source file not on the allowlist opens with a header`. Its diff lists the 185 files. The other three new tests pass.
+Expected: `exit=1`, and exactly two failing tests:
+
+- `every source file not on the allowlist opens with a header`. Its diff lists the 185 files.
+- `the allowlist has exactly ALLOWLIST_SIZE entries`, with 0 against 185.
+
+The 20 rule fixtures and the other new tests pass.
 
 - [ ] **Step 5: Generate the allowlist**
 
 ```bash
-node "$TOOLS/make-allowlist.mjs" "$REPO"
+node "$TOOLS/make-allowlist.mjs" "$REPO" --bootstrap
 ```
 
-Expected: `wrote 185 entries`.
+Expected: `wrote 185 entries; ALLOWLIST_SIZE 185 -> 185`. `--bootstrap` is the only mode that adds entries, and this is the only task that uses it.
 
 - [ ] **Step 6: Run it and watch it pass**
 
@@ -1111,11 +1317,11 @@ npm run test:scripts > "$SCRATCH/pr0-green.txt" 2>&1; echo "exit=$?"
 sed 's/\x1b\[[0-9;]*m//g' "$SCRATCH/pr0-green.txt" | grep -E "Test Files|^ +Tests "
 ```
 
-Expected: `exit=0`, `Tests 69 passed (69)`, which is the 65 from Step 1 plus 4.
+Expected: `exit=0`, `Tests 90 passed (90)`. That is the 65 from Step 1, plus 20 rule fixtures and 5 tests.
 
 - [ ] **Step 7: Prove each assertion bites**
 
-Write these four files with the Write tool.
+Write these five files with the Write tool.
 
 `$TOOLS/edits-ratchet-directive.json`, a header replaced by a tool directive (the first line):
 
@@ -1168,26 +1374,42 @@ The `text` is `""`. `mutate.mjs` confirms that an empty replacement applied by c
 ]
 ```
 
+`$TOOLS/edits-ratchet-grow.json`, a new file without a header, plus an allowlist entry for it. This is the case the code review found passing before `ALLOWLIST_SIZE` existed:
+
+```json
+[
+  {
+    "file": "scripts/__tests__/file-header-allowlist.json",
+    "find": "[\n",
+    "text": "[\n  \"client/src/app/zz-ratchet-probe.js\",\n"
+  }
+]
+```
+
 Stage the two new files first. The loop restores the allowlist with `git checkout --`, which reads from the index, and an untracked file is not in it. Worse, one path git cannot match makes the whole `checkout` restore nothing, which would leave `shutdown.js` and `routing.js` mutated.
 
 ```bash
 git add scripts/__tests__/repo-invariants.test.mjs scripts/__tests__/file-header-allowlist.json
-for case in directive removed done stale; do
-  echo "== $case"; node "$TOOLS/mutate.mjs" "$TOOLS/edits-ratchet-$case.json"; echo "mutate exit=$?"; git diff --stat
+for case in directive removed done stale grow; do
+  echo "== $case"
+  if [ "$case" = grow ]; then printf 'export const probe = 1;\n' > client/src/app/zz-ratchet-probe.js && git add client/src/app/zz-ratchet-probe.js; fi
+  node "$TOOLS/mutate.mjs" "$TOOLS/edits-ratchet-$case.json"; echo "mutate exit=$?"; git diff --stat
   npm run test:scripts > "$SCRATCH/pr0-mut-$case.txt" 2>&1; echo "test exit=$?"
   sed 's/\x1b\[[0-9;]*m//g' "$SCRATCH/pr0-mut-$case.txt" | grep -E "^ +(×|FAIL)|Tests " | head -5
   git checkout -- server/src/shutdown.js client/src/app/routing.js scripts/__tests__/file-header-allowlist.json
+  if [ "$case" = grow ]; then git rm --cached -q client/src/app/zz-ratchet-probe.js && rm client/src/app/zz-ratchet-probe.js; fi
 done; git status --porcelain
 ```
 
-Expected:
+Expected, as measured on 2026-09-29:
 
-| Case        | `test exit` | The failing test                                                   |
-| ----------- | ----------- | ------------------------------------------------------------------ |
-| `directive` | 1           | `every source file not on the allowlist opens with a header`       |
-| `removed`   | 1           | `every source file not on the allowlist opens with a header`       |
-| `done`      | 1           | `every allowlisted file still lacks one, so the list only shrinks` |
-| `stale`     | 1           | `every allowlisted path is an in-scope tracked file, listed once`  |
+| Case        | `test exit` | The failing tests                                                                                                                   |
+| ----------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `directive` | 1           | `every source file not on the allowlist opens with a header`                                                                        |
+| `removed`   | 1           | `every source file not on the allowlist opens with a header`                                                                        |
+| `done`      | 1           | `every allowlisted file still lacks one, so the list only shrinks`                                                                  |
+| `stale`     | 1           | `every allowlisted path is an in-scope tracked file, listed once` and `the allowlist has exactly ALLOWLIST_SIZE entries`            |
+| `grow`      | 1           | only `the allowlist has exactly ALLOWLIST_SIZE entries`, whose message reads "never raise it -- give the new file a header instead" |
 
 The status at the end shows only this task's files, staged: the test and the allowlist, and nothing else modified.
 
@@ -1311,7 +1533,7 @@ End the body with `🤖 Generated with [claude-flow](https://github.com/ruvnet/c
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-server-routes
+git switch -c chore/readability-server-routes
 ```
 
 - [ ] **Step 2: Baseline**
@@ -1393,7 +1615,7 @@ Expected: the **After** line. If something is short, re-run `node "$TOOLS/area.m
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A server/src scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A server/src scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(server): comment the bootstrap, middleware and routes per the SOP
 
@@ -1470,7 +1692,7 @@ Then push and open the PR, following the template:
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-server-services
+git switch -c chore/readability-server-services
 ```
 
 - [ ] **Step 2: Baseline**
@@ -1617,7 +1839,7 @@ Expected: the **After** line.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A server scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A server scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(server): comment the services, repositories and db layer per the SOP
 
@@ -1677,7 +1899,7 @@ Expected: all `exit=0`, and `19 passed`. Then push and open the PR, with Before/
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-client-shell
+git switch -c chore/readability-client-shell
 ```
 
 - [ ] **Step 2: Baseline, including the built bundle**
@@ -1724,7 +1946,7 @@ Expected: the **After** line.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(client): comment the app shell, shared hooks and Vite config per the SOP
 
@@ -1794,7 +2016,7 @@ Expected: all `exit=0`, and `19 passed`. Then push and open the PR, with Before/
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-dashboard
+git switch -c chore/readability-dashboard
 ```
 
 - [ ] **Step 2: Baseline, including the built bundle**
@@ -1828,7 +2050,7 @@ Expected: `same-code exit=0`, `dist identical exit=0` and `counts identical exit
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr4-scripts.txt" 2>&1; echo "test:scripts exit=$?"
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(dashboard): comment the dashboard page per the SOP
 
@@ -1902,7 +2124,7 @@ echo "commit exit=$?"
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-home
+git switch -c chore/readability-home
 ```
 
 - [ ] **Step 2: Baseline, including the built bundle**
@@ -1936,7 +2158,7 @@ pr_dist_same
 pr_counts pr5-comments && diff "$SCRATCH/pr5-before-counts.txt" "$SCRATCH/pr5-comments-counts.txt"; echo "counts identical exit=$?"
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr5-scripts.txt" 2>&1; echo "test:scripts exit=$?"
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(home): comment the home page and physique silhouette per the SOP
 
@@ -2024,7 +2246,7 @@ Two of `utils.js`'s exports, `getRegionFromLocale` and `buildPreviewLinePath`, a
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-preview
+git switch -c chore/readability-preview
 ```
 
 - [ ] **Step 2: Baseline, including the built bundle**
@@ -2049,7 +2271,7 @@ pr_dist_same
 pr_counts pr6-comments && diff "$SCRATCH/pr6-before-counts.txt" "$SCRATCH/pr6-comments-counts.txt"; echo "counts identical exit=$?"
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr6-scripts.txt" 2>&1; echo "test:scripts exit=$?"
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(preview): comment the walkthrough, auth and workout-result pages per the SOP
 
@@ -2133,7 +2355,7 @@ echo "commit exit=$?"
 - [ ] **Step 1: Branch and baseline**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-css-app
+git switch -c chore/readability-css-app
 pr_scan 7 before
 pr_counts pr7-before
 pr_dist_snapshot
@@ -2168,7 +2390,7 @@ Expected:
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr7-scripts.txt" 2>&1; echo "test:scripts exit=$?"
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(css): headers and section banners for the app, dashboard and auth styles
 
@@ -2223,7 +2445,7 @@ Expected: numstat `0	25	…`, and every check `exit=0`. Push and open the PR.
 - [ ] **Step 1: Branch and baseline**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-css-home
+git switch -c chore/readability-css-home
 pr_scan 8 before
 pr_counts pr8-before
 pr_dist_snapshot
@@ -2259,7 +2481,7 @@ Expected: `same-code exit=0`, `dist identical exit=0`, `counts identical exit=0`
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr8-scripts.txt" 2>&1; echo "test:scripts exit=$?"
-git add -A client scripts/__tests__/file-header-allowlist.json && git status --porcelain
+git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(css): headers and section banners for the home page and walkthrough styles
 
@@ -2301,7 +2523,7 @@ Expected: numstat `0	24	…`, and every check `exit=0`. Push and open the PR.
 - [ ] **Step 1: Branch and baseline**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/readability-tooling
+git switch -c chore/readability-tooling
 pr_scan 9 before
 pr_counts pr9-before
 ```
@@ -2332,7 +2554,12 @@ npm run test:scripts > "$SCRATCH/pr9-scripts.txt" 2>&1; echo "test:scripts exit=
 
 Expected: `wrote 0 entries`, the file contains `[]`, and `test:scripts exit=0`.
 
-The ratchet stays. With an empty list, its first assertion now covers every source file, and the other two guard against anyone re-adding an entry. Leave the file as `[]` rather than deleting it. Deleting it would also mean deleting two of the ratchet's tests, which is a separate decision.
+The ratchet stays. With an empty list and `ALLOWLIST_SIZE` at 0:
+
+- the header test covers every source file;
+- the size test fails on any new entry unless the constant is raised in the same diff.
+
+Leave the file as `[]`. Deleting it would also mean deleting the tests that read it, which is a separate decision.
 
 ```bash
 git add -A scripts eslint.config.js playwright.config.js vitest.config.js && git status --porcelain
@@ -2378,7 +2605,7 @@ Push and open the PR.
 - [ ] **Step 1: Branch and baseline**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c refactor/shared-helpers
+git switch -c refactor/shared-helpers
 pr_counts pr10-before
 ```
 
@@ -2660,7 +2887,7 @@ Push and open the PR, with the gates and the three test-count changes explained.
 - [ ] **Step 1: Branch**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c chore/remove-dead-css
+git switch -c chore/remove-dead-css
 ```
 
 - [ ] **Step 2: Write `$TOOLS/css-sweep.mjs`**
@@ -3037,7 +3264,7 @@ Push and open the PR, with the classes removed and the lines removed per file, t
 - [ ] **Step 1: Branch and baseline captures**
 
 ```bash
-git switch main && git pull --ff-only && git switch -c refactor/walkthrough-styles
+git switch -c refactor/walkthrough-styles
 npm -w client run build > /dev/null 2>&1; echo "build exit=$?"
 rm -rf "$SCRATCH"/shots-*
 node "$TOOLS/capture.mjs" "$REPO" "$SCRATCH/shots-before" > "$SCRATCH/cap-before.log" 2>&1; echo "capture exit=$?"
