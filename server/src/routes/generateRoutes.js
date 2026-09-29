@@ -1,6 +1,14 @@
+/**
+ * POST /api/generate: asks Gemini for a weekly workout plan built from the
+ * planner form, and saves it for a signed-in caller. Registered by
+ * registerApiRoutes.
+ */
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 
+// Keys here and in COMMERCIAL_ACCESS_CAPABILITY_MAP are the planner's equipment
+// labels (equipmentOptionsByEnv in client/src/app/constants.js), lower-cased;
+// values are the capabilities the prompt tells the model each one provides.
 const HOME_ACCESS_CAPABILITY_MAP = {
   "bodyweight only": ["bodyweight training", "mobility work", "floor/core work"],
   dumbbells: ["dumbbells", "unilateral strength work", "hypertrophy accessories"],
@@ -75,11 +83,19 @@ const COMMERCIAL_ACCESS_CAPABILITY_MAP = {
 const uniqueList = (items) => [...new Set(items.filter(Boolean))];
 const normalizeText = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
+/**
+ * Turns the chosen environment and equipment labels into the three equipment
+ * lines of the Gemini prompt: what the user listed, the capabilities that
+ * implies, and how to program around it. Labels match case-insensitively, and
+ * one missing from the capability maps adds no capabilities.
+ */
 export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
   const environmentKey = normalizeText(environment);
   const selectedLabels = Array.isArray(equipment) ? equipment : [];
   const selectedKeys = uniqueList(selectedLabels.map(normalizeText));
 
+  // A commercial gym: each label names an area, and "full gym access" stands for
+  // all of them.
   if (environmentKey === "commercial") {
     const hasFullGymAccess = selectedKeys.includes(COMMERCIAL_FULL_ACCESS_LABEL);
     const effectiveKeys = hasFullGymAccess
@@ -106,6 +122,7 @@ export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
     };
   }
 
+  // Any other environment is a home setup, and no equipment means bodyweight only.
   const homeHints = uniqueList(
     selectedKeys.flatMap((key) => HOME_ACCESS_CAPABILITY_MAP[key] || [])
   );
@@ -120,6 +137,13 @@ export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
   };
 };
 
+/**
+ * Registers POST /api/generate.
+ *
+ * @param deps `gemini` is the Gemini client, or null when GEMINI_API_KEY is
+ *   unset; `saveGeneratedPlan` stores the plan for a caller that
+ *   attachOptionalUser (mounted in index.js) has put on `req.user`.
+ */
 export const registerGenerateRoutes = (app, deps) => {
   const {
     gemini,
@@ -141,6 +165,7 @@ export const registerGenerateRoutes = (app, deps) => {
         return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
       }
 
+      // Validate, then default every field the prompt uses.
       const body = validateBody(req, res, generatePlanBodySchema);
       if (!body) return;
 
@@ -153,6 +178,8 @@ export const registerGenerateRoutes = (app, deps) => {
       const environment = cleanText(body.environment, 40) || "Home";
       const focuses = toCleanArray(body.focuses, 8, 60);
 
+      // Build the prompt. The weekday headings and "Coach Notes:" it asks for are
+      // what client/src/app/plans.js parses, so that wording is a contract.
       const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
       const focusLine = focuses.join(", ") || "General fitness";
       const equipmentContext = buildGenerationEquipmentContext({
@@ -163,6 +190,7 @@ export const registerGenerateRoutes = (app, deps) => {
       const prompt = `You are an expert fitness coach. Create a weekly workout plan.\n\nClient info:\n- Goal: ${goal}\n- Equipment/space profile: ${equipmentContext.profileLine}\n- Session length: ${duration} minutes\n- Experience: ${level}\n- Injuries/limitations: ${injuries}\n\nInstructions:\n- Use weekday headings exactly as: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.\n- For each day include: Warmup, Main lifts, Accessories, and Finisher/conditioning with sets x reps and rest guidance.\n- Keep it concise and practical for a home or gym setting.\n- If injuries are mentioned, adapt and avoid risky movements.\n- End with a section labeled "Coach Notes:" containing tips and recovery guidance.\n- Output in clean plain text with clear headings.`;
       const promptWithContext = `${prompt}\n\nEnvironment: ${environment}\nFocuses: ${focusLine}\nTraining days target: ${days}\nAvailable capabilities: ${equipmentContext.capabilityLine}\nPlanning guidance: ${equipmentContext.planningGuidance}`;
 
+      // Generate. An empty answer is a 502.
       const result = await gemini.models.generateContent({
         model: modelName,
         contents: promptWithContext
@@ -173,6 +201,7 @@ export const registerGenerateRoutes = (app, deps) => {
         return res.status(502).json({ error: "No plan generated." });
       }
 
+      // Save the plan for a signed-in caller; an anonymous one gets the text only.
       const sessionUser = req.user;
       let savedPlan = null;
 
@@ -191,9 +220,9 @@ export const registerGenerateRoutes = (app, deps) => {
           plan
         };
 
-        // $position: 0 and $slice: 200 were never doing anything -- plans are
-        // always inserted, ordering comes from createdAt desc, and the 200
-        // limit is applied when the dashboard is read.
+        // Always an insert: the dashboard orders plans newest first and keeps
+        // 200 when it reads them. The entry built here is returned instead when
+        // the user cannot be resolved.
         savedPlan =
           (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry })) || planEntry;
       }

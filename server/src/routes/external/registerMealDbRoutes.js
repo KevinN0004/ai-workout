@@ -1,7 +1,16 @@
+/**
+ * GET /api/mealdb/search: meal search against TheMealDB, answered with mapped
+ * meals. Registered by externalRoutes.js.
+ */
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { mealDbSearchQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
+/**
+ * Registers the meal-search route. The search text arrives as `query` or `q`,
+ * and at most `limit` meals come back (8 by default). An upstream failure
+ * answers 200 with no meals and `fallback: true`.
+ */
 export const registerMealDbRoutes = (app, deps) => {
   const { mealDbRequest, mapMealDbMeal, cleanText, isUpstreamFailureStatus } = deps;
 

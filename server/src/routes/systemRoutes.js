@@ -1,3 +1,8 @@
+/**
+ * The operational endpoints, none of which needs a session: liveness,
+ * readiness, request and cache metrics behind a token, and the CSRF token for a
+ * client with no cookie to read it from. Registered by registerApiRoutes.
+ */
 import crypto from "crypto";
 
 /**
@@ -12,6 +17,17 @@ const tokenMatches = (provided, expected) => {
   return crypto.timingSafeEqual(a, b);
 };
 
+/**
+ * Registers GET /api/health, /api/ready, /api/metrics and /api/csrf-token.
+ *
+ * @param deps `metrics` and `serverBootAtMs` come from index.js. `redisConfigured`,
+ *   `redisSessionsEnabled`, `redisClient`, `postgresStatusRef`,
+ *   `errorTrackingConfigured` and `errorTrackingEnabled` are functions called
+ *   per request: the Redis and Postgres state, and whether error tracking is
+ *   enabled, are only set once startServer runs, after the routes are
+ *   registered. `metricsToken` and `isProduction` decide whether /api/metrics
+ *   answers at all.
+ */
 export const registerSystemRoutes = (app, deps) => {
   const {
     metrics,

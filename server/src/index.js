@@ -1,3 +1,8 @@
+/**
+ * The API server's bootstrap: reads the environment, builds the Express app,
+ * wires every repository and service into the routes, and exports `app` for
+ * the test suites and `startServer` for the entry-point guard at the bottom.
+ */
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
@@ -73,6 +78,7 @@ import {
 import { validateEnv } from "./services/platform/envValidationService.js";
 import { createRateLimitStore } from "./services/platform/rateLimitStore.js";
 
+// ---- Environment ------------------------------------------------------------
 // quiet: dotenv 17+ prints "injected env (N) from .env" to stderr on every
 // call, as an unstructured line beside pino's JSON. prisma.js, the migration
 // script and vitest.setup.js pass it for the same reason.
@@ -96,6 +102,7 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   }
 }
 
+// ---- App, logging and metrics -----------------------------------------------
 const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
@@ -158,6 +165,7 @@ let errorTracker = {
   flush: async () => {}
 };
 
+// ---- Request pipeline -------------------------------------------------------
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
@@ -234,6 +242,7 @@ app.use(
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
+// ---- Configuration ----------------------------------------------------------
 // Built only when a key is configured. The key is optional by design, and the
 // SDK console.warns on every keyless construction, bypassing pino. With no
 // client, /api/generate answers its own "Missing GEMINI_API_KEY." 500.
@@ -328,9 +337,10 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
+
+// ---- Repositories -----------------------------------------------------------
 const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
   createUserReadRepository({ prisma });
-// Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
@@ -341,6 +351,8 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, delete
     prisma
   });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
+
+// ---- Services ---------------------------------------------------------------
 // The cache is built here but sessionService, which owns the Redis client, is not
 // created until further down. This indirection is set once that happens; reaching
 // for `sessionService` directly from here would be a temporal dead zone hazard.
@@ -477,6 +489,7 @@ const dashboardCollectionService = createDashboardCollectionService({
 const { parseDashboardPagination, getDashboardCollections, buildDashboardResponse } =
   dashboardCollectionService;
 
+// ---- Rate limiters ----------------------------------------------------------
 // Counters live in Redis when it is up, so they survive a restart or the free
 // tier's 15-minute idle spin-down -- the same reason sessions moved off memory.
 // Each limiter gets its own store and prefix so their counts stay separate, and
@@ -605,6 +618,7 @@ const anonGenerateLimiter = rateLimit({
   }
 });
 
+// ---- Limits and CSRF on /api ------------------------------------------------
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
@@ -614,6 +628,7 @@ app.use("/api/generate", attachOptionalUser, anonGenerateLimiter, generateLimite
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
 
+// ---- API routes -------------------------------------------------------------
 registerApiRoutes(app, {
   findUserWithDashboard,
   metrics,
@@ -704,6 +719,8 @@ registerApiRoutes(app, {
   saveGeneratedPlan,
   toCleanArray
 });
+
+// ---- Static client and error handler ----------------------------------------
 // After the API routes so /api keeps its own 404s, and before the error
 // handler so a sendFile failure still reaches it. See staticClient.js for why
 // the client must be served from this origin rather than deployed separately.
@@ -724,6 +741,7 @@ app.use(
   })
 );
 
+// ---- Startup ----------------------------------------------------------------
 const startServer = async () => {
   try {
     errorTracker = await initErrorTracking({ logger, toShortText });
@@ -797,6 +815,7 @@ const startServer = async () => {
   }
 };
 
+// ---- Exports ----------------------------------------------------------------
 export { app, startServer };
 
 export const __testables = {

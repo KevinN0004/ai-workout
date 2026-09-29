@@ -1,3 +1,7 @@
+/**
+ * The Open-Meteo routes: current conditions, and current conditions with a
+ * training recommendation and a daily forecast. Registered by externalRoutes.js.
+ */
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
@@ -15,6 +19,11 @@ const toDayFlag = (value) => {
   return Number(value) === 1;
 };
 
+/**
+ * Registers GET /api/weather/current and GET /api/weather/recommendation. Every
+ * numeric reading goes through `toFiniteNumber`, and `isDay` through `toDayFlag`,
+ * so a reading Open-Meteo leaves out comes back null rather than 0.
+ */
 export const registerWeatherRoutes = (app, deps) => {
   const {
     toNullableNumber,
@@ -34,6 +43,7 @@ export const registerWeatherRoutes = (app, deps) => {
       if (!query) return;
       const { latitude, longitude } = query;
 
+      // Load the current conditions only.
       const { data, cache } = await fetchOpenMeteo({
         latitude,
         longitude,
@@ -41,6 +51,7 @@ export const registerWeatherRoutes = (app, deps) => {
           "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day"
       });
 
+      // Respond in the API's own field names, which carry the units.
       const current = data?.current || {};
       res.json({
         cache,
@@ -62,6 +73,7 @@ export const registerWeatherRoutes = (app, deps) => {
         }
       });
     } catch (err) {
+      // A 5xx, or any error with no status, answers 200 with every reading null.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({
@@ -98,6 +110,7 @@ export const registerWeatherRoutes = (app, deps) => {
       if (!query) return;
       const { latitude, longitude } = query;
 
+      // Load the current conditions and the daily forecast in one request.
       const { data, cache } = await fetchOpenMeteo({
         latitude,
         longitude,
@@ -106,6 +119,8 @@ export const registerWeatherRoutes = (app, deps) => {
         daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum"
       });
 
+      // Compute the recommendation from the current conditions, and one row per
+      // forecast day from Open-Meteo's parallel daily arrays.
       const current = data?.current || {};
       const recommendation = buildWorkoutRecommendation(current);
       const days = Array.isArray(data?.daily?.time) ? data.daily.time.length : 0;
@@ -143,6 +158,8 @@ export const registerWeatherRoutes = (app, deps) => {
         daily
       });
     } catch (err) {
+      // A 5xx, or any error with no status, answers 200 with every reading null,
+      // no forecast, and a recommendation to train indoors.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({

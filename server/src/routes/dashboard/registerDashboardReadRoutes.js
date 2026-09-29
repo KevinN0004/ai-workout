@@ -1,6 +1,16 @@
+/**
+ * The dashboard's read routes: the whole dashboard in one response, and one
+ * paginated route per collection. Registered by dashboardRoutes.js.
+ */
 import { dashboardPaginationQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
+/**
+ * Registers GET /api/dashboard and the workout-session, meal-log and
+ * progress-metric collection routes, all behind `requireAuth`. The other three
+ * members it takes from `deps` come from the dashboard collection service built
+ * in index.js.
+ */
 export const registerDashboardReadRoutes = (app, deps) => {
   const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollections } =
     deps;
@@ -14,6 +24,9 @@ export const registerDashboardReadRoutes = (app, deps) => {
     }
   });
 
+  // One page of one collection each. `limit` and `offset` are validated here and
+  // defaulted by parseDashboardPagination, and the response carries the page's
+  // total so the caller can ask for the next one.
   app.get("/api/dashboard/workout-sessions", requireAuth, async (req, res) => {
     try {
       const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);

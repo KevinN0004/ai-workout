@@ -1,15 +1,12 @@
-import path from "path";
-import { fileURLToPath } from "url";
-
 /**
  * Serves the built client from the API process, on one origin.
  *
  * This is not a convenience. The client cannot reach a cross-origin API at
  * all, for two independent reasons:
  *
- *   - Every request it makes is a relative path. There are 16 `/api/...`
- *     literals in `client/src` and no base-URL constant, so a bundle served
- *     from a different host sends `/api/auth/me` to that host. CORS is never
+ *   - Every request it makes is a relative path. The `/api/...` literals in
+ *     `client/src` have no base-URL constant, so a bundle served from a
+ *     different host sends `/api/auth/me` to that host. CORS is never
  *     consulted, because the URL never points at the API.
  *   - Both cookies are `SameSite=Lax`, so even with an absolute URL the
  *     session would not be attached to a cross-site fetch. Relaxing that to
@@ -20,9 +17,16 @@ import { fileURLToPath } from "url";
  * production. So same origin is a constraint, not a preference, and this is
  * where it is satisfied.
  */
+import path from "path";
+import { fileURLToPath } from "url";
 
 const DEFAULT_CLIENT_DIST = fileURLToPath(new URL("../../client/dist", import.meta.url));
 
+/**
+ * The directory the client bundle is served from: `override` resolved against
+ * the working directory when it is set (index.js passes CLIENT_DIST_PATH),
+ * otherwise the repository's client/dist.
+ */
 export const resolveClientDistPath = (override = "") =>
   override ? path.resolve(override) : DEFAULT_CLIENT_DIST;
 

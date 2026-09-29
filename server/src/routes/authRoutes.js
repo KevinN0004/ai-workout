@@ -1,6 +1,17 @@
+/**
+ * The account routes: session check, profile read and update, signup, login,
+ * password change, account deletion and logout. Registered by registerApiRoutes;
+ * the rate limiters and CSRF check in front of them are mounted in index.js.
+ */
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 
+/**
+ * Registers the account routes on `app`, taking the session helpers, user
+ * repositories and password functions from the shared `deps` object. Every
+ * failed password check counts toward `metrics.authFailures`, and signup and
+ * login both start a session that defaults to "remember me".
+ */
 export const registerAuthRoutes = (app, deps) => {
   const {
     getSessionUser,
@@ -85,6 +96,8 @@ export const registerAuthRoutes = (app, deps) => {
       const body = validateBody(req, res, signupBodySchema);
       if (!body) return;
 
+      // Validate: one account per email, compared lower-cased, and a complete
+      // profile (name, age, height, weight and sex).
       const { email, password, profile } = body;
       const rememberMe = body.rememberMe ?? true;
       const normalizedEmail = cleanText(email, 254).toLowerCase();
@@ -98,6 +111,8 @@ export const registerAuthRoutes = (app, deps) => {
           error: "Complete profile details are required to create an account."
         });
       }
+
+      // Write the account, then sign it in: a session cookie and a new CSRF token.
       const { salt, hash, passwordAlgo } = await hashPassword(password);
       const newUser = {
         id: crypto.randomUUID(),
@@ -130,6 +145,9 @@ export const registerAuthRoutes = (app, deps) => {
       const body = validateBody(req, res, loginBodySchema);
       if (!body) return;
 
+      // Check the credentials. An unknown email still pays for one password
+      // verify, against a dummy record, so the response time does not reveal
+      // whether the account exists; both failures answer the same 401.
       const { email, password } = body;
       const rememberMe = body.rememberMe ?? true;
       const normalizedEmail = cleanText(email, 254).toLowerCase();
@@ -144,6 +162,9 @@ export const registerAuthRoutes = (app, deps) => {
         metrics.authFailures += 1;
         return res.status(401).json({ error: "Invalid credentials." });
       }
+
+      // Rehash a non-argon2id hash while the plaintext is at hand. A failed
+      // upgrade is logged and does not block the sign-in.
       if (shouldUpgradePasswordToArgon2id(user)) {
         try {
           await upgradeUserPasswordToArgon2id(user.id, password);
@@ -157,6 +178,8 @@ export const registerAuthRoutes = (app, deps) => {
           );
         }
       }
+
+      // Sign in: a session cookie and a new CSRF token.
       const token = await createSession(user.id);
       setSessionCookie(res, token, rememberMe);
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
