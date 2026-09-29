@@ -33,6 +33,10 @@ Scratch tools do the measuring and proving. They are written out in full below, 
 - **Gating on exit codes.** Never gate on a piped command's exit code. Redirect to a file and check `$?`, as every step below does.
 - **Mutation edits.** Mutations are JSON files written with the Write tool and applied with `mutate.mjs`. Never use sed or a heredoc for them. On 2026-09-29 Git Bash rewrote `\n` to `/n` inside an argument that began with `//`, so a test edit silently became a comment and "passed". `CLAUDE.md` lists four more ways a mutation can fail to apply.
 - **Restoring after a mutation.** Undo each one with `git checkout -- <file>`. Then `git status --porcelain` must list only the work in progress.
+- **Never trust a `\u` escape typed into any Write or Edit, a subagent's or the controller's.** Tool calls decode them, intermittently: typing the escape for U+FEFF can store the character itself, and a lone one can store nothing at all (Findings §9).
+  - If an edit has to include a line that already holds an escape, as the six non-breaking-space escapes in `PreviewWorkoutWeekChapter.jsx` do, end the edit's `old_string` and `new_string` short of that line.
+  - After any edit that writes an escape, run `node "$TOOLS/restore-escapes.mjs" <file>`.
+  - Before **every** commit in Tasks 2–13, run `node "$TOOLS/escapes-intact.mjs" "$REPO"` (Task 0, Step 11). It must exit 0. ESLint cannot stand in for it, because it does not look inside strings.
 - **Postgres.** It must be up for the server suite (`npm run postgres:local:start -w server`, or `docker compose up -d`). Without it, 107 server tests fail with `Can't reach database server`, which says nothing about the change.
 - **Commit trailer.** Every commit message ends with `Co-Authored-By: claude-flow <ruv@ruv.net>`.
 - **One PR at a time, in order.** Every PR edits `scripts/__tests__/file-header-allowlist.json`. Branch each PR from an up-to-date `main` after the previous one merges. If two are ever open together, regenerate the allowlist after rebasing (Task 0, Step 6's tool does it) instead of hand-merging the JSON.
@@ -64,6 +68,13 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
    - waits that poll from Node, because Playwright's `waitForFunction` re-checks on animation frames, and those freeze with the clock
 
    With all three, three runs of 12 captures were byte-identical. An outline added to one element changed exactly the 8 captures that show it.
+
+9. **Tool calls decode `\u` escapes, intermittently.** This was found while executing Task 1. The implementer appended the ratchet with the U+FEFF escape in its regex, and the file received the raw character; ESLint's `no-irregular-whitespace` caught it. A probe on 2026-09-29 then isolated the layer:
+   - **The prompt a subagent receives keeps the escape.** The probe saw six visible characters.
+   - **The Write or Edit call that stores it may not.** A probe that typed `A`, a backslash, `uFEFF` and `B` stored the bytes `41 ef bb bf 42`, and a lone escape stored an empty file.
+   - **The controller is not immune.** One Write kept all 11 of this plan's escapes. The Edits that first added this finding decoded 6 of theirs, and `escapes-intact.mjs` caught them on its first run.
+
+   `same-code.mjs` catches a decoded escape in a comments commit, because the literal's `raw` text changes. Nothing else did: ESLint passes a decoded non-breaking space inside a string, and `same-code` does not check a code-moving commit. Hence `escapes-intact.mjs`, `restore-escapes.mjs`, and the Conventions rule above.
 
 ## Baseline (from the scanner, `9b85b7d`)
 
@@ -856,6 +867,118 @@ npm -w client run build > /dev/null 2>&1; git status --porcelain
 ```
 
 Expected: `exit=0` for the comment edit and `exit=1` for the one-character code edit, which changes every chunk's content hash. At the end, a clean build and an empty status.
+
+- [ ] **Step 11: Write `$TOOLS/escapes-intact.mjs` and `$TOOLS/restore-escapes.mjs`, and prove the guard** (added after Findings §9)
+
+The escape characters in this file are built with `String.fromCharCode`, so writing it can decode nothing. If a subagent writes it, check afterwards that the only backslashes are the ones shown.
+
+```js
+/**
+ * Guards against a subagent tool call decoding a unicode escape. Verified on
+ * 2026-09-29: when a subagent types backslash-u-FEFF into Write or Edit, the
+ * file receives the character U+FEFF itself (a lone one is dropped entirely).
+ * ESLint does not notice inside a string. For every file that differs from
+ * HEAD, this requires no fewer backslash-u escapes than HEAD has, and no more
+ * invisible characters (U+FEFF past position 0, U+00A0, U+200B-U+200D,
+ * U+2060) than HEAD has. Exits 1 if either is violated.
+ *
+ * Usage: node escapes-intact.mjs <repoRoot>
+ */
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+const root = process.argv[2] || "D:/ai-workout";
+const git = (...args) =>
+  execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+const BACKSLASH = String.fromCharCode(92);
+const ESCAPE = new RegExp(`${BACKSLASH}${BACKSLASH}u(\\{[0-9A-Fa-f]+\\}|[0-9A-Fa-f]{4})`, "g");
+const INVISIBLE = [0xfeff, 0xa0, 0x200b, 0x200c, 0x200d, 0x2060].map((c) => String.fromCharCode(c));
+
+const escapes = (text) => (text.match(ESCAPE) || []).length;
+const invisibles = (text) => {
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text; // a leading BOM is legitimate
+  return INVISIBLE.reduce((n, ch) => n + body.split(ch).length - 1, 0);
+};
+
+const changed = git("diff", "--name-only", "HEAD").trim().split("\n").filter(Boolean);
+let failed = 0;
+for (const file of changed) {
+  if (!existsSync(path.join(root, file))) continue;
+  let before = "";
+  try {
+    before = git("show", `HEAD:${file}`);
+  } catch {
+    before = ""; // a new file: HEAD has nothing to compare against
+  }
+  const after = readFileSync(path.join(root, file), "utf8");
+  const e = [escapes(before), escapes(after)];
+  const v = [invisibles(before), invisibles(after)];
+  // Losing an escape, or gaining an invisible character, is what a decoded
+  // escape looks like. Gaining an escape is legitimate: new text can mention one.
+  if (e[1] < e[0] || v[1] > v[0]) {
+    console.log(
+      `FAIL ${file}: escapes ${e[0]} -> ${e[1]}, invisible characters ${v[0]} -> ${v[1]}`
+    );
+    failed += 1;
+  }
+}
+console.log(
+  failed
+    ? `${failed} file(s) lost or gained escapes`
+    : `escapes intact in ${changed.length} changed file(s)`
+);
+process.exit(failed ? 1 : 0);
+```
+
+`$TOOLS/restore-escapes.mjs` repairs a file the guard flags. It turns each invisible character back into its ASCII escape:
+
+```js
+/**
+ * Repairs decoded unicode escapes: every U+FEFF (except a leading byte-order
+ * mark), U+00A0, U+200B-U+200D and U+2060 in the named files becomes its ASCII
+ * escape again. The backslash is built from a character code, so running or
+ * writing this script cannot itself be decoded by a tool call.
+ *
+ * Usage: node restore-escapes.mjs <file> [file...]
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+
+const BACKSLASH = String.fromCharCode(92);
+const CODES = [0xfeff, 0xa0, 0x200b, 0x200c, 0x200d, 0x2060];
+for (const file of process.argv.slice(2)) {
+  const text = readFileSync(file, "utf8");
+  const leadingBom = text.charCodeAt(0) === 0xfeff;
+  let body = leadingBom ? text.slice(1) : text;
+  let fixed = 0;
+  for (const code of CODES) {
+    const ch = String.fromCharCode(code);
+    const escape = `${BACKSLASH}u${code.toString(16).toUpperCase().padStart(4, "0")}`;
+    fixed += body.split(ch).length - 1;
+    body = body.split(ch).join(escape);
+  }
+  writeFileSync(file, (leadingBom ? String.fromCharCode(0xfeff) : "") + body);
+  console.log(`${file}: ${fixed} character(s) restored to escapes`);
+}
+```
+
+Prove it the way it fails in practice. The scripts below build every escape and character from character codes, so no tool call has to type one:
+
+- one turns a non-breaking-space escape in `PreviewWorkoutWeekChapter.jsx` into the literal character, which is what a decoded tool call does;
+- the other adds a comment that mentions a new escape, which is legitimate.
+
+Measured on 2026-09-29, with the copies extracted from this plan:
+
+| Case                                  | Output                                                | Exit |
+| ------------------------------------- | ----------------------------------------------------- | ---- |
+| clean tree                            | `escapes intact in 0 changed file(s)`                 | 0    |
+| a comment that mentions a new escape  | `escapes intact in 1 changed file(s)`                 | 0    |
+| one escape decoded                    | `FAIL …: escapes 6 -> 5, invisible characters 0 -> 1` | 1    |
+| that file after `restore-escapes.mjs` | `escapes intact in 0 changed file(s)`                 | 0    |
+
+After the repair, the file was byte-identical to `HEAD`. The decoded escape also made `same-code.mjs` exit 1, while `npx eslint` on the file exited 0.
+
+Its first real catch was this plan. The Edits that added Findings §9 decoded 6 escapes, and `restore-escapes.mjs` put them back.
 
 ---
 
