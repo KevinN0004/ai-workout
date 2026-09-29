@@ -499,8 +499,8 @@ the native instance all along.
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-28:
-  server **94.32%** statements / 86.67% branches (87.10% in CI), client **98.68%** /
-  93.62%.
+  server **94.32%** statements / 86.67% branches (87.10% in CI), client **98.70%** /
+  93.68%.
   On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
   before it, and the ratchet correctly did not trip, which is the floor doing its job
   rather than failing at it: it sits one decimal below the measurement, so a
@@ -516,6 +516,17 @@ the native instance all along.
   change was verified with `npm test`, which runs no coverage at all, while CI runs
   `test:coverage` and tripped the server floor on lines, functions and statements. Run
   `npm run test:coverage`, not `npm test`, before claiming a change is ready.
+  - **A coverage figure that changes between runs of identical code is a test bug.**
+    Until #178 the client's did. The next-session walk in `usePreviewDerivedData.js`
+    reached its rest-day arm only when the real tomorrow was a rest day, so CI failed
+    the 93.6% branch floor on every Tuesday and Sunday (UTC) and passed the rest of the
+    week. The dashboard loader's superseded-failure guards were reached only
+    intermittently, by timing. Both now have tests, and a sweep of nine dates and times
+    measures identical coverage, which is what the tenth-of-a-point floors in
+    `client/vite.config.js` rely on. `TZ` cannot be set here (see below), but the date
+    can: a `NODE_OPTIONS=--import` preload that shifts `Date` reaches Vitest's workers,
+    and diffing the per-arm JSON across such a sweep is what found both. Pin the clock
+    in any test whose branches follow `new Date()`; stage a race with deferred promises.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.

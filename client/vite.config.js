@@ -47,13 +47,21 @@ export default defineConfig({
       //
       // Aspirational values would block every PR from day one, which is how
       // coverage gates get deleted instead of met. Whole percent was tried
-      // first and let a sub-point gain evaporate without tripping anything;
-      // these suites are deterministic -- no randomness, no timing-dependent
-      // branches -- so a tenth of a point is a safe margin.
+      // first and let a sub-point gain evaporate without tripping anything.
+      //
+      // A tenth of a point is a safe margin only because the suite measures
+      // the same on every run. This comment used to assert that before it was
+      // true: one branch followed the real weekday and another a timing race,
+      // and the branch floor failed on every Tuesday and Sunday (#178). Both
+      // are now pinned by tests, and a sweep across seven weekdays and both
+      // sides of midnight measures identical coverage. To keep it that way, a
+      // test whose branches follow `new Date()` pins the clock
+      // (`vi.setSystemTime`), and a race is staged with deferred promises
+      // rather than left to the scheduler.
       thresholds: {
-        statements: 98.6,
+        statements: 98.7,
         branches: 93.6,
-        functions: 98.7,
+        functions: 98.8,
         lines: 99.3
       }
     }
