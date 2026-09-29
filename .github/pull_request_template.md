@@ -10,7 +10,7 @@ Paste the actual output, not a claim that it passed.
 - [ ] `npm run format:check` — exit 0
 - [ ] `npm test` — exit 0; record the counts you saw (scripts / client / server)
 - [ ] `npm run build` — exit 0
-- [ ] New or changed source files follow `docs/code-readability-sop.md` (a header first, a summary on each export, a reason on each effect)
+- [ ] New or changed source files follow `docs/code-readability-sop.md` (a header first, a summary on each export, a reason on each effect; name any export left without a summary)
 
 ## Risk
 
