@@ -810,12 +810,17 @@ the native instance all along.
     uncaught one both read as "tests passed". Check the file changed, not just the exit
     code. Five things have silently prevented a match so far: shell escaping eating a
     backslash, indentation not matching, an apostrophe in the pattern, **CRLF line
-    endings** (some files here use them — match on `\r?\n`), and a **heredoc collapsing
-    `\\n` to `\n`** even with a quoted delimiter. Three of those five are the shell, so
-    **write mutation scripts with the Write tool rather than a heredoc**, and use
-    `String.raw` for any pattern containing a backslash. The prompt in
-    `generateRoutes.js` is the awkward case: its newlines are the two characters
-    backslash-n inside a template literal. Not every survivor is a weak test either: removing the `!user?.hash` guard in
+    endings**, and a **heredoc collapsing `\\n` to `\n`** even with a quoted delimiter.
+    Three of those five are the shell, so **write mutation scripts with the Write tool
+    rather than a heredoc**, and use `String.raw` for any pattern containing a
+    backslash. The prompt in `generateRoutes.js` is the awkward case: its newlines are
+    the two characters backslash-n inside a template literal. **On CRLF:** no tracked
+    file is CRLF, and none was when this note was first written — `.gitattributes`
+    stores LF. But a file a Windows tool rewrites stays CRLF in the working tree until
+    its next checkout, and `git status` calls it clean, so match on `\r?\n` anyway.
+    Check a file with `git ls-files --eol` (`w/crlf`), not `grep -c $'\r'`: on this
+    machine that returns the line count, and it put a false CRLF claim in #177's
+    description. Not every survivor is a weak test either: removing the `!user?.hash` guard in
     `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
     existing catch returns the same `false`.
     Dropping the `ageValue !== null` guard on `useBodyModel`'s age adjustment is another,
