@@ -72,7 +72,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   geometry in `home/components/physique/`. `client/src/components/`
   and `client/src/hooks/` hold only shared code: used from more than one page, or by
   another shared module (`useBodyScrollLock` serves `ModalPortal`). Images follow the
-  same rule, in an `assets/` folder beside the code that imports them
+  same rule, in an `assets/` folder inside the area that owns them
   (`client/src/app/assets/planner-thumbs/`,
   `client/src/pages/home/components/physique/assets/`); there is no top-level
   `client/src/assets/`.
