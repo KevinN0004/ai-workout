@@ -1045,7 +1045,10 @@ The `text` is `""`. `mutate.mjs` confirms that an empty replacement applied by c
 ]
 ```
 
+Stage the two new files first. The loop restores the allowlist with `git checkout --`, which reads from the index, and an untracked file is not in it. Worse, one path git cannot match makes the whole `checkout` restore nothing, which would leave `shutdown.js` and `routing.js` mutated.
+
 ```bash
+git add scripts/__tests__/repo-invariants.test.mjs scripts/__tests__/file-header-allowlist.json
 for case in directive removed done stale; do
   echo "== $case"; node "$TOOLS/mutate.mjs" "$TOOLS/edits-ratchet-$case.json"; echo "mutate exit=$?"; git diff --stat
   npm run test:scripts > "$SCRATCH/pr0-mut-$case.txt" 2>&1; echo "test exit=$?"
@@ -1063,7 +1066,7 @@ Expected:
 | `done`      | 1           | `every allowlisted file still lacks one, so the list only shrinks` |
 | `stale`     | 1           | `every allowlisted path is an in-scope tracked file, listed once`  |
 
-The status at the end shows only this task's uncommitted files: the test, the allowlist, and nothing else modified.
+The status at the end shows only this task's files, staged: the test and the allowlist, and nothing else modified.
 
 - [ ] **Step 8: The PR template**
 
