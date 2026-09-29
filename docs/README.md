@@ -24,3 +24,4 @@
 - [2026-09-14 — Editable profile](specs/2026-09-14-editable-profile-design.md)
 - [2026-09-18 — Development roadmap](specs/2026-09-18-development-roadmap-design.md)
 - [2026-09-23 — Repository layout reorganization](specs/2026-09-23-repo-layout-reorganization-design.md)
+- [2026-09-29 — Code readability](specs/2026-09-29-code-readability-design.md)
