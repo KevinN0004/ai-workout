@@ -192,7 +192,7 @@ html.preview-smooth-scroll {
   transform: none !important;
 }
 
-/* Keep preview stage untransformed so PreviewPage fixed header/TOC anchor to viewport. */
+/* Keep preview stage untransformed so PreviewStage fixed header/TOC anchor to viewport. */
 .home-stage-preview,
 .home-stage-preview.stage-forward,
 .home-stage-preview.stage-backward,

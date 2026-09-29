@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import PreviewPage from "../PreviewPage";
+import PreviewStage from "../PreviewStage";
 import { PREVIEW_TOC_SWITCH_MS } from "../constants";
 
 // The machine that drives the guided walkthrough. The four hooks it calls are
@@ -98,7 +98,7 @@ vi.mock("../hooks/usePreviewDerivedData", () => ({
 
 const renderPreview = (props = {}) =>
   render(
-    <PreviewPage
+    <PreviewStage
       personal={{}}
       form={{}}
       heightUnit="cm"
@@ -145,7 +145,7 @@ afterEach(() => {
   document.documentElement.classList.remove("preview-smooth-scroll");
 });
 
-describe("PreviewPage", () => {
+describe("PreviewStage", () => {
   describe("routing a chapter to its body", () => {
     test("opens on the first chapter", () => {
       renderPreview();
