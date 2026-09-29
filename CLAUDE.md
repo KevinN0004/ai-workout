@@ -505,7 +505,13 @@ the native instance all along.
   before it, and the ratchet correctly did not trip, which is the floor doing its job
   rather than failing at it: it sits one decimal below the measurement, so a
   rounding-scale movement is tolerated while a real regression is not. Do not "fix" a
-  small dip by raising the floor to meet it.
+  small dip by raising the floor to meet it. That dip was never explained, though, and
+  it was measured on a Tuesday (`a4097dd`), when the weekday-dependent branch in the
+  entry below went uncovered. One arm is about 0.03 points, which the truncated report
+  can show as 0.02, so it may have been that rather than rounding. Nobody re-measured it.
+  How much a floor tolerates is whatever truncation leaves, and that can be nothing:
+  client statements sits at 98.7053% against 98.7, so one new uncovered statement fails
+  CI.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **Both sides carry a ratchet**, floored one decimal below the measured value — the
@@ -517,16 +523,19 @@ the native instance all along.
   `test:coverage` and tripped the server floor on lines, functions and statements. Run
   `npm run test:coverage`, not `npm test`, before claiming a change is ready.
   - **A coverage figure that changes between runs of identical code is a test bug.**
-    Until #178 the client's did. The next-session walk in `usePreviewDerivedData.js`
-    reached its rest-day arm only when the real tomorrow was a rest day, so CI failed
-    the 93.6% branch floor on every Tuesday and Sunday (UTC) and passed the rest of the
-    week. The dashboard loader's superseded-failure guards were reached only
-    intermittently, by timing. Both now have tests, and a sweep of nine dates and times
-    measures identical coverage, which is what the tenth-of-a-point floors in
-    `client/vite.config.js` rely on. `TZ` cannot be set here (see below), but the date
-    can: a `NODE_OPTIONS=--import` preload that shifts `Date` reaches Vitest's workers,
-    and diffing the per-arm JSON across such a sweep is what found both. Pin the clock
-    in any test whose branches follow `new Date()`; stage a race with deferred promises.
+    Until #178 the client's did, from two sources. The next-session walk in
+    `usePreviewDerivedData.js` reached its rest-day arm only when the real tomorrow was
+    a rest day, which never happened on a Tuesday or a Sunday. The dashboard loader's
+    superseded-failure guards (two arms) were reached only when timing lined up, in
+    roughly one full run in six. It took both misses at once to fail: 3171 of 3388
+    branches is 93.59%, under the 93.6% floor, which is what CI hit on a Tuesday.
+    Either one alone stayed above it. Both now have tests, and a sweep of nine dates and
+    times measures identical coverage, which is what the tight floors in
+    `client/vite.config.js` rely on. `TZ` cannot be set here (see the `TZ` entry below),
+    but the date can: a `NODE_OPTIONS=--import` preload that shifts `Date` reaches
+    Vitest's workers, and diffing the per-arm JSON across such a sweep is what found
+    both. Pin the clock in any test whose branches follow `new Date()`; stage a race
+    with deferred promises.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
     repositories have almost none and sit near 95%, because the dashboard integration
     suites drive them; several 500-line view components have no test and sit at 0%.

@@ -37,6 +37,16 @@ const jsonResponse = (body, ok = true) => ({
   json: async () => body
 });
 
+// A response the test releases by hand, so two overlapping requests can be
+// made to answer in whichever order the test is about.
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+};
+
 // Props are built once per render() call, not once per React render. setGoalForm
 // is in the load effect's dependency array, so handing it a fresh vi.fn() on
 // every render re-triggers the effect forever and each pass cancels the last --
@@ -105,6 +115,53 @@ describe("useDashboardData", () => {
     const { result } = render();
 
     await waitFor(() => expect(result.current.dashLoading).toBe(false));
+  });
+
+  test("a superseded failure neither reports nor ends the newer load", async () => {
+    // The loader is an effect, so it is superseded by a change of key --
+    // switching accounts, say -- rather than by a second call. The old request
+    // fails while the new one is still in flight: the catch guard keeps its
+    // error off the screen, and the finally guard keeps it from clearing a
+    // loading flag that now belongs to the new request. Before this test those
+    // guards were reached only when timing happened to line up, which made
+    // client coverage vary between runs of the same code.
+    const gates = [deferred(), deferred()];
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const gate = gates[Math.min(call, 1)];
+        call += 1;
+        return gate.promise;
+      })
+    );
+    const props = (dashboardCacheKey) => ({
+      user,
+      isDashboardRoute: true,
+      shouldLoadAmbientData: false,
+      dashboardCacheKey,
+      weatherCacheKey: "",
+      airCacheKey: "",
+      setGoalForm
+    });
+    const { result, rerender } = renderHook((p) => useDashboardData(p), {
+      initialProps: props("dashboard:first-account")
+    });
+    rerender(props("dashboard:second-account"));
+    await waitFor(() => expect(call).toBe(2));
+
+    await act(async () => {
+      gates[0].resolve(jsonResponse({ error: "Stale failure." }, false));
+    });
+    expect(result.current.dashError).toBe("");
+    expect(result.current.dashLoading).toBe(true);
+
+    await act(async () => {
+      gates[1].resolve(jsonResponse({ dashboard: { marker: "second" } }));
+    });
+    await waitFor(() => expect(result.current.dashLoading).toBe(false));
+    expect(result.current.dashboard.marker).toBe("second");
+    expect(result.current.dashError).toBe("");
   });
 
   describe("cache", () => {
@@ -502,14 +559,6 @@ describe("ambient data", () => {
   // taps refresh twice would otherwise watch the newer reading be replaced by
   // the older.
   describe("overlapping requests", () => {
-    const deferred = () => {
-      let resolve;
-      const promise = new Promise((r) => {
-        resolve = r;
-      });
-      return { promise, resolve };
-    };
-
     test.each([
       ["weather", "loadWeatherRecommendation", "/api/weather", "weatherData"],
       ["air quality", "loadAirQuality", "/api/air-quality", "airQualityData"]
@@ -587,53 +636,6 @@ describe("ambient data", () => {
         expect(result.current[errorKey]).toBe("");
       }
     );
-
-    test("a superseded dashboard failure neither reports nor ends the newer load", async () => {
-      // The dashboard loader is an effect, so it is superseded by a change of
-      // key -- switching accounts, say -- rather than by a second call. The old
-      // request fails while the new one is still in flight: the catch guard
-      // keeps its error off the screen, and the finally guard keeps it from
-      // clearing a loading flag that now belongs to the new request. Before
-      // this test those guards were only reached when a slow machine happened
-      // to line the timing up, which made client coverage vary between runs.
-      const gates = [deferred(), deferred()];
-      let call = 0;
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => {
-          const gate = gates[Math.min(call, 1)];
-          call += 1;
-          return gate.promise;
-        })
-      );
-      const props = (dashboardCacheKey) => ({
-        user,
-        isDashboardRoute: true,
-        shouldLoadAmbientData: false,
-        dashboardCacheKey,
-        weatherCacheKey: "",
-        airCacheKey: "",
-        setGoalForm
-      });
-      const { result, rerender } = renderHook((p) => useDashboardData(p), {
-        initialProps: props("dashboard:first-account")
-      });
-      rerender(props("dashboard:second-account"));
-      await waitFor(() => expect(call).toBe(2));
-
-      await act(async () => {
-        gates[0].resolve(jsonResponse({ error: "Stale failure." }, false));
-      });
-      expect(result.current.dashError).toBe("");
-      expect(result.current.dashLoading).toBe(true);
-
-      await act(async () => {
-        gates[1].resolve(jsonResponse({ dashboard: { marker: "second" } }));
-      });
-      await waitFor(() => expect(result.current.dashLoading).toBe(false));
-      expect(result.current.dashboard.marker).toBe("second");
-      expect(result.current.dashError).toBe("");
-    });
   });
 
   describe("loading air quality", () => {
