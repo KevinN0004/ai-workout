@@ -20,8 +20,8 @@ client/
 |-- src/
 |   |-- main.jsx                # Entry point
 |   |-- App.jsx                 # Top-level routing and app state
-|   |-- app/                    # Shared constants, hooks, routing, cache, API helpers
-|   |-- assets/                 # Static images
+|   |-- app/                    # Shared constants, hooks, routing, cache, API helpers;
+|   |                           #   the planner modals with their CSS and images
 |   |-- components/             # Shared UI components
 |   |-- hooks/                  # Shared hooks
 |   |-- pages/                  # One folder per route, with its own parts
