@@ -46,8 +46,9 @@ export const removeJsonCache = (key) => {
   try {
     window.localStorage.removeItem(key);
   } catch {
-    // Ignore a failed removeItem (private mode, etc.) -- a deletion must not
-    // fail because storage refuses it.
+    // Ignore a failed removeItem: deleteAccount calls this for each cache key
+    // after the account is gone, and a throw would skip the rest of them and its
+    // redirect home.
   }
 };
 

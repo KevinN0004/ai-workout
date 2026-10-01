@@ -11,8 +11,9 @@ import { defaultPersonalForm } from "./constants";
  * It guards before it coerces: `Number("")` and `Number(null)` are both 0 and
  * both finite, so testing afterwards would turn an unfilled field into a
  * measured 0. A 0 is outside every numeric range in the server's profile schema
- * (apiSchemaService.js), so the whole save would be refused with a 400, and the
- * height pick in personalToProfile could never fall back to the other unit.
+ * (apiSchemaService.js), so the whole save would be refused with a 400, and a
+ * blank height in personalToProfile's active unit could not fall back to the
+ * other one.
  * Same shape as toNullableNumber in the server's dashboardDataBuildersService.
  */
 export const toProfileNumber = (value) => {
