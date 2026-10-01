@@ -1,3 +1,19 @@
+/**
+ * The read-through cache in front of the external APIs: a fresh entry answers
+ * without a request, and a stale one answers when the upstream fails. Kept in
+ * Redis when the session store's client is ready, in memory otherwise. Built
+ * once in index.js.
+ */
+
+/**
+ * Builds the cache. Returns the key builder, the read-through wrapper every
+ * external request runs through, and the rule for merging the cache statuses
+ * of a response built from several requests.
+ *
+ * @param deps `maxEntries` caps the in-memory cache, `defaultStaleTtlSec` is
+ *   how long an entry may still be served once its fresh TTL ends, and
+ *   `getRedisClient` returns the session store's client or null.
+ */
 export const createHttpCacheService = ({
   metrics,
   logger,
@@ -5,15 +21,16 @@ export const createHttpCacheService = ({
   toPositiveInt,
   maxEntries,
   defaultStaleTtlSec,
-  // Redis keeps the cache across a restart. That matters less for the 3-15 minute
-  // fresh TTLs than for the stale window (6 hours by default), which is what lets
-  // an upstream outage serve old data instead of an error. In memory that buffer
-  // is lost on every spin-down.
+  // Redis keeps the cache across a restart. That matters less for the fresh
+  // TTLs, which are minutes long, than for the stale window (hours long by
+  // default), which is what lets an upstream outage serve old data instead of
+  // an error. In memory that buffer is lost on every spin-down.
   getRedisClient = () => null
 }) => {
   const responseCache = new Map();
-  // Per operation, because reads and writes fail independently. One shared flag
-  // let a succeeding write re-arm a failing read, which logged on every request.
+  // Per operation, because reads and writes fail independently: with one shared
+  // flag, a succeeding write would re-arm a failing read, which would then log
+  // on every request.
   const redisOutageReported = { read: false, write: false };
 
   const redisReady = () => Boolean(getRedisClient()?.isReady);
@@ -59,10 +76,10 @@ export const createHttpCacheService = ({
   // Both `maxEntries` and the `evictions` metric describe the in-memory fallback
   // only. On the Redis path nothing evicts: a key disappears when its own TTL
   // closes the stale window, which no process observes, so a read that finds
-  // nothing counts as an ordinary miss. Incrementing `evictions` from an expired
-  // Redis read was considered and rejected -- keys that expire unread would never
-  // be counted, so the number would be a systematic undercount presented as a
-  // count. Redis is bounded by TTL rather than by entry count.
+  // nothing counts as an ordinary miss. An expired Redis read is not counted as
+  // an eviction either: keys that expire unread would never be counted, so the
+  // number would be a systematic undercount presented as a count. Redis is
+  // bounded by TTL rather than by entry count.
   const pruneResponseCache = (now = Date.now()) => {
     for (const [key, entry] of responseCache.entries()) {
       if (now <= entry.staleUntilMs) continue;

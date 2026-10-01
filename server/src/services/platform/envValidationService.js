@@ -1,9 +1,7 @@
 /**
- * Startup preflight for the process environment.
- *
- * This validates and reports; it does NOT capture or freeze values. Callers keep
- * reading process.env live, because index.test.js mutates GEMINI_API_KEY at
- * runtime and generateRoutes.js reads it per request.
+ * Startup preflight for the process environment: index.js runs validateEnv
+ * (outside the test suites) before its own module-scope reads of process.env,
+ * and exits on any error. Imported modules such as prisma.js read it earlier.
  */
 
 // Every min/max here is meant to match what the corresponding reader in
@@ -11,9 +9,10 @@
 // reasonable in isolation -- a floor the reader silently discards (falling
 // back to its default) is worse than no floor: it tells the operator their
 // setting took effect when it did not. Check the call site before changing
-// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST additionally have to
-// clear argon2's own library-enforced minimums (timeCost >= 2, memoryCost
-// >= 1024), which are stricter than what toPositiveInt alone would require.
+// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST carry floors stricter than
+// toPositiveInt's. They are this app's floors, not limits argon2 enforces (the
+// library accepts lower costs), so lowering one is a security decision, not a
+// compatibility one.
 const NUMERIC_VARS = [
   { name: "PORT", min: 1, max: 65535 },
   { name: "SHUTDOWN_TIMEOUT_MS", min: 1 },
@@ -52,6 +51,13 @@ const URL_VARS = ["OPEN_METEO_BASE_URL", "OPENAQ_BASE_URL", "WGER_BASE_URL", "ME
 
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === "";
 
+/**
+ * Checks `env` and returns one message per problem, or [] when there is none.
+ *
+ * This validates and reports; it does NOT capture or freeze values. Callers keep
+ * reading process.env live, because index.test.js mutates GEMINI_API_KEY at
+ * runtime and generateRoutes.js reads it per request.
+ */
 export const validateEnv = (env = {}) => {
   const errors = [];
 
@@ -63,6 +69,8 @@ export const validateEnv = (env = {}) => {
     errors.push("CLIENT_ORIGIN (or CLIENT_ORIGINS) is required when NODE_ENV=production.");
   }
 
+  // Optional settings, checked only when set: numbers against their bounds,
+  // then the URLs, then the Sentry sample rate.
   for (const { name, min, max } of NUMERIC_VARS) {
     if (isBlank(env[name])) continue;
     const value = Number(env[name]);

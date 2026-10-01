@@ -1,3 +1,8 @@
+/**
+ * Applies the SQL migrations in server/db/postgres to the database that
+ * DATABASE_URL (or POSTGRES_URL) names. Run by `npm run migrate:postgres` in the
+ * server workspace; any failure is printed and sets exit code 1.
+ */
 import path from "path";
 import { inspect } from "node:util";
 import { fileURLToPath } from "url";

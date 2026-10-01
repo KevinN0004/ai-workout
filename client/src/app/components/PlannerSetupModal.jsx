@@ -1,3 +1,8 @@
+/**
+ * The three-step planner that collects a plan request: environment and
+ * equipment; schedule, level and injuries; then focus. App builds it; HomePage
+ * and DashboardPage render it.
+ */
 import ModalPortal from "../../components/ModalPortal";
 import { equipmentOptionsByEnv, injuryOptions, quickFocuses } from "../constants";
 import thumbHomeBodyweight from "../assets/planner-thumbs/home-bodyweight.svg";
@@ -38,7 +43,8 @@ const equipmentThumbByLabel = {
   "pool / aquatic center": { image: thumbCommercialPool, tone: "tone-endurance" },
   "court sports area": { image: thumbCommercialCourt, tone: "tone-endurance" },
   "recovery & mobility zone": { image: thumbCommercialRecovery, tone: "tone-mobility" },
-  // Backward compatibility with older commercial labels.
+  // Labels equipmentOptionsByEnv does not offer. The grid below looks up only
+  // that list's labels, so nothing in the app reaches these five entries.
   "barbell + plates": { image: thumbCommercialStrengthFloor, tone: "tone-strength" },
   "cable machine": { image: thumbCommercialStrengthFloor, tone: "tone-machine" },
   "smith machine": { image: thumbCommercialStrengthFloor, tone: "tone-machine" },
@@ -58,6 +64,11 @@ const resolveEquipmentThumb = (label) => {
   );
 };
 
+/**
+ * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 3). Every
+ * choice it shows is App's `form`, changed through the handlers passed in; the
+ * last step's button calls `onSubmit`, which generates the plan.
+ */
 export default function PlannerSetupModal({
   plannerOpen,
   plannerStep,
@@ -85,6 +96,7 @@ export default function PlannerSetupModal({
         aria-labelledby="planner-setup-modal-title"
       >
         <div className="modal planner-setup-modal">
+          {/* ---- Header: back, step title, close ---- */}
           <div className="modal-header">
             {plannerStep > 1 ? (
               <button
@@ -122,6 +134,7 @@ export default function PlannerSetupModal({
             </button>
           </div>
           <div className="modal-body">
+            {/* ---- Step 1: environment and equipment ---- */}
             {plannerStep === 1 && (
               <div className="step-panel planner-step-panel">
                 <div className="step-top">
@@ -182,6 +195,7 @@ export default function PlannerSetupModal({
                 </div>
               </div>
             )}
+            {/* ---- Step 2: schedule, level and injuries ---- */}
             {plannerStep === 2 && (
               <div className="step-panel planner-step-panel">
                 <form className="form planner-step-two-form">
@@ -227,6 +241,7 @@ export default function PlannerSetupModal({
                 </form>
               </div>
             )}
+            {/* ---- Step 3: focus ---- */}
             {plannerStep === 3 && (
               <div className="step-panel planner-step-panel">
                 <p className="muted">Select one or more focus areas for this plan.</p>
@@ -245,6 +260,7 @@ export default function PlannerSetupModal({
               </div>
             )}
           </div>
+          {/* ---- Footer: next, or generate on the last step ---- */}
           <div className={`modal-footer ${plannerStep === 3 ? "planner-footer-center" : ""}`}>
             <div className={`modal-actions ${plannerStep === 3 ? "planner-actions-center" : ""}`}>
               {plannerStep < 3 ? (

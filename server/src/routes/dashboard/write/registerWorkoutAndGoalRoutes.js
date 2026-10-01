@@ -1,6 +1,17 @@
+/**
+ * POST routes for workout sessions, daily calories and goals. Registered by
+ * registerDashboardWriteRoutes.js.
+ */
 import crypto from "crypto";
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 
+/**
+ * Registers POST /api/dashboard/workouts (also answered at
+ * /api/dashboard/workout-sessions), /api/dashboard/calories and
+ * /api/dashboard/goals. All three require a session and answer with the
+ * refreshed dashboard; the workout route adds the saved session as
+ * `workoutSession`.
+ */
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {
     requireAuth,
@@ -34,14 +45,8 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
 
         await saveWorkoutSession({ userId: req.user.id, session });
 
-        // The Mongo aggregation-pipeline update that used to sit here was inert.
-        // It prepended a summary into `dashboard.workouts`, deduped by id and
-        // capped at 500 -- but the shim only matched `$set`/`$push`/`$pull`
-        // object updates, so an array pipeline fell through to a plain re-read.
-        // All three effects are already provided elsewhere now that workouts
-        // live in their own table: ordering by loadUserRelated's orderBy, dedupe
-        // by the upsert above, and the 500 cap by mapUser. What remains is the
-        // user-existence check the route actually depends on.
+        // Re-read rather than answer from req.user, which was loaded before this
+        // write: dashboard.workouts in the response has to include the session.
         const updatedDoc = await findUserWithDashboard(req.user.id);
         if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
@@ -101,9 +106,9 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       if (parsedTargetCalories !== null) goals.targetCalories = parsedTargetCalories;
       if (parsedWeeklyWorkouts !== null) goals.weeklyWorkouts = parsedWeeklyWorkouts;
 
-      // updateGoals patches rather than replaces, and treats an empty object as
-      // a no-op, so the route no longer needs to branch on whether anything was
-      // supplied.
+      // updateGoals patches rather than replaces and writes nothing for an empty
+      // object, so the route hands over whatever parsed without checking that
+      // anything did.
       await updateGoals({ userId: req.user.id, goals });
 
       const updatedDoc = await findUserWithDashboard(req.user.id);

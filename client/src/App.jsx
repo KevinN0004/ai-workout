@@ -1,3 +1,7 @@
+/**
+ * The app shell: owns the route, the signed-in user and the form state the
+ * pages share, and renders the page for the current path. Rendered by main.jsx.
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
@@ -35,7 +39,14 @@ import {
 } from "./app/units";
 import "./styles/app.css";
 
+/**
+ * Routes on window.location.pathname without a router: /auth, /plan and
+ * /dashboard with its subpaths each have a page, and any other path renders
+ * HomePage. The planner and generated-plan modals are built here and passed to
+ * HomePage and DashboardPage, which both render them.
+ */
 export default function App() {
+  // ---- State ----------------------------------------------------------------
   const [personalMode, setPersonalMode] = useState("basic");
   const [heightUnit, setHeightUnit] = useState(() =>
     getPreferredMeasurementSystem() === "imperial" ? "ft" : "cm"
@@ -106,6 +117,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+
+  // ---- Dashboard data and the API client ------------------------------------
   const { apiFetch, ensureCsrfToken } = useApiClient();
   const isDashboardRoute = route === "/dashboard" || route.startsWith("/dashboard/");
   const dashboardCacheKey = useMemo(
@@ -158,6 +171,7 @@ export default function App() {
     setDashError
   });
 
+  // ---- Derived values and handlers ------------------------------------------
   const gradient = useMemo(
     () => ({
       background:
@@ -215,6 +229,7 @@ export default function App() {
         prev.environment === "Commercial" && options.includes(fullAccessLabel);
       const currentSelection = prev.equipment.filter((value) => options.includes(value));
 
+      // Home, or a Commercial list without "Full gym access": a plain toggle.
       if (!isCommercialEnv) {
         const exists = prev.equipment.includes(item);
         return {
@@ -225,6 +240,7 @@ export default function App() {
         };
       }
 
+      // "Full gym access" itself selects every room, or clears them all.
       if (item === fullAccessLabel) {
         const hasFullAccess = currentSelection.includes(fullAccessLabel);
         return {
@@ -233,6 +249,8 @@ export default function App() {
         };
       }
 
+      // Any other room: full access is first expanded into the rooms it stands
+      // for, so that one of them can be taken away, and then the room toggles.
       const nextSelection = new Set(currentSelection);
       if (nextSelection.has(fullAccessLabel)) {
         nextSelection.delete(fullAccessLabel);
@@ -247,6 +265,7 @@ export default function App() {
         nextSelection.add(item);
       }
 
+      // Full access then follows the rooms: on exactly when every room is on.
       const specificCommercialOptions = options.filter((option) => option !== fullAccessLabel);
       const hasAllSpecificOptions = specificCommercialOptions.every((option) =>
         nextSelection.has(option)
@@ -291,6 +310,7 @@ export default function App() {
     setPlannerOpen(true);
   };
 
+  // ---- Event handlers, built in app/events.js -------------------------------
   const {
     onSubmit,
     openSignupWithPrefilledProfile,
@@ -365,6 +385,7 @@ export default function App() {
     setProgressForm
   });
 
+  // ---- Modals and the parsed plan -------------------------------------------
   const plannerModal = (
     <PlannerSetupModal
       plannerOpen={plannerOpen}
@@ -396,6 +417,9 @@ export default function App() {
     />
   );
 
+  // A new plan opens on its first day. Only GeneratedPlanModal reads
+  // activeDayIndex. `result` is listed as well as the day count so that a plan
+  // with as many days as the last one still resets.
   useEffect(() => {
     if (!planSections.days.length) return;
     setActiveDayIndex(0);
@@ -403,18 +427,26 @@ export default function App() {
 
   const latestPlanByWeekday = useMemo(() => extractLatestPlanByWeekday(dashboard), [dashboard]);
 
+  // ---- Routing and session --------------------------------------------------
+
+  // `go` navigates with pushState, which fires no event, so the browser's back and
+  // forward buttons are the only route changes this has to hear about.
   useEffect(() => {
     const onPop = () => setRoute(window.location.pathname);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // The URL picks the dashboard view on every route change, back and forward
+  // included. A path that names no view leaves the last one as it was.
   useEffect(() => {
     const routeDashView = resolveDashViewFromPath(route);
     if (!routeDashView) return;
     setDashView((current) => (current === routeDashView ? current : routeDashView));
   }, [route]);
 
+  // Once, on load: the session cookie is HttpOnly, so asking the server is the
+  // only way to learn who is signed in.
   useEffect(() => {
     const loadSession = async () => {
       try {
@@ -429,17 +461,24 @@ export default function App() {
     loadSession();
   }, []);
 
+  // Fetches the CSRF token up front, so the first write need not wait for it.
+  // ensureCsrfToken is stable, so this runs once.
   useEffect(() => {
     ensureCsrfToken().catch(() => {
       // CSRF token is lazily retried before unsafe requests.
     });
   }, [ensureCsrfToken]);
 
+  // Each arrival at / starts the home flow over, blank and in the locale's
+  // units. resetPersonalFlow is stable, so the route is the only trigger.
   useEffect(() => {
     if (route !== "/") return;
     resetPersonalFlow();
   }, [route, resetPersonalFlow]);
 
+  // A signed-in visitor has nothing to do on the landing or sign-in page, so
+  // either one sends them to the dashboard, including once the session check
+  // above resolves.
   useEffect(() => {
     if (!user) return;
     if (route === "/" || route === "/auth" || route === "/auth/") {
@@ -447,6 +486,7 @@ export default function App() {
     }
   }, [go, route, user]);
 
+  // ---- The page for the route -----------------------------------------------
   if (route === "/auth" || route === "/auth/") {
     return (
       <AuthPage
