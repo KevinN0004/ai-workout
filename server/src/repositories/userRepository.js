@@ -1,6 +1,6 @@
 /**
  * Prisma-native writes against the user row and its calorie entries. Each one
- * reports whether it matched a user; a route that answers with the dashboard
+ * reports whether it matched a user; a route that answers with the updated data
  * then re-reads the user through findUserWithDashboard for the response body.
  */
 import { dateOnlyToDate } from "./rowValues.js";
