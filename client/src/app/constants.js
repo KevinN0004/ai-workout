@@ -169,11 +169,14 @@ export const defaultPersonalForm = {
   notes: ""
 };
 
-// The goal comes from the signed-in visitor's profile. PlannerSetupModal never
-// asks for one -- its steps cover environment, equipment, schedule, level,
-// injuries and focus -- so without an argument here every generated plan would
-// carry the same goal into the Gemini prompt, whatever the visitor wanted. The
-// fallback is for a visitor with no goal on file, signed in or not.
+/**
+ * A fresh planner form, seeded with `goal`, which App's resetPlannerFlow passes
+ * from the signed-in visitor's profile. PlannerSetupModal never asks for one --
+ * its steps cover environment, equipment, schedule, level, injuries and focus --
+ * so without an argument every generated plan would carry the same goal into
+ * the Gemini prompt, whatever the visitor wanted. The first of goalOptions is
+ * the fallback for a visitor with no goal on file, signed in or not.
+ */
 export const createDefaultPlannerForm = (goal) => ({
   goal: goal || goalOptions[0],
   equipment: [],

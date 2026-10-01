@@ -43,6 +43,8 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       actionLabel: options?.actionLabel || "",
       onAction: typeof options?.onAction === "function" ? options.onAction : null
     };
+    // Milliseconds. A toast with an action stays longer, so there is time to
+    // reach its button; a positive `durationMs` overrides both.
     const timeoutMs =
       Number(options?.durationMs) > 0
         ? Number(options.durationMs)

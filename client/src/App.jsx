@@ -229,7 +229,7 @@ export default function App() {
         prev.environment === "Commercial" && options.includes(fullAccessLabel);
       const currentSelection = prev.equipment.filter((value) => options.includes(value));
 
-      // Home, or any environment without a full-access option: a plain toggle.
+      // Home, or a Commercial list without "Full gym access": a plain toggle.
       if (!isCommercialEnv) {
         const exists = prev.equipment.includes(item);
         return {
@@ -385,7 +385,7 @@ export default function App() {
     setProgressForm
   });
 
-  // ---- Modals ---------------------------------------------------------------
+  // ---- Modals and the parsed plan -------------------------------------------
   const plannerModal = (
     <PlannerSetupModal
       plannerOpen={plannerOpen}
@@ -417,8 +417,9 @@ export default function App() {
     />
   );
 
-  // A new plan opens on its first day. `result` is listed as well as the day
-  // count so that a plan with as many days as the last one still resets.
+  // A new plan opens on its first day. Only GeneratedPlanModal reads
+  // activeDayIndex. `result` is listed as well as the day count so that a plan
+  // with as many days as the last one still resets.
   useEffect(() => {
     if (!planSections.days.length) return;
     setActiveDayIndex(0);

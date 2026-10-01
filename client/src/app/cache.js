@@ -1,8 +1,8 @@
 /**
  * localStorage helpers for the per-account caches (dashboard, weather, air
- * quality), and the cookie reader useApiClient takes the CSRF token from. Storage
- * failures are swallowed: a cache that cannot be used only costs a page its head
- * start.
+ * quality), and the cookie reader useApiClient takes the CSRF token from. A
+ * failed getItem, setItem or removeItem is swallowed: a cache that cannot be
+ * used only costs a page its head start.
  */
 
 /**
@@ -17,7 +17,7 @@ export const buildScopedCacheKey = (prefix, user) => {
 
 /**
  * The parsed entry under `key`, or null when there is no key, no storage, no
- * entry or no valid JSON. Never throws.
+ * entry, no valid JSON, or getItem throws.
  */
 export const readJsonCache = (key) => {
   if (!key || typeof window === "undefined" || !window.localStorage) return null;
@@ -46,8 +46,8 @@ export const removeJsonCache = (key) => {
   try {
     window.localStorage.removeItem(key);
   } catch {
-    // Ignore cache removal failures (private mode, storage disabled, etc.) --
-    // a deletion must not fail because storage is unavailable.
+    // Ignore a failed removeItem (private mode, etc.) -- a deletion must not
+    // fail because storage refuses it.
   }
 };
 

@@ -46,12 +46,12 @@ const downloadPlanPdfFromText = async (planText) => {
 /**
  * Builds the handlers from App's state and setters, all passed in one object.
  * Rebuilt every render, each handler sees the values of the render that built
- * it. The members that are not plain state: `apiFetch` (useApiClient, which
- * adds the CSRF header to writes); `queueOptimisticLogCommit` and
- * `showDashboardToast` (useOptimisticLogs, which shows a workout, calorie or
- * meal log as pending and sends it after the undo window); and the resets logout
- * and account deletion run, `clearOptimisticOperations`,
- * `clearDashboardDataState`, `clearDashboardToast` and `resetPersonalFlow`.
+ * it. The members that need a word: `apiFetch` (useApiClient, which adds the
+ * CSRF header to writes); `queueOptimisticLogCommit` and `showDashboardToast`
+ * (useOptimisticLogs, which shows a workout, calorie or meal log as pending and
+ * sends it after the undo window); and the resets logout and account deletion
+ * run, `clearOptimisticOperations`, `clearDashboardDataState`,
+ * `clearDashboardToast` and `resetPersonalFlow`.
  */
 export const createAppEventHandlers = ({
   apiFetch,
@@ -155,8 +155,9 @@ export const createAppEventHandlers = ({
   };
 
   const openSignupWithPrefilledProfile = () => {
-    // The signup form carries height and weight in both units, so the home
-    // flow's entries are converted from whichever unit the visitor typed in.
+    // The signup form carries height in centimetres and in feet and inches, and
+    // weight in the visitor's unit and in kilograms, so the home flow's entries
+    // are converted from whichever unit the visitor typed in.
     const { firstName, lastName } = splitFullName(personal.name);
     const fallbackHeightCm = String(personal.heightCm || "").trim();
     const computedHeightCm =
@@ -300,10 +301,10 @@ export const createAppEventHandlers = ({
 
   const onLogout = async () => {
     // Signing out locally must not depend on the request succeeding. The button
-    // is wired straight to this, so a rejection would skip every clear below
-    // and leave the previous account's dashboard on screen -- with nothing
-    // catching it, and no sign to the user that Log out had not worked. A dead
-    // network, or apiFetch refusing to send without a CSRF token, both get here.
+    // is wired straight to this, so an uncaught rejection would skip every clear
+    // below and leave the previous account's dashboard on screen, with no sign
+    // that Log out had not worked. A dead network, or apiFetch refusing to send
+    // without a CSRF token, both get here.
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
     } catch {
@@ -533,9 +534,7 @@ export const createAppEventHandlers = ({
     // The keys are built before setUser(null) for readability only. `user` is
     // a parameter of createAppEventHandlers, so it is a closure constant:
     // setUser sets React state and cannot reassign it, and nothing here does
-    // either. Reading it after the reset would give the same value. Do not
-    // reorder this on the belief that the position is load-bearing -- it is
-    // not.
+    // either, so building the keys after the reset would read the same value.
     const scopedCacheKeysToClear = [
       DASHBOARD_CACHE_PREFIX,
       WEATHER_CACHE_PREFIX,

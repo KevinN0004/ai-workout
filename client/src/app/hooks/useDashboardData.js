@@ -96,6 +96,8 @@ export default function useDashboardData({
     setWeatherLoading(true);
     setWeatherError("");
     try {
+      // Locate the visitor, fetch for that spot, and cache the reading with
+      // the time it arrived.
       const { latitude, longitude } = await getCurrentCoordinates();
       const query = new URLSearchParams({
         latitude: String(latitude),
@@ -121,6 +123,9 @@ export default function useDashboardData({
       });
     } catch (err) {
       if (weatherRequestRef.current !== requestId) return;
+      // A numeric code is a GeolocationPositionError. Every other failure,
+      // GEO_NOT_AVAILABLE included (loadAirQuality reports that one by name),
+      // says the last reading is still showing, when there is one.
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setWeatherError("Location permission was denied.");
@@ -180,8 +185,8 @@ export default function useDashboardData({
     } catch (err) {
       if (airRequestRef.current !== requestId) return;
       // A numeric code is a GeolocationPositionError, and GEO_NOT_AVAILABLE is
-      // getCurrentCoordinates' own. Any other failure keeps the last reading on
-      // screen, if there is one.
+      // getCurrentCoordinates' own. No failure clears the last reading; only the
+      // last branch says it is still showing, when there is one.
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setAirQualityError("Location permission was denied.");
@@ -222,8 +227,9 @@ export default function useDashboardData({
     applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
   }, [dashboardCacheKey, setGoalForm, user]);
 
-  // The cached weather and when it was read fill in the same way, so the card
-  // has something to show while the visitor's location is requested.
+  // The cached weather and the time it arrived fill in the same way, so the card
+  // has something to show before a fresh reading, or in place of one when the
+  // auto-load below skips it.
   useEffect(() => {
     if (!user || !weatherCacheKey) return;
     const cached = readJsonCache(weatherCacheKey);
@@ -319,8 +325,11 @@ export default function useDashboardData({
   }, [isDashboardRoute, user]);
 
   // Loads weather and air quality once per dashboard visit, the first time the
-  // summary view shows, skipping either one already in state. The ref, not the
-  // dependency list, is what keeps it to once.
+  // summary view shows, skipping either one the refs already hold. A cached
+  // reading set in this same commit is not in its ref yet, so opening /dashboard
+  // or signing in still loads; one set a render earlier, as when a returning
+  // visitor's session check on / or /auth redirects here, is skipped. The ref,
+  // not the dependency list, is what keeps it to once.
   useEffect(() => {
     if (!isDashboardRoute || !user || !shouldLoadAmbientData) return;
     if (hasAutoLoadedEnvironmentRef.current) return;

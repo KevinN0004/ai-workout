@@ -1,15 +1,18 @@
 /**
  * The generated-plan modal: the plan's days as tabs beside the coach notes, with
- * PDF download and a Login / Sign up button. App builds it; HomePage and
- * DashboardPage render it.
+ * PDF download and a Login / Sign up button. App builds it and HomePage and
+ * DashboardPage render it, but nothing in the app opens it (see below).
  */
 import ModalPortal from "../../components/ModalPortal";
 import { APP_BRAND_NAME } from "../constants";
 
 /**
- * Renders while `planModalOpen` is set and there is a plan (`result`).
- * `planSections` is that plan split by parsePlanSections, and `activeDayIndex`
- * picks the day tab shown; App resets it to the first day for each new plan.
+ * Renders while `planModalOpen` is set and there is a plan (`result`). Nothing
+ * in the app sets `planModalOpen` true: onSubmit in events.js only ever clears
+ * it, and shows a new plan on /plan or the dashboard instead, so only this
+ * file's tests open the modal. `planSections` is that plan split by
+ * parsePlanSections, and `activeDayIndex` picks the day tab shown; App resets
+ * it to the first day for each new plan.
  */
 export default function GeneratedPlanModal({
   planModalOpen,

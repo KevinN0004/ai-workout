@@ -66,7 +66,7 @@ const resolveEquipmentThumb = (label) => {
 
 /**
  * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 3). Every
- * value it shows is App's `form`, changed through the handlers passed in; the
+ * choice it shows is App's `form`, changed through the handlers passed in; the
  * last step's button calls `onSubmit`, which generates the plan.
  */
 export default function PlannerSetupModal({
