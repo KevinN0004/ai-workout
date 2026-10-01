@@ -263,9 +263,8 @@ export const registerAuthRoutes = (app, deps) => {
         return res.status(401).json({ error: "Password is incorrect." });
       }
 
-      // The six AppUser relations cascade, so this removes the workout
-      // sessions, meal logs, progress metrics, calorie entries, generated plans
-      // and saved exercises with it.
+      // Every AppUser relation cascades on delete (see schema.prisma), so this
+      // removes every row the user owns along with the account.
       await deleteUser({ userId: req.user.id });
 
       const token = parseCookies(req.headers.cookie || "").sid;

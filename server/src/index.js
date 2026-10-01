@@ -86,11 +86,10 @@ dotenv.config({ quiet: true });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Must run before any other module-scope code reads process.env below
-  // (the pino logger, argon2 options, the port, every base URL, and most of
-  // the limits and timeouts) -- a check that runs after those reads is not a
-  // preflight, it is a report filed after the crash. Kept in its own guard so
-  // the suite, which imports `app` from this module, never trips a fatal env
-  // check.
+  // (the pino logger, argon2 options, the port, and every base URL, rate limit
+  // and cache TTL) -- a check that runs after those reads is not a preflight,
+  // it is a report filed after the crash. Kept in its own guard so the suite,
+  // which imports `app` from this module, never trips a fatal env check.
   const envErrors = validateEnv(process.env);
   if (envErrors.length > 0) {
     // process.stderr rather than the pino logger: the logger is not yet
