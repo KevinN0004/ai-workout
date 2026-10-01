@@ -1,3 +1,8 @@
+/**
+ * Converts between the profile the server stores and the form state that edits
+ * it: personalToProfile for a save (submitProfile in events.js), and
+ * profileToPersonal to seed Settings' form from user.profile.
+ */
 import { splitFullName, toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "./units";
 import { defaultPersonalForm } from "./constants";
 
@@ -60,6 +65,11 @@ export const personalToProfile = (personal, units) => {
   };
 };
 
+/**
+ * The way back: a stored profile as form state, height in both centimetres and
+ * feet and inches, weight in `units.weightUnit` (kg unless "lb"). An absent
+ * value reads as "" (training days as []), except activity, as noted below.
+ */
 export const profileToPersonal = (profile, units) => {
   const { weightUnit = "kg" } = units || {};
   const stored = profile || {};
