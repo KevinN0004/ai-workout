@@ -1,3 +1,9 @@
+/**
+ * Loads a user together with the dashboard collections the API returns: the
+ * user row, then every collection at once, in the response shape the routes
+ * depend on. Each collection is capped here, on read (COLLECTION_LIMITS);
+ * nothing prunes the tables.
+ */
 import { toDateOnly, toIso } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
@@ -5,19 +11,6 @@ import { mapWorkoutSession } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";
 import { mapSavedExercise } from "./savedExerciseRepository.js";
 import { mapGeneratedPlan } from "./generatedPlanRepository.js";
-
-/**
- * Loading a user together with the dashboard collections the API returns.
- *
- * Task 6 of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md, and the
- * end of that plan. This is what remained of services/prismaDataModels.js once
- * every write moved to its own repository: no Mongo operators, no fake model
- * objects, just a six-table fetch and the shape assembly the routes depend on.
- *
- * The `.toObject()` wrapper the old module applied to every returned document
- * is gone -- it existed only so Mongoose-shaped callers could call it, and
- * nothing does any more.
- */
 
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 const toJsonObject = (value) =>
@@ -36,9 +29,8 @@ const mapCalorieEntry = (row = {}) => ({
 });
 
 /**
- * The per-collection limits are the caps the API actually enforces. They are
- * applied here on read rather than in storage, which is why nothing prunes
- * these tables -- see Task 5 in the plan.
+ * The caps the API enforces on each collection. They are applied here, on
+ * read, rather than in storage, so nothing prunes these tables.
  */
 const COLLECTION_LIMITS = {
   workoutSessions: 500,
@@ -49,6 +41,11 @@ const COLLECTION_LIMITS = {
   savedExercises: 200
 };
 
+/**
+ * Maps a user row and its loaded collections to the user document that
+ * authUserService.mapDbDocToUser reads, or null when there is no row. It
+ * carries the password hash and salt, which authUserService verifies against.
+ */
 export const mapUser = (row, related = {}) => {
   if (!row) return null;
   const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
@@ -78,12 +75,21 @@ export const mapUser = (row, related = {}) => {
   };
 };
 
+/**
+ * Builds the user readers over `prisma`: find by id (either form), find by
+ * email ignoring case, and create. Each returns the mapped user, or null when
+ * no user matches.
+ */
 export const createUserReadRepository = ({ prisma }) => {
+  /** One user and every collection, or null only when no user row matches. */
   const loadWithCollections = async (userId) => {
+    // The user row first: its primary key scopes every collection query.
     const user = await prisma.appUser.findFirst({ where: userIdWhere(userId) });
     if (!user) return null;
     const userPk = user.id;
 
+    // Then every collection at once, newest first, each capped by
+    // COLLECTION_LIMITS.
     const [
       workoutSessions,
       calorieEntries,

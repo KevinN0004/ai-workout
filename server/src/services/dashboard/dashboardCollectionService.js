@@ -1,3 +1,18 @@
+/**
+ * The paginated dashboard: one page of each collection, and the dashboard
+ * response that combines those pages with the rest of the stored dashboard.
+ * Built once in index.js over dashboardCollectionRepository's reader.
+ */
+
+/**
+ * Builds the service. Returns the pagination parser and the collection loader
+ * the dashboard read routes use, and `buildDashboardResponse`, which the read
+ * and write routes both answer with.
+ *
+ * @param deps `defaultLimit` and `maxLimit` bound a page's size; index.js reads
+ *   both from the environment. `loadCollectionPage` is the repository reader,
+ *   and `buildDashboard` normalises the stored dashboard.
+ */
 export const createDashboardCollectionService = ({
   cleanText,
   toNullableNumber,
@@ -40,6 +55,7 @@ export const createDashboardCollectionService = ({
   };
 
   const getDashboardCollections = async (user, pagination = {}) => {
+    // No user id: an empty page of each, without a query.
     const userId = cleanText(user?.id, 120);
     if (!userId) {
       return {
@@ -49,6 +65,8 @@ export const createDashboardCollectionService = ({
       };
     }
 
+    // Each collection gets the caller's pagination for it, else the default
+    // first page.
     const workoutPagination = {
       ...parseDashboardPagination({}, defaultLimit),
       ...(pagination.workoutSessions || {})
@@ -62,6 +80,7 @@ export const createDashboardCollectionService = ({
       ...(pagination.progressMetrics || {})
     };
 
+    // All three pages load at once, even for a route that answers with one.
     const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
       toCollectionPage({
         collection: "workoutSessions",

@@ -1,15 +1,14 @@
+/**
+ * Prisma-native persistence for progress metrics: the row mapper the API
+ * returns, and the save.
+ */
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
 /**
- * Prisma-native persistence for progress metrics.
- *
- * First step of the migration described in
- * docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md. The compatibility
- * shim now delegates its ProgressMetric mapping here rather than owning a
- * private copy, so the two cannot drift while both exist.
+ * Maps a progress_metrics row to the metric the API returns. The Decimal
+ * columns read through toNumberOrNull, so an unrecorded reading is null, not 0.
  */
-
 export const mapProgressMetric = (row = {}) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.metricDate),
@@ -21,6 +20,10 @@ export const mapProgressMetric = (row = {}) => ({
   loggedAt: toIso(row.loggedAt)
 });
 
+/**
+ * Builds the progress-metric writer over `prisma`. Returns `saveProgressMetric`,
+ * which the progress-metrics route calls.
+ */
 export const createProgressMetricRepository = ({ prisma }) => {
   /**
    * Inserts a metric, or updates the existing row when one already carries the
@@ -31,8 +34,8 @@ export const createProgressMetricRepository = ({ prisma }) => {
    * unique index (`where legacy_id is not null`). Prisma's schema language
    * cannot express partial indexes, so `upsert` has no constraint to target.
    *
-   * Returns null when the user cannot be resolved, matching what the route
-   * treats as "user not found".
+   * Returns null when the user cannot be resolved, as the other repositories
+   * do. The route does not read it: its own re-read is what answers 404.
    */
   const saveProgressMetric = async ({ userId, metric = {} }) => {
     const userPk = await getUserPk(prisma, userId);

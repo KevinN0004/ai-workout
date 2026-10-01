@@ -1,3 +1,8 @@
+/**
+ * Sentry error tracking, on only when SENTRY_DSN is set. index.js initialises it
+ * at startup, the error middleware reports 5xx errors through it, and the
+ * shutdown handler flushes it.
+ */
 const disabledTracker = () => ({
   enabled: false,
   configured: false,
@@ -22,10 +27,10 @@ const toRate = (value, fallback = 0) => {
 // collects request bodies, cookies, user info and query data by default. Here a
 // request body is a sign-in password or a profile's weight and body fat, and a
 // cookie is a session token. Measured with the real SDK on an error from a POST:
-// with this unset, the password and the weight were both in the event sent.
+// with this unset, the password and the weight are both in the event sent.
 //
 // This is the configuration Sentry's migration guide gives for reproducing v10's
-// default (`sendDefaultPii: false`), which is what this server ran on before.
+// default (`sendDefaultPii: false`).
 const PII_HEADER_DENY = ["forwarded", "-ip", "remote-", "via", "-user"];
 const DATA_COLLECTION = {
   userInfo: false,
@@ -42,7 +47,14 @@ const DATA_COLLECTION = {
   graphQL: { document: false, variables: false }
 };
 
+/**
+ * Loads and initialises the Sentry SDK when SENTRY_DSN is set, and returns the
+ * tracker the app calls: `captureException(error, context)` and
+ * `flush(timeoutMs)`. With no DSN, or when the SDK fails to load or initialise,
+ * both calls do nothing, and `configured` says whether a DSN was set.
+ */
 export const initErrorTracking = async ({ logger, toShortText }) => {
+  // No DSN: tracking stays off.
   const dsn = toShortText(process.env.SENTRY_DSN || "", 500);
   if (!dsn) {
     return {
@@ -73,6 +85,7 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
       "Sentry error tracking initialized."
     );
 
+    // The tracker. Each error is tagged with the request it came from.
     return {
       enabled: true,
       configured: true,
@@ -93,6 +106,7 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
       }
     };
   } catch (err) {
+    // The SDK is missing or failed to initialise: say so, and track nothing.
     logger.warn(
       {
         event: "sentry_init_failed",

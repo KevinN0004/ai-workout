@@ -1,16 +1,16 @@
+/**
+ * Prisma-native persistence for workout sessions: the row mapper the API
+ * returns, and the save.
+ */
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
-/**
- * Prisma-native persistence for workout sessions.
- *
- * Task 2 of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md, and the
- * same shape as progressMetricRepository.js. The compatibility shim delegates
- * its WorkoutSession mapping here rather than keeping a private copy.
- */
-
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
+/**
+ * Maps a workout_sessions row to the session the API returns. `intensityRpe`
+ * is a Decimal column, read through toNumberOrNull.
+ */
 export const mapWorkoutSession = (row = {}) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.workoutDate),
@@ -24,6 +24,10 @@ export const mapWorkoutSession = (row = {}) => ({
   createdAt: toIso(row.createdAt)
 });
 
+/**
+ * Builds the workout-session writer over `prisma`. Returns `saveWorkoutSession`,
+ * which the workout route calls.
+ */
 export const createWorkoutSessionRepository = ({ prisma }) => {
   /**
    * Inserts a session, or updates the existing row carrying the same legacy id

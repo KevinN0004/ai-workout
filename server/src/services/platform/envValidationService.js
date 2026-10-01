@@ -1,9 +1,6 @@
 /**
- * Startup preflight for the process environment.
- *
- * This validates and reports; it does NOT capture or freeze values. Callers keep
- * reading process.env live, because index.test.js mutates GEMINI_API_KEY at
- * runtime and generateRoutes.js reads it per request.
+ * Startup preflight for the process environment: index.js runs validateEnv
+ * before any other module-scope code reads process.env, and exits on any error.
  */
 
 // Every min/max here is meant to match what the corresponding reader in
@@ -52,9 +49,17 @@ const URL_VARS = ["OPEN_METEO_BASE_URL", "OPENAQ_BASE_URL", "WGER_BASE_URL", "ME
 
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === "";
 
+/**
+ * Checks `env` and returns one message per problem, or [] when there is none.
+ *
+ * This validates and reports; it does NOT capture or freeze values. Callers keep
+ * reading process.env live, because index.test.js mutates GEMINI_API_KEY at
+ * runtime and generateRoutes.js reads it per request.
+ */
 export const validateEnv = (env = {}) => {
   const errors = [];
 
+  // Required: a database URL always, and a client origin in production.
   if (isBlank(env.DATABASE_URL) && isBlank(env.POSTGRES_URL)) {
     errors.push("DATABASE_URL (or POSTGRES_URL) is required.");
   }
@@ -63,6 +68,8 @@ export const validateEnv = (env = {}) => {
     errors.push("CLIENT_ORIGIN (or CLIENT_ORIGINS) is required when NODE_ENV=production.");
   }
 
+  // Optional settings, checked only when set: numbers against their bounds,
+  // then the URLs, then the Sentry sample rate.
   for (const { name, min, max } of NUMERIC_VARS) {
     if (isBlank(env[name])) continue;
     const value = Number(env[name]);

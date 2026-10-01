@@ -1,9 +1,24 @@
+/**
+ * Users as the auth layer sees them, and their passwords: lookup and creation
+ * over userReadRepository, argon2id hashing, and verification of argon2id and
+ * legacy pbkdf2 hashes. Built once in index.js.
+ */
 import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";
 
 const pbkdf2Async = promisify(crypto.pbkdf2);
 
+/**
+ * Builds the service. Returns the user lookups and creation the routes and
+ * sessionService call, and the hashing, verification and legacy-hash upgrade
+ * the auth routes call.
+ *
+ * @param deps The three user readers come from userReadRepository and
+ *   `updatePasswordHash` from userRepository. `argon2Options` carries the
+ *   argon2id costs index.js reads from the environment; any it leaves out
+ *   takes the default below.
+ */
 export const createAuthUserService = ({
   cleanText,
   argon2Options,
@@ -19,8 +34,8 @@ export const createAuthUserService = ({
     hashLength = 32
   } = argon2Options || {};
 
-  // `source` used to be `doc.toObject()` when the data layer handed back
-  // Mongoose-shaped documents. Nothing wraps rows like that any more.
+  // Maps a user as userReadRepository returns it to the shape the routes use:
+  // `userId` becomes `id`, and a missing passwordAlgo is inferred from the hash.
   const mapDbDocToUser = (source) => {
     if (!source) return null;
     const inferredAlgo =

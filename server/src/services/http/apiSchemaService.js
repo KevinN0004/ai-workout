@@ -1,3 +1,8 @@
+/**
+ * The zod schemas for the JSON bodies the routes accept, and validateBody, which
+ * a route calls to parse one or answer 400. The closed-set profile fields take
+ * their option lists from dashboardDataBuildersService.
+ */
 import { z } from "zod";
 import {
   allowedActivityValues,
@@ -69,11 +74,10 @@ const profileInputSchema = z
     // Validated as an enum array, not a bounded string array: any item cap
     // that runs ahead of a membership check discards valid entries that
     // happen to sit past the cut, and raising the number only moves the
-    // cliff rather than removing it (7 -> 64 still dropped a valid day at
-    // position 65). z.array(z.enum(...)).max(7) rejects instead -- an
-    // unknown day or more than seven entries is a 400, consistent with every
-    // other closed-set field in this schema, and there is no slice step left
-    // to get wrong.
+    // cliff rather than removing it. z.array(z.enum(...)).max(7) rejects
+    // instead -- an unknown day or more than seven entries is a 400,
+    // consistent with every other closed-set field in this schema, and there
+    // is no slice step to get wrong.
     trainingDays: z.array(z.enum(allowedTrainingDayValues)).max(7).optional()
   })
   .passthrough();
@@ -210,6 +214,10 @@ export const generatePlanBodySchema = z
   })
   .passthrough();
 
+/**
+ * The first issue in a zod error as `path: message`, cut to 240 characters. The
+ * path is "request" when the issue names none.
+ */
 export const getValidationMessage = (error) => {
   const issue = error?.issues?.[0];
   if (!issue) return "Invalid request body.";
@@ -217,6 +225,11 @@ export const getValidationMessage = (error) => {
   return `${path}: ${issue.message}`.trim().slice(0, 240) || "Invalid request body.";
 };
 
+/**
+ * Parses `req.body` with `schema`, in zod 3's wording (validationMessages.js),
+ * and returns the parsed data. On failure it answers 400 with the first issue
+ * and returns null, so the route returns as soon as this does.
+ */
 export const validateBody = (req, res, schema) => {
   const result = schema.safeParse(req.body || {}, { error: validationMessage });
   if (result.success) return result.data;

@@ -1,8 +1,18 @@
+/**
+ * Request input to stored values: the text and number coercions, the option
+ * lists the profile accepts, the defaults, and one builder per entry a route
+ * saves. index.js hands these to the routes; apiSchemaService reads the lists.
+ */
 import crypto from "crypto";
 
+/** Trims a string and cuts it to `maxLen`; anything that is not a string is "". */
 export const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+/**
+ * A finite number within [min, max], or null. Absent input (null, undefined,
+ * "") is null rather than the 0 `Number()` would make it.
+ */
 export const toNullableNumber = (value, min, max) => {
   if (value === null || value === undefined || value === "") return null;
   const num = Number(value);
@@ -11,12 +21,20 @@ export const toNullableNumber = (value, min, max) => {
   return num;
 };
 
+/**
+ * Cleans a list of strings, or a single string, with cleanText: empties are
+ * dropped and the first `maxItems` kept.
+ */
 export const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
   (Array.isArray(value) ? value : [value])
     .map((item) => cleanText(item, maxLen))
     .filter(Boolean)
     .slice(0, maxItems);
 
+/**
+ * Like toCleanArray, but each item may be a string or an object carrying a
+ * `name`, and anything that is not an array gives [].
+ */
 export const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
   (Array.isArray(value) ? value : [])
     .map((item) => cleanText(typeof item === "string" ? item : item?.name, maxLen))
@@ -25,8 +43,7 @@ export const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
 
 export const allowedSexValues = ["Female", "Male", "Non-binary", "Prefer not to say"];
 export const allowedActivityValues = ["Light", "Moderate", "High", "Very high"];
-// Reinstated from commit c2c820f, which removed it as dead code. It is live
-// again because the profile now carries a goal and the planner seeds from it.
+// The profile's goal, which the client's planner form is seeded from.
 export const allowedGoalValues = [
   "Build lean strength and energy",
   "Fat loss + conditioning",
@@ -35,9 +52,10 @@ export const allowedGoalValues = [
   "Cardio"
 ];
 // sleep, experience, nutrition and cardio are closed-set <select> dropdowns in
-// HomePersonalStage.jsx, not free text -- useBodyModel.js looks each one up in
-// an exact-match lowercased map, same as sex/activity/goal above. Validated
-// the same way. timeline stays cleanText: it is a placeholder text input.
+// HomePersonalStage.jsx, not free text, and useBodyModel.js looks each one up
+// in an exact-match lowercased map -- so they are validated as closed sets,
+// like sex, activity and goal above. timeline stays cleanText: it is a
+// free-text input.
 export const allowedSleepValues = ["Less than 4", "4 - 6 hours", "7 - 8 hours", "More than 8"];
 export const allowedExperienceValues = ["Beginner", "Intermediate", "Advanced"];
 export const allowedNutritionValues = [
@@ -48,10 +66,9 @@ export const allowedNutritionValues = [
   "Vegetarian",
   "Vegan"
 ];
-// Includes "Mixed": the cardio <select> in HomePersonalStage.jsx has 8 options,
-// not 7, and useBodyModel.js's cardioScore map scores "mixed" at 0.7 alongside
-// the other seven. Omitting it here would silently drop a legitimate value --
-// the exact bug class this task exists to close.
+// Includes "Mixed": the cardio <select> in HomePersonalStage.jsx offers it, and
+// useBodyModel.js's cardioScore map scores it. Omitting it here would silently
+// drop a legitimate value.
 export const allowedCardioValues = [
   "None",
   "Walking",
@@ -82,6 +99,10 @@ const allowedNutritions = new Set(allowedNutritionValues);
 const allowedCardios = new Set(allowedCardioValues);
 const allowedMealTypes = new Set(allowedMealTypeValues);
 
+/**
+ * A blank profile, stamped now. Every field is empty or null except `activity`,
+ * which starts at "Moderate".
+ */
 export const defaultProfile = () => ({
   firstName: "",
   lastName: "",
@@ -103,12 +124,17 @@ export const defaultProfile = () => ({
   updatedAt: new Date().toISOString()
 });
 
+/**
+ * The goals a new dashboard starts with, and the fallback buildDashboard uses
+ * for any goal that is absent or out of range.
+ */
 export const defaultGoals = () => ({
   targetWeight: 160,
   targetCalories: 2200,
   weeklyWorkouts: 3
 });
 
+/** An empty dashboard: every list empty, and the default goals. */
 export const defaultDashboard = () => ({
   workouts: [],
   workoutSessions: [],
@@ -120,6 +146,11 @@ export const defaultDashboard = () => ({
   goals: defaultGoals()
 });
 
+/**
+ * Normalises a stored dashboard for a response: each list becomes an array,
+ * most of them capped, and each goal falls back to its default when absent or
+ * out of range.
+ */
 export const buildDashboard = (input = {}) => {
   const base = defaultDashboard();
   const goals = input.goals || {};
@@ -146,6 +177,12 @@ export const buildDashboard = (input = {}) => {
   };
 };
 
+/**
+ * The workout session the workout route saves, built from a validated body.
+ * Each field is cleaned or range-checked, `rpe` is accepted for
+ * `intensityRpe`, an id is minted when the body has none, and `createdAt` is
+ * now.
+ */
 export const buildWorkoutSessionEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
   date: cleanText(input.date, 20),
@@ -159,6 +196,11 @@ export const buildWorkoutSessionEntry = (input = {}) => ({
   createdAt: new Date().toISOString()
 });
 
+/**
+ * The meal the meal-log route saves, built from a validated body. An unknown
+ * `mealType` becomes "other", an id is minted when the body has none, and
+ * `loggedAt` is now.
+ */
 export const buildMealLogEntry = (input = {}) => {
   const mealTypeRaw = cleanText(input.mealType, 40).toLowerCase();
   return {
@@ -175,6 +217,11 @@ export const buildMealLogEntry = (input = {}) => {
   };
 };
 
+/**
+ * The metric the progress-metrics route saves, built from a validated body.
+ * A reading out of range becomes null, an id is minted when the body has none,
+ * and `loggedAt` is now.
+ */
 export const buildProgressMetricEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
   date: cleanText(input.date, 20),
@@ -186,6 +233,11 @@ export const buildProgressMetricEntry = (input = {}) => ({
   loggedAt: new Date().toISOString()
 });
 
+/**
+ * The exercise the saved-exercise route saves, built from a validated body.
+ * Muscles and equipment may arrive as names or as objects carrying one,
+ * `source` is always "wger", and `savedAt` is now.
+ */
 export const buildSavedExerciseEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
   exerciseId: toNullableNumber(input.exerciseId, 1, 10000000),
@@ -200,6 +252,12 @@ export const buildSavedExerciseEntry = (input = {}) => ({
   savedAt: new Date().toISOString()
 });
 
+/**
+ * A complete profile built from `input`: a signup body's profile, or for an
+ * update the stored profile with the update spread over it. A full name is
+ * split into first and last when they are not given, an option outside its list
+ * falls back to its default, and `updatedAt` is now.
+ */
 export const buildProfile = (input = {}) => {
   const base = defaultProfile();
   const rawName = cleanText(input.name, 80);
@@ -230,10 +288,10 @@ export const buildProfile = (input = {}) => {
     // Iterate the seven canonical days rather than the input array, with no
     // cap on the input at all: the result is bounded and deduped by
     // construction because it can only ever contain the seven canonical
-    // names. Capping the raw input first (this line has tried both 7 and 64)
-    // just slices it ahead of this membership check, silently discarding a
-    // valid day that happens to sit past the cut. Input size is already
-    // bounded upstream by express's request body limit.
+    // names. Capping the raw input first just slices it ahead of this
+    // membership check, silently discarding a valid day that happens to sit
+    // past the cut. Input size is already bounded upstream by express's
+    // request body limit.
     trainingDays: allowedTrainingDayValues.filter((day) =>
       (Array.isArray(input.trainingDays) ? input.trainingDays : []).some(
         (entry) => cleanText(entry, 20) === day
@@ -243,6 +301,10 @@ export const buildProfile = (input = {}) => {
   };
 };
 
+/**
+ * Whether a built profile has what signup requires: first and last name, age,
+ * height, weight and sex.
+ */
 export const isCompleteSignupProfile = (profile) =>
   Boolean(
     cleanText(profile?.firstName, 40) &&
