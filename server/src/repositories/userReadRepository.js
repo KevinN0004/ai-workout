@@ -76,9 +76,9 @@ export const mapUser = (row, related = {}) => {
 };
 
 /**
- * Builds the user readers over `prisma`: find by id (either form), find by
- * email ignoring case, and create. Each returns the mapped user, or null when
- * no user matches.
+ * Builds the user reads over `prisma`: find by id (either form) and by email
+ * ignoring case, each returning the mapped user or null, and create, which
+ * returns the new user loaded the same way.
  */
 export const createUserReadRepository = ({ prisma }) => {
   /** One user and every collection, or null only when no user row matches. */

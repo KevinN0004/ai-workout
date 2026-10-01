@@ -29,8 +29,9 @@ const toRate = (value, fallback = 0) => {
 // cookie is a session token. Measured with the real SDK on an error from a POST:
 // with this unset, the password and the weight are both in the event sent.
 //
-// This is the configuration Sentry's migration guide gives for reproducing v10's
-// default (`sendDefaultPii: false`).
+// This is the configuration Sentry's v10-to-v11 migration guide gives for
+// keeping v10's default (`sendDefaultPii: false`), deny list included, plus
+// `queues: false`, which the guide's block leaves out.
 const PII_HEADER_DENY = ["forwarded", "-ip", "remote-", "via", "-user"];
 const DATA_COLLECTION = {
   userInfo: false,
@@ -54,7 +55,6 @@ const DATA_COLLECTION = {
  * both calls do nothing, and `configured` says whether a DSN was set.
  */
 export const initErrorTracking = async ({ logger, toShortText }) => {
-  // No DSN: tracking stays off.
   const dsn = toShortText(process.env.SENTRY_DSN || "", 500);
   if (!dsn) {
     return {

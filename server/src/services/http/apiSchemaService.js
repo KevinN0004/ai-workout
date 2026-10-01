@@ -228,7 +228,7 @@ export const getValidationMessage = (error) => {
 /**
  * Parses `req.body` with `schema`, in zod 3's wording (validationMessages.js),
  * and returns the parsed data. On failure it answers 400 with the first issue
- * and returns null, so the route returns as soon as this does.
+ * and returns null, so a route must return as soon as this returns null.
  */
 export const validateBody = (req, res, schema) => {
   const result = schema.safeParse(req.body || {}, { error: validationMessage });

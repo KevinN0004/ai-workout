@@ -16,13 +16,11 @@ const globalPrisma = globalThis.__aiWorkoutPrismaClient;
 // The session timezone is UTC, and it is set by the DATABASE rather than here
 // -- see server/db/postgres/003_utc_timezone.sql.
 //
-// Do not add `options: "-c timezone=UTC"` to this connection. That works
-// against a direct Postgres connection and **fails against a pooled one**:
-// PgBouncer tracks only client_encoding, datestyle, timezone and
-// standard_conforming_strings in startup packets and errors on anything else,
-// and `options` is not on that list. Every managed Postgres worth deploying on
-// fronts the database with exactly that, so the parameter is a deploy blocker
-// that a local setup without a pooler never shows.
+// Do not add `options: "-c timezone=UTC"` to this connection. A direct
+// Postgres connection accepts it, but a pooler may not: PgBouncer before 1.20
+// by default rejects any startup parameter it does not track, `options`
+// included, and managed poolers vary. A pooled deploy would then fail to connect while a
+// local setup without one never shows it.
 //
 // If the timezone is ever wrong, the database default is the thing to check
 // -- `show timezone` on a new connection --  and prisma.test.js asserts it on
@@ -48,7 +46,9 @@ if (process.env.NODE_ENV !== "production") {
  * Calls `$connect()` and returns the client. Over the pg driver adapter that
  * opens no connection -- it resolves even when the database is unreachable --
  * so the startup check that fails fast is connectPostgres, which index.js
- * runs first.
+ * runs first. Its failure aborts startup only when POSTGRES_STARTUP_REQUIRED is
+ * on, which it is by default in production; otherwise the server starts
+ * degraded.
  */
 export const connectPrisma = async () => {
   await prisma.$connect();

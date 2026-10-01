@@ -1,6 +1,7 @@
 /**
- * Resolves an application user id, either form of it, to the user row. Every
- * repository resolves a user id through these two functions.
+ * Resolves an application user id, either form of it, into a Prisma `where`
+ * (userIdWhere) or the primary key (getUserPk). Every repository resolves a
+ * user id through these two functions.
  */
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -83,9 +83,10 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
     const { Pool } = await import("pg");
     postgresPool = new Pool({
       connectionString: config.databaseUrl,
-      // No `options: "-c timezone=UTC"` here, deliberately -- PgBouncer rejects
-      // that startup parameter and this pool is what applies the migrations, so
-      // carrying it would make the schema unreachable on any pooled database.
+      // No `options: "-c timezone=UTC"` here, deliberately -- a pooler may
+      // reject that startup parameter (PgBouncer before 1.20 does by default),
+      // and this pool is what applies the migrations, so carrying it could make
+      // the schema unreachable on a pooled database.
       // UTC comes from the database default instead; see
       // server/db/postgres/003_utc_timezone.sql.
       ssl: config.ssl

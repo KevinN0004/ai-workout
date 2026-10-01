@@ -1,7 +1,8 @@
 /**
  * Request input to stored values: the text and number coercions, the option
- * lists the profile accepts, the defaults, and one builder per entry a route
- * saves. index.js hands these to the routes; apiSchemaService reads the lists.
+ * lists the profile accepts, the defaults, and a builder for each of the
+ * workout, meal, metric, saved-exercise and profile bodies. index.js hands
+ * these to the routes; apiSchemaService reads the lists.
  */
 import crypto from "crypto";
 

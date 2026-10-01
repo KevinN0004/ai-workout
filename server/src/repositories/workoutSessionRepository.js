@@ -9,7 +9,8 @@ const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
 /**
  * Maps a workout_sessions row to the session the API returns. `intensityRpe`
- * is a Decimal column, read through toNumberOrNull.
+ * is a Decimal column, read through toNumberOrNull, so an unrecorded RPE is
+ * null, not 0.
  */
 export const mapWorkoutSession = (row = {}) => ({
   id: row.legacyId || row.id,

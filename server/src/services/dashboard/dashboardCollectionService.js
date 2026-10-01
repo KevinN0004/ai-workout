@@ -9,8 +9,9 @@
  * the dashboard read routes use, and `buildDashboardResponse`, which the read
  * and write routes both answer with.
  *
- * @param deps `defaultLimit` and `maxLimit` bound a page's size; index.js reads
- *   both from the environment. `loadCollectionPage` is the repository reader,
+ * @param deps `defaultLimit` is a page's size when the caller names none, and a
+ *   requested size above `maxLimit` falls back to it; index.js reads both from
+ *   the environment. `loadCollectionPage` is the repository reader,
  *   and `buildDashboard` normalises the stored dashboard.
  */
 export const createDashboardCollectionService = ({

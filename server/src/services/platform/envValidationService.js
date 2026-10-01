@@ -1,6 +1,7 @@
 /**
  * Startup preflight for the process environment: index.js runs validateEnv
- * before any other module-scope code reads process.env, and exits on any error.
+ * (outside the test suites) before its own module-scope reads of process.env,
+ * and exits on any error. Imported modules such as prisma.js read it earlier.
  */
 
 // Every min/max here is meant to match what the corresponding reader in
@@ -8,9 +9,10 @@
 // reasonable in isolation -- a floor the reader silently discards (falling
 // back to its default) is worse than no floor: it tells the operator their
 // setting took effect when it did not. Check the call site before changing
-// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST additionally have to
-// clear argon2's own library-enforced minimums (timeCost >= 2, memoryCost
-// >= 1024), which are stricter than what toPositiveInt alone would require.
+// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST carry floors stricter than
+// toPositiveInt's. They are this app's floors, not limits argon2 enforces (the
+// library accepts lower costs), so lowering one is a security decision, not a
+// compatibility one.
 const NUMERIC_VARS = [
   { name: "PORT", min: 1, max: 65535 },
   { name: "SHUTDOWN_TIMEOUT_MS", min: 1 },
@@ -59,7 +61,6 @@ const isBlank = (value) => value === undefined || value === null || String(value
 export const validateEnv = (env = {}) => {
   const errors = [];
 
-  // Required: a database URL always, and a client origin in production.
   if (isBlank(env.DATABASE_URL) && isBlank(env.POSTGRES_URL)) {
     errors.push("DATABASE_URL (or POSTGRES_URL) is required.");
   }

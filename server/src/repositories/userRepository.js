@@ -90,9 +90,10 @@ export const createUserRepository = ({ prisma }) => {
 
   /**
    * Inserts a calorie entry, or updates the existing row with the same legacy
-   * id. The calories route mints a fresh uuid per submission, so every call it
-   * makes inserts; the update arm serves a caller that passes back an id that
-   * is already stored.
+   * id. Its one caller, the calories route, mints a fresh uuid per submission,
+   * so every call inserts today; the update arm keeps a repeated id from
+   * colliding with calorie_entries_user_legacy_idx, as the workout, meal and
+   * metric saves do with theirs.
    */
   const saveCalorieEntry = async ({ userId, entry = {} }) => {
     const userPk = await getUserPk(prisma, userId);

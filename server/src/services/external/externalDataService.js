@@ -13,7 +13,9 @@
  *   upstream takes a base URL, a timeout in ms and a cache TTL in seconds.
  *   `openAqApiKey` is required for OpenAQ, `wgerApiToken` is optional, and
  *   `wgerDefaultLanguage` is the wger language id used when none is asked for.
- *   A request that fails retriably is retried up to `externalApiRetries` times.
+ *   A request that times out, fails on the network or fails with a 5xx status
+ *   is retried up to `externalApiRetries` times, the wait doubling each time
+ *   from `externalApiRetryBaseDelayMs`.
  */
 export const createExternalDataService = ({
   cleanText,
@@ -399,8 +401,12 @@ export const createExternalDataService = ({
     if (pm25 === null || pm25 === undefined || pm25 === "") return null;
     const value = Number(pm25);
     if (!Number.isFinite(value) || value < 0) return null;
-    // The US EPA's PM2.5 breakpoints: each band maps a concentration range in
-    // ug/m3 linearly onto an AQI range.
+    // The US EPA's PM2.5 breakpoints as they stood before its 2024 revision,
+    // which lowered the top of Good and moved the Unhealthy, Very unhealthy and
+    // Hazardous bands; this table has not been updated. Each band maps a
+    // concentration range in ug/m3 linearly onto an AQI range. The EPA truncates
+    // a reading to one decimal first; this does not, so a value in the gap
+    // between two bands falls through to 500.
     const points = [
       { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
       { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
@@ -589,7 +595,6 @@ export const createExternalDataService = ({
             throw err;
           }
 
-          // Build the URL, leaving absent query values off.
           const base = mealDbBaseUrl.replace(/\/+$/, "");
           const path = String(endpoint || "").replace(/^\/+/, "");
           const url = new URL(`${base}/${path}`);

@@ -11,7 +11,8 @@ const pbkdf2Async = promisify(crypto.pbkdf2);
 
 /**
  * Builds the service. Returns the user lookups and creation the routes and
- * sessionService call, and the hashing, verification and legacy-hash upgrade
+ * sessionService call, mapDbDocToUser, which the routes apply to a user they
+ * re-read after a write, and the hashing, verification and legacy-hash upgrade
  * the auth routes call.
  *
  * @param deps The three user readers come from userReadRepository and
@@ -35,7 +36,8 @@ export const createAuthUserService = ({
   } = argon2Options || {};
 
   // Maps a user as userReadRepository returns it to the shape the routes use:
-  // `userId` becomes `id`, and a missing passwordAlgo is inferred from the hash.
+  // `userId` becomes `id`, and a missing passwordAlgo, which only a hand-built
+  // source can have, is inferred from the hash.
   const mapDbDocToUser = (source) => {
     if (!source) return null;
     const inferredAlgo =

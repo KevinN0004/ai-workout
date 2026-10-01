@@ -20,8 +20,8 @@ export const toDateOnly = (value) => {
 
 /**
  * The Date to write to a `@db.Date` column: the first ten characters of a
- * `YYYY-MM-DD` string, as UTC midnight. Null when there is no string. It does
- * not validate, so a malformed string becomes an Invalid Date.
+ * `YYYY-MM-DD` string, as UTC midnight. Null when there is no string or it is
+ * blank. It does not validate, so a malformed string becomes an Invalid Date.
  */
 export const dateOnlyToDate = (value) => {
   const raw = typeof value === "string" ? value.trim().slice(0, 10) : "";

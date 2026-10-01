@@ -1,6 +1,7 @@
 /**
- * The error response for route handlers that catch their own errors: the whole
- * error is logged, and the response carries a masked message and the request id.
+ * The error response for route handlers that catch their own errors: the
+ * unmasked message is logged (no stack), and the response carries a masked
+ * message and the request id. Nothing here reports to error tracking.
  */
 const GENERIC_SERVER_ERROR = "Server error.";
 
