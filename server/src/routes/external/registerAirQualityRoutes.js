@@ -120,8 +120,9 @@ export const registerAirQualityRoutes = (app, deps) => {
         }))
       });
     } catch (err) {
-      // A 5xx, including a missing OPENAQ_API_KEY (503) and any error with no
-      // status, answers 200 with an "Unknown" reading that advises indoor training.
+      // An outage (any status isUpstreamFailureStatus accepts, which includes a
+      // missing OPENAQ_API_KEY; an error with no status counts as 500) answers
+      // 200 with an "Unknown" reading that advises indoor training.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({

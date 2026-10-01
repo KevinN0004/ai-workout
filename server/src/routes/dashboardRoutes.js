@@ -5,7 +5,7 @@
 import { registerDashboardReadRoutes } from "./dashboard/registerDashboardReadRoutes.js";
 import { registerDashboardWriteRoutes } from "./dashboard/registerDashboardWriteRoutes.js";
 
-/** Registers every /api/dashboard route, reads first, then writes. All require a session. */
+/** Registers every /api/dashboard route, reads and writes. All require a session. */
 export const registerDashboardRoutes = (app, deps) => {
   registerDashboardReadRoutes(app, deps);
   registerDashboardWriteRoutes(app, deps);

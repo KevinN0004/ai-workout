@@ -8,8 +8,8 @@ import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 /**
  * Registers the meal-search route. The search text arrives as `query` or `q`,
- * and at most `limit` meals come back (8 by default). An upstream failure
- * answers 200 with no meals and `fallback: true`.
+ * and at most `limit` meals come back (8 by default). An outage answers 200
+ * with no meals and `fallback: true`; an upstream 4xx is answered as an error.
  */
 export const registerMealDbRoutes = (app, deps) => {
   const { mealDbRequest, mapMealDbMeal, cleanText, isUpstreamFailureStatus } = deps;

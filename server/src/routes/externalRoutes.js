@@ -9,8 +9,10 @@ import { registerWgerRoutes } from "./external/registerWgerRoutes.js";
 
 /**
  * Registers the weather, air-quality, wger and TheMealDB routes. None requires
- * a session, and each answers an upstream failure with a 200 fallback payload
- * rather than an error.
+ * a session. A failure the cache cannot cover with a stale copy goes one of two
+ * ways: an outage (an upstream 5xx, a timeout, a missing OpenAQ key, or an
+ * error with no status) answers 200 with a fallback payload, and an upstream
+ * 4xx, such as a 429, is answered as that error.
  */
 export const registerExternalRoutes = (app, deps) => {
   registerWeatherRoutes(app, deps);

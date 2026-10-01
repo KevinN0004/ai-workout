@@ -7,10 +7,10 @@ import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 // `is_day` is a 0/1 flag rather than a measurement, so it does not go through
 // `toFiniteNumber` -- but it needs the same absent guard for the same reason.
-// `Number(null)` is 0 and `0 === 1` is false, so a payload carrying no daylight
-// reading published a confident "night", while `weatherCode` beside it
-// correctly reported null and the upstream-failure branch of this same route
-// already reported `isDay: null`.
+// `Number(null)` is 0 and `0 === 1` is false, so without the guard a payload
+// whose readings are all null would report a confident "night" beside a null
+// `weatherCode`, and disagree with the fallback branch, which reports
+// `isDay: null`.
 //
 // A value that is present but is not the flag (2, "yes") is still an answer,
 // and it is still not daytime.
@@ -51,7 +51,8 @@ export const registerWeatherRoutes = (app, deps) => {
           "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day"
       });
 
-      // Respond in the API's own field names, which carry the units.
+      // Rename Open-Meteo's fields to this API's, whose names carry the units
+      // (temperatureC, windSpeedKmh).
       const current = data?.current || {};
       res.json({
         cache,
@@ -73,7 +74,8 @@ export const registerWeatherRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      // A 5xx, or any error with no status, answers 200 with every reading null.
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with every reading null.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({
@@ -158,8 +160,9 @@ export const registerWeatherRoutes = (app, deps) => {
         daily
       });
     } catch (err) {
-      // A 5xx, or any error with no status, answers 200 with every reading null,
-      // no forecast, and a recommendation to train indoors.
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with every reading null, no forecast,
+      // and a recommendation to train indoors.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({

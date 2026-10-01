@@ -9,7 +9,8 @@ import { sendErrorResponse } from "../../../services/http/errorResponseService.j
  * Registers POST /api/dashboard/workouts (also answered at
  * /api/dashboard/workout-sessions), /api/dashboard/calories and
  * /api/dashboard/goals. All three require a session and answer with the
- * refreshed dashboard.
+ * refreshed dashboard; the workout route adds the saved session as
+ * `workoutSession`.
  */
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {

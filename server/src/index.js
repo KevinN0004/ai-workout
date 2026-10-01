@@ -1,7 +1,7 @@
 /**
- * The API server's bootstrap: reads the environment, builds the Express app,
- * wires every repository and service into the routes, and exports `app` for
- * the test suites and `startServer` for the entry-point guard at the bottom.
+ * The API server's bootstrap: reads the environment, builds the Express app and
+ * wires every repository and service into the routes. Exports `app` for the
+ * test suites; the guard at the bottom runs `startServer` only outside them.
  */
 import { existsSync } from "fs";
 import express from "express";
@@ -86,10 +86,11 @@ dotenv.config({ quiet: true });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Must run before any other module-scope code reads process.env below
-  // (the pino logger, argon2 options, the port, ~30 vars in all) -- a
-  // check that runs after those reads is not a preflight, it is a report
-  // filed after the crash. Kept in its own guard so the suite, which
-  // imports `app` from this module, never trips a fatal env check.
+  // (the pino logger, argon2 options, the port, every base URL, and most of
+  // the limits and timeouts) -- a check that runs after those reads is not a
+  // preflight, it is a report filed after the crash. Kept in its own guard so
+  // the suite, which imports `app` from this module, never trips a fatal env
+  // check.
   const envErrors = validateEnv(process.env);
   if (envErrors.length > 0) {
     // process.stderr rather than the pino logger: the logger is not yet
@@ -125,8 +126,8 @@ const defaultRedactedLogPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
   "req.headers.x-csrf-token",
-  // Guards /api/metrics. Belongs here with the other credential headers --
-  // it was the one bearer token the list missed.
+  // The /api/metrics token: a credential like the three headers above, so it is
+  // redacted with them.
   "req.headers.x-metrics-token",
   "authorization",
   "cookie",
@@ -256,10 +257,9 @@ const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
-// Guards before it coerces. The `> 0` below already rejected the 0 that
-// `Number(null)` and `Number("")` produce, so this changes no answer -- it just
-// stops the safety being a side effect of the range. A later helper copying
-// this shape for a range that includes 0 would not have been so lucky.
+// Guards before it coerces. The `> 0` below would also reject the 0 that
+// `Number(null)` and `Number("")` produce, but only by accident of the range;
+// a copy of this shape for a range that includes 0 needs the guard to be right.
 const toPositiveInt = (value, fallback) => {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
@@ -491,7 +491,7 @@ const { parseDashboardPagination, getDashboardCollections, buildDashboardRespons
 
 // ---- Rate limiters ----------------------------------------------------------
 // Counters live in Redis when it is up, so they survive a restart or the free
-// tier's 15-minute idle spin-down -- the same reason sessions moved off memory.
+// tier's 15-minute idle spin-down -- which is also why sessions are kept there.
 // Each limiter gets its own store and prefix so their counts stay separate, and
 // each falls back to memory on its own if Redis is unavailable.
 const rateLimitStore = (scope) =>
@@ -850,6 +850,7 @@ export const __testables = {
   parseEnvBoolean
 };
 
+// ---- Entry point ------------------------------------------------------------
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startServer();
 }

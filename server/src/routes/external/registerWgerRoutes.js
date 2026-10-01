@@ -77,7 +77,8 @@ export const registerWgerRoutes = (app, deps) => {
         equipment
       });
     } catch (err) {
-      // A 5xx, or any error with no status, answers 200 with empty lists.
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with empty lists.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({
@@ -148,8 +149,9 @@ export const registerWgerRoutes = (app, deps) => {
         exercises
       });
     } catch (err) {
-      // A 5xx, or any error with no status, answers 200 with no exercises and
-      // the request's paging echoed back.
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with no exercises and the request's
+      // paging echoed back.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         const queryInput =
@@ -186,7 +188,7 @@ export const registerWgerRoutes = (app, deps) => {
       const language = queryInput.language ?? wgerDefaultLanguage;
 
       // Ask in the requested language first. If that finds nothing, ask again
-      // with no language filter; both lookups are reported in `cache.attempts`.
+      // with no language filter; each lookup is reported in `cache.attempts`.
       let response = await wgerRequest("exerciseinfo/", {
         query: {
           id: Math.trunc(id),
@@ -215,7 +217,8 @@ export const registerWgerRoutes = (app, deps) => {
         exercise: mapWgerExercise(source, language)
       });
     } catch (err) {
-      // A 5xx, or any error with no status, answers 200 with a null exercise.
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with a null exercise.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({

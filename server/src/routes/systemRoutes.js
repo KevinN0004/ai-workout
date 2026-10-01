@@ -1,7 +1,8 @@
 /**
  * The operational endpoints, none of which needs a session: liveness,
- * readiness, request and cache metrics behind a token, and the CSRF token for a
- * client with no cookie to read it from. Registered by registerApiRoutes.
+ * readiness, request, cache and upstream metrics (never public in production;
+ * see metricsGuard), and the CSRF token for a client with no cookie to read it
+ * from. Registered by registerApiRoutes.
  */
 import crypto from "crypto";
 
@@ -109,9 +110,8 @@ export const registerSystemRoutes = (app, deps) => {
     return res.status(503).json(payload);
   });
 
-  // Unauthenticated, this reported authFailures, per-route latency and request
-  // totals to anyone who asked -- enough for someone brute-forcing a password
-  // to watch their own attempts land, and enough to map the route surface.
+  // The payload maps the route surface (per-route latency and request totals)
+  // and counts rate-limited requests live, so it is not for the open internet.
   //
   // Secure by default rather than opt-in: with no METRICS_TOKEN set it stays
   // open in development, where it is a debugging convenience and the process is

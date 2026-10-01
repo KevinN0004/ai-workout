@@ -24,9 +24,10 @@ export const registerDashboardReadRoutes = (app, deps) => {
     }
   });
 
-  // One page of one collection each. `limit` and `offset` are validated here and
-  // defaulted by parseDashboardPagination, and the response carries the page's
-  // total so the caller can ask for the next one.
+  // One page of one collection each. `limit` and `offset` are validated here
+  // and defaulted by parseDashboardPagination. `pagination.total` counts the
+  // user's whole collection, not the page, so the caller can tell whether there
+  // is another page to ask for.
   app.get("/api/dashboard/workout-sessions", requireAuth, async (req, res) => {
     try {
       const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);

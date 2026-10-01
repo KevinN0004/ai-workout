@@ -9,8 +9,9 @@ import { sendErrorResponse } from "../services/http/errorResponseService.js";
 /**
  * Registers the account routes on `app`, taking the session helpers, user
  * repositories and password functions from the shared `deps` object. Every
- * failed password check counts toward `metrics.authFailures`, and signup and
- * login both start a session that defaults to "remember me".
+ * failed password check counts toward `metrics.authFailures`, which nothing
+ * reports at present. Signup and login both start a session that defaults to
+ * "remember me".
  */
 export const registerAuthRoutes = (app, deps) => {
   const {

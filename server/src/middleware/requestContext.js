@@ -20,7 +20,7 @@ const sanitizeRoutePath = (req) => {
 };
 
 /**
- * Builds the middleware. It reuses the caller's `X-Request-Id` (trimmed to 128
+ * Builds the middleware. It reuses the caller's `X-Request-Id` (cut to 128
  * characters) or mints a UUID, echoes the id on the response, and counts the
  * request in `metrics.requestsTotal`. When the response finishes it records the
  * latency overall and per matched route, and logs one `http_request` line.

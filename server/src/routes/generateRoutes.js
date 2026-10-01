@@ -6,9 +6,10 @@
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 
-// Keys here and in COMMERCIAL_ACCESS_CAPABILITY_MAP are the planner's equipment
-// labels (equipmentOptionsByEnv in client/src/app/constants.js), lower-cased;
-// values are the capabilities the prompt tells the model each one provides.
+// Keys are equipment labels, lower-cased: those the planner offers
+// (equipmentOptionsByEnv in client/src/app/constants.js), plus, in the
+// commercial map, the older labels marked below, which a request can still
+// send. Values are the capabilities the prompt tells the model each provides.
 const HOME_ACCESS_CAPABILITY_MAP = {
   "bodyweight only": ["bodyweight training", "mobility work", "floor/core work"],
   dumbbells: ["dumbbells", "unilateral strength work", "hypertrophy accessories"],
@@ -141,8 +142,7 @@ export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
  * Registers POST /api/generate.
  *
  * @param deps `gemini` is the Gemini client, or null when GEMINI_API_KEY is
- *   unset; `saveGeneratedPlan` stores the plan for a caller that
- *   attachOptionalUser (mounted in index.js) has put on `req.user`.
+ *   unset.
  */
 export const registerGenerateRoutes = (app, deps) => {
   const {
@@ -220,9 +220,9 @@ export const registerGenerateRoutes = (app, deps) => {
           plan
         };
 
-        // Always an insert: the dashboard orders plans newest first and keeps
-        // 200 when it reads them. The entry built here is returned instead when
-        // the user cannot be resolved.
+        // Always an insert: the dashboard orders plans newest first and caps how
+        // many it reads (userReadRepository.js). The entry built here is returned
+        // instead when the user cannot be resolved.
         savedPlan =
           (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry })) || planEntry;
       }
