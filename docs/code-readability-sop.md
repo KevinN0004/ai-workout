@@ -50,6 +50,12 @@ prose: what it is for, what it returns, and anything it assumes.
   noise. `// cleared before the request so a retry never shows the last error` is not.
 - **An `eslint-disable` carries its reason** in the comment above it, as every existing one
   does.
+- **Every claim is checked against the code it names**, including code in other files,
+  before it is written. A comment that says something the code does not do is worse than
+  none, and none of the scanners can catch one.
+- **No numbers that live elsewhere.** A cap, a count or a line number defined in another
+  file changes without the comment noticing. Name where it lives instead: "capped on read
+  by userReadRepository", not "capped at 200".
 
 ### 4. Present tense
 
