@@ -1,8 +1,8 @@
 /**
- * Sessions and CSRF: the session store (Redis when it is configured and connects
- * at startup, memory otherwise, chosen once; only a failed Redis write still
- * falls back to memory), the session and CSRF cookies, and the middleware that
- * requires a signed-in user or a matching CSRF token. Built once in index.js.
+ * Sessions and CSRF: the session store (Redis if configured and connected at
+ * startup, else memory, chosen once; a session whose Redis write fails lands in
+ * memory, which reads then never consult), the session and CSRF cookies, and the
+ * middleware requiring a signed-in user or a matching CSRF token. Built in index.js.
  */
 import crypto from "crypto";
 import { createClient } from "redis";

@@ -19,8 +19,8 @@ const globalPrisma = globalThis.__aiWorkoutPrismaClient;
 // Do not add `options: "-c timezone=UTC"` to this connection. A direct
 // Postgres connection accepts it, but a pooler may not: PgBouncer before 1.20
 // by default rejects any startup parameter it does not track, `options`
-// included, and managed poolers vary. A pooled deploy would then fail to connect while a
-// local setup without one never shows it.
+// included, and managed poolers vary. A pooled deploy would then fail to
+// connect while a local setup without one never shows it.
 //
 // If the timezone is ever wrong, the database default is the thing to check
 // -- `show timezone` on a new connection --  and prisma.test.js asserts it on

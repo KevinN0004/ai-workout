@@ -35,7 +35,8 @@ export const createProgressMetricRepository = ({ prisma }) => {
    * cannot express partial indexes, so `upsert` has no constraint to target.
    *
    * Returns null when the user cannot be resolved, as the workout, meal,
-   * saved-exercise and plan saves do. The route does not read it: its own re-read is what answers 404.
+   * saved-exercise and plan saves do. The route does not read it: its own
+   * re-read is what answers 404.
    */
   const saveProgressMetric = async ({ userId, metric = {} }) => {
     const userPk = await getUserPk(prisma, userId);
