@@ -18,7 +18,8 @@ const appendPointIfDistinct = (collection, point) => {
  * stands `minDeviation` off the line from that point to the next one or bends
  * the run by `minTurn` (one minus the cosine of the angle); after `maxStride`
  * points dropped in a row, the next is kept regardless. Each option is clamped
- * to a working range. A run of two points or fewer comes back as it is.
+ * to a working range (`maxStride` only to at least 1). A run of two points or
+ * fewer comes back as it is.
  */
 export const selectImportantSegmentPoints = (points, options = {}) => {
   if (!Array.isArray(points) || points.length <= 2) return Array.isArray(points) ? points : [];
@@ -60,10 +61,11 @@ export const selectImportantSegmentPoints = (points, options = {}) => {
 };
 
 /**
- * The same thinning as selectImportantSegmentPoints, for the right half of
- * outlineGeometry.js's outline, except that a point whose id is one of the
- * landmarks `criticalPattern` names always survives, wherever it falls. A run
- * of four points or fewer comes back as it is.
+ * The same test as selectImportantSegmentPoints, with its own defaults and
+ * clamp ranges, for the right half of outlineGeometry.js's outline, except
+ * that a point whose id is one of the landmarks `criticalPattern` names always
+ * survives, wherever it falls. A run of four points or fewer comes back as it
+ * is.
  */
 export const simplifyPerimeterByImportance = (points, options = {}) => {
   if (!Array.isArray(points) || points.length <= 4) return Array.isArray(points) ? points : [];

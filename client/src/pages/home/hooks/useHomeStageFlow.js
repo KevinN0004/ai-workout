@@ -6,8 +6,9 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 
-// The stages in walkthrough order; goToStage compares positions to pick the
-// direction a stage is entered in.
+// Each stage's position, intro first and workout last, with the preview
+// (reached only from the nav) after the intro. goToStage compares positions to
+// pick the direction a stage is entered in.
 const STAGE_ORDER = {
   intro: 0,
   preview: 1,
@@ -25,8 +26,9 @@ const STAGE_CROSSFADE_MS = 220;
 /**
  * Owns the current stage ("intro", "preview", "personal", "visualizer" or
  * "workout"), the direction it was entered in, and the flags HomePage styles
- * and disables the stages by. Returns those, the refs the stages attach to the
- * elements the animations measure and move, and three ways to change stage:
+ * and disables the stages by. Returns those, the refs the stages and the hidden
+ * workout copy attach to the elements the animations measure and move, and
+ * three ways to change stage:
  *
  * - `goToStage`, a plain switch, used by the nav and the back controls. Going
  *   to the intro calls `onResetPersonalFlow`, which resets the profile form.
@@ -37,9 +39,9 @@ const STAGE_CROSSFADE_MS = 220;
  *
  * Both animations switch straight to the next stage under
  * `prefers-reduced-motion`, and when what they would animate is missing or,
- * for the morph, has no size.
- * `samplePlanLength` and `personalMode` are read only to re-measure a panel
- * whose size they change.
+ * for the morph, has no size. The visualizer's entrance and pulse (the first
+ * effect) run either way. `samplePlanLength` and `personalMode` are read only
+ * to re-measure a panel whose size they change.
  */
 export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
   // ---- Refs: DOM handles, animations, pending timers and measurements -------
@@ -141,8 +143,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
 
     // ---- Fallback target, for when the next panel cannot be measured --------
     // For the workout stage a measurement of its hidden copy wins; then the
-    // size the next stage had when last shown; then a per-stage preset bounded
-    // by the viewport.
+    // size and centre last recorded for the next stage by the effects below
+    // (for the workout stage, the copy's again); then a per-stage preset in CSS
+    // pixels, sized from the viewport within fixed bounds.
     const pageEl = document.querySelector(".home-page");
     const pageStyles = pageEl ? window.getComputedStyle(pageEl) : null;
     const pagePaddingX = pageStyles
@@ -412,8 +415,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     setSuppressStageEnter(true);
 
     // ---- Measure the button and the panel -----------------------------------
-    // The button grows to a panel's size, bounded by the viewport, centred
-    // where the intro panel is.
+    // The button grows to a panel's size, taken from the viewport within fixed
+    // floors and caps, centred where the intro panel is.
     const panelRect = panelEl.getBoundingClientRect();
     const buttonRect = buttonEl.getBoundingClientRect();
     const pageEl = panelEl.closest(".page");
@@ -485,8 +488,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   // ---- Effects --------------------------------------------------------------
 
   // Runs the visualizer's entrance and starts its slow pulse whenever that
-  // stage is entered, by the morph or by Back alike; leaving the stage, or
-  // unmounting, stops both.
+  // stage is entered. After the morph the entrance plays out while the stage is
+  // still hidden under the clone, so it is seen only on Back and on the paths
+  // that skip the morph. Leaving the stage, or unmounting, stops both.
   useEffect(() => {
     if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
@@ -567,7 +571,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   // A frame after each stage change, records the active panel's size and
   // centre, which the morph falls back on when it cannot measure its target
   // live. `personalMode` re-runs it because the mode changes the personal
-  // panel's size.
+  // panel's size. Of its records only the physique stage's is read: the morph
+  // targets only that stage and the workout stage, whose record the next
+  // effect overwrites.
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
       const activeEl = getMorphStageElement(homeStage);

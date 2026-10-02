@@ -8,9 +8,10 @@
  * onPersonalSubmit, which moves on to the physique stage once useBodyModel
  * reports the five required fields complete; Back returns to the intro, and
  * going there resets the form. The Advanced fields stay mounted in Basic mode,
- * hidden by forms-and-motion.css, which animates their reveal, and what they
- * hold still feeds the silhouette. `personalPanelRef` is the panel
- * useHomeStageFlow's morph measures for this stage.
+ * hidden by forms-and-motion.css, which animates their reveal, and the scored
+ * ones (all but Goal timeline and Additional Info) still feed the silhouette.
+ * `personalPanelRef` is the panel useHomeStageFlow's morph measures for this
+ * stage.
  */
 export default function HomePersonalStage({
   personalPanelRef,

@@ -12,8 +12,8 @@ import { clamp, toFiniteNumber } from "./math";
  * geometry.js's fallback model.
  *
  * forms-and-motion.css reads the outline pair for the visible outline and the
- * anchor colours for the debug points. No stylesheet reads `major`, `minor`
- * or the bone and muscle colours.
+ * anchor colours for the debug points. No stylesheet reads `major`, `minor`,
+ * `bone`, `muscle`, `boneGlow` or `muscleGlow`.
  */
 export const buildPhysiquePalette = (model, fallback) => {
   const fillHue = clamp(toFiniteNumber(model.fillHue, fallback.fillHue), 0, 360);

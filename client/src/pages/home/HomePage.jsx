@@ -29,9 +29,12 @@ const TRAINING_DAY_OPTIONS = [
   "Sunday"
 ];
 
-// useBodyModel stands the figure with these, in view-box units: the view box's
-// height, the same as VIEWBOX_HEIGHT in physique/geometry.js, and the gap left
-// under the feet.
+// useBodyModel lays out the model's landmarks with these, in view-box units:
+// the view box's height, the same as VIEWBOX_HEIGHT in physique/geometry.js,
+// and how far above its bottom edge it puts the floor line the ankles are set
+// from. They do not place the drawn outline, which buildTemplateOutline stands
+// just above the bottom edge either way; they move the landmark heights its
+// morph bands follow.
 const SILHOUETTE_VIEW_HEIGHT = 430;
 const SILHOUETTE_FLOOR_INSET = 18;
 

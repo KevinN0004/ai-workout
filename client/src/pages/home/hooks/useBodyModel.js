@@ -18,8 +18,9 @@ const toFiniteNumber = (value) => {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 // The form stores each option's label verbatim ("Moderate", "HIIT",
 // "High-protein") and the five option score tables are keyed in lower case, so
-// this is what joins them. Without it every one of those lookups would miss
-// and fall to its default.
+// this is what joins them. Without it every capitalised label would miss and
+// fall to its default; only the two sleep bands that start with a digit would
+// still match.
 const toLowerText = (value) =>
   String(value || "")
     .trim()
@@ -113,12 +114,13 @@ const TRAINING_DAY_COUNT_SCORES = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.9
  * Derives the body model from App's `personal` form. Returns the height in
  * centimetres and the weight in kilograms, each null when it is missing or not
  * positive; `bmi`; `isPersonalComplete`, which gates the personal stage's
- * Continue; `effectiveBodyFat`, the body fat entered or else one estimated from
- * BMI; and the silhouette's shape, with a JSON signature of it.
+ * Continue; `effectiveBodyFat`, `personal.bodyFat` when it holds a number,
+ * else one estimated from BMI; and the silhouette's shape, with a JSON
+ * signature of it.
  *
  * `toCmFromFeetInches` and `toKg` are app/units.js's converters, passed down
- * from App. `silhouetteViewHeight` and `silhouetteFloorInset` place the figure
- * vertically in the silhouette's view box.
+ * from App. `silhouetteViewHeight` and `silhouetteFloorInset` place the model's
+ * landmarks vertically in the view box (see HomePage).
  */
 export default function useBodyModel({
   personal,
@@ -176,6 +178,8 @@ export default function useBodyModel({
   // ---- Body fat as entered --------------------------------------------------
   // Blank, null and absent all read as not entered and fall through to the BMI
   // estimate below. An entered "0" is a measurement, and clamps to the floor.
+  // No home-page field writes `personal.bodyFat`, so in the app this is null
+  // and the model runs on the estimate.
   const explicitBodyFat = useMemo(() => {
     const value = toFiniteNumber(personal.bodyFat);
     return value === null ? null : clamp(value, 3, 60);
@@ -337,8 +341,10 @@ export default function useBodyModel({
           : MEDICAL_REGION_PROFILES.neutral;
 
     // ---- Vertical placement in the view box ---------------------------------
-    // y is measured down from the top. A taller visitor stands lower and spans
-    // more of the box.
+    // y is measured down from the top. A taller visitor's ankles sit lower and
+    // the landmarks span more of the box. This places the model, not the
+    // drawing: the template outline keeps its feet just above the box's bottom
+    // edge, and only its height scale and morph follow these heights.
     const legBias = (heightNorm - 0.5) * 18;
     const floorY = silhouetteViewHeight - silhouetteFloorInset;
     const ankleY = floorY + legBias;

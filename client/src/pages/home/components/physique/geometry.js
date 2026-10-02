@@ -980,8 +980,9 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   // ---- Template outline and palette -----------------------------------------
   // Both are handed the raw `model`, not the clamped locals above, so those
   // clamps do not bound them: each applies its own. buildTemplateSizing in
-  // templateOutline.js reads each raw value into its width scale, which only
-  // its clamps on the combined scale and the target width bound.
+  // templateOutline.js reads the raw half-widths and arm width into its width
+  // scale; only its own clamps, on the combined scale and on the target width,
+  // bound it.
   const templateOutline = buildTemplateOutline({
     model,
     fallback,

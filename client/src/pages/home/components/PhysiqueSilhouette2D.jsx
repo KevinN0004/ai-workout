@@ -20,12 +20,12 @@ export { SILHOUETTE_GEOMETRY_REV } from "./physique/geometry";
  * element HomeVisualizerStage wraps it in carries the label.
  */
 export default function PhysiqueSilhouette2D({ shape }) {
-  // Depends on a JSON signature of `shape` rather than on the object, so the
-  // geometry is rebuilt only when the measurements change by value, not
-  // whenever an equal object arrives. useBodyModel can hand one over: its memo
-  // reruns when any input changes, even one that leaves the shape the same,
-  // such as moving the sex field between two answers that both get the
-  // neutral proportions.
+  // Depends on a JSON signature of `shape` rather than on the object, so an
+  // equal shape in a new object does not rebuild the geometry. In the app this
+  // saves nothing: HomeVisualizerStage's key remounts this whenever the
+  // signature changes, and the form that feeds useBodyModel is not on screen
+  // while it is mounted. It keeps the memo correct for a caller that builds
+  // `shape` inline.
   const shapeSignature = JSON.stringify(shape || {});
   const { anchors, outlineMarkers, outlinePath, outlineTransform, palette } = useMemo(
     () => buildPhysiqueSilhouetteGeometry(shape),

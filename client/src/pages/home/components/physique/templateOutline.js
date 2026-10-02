@@ -290,8 +290,9 @@ const MEDICAL_REGION_CURVE_WEIGHTS = {
 };
 
 // The size the template is scaled to fit: a width from the model's half-widths
-// relative to the fallback's, and a height from its stature relative to the
-// fallback's, each kept to a share of the view box.
+// and arm width relative to the fallback's, scaled by its arm span and side
+// fat, and a height from its stature relative to the fallback's, each kept to a
+// share of the view box.
 const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   // ---- Width scale ----------------------------------------------------------
   // Each part reads the raw model value, not geometry.js's clamped local, so
