@@ -150,8 +150,9 @@
 }
 
 /* ---- Reduced motion ------------------------------------------------------ */
-/* Opens the drawer and its backdrop without their entrance animations. The drawer
-   buttons' hover transition and the loading skeleton's shimmer still run. */
+/* Opens the drawer and its backdrop without their entrance animations. Nothing else in the
+   dashboard's stylesheets is switched off: the drawer buttons' hover transition, the views'
+   card and pill hover transitions and all three loading skeletons' shimmers still run. */
 @media (prefers-reduced-motion: reduce) {
   .drawer-backdrop,
   .drawer {

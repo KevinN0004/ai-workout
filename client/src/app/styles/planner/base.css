@@ -7,6 +7,8 @@
   padding: 24px;
 }
 
+/* styles/base.css's .modal ties this and comes later in the bundle, so of these only height
+   and grid-template-rows take effect. */
 .plan-modal {
   width: min(1200px, 86.6vw);
   height: 86.6vh;

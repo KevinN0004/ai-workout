@@ -1,5 +1,5 @@
-/* DashboardHomeView, the dashboard's Home view: one panel with a button back to the landing
-   page. Imported by the view, so it loads in the view's lazy chunk. */
+/* DashboardHomeView, the view at /dashboard/home, which no nav item lists: one panel with a
+   back-btn to "/". Imported by the view, so it loads in the view's lazy chunk. */
 
 .dashboard-home-view {
   width: 100%;

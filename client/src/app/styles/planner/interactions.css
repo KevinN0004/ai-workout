@@ -3,6 +3,7 @@
    four planner sheets by styles/app.css; the keyframes it names are in motion.css. */
 
 /* ---- Muted text ---------------------------------------------------------- */
+/* styles/base.css's .modal .muted ties this and comes later, so it does not apply. */
 .planner-setup-modal .muted {
   color: #ececec;
 }
@@ -174,6 +175,8 @@
 }
 
 /* ---- Back button in the actions row -------------------------------------- */
+/* Matches nothing: PlannerSetupModal puts only .cta buttons in .modal-actions. Its back
+   button is the header arrow, styled below. */
 .planner-setup-modal .modal-actions .back-btn {
   background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   border-color: rgba(255, 106, 88, 0.94) !important;

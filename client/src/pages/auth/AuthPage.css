@@ -1,6 +1,7 @@
 /* AuthPage, the /auth page: the card with its login/sign-up toggle, the form, the sign-up
    fields it reveals, and the password and remember-me controls. Imported by AuthPage. The
-   page also carries the home-page class, so the home page's styles reach it too. */
+   page also carries home-page, so the home page's styles reach it; they come later in the
+   bundle, so where one ties a rule here, the home page's wins. */
 
 /* ---- Page and title ------------------------------------------------------ */
 .auth-page {
@@ -236,7 +237,7 @@
   grid-column: 1 / -1;
 }
 
-/* ---- Wrapping and the submit button -------------------------------------- */
+/* ---- Textarea, full-width fields, wrapping and submit -------------------- */
 .auth-form textarea {
   width: 100%;
   min-height: 96px;
@@ -316,8 +317,10 @@
 
 /* ---- Height fields ------------------------------------------------------- */
 /* home/styles/forms-and-motion.css has the same four selectors and comes later in the
-   bundle, so where the two differ its values win. On this page .height-unit takes its
-   colour from .home-page .height-unit in home/styles/core/shell.css, which beats both. */
+   bundle, so where the two differ its values win, and its .height-split also beats the
+   one-column .height-split in this file's smallest-screens block. On this page .height-unit
+   takes its colour from .home-page .height-unit in home/styles/core/shell.css, which beats
+   both. */
 .height-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -419,8 +422,10 @@
 
 /* ---- Reduced motion ------------------------------------------------------ */
 /* Turns off CSS animations and transitions on the form and everything in it: its width
-   change, the sign-up fields' reveal and the checkbox. The tick is a ::before, which * does
-   not select, so it still scales in. */
+   change, the sign-up fields' reveal and the checkbox. * selects no pseudo-elements, so the
+   checkbox's tick (::before) still scales in and the unit toggles' pills (::before, from
+   home/styles/core/shell.css) still slide, as does the login/sign-up toggle's, which is
+   outside the form, and the close button's hover transition still runs. */
 @media (prefers-reduced-motion: reduce) {
   .auth-form,
   .auth-form * {

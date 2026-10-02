@@ -161,6 +161,8 @@
   text-wrap: balance;
 }
 
+/* Keeps .dashboard-workout-grid's twelve columns. The metrics grid inside it sets no
+   grid-column, so it takes one of them until responsive.css makes both one column. */
 .dashboard-workout-grid-exercise {
   display: grid;
   gap: 12px;
@@ -196,6 +198,8 @@
 }
 
 /* ---- Actions ------------------------------------------------------------- */
+/* The row is also .modal-submit, whose justify-content in styles/base.css ties this one and
+   comes later, so the buttons are centred; responsive.css's stretch loses the same way. */
 .dashboard-workout-actions {
   justify-content: flex-end;
   gap: 12px;

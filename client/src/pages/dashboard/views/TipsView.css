@@ -242,7 +242,8 @@
 
 /* ---- Exercise details modal ---------------------------------------------- */
 /* ExerciseDetailsModal renders through ModalPortal, outside .tips-view, so these selectors
-   start from .exercise-modal. */
+   start from .exercise-modal. Its width and text-align beat styles/base.css's .modal only
+   because this sheet loads after the main CSS chunk. */
 .exercise-modal {
   width: min(980px, 100%);
   text-align: left;

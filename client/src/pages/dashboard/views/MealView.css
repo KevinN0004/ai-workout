@@ -268,7 +268,8 @@
 
 /* ---- Meal details modal -------------------------------------------------- */
 /* MealDetailsModal renders through ModalPortal, outside .meal-view, so these selectors
-   start from .meal-modal. */
+   start from .meal-modal. Its width and text-align beat styles/base.css's .modal only
+   because this sheet loads after the main CSS chunk. */
 .meal-modal {
   width: min(960px, 100%);
   text-align: initial;

@@ -1,7 +1,7 @@
 /* The app's base layer: the Google Fonts import, the type scale on :root, the reset, and
    the page, panel, form, button and modal classes the pages share. Imported by index.css,
-   which main.jsx loads after App, so in the main CSS chunk these rules come after every
-   page's stylesheet and win a tie in specificity against them. */
+   which main.jsx loads after App, so it follows every stylesheet in the main CSS chunk and
+   wins ties against them; a lazy dashboard view's stylesheet loads after it and wins ties. */
 
 /* ---- Fonts and type scale ------------------------------------------------ */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
@@ -260,7 +260,7 @@ select:focus {
   color: #ffd9a0;
 }
 
-/* ---- Buttons ------------------------------------------------------------- */
+/* ---- Secondary and primary buttons --------------------------------------- */
 .ghost {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -339,7 +339,7 @@ select:focus {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* ---- Back button --------------------------------------------------------- */
+/* ---- Back button gradient ------------------------------------------------ */
 .back-btn,
 .ghost.back-btn,
 .modal .ghost.back-btn {
@@ -421,7 +421,7 @@ select:focus {
   padding-top: 8px;
 }
 
-/* ---- Icon buttons -------------------------------------------------------- */
+/* ---- Round icon buttons -------------------------------------------------- */
 .icon-button {
   display: flex;
   align-items: center;

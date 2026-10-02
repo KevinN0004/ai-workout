@@ -1,5 +1,6 @@
-﻿/* PlannerSetupModal's entrance keyframes, named by interactions.css, and its
-   reduced-motion switch. Imported last of the four planner sheets by styles/app.css. */
+﻿/* PlannerSetupModal's keyframes, named by interactions.css: the entrances and the
+   environment toggle's pop, and its reduced-motion switch. Imported last of the four planner
+   sheets by styles/app.css. */
 
 /* ---- Keyframes ----------------------------------------------------------- */
 @keyframes planner-backdrop-in {

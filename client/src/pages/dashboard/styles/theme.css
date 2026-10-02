@@ -1,11 +1,12 @@
-﻿/* The dashboard's dark theme: the --dash-* custom properties, and the rules that apply
-   them to the shared base classes, the header, the cards, each view and the dashboard
-   modals. Imported first by DashboardPage.css; glance-loading.css, toast.css and
-   navigation.css read its tokens. */
+﻿/* The dashboard's dark theme: the --dash-* custom properties, and the dark-theme rules for
+   the shared base classes, the header, the cards, each view and the dashboard modals.
+   Imported first by DashboardPage.css; glance-loading.css, toast.css and navigation.css
+   read its tokens. */
 
 /* ---- Tokens -------------------------------------------------------------- */
 /* Set on .drawer as well, because DashboardPage renders the drawer beside .dashboard-page
-   rather than inside it. */
+   rather than inside it. DashboardBottomNav is beside it too and is not covered, so the
+   tokens navigation.css gives the bottom bar resolve to nothing. */
 .dashboard-page,
 .drawer {
   --dash-page-bg: #000;
@@ -340,8 +341,9 @@
 }
 
 /* ---- Primary and back buttons -------------------------------------------- */
-/* styles/base.css declares .back-btn's colours and shadow !important, so these have to be
-   too. */
+/* styles/base.css declares .back-btn's colours and shadow !important, so the .back-btn
+   selectors here have to be too. No .cta rule that reaches the dashboard is !important, so
+   the .cta half would win without it. */
 .dashboard-page .cta,
 .dashboard-page .back-btn {
   background: #fff !important;
