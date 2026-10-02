@@ -4,6 +4,8 @@
  * and generated-plan modals App builds. Rendered by App for any path it does
  * not route elsewhere.
  */
+// First on purpose, ahead of PreviewStage: imported after it, this sheet would
+// follow PreviewStage.css in the built stylesheet and reorder the cascade.
 import "./HomePage.css";
 import useBodyModel from "./hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../../app/constants";
@@ -14,6 +16,36 @@ import HomePersonalStage from "./components/HomePersonalStage";
 import HomeVisualizerStage from "./components/HomeVisualizerStage";
 import HomeWorkoutStage from "./components/HomeWorkoutStage";
 import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
+
+// The days the personal stage's Training days toggles offer, stored as they
+// are in `personal.trainingDays`.
+const TRAINING_DAY_OPTIONS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday"
+];
+
+// useBodyModel stands the figure with these, in view-box units: the view box's
+// height, the same as VIEWBOX_HEIGHT in physique/geometry.js, and the gap left
+// under the feet.
+const SILHOUETTE_VIEW_HEIGHT = 430;
+const SILHOUETTE_FLOOR_INSET = 18;
+
+// The white Back control of the personal, physique and workout stages.
+const BACK_BUTTON_STYLE = {
+  background: "#fff",
+  border: "1px solid rgba(255, 255, 255, 0.92)",
+  color: "#000",
+  boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
+};
+
+// The physique stage's accessible name for the silhouette.
+const VISUAL_LABEL =
+  "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
 
 /**
  * Shows the stage useHomeStageFlow is on, feeding the stages the body model
@@ -51,16 +83,6 @@ export default function HomePage({
   generatedPlanModal
 }) {
   // ---- Training days --------------------------------------------------------
-  const trainingDayOptions = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
-  ];
-
   const toggleTrainingDay = (day) => {
     setPersonal((prev) => {
       const selectedDays = Array.isArray(prev.trainingDays) ? prev.trainingDays : [];
@@ -75,12 +97,6 @@ export default function HomePage({
   };
 
   // ---- Stage flow and body model --------------------------------------------
-  // useBodyModel stands the figure with these, in view-box units: the view
-  // box's height, the same as VIEWBOX_HEIGHT in physique/geometry.js, and the
-  // gap left under the feet.
-  const silhouetteViewHeight = 430;
-  const silhouetteFloorInset = 18;
-
   const {
     visualPanelRef,
     introPanelRef,
@@ -118,11 +134,11 @@ export default function HomePage({
     weightUnit,
     toCmFromFeetInches,
     toKg,
-    silhouetteViewHeight,
-    silhouetteFloorInset
+    silhouetteViewHeight: SILHOUETTE_VIEW_HEIGHT,
+    silhouetteFloorInset: SILHOUETTE_FLOOR_INSET
   });
 
-  // ---- Personal stage submit, and what the stages share ---------------------
+  // ---- Personal stage submit ------------------------------------------------
   // Continue on the personal stage moves to the physique stage through the
   // morph, once the profile is complete and nothing is animating.
   const onPersonalSubmit = (event) => {
@@ -130,18 +146,6 @@ export default function HomePage({
     if (!isPersonalComplete || isIntroTransitioning || isStageTransitioning) return;
     transitionToStageFromTrigger("visualizer");
   };
-
-  // The white Back control of the personal, physique and workout stages.
-  const backBtnStyle = {
-    background: "#fff",
-    border: "1px solid rgba(255, 255, 255, 0.92)",
-    color: "#000",
-    boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
-  };
-
-  // The physique stage's accessible name for the silhouette.
-  const visualLabel =
-    "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
 
   // ---- Render ---------------------------------------------------------------
   return (
@@ -215,10 +219,10 @@ export default function HomePage({
                 setWeightUnit={setWeightUnit}
                 toLb={toLb}
                 toKg={toKg}
-                trainingDayOptions={trainingDayOptions}
+                trainingDayOptions={TRAINING_DAY_OPTIONS}
                 toggleTrainingDay={toggleTrainingDay}
                 isPersonalComplete={isPersonalComplete}
-                backBtnStyle={backBtnStyle}
+                backBtnStyle={BACK_BUTTON_STYLE}
                 goToStage={goToStage}
                 isIntroTransitioning={isIntroTransitioning}
                 isStageTransitioning={isStageTransitioning}
@@ -228,10 +232,10 @@ export default function HomePage({
             {homeStage === "visualizer" && (
               <HomeVisualizerStage
                 visualPanelRef={visualPanelRef}
-                visualLabel={visualLabel}
+                visualLabel={VISUAL_LABEL}
                 silhouetteRenderSignature={silhouetteRenderSignature}
                 silhouetteShape={silhouetteShape}
-                backBtnStyle={backBtnStyle}
+                backBtnStyle={BACK_BUTTON_STYLE}
                 onBack={() => goToStage("personal")}
                 onContinue={() => transitionToStageFromTrigger("workout")}
                 isIntroTransitioning={isIntroTransitioning}
@@ -243,7 +247,7 @@ export default function HomePage({
               <HomeWorkoutStage
                 workoutShellRef={workoutShellRef}
                 workoutPanelRef={workoutPanelRef}
-                backBtnStyle={backBtnStyle}
+                backBtnStyle={BACK_BUTTON_STYLE}
                 onBack={() => goToStage("visualizer")}
                 isIntroTransitioning={isIntroTransitioning}
                 isStageTransitioning={isStageTransitioning}

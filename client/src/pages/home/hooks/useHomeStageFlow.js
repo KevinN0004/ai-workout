@@ -6,6 +6,22 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 
+// The stages in walkthrough order; goToStage compares positions to pick the
+// direction a stage is entered in.
+const STAGE_ORDER = {
+  intro: 0,
+  preview: 1,
+  personal: 2,
+  visualizer: 3,
+  workout: 4
+};
+// The length of the morph, the Get Started hand-off and the visualizer's
+// entrance, in milliseconds. The same as `--home-animation-ms` in
+// styles/core/layout.css.
+const UNIFIED_ANIMATION_MS = 1400;
+// How long the morph's clone takes to fade out once the stage is revealed.
+const STAGE_CROSSFADE_MS = 220;
+
 /**
  * Owns the current stage ("intro", "preview", "personal", "visualizer" or
  * "workout"), the direction it was entered in, and the flags HomePage styles
@@ -56,15 +72,6 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
   const [isStageTransitioning, setIsStageTransitioning] = useState(false);
   const [suppressStageEnter, setSuppressStageEnter] = useState(false);
-  const stageOrder = {
-    intro: 0,
-    preview: 1,
-    personal: 2,
-    visualizer: 3,
-    workout: 4
-  };
-  const unifiedAnimationMs = 1400;
-  const stageCrossfadeMs = 220;
 
   // ---- Clean-up helpers -----------------------------------------------------
   const clearStageMorphClone = () => {
@@ -92,14 +99,14 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
 
   // ---- Plain stage switch ---------------------------------------------------
   // The direction drives the stage's enter animation: forward when the next
-  // stage is at or after this one in `stageOrder`.
+  // stage is at or after this one in `STAGE_ORDER`.
   const goToStage = (nextStage) => {
     if (nextStage === homeStage) return;
     if (nextStage === "intro") {
       onResetPersonalFlow?.();
     }
-    const nextOrder = stageOrder[nextStage] ?? 0;
-    const currentOrder = stageOrder[homeStage] ?? 0;
+    const nextOrder = STAGE_ORDER[nextStage] ?? 0;
+    const currentOrder = STAGE_ORDER[homeStage] ?? 0;
     setStageDirection(nextOrder >= currentOrder ? "forward" : "backward");
     setHomeStage(nextStage);
   };
@@ -275,8 +282,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     stageMorphCloneRef.current = morphClone;
     const morphCloneContentEls = Array.from(morphClone.children);
 
-    const completeDelayMs = unifiedAnimationMs;
-    const crossfadeDurationMs = stageCrossfadeMs;
+    const completeDelayMs = UNIFIED_ANIMATION_MS;
+    const crossfadeDurationMs = STAGE_CROSSFADE_MS;
 
     // ---- Switch the real stage underneath -----------------------------------
     goToStage(nextStage);
@@ -455,7 +462,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
           backgroundColor: ["rgb(255, 255, 255)", "rgba(110, 110, 110, 0.28)"],
           borderColor: ["rgb(255, 255, 255)", "rgba(255, 255, 255, 0.16)"],
           letterSpacing: ["0em", "0.04em"],
-          duration: unifiedAnimationMs
+          duration: UNIFIED_ANIMATION_MS
         },
         "<<+=40"
       )
@@ -463,7 +470,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
         panelEl,
         {
           opacity: [1, 0],
-          duration: unifiedAnimationMs
+          duration: UNIFIED_ANIMATION_MS
         },
         "<<"
       );
@@ -472,7 +479,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     introTransitionTimeoutRef.current = window.setTimeout(() => {
       setIsIntroTransitioning(false);
       goToStage("personal");
-    }, unifiedAnimationMs + 60);
+    }, UNIFIED_ANIMATION_MS + 60);
   };
 
   // ---- Effects --------------------------------------------------------------
@@ -491,15 +498,15 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     if (!stageEl || !renderSurfaceEl) return undefined;
 
     visualIntroTimelineRef.current = createTimeline({
-      defaults: { ease: "outCubic", duration: unifiedAnimationMs }
+      defaults: { ease: "outCubic", duration: UNIFIED_ANIMATION_MS }
     })
-      .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: unifiedAnimationMs })
+      .add(stageEl, { opacity: [0.42, 1], scale: [0.97, 1], duration: UNIFIED_ANIMATION_MS })
       .add(
         renderSurfaceEl,
         {
           opacity: [0.6, 1],
           scale: [0.93, 1],
-          duration: unifiedAnimationMs
+          duration: UNIFIED_ANIMATION_MS
         },
         "<<"
       );

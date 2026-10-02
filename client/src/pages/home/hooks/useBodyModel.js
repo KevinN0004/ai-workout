@@ -67,6 +67,48 @@ const MEDICAL_REGION_PROFILES = {
   }
 };
 
+// Scores from 0 to 1 for the Advanced fields' answers, keyed by the option
+// label lower-cased (see toLowerText). An answer not listed takes the default
+// its lookup in useBodyModel gives.
+const ACTIVITY_LEVEL_SCORES = {
+  light: 0.28,
+  moderate: 0.5,
+  high: 0.72,
+  "very high": 0.9
+};
+const TRAINING_EXPERIENCE_SCORES = {
+  beginner: 0.3,
+  intermediate: 0.58,
+  advanced: 0.84
+};
+const CARDIO_PREFERENCE_SCORES = {
+  none: 0.2,
+  walking: 0.45,
+  running: 0.78,
+  cycling: 0.72,
+  rowing: 0.74,
+  swimming: 0.76,
+  hiit: 0.86,
+  mixed: 0.7
+};
+const NUTRITION_PREFERENCE_SCORES = {
+  "no preference": 0.5,
+  "high-protein": 0.74,
+  balanced: 0.62,
+  "low-carb": 0.58,
+  vegetarian: 0.54,
+  vegan: 0.52
+};
+const SLEEP_HOURS_SCORES = {
+  "less than 4": 0.16,
+  "4 - 6 hours": 0.42,
+  "7 - 8 hours": 0.78,
+  "more than 8": 0.72
+};
+// Indexed by the number of training days chosen, from none to seven. None
+// chosen scores above one day.
+const TRAINING_DAY_COUNT_SCORES = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.95];
+
 /**
  * Derives the body model from App's `personal` form. Returns the height in
  * centimetres and the weight in kilograms, each null when it is missing or not
@@ -142,72 +184,34 @@ export default function useBodyModel({
   // ---- Lifestyle scores from the Advanced fields ----------------------------
   // Each 0 to 1, with a middling default for an unanswered field.
   const activityScore = useMemo(() => {
-    const map = {
-      light: 0.28,
-      moderate: 0.5,
-      high: 0.72,
-      "very high": 0.9
-    };
     const key = toLowerText(personal.activity);
-    return map[key] ?? 0.5;
+    return ACTIVITY_LEVEL_SCORES[key] ?? 0.5;
   }, [personal.activity]);
 
   const experienceScore = useMemo(() => {
-    const map = {
-      beginner: 0.3,
-      intermediate: 0.58,
-      advanced: 0.84
-    };
     const key = toLowerText(personal.experience);
-    return map[key] ?? 0.5;
+    return TRAINING_EXPERIENCE_SCORES[key] ?? 0.5;
   }, [personal.experience]);
 
   const cardioScore = useMemo(() => {
-    const map = {
-      none: 0.2,
-      walking: 0.45,
-      running: 0.78,
-      cycling: 0.72,
-      rowing: 0.74,
-      swimming: 0.76,
-      hiit: 0.86,
-      mixed: 0.7
-    };
     const key = toLowerText(personal.cardio);
-    return map[key] ?? 0.5;
+    return CARDIO_PREFERENCE_SCORES[key] ?? 0.5;
   }, [personal.cardio]);
 
   const nutritionScore = useMemo(() => {
-    const map = {
-      "no preference": 0.5,
-      "high-protein": 0.74,
-      balanced: 0.62,
-      "low-carb": 0.58,
-      vegetarian: 0.54,
-      vegan: 0.52
-    };
     const key = toLowerText(personal.nutrition);
-    return map[key] ?? 0.55;
+    return NUTRITION_PREFERENCE_SCORES[key] ?? 0.55;
   }, [personal.nutrition]);
 
   const sleepScore = useMemo(() => {
-    const map = {
-      "less than 4": 0.16,
-      "4 - 6 hours": 0.42,
-      "7 - 8 hours": 0.78,
-      "more than 8": 0.72
-    };
     const key = toLowerText(personal.sleep);
-    return map[key] ?? 0.56;
+    return SLEEP_HOURS_SCORES[key] ?? 0.56;
   }, [personal.sleep]);
 
-  // Indexed by the number of days chosen, up to seven. None chosen scores above
-  // one day.
   const trainingDaysScore = useMemo(() => {
     const total = Array.isArray(personal.trainingDays) ? personal.trainingDays.length : 0;
-    const map = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.95];
     const capped = clamp(total, 0, 7);
-    return map[capped];
+    return TRAINING_DAY_COUNT_SCORES[capped];
   }, [personal.trainingDays]);
 
   // ---- Body fat the model uses ----------------------------------------------

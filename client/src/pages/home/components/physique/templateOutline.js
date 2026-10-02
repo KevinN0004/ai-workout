@@ -4,9 +4,9 @@
  * match the model. geometry.js prefers it to the anchor outline whenever it
  * builds.
  */
-import templateSvgRaw from "./assets/template-outline.svg?raw";
 import { clamp, toFiniteNumber } from "./math";
 import { buildSmoothClosedPath, selectImportantSegmentPoints } from "./outlineUtils";
+import templateSvgRaw from "./assets/template-outline.svg?raw";
 
 const smoothstep = (edge0, edge1, value) => {
   if (value <= edge0) return 0;
