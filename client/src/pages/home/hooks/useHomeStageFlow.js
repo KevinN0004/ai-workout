@@ -40,8 +40,10 @@ const STAGE_CROSSFADE_MS = 220;
  * Both animations switch straight to the next stage under
  * `prefers-reduced-motion`, and when what they would animate is missing or,
  * for the morph, has no size. The visualizer's entrance and pulse (the first
- * effect) run either way. `samplePlanLength` and `personalMode` are read only
- * to re-measure a panel whose size they change.
+ * effect) run under reduced motion too: they are script-driven, so the
+ * stylesheet's reduced-motion block does not reach them. `samplePlanLength`
+ * and `personalMode` are read only to re-measure a panel whose size they
+ * change.
  */
 export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
   // ---- Refs: DOM handles, animations, pending timers and measurements -------

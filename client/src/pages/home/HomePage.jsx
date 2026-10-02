@@ -34,7 +34,8 @@ const TRAINING_DAY_OPTIONS = [
 // and how far above its bottom edge it puts the floor line the ankles are set
 // from. They do not place the drawn outline, which buildTemplateOutline stands
 // just above the bottom edge either way; they move the landmark heights its
-// morph bands follow.
+// morph bands follow, and the view height also sets the stature its height
+// scale reads.
 const SILHOUETTE_VIEW_HEIGHT = 430;
 const SILHOUETTE_FLOOR_INSET = 18;
 
