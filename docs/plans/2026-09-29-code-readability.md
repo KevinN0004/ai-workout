@@ -100,6 +100,10 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
 
     The original Task 0 proofs still pass on the new version.
 
+12. **A stylesheet import's position is load-bearing.** Found in Task 6. The built CSS follows import order, so moving a page's `import "./Page.css"` below a local module that brings in its own stylesheet puts that module's rules ahead of the page's, and the cascade changes. In `HomePage.jsx`, moving `./HomePage.css` last reordered 481 of the 899 top-level rules in the main CSS file, because `PreviewStage.css` then landed ahead of it. No gate notices: the E2E suite is a smoke test, and nothing compares the CSS.
+
+    So an import-order tidy that moves a stylesheet is proven by building before and after and comparing the CSS files rule by rule. If the order changes, the import stays where it is, with a comment saying why. That is why Task 6 ends at 9 import-order breaks rather than 0: the scanner ranks a stylesheet after local modules, and `HomePage.css` has to stay ahead of `PreviewStage`.
+
 ## Baseline (from the scanner, `9b85b7d`)
 
 | PR  | Headers first | Exports documented | Effects commented | Long functions sectioned | History | To module scope | Import-order breaks | BOMs |
