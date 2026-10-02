@@ -139,8 +139,8 @@
 
 /* ---- Day-detail modal ---------------------------------------------------- */
 /* The modal renders through ModalPortal, outside .plans-view, so these selectors do not
-   start from it. Its width and text-align beat styles/base.css's .modal only because this
-   sheet loads after the main CSS chunk. */
+   start from it. The modal's width and text-align beat styles/base.css's .modal only because
+   this sheet loads after the main CSS chunk. */
 .plan-day-detail-modal {
   width: min(980px, 100%);
   text-align: left;

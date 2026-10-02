@@ -1,8 +1,7 @@
-/* SummaryView, the dashboard's summary view: the overview, today's picks, weather and air
-   quality, weekly progress and the trend charts, in a main column and a side column.
-   Imported by the view, which DashboardPage imports eagerly and before DashboardPage.css, so
-   this sheet lands ahead of theme.css in the main chunk; theme.css wins ties against it and
-   recolours much of it. */
+/* SummaryView, the dashboard's summary view: overview, today's picks, weather and air
+   quality, weekly progress and trend charts, in a main column and a side column. Imported
+   by the view, which DashboardPage imports eagerly and before DashboardPage.css, so this
+   sheet lands ahead of theme.css, which wins ties against it and recolours much of it. */
 
 /* ---- View layout --------------------------------------------------------- */
 .summary-view {
