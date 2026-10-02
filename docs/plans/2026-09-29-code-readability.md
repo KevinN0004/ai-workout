@@ -94,11 +94,11 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
 
 11. **A JSX comment is not invisible to the parser.** Found before Task 4. `{/* … */}` parses as a container holding an empty expression, and it splits the whitespace text around it, so the first `same-code.mjs` reported every JSX section comment, which the SOP prescribes, as a code change. Simply ignoring those nodes would be wrong in the other direction: between two lines of text, a comment changes what renders, because each text node is trimmed on its own ("Get Started" becomes "GetStarted"). The tool now applies the JSX transform's own whitespace rule, Babel's `cleanJSXElementLiteralChild`, to each text node and drops empty containers. Measured on 2026-10-01 against the real bundle:
 
-- **A comment between two elements:** the old tool failed it, the new one passes it, and `client/dist` stays byte-identical.
-- **A comment splitting a text run:** both tools fail it, and `client/dist` changes.
-- **A class-name edit:** both tools fail it.
+    - **A comment between two elements:** the old tool failed it, the new one passes it, and `client/dist` stays byte-identical.
+    - **A comment splitting a text run:** both tools fail it, and `client/dist` changes.
+    - **A class-name edit:** both tools fail it.
 
-The original Task 0 proofs still pass on the new version.
+    The original Task 0 proofs still pass on the new version.
 
 ## Baseline (from the scanner, `9b85b7d`)
 
