@@ -43,6 +43,18 @@ const DASH_DRAWER_ITEMS = [
   { key: "settings", label: "Settings" }
 ];
 
+// Every view the page can render, one per branch of renderActiveDashboardView.
+const DASH_VIEW_ORDER = [
+  "summary",
+  "workouts",
+  "calories",
+  "plans",
+  "meal",
+  "tips",
+  "settings",
+  "home"
+];
+
 /**
  * Lays the dashboard out around the view App's `dashView` names; every view but
  * the summary loads lazily. Its data and handlers are App's: the dashboard and
@@ -236,19 +248,9 @@ export default function DashboardPage({
       <p className="muted">Loading view...</p>
     </section>
   );
-  const dashViewOrder = [
-    "summary",
-    "workouts",
-    "calories",
-    "plans",
-    "meal",
-    "tips",
-    "settings",
-    "home"
-  ];
   // A name outside the list falls back to the summary. Every setter of
   // `dashView` passes one of these, so the fallback is defensive.
-  const activeDashView = dashViewOrder.includes(dashView) ? dashView : "summary";
+  const activeDashView = DASH_VIEW_ORDER.includes(dashView) ? dashView : "summary";
   // One branch per view. The summary is imported eagerly; every other view is
   // lazy and waits behind the same Suspense fallback.
   const renderActiveDashboardView = () => {
