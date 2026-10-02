@@ -25,7 +25,11 @@ export const normalizePreviewTrainingDay = (dayValue) => {
   return PREVIEW_WEEK_DAY_NORMALIZATION[normalizedKey] || "";
 };
 
-/** The upper-cased region of a locale tag, or "", by the same rule as app/units.js's copy. */
+/**
+ * A locale tag's second subtag, upper-cased and taken as its region, or
+ * Intl.Locale's region for a bare language; "" if neither. The same rule as
+ * app/units.js's copy.
+ */
 export const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
   const localeParts = locale.split(/[-_]/).filter(Boolean);

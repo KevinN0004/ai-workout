@@ -1,20 +1,22 @@
 /**
- * The preview walkthrough's Result chapter: the generated week as a table that
- * draws its outline, types in its headers and then its cells, and breaks apart
- * into particles. Rendered by PreviewStage.
+ * The preview walkthrough's Result chapter: usePreviewDerivedData's sample week
+ * as a table that draws its outline, types in its headers and then its cells,
+ * and breaks apart into particles. Rendered by PreviewStage.
  */
 import { PREVIEW_WEEK_LINE_STAGGER_MS, PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../constants";
 
 /**
- * Each `previewWeekStage` from 1 adds classes the stylesheet animates: 1 draws
- * the outline, 2 shows the headers, 3 the rows, 5 runs the scan and 6 the
- * break; 4, the typing finished, adds none. The text typed so far comes from
- * `getPreviewWeekHeaderTypedText` and `getPreviewWeekTypedText`, and a cell
- * with none yet holds a non-breaking space so it keeps a line's height. The
- * outline's lines sit at `previewWeekLineOffsets`, which usePreviewWeekOutline
- * measures from this table, and start one after another, horizontals first.
- * The two refs are the table's wrap, which the outline and the particle
- * animation measure, and the layer the particles are drawn into.
+ * Each `previewWeekStage` from 1 adds classes: 1 draws the outline, 2 shows the
+ * headers, 3 the rows and 5 runs the scan, all animated by the stylesheet; 4,
+ * the typing finished, adds none. 6 adds the break classes, which switch the
+ * stylesheet's own break animations off so that the timeline in
+ * usePreviewWeekParticleAnimation plays the break instead. The text typed so
+ * far comes from `getPreviewWeekHeaderTypedText` and `getPreviewWeekTypedText`,
+ * and a cell with none yet holds a non-breaking space so it keeps a line's
+ * height. The outline's lines sit at `previewWeekLineOffsets`, which
+ * usePreviewWeekOutline measures from this table, and start one after another,
+ * horizontals first. The two refs are the table's wrap, which the outline and
+ * the particle animation measure, and the layer the particles are drawn into.
  */
 export default function PreviewWorkoutWeekChapter({
   previewWeekLineOffsets,
@@ -96,7 +98,6 @@ export default function PreviewWorkoutWeekChapter({
             }}
           />
         </div>
-        {/* ---- The table ---- */}
         <table className="preview-week-table">
           <thead>
             <tr>

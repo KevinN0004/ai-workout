@@ -16,8 +16,9 @@ import usePreviewDerivedData from "./hooks/usePreviewDerivedData";
 import "./PreviewStage.css";
 
 /**
- * Owns the walkthrough's state: the current chapter, each chapter's stage, the
- * fields filled so far, the week outline's line positions and the typing
+ * Owns the walkthrough's state: the current chapter, the table of contents'
+ * switch, each chapter's stage, the fields filled so far and the form's
+ * collapsed and shifted flags, the week outline's line positions and the typing
  * progress. Its hooks derive the content and play each chapter; the chapter
  * components render it. `personal` and `form` are App's profile and planner
  * form and `heightUnit` and `weightUnit` App's units; the converters are
@@ -151,6 +152,7 @@ export default function PreviewStage({
   // Switches to a chapter, held to the list, unless it is the one showing. The
   // table of contents and the chapter hooks both move on through this, and the
   // chips keep their expanding and contracting classes for PREVIEW_TOC_SWITCH_MS.
+  // Despite the name it does not scroll; only the mount effect does.
   const scrollToChapter = (targetIndex) => {
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
     const currentIndex = previewStepIndexRef.current;
@@ -168,8 +170,9 @@ export default function PreviewStage({
   };
 
   // ---- Effects --------------------------------------------------------------
-  // While the walkthrough is mounted, `preview-smooth-scroll` on <html> gives the
-  // page smooth scrolling and a top scroll padding (styles/layout/base.css).
+  // While the walkthrough is mounted, `preview-smooth-scroll` on <html> gives
+  // the page a top scroll padding and, unless the visitor prefers reduced
+  // motion, smooth scrolling (styles/layout/base.css, styles/responsive.css).
   useEffect(() => {
     const rootEl = document.documentElement;
     if (!rootEl) return undefined;
@@ -188,8 +191,11 @@ export default function PreviewStage({
   }, [previewStepIndex]);
 
   // On mount, the first chapter, and two animation frames on, once the stage
-  // has been painted, a smooth scroll that brings it to the top of the window.
-  // The index already starts at 0, so the reset changes nothing here.
+  // has been painted, a smooth scroll that brings its top up to the page's
+  // scroll padding. The index already starts at 0, so the reset changes nothing
+  // here. The frames are not cancelled, so a PreviewStage that unmounts before
+  // they run reaches scrollPreviewIntoView with no element, which its null
+  // check covers.
   useEffect(() => {
     setPreviewStepIndex(0);
     previewStepIndexRef.current = 0;

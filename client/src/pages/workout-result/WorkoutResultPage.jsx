@@ -13,11 +13,12 @@ import "./WorkoutResultPage.css";
  * vertical layout is a row per day, its lines as a list. The horizontal one is
  * a column per day and a row per line position, each row labelled from the
  * first day with a non-blank line there: the text before a colon, else its
- * first three words, else "Task" and the row's number. The stylesheet sizes the
- * table by `--plan-day-count`, and lays a day's lines in one to three columns
- * by `--plan-vertical-line-cols`, from the longest day. A signed-out visitor
- * also gets Signup, which opens sign-up with the home flow's profile filled in,
- * and the last button goes to the dashboard when signed in and home otherwise.
+ * first three words; a row with no non-blank line is "Task" and its number. The
+ * stylesheet sizes the table by `--plan-day-count`, and lays a day's lines in
+ * one to three columns by `--plan-vertical-line-cols`, from the longest day. A
+ * signed-out visitor also gets Signup, which opens sign-up with the home flow's
+ * profile filled in, and the last button goes to the dashboard when signed in
+ * and home otherwise.
  */
 export default function WorkoutResultPage({
   gradient,
@@ -51,7 +52,7 @@ export default function WorkoutResultPage({
     "--plan-day-count": String(dayCount),
     "--plan-vertical-line-cols": String(verticalLineColumnCount)
   };
-  // ---- The horizontal layout's rows: a line position across every day ------
+  // ---- The horizontal layout's rows: a line position across every day -------
   const horizontalRows = useMemo(() => {
     const getTaskLabelFromRow = (values, rowIndex) => {
       const firstLine = values.find((value) => String(value || "").trim());

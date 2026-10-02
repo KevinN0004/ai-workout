@@ -1,7 +1,8 @@
 /**
  * The preview walkthrough's timed state machine: on arrival each chapter plays
- * a sequence of stage changes on timers, and Personal Info and Generate then
- * move on to the next chapter by themselves. Called by PreviewStage.
+ * a sequence of stage changes on timers, or under reduced motion shows its end
+ * state, and Personal Info and Generate then move on to the next chapter by
+ * themselves. Called by PreviewStage.
  */
 import { useCallback, useEffect } from "react";
 import {
@@ -83,7 +84,7 @@ export default function usePreviewChapterFlow({
   }, [previewFillTimeoutsRef]);
 
   useEffect(() => {
-    // ---- What gets typed, and filling it all at once --------------------------
+    // ---- What gets typed, and filling it all at once ------------------------
     const personalTargets = previewInitialTargetsRef.current || previewPersonalTargets;
     const fillOrder = previewInitialFillOrderRef.current || previewFillOrder;
 
@@ -108,7 +109,7 @@ export default function usePreviewChapterFlow({
     // unmount is what stops them.
     clearPreviewFillTimers();
 
-    // ---- Generate -------------------------------------------------------------
+    // ---- Generate -----------------------------------------------------------
     // The builder's six stages, PREVIEW_BUILDER_STEP_MS apart, then the move to
     // the week once the last has held for PREVIEW_GENERATING_HOLD_MS.
     if (activePreviewChapterId === "generate") {
@@ -154,7 +155,7 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
-    // ---- The week -------------------------------------------------------------
+    // ---- The week -----------------------------------------------------------
     // The outline, the headers and the rows start at fixed offsets from
     // arrival; stage 4, then the scan (5) and the break (6), follow the end of
     // the row typing. Typing progress is the time elapsed over the typing's
@@ -229,7 +230,7 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
-    // ---- The dashboard --------------------------------------------------------
+    // ---- The dashboard ------------------------------------------------------
     // A card a stage, up to PREVIEW_DASHBOARD_FINAL_STAGE. It is the last
     // chapter, so nothing moves on from here.
     if (activePreviewChapterId === "dashboard-preview") {
@@ -263,7 +264,7 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
-    // ---- Any other chapter ----------------------------------------------------
+    // ---- Any other chapter --------------------------------------------------
     // Cannot run: usePreviewDerivedData builds only the four chapters handled
     // here and below.
     if (activePreviewChapterId !== "personal-info") {
@@ -278,7 +279,7 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
-    // ---- Personal Info --------------------------------------------------------
+    // ---- Personal Info ------------------------------------------------------
     if (prefersReducedMotion) {
       markAllFilled();
       setPreviewPersonalCollapsed(true);

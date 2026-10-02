@@ -97,7 +97,7 @@ export default function usePreviewDerivedData({
       ? String(personal.trainingDays.length)
       : "";
 
-  // ---- The profile: the visitor's, with the sample filling the gaps ----------
+  // ---- The profile: the visitor's, with the sample filling the gaps ---------
   // Every field comes out set. A text field or list the visitor left empty
   // takes the sample's value (`days` falls back first to the count of training
   // days picked), and a missing height, weight or body fat takes the sample's
@@ -143,8 +143,9 @@ export default function usePreviewDerivedData({
   );
 
   // ---- Body figures and the personal chapter's height and weight ------------
-  // A height or weight the visitor typed is shown as typed; otherwise it comes
-  // from the profile, the weight in App's weightUnit.
+  // A height or weight the visitor entered is typed back as entered; otherwise
+  // it comes from the profile, the weight in App's weightUnit. Which height
+  // fields are typed is previewFillOrder's choice, below.
   const activeHeightCm =
     Number(activePreviewProfile.heightCm) > 0 ? Number(activePreviewProfile.heightCm) : 175;
   const activeWeightKg =
@@ -174,7 +175,7 @@ export default function usePreviewDerivedData({
   const defaultAge = activePreviewProfile.age;
   const defaultSex = activePreviewProfile.sex;
 
-  // ---- The week plan ----------------------------------------------------------
+  // ---- The week plan --------------------------------------------------------
   // The visitor's training days, topped up from Monday on to the larger of the
   // days asked for and PREVIEW_WEEK_MIN_WORKOUT_DAYS. Training days take the
   // session templates in turn; rest days get a fixed recovery entry.
@@ -245,10 +246,10 @@ export default function usePreviewDerivedData({
     activePreviewProfile.environment
   ]);
 
-  // ---- The dashboard chapter's figures ----------------------------------------
+  // ---- The dashboard chapter's figures --------------------------------------
   // A plausible dashboard made from the plan and the profile, not from logs.
   const previewDashboardSummary = useMemo(() => {
-    // ---- The weekly goal and the workouts done ----
+    // ---- The weekly goal and the workouts done ------------------------------
     // Every planned training day counts as done, and the plan always holds at
     // least as many as the goal, so progress is always full and the pace text
     // below always says the goal is reached.
@@ -266,8 +267,9 @@ export default function usePreviewDerivedData({
       100
     );
 
-    // ---- Calories: a goal from body weight and the weekly goal, and an
-    // average just under it ----
+    // ---- Calories -----------------------------------------------------------
+    // A goal from body weight and the weekly goal, and an average just under
+    // it.
     const calorieGoal = clamp(Math.round(activeWeightKg * 30 + weeklyGoal * 18), 1700, 3400);
     const avgCalories = clamp(
       Math.round(calorieGoal * (0.92 + (workoutProgress / 100) * 0.06)),
@@ -281,10 +283,12 @@ export default function usePreviewDerivedData({
     );
     const calorieDelta = Math.round(avgCalories - calorieGoal);
 
-    // ---- Target weight ----
-    // Down for a goal containing "lose", "cut" or "fat", in any case, up for one
-    // containing "gain", "bulk" or "mass", and a little down otherwise. Shown in
-    // the locale's units (usesImperialUnits), not App's weightUnit.
+    // ---- Target weight ------------------------------------------------------
+    // Letter case aside, a goal containing "lose", "cut" or "fat", tested
+    // first, sets the target down, one containing "gain", "bulk" or "mass" sets
+    // it up, and any other sets it a little down. Both downward targets stop at
+    // 45 kg, so a visitor under that gets one above their weight. Shown in the
+    // locale's units (usesImperialUnits), not App's weightUnit.
     const goalText = String(activePreviewProfile.goal);
     const goalTokens = goalText.toLowerCase();
     const targetWeightKg = (() => {
@@ -296,9 +300,10 @@ export default function usePreviewDerivedData({
       ? `${Math.round(Number(toLb(String(roundTo(targetWeightKg, 1)), "kg")))} lb`
       : `${Math.round(targetWeightKg)} kg`;
 
-    // ---- Today and the next session ----
-    // Today is the real weekday, so these follow the clock. The next session is
-    // the first training day after today, going round the week.
+    // ---- Today and the next session -----------------------------------------
+    // Today is the real weekday when the summary is built; nothing rebuilds it
+    // at midnight. The next session is the first training day after today,
+    // going round the week.
     const todayName = getPreviewWeekdayName(new Date());
     const todayPlan = previewWeekPlan.find((item) => item.day === todayName) || previewWeekPlan[0];
     const todayWorkoutLines = String(todayPlan?.workout || "")
@@ -322,9 +327,11 @@ export default function usePreviewDerivedData({
     }
     if (!nextTrainingPlan) nextTrainingPlan = trainingDays[0] || previewWeekPlan[0];
 
-    // ---- Trend series, a value per day of the week ----
-    // Calories above the goal on training days and below it on rest days, and
-    // recovery lower on training days, each with a gentle wave over the week.
+    // ---- Trend series, a value per day of the week --------------------------
+    // Calories 2% over the goal on training days and 10% under it on rest days,
+    // plus a wave of up to 70 kcal across the week, which can pull a late-week
+    // training day under the goal (the sample's Saturday is); recovery lower on
+    // training days, with a smaller wave.
     const calorieSeries = previewWeekPlan.map((dayPlan, index) => {
       const base = dayPlan.isTraining ? calorieGoal * 1.02 : calorieGoal * 0.9;
       const wave = Math.sin((index / Math.max(previewWeekPlan.length - 1, 1)) * Math.PI * 2) * 70;
@@ -343,7 +350,7 @@ export default function usePreviewDerivedData({
     const trendStartLabel = PREVIEW_WEEK_DAY_ORDER[0].slice(0, 3);
     const trendEndLabel = PREVIEW_WEEK_DAY_ORDER[PREVIEW_WEEK_DAY_ORDER.length - 1].slice(0, 3);
 
-    // ---- Streak, recent activity, the overview's settings and the pace ----
+    // ---- Streak, recent activity, the overview's settings and the pace ------
     // The streak is the longest run of training days from Monday to Sunday,
     // not wrapping round, held between 1 and the weekly goal.
     let runningStreak = 0;
@@ -380,7 +387,7 @@ export default function usePreviewDerivedData({
           ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
           : "Log a workout to start your pace estimate.";
 
-    // ---- Today's meals: a training-day menu or a rest-day one ----
+    // ---- Today's meals: a training-day menu or a rest-day one ---------------
     const mealPlan = todayPlan?.isTraining
       ? {
           breakfast: "Greek yogurt + oats + berries",
@@ -442,7 +449,8 @@ export default function usePreviewDerivedData({
   ]);
 
   // ---- What the personal chapter types, and in what order -------------------
-  // computedBodyFat is in neither fill order, so the chapter never shows it.
+  // computedBodyFat is in neither fill order and PreviewPersonalChapter has no
+  // field for it, so nothing reads it.
   const previewPersonalTargets = useMemo(
     () => ({
       name: String(defaultName ?? ""),
@@ -534,7 +542,7 @@ export default function usePreviewDerivedData({
     previewInitialFillOrderRef.current = previewFillOrder;
   }
 
-  // ---- The chapters -----------------------------------------------------------
+  // ---- The chapters ---------------------------------------------------------
   // Each is an id, which PreviewStage and the hooks switch on, and a title,
   // which heads the stage, labels the table of contents and sizes its chips
   // below. Nothing in the list depends on the profile, so it is built once.
@@ -557,7 +565,7 @@ export default function usePreviewDerivedData({
     (chapter) => chapter.id === "dashboard-preview"
   );
 
-  // ---- Layout -----------------------------------------------------------------
+  // ---- Layout ---------------------------------------------------------------
   // The chips and the stage title are as wide as the longest chapter title,
   // with a minimum each. The body is padded on the right by the table of
   // contents' lane and 8px on every chapter but the dashboard.
@@ -588,7 +596,7 @@ export default function usePreviewDerivedData({
     "--preview-chip-collapsed": "44px"
   };
 
-  // ---- Helpers for the chapters -----------------------------------------------
+  // ---- Helpers for the chapters ---------------------------------------------
   // A textarea's rows: one per 30 characters, between minRows and maxRows.
   const getPreviewTextRows = (value, minRows = 1, maxRows = 4) => {
     const text = String(value ?? "").trim();

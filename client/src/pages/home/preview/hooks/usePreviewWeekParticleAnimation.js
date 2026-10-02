@@ -25,12 +25,16 @@ import { clamp, randomBetween } from "../utils";
 /**
  * Plays the dissolve when the week chapter reaches stage 6, unless the visitor
  * prefers reduced motion. It measures each th, td, p, li and h3 of the table
- * in `previewWeekTableWrapRef` with getBoundingClientRect, scatters particles
- * over each and chunks over each cell into `previewWeekParticleLayerRef`,
- * coloured from the element's computed style, and draws their positions,
- * sizes, drifts and timings from Math.random, mostly through randomBetween. The
- * dissolve runs down the table from the top. If it finds nothing to break up
- * it starts nothing, and the walkthrough does not move on by itself.
+ * in `previewWeekTableWrapRef` with getBoundingClientRect and, in document
+ * order, scatters particles over each element and chunks over each cell into
+ * `previewWeekParticleLayerRef` until PREVIEW_WEEK_PARTICLE_MAX_TOTAL and
+ * PREVIEW_WEEK_CHUNK_MAX_TOTAL run out, which for a full table happens before
+ * its bottom rows are covered. Colours come from the element's computed style,
+ * and positions, sizes, drifts and timings from Math.random, mostly through
+ * randomBetween. The dissolve is staggered down the table from the top, except
+ * for the cells left without chunks, which fade from the start (see cellMeta
+ * below). If it finds nothing to break up it starts nothing, and the
+ * walkthrough does not move on by itself.
  *
  * On completion it sets stage 7, which leaves the dissolved table as it ended,
  * and, while the week is still the current chapter (`previewStepIndexRef`),
@@ -106,7 +110,7 @@ export default function usePreviewWeekParticleAnimation({
     const wrapRect = wrapEl.getBoundingClientRect();
     if (!wrapRect.width || !wrapRect.height) return undefined;
 
-    // ---- Measure the table ----------------------------------------------------
+    // ---- Measure the table --------------------------------------------------
     // Every element with a size that overlaps the wrap, placed relative to it.
     // Its row and column progress, 0 at the top or left edge and 1 at the
     // other, are what stagger the dissolve.
@@ -151,7 +155,7 @@ export default function usePreviewWeekParticleAnimation({
     const textMeta = [];
     const fragment = document.createDocumentFragment();
 
-    // ---- Particles: over each element in its text colour, up to a cap ------
+    // ---- Particles: over each element in its text colour, up to a cap -------
     contentEntries.forEach((entry) => {
       const { rect, relativeLeft, relativeTop, rowProgress, particleColor } = entry;
       // One per PREVIEW_WEEK_PARTICLE_DENSITY_PX of area, between the
@@ -193,6 +197,9 @@ export default function usePreviewWeekParticleAnimation({
 
         fragment.appendChild(particleEl);
         particles.push(particleEl);
+        // Here and in the cell and chunk records below, durations and delays
+        // are in ms, drifts in px, rotations in degrees and clips in % of the
+        // cell.
         particleMeta.push({
           delay: Math.round(
             particleRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS +
@@ -212,7 +219,10 @@ export default function usePreviewWeekParticleAnimation({
       }
     });
 
-    // ---- Chunks: over each cell in its background colour, up to a cap -------
+    // ---- Chunks: over each cell, up to a cap --------------------------------
+    // In the cell's background colour or, where that is transparent, as it is
+    // for every day cell, whose background is a gradient, a fixed translucent
+    // white, stronger for a th.
     cellEntries.forEach((entry) => {
       const { targetEl, rect, relativeLeft, relativeTop, rowProgress, colProgress } = entry;
 
@@ -234,8 +244,10 @@ export default function usePreviewWeekParticleAnimation({
       );
 
       // The cell's own drift, clip and fade, staggered down the table and a
-      // little across it. A cell past the chunk cap has returned above without
-      // one, so the timeline's fallbacks, with no delay, apply to it.
+      // little across it. Once the chunk cap is used up every later cell
+      // returns above without one, so cellMeta lines up with cellTargets by
+      // index for the cells before it, and the timeline's fallbacks, with no
+      // delay, apply to the rest.
       cellMeta.push({
         delay: baseDelay,
         duration: Math.round(randomBetween(1250, 1820)),
@@ -297,7 +309,7 @@ export default function usePreviewWeekParticleAnimation({
 
     if (!particles.length && !chunks.length) return undefined;
 
-    // ---- Play -----------------------------------------------------------------
+    // ---- Play ---------------------------------------------------------------
     // The elements the timeline styles are recorded first, so that a clear can
     // strip those styles again.
     layerEl.appendChild(fragment);

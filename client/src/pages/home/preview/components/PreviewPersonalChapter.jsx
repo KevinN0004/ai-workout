@@ -9,13 +9,15 @@ import { TRAINING_DAY_OPTIONS } from "../constants";
 /**
  * Shows what `previewFilledFields` holds, which usePreviewChapterFlow fills
  * over time; a field not filled yet is blank. With `isGenerateView`, for the
- * Generate chapter, the form is collapsed and the builder showing whatever the
- * other flags say. Otherwise `previewPersonalCollapsed` collapses the form and
- * `previewPersonalShifted` shows the builder. `previewBuilderStage` reveals the
- * builder's pieces in turn, and is also a class the stylesheet keys on. The
- * height field and the unit toggles follow App's `heightUnit` and
- * `weightUnit`. The visitor cannot change any of it: the inputs are read-only,
- * a select snaps back to its value, and the buttons have no handlers.
+ * Generate chapter, the form is collapsed and the builder shown, whatever the
+ * other two flags say. Otherwise `previewPersonalCollapsed` collapses the form
+ * and `previewPersonalShifted` shows the builder. `previewBuilderStage` reveals
+ * the builder's pieces in turn, and is also a class the stylesheet keys on.
+ * The height field and the unit toggles follow App's `heightUnit` and
+ * `weightUnit`; which height values get filled is usePreviewDerivedData's
+ * previewFillOrder, which follows the locale instead. The visitor cannot change
+ * any of it: the inputs are read-only, a select snaps back to its value, and
+ * the buttons have no handlers.
  */
 export default function PreviewPersonalChapter({
   isGenerateView = false,

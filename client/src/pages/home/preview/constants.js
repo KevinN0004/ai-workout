@@ -1,11 +1,12 @@
 /**
  * Fixed values for the home page's preview walkthrough: the sample profile it
  * falls back on, the day and field lists, and the timings and particle limits
- * it is paced by. Read throughout the walkthrough, and TRAINING_DAY_OPTIONS by
- * HomePage too.
+ * it is paced by. Read throughout the walkthrough; HomePage keeps a separate
+ * copy of TRAINING_DAY_OPTIONS.
  */
-// The regions usePreviewDerivedData shows in feet, inches and pounds. App's own
-// unit choice reads a private copy of the same set in app/units.js.
+// The regions for which usePreviewDerivedData types the height in feet and
+// inches and gives the dashboard's target weight in pounds. App's own unit
+// choice reads a private copy of the same set in app/units.js.
 export const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
 export const TRAINING_DAY_OPTIONS = [
   "Monday",
@@ -62,7 +63,8 @@ export const PREVIEW_TYPING_MAX_MS = 58;
 export const PREVIEW_TRAINING_DAY_STEP_MS = 110;
 export const PREVIEW_COLLAPSE_DELAY_MS = 480;
 // The same as `--preview-motion-duration` in styles/personal.css, which times
-// the personal chapter's collapse morph.
+// the collapse morph and the builder's entrances; the wait after the morph and
+// the builder's step below are derived from it.
 const PREVIEW_MOTION_DURATION_MS = 1100;
 const PREVIEW_MORPH_DURATION_MS = PREVIEW_MOTION_DURATION_MS;
 export const PREVIEW_POST_MORPH_SHIFT_DELAY_MS = Math.max(0, PREVIEW_MORPH_DURATION_MS + 40);
@@ -122,8 +124,9 @@ export const PREVIEW_WEEK_OUTLINE_DRAW_MS =
 export const PREVIEW_WEEK_HEADER_REVEAL_MS = 620;
 export const PREVIEW_WEEK_ROW_TYPING_MS = 1800;
 export const PREVIEW_WEEK_SCAN_DELAY_MS = 400;
-// The same as the scan animation's 5000ms in styles/workout-week/structure.css,
-// so the table starts to break apart as the scan ends.
+// The same as the duration of `preview-week-live-scan-once` in
+// styles/workout-week/structure.css, so the table starts to break apart as the
+// scan ends.
 const PREVIEW_WEEK_SCAN_DURATION_MS = 5000;
 export const PREVIEW_WEEK_BREAK_AFTER_SCAN_START_MS = PREVIEW_WEEK_SCAN_DURATION_MS;
 // The dissolve: square pixels of an element per particle, the particles each
