@@ -28,10 +28,10 @@ const LIBRARY_PAGE_SIZE = 24;
  * Three sections, picked by the View select: smart picks (the loaded exercises
  * scored by recommendationUtils against the goal track, the planner's
  * equipment, today's plan lines, the weather and any injury note), a training
- * guide (buildGuideCards), and the exercise list. The search
- * and filters drive the one exercise load both lists share. An injury note is
- * the planner form's injuries plus the profile's notes. `onSaveExerciseToPlan`
- * is saveExerciseToPlan in events.js, which resolves to `{ ok: true }` or
+ * guide (buildGuideCards), and the exercise list. The search and filters drive
+ * the one exercise load both lists share. An injury note is the planner form's
+ * injuries plus the profile's notes. `onSaveExerciseToPlan` is
+ * saveExerciseToPlan in events.js, which resolves to `{ ok: true }` or
  * `{ ok: false, error }`.
  */
 export default function TipsView({

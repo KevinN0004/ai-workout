@@ -19,9 +19,11 @@ export default function ExerciseDetailsModal({
   isSaving
 }) {
   // The only guard on this, so ModalPortal gets `open` outright. Repeating the
-  // condition there would make both untestable: either one alone renders
-  // nothing, so no test could tell a broken guard from a working one.
-  // GeneratedPlanModal follows the same rule.
+  // condition there would add a check that is always true by the time it runs,
+  // so no test could tell it working from broken. The children read
+  // `selectedExercise.name` before ModalPortal runs, so this guard is also what
+  // keeps a null exercise from throwing. GeneratedPlanModal follows the same
+  // one-guard rule.
   if (!selectedExercise) return null;
 
   return (

@@ -264,7 +264,7 @@ export const scoreExercise = (exercise, context) => {
 
 /**
  * The training guide's cards: split, load progression, volume, session budget,
- * weather and injuries. Each is a fixed cue chosen by one setting: weekly
+ * weather and injuries. Each card's text depends on one setting: weekly
  * workouts, track, activity level, session minutes, weather mode and whether
  * there is an injury note.
  */

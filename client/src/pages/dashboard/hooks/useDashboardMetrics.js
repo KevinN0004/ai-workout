@@ -145,9 +145,11 @@ export default function useDashboardMetrics({
 }) {
   // ---- Deduplicated lists ---------------------------------------------------
 
-  // The dashboard carries the same sessions as both `workoutSessions` and
-  // `workouts`: userReadRepository fills both from one query, and a pending
-  // workout is added to both. Merging them and deduplicating by id keeps one.
+  // The dashboard carries the newest sessions twice: `workouts` is the list
+  // userReadRepository loads, and `workoutSessions` is the first page that
+  // buildDashboardResponse (dashboardCollectionService.js) loads separately in
+  // its place. A pending workout is added to both. Both use mapWorkoutSession, so
+  // merging them and deduplicating by id keeps one of each.
   const workouts = useMemo(() => {
     const workoutSessions = Array.isArray(dashboard?.workoutSessions)
       ? dashboard.workoutSessions

@@ -35,12 +35,12 @@ function TrendChart({
 
 /**
  * `form` is App's planner form, so the overview shows the settings the next
- * plan will use rather than the saved plan's. Everything numeric comes from
- * useDashboardMetrics, and the trend charts draw with its `buildLinePath`.
- * Showing this view is what triggers useDashboardData's one-time weather and
- * air-quality load, which skips a reading it already holds. The two cards'
- * refresh buttons are always there, and each card shows its error alongside any
- * reading it still has.
+ * plan will use rather than the saved plan's. The progress and trend numbers
+ * come from useDashboardMetrics, and the charts draw with its `buildLinePath`;
+ * the weather and air-quality figures are useDashboardData's readings. App's
+ * `dashView` being "summary", not this view rendering, is what starts their
+ * one-time load. The two cards' refresh buttons are always there, and each card
+ * shows its error alongside any reading it still has.
  */
 export default function SummaryView({
   form,

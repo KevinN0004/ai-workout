@@ -5,12 +5,12 @@
 
 /**
  * Shows the next or latest workout, the calorie gap, and the weather and air
- * quality, each with a "Last updated" line. DashboardPage derives every value:
- * `nextWorkout` carries a `context` of "Upcoming" or "Latest", `caloriesGap` is
- * the goal minus `avgCalories` (positive means under target), and
- * `formatRelativeUpdatedAt` words the update times. The weather and air cards
- * offer Retry while their last load has an error; a reading already on screen
- * stays in place of the error text.
+ * quality, the last two each with a line saying when they were updated.
+ * DashboardPage derives every value: `nextWorkout` carries a `context` of
+ * "Upcoming" or "Latest", `caloriesGap` is the goal minus `avgCalories`
+ * (positive means under target), and `formatRelativeUpdatedAt` words the update
+ * times. The weather and air cards offer Retry while their last load has an
+ * error; a reading already on screen stays in place of the error text.
  */
 export default function DashboardAtAGlance({
   nextWorkout,

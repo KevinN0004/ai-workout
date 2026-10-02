@@ -1,6 +1,6 @@
 /**
- * The dashboard's Goal view: calories, the goals and progress metrics, each
- * with its form and log. Rendered by DashboardPage, which loads it lazily.
+ * The dashboard's Goal view: calories and progress metrics, each with its form
+ * and log, and the goals form. Rendered by DashboardPage, which loads it lazily.
  */
 import "./CaloriesView.css";
 
@@ -33,8 +33,8 @@ export default function CaloriesView({
 }) {
   // Each list is narrowed once, and both the rows and the empty state beneath
   // them read the result, so the two cannot disagree. Guarded separately they
-  // could: `Array.isArray` rejects a string where `?.length` accepts one, and a
-  // non-array would render no rows and no explanation either.
+  // could: `Array.isArray` rejects a string where `?.length` accepts one, so a
+  // string would render no rows and no explanation either.
   // useDashboardMetrics already hands over arrays.
   const calorieEntries = Array.isArray(calories) ? calories : [];
   const metricEntries = Array.isArray(progressMetrics) ? progressMetrics : [];

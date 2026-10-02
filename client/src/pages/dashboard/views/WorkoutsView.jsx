@@ -11,7 +11,9 @@ const ROW_BATCH_SIZE = 40;
 
 // A sort key rather than a date: the timestamp, or 0 so that a row whose date
 // does not parse sorts last. useDashboardMetrics' parseDateValue is a different
-// function, returning a Date or null.
+// function, returning a Date or null. This one reads a bare YYYY-MM-DD as UTC
+// midnight, unlike that one, but UTC midnights fall in date order too, so the
+// sort is the same.
 const parseDateValue = (value) => {
   if (!value) return 0;
   const parsed = new Date(value);

@@ -8,7 +8,9 @@
  * (submitMealLog in events.js). The list shows the first few of `safeMealLogs`,
  * which arrive most recently logged first. With none, "Log first meal" fills in
  * a date and a meal type where the form has none, then focuses the name field
- * through `mealLogNameInputRef`.
+ * through `mealLogNameInputRef`. The date it fills is the UTC one
+ * (toISOString), not getLocalDateKey's, so in the evening west of UTC it is
+ * tomorrow.
  */
 export default function MealLogPanel({
   safeMealLogForm,

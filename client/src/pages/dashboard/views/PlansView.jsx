@@ -14,10 +14,11 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * The week comes from `latestPlanByWeekday`, the newest saved plan's lines by
  * weekday; `openPlannerFromProfile` opens the planner to make a new one. A day's
  * card opens a details modal for its workout or its meals. The saved exercises
- * show SAVED_EXERCISE_PAGE_SIZE at a time, and `onRemoveSavedExercise` takes an
- * exercise's id. The meals week follows the latest plan's goal, else the
- * planner form's (`fallbackPlan`); the `goals.goalType` step between them never
- * applies, because the server's goals carry none.
+ * show SAVED_EXERCISE_PAGE_SIZE at a time, and `onRemoveSavedExercise` takes the
+ * saved entry's `id`, not its wger `exerciseId`. The meals week follows the
+ * latest plan's goal, else the planner form's (`fallbackPlan`); the
+ * `goals.goalType` step between them never applies, because the server's goals
+ * carry none.
  */
 export default function PlansView({
   weekDays,

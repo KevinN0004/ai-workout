@@ -4,10 +4,10 @@
  */
 
 /**
- * Signed out, renders only the title and a Login / Sign up button. Signed in,
- * adds the menu button and the profile menu (View profile, Log out).
- * `profileMenuRef` goes on the menu's wrapper, which is how DashboardPage tells
- * a click outside the menu from one inside it.
+ * Signed out, renders the title, a Login / Sign up button and a sign-in prompt.
+ * Signed in, it adds the menu button and the profile menu (View profile, Log
+ * out). `profileMenuRef` goes on the menu's wrapper, which is how DashboardPage
+ * tells a click outside the menu from one inside it.
  */
 export default function DashboardHeader({
   user,
