@@ -63,12 +63,12 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
     [measurementSystem]
   );
 
-  // Every row and the edit form read the stored profile, some rows and all the
-  // form's values through profileToPersonal, the mapper the save path uses in
-  // reverse. App's in-memory `personal` is no substitute: it is the home flow's
-  // form, and a returning visitor who signs in never passes through that flow,
-  // so rows read from it would say "Not set" over a stored profile and the edit
-  // form would seed blanks.
+  // The rows that show profile fields, and the edit form, read the stored
+  // profile: some rows and all the form's values through profileToPersonal, the
+  // mapper the save path uses in reverse. App's in-memory `personal` is no
+  // substitute: it is the home flow's form, and a returning visitor who signs
+  // in never passes through that flow, so rows read from it would say "Not
+  // set" over a stored profile and the edit form would seed blanks.
   const stored = useMemo(() => profileToPersonal(profile, units), [profile, units]);
   const fullName = stored.name;
   const trainingDays = stored.trainingDays;
