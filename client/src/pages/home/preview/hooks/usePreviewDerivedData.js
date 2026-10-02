@@ -19,6 +19,25 @@ import {
   getPreviewWeekdayName
 } from "../utils";
 
+// Session names and their exercises, paired by index, handed to the week plan's
+// training days in week order and starting over after the last.
+const TRAINING_TEMPLATES = [
+  "Upper Strength",
+  "Lower Strength",
+  "Conditioning",
+  "Pull + Core",
+  "Power + Stability",
+  "Full Body Session"
+];
+const TRAINING_EXERCISE_TEMPLATES = [
+  "Bench Press - Incline DB Press - Cable Row",
+  "Back Squat - Romanian Deadlift - Walking Lunge",
+  "Bike Intervals - Kettlebell Swings - Burpees",
+  "Pull-ups - Seated Row - Hanging Knee Raise",
+  "Trap Bar Deadlift - Push Press - Sled Push",
+  "Front Squat - DB Bench Press - Lat Pulldown"
+];
+
 /**
  * Derives the walkthrough's content from the visitor's `personal` profile and
  * planner `form`, with JOHN_DOE_PREVIEW_PROFILE filling what they leave empty,
@@ -189,24 +208,6 @@ export default function usePreviewDerivedData({
         ? `${Number(activePreviewProfile.duration)} min`
         : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
     const environmentLabel = String(activePreviewProfile.environment);
-    // Session names and their exercises, paired by index, handed to the
-    // training days in week order and starting over after the last.
-    const trainingTemplates = [
-      "Upper Strength",
-      "Lower Strength",
-      "Conditioning",
-      "Pull + Core",
-      "Power + Stability",
-      "Full Body Session"
-    ];
-    const trainingExerciseTemplates = [
-      "Bench Press - Incline DB Press - Cable Row",
-      "Back Squat - Romanian Deadlift - Walking Lunge",
-      "Bike Intervals - Kettlebell Swings - Burpees",
-      "Pull-ups - Seated Row - Hanging Knee Raise",
-      "Trap Bar Deadlift - Push Press - Sled Push",
-      "Front Squat - DB Bench Press - Lat Pulldown"
-    ];
     let trainingIndex = 0;
 
     return PREVIEW_WEEK_DAY_ORDER.map((day) => {
@@ -222,9 +223,9 @@ export default function usePreviewDerivedData({
         };
       }
 
-      const templateIndex = trainingIndex % trainingTemplates.length;
-      const session = trainingTemplates[templateIndex];
-      const workout = trainingExerciseTemplates[templateIndex];
+      const templateIndex = trainingIndex % TRAINING_TEMPLATES.length;
+      const session = TRAINING_TEMPLATES[templateIndex];
+      const workout = TRAINING_EXERCISE_TEMPLATES[templateIndex];
       const focus = String(sourceFocuses[trainingIndex % sourceFocuses.length] || "Strength");
       trainingIndex += 1;
       return {

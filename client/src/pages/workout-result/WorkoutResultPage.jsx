@@ -4,8 +4,8 @@
  * notes and a PDF download. Rendered by App.
  */
 import { useMemo, useState } from "react";
-import "./WorkoutResultPage.css";
 import { APP_BRAND_NAME } from "../../app/constants";
+import "./WorkoutResultPage.css";
 
 /**
  * `planSections` is App's parse of the generated plan, and `hasResult` says

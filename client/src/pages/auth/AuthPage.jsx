@@ -2,8 +2,8 @@
  * The /auth page: one form for logging in and for signing up, the sign-up mode
  * adding the profile fields above the email and password. Rendered by App.
  */
-import "./AuthPage.css";
 import { APP_BRAND_EXPANSION, APP_BRAND_NAME } from "../../app/constants";
+import "./AuthPage.css";
 
 /**
  * Renders App's auth and sign-up state and calls back into App for every
