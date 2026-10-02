@@ -352,7 +352,7 @@ describe("every source file opens with a header comment", () => {
   // stops being an in-scope file, fails the tests named for those cases, so no
   // entry outlives the file it excuses. When entries are removed, lower
   // ALLOWLIST_SIZE in the same change.
-  const ALLOWLIST_SIZE = 87;
+  const ALLOWLIST_SIZE = 71;
 
   const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
   const isInScope = (file) =>

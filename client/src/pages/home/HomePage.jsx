@@ -1,4 +1,10 @@
-﻿import "./HomePage.css";
+﻿/**
+ * The home page: the intro, the walkthrough preview, the profile form, the
+ * physique silhouette and the workout stage, one at a time, with the planner
+ * and generated-plan modals App builds. Rendered by App for any path it does
+ * not route elsewhere.
+ */
+import "./HomePage.css";
 import useBodyModel from "./hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../../app/constants";
 import useHomeStageFlow from "./hooks/useHomeStageFlow";
@@ -9,6 +15,15 @@ import HomeVisualizerStage from "./components/HomeVisualizerStage";
 import HomeWorkoutStage from "./components/HomeWorkoutStage";
 import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
 
+/**
+ * Shows the stage useHomeStageFlow is on, feeding the stages the body model
+ * useBodyModel derives from App's `personal` form. Most props are App's form
+ * state, setters and unit converters, passed through to the stage that uses
+ * them. `samplePlan` is the plan the workout stage shows; `plannerModal` and
+ * `generatedPlanModal` are App's elements, rendered here whatever the stage.
+ * The hidden workout copy is always rendered too, so the workout panel can be
+ * measured before its stage exists.
+ */
 export default function HomePage({
   gradient,
   user,
@@ -35,6 +50,7 @@ export default function HomePage({
   plannerModal,
   generatedPlanModal
 }) {
+  // ---- Training days --------------------------------------------------------
   const trainingDayOptions = [
     "Monday",
     "Tuesday",
@@ -58,6 +74,10 @@ export default function HomePage({
     });
   };
 
+  // ---- Stage flow and body model --------------------------------------------
+  // useBodyModel stands the figure with these, in view-box units: the view
+  // box's height, the same as VIEWBOX_HEIGHT in physique/geometry.js, and the
+  // gap left under the feet.
   const silhouetteViewHeight = 430;
   const silhouetteFloorInset = 18;
 
@@ -102,12 +122,16 @@ export default function HomePage({
     silhouetteFloorInset
   });
 
+  // ---- Personal stage submit, and what the stages share ---------------------
+  // Continue on the personal stage moves to the physique stage through the
+  // morph, once the profile is complete and nothing is animating.
   const onPersonalSubmit = (event) => {
     event.preventDefault();
     if (!isPersonalComplete || isIntroTransitioning || isStageTransitioning) return;
     transitionToStageFromTrigger("visualizer");
   };
 
+  // The white Back control of the personal, physique and workout stages.
   const backBtnStyle = {
     background: "#fff",
     border: "1px solid rgba(255, 255, 255, 0.92)",
@@ -115,11 +139,14 @@ export default function HomePage({
     boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
   };
 
+  // The physique stage's accessible name for the silhouette.
   const visualLabel =
     "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <div className="page home-page" style={gradient}>
+      {/* ---- Sticky nav: the brand returns to the intro ---- */}
       <div className="home-sticky-nav">
         <span className="home-nav-spacer" aria-hidden="true" />
         <button type="button" className="home-nav-title" onClick={() => goToStage("intro")}>
@@ -135,6 +162,7 @@ export default function HomePage({
         </button>
       </div>
 
+      {/* ---- The current stage; all but the intro share the keyed wrapper ---- */}
       {homeStage === "intro" ? (
         <HomeIntroStage
           introPanelRef={introPanelRef}
@@ -228,6 +256,7 @@ export default function HomePage({
         </main>
       )}
 
+      {/* ---- App's modals, and the hidden workout copy ---- */}
       {plannerModal}
       {generatedPlanModal}
 

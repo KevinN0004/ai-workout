@@ -1,3 +1,9 @@
+/**
+ * The visitor's body as the home page models it: height and weight read from
+ * whichever units the form is in, BMI and body fat, whether the profile step is
+ * complete, and the silhouette shape PhysiqueSilhouette2D draws. Called by
+ * HomePage.
+ */
 import { useMemo } from "react";
 
 // Guards before it coerces, because `Number("")` and `Number(null)` are both 0
@@ -10,6 +16,10 @@ const toFiniteNumber = (value) => {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+// The form stores each option's label verbatim ("Moderate", "HIIT",
+// "High-protein") and the five option score tables are keyed in lower case, so
+// this is what joins them. Without it every one of those lookups would miss
+// and fall to its default.
 const toLowerText = (value) =>
   String(value || "")
     .trim()
@@ -20,6 +30,9 @@ const roundTo = (value, decimals = 1) => {
   return Math.round(value * factor) / factor;
 };
 
+// Where fat sits, by sex: each region's share, and the waist-to-hip ratio from
+// lean to high adiposity. They weight how the fat score widens each part of the
+// silhouette. `neutral`, for any other answer, is the average of the two.
 const MEDICAL_REGION_PROFILES = {
   male: {
     // Regional adipose tendency from DXA population trends:
@@ -54,6 +67,17 @@ const MEDICAL_REGION_PROFILES = {
   }
 };
 
+/**
+ * Derives the body model from App's `personal` form. Returns the height in
+ * centimetres and the weight in kilograms, each null when it is missing or not
+ * positive; `bmi`; `isPersonalComplete`, which gates the personal stage's
+ * Continue; `effectiveBodyFat`, the body fat entered or else one estimated from
+ * BMI; and the silhouette's shape, with a JSON signature of it.
+ *
+ * `toCmFromFeetInches` and `toKg` are app/units.js's converters, passed down
+ * from App. `silhouetteViewHeight` and `silhouetteFloorInset` place the figure
+ * vertically in the silhouette's view box.
+ */
 export default function useBodyModel({
   personal,
   heightUnit,
@@ -63,6 +87,11 @@ export default function useBodyModel({
   silhouetteViewHeight,
   silhouetteFloorInset
 }) {
+  // ---- Height, weight and BMI -----------------------------------------------
+  // The field for the unit in use wins and the other is the fallback, so a
+  // profile holding a height in only one of the two still resolves.
+  // personalToProfile in app/profileMapping.js makes the same pick, and the two
+  // must agree.
   const resolvedHeightCm = useMemo(() => {
     const fromCmInput = toFiniteNumber(personal.heightCm);
     const fromImperialInput = toFiniteNumber(
@@ -90,6 +119,8 @@ export default function useBodyModel({
     return Number((resolvedWeightKg / (heightMeters * heightMeters)).toFixed(1));
   }, [resolvedHeightCm, resolvedWeightKg]);
 
+  // ---- Whether the personal step is complete --------------------------------
+  // The five fields HomePersonalStage's hint asks for.
   const ageValue = useMemo(() => toFiniteNumber(personal.age), [personal.age]);
   const hasValidName = Boolean(personal.name?.trim());
   const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 99;
@@ -100,11 +131,16 @@ export default function useBodyModel({
     resolvedWeightKg !== null &&
     Boolean(personal.sex);
 
+  // ---- Body fat as entered --------------------------------------------------
+  // Blank, null and absent all read as not entered and fall through to the BMI
+  // estimate below. An entered "0" is a measurement, and clamps to the floor.
   const explicitBodyFat = useMemo(() => {
     const value = toFiniteNumber(personal.bodyFat);
     return value === null ? null : clamp(value, 3, 60);
   }, [personal.bodyFat]);
 
+  // ---- Lifestyle scores from the Advanced fields ----------------------------
+  // Each 0 to 1, with a middling default for an unanswered field.
   const activityScore = useMemo(() => {
     const map = {
       light: 0.28,
@@ -165,6 +201,8 @@ export default function useBodyModel({
     return map[key] ?? 0.56;
   }, [personal.sleep]);
 
+  // Indexed by the number of days chosen, up to seven. None chosen scores above
+  // one day.
   const trainingDaysScore = useMemo(() => {
     const total = Array.isArray(personal.trainingDays) ? personal.trainingDays.length : 0;
     const map = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.95];
@@ -172,6 +210,7 @@ export default function useBodyModel({
     return map[capped];
   }, [personal.trainingDays]);
 
+  // ---- Body fat the model uses ----------------------------------------------
   const estimatedBodyFat = useMemo(() => {
     if (bmi === null) return null;
     const estimate = 1.35 * bmi - 13.5;
@@ -180,7 +219,13 @@ export default function useBodyModel({
 
   const effectiveBodyFat = explicitBodyFat ?? estimatedBodyFat;
 
+  // ---- Silhouette shape -----------------------------------------------------
+  // The model geometry.js builds the figure from: positions and half-widths in
+  // view-box units, fat channels, and the fill colour.
   const silhouetteShape = useMemo(() => {
+    // ---- Fat and muscularity scores -----------------------------------------
+    // The scores run 0 to 1 and the biases shift them. Body fat leads where it
+    // is known, entered or estimated, with BMI behind it.
     const bmiMassScore = bmi !== null ? clamp((bmi - 18.5) / (45 - 18.5), 0, 1) : 0.45;
     const bodyFatMassScore =
       effectiveBodyFat !== null ? clamp((effectiveBodyFat - 8) / (50 - 8), 0, 1) : null;
@@ -203,6 +248,8 @@ export default function useBodyModel({
       -0.22,
       0.22
     );
+    // 0 without an age. The guard states that rather than causing it:
+    // `(null - 40) / 45` clamps to 0 as well.
     const ageAdjustment = ageValue !== null ? clamp((ageValue - 40) / 45, 0, 0.22) : 0;
     const fatScore = clamp(baseFatScore - profileFatBias + ageAdjustment * 0.32, 0, 1);
     const obesityBias = clamp((bmiMassScore - 0.38) / 0.62, 0, 1);
@@ -214,6 +261,10 @@ export default function useBodyModel({
       1
     );
 
+    // ---- Proportions by sex -------------------------------------------------
+    // Landmark heights up from the floor, the head's length, and the breadths
+    // and reach, each as a fraction of stature. Any answer but "male" or
+    // "female" gets the average of the two.
     const heightNorm = resolvedHeightCm
       ? clamp((resolvedHeightCm - 150) / (205 - 150), 0, 1)
       : 0.48;
@@ -281,6 +332,9 @@ export default function useBodyModel({
           ? MEDICAL_REGION_PROFILES.female
           : MEDICAL_REGION_PROFILES.neutral;
 
+    // ---- Vertical placement in the view box ---------------------------------
+    // y is measured down from the top. A taller visitor stands lower and spans
+    // more of the box.
     const legBias = (heightNorm - 0.5) * 18;
     const floorY = silhouetteViewHeight - silhouetteFloorInset;
     const ankleY = floorY + legBias;
@@ -305,6 +359,9 @@ export default function useBodyModel({
     const kneeTargetY = yFromHeightRatio(anthropometry.kneeHeight);
     const chestYRaw = shoulderYRaw + (waistYRaw - shoulderYRaw) * 0.34;
     const thighYRaw = groinTargetY + (kneeTargetY - groinTargetY) * 0.52;
+    // Hip and calf are solved back from the groin and knee targets, inverting
+    // how buildDerivedMetrics in templateOutline.js derives groin and knee from
+    // them, so an unclamped figure puts both at their anthropometric heights.
     const hipYRaw = (groinTargetY - 0.13 * thighYRaw) / 0.87;
     const calfYRaw = (kneeTargetY - 0.62 * thighYRaw) / 0.38;
 
@@ -315,6 +372,7 @@ export default function useBodyModel({
     const thighY = clamp(thighYRaw, hipY + 30, hipY + 96);
     const calfY = clamp(calfYRaw, thighY + 26, ankleY - 20);
 
+    // ---- Half-widths --------------------------------------------------------
     const shoulderBreadth = statureSpan * anthropometry.shoulderBreadth;
     const chestBreadth = statureSpan * anthropometry.chestBreadth;
     const waistBreadth = statureSpan * anthropometry.waistBreadth;
@@ -393,6 +451,8 @@ export default function useBodyModel({
       8,
       24
     );
+    // Pulls the waist-to-hip ratio toward the one expected for this sex and
+    // adiposity: the waist moves most, the hip and chest a little.
     const expectedWhr =
       medicalRegionProfile.whrLean +
       (medicalRegionProfile.whrHighAdiposity - medicalRegionProfile.whrLean) * adiposityPressure;
@@ -404,6 +464,10 @@ export default function useBodyModel({
     const armHeight = clamp(statureSpan * anthropometry.armReach, 146, 194);
     const armSpanRatio = anthropometry.armSpanRatio;
 
+    // ---- Colour and soft-tissue channels ------------------------------------
+    // The fill is an HSL hue in degrees with saturation and lightness in
+    // percent. Nothing downstream reads `strokeLightness` or the three glow
+    // values; they only add to the shape's signature.
     const fillHue = 24 - fatScore * 4;
     const fillSaturation = clamp(44 + fatScore * 18, 40, 82);
     const fillLightness = clamp(56 - fatScore * 10, 36, 68);
@@ -483,6 +547,9 @@ export default function useBodyModel({
     trainingDaysScore
   ]);
 
+  // ---- Render signature -----------------------------------------------------
+  // HomeVisualizerStage keys the silhouette on it, so the silhouette remounts
+  // when the shape changes by value.
   const silhouetteRenderSignature = useMemo(
     () => JSON.stringify(silhouetteShape),
     [silhouetteShape]

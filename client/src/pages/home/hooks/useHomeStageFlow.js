@@ -1,7 +1,32 @@
+/**
+ * The home page's stage machine: which stage is showing, which way it was
+ * entered, and the animations between stages -- the intro's button growing into
+ * a panel, and a morph from one stage's panel to the next. Called by HomePage.
+ */
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 
+/**
+ * Owns the current stage ("intro", "preview", "personal", "visualizer" or
+ * "workout"), the direction it was entered in, and the flags HomePage styles
+ * and disables the stages by. Returns those, the refs the stages attach to the
+ * elements the animations measure and move, and three ways to change stage:
+ *
+ * - `goToStage`, a plain switch, used by the nav and the back controls. Going
+ *   to the intro calls `onResetPersonalFlow`, which resets the profile form.
+ * - `transitionToStageFromTrigger`, the morph: a fixed-position clone of the
+ *   current panel animates to the next panel's size and place, while the real
+ *   stage, already switched underneath, stays hidden.
+ * - `onGetStarted`, the intro's own animation into the personal stage.
+ *
+ * Both animations switch straight to the next stage under
+ * `prefers-reduced-motion`, and when what they would animate is missing or,
+ * for the morph, has no size.
+ * `samplePlanLength` and `personalMode` are read only to re-measure a panel
+ * whose size they change.
+ */
 export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
+  // ---- Refs: DOM handles, animations, pending timers and measurements -------
   const visualPanelRef = useRef(null);
   const visualIntroTimelineRef = useRef(null);
   const stagePulseRef = useRef(null);
@@ -22,6 +47,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   const workoutShellRef = useRef(null);
   const workoutMeasureRef = useRef(null);
   const workoutMeasureShellRef = useRef(null);
+
+  // ---- State ----------------------------------------------------------------
+  // `suppressStageEnter` puts `stage-snap` on the stage, which turns its enter
+  // animation off.
   const [homeStage, setHomeStage] = useState("intro");
   const [stageDirection, setStageDirection] = useState("forward");
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
@@ -37,6 +66,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   const unifiedAnimationMs = 1400;
   const stageCrossfadeMs = 220;
 
+  // ---- Clean-up helpers -----------------------------------------------------
   const clearStageMorphClone = () => {
     if (!stageMorphCloneRef.current) return;
     stageMorphCloneRef.current.remove();
@@ -60,6 +90,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     stageSwapRafRef.current = null;
   };
 
+  // ---- Plain stage switch ---------------------------------------------------
+  // The direction drives the stage's enter animation: forward when the next
+  // stage is at or after this one in `stageOrder`.
   const goToStage = (nextStage) => {
     if (nextStage === homeStage) return;
     if (nextStage === "intro") {
@@ -71,6 +104,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     setHomeStage(nextStage);
   };
 
+  // The panel the morph measures for each stage. The preview has none.
   const getMorphStageElement = (stage) => {
     if (stage === "intro") return introPanelRef.current;
     if (stage === "personal") return personalPanelRef.current;
@@ -79,7 +113,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     return null;
   };
 
+  // ---- The morph between stages ---------------------------------------------
   const transitionToStageFromTrigger = (nextStage) => {
+    // ---- Guards, and the paths that skip the animation ----------------------
     if (nextStage === homeStage || isIntroTransitioning || isStageTransitioning) return;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -96,6 +132,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       return;
     }
 
+    // ---- Fallback target, for when the next panel cannot be measured --------
+    // For the workout stage a measurement of its hidden copy wins; then the
+    // size the next stage had when last shown; then a per-stage preset bounded
+    // by the viewport.
     const pageEl = document.querySelector(".home-page");
     const pageStyles = pageEl ? window.getComputedStyle(pageEl) : null;
     const pagePaddingX = pageStyles
@@ -149,6 +189,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       centerY: knownTarget?.centerY || fallbackCenterY
     };
 
+    // ---- How the clone looks at each end ------------------------------------
     const sourceStyles = window.getComputedStyle(sourceMorphEl);
     const transitionFillColor =
       homeStage === "visualizer" && nextStage === "workout"
@@ -169,6 +210,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
             radius: "24px"
           };
 
+    // ---- Stop any morph still finishing, and hide the stages ----------------
+    // The guard above has already refused a morph in flight, but the last one's
+    // clone can still be fading out.
     stageSwapTimelineRef.current?.cancel();
     clearStageSwapTimers();
     clearStageSwapRaf();
@@ -178,6 +222,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     suppressResetPendingRef.current = false;
     setSuppressStageEnter(true);
 
+    // ---- Anchors ------------------------------------------------------------
+    // Every preset, like the default, anchors both ends at the centre, so the
+    // anchor terms below cancel and the clone lands on the target's box.
     const transitionAnchors = {
       "personal->visualizer": {
         source: { x: 0.5, y: 0.5 },
@@ -201,6 +248,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     const targetAnchorX = clampAnchor(anchorPreset.target?.x, 0.5);
     const targetAnchorY = clampAnchor(anchorPreset.target?.y, 0.5);
 
+    // ---- The clone ----------------------------------------------------------
+    // Fixed over the current panel and appended to body, outside React, so it
+    // survives the stage switch below.
     const morphClone = sourceMorphEl.cloneNode(true);
     morphClone.style.position = "fixed";
     morphClone.style.left = `${sourceRect.left}px`;
@@ -228,11 +278,15 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     const completeDelayMs = unifiedAnimationMs;
     const crossfadeDurationMs = stageCrossfadeMs;
 
+    // ---- Switch the real stage underneath -----------------------------------
     goToStage(nextStage);
 
     const startMorphTimeline = (attempt = 0) => {
+      // A newer morph has replaced this one's clone.
       if (stageMorphCloneRef.current !== morphClone) return;
 
+      // ---- Wait for the next panel to have a size ---------------------------
+      // Up to eight more frames, then the fallbacks.
       const liveTargetEl = getMorphStageElement(nextStage);
       const liveTargetRect = liveTargetEl?.getBoundingClientRect();
       const hasLiveTargetRect = Boolean(liveTargetRect?.width && liveTargetRect?.height);
@@ -252,6 +306,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
             centerY: liveTargetRect.top + liveTargetRect.height / 2
           }
         : null;
+
+      // ---- Where the clone ends up ------------------------------------------
       const resolvedTarget =
         liveTarget ||
         (homeStage === "visualizer" && nextStage === "workout" ? measuredWorkoutTarget : null) ||
@@ -264,6 +320,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       const morphTranslateX = finalLeft - sourceRect.left;
       const morphTranslateY = finalTop - sourceRect.top;
 
+      // ---- Animate the clone ------------------------------------------------
+      // Its copied content vanishes at once, so only the panel's box morphs.
       const timeline = createTimeline({
         defaults: { ease: "inOutCubic" }
       }).add(morphClone, {
@@ -292,6 +350,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
 
       stageSwapTimelineRef.current = timeline;
 
+      // ---- Reveal the stage, then fade the clone and remove it --------------
       stageSwapRevealTimeoutRef.current = window.setTimeout(() => {
         stageSwapRevealTimeoutRef.current = null;
         setIsStageTransitioning(false);
@@ -310,6 +369,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       );
     };
 
+    // ---- Start two frames on, once the new stage has rendered ---------------
     stageSwapRafRef.current = window.requestAnimationFrame(() => {
       stageSwapRafRef.current = window.requestAnimationFrame(() => {
         stageSwapRafRef.current = null;
@@ -318,7 +378,11 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     });
   };
 
+  // ---- Get Started: the intro's hand-off ------------------------------------
+  // Unlike the morph, this asks for the stage-enter suppression to be lifted
+  // once the personal stage is showing (see the effects below).
   const onGetStarted = () => {
+    // ---- Guards, and the paths that skip the animation ----------------------
     if (isIntroTransitioning || isStageTransitioning) return;
 
     const panelEl = introPanelRef.current;
@@ -340,6 +404,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     suppressResetPendingRef.current = true;
     setSuppressStageEnter(true);
 
+    // ---- Measure the button and the panel -----------------------------------
+    // The button grows to a panel's size, bounded by the viewport, centred
+    // where the intro panel is.
     const panelRect = panelEl.getBoundingClientRect();
     const buttonRect = buttonEl.getBoundingClientRect();
     const pageEl = panelEl.closest(".page");
@@ -360,12 +427,14 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     const translateX = targetCenterX - startCenterX;
     const translateY = targetCenterY - startCenterY;
 
+    // ---- Stop any hand-off still running ------------------------------------
     introExitTimelineRef.current?.cancel();
     if (introTransitionTimeoutRef.current) {
       window.clearTimeout(introTransitionTimeoutRef.current);
       introTransitionTimeoutRef.current = null;
     }
 
+    // ---- Animate: the title goes, the button grows, the panel fades ---------
     introExitTimelineRef.current = createTimeline({
       defaults: { ease: "inOutCubic" }
     })
@@ -399,12 +468,18 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
         "<<"
       );
 
+    // ---- Switch to the personal stage once it has run -----------------------
     introTransitionTimeoutRef.current = window.setTimeout(() => {
       setIsIntroTransitioning(false);
       goToStage("personal");
     }, unifiedAnimationMs + 60);
   };
 
+  // ---- Effects --------------------------------------------------------------
+
+  // Runs the visualizer's entrance and starts its slow pulse whenever that
+  // stage is entered, by the morph or by Back alike; leaving the stage, or
+  // unmounting, stops both.
   useEffect(() => {
     if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
@@ -444,6 +519,9 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     };
   }, [homeStage]);
 
+  // On unmount, stops the hand-off and the morph wherever they are and removes
+  // the clone, which lives on body outside React and would otherwise outlive
+  // the page. The first render's helpers are safe to call: they read only refs.
   useEffect(
     () => () => {
       introExitTimelineRef.current?.cancel();
@@ -458,6 +536,11 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     []
   );
 
+  // Lifts the stage-enter suppression a frame after Get Started has put the
+  // personal stage up, animated or not. Only Get Started asks, through
+  // `suppressResetPendingRef`; the morph leaves suppression on, because lifting
+  // it would start the forward enter animation on a stage the morph has already
+  // revealed.
   useEffect(() => {
     if (
       !suppressStageEnter ||
@@ -474,6 +557,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     return () => window.cancelAnimationFrame(rafId);
   }, [homeStage, suppressStageEnter, isStageTransitioning, isIntroTransitioning]);
 
+  // A frame after each stage change, records the active panel's size and
+  // centre, which the morph falls back on when it cannot measure its target
+  // live. `personalMode` re-runs it because the mode changes the personal
+  // panel's size.
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
       const activeEl = getMorphStageElement(homeStage);
@@ -490,6 +577,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     return () => window.cancelAnimationFrame(rafId);
   }, [homeStage, personalMode]);
 
+  // Records the hidden workout copy's size as the workout stage's, a frame
+  // after each stage change and whenever the sample plan's length changes its
+  // height. Declared after the effect above, so on the workout stage its frame
+  // runs second and the copy's size is the one kept.
   useEffect(() => {
     const rafId = window.requestAnimationFrame(() => {
       const measureEl = workoutMeasureShellRef.current || workoutMeasureRef.current;

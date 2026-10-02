@@ -1,3 +1,8 @@
+/**
+ * The physique silhouette's geometry: from useBodyModel's shape to the outline,
+ * colours and debug anchors PhysiqueSilhouette2D draws. Every position and size
+ * is in SVG user units of the fixed view box below, with y measured down.
+ */
 import { clamp, mirrorX, toFiniteNumber, interpolateBandWidth } from "./math";
 import { buildSymmetricOutline } from "./outlineGeometry";
 import { appendDefaultGuides } from "./guideLayout";
@@ -7,6 +12,9 @@ import { buildTemplateOutline } from "./templateOutline";
 export const VIEWBOX_WIDTH = 430;
 const CENTER_X = VIEWBOX_WIDTH / 2;
 export const VIEWBOX_HEIGHT = 430;
+// Per-finger shape factors, applied to the hand's computed reach and spread:
+// `profile` scales the finger's length, `yOffsetScale` spaces the fingers down
+// the hand, `jointCurve` bends the joint and tip, and `xSplayScale` fans them.
 const FINGER_CONFIGS = [
   { id: "thumb", profile: 0.76, yOffsetScale: -0.22, jointCurve: -0.2, xSplayScale: -0.22 },
   { id: "index", profile: 0.96, yOffsetScale: -0.1, jointCurve: -0.08, xSplayScale: -0.08 },
@@ -17,15 +25,21 @@ const FINGER_CONFIGS = [
 export const SILHOUETTE_GEOMETRY_REV = "outer-envelope-r24";
 let devHotReloadTick = 0;
 // Guard on `data`, not just on `hot`. Under vitest `import.meta.hot` is truthy
-// but its data bag is undefined, so writing to it threw and made this module
-// impossible to import from a test at all.
+// but its data bag is undefined, so writing to it would throw and make this
+// module impossible to import from a test at all.
 if (import.meta.hot?.data) {
   devHotReloadTick = (import.meta.hot.data.silhouetteHotReloadTick || 0) + 1;
   import.meta.hot.data.silhouetteHotReloadTick = devHotReloadTick;
 }
+// Differs after each hot reload of this module in development, and
+// PhysiqueSilhouette2D's memo depends on it, so an edit here is redrawn. In a
+// build it is the revision label alone.
 export const DEV_HOT_RELOAD_TOKEN = import.meta.env.DEV
   ? `${SILHOUETTE_GEOMETRY_REV}-hmr-${devHotReloadTick}`
   : SILHOUETTE_GEOMETRY_REV;
+// Body-segment lengths as fractions of stature, from the sources named on each.
+// The shoulder width, arm length, knee and groin below blend these with the
+// shape's own measurements.
 const MEDICAL_RATIOS = {
   // CDC Series 11 No. 35: biacromial/stature index avg (men 22.5, women 21.7)
   biacromialToStature: (22.5 + 21.7) / 200,
@@ -39,7 +53,25 @@ const MEDICAL_RATIOS = {
   sittingToStature: (51.8 + 52.4) / 200
 };
 
+/**
+ * Everything the silhouette draws, built from `shape`: useBodyModel's model of
+ * the body, as landmark heights, half-widths, fat channels and fill colour. A
+ * field that is absent or not numeric falls back, to the fallback table's value
+ * where it has one, and each is then clamped, the heights from the shoulder
+ * down to a range below the landmark above.
+ *
+ * Returns the outline path and its markers -- templateOutline.js's when it
+ * builds one, otherwise outlineGeometry.js's, traced from the anchors -- and
+ * the palette. Also returns `anchors`, the labelled points the debug overlay
+ * draws; `guides`, bone and muscle segments PhysiqueSilhouette2D does not
+ * draw; and `outlineTransform`, read from a `transform` buildTemplateOutline
+ * does not return, so it is undefined.
+ */
 export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
+  // ---- Fallback model and clamped inputs ------------------------------------
+  // Sizes and heights in view-box units, and the fill colour as an HSL hue in
+  // degrees with saturation and lightness in percent. templateOutline.js also
+  // measures its scales against this figure.
   const fallback = {
     shoulderHalf: 46,
     chestHalf: 38,
@@ -108,6 +140,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     calfY + 20,
     VIEWBOX_HEIGHT - 24
   );
+
+  // ---- Vertical landmarks derived from the inputs ---------------------------
   const statureSpan = Math.max(300, ankleY - headTopY);
   const kneeYFromMarkers = thighY + (calfY - thighY) * 0.38;
   const thighShare =
@@ -127,6 +161,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   );
   const pelvisY = hipY + (thighY - hipY) * 0.24;
 
+  // ---- Neck and head arc ----------------------------------------------------
   const neckHalf = clamp(headRadiusX * 0.34 + shoulderHalf * 0.048, 7.6, shoulderHalf * 0.38);
   const headArcAngles = [-76, -62, -48, -34, -20, -6, 8, 22, 36, 50];
   const rightHeadArc = headArcAngles.map((angle) => {
@@ -143,6 +178,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const neckCurveMidY = neckBaseY + clamp((shoulderY - neckBaseY) * 0.42, 4.2, 14.4);
   const neckCurveLowerX = CENTER_X + clamp(neckHalf * 1.16, neckHalf + 0.8, neckHalf + 4.8);
   const neckCurveLowerY = neckBaseY + clamp((shoulderY - neckBaseY) * 0.68, 6.2, 20.4);
+  // Shoulder points, placed below once `shoulderX` is known.
   let trapCurveX = CENTER_X + neckHalf;
   let trapCurveY = shoulderY;
   let trapShoulderX = CENTER_X + neckHalf;
@@ -157,6 +193,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   let shoulderArmTopY = shoulderY;
   let shoulderArmBottomX = CENTER_X;
   let shoulderArmBottomY = shoulderY;
+
+  // ---- Width bands and soft-tissue bulges -----------------------------------
   const groinHalf = clamp(hipHalf * 0.18, 5, 12);
   const kneeHalf = clamp(thighHalf * 0.64 + calfHalf * 0.24, 10, Math.max(12, thighHalf * 0.96));
   const ankleHalf = clamp(calfHalf * 0.46, 6, 18);
@@ -181,6 +219,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const shoulderSoftPad = clamp(shoulderFat * 4.4 + sideFat * 1.35, 0.4, 7.6);
   const shoulderLowerSoft = clamp(shoulderFat * 2.8 + sideFat * 0.9, 0, 4.6);
 
+  // ---- Shoulder -------------------------------------------------------------
   const shoulderStarSpread = clamp(2.4 + armWidth * 0.18, 2.4, 8.2);
   const shoulderJointOffset = clamp(armWidth * 0.46, 2.6, 8);
   const medicalShoulderHalf = statureSpan * MEDICAL_RATIOS.biacromialToStature * 0.5;
@@ -214,6 +253,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const shoulderBridgeY = shoulderCapY + (shoulderArmTopY - shoulderCapY) * 0.56;
   shoulderArmBottomX = shoulderX + clamp(armWidth * 0.2 + shoulderFat * 1.3, 1.4, 4.8);
   shoulderArmBottomY = shoulderY + shoulderJointOffset * 0.76;
+
+  // ---- Torso sides and leg stance -------------------------------------------
   const chestX = CENTER_X + widthAt(chestY) + upperTorsoBulge;
   const waistX = CENTER_X + widthAt(waistY) + midTorsoBulge;
   const legStanceSpread = clamp(5 + hipHalf * 0.09 + thighHalf * 0.07, 5, 14);
@@ -223,6 +264,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const calfX = CENTER_X + widthAt(calfY) + legStanceSpread * 0.26;
   const ankleX = CENTER_X + widthAt(ankleY) + legStanceSpread * 0.32;
 
+  // ---- Foot -----------------------------------------------------------------
   const footOuterHalf = clamp(ankleHalf * 1.42 + 2.4, 10, 25);
   const footInnerHalf = clamp(ankleHalf * 0.84 + 1.4, 5.5, 15.5);
   const footY = ankleY + clamp(9 + calfHalf * 0.16, 10, 17);
@@ -232,6 +274,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const footBallX = ankleX + clamp(footOuterHalf * 0.38, 5, 14);
   const footArchX = ankleX - clamp(footInnerHalf * 0.28, 2, 7);
   const heelX = ankleX - clamp(ankleHalf * 0.6, 3.5, 9);
+
+  // ---- Arm and hand proportions ---------------------------------------------
   const armSpanRatio = clamp(toFiniteNumber(model.armSpanRatio, 1), 0.98, 1.02);
   const handScale = clamp(0.92 + ((armWidth - 8) / 20) * 0.18, 0.9, 1.1);
   const wristThickness = clamp(armWidth * 0.52, 5.2, 11);
@@ -287,6 +331,9 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const fingerTipBaseX = palmX + fingerTipReach;
   const handTipXValues = [];
 
+  // ---- Anchor and guide collectors ------------------------------------------
+  // Each mirrored helper pushes a right-side point (`-r`) and its reflection
+  // (`-l`); outlineGeometry.js reads the right-side ids back by name.
   const anchors = [];
   const guides = [];
   const pushAnchor = (id, x, y, kind = "minor", group = "surface") => {
@@ -354,6 +401,10 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
       pushMirrorAnchor(`${id}-ring-${index + 1}`, pointX, pointY, kind, group);
     });
   };
+  // Samples a limb segment and pushes a point either side of it at each sample,
+  // the half-width tapering from `startHalfWidth` to `endHalfWidth`, as
+  // `<id>-<n>-top` and `<id>-<n>-bottom` (the one higher up is `top`).
+  // outlineGeometry.js reads these pairs back as the limb's edges.
   const pushMirrorLimbTrapezoidAnchors = (
     id,
     startX,
@@ -366,6 +417,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     options = {},
     group = "surface"
   ) => {
+    // ---- Segment direction and normal ---------------------------------------
     const dx = endX - startX;
     const dy = endY - startY;
     const length = Math.hypot(dx, dy);
@@ -375,6 +427,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     const tangentY = dy / length;
     const normalX = -tangentY;
     const normalY = tangentX;
+
+    // ---- Shape options, clamped ---------------------------------------------
     const samples =
       Array.isArray(options.samples) && options.samples.length
         ? options.samples
@@ -386,6 +440,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     const endSquare = clamp(toFiniteNumber(options.endSquare, 0.12), 0, 0.52);
     const offsetScale = clamp(toFiniteNumber(options.offsetScale, 1), 0.72, 1.36);
 
+    // ---- Two anchors per sample, one either side ----------------------------
     samples.forEach((t, index) => {
       const safeT = clamp(toFiniteNumber(t, 0.5), 0.06, 0.94);
       const widthT = Math.pow(safeT, taperPower);
@@ -414,6 +469,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     });
   };
 
+  // ---- Anchors: head, neck and shoulder -------------------------------------
   pushAnchor("head-top", CENTER_X, headTopY, "major");
   pushAnchor("head-center", CENTER_X, headCenterY, "minor", "skeletal");
   pushMirrorAnchor(
@@ -443,6 +499,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   pushMirrorAnchor("shoulder-lower", shoulderLowerX, shoulderLowerY, "minor");
   pushMirrorAnchor("shoulder-arm-bottom", shoulderArmBottomX, shoulderArmBottomY, "minor");
 
+  // ---- Anchors: arm ---------------------------------------------------------
   pushMirrorJointTriplet("shoulder-joint", shoulderX, shoulderY, shoulderJointOffset, "major");
   pushMirrorJointCircle(
     "shoulder-joint",
@@ -504,6 +561,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     }
   );
 
+  // ---- Anchors: fingers and hand tip ----------------------------------------
   FINGER_CONFIGS.forEach((finger) => {
     const fingerBaseYValue = fingerBaseY + fingerSpread * finger.yOffsetScale * 5.2;
     const splayX = fingerFan * finger.xSplayScale;
@@ -537,6 +595,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const handCenterY = wristY + fingerSpread * 0.16;
   pushMirrorAnchor("hand-tip", handTipX, handCenterY, "major");
 
+  // ---- Torso landmarks ------------------------------------------------------
   const upperChestY = shoulderY + (chestY - shoulderY) * 0.44;
   const lowerChestY = chestY + (waistY - chestY) * 0.36;
   const ribUpperY = chestY + (waistY - chestY) * 0.18;
@@ -623,6 +682,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const quadOuterMidX = CENTER_X + widthAt(quadMidY) + legStanceSpread * 0.19;
   const quadOuterLowerX = CENTER_X + widthAt(quadLowerY) + legStanceSpread * 0.22;
 
+  // ---- Anchors: torso centre line -------------------------------------------
   pushAnchor("chest-center", CENTER_X, chestY, "major", "skeletal");
   pushAnchor("waist-center", CENTER_X, waistY, "major", "skeletal");
   pushAnchor("pelvis-center", CENTER_X, pelvisY, "major", "skeletal");
@@ -649,6 +709,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   pushAnchor("quad-center-mid", CENTER_X, quadMidY, "minor", "skeletal");
   pushAnchor("quad-center-lower", CENTER_X, quadLowerY, "minor", "skeletal");
 
+  // ---- Anchors: torso sides -------------------------------------------------
   pushMirrorAnchor("upper-chest-side", upperChestX, upperChestY, "minor");
   pushMirrorAnchor("chest-side", chestX, chestY, "minor");
   pushMirrorAnchor("lower-chest-side", lowerChestX, lowerChestY, "minor");
@@ -678,6 +739,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   pushMirrorAnchor("hip-dip", hipDipX, hipDipY, "minor");
   pushMirrorAnchor("hip-outer", hipOuterX, hipOuterY, "minor");
   pushMirrorAnchor("quad-outer-high", quadOuterHighX, quadOuterHighY, "minor");
+
+  // ---- Anchors: hip, leg and foot -------------------------------------------
   pushMirrorJointTriplet(
     "hip-joint",
     hipX,
@@ -766,6 +829,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     }
   );
 
+  // ---- Inner leg and pelvis -------------------------------------------------
   const innerThighHalf = clamp(thighHalf * 0.48, groinHalf + 1, thighHalf * 0.82);
   const innerKneeHalf = clamp(kneeHalf * 0.58, groinHalf + 1, kneeHalf * 0.9);
   const innerCalfHalf = clamp(calfHalf * 0.5, groinHalf + 0.8, calfHalf * 0.88);
@@ -850,6 +914,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     "minor"
   );
 
+  // ---- Outline from the anchors ---------------------------------------------
   const { outlinePath, outlineMarkers } = buildSymmetricOutline({
     anchors,
     rightHeadArc,
@@ -861,6 +926,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     pelvisBaseCenterY
   });
 
+  // ---- Guides ---------------------------------------------------------------
   appendDefaultGuides({
     pushGuide,
     pushMirrorGuide,
@@ -911,6 +977,11 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     calfY
   });
 
+  // ---- Template outline and palette -----------------------------------------
+  // Both are handed the raw `model`, not the clamped locals above, so those
+  // clamps do not bound them: each applies its own. buildTemplateSizing in
+  // templateOutline.js reads each raw value into its width scale, which only
+  // its clamps on the combined scale and the target width bound.
   const templateOutline = buildTemplateOutline({
     model,
     fallback,

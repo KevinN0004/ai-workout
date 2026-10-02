@@ -1,3 +1,8 @@
+/**
+ * The physique silhouette as an SVG: its outline, and in development the
+ * anchor and outline points when VITE_SHOW_PHYSIQUE_POINTS is "1". Rendered by
+ * HomeVisualizerStage.
+ */
 import { useMemo } from "react";
 import {
   VIEWBOX_WIDTH,
@@ -8,11 +13,19 @@ import {
 } from "./physique/geometry";
 export { SILHOUETTE_GEOMETRY_REV } from "./physique/geometry";
 
+/**
+ * Draws the outline geometry.js builds from `shape`, useBodyModel's
+ * `silhouetteShape`, coloured through CSS custom properties set from its
+ * palette. The svg is hidden from assistive technology: the `role="img"`
+ * element HomeVisualizerStage wraps it in carries the label.
+ */
 export default function PhysiqueSilhouette2D({ shape }) {
-  // `shape` is rebuilt by the parent on every render, so depending on it
-  // directly would recompute the whole silhouette each time. The JSON signature
-  // is the dependency on purpose: it compares by value, so the geometry is
-  // rebuilt only when the measurements actually change.
+  // Depends on a JSON signature of `shape` rather than on the object, so the
+  // geometry is rebuilt only when the measurements change by value, not
+  // whenever an equal object arrives. useBodyModel can hand one over: its memo
+  // reruns when any input changes, even one that leaves the shape the same,
+  // such as moving the sex field between two answers that both get the
+  // neutral proportions.
   const shapeSignature = JSON.stringify(shape || {});
   const { anchors, outlineMarkers, outlinePath, outlineTransform, palette } = useMemo(
     () => buildPhysiqueSilhouetteGeometry(shape),
@@ -46,7 +59,10 @@ export default function PhysiqueSilhouette2D({ shape }) {
       style={anchorStyle}
       data-geometry-rev={SILHOUETTE_GEOMETRY_REV}
     >
+      {/* ---- Outline ---- */}
       <path className="physique-outline-line" d={outlinePath} transform={outlineTransform} />
+
+      {/* ---- Debug points: the outline's, then the anchors ---- */}
       {showDebugPoints && (
         <g className="physique-point-layer physique-outline-anchor-layer">
           {outlineMarkers.map((point) => (

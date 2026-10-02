@@ -1,3 +1,9 @@
+/**
+ * The silhouette outline morphed from a fixed SVG template: the template's body
+ * polygon, scaled into the view box and widened or narrowed band by band to
+ * match the model. geometry.js prefers it to the anchor outline whenever it
+ * builds.
+ */
 import templateSvgRaw from "./assets/template-outline.svg?raw";
 import { clamp, toFiniteNumber } from "./math";
 import { buildSmoothClosedPath, selectImportantSegmentPoints } from "./outlineUtils";
@@ -30,6 +36,9 @@ const interpolateScale = (bands, yValue) => {
   return bands[bands.length - 1].s;
 };
 
+// Chaikin corner cutting: each pass replaces every edge with two points `ratio`
+// of the way in from either end, doubling the count, and a pass that would take
+// it past `maxPoints` is skipped.
 const smoothClosedContour = (points, options = {}) => {
   if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
   const iterations = Math.max(0, Math.min(2, Math.round(toFiniteNumber(options.iterations, 1))));
@@ -66,10 +75,8 @@ const smoothClosedContour = (points, options = {}) => {
 };
 
 const buildCurvedPath = (points) => {
-  // Too few points to curve through, so there is no path to draw. This used to
-  // call a pointsToPath helper that built M/L/Z commands, but its own first
-  // line returned "" for exactly this condition -- so it could only ever return
-  // "", and the command-building below it was unreachable.
+  // Too few points to curve through, so there is no path to draw, and
+  // buildTemplateOutline returns null in its place.
   if (!Array.isArray(points) || points.length < 3) return "";
   const reduced = selectImportantSegmentPoints(points, {
     minSpacing: 2.2,
@@ -90,6 +97,9 @@ const buildCurvedPath = (points) => {
   });
 };
 
+// Relaxes the points at the hand end of each arm toward the midpoint of their
+// neighbours, more in y than in x, fading in around `handStart` and out past
+// `armSpan` beyond it. Points outside the arm's height band are untouched.
 const softenDistalArmTips = (points, options = {}) => {
   if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
 
@@ -158,6 +168,9 @@ const getPointBounds = (points) => {
   };
 };
 
+// Squeezes the outline horizontally about `centerX` when it is wider than the
+// view box less its padding, then shifts it sideways if it still overhangs an
+// edge. The vertical extent is left alone.
 const fitPointsInsideViewbox = (points, { viewboxWidth, paddingX = 8, centerX }) => {
   if (!Array.isArray(points) || points.length < 3) return points;
 
@@ -208,7 +221,12 @@ const parsePolygonPoints = (rawPoints) => {
     .filter(Boolean);
 };
 
+// The template's body polygon as points, with its bounds. Fewer than three
+// points gives an empty template, which buildTemplateOutline treats as none.
 const parseTemplate = () => {
+  // ---- Find the body polygon ------------------------------------------------
+  // The first polygon whose attributes ahead of `points` do not mark it as an
+  // unfilled (`fill="none"`) wire.
   const polygonRegex = /<polygon\b([^>]*)\bpoints="([\s\S]*?)"[^>]*>/gi;
   let selectedPoints = "";
   let match = polygonRegex.exec(templateSvgRaw);
@@ -222,6 +240,7 @@ const parseTemplate = () => {
     match = polygonRegex.exec(templateSvgRaw);
   }
 
+  // ---- Parse it and measure its bounds --------------------------------------
   const points = parsePolygonPoints(selectedPoints);
   if (points.length < 3) {
     return {
@@ -253,6 +272,7 @@ const parseTemplate = () => {
   };
 };
 
+// Parsed once, when the module loads.
 const TEMPLATE = parseTemplate();
 
 const MEDICAL_REGION_CURVE_WEIGHTS = {
@@ -269,7 +289,14 @@ const MEDICAL_REGION_CURVE_WEIGHTS = {
   forearm: 0.28
 };
 
+// The size the template is scaled to fit: a width from the model's half-widths
+// relative to the fallback's, and a height from its stature relative to the
+// fallback's, each kept to a share of the view box.
 const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
+  // ---- Width scale ----------------------------------------------------------
+  // Each part reads the raw model value, not geometry.js's clamped local, so
+  // what bounds it is the clamps below, on the combined scale and on the target
+  // width.
   const shoulderScale =
     toFiniteNumber(model?.shoulderHalf, fallback.shoulderHalf) / fallback.shoulderHalf;
   const chestScale = toFiniteNumber(model?.chestHalf, fallback.chestHalf) / fallback.chestHalf;
@@ -294,6 +321,7 @@ const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
     1.28
   );
 
+  // ---- Height scale ---------------------------------------------------------
   const modelStature =
     toFiniteNumber(model?.ankleY, fallback.ankleY) -
     (toFiniteNumber(model?.headCenterY, fallback.headCenterY) -
@@ -301,6 +329,7 @@ const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   const fallbackStature = fallback.ankleY - (fallback.headCenterY - fallback.headRadius);
   const heightScale = clamp(modelStature / Math.max(1, fallbackStature), 0.9, 1.14);
 
+  // ---- Target size within the view box --------------------------------------
   const baseTargetWidth = viewboxWidth * 0.82;
   const baseTargetHeight = viewboxHeight * 0.98;
   const targetWidth = clamp(baseTargetWidth * widthScale, viewboxWidth * 0.68, viewboxWidth * 0.91);
@@ -313,7 +342,12 @@ const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   return { targetWidth, targetHeight };
 };
 
+// `shape`'s half-widths and landmark heights, re-clamped to this module's own
+// ranges (wider than geometry.js's for the half-widths), with the head, neck,
+// groin and knee points derived from them. buildTemplateOutline runs it on the
+// model and on the fallback, and morphs by how the two compare.
 const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
+  // ---- Half-widths ----------------------------------------------------------
   const shoulderHalf = clamp(toFiniteNumber(shape?.shoulderHalf, fallback.shoulderHalf), 20, 90);
   const chestHalf = clamp(toFiniteNumber(shape?.chestHalf, fallback.chestHalf), 12, 80);
   const waistHalf = clamp(toFiniteNumber(shape?.waistHalf, fallback.waistHalf), 8, 70);
@@ -325,6 +359,7 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
   const armSpanRatio = clamp(toFiniteNumber(shape?.armSpanRatio, 1), 0.94, 1.08);
   const headRadius = clamp(toFiniteNumber(shape?.headRadius, fallback.headRadius), 12, 34);
 
+  // ---- Landmark heights -----------------------------------------------------
   const shoulderY = clamp(
     toFiniteNumber(shape?.shoulderY, fallback.shoulderY),
     40,
@@ -358,6 +393,7 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
     shoulderY - 20
   );
 
+  // ---- Points derived from the heights --------------------------------------
   const headTopY = headCenterY - headRadius;
   const chinY = headCenterY + headRadius;
   const headUpperY = headCenterY - headRadius * 0.46;
@@ -403,7 +439,12 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
   };
 };
 
+// The horizontal scale at each of the model's landmark heights: the model's
+// size there over the fallback's, clamped per band, then sorted by height, with
+// a band level with the one before it moved a hundredth of a unit lower.
+// interpolateScale reads between them.
 const buildScaleBands = (metrics, fallbackMetrics) => {
+  // ---- One band per landmark ------------------------------------------------
   const withScale = (y, value, fallbackValue, min = 0.78, max = 1.24) => ({
     y,
     s: clamp(value / Math.max(1, fallbackValue), min, max)
@@ -457,6 +498,7 @@ const buildScaleBands = (metrics, fallbackMetrics) => {
     withScale(metrics.ankleY, metrics.ankleHalf, fallbackMetrics.ankleHalf, 0.78, 1.24)
   ];
 
+  // ---- Sorted by height, ties moved apart -----------------------------------
   return bands
     .sort((left, right) => left.y - right.y)
     .map((band, index, allBands) => {
@@ -469,9 +511,24 @@ const buildScaleBands = (metrics, fallbackMetrics) => {
     });
 };
 
+/**
+ * The template outline fitted to `model`, which geometry.js passes raw, with
+ * `fallback` as the reference figure. The template is scaled uniformly to
+ * buildTemplateSizing's target, centred, and stood just above the view box's
+ * bottom edge. Each point is then widened or narrowed about the centre line by
+ * how the model's size at that height compares with the fallback's, then
+ * reshaped region by region, head to arms, by the same comparison and by the
+ * model's fat channels; in the arm band its upper and lower edges are also
+ * pushed apart. Last, the outline is kept within the view box's width and the
+ * hand ends are softened.
+ *
+ * Returns `{ path, outlineMarkers }`, the markers being every morphed point, or
+ * null when the template has fewer than three points or no path results.
+ */
 export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHeight }) => {
   if (!Array.isArray(TEMPLATE.points) || TEMPLATE.points.length < 3) return null;
 
+  // ---- Metrics, target size and placement -----------------------------------
   const metrics = buildDerivedMetrics(model, fallback, viewboxHeight);
   const fallbackMetrics = buildDerivedMetrics(fallback, fallback, viewboxHeight);
   const { targetWidth, targetHeight } = buildTemplateSizing(
@@ -488,6 +545,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
   const insetY = viewboxHeight - usedHeight - 3;
   const centerX = viewboxWidth / 2;
 
+  // ---- How far the model is from the fallback, by region --------------------
   const bands = buildScaleBands(metrics, fallbackMetrics);
   const armReachScale = clamp(
     (metrics.armHeight / fallbackMetrics.armHeight) * 0.64 + metrics.armSpanRatio * 0.36,
@@ -530,6 +588,9 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
   const calfFat = clamp(toFiniteNumber(model?.calfFat, sideFat * 0.46), 0, 1);
   const calfProfile = clamp(toFiniteNumber(model?.lowerLegAdiposity, calfFat), 0, 1.5);
 
+  // ---- Zones the regional boosts act in -------------------------------------
+  // Heights are in view-box y; `armStart`, `legInnerStart` and the like are
+  // distances out from the centre line.
   const armZoneTop = metrics.shoulderY - clamp(metrics.armWidth * 2.8, 15, 36);
   const armZoneBottom = metrics.shoulderY + clamp(metrics.armWidth * 3.2, 20, 46);
   const armStart = clamp(metrics.shoulderHalf + 14, 48, 122);
@@ -547,7 +608,11 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
   const calfPeakTop = metrics.kneeY + (metrics.calfY - metrics.kneeY) * 0.12;
   const calfPeakBottom = metrics.calfY + (metrics.ankleY - metrics.calfY) * 0.32;
 
+  // ---- Morph each template point --------------------------------------------
+  // Only the horizontal scale about the centre line changes, except in the arm
+  // band, where `yOffset` also moves the arm's edges.
   const morphedPoints = TEMPLATE.points.map((point, index) => {
+    // ---- Base position and the horizontal zones -----------------------------
     const baseX = (point.x - TEMPLATE.minX) * uniformScale + insetX;
     const baseY = (point.y - TEMPLATE.minY) * uniformScale + insetY;
     const dx = baseX - centerX;
@@ -568,9 +633,11 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
       1
     );
 
+    // The banded scale at this height, which each region below multiplies.
     let xScale = interpolateScale(bands, baseY);
     let yOffset = 0;
 
+    // ---- Head ---------------------------------------------------------------
     if (baseY >= metrics.headTopY - 1 && baseY <= metrics.neckBaseY + 1) {
       const topTaper = bellCurve(
         baseY,
@@ -591,6 +658,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
       xScale *= 1 + midBulge * 0.04;
     }
 
+    // ---- Neck ---------------------------------------------------------------
     const neckInfluence = bellCurve(
       baseY,
       metrics.neckBaseY - (metrics.neckBaseY - metrics.headCenterY) * 0.2,
@@ -603,6 +671,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
         neckInfluence *
         neckBlend;
 
+    // ---- Shoulders and torso ------------------------------------------------
     const shoulderInfluence = bellCurve(
       baseY,
       metrics.shoulderY,
@@ -624,6 +693,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     xScale *= 1 + shoulderBoost * shoulderInfluence * (0.46 + shoulderContourBlend);
     xScale *= 1 + sideFat * 0.18 * torsoInfluence;
 
+    // ---- Chest --------------------------------------------------------------
     const chestInfluence = bellCurve(
       baseY,
       metrics.chestY,
@@ -637,6 +707,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     );
     xScale *= 1 + chestBoost * chestInfluence * chestBlend;
 
+    // ---- Waist and lower torso ----------------------------------------------
     const torsoVertical = clamp(
       smoothstep(torsoTop, metrics.waistY, baseY) *
         (1 - smoothstep(metrics.hipY, torsoBottom, baseY)) *
@@ -654,6 +725,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     );
     xScale *= 1 + torsoBoost * torsoVertical * torsoBlend;
 
+    // ---- Hips ---------------------------------------------------------------
     const hipInfluence = bellCurve(
       baseY,
       metrics.hipY,
@@ -666,6 +738,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
         hipInfluence *
         hipBlend;
 
+    // ---- Legs ---------------------------------------------------------------
     const thighInfluence = bellCurve(
       baseY,
       metrics.thighY,
@@ -720,6 +793,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
         Math.max(calfSpreadBlend, legSpreadBlend * 0.5);
     xScale *= 1 + calfFat * 0.12 * calfBulgeVertical * calfOuterBlend;
 
+    // ---- Arms ---------------------------------------------------------------
     if (baseY >= armZoneTop && baseY <= armZoneBottom) {
       const topBlend = smoothstep(armZoneTop, metrics.shoulderY, baseY);
       const bottomBlend = 1 - smoothstep(metrics.shoulderY, armZoneBottom, baseY);
@@ -815,6 +889,7 @@ export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHei
     };
   });
 
+  // ---- Fit, soften and draw -------------------------------------------------
   const fittedPoints = fitPointsInsideViewbox(morphedPoints, {
     viewboxWidth,
     paddingX: 12,

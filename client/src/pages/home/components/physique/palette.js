@@ -1,5 +1,20 @@
+/**
+ * The silhouette's colours, built by geometry.js and set by
+ * PhysiqueSilhouette2D as CSS custom properties on its svg.
+ */
 import { clamp, toFiniteNumber } from "./math";
 
+/**
+ * HSL colour strings keyed by role. `major`, `minor`, `glow`, `anchorSurface`
+ * and the outline pair are lighter shades of the model's `fillHue`,
+ * `fillSaturation` and `fillLightness`, which useBodyModel shifts with the fat
+ * score; the skeletal, joint, bone and muscle colours are fixed. `fallback` is
+ * geometry.js's fallback model.
+ *
+ * forms-and-motion.css reads the outline pair for the visible outline and the
+ * anchor colours for the debug points. No stylesheet reads `major`, `minor`
+ * or the bone and muscle colours.
+ */
 export const buildPhysiquePalette = (model, fallback) => {
   const fillHue = clamp(toFiniteNumber(model.fillHue, fallback.fillHue), 0, 360);
   const fillSaturation = clamp(
