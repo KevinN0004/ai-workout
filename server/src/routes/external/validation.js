@@ -1,3 +1,7 @@
+/**
+ * Query and params schemas for the external-data routes (weather, air quality,
+ * wger and TheMealDB), and the helpers that validate a request against them.
+ */
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 
@@ -54,6 +58,12 @@ export const mealDbSearchQuerySchema = z
     path: ["query"]
   });
 
+/**
+ * Validates `req.query` against `schema` and returns the parsed data. On failure
+ * it answers 400 and returns null, so the route stops on a null. The error is
+ * the first schema issue unless `options.message` gives a fixed one instead;
+ * `options.fallbackPath` names the field when that issue carries no path.
+ */
 export const validateQuery = (req, res, schema, options = {}) => {
   const { fallbackPath = "query", message = "" } = options;
   const { data, error } = validateSchemaInput(schema, req.query || {}, fallbackPath);
@@ -62,6 +72,7 @@ export const validateQuery = (req, res, schema, options = {}) => {
   return null;
 };
 
+/** The same as validateQuery, for `req.params`. */
 export const validateParams = (req, res, schema, options = {}) => {
   const { fallbackPath = "params", message = "" } = options;
   const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);

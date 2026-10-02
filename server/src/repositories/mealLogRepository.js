@@ -1,16 +1,18 @@
+/**
+ * Prisma-native persistence for meal logs: the row mapper the API returns, the
+ * save, and the calorie entry derived from each day's meals.
+ */
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
-
-/**
- * Prisma-native persistence for meal logs.
- *
- * Task 3 of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
- */
 
 // Marks a calorie entry as derived from meal logs rather than typed by the user.
 const DERIVED_CALORIE_SOURCE = "meal_logs";
 const DERIVED_CALORIE_SOURCE_PREFIX = "meal-logs-";
 
+/**
+ * Maps a meal_logs row to the meal the API returns. The macro columns are
+ * Decimals, read through toNumberOrNull, so an unrecorded macro is null, not 0.
+ */
 export const mapMealLog = (row = {}) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.mealDate),
@@ -24,6 +26,11 @@ export const mapMealLog = (row = {}) => ({
   loggedAt: toIso(row.loggedAt)
 });
 
+/**
+ * Builds the meal-log writer over `prisma`. The meal-log route calls
+ * `saveMealLog` and then `syncDerivedCalorieEntry`; `sumCaloriesForDate` is the
+ * total the sync derives its entry from.
+ */
 export const createMealLogRepository = ({ prisma }) => {
   /**
    * Inserts a meal, or updates the existing row carrying the same legacy id for
@@ -69,10 +76,8 @@ export const createMealLogRepository = ({ prisma }) => {
   /**
    * Total calories logged by a user on one date.
    *
-   * `_sum` returns null when no row has a calories value, which is not the same
-   * as a zero total -- the Mongo pipeline this replaces used `$ifNull` to make
-   * both cases 0, so that coalescing is preserved here rather than left to the
-   * caller.
+   * `_sum` is null when no row has calories, so it is turned into 0 here: an
+   * empty day's total is zero, not absent.
    */
   const sumCaloriesForDate = async ({ userId, date }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -87,12 +92,7 @@ export const createMealLogRepository = ({ prisma }) => {
   };
 
   /**
-   * Keeps the calories view in step with the meals logged for one date.
-   *
-   * The rules are lifted from the Mongo aggregation pipeline that was supposed
-   * to do this and never executed -- the shim only matched object updates, so
-   * an array pipeline fell through to a plain re-read and meal logs contributed
-   * nothing to the calories view. Restated plainly, that pipeline said:
+   * Keeps the calories view in step with the meals logged for one date:
    *
    *   1. if a manual entry exists for the day, change nothing -- a number the
    *      user typed themselves outranks one derived from meals

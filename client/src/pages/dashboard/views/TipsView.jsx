@@ -1,3 +1,8 @@
+/**
+ * The dashboard's Guides view: wger exercises ranked for the visitor, a
+ * training guide, and the full exercise list, each exercise savable to the
+ * plan. Rendered by DashboardPage, which loads it lazily.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { detectTrack } from "../planUtils";
 import ExerciseTile from "../tips/ExerciseTile";
@@ -19,6 +24,16 @@ const DEFAULT_LIMIT = 48;
 const SEARCH_DEBOUNCE_MS = 320;
 const LIBRARY_PAGE_SIZE = 24;
 
+/**
+ * Three sections, picked by the View select: smart picks (the loaded exercises
+ * scored by recommendationUtils against the goal track, the planner's
+ * equipment, today's plan lines, the weather and any injury note), a training
+ * guide (buildGuideCards), and the exercise list. The search and filters drive
+ * the one exercise load both lists share. An injury note is the planner form's
+ * injuries plus the profile's notes. `onSaveExerciseToPlan` is
+ * saveExerciseToPlan in events.js, which resolves to `{ ok: true }` or
+ * `{ ok: false, error }`.
+ */
 export default function TipsView({
   user,
   form,
@@ -27,6 +42,7 @@ export default function TipsView({
   weatherData,
   onSaveExerciseToPlan
 }) {
+  // ---- State ----------------------------------------------------------------
   const [meta, setMeta] = useState({ categories: [], muscles: [], equipment: [] });
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -46,6 +62,10 @@ export default function TipsView({
   const [activeGuideSection, setActiveGuideSection] = useState("smart");
   const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_PAGE_SIZE);
 
+  // ---- Loading the filters and the exercises --------------------------------
+
+  // The search reaches the exercise load only once typing pauses, so a query is
+  // not one request per keystroke.
   useEffect(() => {
     const timerId = setTimeout(() => {
       setDebouncedQuery(query.trim());
@@ -53,10 +73,14 @@ export default function TipsView({
     return () => clearTimeout(timerId);
   }, [query]);
 
+  // Whatever reloads the exercises below, a search, a filter or a refresh, also
+  // takes the list back to its first page.
   useEffect(() => {
     setLibraryVisibleCount(LIBRARY_PAGE_SIZE);
   }, [debouncedQuery, categoryId, muscleId, equipmentId, refreshTick]);
 
+  // The filter options load on mount and again on each refresh. A response that
+  // lands after this run's cleanup is dropped.
   useEffect(() => {
     let cancelled = false;
     const loadMeta = async () => {
@@ -87,6 +111,8 @@ export default function TipsView({
     };
   }, [refreshTick]);
 
+  // The exercises load on mount and again whenever the search, a filter or the
+  // refresh changes; the cleanup aborts a request that has been superseded.
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
@@ -94,6 +120,8 @@ export default function TipsView({
       setLibraryLoading(true);
       setLibraryError("");
       try {
+        // The first page, in wger's language 2 (English) whatever the server's
+        // WGER_DEFAULT_LANGUAGE, plus whichever filters are set.
         const params = new URLSearchParams({
           limit: String(DEFAULT_LIMIT),
           offset: "0",
@@ -115,6 +143,8 @@ export default function TipsView({
         if (cancelled) return;
         setExercises(Array.isArray(data?.exercises) ? data.exercises : []);
       } catch (err) {
+        // An abort is this effect's own cleanup, not a failure. A real failure
+        // empties the list and shows its error.
         if (err?.name === "AbortError") return;
         if (cancelled) return;
         setLibraryError(err?.message || "Couldn't load exercises right now.");
@@ -130,8 +160,10 @@ export default function TipsView({
     };
   }, [debouncedQuery, categoryId, muscleId, equipmentId, refreshTick]);
 
+  // ---- Ranking and the training guide ---------------------------------------
   const todayWeekday = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  // The `|| []` branch minted a fresh array every render, defeating the memo below.
+  // Memoized because the `|| []` fallback would otherwise be a new array every
+  // render, defeating the memo below.
   const todayLines = useMemo(
     () => latestPlanByWeekday?.[todayWeekday] || [],
     [latestPlanByWeekday, todayWeekday]
@@ -169,6 +201,7 @@ export default function TipsView({
     };
   }, [track, goalText, todayLines, form, injuryText, weatherMode]);
 
+  // The highest-scoring exercises, ties broken by name.
   const recommendations = useMemo(() => {
     const scored = exercises.map((exercise) => scoreExercise(exercise, recommendationContext));
     scored.sort((a, b) => b.score - a.score || a.exercise.name.localeCompare(b.exercise.name));
@@ -188,7 +221,10 @@ export default function TipsView({
     [track, weeklyWorkouts, duration, activity, weatherMode, injuryText]
   );
 
-  // The `: []` branch minted a fresh array every render, defeating the memo below.
+  // ---- Saving ---------------------------------------------------------------
+
+  // Memoized because the `: []` fallback would otherwise be a new array every
+  // render, defeating the memo below.
   const savedExercises = useMemo(
     () => (Array.isArray(dashboard?.savedExercises) ? dashboard.savedExercises : []),
     [dashboard]
@@ -197,6 +233,8 @@ export default function TipsView({
     () => exercises.slice(0, libraryVisibleCount),
     [exercises, libraryVisibleCount]
   );
+  // An exercise counts as saved when the bank holds one with the same wger id
+  // and name; toExerciseKey builds the same key from a loaded exercise.
   const savedKeys = useMemo(() => {
     return new Set(
       savedExercises.map((item) => {
@@ -258,6 +296,7 @@ export default function TipsView({
   };
   const showExerciseFilters = activeGuideSection === "smart" || activeGuideSection === "library";
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="panel tips-view">
       <div className="panel-header">
@@ -294,6 +333,7 @@ export default function TipsView({
         </button>
       </div>
 
+      {/* ---- Section picker, search and filters ---- */}
       <section className="tips-section-selector">
         <label>
           View
@@ -355,6 +395,7 @@ export default function TipsView({
         </section>
       )}
 
+      {/* ---- Loading, errors and save feedback ---- */}
       {(metaLoading || libraryLoading) && (
         <div className="tips-skeleton-grid" aria-hidden="true">
           <div className="tips-skeleton-card" />
@@ -367,6 +408,7 @@ export default function TipsView({
       {saveError && <p className="error">{saveError}</p>}
       {saveFeedback && <p className="muted save-feedback">{saveFeedback}</p>}
 
+      {/* ---- Smart picks ---- */}
       {activeGuideSection === "smart" && (
         <section className="tips-block">
           <div className="tips-block-header">
@@ -401,6 +443,7 @@ export default function TipsView({
         </section>
       )}
 
+      {/* ---- Training guide ---- */}
       {activeGuideSection === "guides" && (
         <section className="tips-block">
           <div className="tips-block-header">
@@ -424,6 +467,7 @@ export default function TipsView({
         </section>
       )}
 
+      {/* ---- Exercise list ---- */}
       {activeGuideSection === "library" && (
         <section className="tips-block">
           <div className="tips-block-header">
@@ -462,6 +506,7 @@ export default function TipsView({
         </section>
       )}
 
+      {/* ---- Exercise details ---- */}
       <ExerciseDetailsModal
         selectedExercise={selectedExercise}
         onClose={() => setSelectedExercise(null)}

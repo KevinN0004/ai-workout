@@ -1,24 +1,28 @@
 /**
- * Column value conversions shared between the Prisma repositories and the
- * Mongo compatibility shim that still wraps some of them.
- *
- * These were private to services/prismaDataModels.js. They are lifted here so a
- * repository can be written without importing the shim, and so the two cannot
- * drift apart while both exist.
+ * Column value conversions shared by the repositories: Date columns to ISO
+ * strings and date-only keys and back, and Decimal columns to numbers. An absent
+ * value reads as "" or null, never as 0.
  */
 
+/** A timestamp as an ISO string, or "" when there is none. */
 export const toIso = (value) => {
   if (!value) return "";
   if (value instanceof Date) return value.toISOString();
   return String(value);
 };
 
+/** The `YYYY-MM-DD` key of a date column (read in UTC), or "" when there is none. */
 export const toDateOnly = (value) => {
   if (!value) return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 };
 
+/**
+ * The Date to write to a `@db.Date` column: the first ten characters of a
+ * `YYYY-MM-DD` string, as UTC midnight. Null when there is no string or it is
+ * blank. It does not validate, so a malformed string becomes an Invalid Date.
+ */
 export const dateOnlyToDate = (value) => {
   const raw = typeof value === "string" ? value.trim().slice(0, 10) : "";
   return raw ? new Date(`${raw}T00:00:00.000Z`) : null;

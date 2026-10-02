@@ -1,3 +1,7 @@
+/**
+ * The dashboard's Logs view: the workout, calorie, meal and progress-metric
+ * logs, newest first. Rendered by DashboardPage, which loads it lazily.
+ */
 import { useMemo, useState } from "react";
 import { getLocalDateKey } from "../../../app/units";
 import "./WorkoutsView.css";
@@ -5,6 +9,11 @@ import "./WorkoutsView.css";
 const INITIAL_VISIBLE_ROWS = 40;
 const ROW_BATCH_SIZE = 40;
 
+// A sort key rather than a date: the timestamp, or 0 so that a row whose date
+// does not parse sorts last. useDashboardMetrics' parseDateValue is a different
+// function, returning a Date or null. This one reads a bare YYYY-MM-DD as UTC
+// midnight, unlike that one, but UTC midnights fall in date order too, so the
+// sort is the same.
 const parseDateValue = (value) => {
   if (!value) return 0;
   const parsed = new Date(value);
@@ -14,6 +23,13 @@ const parseDateValue = (value) => {
 const sortByDateDesc = (items) =>
   [...items].sort((a, b) => parseDateValue(b?.date) - parseDateValue(a?.date));
 
+/**
+ * The four lists arrive deduplicated from useDashboardMetrics. Each shows
+ * INITIAL_VISIBLE_ROWS and grows by ROW_BATCH_SIZE on "Show more", over rows the
+ * dashboard already holds; nothing is fetched here. Both Add workout buttons set
+ * the workout form's date to today and open the Log workout modal; the other
+ * empty states link to the view where that log is entered.
+ */
 export default function WorkoutsView({
   workouts,
   calories,
@@ -24,6 +40,7 @@ export default function WorkoutsView({
   onOpenCalories,
   onOpenMeal
 }) {
+  // ---- Sorted lists and the visible slice of each ---------------------------
   const [visibleRows, setVisibleRows] = useState({
     workouts: INITIAL_VISIBLE_ROWS,
     calories: INITIAL_VISIBLE_ROWS,
@@ -69,6 +86,7 @@ export default function WorkoutsView({
     setVisibleRows((prev) => ({ ...prev, [key]: prev[key] + ROW_BATCH_SIZE }));
   };
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="panel workouts-view">
       <div className="panel-header">
@@ -94,6 +112,7 @@ export default function WorkoutsView({
       </div>
 
       <div className="logs-grid">
+        {/* ---- Workouts ---- */}
         <section className="log-section">
           <h3>Workout log</h3>
           <div className="log-list">
@@ -149,6 +168,7 @@ export default function WorkoutsView({
           </div>
         </section>
 
+        {/* ---- Calories ---- */}
         <section className="log-section">
           <h3>Calories log</h3>
           <div className="log-list">
@@ -179,6 +199,7 @@ export default function WorkoutsView({
           </div>
         </section>
 
+        {/* ---- Meals ---- */}
         <section className="log-section">
           <h3>Meal log</h3>
           <div className="log-list">
@@ -218,6 +239,7 @@ export default function WorkoutsView({
           </div>
         </section>
 
+        {/* ---- Progress metrics ---- */}
         <section className="log-section">
           <h3>Progress metrics log</h3>
           <div className="log-list">
