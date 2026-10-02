@@ -98,6 +98,7 @@ export default function PreviewWorkoutWeekChapter({
             }}
           />
         </div>
+        {/* ---- The table: the header row, then the body ---- */}
         <table className="preview-week-table">
           <thead>
             <tr>

@@ -220,9 +220,9 @@ export default function usePreviewWeekParticleAnimation({
     });
 
     // ---- Chunks: over each cell, up to a cap --------------------------------
-    // In the cell's background colour or, where that is transparent, as it is
-    // for every day cell, whose background is a gradient, a fixed translucent
-    // white, stronger for a th.
+    // In the cell's background colour, or a fixed translucent white, stronger
+    // for a th, where that colour is transparent, as it is for every day cell,
+    // whose background is a gradient.
     cellEntries.forEach((entry) => {
       const { targetEl, rect, relativeLeft, relativeTop, rowProgress, colProgress } = entry;
 
