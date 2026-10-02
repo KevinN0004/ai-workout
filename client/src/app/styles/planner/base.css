@@ -1,4 +1,9 @@
-﻿.plan-modal-backdrop {
+﻿/* The two planner modals App builds for HomePage and DashboardPage: GeneratedPlanModal's
+   day tabs and plan, and PlannerSetupModal's three steps. Imported first of the four
+   planner sheets by styles/app.css. */
+
+/* ---- Generated plan modal ------------------------------------------------ */
+.plan-modal-backdrop {
   padding: 24px;
 }
 
@@ -37,6 +42,7 @@
   padding-right: 8px;
 }
 
+/* ---- Day tabs and the day's plan ----------------------------------------- */
 .plan-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -83,6 +89,7 @@
   line-height: 1.6;
 }
 
+/* ---- Notes and footer ---------------------------------------------------- */
 .plan-modal-notes {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   padding-top: 16px;
@@ -106,6 +113,7 @@
   padding-top: 8px;
 }
 
+/* ---- Setup modal steps --------------------------------------------------- */
 .step-panel {
   display: grid;
   gap: 16px;
@@ -126,6 +134,7 @@
   gap: 12px;
 }
 
+/* ---- Equipment cards (step 1) -------------------------------------------- */
 .equip-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.24);
@@ -180,6 +189,8 @@
   filter: saturate(1.05) contrast(1.02);
 }
 
+/* The tone comes from equipmentThumbByLabel in PlannerSetupModal, and sets the thumbnail's
+   background, behind its photo. */
 .equip-thumb.tone-strength {
   background: linear-gradient(140deg, rgba(63, 84, 152, 0.78), rgba(25, 33, 70, 0.82));
 }
@@ -208,6 +219,8 @@
   text-align: center;
 }
 
+/* ---- Focus chips (step 3) ------------------------------------------------ */
+/* Each chip is an .equip-card too, so it starts from the card styles above. */
 .focus-option-grid {
   display: flex;
   flex-wrap: wrap;
@@ -231,6 +244,7 @@
   text-align: center;
 }
 
+/* ---- Setup modal header -------------------------------------------------- */
 .planner-close-icon {
   font-size: 1.2rem;
   line-height: 1;
@@ -271,6 +285,7 @@
   justify-self: start;
 }
 
+/* ---- Training form (step 2) ---------------------------------------------- */
 .planner-step-two-form {
   margin-top: 8px;
   gap: 18px;

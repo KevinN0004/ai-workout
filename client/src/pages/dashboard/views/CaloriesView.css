@@ -1,3 +1,8 @@
+/* CaloriesView, the dashboard's Goal view (root .goal-view): the calorie, goal and
+   progress-metric cards, with the stats, two seven-day charts, forms and logs. Imported by
+   the view, so it loads in the view's lazy chunk; theme.css recolours the charts. */
+
+/* ---- View and layout ----------------------------------------------------- */
 .goal-view {
   width: 100%;
   display: grid;
@@ -30,6 +35,8 @@
   gap: 12px;
 }
 
+/* ---- Forms --------------------------------------------------------------- */
+/* All three cards' forms are .goal-form; the progress-metric one is .progress-form too. */
 .goal-view .goal-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
@@ -41,6 +48,7 @@
   max-width: 100%;
 }
 
+/* ---- Charts -------------------------------------------------------------- */
 .goal-view .chart-card {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -92,6 +100,7 @@
   white-space: nowrap;
 }
 
+/* ---- Logs ---------------------------------------------------------------- */
 .goal-view .goal-list {
   display: grid;
   gap: 10px;
@@ -109,6 +118,7 @@
   word-break: break-word;
 }
 
+/* ---- Progress form and submit buttons ------------------------------------ */
 .goal-view .progress-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -120,12 +130,14 @@
   border-radius: 12px;
 }
 
+/* ---- Cards in one column ------------------------------------------------- */
 @media (max-width: 1100px) {
   .goal-view .goal-layout {
     grid-template-columns: 1fr;
   }
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .goal-view .chart-header {
     flex-direction: column;
@@ -151,6 +163,7 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
 @media (max-width: 520px) {
   .goal-view .chart-card {
     padding: 12px;

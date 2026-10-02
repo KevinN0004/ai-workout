@@ -1,7 +1,15 @@
-﻿.planner-setup-modal .muted {
+﻿/* PlannerSetupModal's motion and feedback: the sliding environment toggle, the entrance
+   animations, hover and press feedback, and the header's back arrow. Imported second of the
+   four planner sheets by styles/app.css; the keyframes it names are in motion.css. */
+
+/* ---- Muted text ---------------------------------------------------------- */
+.planner-setup-modal .muted {
   color: #ececec;
 }
 
+/* ---- Environment toggle (step 1) ----------------------------------------- */
+/* ::before is the pill behind the two buttons. PlannerSetupModal sets pos-1 when the
+   environment is Commercial, which slides it under the second button. */
 .planner-setup-modal .planner-env-toggle {
   position: relative;
   display: inline-grid;
@@ -59,6 +67,7 @@
   animation: planner-toggle-pop 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* ---- Entrance animations ------------------------------------------------- */
 .planner-backdrop {
   animation: planner-backdrop-in 380ms ease both;
 }
@@ -73,6 +82,8 @@
   animation: planner-chrome-in 420ms ease both;
 }
 
+/* ---- Footer alignment ---------------------------------------------------- */
+/* planner-footer-center is set on step 3, which centres its one button. */
 .planner-setup-modal .modal-footer {
   justify-content: flex-end;
 }
@@ -89,6 +100,9 @@
   margin-right: 0;
 }
 
+/* ---- Step and card entrance ---------------------------------------------- */
+/* The option grid is on steps 1 and 3. Its first eight cards enter 40ms apart; any card
+   after the eighth has no delay, so it enters with the first. */
 .planner-setup-modal .planner-step-panel {
   animation: planner-step-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -125,6 +139,7 @@
   animation-delay: 280ms;
 }
 
+/* ---- Hover and press feedback -------------------------------------------- */
 .planner-setup-modal .segmented button,
 .planner-setup-modal .equip-card,
 .planner-setup-modal .focus-chip,
@@ -158,6 +173,7 @@
   transform: scale(0.97);
 }
 
+/* ---- Back button in the actions row -------------------------------------- */
 .planner-setup-modal .modal-actions .back-btn {
   background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   border-color: rgba(255, 106, 88, 0.94) !important;
@@ -188,6 +204,7 @@
   box-shadow: none;
 }
 
+/* ---- Header back arrow --------------------------------------------------- */
 .planner-setup-modal .planner-back-arrow {
   min-width: 44px;
   width: 44px;

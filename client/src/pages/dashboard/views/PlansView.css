@@ -1,3 +1,8 @@
+/* PlansView, the dashboard's Weekly plan view: a row of hub cards for each of the workout
+   week, the saved exercises, the meals week and the week's tips, and the day-detail modal.
+   Imported by the view, so it loads in the view's lazy chunk. */
+
+/* ---- View and plan rows -------------------------------------------------- */
 .plans-view {
   width: 100%;
   display: grid;
@@ -44,6 +49,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* ---- Hub cards ----------------------------------------------------------- */
+/* A day's card is a button (.hub-card-button) that opens the day-detail modal. */
 .plans-view .hub-card {
   padding: 16px;
   border-radius: 16px;
@@ -76,6 +83,7 @@
   margin: 0;
 }
 
+/* ---- Pills and lists ----------------------------------------------------- */
 .plans-view .meal-track-pill {
   border: 1px solid rgba(255, 255, 255, 0.45);
   color: #f2f2f2;
@@ -129,6 +137,9 @@
   color: #dcdcdc;
 }
 
+/* ---- Day-detail modal ---------------------------------------------------- */
+/* The modal renders through ModalPortal, outside .plans-view, so these selectors do not
+   start from it. */
 .plan-day-detail-modal {
   width: min(980px, 100%);
   text-align: left;
@@ -175,6 +186,7 @@
   margin-top: 0;
 }
 
+/* ---- Saved exercises and empty states ------------------------------------ */
 .plans-view .saved-exercise-card {
   gap: 8px;
 }
@@ -206,6 +218,7 @@
   text-decoration: none;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .plans-view .plan-row {
     padding: 16px;

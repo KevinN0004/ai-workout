@@ -1,4 +1,10 @@
-﻿@media (max-width: 960px) {
+﻿/* The dashboard on smaller screens: the drawer's width, a tighter header, the workout modal
+   in one column, the bottom navigation and the toast above it, and the drawer's
+   reduced-motion switch. Imported last by DashboardPage.css, so these rules override the
+   earlier dashboard sheets at the same specificity. */
+
+/* ---- Medium screens ------------------------------------------------------ */
+@media (max-width: 960px) {
   .drawer {
     width: min(300px, 92vw);
     padding: 16px;
@@ -13,6 +19,9 @@
   }
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
+/* Shows the bottom navigation, and lifts the toast and pads the foot of the page so the
+   bar covers neither. */
 @media (max-width: 720px) {
   .dashboard-page {
     padding-bottom: 88px;
@@ -131,6 +140,7 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
 @media (max-width: 520px) {
   .drawer {
     width: 100%;
@@ -139,6 +149,9 @@
   }
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Opens the drawer and its backdrop without their entrance animations. The drawer
+   buttons' hover transition and the loading skeleton's shimmer still run. */
 @media (prefers-reduced-motion: reduce) {
   .drawer-backdrop,
   .drawer {

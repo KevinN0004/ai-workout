@@ -1,3 +1,6 @@
+/* DashboardHomeView, the dashboard's Home view: one panel with a button back to the landing
+   page. Imported by the view, so it loads in the view's lazy chunk. */
+
 .dashboard-home-view {
   width: 100%;
   min-height: clamp(220px, 40vh, 420px);
@@ -12,6 +15,7 @@
   min-width: 160px;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .dashboard-home-view {
     min-height: 200px;

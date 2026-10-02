@@ -1,4 +1,8 @@
-﻿@import "./styles/theme.css";
+﻿/* The dashboard page's styles, imported by DashboardPage: the six sheets in ./styles, theme
+   first. Their order is the cascade order, and responsive.css comes last so its overrides
+   win ties with the rest. Each view imports a stylesheet of its own. */
+
+@import "./styles/theme.css";
 @import "./styles/glance-loading.css";
 @import "./styles/toast.css";
 @import "./styles/workout-modal.css";
