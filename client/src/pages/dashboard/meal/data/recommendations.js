@@ -1,4 +1,9 @@
-﻿export const COURSE_ALL_KEY = "all-courses";
+﻿/**
+ * The meal suggestions for each goal track, keyed by detectTrack's track names:
+ * a titled MealDB search per section, run by useMealDbSearch. Also the key of
+ * MealView's "All courses" option.
+ */
+export const COURSE_ALL_KEY = "all-courses";
 
 export const MEALDB_RECOMMENDATION_QUERIES = {
   lean_strength: [

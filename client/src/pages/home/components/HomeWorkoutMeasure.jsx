@@ -1,3 +1,15 @@
+/**
+ * An invisible copy of the workout stage, rendered by HomePage on every stage
+ * so useHomeStageFlow can measure the workout panel's size before that stage is
+ * mounted.
+ */
+
+/**
+ * Mirrors HomeWorkoutStage's markup and `samplePlan` without its handlers,
+ * back-button style or error line. `.stage-measure` (layout.css) hides it, it
+ * is hidden from assistive technology, and its buttons are out of the tab
+ * order.
+ */
 export default function HomeWorkoutMeasure({
   workoutMeasureShellRef,
   workoutMeasureRef,
@@ -8,6 +20,7 @@ export default function HomeWorkoutMeasure({
       <main className="content">
         <div className="home-stage">
           <div className="workout-stage-shell" ref={workoutMeasureShellRef}>
+            {/* ---- Header and Generate Workout ---- */}
             <section
               className="panel center-panel stage-panel workout-stage-panel"
               ref={workoutMeasureRef}
@@ -38,6 +51,7 @@ export default function HomeWorkoutMeasure({
               </div>
             </section>
 
+            {/* ---- Sample weekly plan ---- */}
             <section className="panel muted-panel stage-panel">
               <h2>Sample Weekly Plan</h2>
               <div className="grid">

@@ -1,29 +1,18 @@
+/**
+ * Prisma-native persistence for generated workout plans. It only inserts:
+ * plans are read newest first by `createdAt`, and userReadRepository caps how
+ * many it reads, so nothing prunes the table and it grows without bound.
+ * That is a decision still to be made, not an oversight.
+ */
 import { toIso } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
-/**
- * Prisma-native persistence for generated workout plans.
- *
- * Task 5 of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
- *
- * That plan called this the one task with a genuine design question, because
- * the route asks for `$push` with `$position: 0` and `$slice: 200` -- prepend
- * to a capped list -- and warned that choosing between "insert plus bounded
- * delete" and "insert plus ordered read" changes behaviour under concurrency.
- *
- * There is no such question. Both operators are inert. Probed against a live
- * database: 205 rows inserted, the user read returned 200 and the table kept
- * all 205; pushing another left 206 stored and still 200 returned, newest
- * first. So plans are always inserted, ordering comes from `createdAt desc`,
- * and the 200 limit is applied by the reader in prismaDataModels' loadUserRelated.
- *
- * This repository therefore only inserts. The table growing without bound is
- * pre-existing behaviour, not something introduced here -- worth a separate
- * decision if it ever matters.
- */
-
 const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
+/**
+ * Maps a generated_plans row to the plan the API returns. `id` is the legacy id
+ * when the row has one, and the JSON list columns always read as arrays.
+ */
 export const mapGeneratedPlan = (row = {}) => ({
   id: row.legacyId || row.id,
   createdAt: toIso(row.createdAt),
@@ -38,6 +27,10 @@ export const mapGeneratedPlan = (row = {}) => ({
   plan: row.planText || ""
 });
 
+/**
+ * Builds the plan writer over `prisma`. Returns `saveGeneratedPlan`, which the
+ * generate route calls once it has a plan for a signed-in user.
+ */
 export const createGeneratedPlanRepository = ({ prisma }) => {
   /** Returns null when the user cannot be resolved, matching the other repositories. */
   const saveGeneratedPlan = async ({ userId, entry = {} }) => {

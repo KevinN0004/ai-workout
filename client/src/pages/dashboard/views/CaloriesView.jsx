@@ -1,5 +1,15 @@
+/**
+ * The dashboard's Goal view: calories and progress metrics, each with its form
+ * and log, and the goals form. Rendered by DashboardPage, which loads it lazily.
+ */
 import "./CaloriesView.css";
 
+/**
+ * The calorie, goals and progress-metric forms are controlled by App's state
+ * and saved by the matching handlers in events.js; the header's Save goals
+ * button submits the goals form by its id. The averages, chart series, day keys
+ * and pace text come from useDashboardMetrics.
+ */
 export default function CaloriesView({
   goalForm,
   setGoalForm,
@@ -21,11 +31,11 @@ export default function CaloriesView({
   setProgressForm,
   submitProgressMetric
 }) {
-  // Each list is narrowed once and then used for both the rows and the empty
-  // state beneath them. They used to be guarded separately and disagreed:
-  // `Array.isArray(...)` for the rows and `?.length` for the message, which a
-  // string satisfies -- so a non-array rendered no rows and no explanation
-  // either. Deriving them once means the two cannot drift apart again.
+  // Each list is narrowed once, and both the rows and the empty state beneath
+  // them read the result, so the two cannot disagree. Guarded separately they
+  // could: `Array.isArray` rejects a string where `?.length` accepts one, so a
+  // string would render no rows and no explanation either.
+  // useDashboardMetrics already hands over arrays.
   const calorieEntries = Array.isArray(calories) ? calories : [];
   const metricEntries = Array.isArray(progressMetrics) ? progressMetrics : [];
 
@@ -42,6 +52,7 @@ export default function CaloriesView({
       </header>
       <div className="goal-layout">
         <div className="goal-main">
+          {/* ---- Calories: stats, chart, form and log ---- */}
           <section className="panel goal-card">
             <h3>Calories</h3>
             <div className="goal-stat-row">
@@ -112,6 +123,7 @@ export default function CaloriesView({
           </section>
         </div>
         <aside className="goal-side">
+          {/* ---- Goals: pace, workouts chart and form ---- */}
           <section className="panel goal-card">
             <h3>Goals</h3>
             <p className="muted">{goalPaceText}</p>
@@ -184,6 +196,7 @@ export default function CaloriesView({
             </form>
           </section>
 
+          {/* ---- Progress metrics: form and latest entries ---- */}
           <section className="panel goal-card">
             <h3>Progress metrics</h3>
             <p className="muted">Log body metrics over time and keep historical records.</p>
