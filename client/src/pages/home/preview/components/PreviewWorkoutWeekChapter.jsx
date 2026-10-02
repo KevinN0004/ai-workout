@@ -1,5 +1,21 @@
+/**
+ * The preview walkthrough's Result chapter: the generated week as a table that
+ * draws its outline, types in its headers and then its cells, and breaks apart
+ * into particles. Rendered by PreviewStage.
+ */
 import { PREVIEW_WEEK_LINE_STAGGER_MS, PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../constants";
 
+/**
+ * Each `previewWeekStage` from 1 adds classes the stylesheet animates: 1 draws
+ * the outline, 2 shows the headers, 3 the rows, 5 runs the scan and 6 the
+ * break; 4, the typing finished, adds none. The text typed so far comes from
+ * `getPreviewWeekHeaderTypedText` and `getPreviewWeekTypedText`, and a cell
+ * with none yet holds a non-breaking space so it keeps a line's height. The
+ * outline's lines sit at `previewWeekLineOffsets`, which usePreviewWeekOutline
+ * measures from this table, and start one after another, horizontals first.
+ * The two refs are the table's wrap, which the outline and the particle
+ * animation measure, and the layer the particles are drawn into.
+ */
 export default function PreviewWorkoutWeekChapter({
   previewWeekLineOffsets,
   previewWeekStage,
@@ -25,6 +41,7 @@ export default function PreviewWorkoutWeekChapter({
       aria-label="Generated weekly workout preview"
     >
       <div ref={previewWeekTableWrapRef} className="preview-week-table-wrap">
+        {/* ---- The outline: its lines, then its corners ---- */}
         <div className="preview-week-outline" aria-hidden="true">
           {horizontalLineOffsets.map((offset, index) => (
             <span
@@ -79,6 +96,7 @@ export default function PreviewWorkoutWeekChapter({
             }}
           />
         </div>
+        {/* ---- The table ---- */}
         <table className="preview-week-table">
           <thead>
             <tr>
@@ -104,6 +122,7 @@ export default function PreviewWorkoutWeekChapter({
               ))}
             </tr>
           </thead>
+          {/* ---- A row per PREVIEW_WEEK_TEXT_ROW_CONFIG entry, then the highlights ---- */}
           <tbody>
             {PREVIEW_WEEK_TEXT_ROW_CONFIG.map((rowConfig) => (
               <tr key={`preview-week-row-${rowConfig.id}`}>
@@ -161,6 +180,7 @@ export default function PreviewWorkoutWeekChapter({
             </tr>
           </tbody>
         </table>
+        {/* ---- Where usePreviewWeekParticleAnimation draws the break ---- */}
         <div
           ref={previewWeekParticleLayerRef}
           className="preview-week-particle-layer"

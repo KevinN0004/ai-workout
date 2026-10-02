@@ -1,3 +1,9 @@
+/**
+ * What the preview walkthrough shows that is worked out rather than stored: the
+ * profile with the sample filling its gaps, the week plan, the dashboard's
+ * figures, the values to type, the chapters, and layout widths. Called by
+ * PreviewStage.
+ */
 import { useMemo, useRef } from "react";
 import {
   IMPERIAL_REGION_CODES,
@@ -13,6 +19,16 @@ import {
   getPreviewWeekdayName
 } from "../utils";
 
+/**
+ * Derives the walkthrough's content from the visitor's `personal` profile and
+ * planner `form`, with JOHN_DOE_PREVIEW_PROFILE filling what they leave empty,
+ * and from the chapter state PreviewStage passes in. `resolvedHeightCm`,
+ * `resolvedWeightKg` and `effectiveBodyFat` are useBodyModel's figures, passed
+ * down by HomePage, and `toFeetInchesFromCm` and `toLb` are app/units.js's
+ * converters. Returns the derived values; refs holding the values to type and
+ * their order as they were on the first render; and helpers that size a
+ * textarea and cut the week's text down to what has been typed so far.
+ */
 export default function usePreviewDerivedData({
   personal,
   form,
@@ -27,6 +43,13 @@ export default function usePreviewDerivedData({
   previewWeekHeaderTypingProgress,
   previewWeekTypingProgress
 }) {
+  // ---- Units: the locale's, read once ---------------------------------------
+  // Imperial when the region of the browser's first preferred language is in
+  // IMPERIAL_REGION_CODES. A language with no region defers to Intl's default
+  // locale, and when that has none either, or Intl throws, the region is the
+  // US. App picks heightUnit and weightUnit by another rule,
+  // getPreferredMeasurementSystem in app/units.js, which checks every
+  // preferred language and otherwise picks metric.
   const usesImperialUnits = useMemo(() => {
     const previewLocale = (() => {
       if (typeof navigator === "undefined") return "en-US";
@@ -55,6 +78,15 @@ export default function usePreviewDerivedData({
       ? String(personal.trainingDays.length)
       : "";
 
+  // ---- The profile: the visitor's, with the sample filling the gaps ----------
+  // Every field comes out set. A text field or list the visitor left empty
+  // takes the sample's value (`days` falls back first to the count of training
+  // days picked), and a missing height, weight or body fat takes the sample's
+  // number. What follows reads the fields on that basis, so a guard further
+  // down that only tests for a missing value, such as the `?? ""` and
+  // Array.isArray in previewPersonalTargets, cannot fire; one that tests the
+  // value itself, like the session length's `> 0`, is not covered by this.
+  // usePreviewDerivedData.test.jsx pins the guarantee.
   const activePreviewProfile = useMemo(
     () => ({
       ...JOHN_DOE_PREVIEW_PROFILE,
@@ -91,6 +123,9 @@ export default function usePreviewDerivedData({
     [effectiveBodyFat, form, inferredTrainingDayCount, personal, resolvedHeightCm, resolvedWeightKg]
   );
 
+  // ---- Body figures and the personal chapter's height and weight ------------
+  // A height or weight the visitor typed is shown as typed; otherwise it comes
+  // from the profile, the weight in App's weightUnit.
   const activeHeightCm =
     Number(activePreviewProfile.heightCm) > 0 ? Number(activePreviewProfile.heightCm) : 175;
   const activeWeightKg =
@@ -120,6 +155,10 @@ export default function usePreviewDerivedData({
   const defaultAge = activePreviewProfile.age;
   const defaultSex = activePreviewProfile.sex;
 
+  // ---- The week plan ----------------------------------------------------------
+  // The visitor's training days, topped up from Monday on to the larger of the
+  // days asked for and PREVIEW_WEEK_MIN_WORKOUT_DAYS. Training days take the
+  // session templates in turn; rest days get a fixed recovery entry.
   const previewWeekPlan = useMemo(() => {
     // No re-guard: activePreviewProfile already resolved this to a non-empty
     // array, falling back to the sample profile if the visitor supplied none.
@@ -150,6 +189,8 @@ export default function usePreviewDerivedData({
         ? `${Number(activePreviewProfile.duration)} min`
         : `${Number(JOHN_DOE_PREVIEW_PROFILE.duration)} min`;
     const environmentLabel = String(activePreviewProfile.environment);
+    // Session names and their exercises, paired by index, handed to the
+    // training days in week order and starting over after the last.
     const trainingTemplates = [
       "Upper Strength",
       "Lower Strength",
@@ -203,7 +244,13 @@ export default function usePreviewDerivedData({
     activePreviewProfile.environment
   ]);
 
+  // ---- The dashboard chapter's figures ----------------------------------------
+  // A plausible dashboard made from the plan and the profile, not from logs.
   const previewDashboardSummary = useMemo(() => {
+    // ---- The weekly goal and the workouts done ----
+    // Every planned training day counts as done, and the plan always holds at
+    // least as many as the goal, so progress is always full and the pace text
+    // below always says the goal is reached.
     const trainingDays = previewWeekPlan.filter((item) => item.isTraining);
     const requestedGoalDays = Number(activePreviewProfile.days);
     const weeklyGoal = clamp(
@@ -218,6 +265,8 @@ export default function usePreviewDerivedData({
       100
     );
 
+    // ---- Calories: a goal from body weight and the weekly goal, and an
+    // average just under it ----
     const calorieGoal = clamp(Math.round(activeWeightKg * 30 + weeklyGoal * 18), 1700, 3400);
     const avgCalories = clamp(
       Math.round(calorieGoal * (0.92 + (workoutProgress / 100) * 0.06)),
@@ -231,6 +280,10 @@ export default function usePreviewDerivedData({
     );
     const calorieDelta = Math.round(avgCalories - calorieGoal);
 
+    // ---- Target weight ----
+    // Down for a goal containing "lose", "cut" or "fat", in any case, up for one
+    // containing "gain", "bulk" or "mass", and a little down otherwise. Shown in
+    // the locale's units (usesImperialUnits), not App's weightUnit.
     const goalText = String(activePreviewProfile.goal);
     const goalTokens = goalText.toLowerCase();
     const targetWeightKg = (() => {
@@ -242,6 +295,9 @@ export default function usePreviewDerivedData({
       ? `${Math.round(Number(toLb(String(roundTo(targetWeightKg, 1)), "kg")))} lb`
       : `${Math.round(targetWeightKg)} kg`;
 
+    // ---- Today and the next session ----
+    // Today is the real weekday, so these follow the clock. The next session is
+    // the first training day after today, going round the week.
     const todayName = getPreviewWeekdayName(new Date());
     const todayPlan = previewWeekPlan.find((item) => item.day === todayName) || previewWeekPlan[0];
     const todayWorkoutLines = String(todayPlan?.workout || "")
@@ -265,6 +321,9 @@ export default function usePreviewDerivedData({
     }
     if (!nextTrainingPlan) nextTrainingPlan = trainingDays[0] || previewWeekPlan[0];
 
+    // ---- Trend series, a value per day of the week ----
+    // Calories above the goal on training days and below it on rest days, and
+    // recovery lower on training days, each with a gentle wave over the week.
     const calorieSeries = previewWeekPlan.map((dayPlan, index) => {
       const base = dayPlan.isTraining ? calorieGoal * 1.02 : calorieGoal * 0.9;
       const wave = Math.sin((index / Math.max(previewWeekPlan.length - 1, 1)) * Math.PI * 2) * 70;
@@ -283,6 +342,9 @@ export default function usePreviewDerivedData({
     const trendStartLabel = PREVIEW_WEEK_DAY_ORDER[0].slice(0, 3);
     const trendEndLabel = PREVIEW_WEEK_DAY_ORDER[PREVIEW_WEEK_DAY_ORDER.length - 1].slice(0, 3);
 
+    // ---- Streak, recent activity, the overview's settings and the pace ----
+    // The streak is the longest run of training days from Monday to Sunday,
+    // not wrapping round, held between 1 and the weekly goal.
     let runningStreak = 0;
     let bestStreak = 0;
     previewWeekPlan.forEach((dayPlan) => {
@@ -316,6 +378,8 @@ export default function usePreviewDerivedData({
         : avgDailyWorkouts > 0
           ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
           : "Log a workout to start your pace estimate.";
+
+    // ---- Today's meals: a training-day menu or a rest-day one ----
     const mealPlan = todayPlan?.isTraining
       ? {
           breakfast: "Greek yogurt + oats + berries",
@@ -376,6 +440,8 @@ export default function usePreviewDerivedData({
     toLb
   ]);
 
+  // ---- What the personal chapter types, and in what order -------------------
+  // computedBodyFat is in neither fill order, so the chapter never shows it.
   const previewPersonalTargets = useMemo(
     () => ({
       name: String(defaultName ?? ""),
@@ -417,6 +483,8 @@ export default function usePreviewDerivedData({
     ]
   );
 
+  // Which height fields are typed follows usesImperialUnits. PreviewPersonalChapter
+  // shows the ones for App's heightUnit.
   const previewFillOrder = useMemo(
     () =>
       usesImperialUnits
@@ -454,6 +522,8 @@ export default function usePreviewDerivedData({
     [usesImperialUnits]
   );
 
+  // Kept from the first render, so usePreviewChapterFlow types the profile as it
+  // was when the walkthrough opened, whatever changes after.
   const previewInitialTargetsRef = useRef(null);
   const previewInitialFillOrderRef = useRef(null);
   if (!previewInitialTargetsRef.current) {
@@ -463,12 +533,10 @@ export default function usePreviewDerivedData({
     previewInitialFillOrderRef.current = previewFillOrder;
   }
 
-  // Only the id and the title are read: PreviewStage routes on the id and the
-  // table of contents shows the title. Each chapter used to carry a `fields`
-  // array of label/value descriptors as well, built from the profile, but the
-  // only thing that ever read them was a fallback arm of PreviewStage's router
-  // that no chapter id could reach. With that gone the list is static, which is
-  // why the dependency array is now empty.
+  // ---- The chapters -----------------------------------------------------------
+  // Each is an id, which PreviewStage and the hooks switch on, and a title,
+  // which heads the stage, labels the table of contents and sizes its chips
+  // below. Nothing in the list depends on the profile, so it is built once.
   const previewChapters = useMemo(
     () => [
       { id: "personal-info", title: "Personal Info" },
@@ -479,6 +547,7 @@ export default function usePreviewDerivedData({
     []
   );
 
+  // Each is always found, so the hooks' `>= 0` checks on them always pass.
   const generateChapterIndex = previewChapters.findIndex((chapter) => chapter.id === "generate");
   const workoutWeekChapterIndex = previewChapters.findIndex(
     (chapter) => chapter.id === "workout-week"
@@ -487,6 +556,10 @@ export default function usePreviewDerivedData({
     (chapter) => chapter.id === "dashboard-preview"
   );
 
+  // ---- Layout -----------------------------------------------------------------
+  // The chips and the stage title are as wide as the longest chapter title,
+  // with a minimum each. The body is padded on the right by the table of
+  // contents' lane and 8px on every chapter but the dashboard.
   const activePreviewChapter = previewChapters[previewStepIndex] || previewChapters[0];
   const isCenteredBodyChapter =
     activePreviewChapter.id === "personal-info" ||
@@ -514,6 +587,8 @@ export default function usePreviewDerivedData({
     "--preview-chip-collapsed": "44px"
   };
 
+  // ---- Helpers for the chapters -----------------------------------------------
+  // A textarea's rows: one per 30 characters, between minRows and maxRows.
   const getPreviewTextRows = (value, minRows = 1, maxRows = 4) => {
     const text = String(value ?? "").trim();
     if (!text) return minRows;
@@ -521,6 +596,9 @@ export default function usePreviewDerivedData({
     return Math.max(minRows, Math.min(maxRows, estimatedRows));
   };
 
+  // How much of a week header has been typed: none before stage 2, all of it
+  // from stage 3, and in between the share the header progress gives, rounded
+  // up. A cell's text works the same way from stage 3, by the row progress.
   const getPreviewWeekHeaderTypedText = (value) => {
     const text = String(value ?? "");
     if (previewWeekStage < 2) return "";
