@@ -1,10 +1,16 @@
+/**
+ * The Account tab's forms: change the password, and delete the account behind
+ * a confirmation step. Rendered by SettingsView on that tab.
+ */
 import { useEffect, useRef, useState } from "react";
 import "./SettingsAccountPanel.css";
 
-// Two independent forms: changing a password and deleting the account.
-// Both handlers resolve to { ok: true } or { ok: false, error } and never
-// throw -- see client/src/app/events.js -- so every branch here is driven by
-// the resolved value.
+/**
+ * Two independent forms, each with its own state. Both handlers (changePassword
+ * and deleteAccount in events.js) report the request's outcome as
+ * `{ ok: true }` or `{ ok: false, error }` rather than throwing a failure, so
+ * every branch here is driven by the resolved value.
+ */
 export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -16,13 +22,13 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
   const [deleteError, setDeleteError] = useState("");
   const [deleteSaving, setDeleteSaving] = useState(false);
 
-  // Revealing the confirmation unmounts the button that was focused, so focus
-  // falls to <body>: a keyboard user has to Tab from the top of the document
-  // to reach the field they just asked for, and a screen reader announces
-  // nothing at all. axe cannot see this -- it audits a static tree, and the
-  // a11y spec scans the revealed state without asking where focus went -- so
-  // it is structurally invisible to this branch's own accessibility gate.
-  // WCAG 2.4.3. The hook-based precedent here is useCloseOnEscape.
+  // Revealing the confirmation unmounts the button that had focus, so focus
+  // would fall to <body>: a keyboard user would have to Tab from the top of the
+  // document to reach the field they just asked for, and a screen reader would
+  // announce nothing. Focusing the field keeps their place (WCAG 2.4.3). axe
+  // cannot see the difference -- it audits a static tree, and the a11y spec
+  // scans the revealed state without asking where focus went -- so
+  // SettingsAccountPanel.test.jsx is what guards it.
   const deletePasswordRef = useRef(null);
   useEffect(() => {
     if (deleteRevealed) deletePasswordRef.current?.focus();

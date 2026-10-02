@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -334,5 +335,179 @@ describe("the Deploy workflow deploys only this repository's own pushes", () => 
   test("those requirements are all required, not alternatives", () => {
     // One `||` inside the automatic branch would let any single check through.
     expect(automatic).not.toContain("||");
+  });
+});
+
+describe("every source file opens with a header comment", () => {
+  // docs/code-readability-sop.md asks every non-test source file to open with a
+  // comment saying what it is for. This checks presence only; whether a header
+  // is any good is review's job.
+  //
+  // file-header-allowlist.json lists the files that had no header when this
+  // check arrived, and it only shrinks. ALLOWLIST_SIZE pins its length, so a new
+  // entry fails "the allowlist has exactly ALLOWLIST_SIZE entries" unless the
+  // constant is raised in the same diff -- the line a reviewer should refuse.
+  // (Swapping one entry for another keeps the length; only the allowlist's own
+  // diff shows that, as an added line.) An entry whose file gains a header, or
+  // stops being an in-scope file, fails the tests named for those cases, so no
+  // entry outlives the file it excuses. When entries are removed, lower
+  // ALLOWLIST_SIZE in the same change.
+  const ALLOWLIST_SIZE = 58;
+
+  const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
+  const isInScope = (file) =>
+    /\.(js|jsx|mjs|cjs|css)$/.test(file) &&
+    !/\.(test|spec)\.|(^|\/)__tests__\/|^client\/src\/test\/setup\.js$/.test(file) &&
+    (IN_SCOPE_DIRS.some((dir) => file.startsWith(`${dir}/`)) ||
+      /(^|\/)[^/]+\.config\.js$/.test(file));
+  // Tracked files, not a directory walk, so stray local files cannot fail it.
+  const sources = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
+    .split("\0")
+    .filter((file) => file && isInScope(file) && existsSync(path.join(repoRoot, file)));
+
+  // A comment that only instructs a tool tells a reader nothing, so it is not a
+  // header. The rule reads the comment's first line of content, which also
+  // catches a directive split across lines ("/*\n eslint-disable */"). ESLint
+  // reads a rule setting and a globals list only in a block comment, and
+  // "global" only in JS, so "// global error handler" and a stylesheet's
+  // "/* global tokens */" are both headers.
+  const TOOL_DIRECTIVE =
+    /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
+  const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
+  const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
+  // True when, after a byte-order mark and a shebang line, the text opens with a
+  // comment whose first line of content is not a tool directive.
+  const hasHeaderText = (file, text) => {
+    const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+    const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
+    const isBlock = body.startsWith("/*");
+    let lines;
+    if (body.startsWith("//")) {
+      lines = [];
+      for (const line of body.split(/\r?\n/)) {
+        if (!line.trimStart().startsWith("//")) break;
+        lines.push(line.trimStart().slice(2));
+      }
+    } else if (isBlock) {
+      const end = body.indexOf("*/", 2);
+      lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
+    } else {
+      return false;
+    }
+    const content =
+      lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
+    if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
+    if (!isBlock) return true;
+    if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
+    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
+  };
+  const hasHeader = (file) => hasHeaderText(file, readFileSync(path.join(repoRoot, file), "utf8"));
+
+  const allowlist = JSON.parse(
+    readFileSync(path.join(repoRoot, "scripts", "__tests__", "file-header-allowlist.json"), "utf8")
+  );
+  const allowed = new Set(allowlist);
+  const BOM = String.fromCharCode(0xfeff);
+
+  test.each([
+    ["a block comment", "a.js", '/**\n * Does a thing.\n */\nimport x from "y";\n', true],
+    ["a line comment", "a.js", "// Does a thing.\nexport const a = 1;\n", true],
+    ["a CSS comment after a byte-order mark", "a.css", `${BOM}/* The drawer. */\n.a {}\n`, true],
+    ["a header after a shebang", "a.mjs", "#!/usr/bin/env node\n// A tool.\n", true],
+    [
+      "a byte-order mark, then a shebang, then a header",
+      "a.mjs",
+      `${BOM}#!/usr/bin/env node\n// A tool.\n`,
+      true
+    ],
+    ["CRLF line endings", "a.js", "/**\r\n * Does a thing.\r\n */\r\n", true],
+    ["a licence comment", "a.js", "/*! Licensed MIT */\n", true],
+    [
+      "a stylesheet header that starts with the word global",
+      "a.css",
+      "/* global resets and tokens */\n",
+      true
+    ],
+    [
+      "a line comment that starts with the word global",
+      "a.js",
+      "// global error handler for every route\n",
+      true
+    ],
+    [
+      "a line comment that starts with eslint and a colon",
+      "a.js",
+      "// eslint config: flat, scoped to defect classes\n",
+      true
+    ],
+    ["an import first", "a.js", 'import x from "y";\n// late\n', false],
+    [
+      "a directive above the header",
+      "a.js",
+      "// eslint-disable-next-line no-console\n/** Header. */\n",
+      false
+    ],
+    ["a directive split across lines", "a.js", "/*\n  eslint-disable no-console\n*/\n", false],
+    ["an ESLint globals comment", "a.js", "/* globals window */\n", false],
+    [
+      "an ESLint globals comment broken after the keyword",
+      "a.js",
+      "/* globals\n  window */\n",
+      false
+    ],
+    ["a coverage directive", "a.js", "/* v8 ignore next */\n", false],
+    ["a TypeScript check directive", "a.js", "// @ts-check\n", false],
+    ["an empty comment", "a.js", "//\nexport const a = 1;\n", false],
+    ["use strict first", "a.cjs", '"use strict";\n// late\n', false],
+    ["an empty file", "a.js", "", false]
+  ])("the header rule: %s", (_label, file, text, expected) => {
+    expect(hasHeaderText(file, text)).toBe(expected);
+  });
+
+  test("the sweep found the source tree", () => {
+    // Guards the scope: a broken filter must not pass vacuously, so one file
+    // from each part of it must be present.
+    expect(sources.length).toBeGreaterThan(150);
+    for (const file of [
+      "server/src/index.js",
+      "client/src/styles/base.css",
+      "scripts/manual-deploy.mjs",
+      "server/scripts/refuse-db-push.js",
+      "playwright.config.js"
+    ]) {
+      expect(sources).toContain(file);
+    }
+  });
+
+  test("every source file not on the allowlist opens with a header", () => {
+    const missing = sources.filter((file) => !allowed.has(file) && !hasHeader(file));
+    expect(
+      missing,
+      "give each file a header comment (docs/code-readability-sop.md, rule 1); never add it to file-header-allowlist.json"
+    ).toEqual([]);
+  });
+
+  test("every allowlisted file still lacks one, so the list only shrinks", () => {
+    const done = allowlist.filter((file) => sources.includes(file) && hasHeader(file));
+    expect(
+      done,
+      "these files have a header now: delete them from file-header-allowlist.json and lower ALLOWLIST_SIZE"
+    ).toEqual([]);
+  });
+
+  test("every allowlisted path is an in-scope tracked file, listed once", () => {
+    const stale = allowlist.filter((file) => !sources.includes(file));
+    expect(
+      stale,
+      "these are not in-scope tracked files: delete them from file-header-allowlist.json and lower ALLOWLIST_SIZE"
+    ).toEqual([]);
+    expect(allowed.size, "an entry is listed twice").toBe(allowlist.length);
+  });
+
+  test("the allowlist has exactly ALLOWLIST_SIZE entries", () => {
+    expect(
+      allowlist.length,
+      "lower ALLOWLIST_SIZE when entries are removed; never raise it -- give the new file a header instead"
+    ).toBe(ALLOWLIST_SIZE);
   });
 });

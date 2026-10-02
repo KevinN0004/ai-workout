@@ -1,6 +1,20 @@
-import "./AuthPage.css";
+/**
+ * The /auth page: one form for logging in and for signing up, the sign-up mode
+ * revealing the profile fields above the email and password. Rendered by App.
+ */
 import { APP_BRAND_EXPANSION, APP_BRAND_NAME } from "../../app/constants";
+import "./AuthPage.css";
 
+/**
+ * Renders App's auth and sign-up state and calls back into App for every
+ * change and for the submit; it holds no state of its own. In login mode the
+ * profile fields stay rendered but hidden, and their fieldset is disabled, so
+ * their `required` does not block a login. The ft/in button fills feet and
+ * inches from the centimetres field and the cm button does the reverse; the lb
+ * and kg buttons convert the weight from the unit in use. All four use App's
+ * converters from app/units.js. `gradient` is App's page background, and the
+ * close button goes home through `go`.
+ */
 export default function AuthPage({
   gradient,
   authMode,
@@ -26,11 +40,14 @@ export default function AuthPage({
   authLoading,
   authError
 }) {
+  // Writes one sign-up field through App's change handler, shaped as the
+  // change event it expects.
   const setSignupField = (name, value) => {
     onSignupProfileChange({ target: { name, value } });
   };
   const isSignupMode = authMode === "signup";
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <div className="page auth-page home-page" style={gradient}>
       <header className="title">
@@ -43,6 +60,7 @@ export default function AuthPage({
       </header>
       <main className="content auth-content">
         <section className={`panel auth-card ${isSignupMode ? "auth-card-profile" : ""}`}>
+          {/* ---- Login or Sign Up, and close ---- */}
           <div className="auth-card-top">
             <div className={`segmented auth-mode-toggle ${isSignupMode ? "pos-1" : "pos-0"}`}>
               <button
@@ -84,6 +102,7 @@ export default function AuthPage({
             className={`form auth-form ${isSignupMode ? "auth-mode-signup" : "auth-mode-login"}`}
             onSubmit={onAuthSubmit}
           >
+            {/* ---- Sign-up profile fields, hidden and disabled in login mode ---- */}
             <div
               className={`auth-signup-fields-wrap ${isSignupMode ? "active" : ""}`}
               aria-hidden={!isSignupMode}
@@ -138,6 +157,7 @@ export default function AuthPage({
                       <option>Prefer not to say</option>
                     </select>
                   </label>
+                  {/* ---- Height, in centimetres or in feet and inches ---- */}
                   <label>
                     <span className="label-row">
                       Height
@@ -218,6 +238,7 @@ export default function AuthPage({
                       </div>
                     )}
                   </label>
+                  {/* ---- Weight, in kilograms or pounds ---- */}
                   <label>
                     <span className="label-row">
                       Weight
@@ -292,6 +313,7 @@ export default function AuthPage({
               </div>
             </div>
 
+            {/* ---- Email and password, for both modes ---- */}
             <label className={isSignupMode ? "full" : ""}>
               Email
               <input
@@ -371,6 +393,7 @@ export default function AuthPage({
                 </button>
               </div>
             </label>
+            {/* ---- Remember me (login only), submit, and the error ---- */}
             {!isSignupMode && (
               <label className="auto-signin-toggle">
                 <input

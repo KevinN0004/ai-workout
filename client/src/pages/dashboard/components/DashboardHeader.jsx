@@ -1,3 +1,15 @@
+/**
+ * The dashboard's header: the drawer's menu button, the "Hub" title and the
+ * profile menu. Rendered by DashboardPage, which owns the profile menu's state.
+ */
+
+/**
+ * Signed out, renders the title, a Login / Sign up button and a sign-in prompt.
+ * Signed in, the menu button and the profile menu (View profile, Log out) take
+ * the place of the button and the prompt. `profileMenuRef` goes on the menu's
+ * wrapper, which is how DashboardPage tells a click outside the menu from one
+ * inside it.
+ */
 export default function DashboardHeader({
   user,
   go,
@@ -9,6 +21,7 @@ export default function DashboardHeader({
   onOpenSettings,
   onLogout
 }) {
+  // ---- Signed out -----------------------------------------------------------
   if (!user) {
     return (
       <header className="title">
@@ -38,9 +51,11 @@ export default function DashboardHeader({
     );
   }
 
+  // ---- Signed in ------------------------------------------------------------
   return (
     <header className="title">
       <div className="header-top">
+        {/* ---- Menu button ---- */}
         <div className="header-left">
           <div className="nav-trigger">
             <button
@@ -62,6 +77,7 @@ export default function DashboardHeader({
             </button>
           </div>
         </div>
+        {/* ---- Title ---- */}
         <div className="header-center">
           <h1>
             <button
@@ -75,6 +91,7 @@ export default function DashboardHeader({
             </button>
           </h1>
         </div>
+        {/* ---- Profile menu ---- */}
         <div className="auth-actions">
           <div className="profile-menu" ref={profileMenuRef}>
             <button

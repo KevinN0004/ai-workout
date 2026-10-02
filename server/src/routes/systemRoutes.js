@@ -1,3 +1,9 @@
+/**
+ * The operational endpoints, none of which needs a session: liveness,
+ * readiness, request, cache and upstream metrics (never public in production;
+ * see metricsGuard), and the CSRF token for a client with no cookie to read it
+ * from. Registered by registerApiRoutes.
+ */
 import crypto from "crypto";
 
 /**
@@ -12,6 +18,17 @@ const tokenMatches = (provided, expected) => {
   return crypto.timingSafeEqual(a, b);
 };
 
+/**
+ * Registers GET /api/health, /api/ready, /api/metrics and /api/csrf-token.
+ *
+ * @param deps `metrics` and `serverBootAtMs` come from index.js. `redisConfigured`,
+ *   `redisSessionsEnabled`, `redisClient`, `postgresStatusRef`,
+ *   `errorTrackingConfigured` and `errorTrackingEnabled` are functions called
+ *   per request: the Redis and Postgres state, and whether error tracking is
+ *   enabled, are only set once startServer runs, after the routes are
+ *   registered. `metricsToken` and `isProduction` decide whether /api/metrics
+ *   answers at all.
+ */
 export const registerSystemRoutes = (app, deps) => {
   const {
     metrics,
@@ -93,9 +110,8 @@ export const registerSystemRoutes = (app, deps) => {
     return res.status(503).json(payload);
   });
 
-  // Unauthenticated, this reported authFailures, per-route latency and request
-  // totals to anyone who asked -- enough for someone brute-forcing a password
-  // to watch their own attempts land, and enough to map the route surface.
+  // The payload maps the route surface (per-route latency and request totals)
+  // and counts rate-limited requests live, so it is not for the open internet.
   //
   // Secure by default rather than opt-in: with no METRICS_TOKEN set it stays
   // open in development, where it is a debugging convenience and the process is

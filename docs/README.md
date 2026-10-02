@@ -1,10 +1,11 @@
 # docs
 
-| Path                                     | What it is                                                                                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`deploy-runbook.md`](deploy-runbook.md) | Step-by-step first deployment to Render + Neon + Upstash, and what to check when it goes wrong |
-| `plans/`                                 | Implementation plans, one file per effort, named `YYYY-MM-DD-name.md`                          |
-| `specs/`                                 | Design specs, named to match the plan they belong to                                           |
+| Path                                                 | What it is                                                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [`deploy-runbook.md`](deploy-runbook.md)             | Step-by-step first deployment to Render + Neon + Upstash, and what to check when it goes wrong    |
+| [`code-readability-sop.md`](code-readability-sop.md) | How source files are commented and ordered, and how to prove a readability change altered nothing |
+| `plans/`                                             | Implementation plans, one file per effort, named `YYYY-MM-DD-name.md`                             |
+| `specs/`                                             | Design specs, named to match the plan they belong to                                              |
 
 **Plans and specs are dated records.** Each describes the codebase as it was when it was written and is not updated afterwards, so a name or figure in one may since have changed. For how things are now, read the code, the READMEs and `CLAUDE.md`. For why something is the way it is, read the plan or spec for that effort.
 
@@ -17,6 +18,7 @@
 - [2026-09-18 — Baseline and account management](plans/2026-09-18-baseline-and-account-management.md)
 - [2026-09-22 — Deployment readiness remediation](plans/2026-09-22-deployment-readiness-remediation.md)
 - [2026-09-23 — Repository layout reorganization](plans/2026-09-23-repo-layout-reorganization.md)
+- [2026-09-29 — Code readability](plans/2026-09-29-code-readability.md)
 
 ## Specs
 
@@ -24,3 +26,4 @@
 - [2026-09-14 — Editable profile](specs/2026-09-14-editable-profile-design.md)
 - [2026-09-18 — Development roadmap](specs/2026-09-18-development-roadmap-design.md)
 - [2026-09-23 — Repository layout reorganization](specs/2026-09-23-repo-layout-reorganization-design.md)
+- [2026-09-29 — Code readability](specs/2026-09-29-code-readability-design.md)

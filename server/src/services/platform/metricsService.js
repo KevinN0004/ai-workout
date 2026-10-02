@@ -1,14 +1,10 @@
 /**
- * The in-process metrics the `/api/metrics` route reports.
- *
- * Extracted from index.js, where these sat at module scope in a 778-line file
- * and could only be reached by booting the whole app -- which is why the three
- * guards below were the last uncovered statements in it.
- *
- * `recordLatencyStats` also existed a second time, byte-identical, as
- * `recordLatency` in middleware/requestContext.js. Both now call this one.
+ * The in-process metrics the `/api/metrics` route reports: the counters object
+ * index.js creates at boot, and the latency buckets that requestContext.js and
+ * the external-API recorder fold durations into.
  */
 
+/** An empty latency bucket, the shape recordLatencyStats fills. */
 export const initLatencyStats = () => ({
   count: 0,
   totalMs: 0,

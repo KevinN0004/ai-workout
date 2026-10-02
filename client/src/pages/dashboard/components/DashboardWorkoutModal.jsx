@@ -1,5 +1,15 @@
+/**
+ * The Log workout modal: session details, exercise details and notes. Rendered
+ * by DashboardPage, and opened by the glance panel's and WorkoutsView's Add
+ * workout buttons, each of which sets the form's date to today first.
+ */
 import ModalPortal from "../../../components/ModalPortal";
 
+/**
+ * A controlled form over App's `workoutForm`. `onSubmit` is submitWorkout in
+ * events.js, which queues the entry behind the undo window, then resets the
+ * form and closes the modal without waiting for the save.
+ */
 export default function DashboardWorkoutModal({
   open,
   workoutForm,
@@ -22,6 +32,7 @@ export default function DashboardWorkoutModal({
           className="modal dashboard-modal dashboard-workout-modal"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* ---- Title and close ---- */}
           <div className="modal-header dashboard-workout-modal-header">
             <div className="dashboard-workout-heading">
               <h2 id="workout-modal-title">Log workout</h2>
@@ -46,6 +57,7 @@ export default function DashboardWorkoutModal({
             </button>
           </div>
           <form className="form dashboard-workout-form" onSubmit={onSubmit}>
+            {/* ---- Fields: session, exercise and notes ---- */}
             <div className="dashboard-workout-layout">
               <section className="dashboard-workout-section dashboard-workout-section-session">
                 <h3>Session details</h3>
@@ -176,6 +188,7 @@ export default function DashboardWorkoutModal({
               </section>
             </div>
 
+            {/* ---- Cancel and save ---- */}
             <div className="modal-submit dashboard-workout-actions">
               <button type="button" className="ghost" onClick={onClose}>
                 Cancel

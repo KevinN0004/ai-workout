@@ -1,7 +1,17 @@
+/**
+ * Sessions and CSRF: the session store (Redis if configured and connected at
+ * startup, else memory, chosen once; a session whose Redis write fails lands in
+ * memory, which reads then never consult), the session and CSRF cookies, and the
+ * middleware requiring a signed-in user or a matching CSRF token. Built in index.js.
+ */
 import crypto from "crypto";
 import { createClient } from "redis";
 import { sendErrorResponse } from "../http/errorResponseService.js";
 
+/**
+ * Parses a Cookie header into a name-to-value object. A value that is not valid
+ * percent-encoding is kept raw rather than dropped.
+ */
 export const parseCookies = (cookieHeader = "") =>
   cookieHeader.split(";").reduce((acc, pair) => {
     const [key, ...rest] = pair.trim().split("=");
@@ -15,8 +25,8 @@ export const parseCookies = (cookieHeader = "") =>
     return acc;
   }, {});
 
-// Guards before it coerces. The 1..65535 range already rejected the 0 that
-// `Number(null)` and `Number("")` produce, so no answer changes here either;
+// Guards before it coerces. The 1..65535 range would also reject the 0 that
+// `Number(null)` and `Number("")` produce, but only by accident of the range;
 // see the note on `toPositiveInt` in index.js.
 export const parseRedisPort = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -26,6 +36,10 @@ export const parseRedisPort = (value) => {
   return parsed;
 };
 
+/**
+ * Reads an on/off environment flag: true, 1, yes or on, and false, 0, no or
+ * off, in any case. Anything else, including an absent value, is `fallback`.
+ */
 export const parseEnvBoolean = (value, fallback = false) => {
   const normalized = typeof value === "string" ? value.trim().slice(0, 12).toLowerCase() : "";
   if (!normalized) return fallback;
@@ -66,6 +80,16 @@ const tokensMatch = (a, b) => {
   return crypto.timingSafeEqual(left, right);
 };
 
+/**
+ * Builds the service. index.js calls `initSessionStore` once at startup, which
+ * connects Redis when it is configured and falls back to memory when it is not
+ * or cannot connect.
+ *
+ * @param deps `findUserById` (from authUserService) loads a session's user.
+ *   `cookieSecure` is "; Secure" or "", appended to every cookie.
+ *   `csrfUnsafeMethods` is the set of methods `requireCsrfToken` checks, and
+ *   `redisSessionKeyPrefix` namespaces the session keys in Redis.
+ */
 export const createSessionService = ({
   cleanText,
   logger,
@@ -338,7 +362,7 @@ export const createSessionService = ({
     // and every comparison against NaN is false -- so an unparseable timestamp
     // fails OPEN and silently stops invalidating anything. The finite check
     // makes that explicit rather than incidental, and the "created before"
-    // test above is what proves the rule still bites.
+    // test in sessionService.test.js is what proves the rule still bites.
     const changedAtMs = Date.parse(user.passwordChangedAt ?? "");
     if (Number.isFinite(changedAtMs) && session.createdAt < changedAtMs) {
       await deleteSession(token);

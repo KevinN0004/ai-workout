@@ -1,10 +1,21 @@
+/**
+ * Converts between the profile the server stores and the form state that edits
+ * it: personalToProfile for a save (submitProfile in events.js), and
+ * profileToPersonal to seed Settings' form from user.profile.
+ */
 import { splitFullName, toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "./units";
 import { defaultPersonalForm } from "./constants";
 
-// Guards before it coerces. `Number("")` and `Number(null)` are both 0 and both
-// finite, so testing afterwards turns an unfilled form field into a measured
-// value -- which is how an unentered body fat once modelled a user at 3%.
-// Same shape as toNullableNumber in the server's dashboardDataBuildersService.
+/**
+ * A form value as a profile number, or null when it is blank or not a number.
+ * It guards before it coerces: `Number("")` and `Number(null)` are both 0 and
+ * both finite, so testing afterwards would turn an unfilled field into a
+ * measured 0. A 0 is outside every numeric range in the server's profile schema
+ * (apiSchemaService.js), so the whole save would be refused with a 400, and a
+ * blank height in personalToProfile's active unit could not fall back to the
+ * other one.
+ * Same shape as toNullableNumber in the server's dashboardDataBuildersService.
+ */
 export const toProfileNumber = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -16,8 +27,17 @@ const toFormValue = (value) => (value === null || value === undefined ? "" : Str
 
 const toDayList = (value) => (Array.isArray(value) ? value : []);
 
-// `= {}` only fires on undefined, and this is a shared module a future caller
-// can reach with an explicitly null argument. `|| {}` covers both.
+/**
+ * Form state shaped like the home flow's `personal` (Settings' draft is one) as
+ * the body POST /api/profile takes: the name split, numbers through
+ * toProfileNumber, height in centimetres from whichever unit is active, and
+ * weight in kilograms. `units` holds `heightUnit` ("cm" or "ft") and
+ * `weightUnit` ("kg" or "lb"), metric when absent.
+ *
+ * Both arguments are read through `|| {}` rather than a `= {}` default, which
+ * only fires on undefined: this is a shared module, and a future caller can
+ * reach it with an explicit null.
+ */
 export const personalToProfile = (personal, units) => {
   const { heightUnit = "cm", weightUnit = "kg" } = units || {};
   const source = personal || {};
@@ -60,6 +80,11 @@ export const personalToProfile = (personal, units) => {
   };
 };
 
+/**
+ * The way back: a stored profile as form state, height in both centimetres and
+ * feet and inches, weight in `units.weightUnit` (kg unless "lb"). An absent
+ * value reads as "" (training days as []), except activity, as noted below.
+ */
 export const profileToPersonal = (profile, units) => {
   const { weightUnit = "kg" } = units || {};
   const stored = profile || {};

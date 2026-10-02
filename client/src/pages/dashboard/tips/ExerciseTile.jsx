@@ -1,5 +1,16 @@
+/**
+ * One exercise card in the Guides view's smart picks and exercise list: image,
+ * category, name, equipment and the top reason, with a Save button. Rendered by
+ * TipsView.
+ */
 import { getExerciseImage } from "./recommendationUtils";
 
+/**
+ * `recommendation` is the exercise's scoreExercise entry for a smart pick, and
+ * absent in the exercise list. Opening the card hands `onOpen` the exercise
+ * with that entry attached, so the details modal can list its reasons; `onSave`
+ * receives the exercise and the entry.
+ */
 export default function ExerciseTile({
   exercise,
   recommendation,
@@ -17,6 +28,7 @@ export default function ExerciseTile({
 
   return (
     <article className="exercise-tile">
+      {/* ---- The card, which opens the details ---- */}
       <button
         type="button"
         className="exercise-tile-open"
@@ -36,6 +48,7 @@ export default function ExerciseTile({
           </div>
         </div>
       </button>
+      {/* ---- Save ---- */}
       <div className="exercise-tile-actions">
         <button
           type="button"

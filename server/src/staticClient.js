@@ -1,28 +1,18 @@
+/**
+ * Serves the built client from the API process, so the page and /api share one
+ * origin. index.js mounts it after the API routes and before the error handler.
+ * Same origin is a constraint here, not a convenience: see registerClientStatic.
+ */
 import path from "path";
 import { fileURLToPath } from "url";
 
-/**
- * Serves the built client from the API process, on one origin.
- *
- * This is not a convenience. The client cannot reach a cross-origin API at
- * all, for two independent reasons:
- *
- *   - Every request it makes is a relative path. There are 16 `/api/...`
- *     literals in `client/src` and no base-URL constant, so a bundle served
- *     from a different host sends `/api/auth/me` to that host. CORS is never
- *     consulted, because the URL never points at the API.
- *   - Both cookies are `SameSite=Lax`, so even with an absolute URL the
- *     session would not be attached to a cross-site fetch. Relaxing that to
- *     `SameSite=None` is the direction browsers are removing.
- *
- * The `/api` proxy that makes development work lives in `client/vite.config.js`
- * and covers the dev server and `vite preview` only. Nothing proxies in
- * production. So same origin is a constraint, not a preference, and this is
- * where it is satisfied.
- */
-
 const DEFAULT_CLIENT_DIST = fileURLToPath(new URL("../../client/dist", import.meta.url));
 
+/**
+ * The directory the client bundle is served from: `override` resolved against
+ * the working directory when it is set (index.js passes CLIENT_DIST_PATH),
+ * otherwise the repository's client/dist.
+ */
 export const resolveClientDistPath = (override = "") =>
   override ? path.resolve(override) : DEFAULT_CLIENT_DIST;
 
@@ -47,11 +37,27 @@ const cacheControlFor = (filePath) => {
 /**
  * Registers static serving and the single-page fallback.
  *
+ * This is not a convenience. The client cannot reach a cross-origin API at
+ * all, for two independent reasons:
+ *
+ *   - Every request it makes is a relative path: each `/api/...` in `client/src`
+ *     is a bare literal with no base URL in front of it, so a bundle served from
+ *     a different host sends `/api/auth/me` to that host. CORS is never
+ *     consulted, because the URL never points at the API.
+ *   - Both cookies are `SameSite=Lax`, so even with an absolute URL the
+ *     session would not be attached to a cross-site fetch. Relaxing that to
+ *     `SameSite=None` is the direction browsers are removing.
+ *
+ * The `/api` proxy that makes development work lives in `client/vite.config.js`
+ * and covers the dev server and `vite preview` only. Nothing proxies in
+ * production. So same origin is a constraint, not a preference, and this is
+ * where it is satisfied.
+ *
  * Returns true when the build was found and mounted, false when it was not --
  * `npm run dev:server` runs without ever building the client, and refusing to
- * start would make the ordinary development path fail. The caller logs the
- * difference so a production process that is missing its bundle is visible in
- * the logs rather than only in a 404.
+ * start would make the ordinary development path fail. It logs which, through
+ * the `logger` it is given, so a production process that is missing its bundle
+ * is visible in the logs rather than only in a 404.
  *
  * `express`, `existsSync` and `distPath` are injected so this is testable
  * without a build on disk.

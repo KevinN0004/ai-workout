@@ -1,6 +1,21 @@
+/**
+ * Measures the preview's week table so the outline its chapter draws sits on
+ * the table's real row and column edges. Called by PreviewStage.
+ */
 import { useEffect } from "react";
 import { clamp } from "../utils";
 
+/**
+ * While the week chapter shows, measures the table inside
+ * `previewWeekTableWrapRef` and passes `setPreviewWeekLineOffsets` the edges as
+ * percentages of the wrap: the table's top and each row's bottom, and its left
+ * and each header cell's right. It measures on the next animation frame, then
+ * again after the window resizes or, where ResizeObserver exists, the wrap or
+ * the table does, at most once a frame, and stores a result only when a
+ * position changed. A wrap or table with no size, or a table with no rows,
+ * leaves the offsets in state as they are. It subscribes afresh when the
+ * chapter or the plan changes.
+ */
 export default function usePreviewWeekOutline({
   activePreviewChapterId,
   previewWeekPlan,
