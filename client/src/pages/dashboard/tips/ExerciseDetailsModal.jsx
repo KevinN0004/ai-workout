@@ -1,6 +1,16 @@
+/**
+ * The exercise details modal: one wger exercise's image, muscles, equipment,
+ * description, why it was recommended and its videos, with a Save button.
+ * Rendered by TipsView.
+ */
 import ModalPortal from "../../../components/ModalPortal";
 import { getExerciseImage, resolveMediaUrl } from "./recommendationUtils";
 
+/**
+ * Renders nothing without `selectedExercise`. A smart pick arrives with its
+ * `recommendation` attached by ExerciseTile, and its reasons are listed;
+ * `onSave` receives the exercise and that recommendation.
+ */
 export default function ExerciseDetailsModal({
   selectedExercise,
   onClose,
@@ -8,10 +18,10 @@ export default function ExerciseDetailsModal({
   isSaved,
   isSaving
 }) {
-  // The only guard on this. Passing the same condition to ModalPortal as well
-  // made both untestable: either one alone produced an empty render, so no test
-  // could tell a broken guard from a working one. Same fix as
-  // GeneratedPlanModal.jsx.
+  // The only guard on this, so ModalPortal gets `open` outright. Repeating the
+  // condition there would make both untestable: either one alone renders
+  // nothing, so no test could tell a broken guard from a working one.
+  // GeneratedPlanModal follows the same rule.
   if (!selectedExercise) return null;
 
   return (

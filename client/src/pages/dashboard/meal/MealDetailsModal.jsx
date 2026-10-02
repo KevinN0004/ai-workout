@@ -1,5 +1,14 @@
+/**
+ * The meal details modal: one meal's photo, summary, ingredients and recipe
+ * links. Rendered by MealView, and open while a meal card is selected.
+ */
 import ModalPortal from "../../../components/ModalPortal";
 
+/**
+ * Renders nothing without `activeMeal`. MealView passes the meal's ingredients
+ * and recipe links already narrowed to arrays, and `handleImageError` swaps a
+ * photo that fails to load for the fallback image.
+ */
 export default function MealDetailsModal({
   activeMeal,
   activeMealIngredients,
@@ -22,6 +31,7 @@ export default function MealDetailsModal({
           className="modal dashboard-modal meal-modal"
           onClick={(event) => event.stopPropagation()}
         >
+          {/* ---- Close ---- */}
           <div className="modal-header meal-modal-header">
             <button
               type="button"
@@ -43,10 +53,12 @@ export default function MealDetailsModal({
 
           <div className="modal-body">
             <div className="meal-modal-grid">
+              {/* ---- Photo ---- */}
               <section className="meal-modal-left">
                 <img src={activeMeal.image} alt={activeMeal.title} onError={handleImageError} />
               </section>
 
+              {/* ---- Summary, ingredients and recipe links ---- */}
               <section className="meal-modal-right">
                 <h3 className="meal-modal-title">{activeMeal.title}</h3>
                 <p className="meal-modal-summary">{activeMeal.blurb}</p>

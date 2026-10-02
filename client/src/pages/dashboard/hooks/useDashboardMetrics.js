@@ -1,6 +1,13 @@
+/**
+ * The dashboard's derived numbers: the deduplicated logs, the seven-day
+ * averages and goal progress, the week and month trend series, and today's
+ * planned workout and meals. Called by DashboardPage.
+ */
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
 
+// A Date or null. A bare YYYY-MM-DD is read as local midnight: `new Date` would
+// read it as UTC midnight, which west of UTC falls on the previous local day.
 const parseDateValue = (value) => {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
@@ -22,21 +29,23 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const toText = (value) => (value === null || value === undefined ? "" : String(value).trim());
 
-// One coercion for every reading that gets summed, because the accumulation
-// loops and the averages below used to disagree about the same row: the loops
-// guarded with `Number.isNaN`, the averages folded `Number(x || 0)` unguarded.
-// A single unparseable value is enough -- `sum + NaN` stays NaN for the rest of
-// the fold -- and avgCalories is rendered directly and drives a progress-bar
-// width, so the card read "NaN" and the bar got `width: NaN%`.
+// One coercion for every reading that gets summed, so the accumulation loops
+// and the averages below cannot disagree about the same row. A single
+// unparseable value would otherwise be enough -- `sum + NaN` stays NaN for the
+// rest of the fold -- and avgCalories is rendered directly and drives a
+// progress-bar width, so the card would read "NaN" and the bar get
+// `width: NaN%`.
 //
-// Contributing 0 is what the guarded loop already did with such a row. A
-// measured 0 is untouched: it is a real reading and still counts as a logged
-// day, so it must keep pulling the average down.
+// Such a row contributes 0. A measured 0 is untouched: it is a real reading and
+// still counts in the average's divisor, so it must keep pulling the average
+// down.
 const toMetricNumber = (value) => {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+// Keeps the first row for each id, or for each content key when a row has no
+// id. A row with neither is kept.
 const buildDedupedList = (items, fallbackKeyBuilder) => {
   const source = Array.isArray(items) ? items : [];
   const seen = new Set();
@@ -100,6 +109,9 @@ const progressFallbackKey = (item) =>
     .filter(Boolean)
     .join("::");
 
+// An SVG path through `values`, scaled into a box the size of the charts'
+// viewBox. The scale always spans 0 and at least 1, so an empty or all-zero
+// series runs along the bottom.
 const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
   const safeValues = values.length ? values : [0];
   const max = Math.max(...safeValues, 1);
@@ -116,6 +128,14 @@ const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
     .join(" ");
 };
 
+/**
+ * Derives what the dashboard's views chart and summarise. `goalForm` stands in
+ * for `dashboard.goals` until there is a dashboard, `formGoal` (the planner
+ * form's goal) is the last fallback for the meal plan's goal, and `weekDays`
+ * with `latestPlanByWeekday` give the meal plan its days and mark which are
+ * training days. Returns the deduplicated lists, `goals`, `buildLinePath` for
+ * the charts, and the metrics, all recomputed only when their inputs change.
+ */
 export default function useDashboardMetrics({
   dashboard,
   goalForm,
@@ -123,6 +143,11 @@ export default function useDashboardMetrics({
   weekDays,
   latestPlanByWeekday
 }) {
+  // ---- Deduplicated lists ---------------------------------------------------
+
+  // The dashboard carries the same sessions as both `workoutSessions` and
+  // `workouts`: userReadRepository fills both from one query, and a pending
+  // workout is added to both. Merging them and deduplicating by id keeps one.
   const workouts = useMemo(() => {
     const workoutSessions = Array.isArray(dashboard?.workoutSessions)
       ? dashboard.workoutSessions
@@ -169,7 +194,10 @@ export default function useDashboardMetrics({
 
   const goals = useMemo(() => dashboard?.goals || goalForm, [dashboard?.goals, goalForm]);
 
+  // ---- Metrics --------------------------------------------------------------
   const metrics = useMemo(() => {
+    // This week is the seven days ending today, and last week the seven before
+    // it, both counted from local midnight.
     const today = new Date();
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const last7Cutoff = new Date(todayDate);
@@ -182,6 +210,8 @@ export default function useDashboardMetrics({
     const inPrevious7Days = (value) =>
       Boolean(value && value >= previous7Start && value <= previous7End);
 
+    // Per-day totals for the trend series, and each log split into this week
+    // and last week. A row whose date does not parse is skipped.
     const caloriesByDate = {};
     const last7Calories = [];
     const previous7Calories = [];
@@ -214,6 +244,8 @@ export default function useDashboardMetrics({
       }
     }
 
+    // The average of this week's and of last week's calorie entries, and
+    // progress toward the goals.
     const avgCalories =
       last7Calories.reduce((sum, item) => sum + toMetricNumber(item?.calories), 0) /
       (last7Calories.length || 1);
@@ -225,6 +257,7 @@ export default function useDashboardMetrics({
     const calorieGoal = Math.max(Number(goals.targetCalories || 2200), 1);
     const calorieProgress = Math.min(100, Math.round((avgCalories / calorieGoal) * 100));
 
+    // Trend series for the week and month charts, one point per day.
     const buildRangeKeys = (days) =>
       Array.from({ length: days }, (_, index) => {
         const date = new Date(todayDate);
@@ -239,6 +272,10 @@ export default function useDashboardMetrics({
         : key;
     };
 
+    // A heuristic score with no outside source, not a measurement: a day's
+    // distance from the calorie goal and its training minutes each cost points,
+    // each up to a cap; a rest day earns a few; and the result is clamped. A day
+    // with no calorie entry counts as on goal.
     const buildRecoveryScore = (key) => {
       const dailyCalories = caloriesByDate[key] || calorieGoal;
       const caloriePenalty = Math.min(
@@ -276,6 +313,7 @@ export default function useDashboardMetrics({
     const workoutSeries = trendRanges.week.workoutSeries;
     const last7Keys = trendRanges.week.keys;
 
+    // Workouts newest first, and the pace toward this week's workout goal.
     const recentWorkouts = [...workouts].sort((a, b) => {
       const dateA = parseDateValue(a?.date)?.getTime() || 0;
       const dateB = parseDateValue(b?.date)?.getTime() || 0;
@@ -296,6 +334,9 @@ export default function useDashboardMetrics({
     const workoutDeltaVsLastWeek = last7Workouts.length - previous7Workouts.length;
     const calorieDeltaVsLastWeek = Math.round(avgCalories - previousAvgCalories);
 
+    // The latest weight by date, and its change since the one before.
+    // Number(null) is 0, which is finite, so a metric logged without a weight
+    // passes this filter as a reading of 0 lb.
     const weightTrendCandidates = [...progressMetrics]
       .filter((item) => Number.isFinite(Number(item?.weightLb)))
       .sort((a, b) => {
@@ -315,6 +356,8 @@ export default function useDashboardMetrics({
         ? Number((latestWeight - previousWeight).toFixed(1))
         : null;
 
+    // Today's lines from the latest plan, and today's meals from the meal plan
+    // built for that plan's training days.
     const latestPlan = plans[0];
     const weeklyMealPlan = buildWeeklyMealPlan({
       weekDays,

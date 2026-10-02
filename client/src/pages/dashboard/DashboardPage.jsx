@@ -1,3 +1,8 @@
+/**
+ * The dashboard page: header, navigation, the glance panel and the active view,
+ * with the toast, the workout modal and App's planner modals. Rendered by App
+ * on /dashboard and every path under it.
+ */
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import SummaryView from "./views/SummaryView";
 import DashboardHeader from "./components/DashboardHeader";
@@ -38,6 +43,14 @@ const DASH_DRAWER_ITEMS = [
   { key: "settings", label: "Settings" }
 ];
 
+/**
+ * Lays the dashboard out around the view App's `dashView` names; every view but
+ * the summary loads lazily. Its data and handlers are App's: the dashboard and
+ * the weather and air-quality readings (useDashboardData), the forms, and the
+ * events.js handlers. The page derives its numbers through useDashboardMetrics
+ * and keeps only the profile menu's state. Signed out, it renders the header
+ * alone, which offers sign-in.
+ */
 export default function DashboardPage({
   user,
   go,
@@ -90,6 +103,7 @@ export default function DashboardPage({
   dashboardToast,
   clearDashboardToast
 }) {
+  // ---- Profile menu, metrics and the next workout ---------------------------
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
   const {
@@ -121,11 +135,16 @@ export default function DashboardPage({
     latestPlanByWeekday
   });
 
-  // Must stay above the `if (!user)` early return below. `user` starts null in
-  // App.jsx and is only set once /api/auth/me resolves, so a hook declared after
-  // that return makes the hook count grow between renders -- React then throws
-  // "Rendered more hooks than during the previous render." on the signed-in
-  // re-render, which crashed a direct load of /dashboard.
+  // Must stay above the `if (!user)` early return below. On a direct load of
+  // /dashboard, `user` is null until App's session check resolves, so a hook
+  // declared after that return would run on the signed-in render but not the
+  // one before it, and React would throw "Rendered more hooks than during the
+  // previous render.", crashing the page.
+  //
+  // The glance panel's workout: the earliest dated today or later, else the
+  // most recent. The dates go through `new Date`, which reads a bare
+  // YYYY-MM-DD as UTC midnight, so west of UTC a workout dated today falls
+  // before local midnight and is not counted as upcoming.
   const nextWorkout = useMemo(() => {
     const parseDateAsTime = (value) => {
       if (!value) return 0;
@@ -143,6 +162,8 @@ export default function DashboardPage({
     return null;
   }, [recentWorkouts]);
 
+  // While the profile menu is open, a mousedown outside it or Escape closes it.
+  // The listeners exist only while it is open.
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
 
@@ -165,6 +186,7 @@ export default function DashboardPage({
     };
   }, [profileMenuOpen]);
 
+  // ---- Signed out -----------------------------------------------------------
   if (!user) {
     return (
       <div className="page dashboard-page">
@@ -173,6 +195,10 @@ export default function DashboardPage({
     );
   }
 
+  // ---- Navigation and the glance panel's values -----------------------------
+
+  // The links between views go through here, so the view and the URL move
+  // together.
   const navigateDashView = (nextView, { closeDrawer = false } = {}) => {
     setDashView(nextView);
     go(DASH_VIEW_TO_ROUTE[nextView] || "/dashboard");
@@ -200,6 +226,10 @@ export default function DashboardPage({
     })}`;
   };
 
+  // ---- The active view ------------------------------------------------------
+
+  // The skeleton shows only before any dashboard, cached or fetched, is in hand;
+  // a refresh over one shows the inline status line instead.
   const showInitialDashboardLoading = dashLoading && !dashboard;
   const lazyDashboardViewFallback = (
     <section className="panel dashboard-loading-card" role="status" aria-live="polite">
@@ -216,7 +246,11 @@ export default function DashboardPage({
     "settings",
     "home"
   ];
+  // A name outside the list falls back to the summary. Every setter of
+  // `dashView` passes one of these, so the fallback is defensive.
   const activeDashView = dashViewOrder.includes(dashView) ? dashView : "summary";
+  // One branch per view. The summary is imported eagerly; every other view is
+  // lazy and waits behind the same Suspense fallback.
   const renderActiveDashboardView = () => {
     if (activeDashView === "summary") {
       return (
@@ -364,12 +398,15 @@ export default function DashboardPage({
       );
     }
 
+    // Unreachable: activeDashView is always one of the views handled above.
     return null;
   };
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <>
       <div className="page dashboard-page">
+        {/* ---- Header ---- */}
         <DashboardHeader
           user={user}
           go={go}
@@ -423,6 +460,7 @@ export default function DashboardPage({
           />
         </section>
 
+        {/* ---- The active view, or the first-load skeleton ---- */}
         <main className="dashboard-grid">
           {showInitialDashboardLoading && (
             <section
@@ -450,6 +488,7 @@ export default function DashboardPage({
           )}
         </main>
 
+        {/* ---- Refresh status, error and toast ---- */}
         {dashLoading && dashboard && (
           <p className="muted dashboard-inline-status">Refreshing dashboard data...</p>
         )}
@@ -466,6 +505,8 @@ export default function DashboardPage({
                 type="button"
                 className="ghost dashboard-toast-action"
                 onClick={() => {
+                  // Cleared before the action runs, so a toast the action shows
+                  // (Undo shows one) is not cleared with it.
                   const action = dashboardToast.onAction;
                   clearDashboardToast();
                   action();
@@ -485,6 +526,7 @@ export default function DashboardPage({
           </div>
         )}
 
+        {/* ---- Modals ---- */}
         <DashboardWorkoutModal
           open={workoutModalOpen}
           workoutForm={workoutForm}
@@ -497,6 +539,7 @@ export default function DashboardPage({
         {generatedPlanModal}
       </div>
 
+      {/* ---- Navigation: the drawer and the bottom bar ---- */}
       <DashboardDrawer
         open={dashNavOpen}
         dashView={dashView}

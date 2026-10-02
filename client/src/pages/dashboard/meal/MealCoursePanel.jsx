@@ -1,3 +1,13 @@
+/**
+ * The meal view's course picker: one pill per course, each with its meal count.
+ * Rendered by MealView.
+ */
+
+/**
+ * `courseOptions` is MealView's list, "All courses" first and then one entry per
+ * section. Picking a pill sets `activeCourseKey`, which decides the sections
+ * MealSections shows.
+ */
 export default function MealCoursePanel({ courseOptions, activeCourseKey, setActiveCourseKey }) {
   return (
     <section className="meal-course-panel">
