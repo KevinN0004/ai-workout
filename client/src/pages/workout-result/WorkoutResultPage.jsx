@@ -1,7 +1,25 @@
+/**
+ * The /plan page: the workout plan the home flow generated, as a table the
+ * visitor can turn between a vertical and a horizontal layout, with its coach
+ * notes and a PDF download. Rendered by App.
+ */
 import { useMemo, useState } from "react";
-import "./WorkoutResultPage.css";
 import { APP_BRAND_NAME } from "../../app/constants";
+import "./WorkoutResultPage.css";
 
+/**
+ * `planSections` is App's parse of the generated plan, and `hasResult` says
+ * whether there is one; without one the page offers only a way home. The
+ * vertical layout is a row per day, its lines as a list. The horizontal one is
+ * a column per day and a row per line position, each row labelled from the
+ * first day with a non-blank line there: the text before a colon, else its
+ * first three words; a row with no non-blank line is "Task" and its number. The
+ * stylesheet sizes the table by `--plan-day-count`, and lays a day's lines in
+ * one to three columns by `--plan-vertical-line-cols`, from the longest day. A
+ * signed-out visitor also gets Signup, which opens sign-up with the home flow's
+ * profile filled in, and the last button goes to the dashboard when signed in
+ * and home otherwise.
+ */
 export default function WorkoutResultPage({
   gradient,
   user,
@@ -11,9 +29,11 @@ export default function WorkoutResultPage({
   onDownloadPlanPdf,
   onSignupWithPrefilledProfile
 }) {
-  // Memoized because the `: []` branch minted a fresh array every render, which
-  // made the two useMemo hooks below recompute on every render whenever a plan
-  // had no days.
+  // ---- The plan's shape -----------------------------------------------------
+  // Memoized so that the `: []` fallback, for planSections without a days
+  // array, is not a fresh array each render, which would make the two useMemo
+  // hooks below recompute every time. App's parsePlanSections always supplies
+  // the array, so the fallback is defensive.
   const days = useMemo(
     () => (Array.isArray(planSections?.days) ? planSections.days : []),
     [planSections]
@@ -32,6 +52,7 @@ export default function WorkoutResultPage({
     "--plan-day-count": String(dayCount),
     "--plan-vertical-line-cols": String(verticalLineColumnCount)
   };
+  // ---- The horizontal layout's rows: a line position across every day -------
   const horizontalRows = useMemo(() => {
     const getTaskLabelFromRow = (values, rowIndex) => {
       const firstLine = values.find((value) => String(value || "").trim());
@@ -59,6 +80,7 @@ export default function WorkoutResultPage({
     });
   }, [days, maxLineCount]);
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <div className="page home-page plan-result-page" style={gradient}>
       <header className="title">
@@ -74,6 +96,7 @@ export default function WorkoutResultPage({
         className={`content plan-result-content ${tableLayout === "horizontal" ? "is-horizontal-layout" : ""}`}
       >
         <section className="panel plan-result-panel">
+          {/* ---- No plan yet ---- */}
           {!hasResult && (
             <div className="plan-result-empty">
               <p className="muted">No generated workout is available yet.</p>
@@ -85,6 +108,7 @@ export default function WorkoutResultPage({
 
           {hasResult && (
             <>
+              {/* ---- The layout toggle ---- */}
               <div
                 className="plan-result-table-controls"
                 role="group"
@@ -106,6 +130,7 @@ export default function WorkoutResultPage({
                 </button>
               </div>
 
+              {/* ---- The plan table, in the chosen layout ---- */}
               <div
                 className={`plan-result-table-wrap ${tableLayout === "horizontal" ? "is-horizontal" : ""}`}
                 style={tableDensityStyle}
@@ -193,6 +218,7 @@ export default function WorkoutResultPage({
                 )}
               </div>
 
+              {/* ---- Coach notes and the actions ---- */}
               {hasNotes && (
                 <section className="plan-result-notes" aria-label="Coach notes">
                   <h3>Coach Notes</h3>

@@ -1,3 +1,8 @@
+/**
+ * The preview week chapter's closing dissolve: the table breaks into particles
+ * and chunks that drift up and fade, played as one animejs timeline, after
+ * which the walkthrough moves on to the dashboard. Called by PreviewStage.
+ */
 import { createTimeline } from "animejs";
 import { useCallback, useEffect } from "react";
 import {
@@ -17,6 +22,27 @@ import {
 } from "../constants";
 import { clamp, randomBetween } from "../utils";
 
+/**
+ * Plays the dissolve when the week chapter reaches stage 6, unless the visitor
+ * prefers reduced motion. It measures each th, td, p, li and h3 of the table
+ * in `previewWeekTableWrapRef` with getBoundingClientRect and, in document
+ * order, scatters particles over each element and chunks over each cell into
+ * `previewWeekParticleLayerRef` until PREVIEW_WEEK_PARTICLE_MAX_TOTAL and
+ * PREVIEW_WEEK_CHUNK_MAX_TOTAL run out, which for a full table happens before
+ * its bottom rows are covered. Colours come from the element's computed style,
+ * and positions, sizes, drifts and timings from Math.random, mostly through
+ * randomBetween. The dissolve is staggered down the table from the top, except
+ * for the cells left without chunks, which fade from the start (see cellMeta
+ * below). If it finds nothing to break up it starts nothing, and the
+ * walkthrough does not move on by itself.
+ *
+ * On completion it sets stage 7, which leaves the dissolved table as it ended,
+ * and, while the week is still the current chapter (`previewStepIndexRef`),
+ * schedules the move to the dashboard on `previewFillTimeoutsRef`, the list
+ * usePreviewChapterFlow clears on every chapter change. Leaving the chapter, or
+ * a stage below 6, cancels the timeline, strips the inline styles it set and
+ * empties the layer. Returns that clear function, for PreviewStage's unmount.
+ */
 export default function usePreviewWeekParticleAnimation({
   activePreviewChapterId,
   previewWeekStage,
@@ -58,6 +84,8 @@ export default function usePreviewWeekParticleAnimation({
   }, [previewWeekParticleLayerRef, previewWeekParticlePlayersRef, previewWeekParticleTargetsRef]);
 
   useEffect(() => {
+    // ---- Whether to play ----------------------------------------------------
+    // Stage 7 is the completed dissolve, left as it ended.
     if (activePreviewChapterId !== "workout-week" || previewWeekStage < 6) {
       clearPreviewWeekParticleAnimation();
       return undefined;
@@ -82,6 +110,10 @@ export default function usePreviewWeekParticleAnimation({
     const wrapRect = wrapEl.getBoundingClientRect();
     if (!wrapRect.width || !wrapRect.height) return undefined;
 
+    // ---- Measure the table --------------------------------------------------
+    // Every element with a size that overlaps the wrap, placed relative to it.
+    // Its row and column progress, 0 at the top or left edge and 1 at the
+    // other, are what stagger the dissolve.
     const contentEntries = Array.from(tableEl.querySelectorAll("th, td, p, li, h3"))
       .map((targetEl) => {
         const rect = targetEl.getBoundingClientRect();
@@ -123,8 +155,12 @@ export default function usePreviewWeekParticleAnimation({
     const textMeta = [];
     const fragment = document.createDocumentFragment();
 
+    // ---- Particles: over each element in its text colour, up to a cap -------
     contentEntries.forEach((entry) => {
       const { rect, relativeLeft, relativeTop, rowProgress, particleColor } = entry;
+      // One per PREVIEW_WEEK_PARTICLE_DENSITY_PX of area, between the
+      // per-element minimum and maximum, but never more than the table's total
+      // has left.
       const particleCount = Math.min(
         PREVIEW_WEEK_PARTICLE_MAX_TOTAL - particles.length,
         clamp(
@@ -135,6 +171,9 @@ export default function usePreviewWeekParticleAnimation({
       );
       if (particleCount <= 0) return;
 
+      // Each lands at a random point in the element, and its delay follows its
+      // height within the element as well as the element's place down the
+      // table, plus a random jitter.
       for (let index = 0; index < particleCount; index += 1) {
         const particleEl = document.createElement("span");
         particleEl.className = "preview-week-particle";
@@ -158,6 +197,9 @@ export default function usePreviewWeekParticleAnimation({
 
         fragment.appendChild(particleEl);
         particles.push(particleEl);
+        // Here and in the cell and chunk records below, durations and delays
+        // are in ms, drifts in px, rotations in degrees and clips in % of the
+        // cell.
         particleMeta.push({
           delay: Math.round(
             particleRowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS +
@@ -177,6 +219,10 @@ export default function usePreviewWeekParticleAnimation({
       }
     });
 
+    // ---- Chunks: over each cell, up to a cap --------------------------------
+    // In the cell's background colour, or a fixed translucent white, stronger
+    // for a th, where that colour is transparent, as it is for every day cell,
+    // whose background is a gradient.
     cellEntries.forEach((entry) => {
       const { targetEl, rect, relativeLeft, relativeTop, rowProgress, colProgress } = entry;
 
@@ -197,6 +243,11 @@ export default function usePreviewWeekParticleAnimation({
         rowProgress * PREVIEW_WEEK_PARTICLE_ROW_DELAY_MS + colProgress * 24
       );
 
+      // The cell's own drift, clip and fade, staggered down the table and a
+      // little across it. Once the chunk cap is used up every later cell
+      // returns above without one, so cellMeta lines up with cellTargets by
+      // index for the cells before it, and the timeline's fallbacks, with no
+      // delay, apply to the rest.
       cellMeta.push({
         delay: baseDelay,
         duration: Math.round(randomBetween(1250, 1820)),
@@ -209,6 +260,8 @@ export default function usePreviewWeekParticleAnimation({
         clipSide: randomBetween(4, 24)
       });
 
+      // Pieces of the cell at random points inside it, about half of them
+      // bordered, staggered like the particles.
       for (let index = 0; index < chunkCount; index += 1) {
         const chunkEl = document.createElement("span");
         chunkEl.className = "preview-week-chunk";
@@ -244,6 +297,7 @@ export default function usePreviewWeekParticleAnimation({
       }
     });
 
+    // ---- Text: each rises and fades, lower rows a little further ------------
     textEntries.forEach((entry) => {
       textMeta.push({
         delay: Math.round(
@@ -255,6 +309,9 @@ export default function usePreviewWeekParticleAnimation({
 
     if (!particles.length && !chunks.length) return undefined;
 
+    // ---- Play ---------------------------------------------------------------
+    // The elements the timeline styles are recorded first, so that a clear can
+    // strip those styles again.
     layerEl.appendChild(fragment);
     previewWeekParticleTargetsRef.current = sourceTargets;
     tableEl.style.transformOrigin = "center top";
@@ -266,8 +323,13 @@ export default function usePreviewWeekParticleAnimation({
       target.style.willChange = "transform, opacity";
     });
 
+    // Set on completion, so the cleanup before the re-run that stage 7 causes
+    // keeps the dissolved frame instead of clearing it.
     let keepCompletionFrame = false;
 
+    // The table rises and fades as a whole from a fixed offset; the cells, text,
+    // chunks and particles are all placed at the start, each held back by its
+    // own delay.
     const dissolveTimeline = createTimeline({
       defaults: { ease: "inOutSine" },
       onComplete: () => {
@@ -356,10 +418,13 @@ export default function usePreviewWeekParticleAnimation({
         clearPreviewWeekParticleAnimation();
       }
     };
-    // Keyed on the chapter and stage that drive this animation. The listed
-    // "missing" deps are refs, setState functions, and chapter indices that do
-    // not change while a stage is playing; re-running on them would cancel and
-    // restart the particle timeline mid-animation.
+    // Keyed on the chapter and stage that drive this animation. Of the "missing"
+    // deps, only scrollToChapter ever changes: PreviewStage makes a new one each
+    // render, and re-running on it would cancel and restart the timeline
+    // mid-animation. The copy captured here reads only refs, setters and the
+    // fixed chapter list, so it acts as a newer one would. The rest are refs,
+    // setState functions, the stable clear function and chapter indices that
+    // never change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePreviewChapterId, previewWeekStage]);
 

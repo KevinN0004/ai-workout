@@ -1,3 +1,8 @@
+/**
+ * The dashboard and the weather and air-quality readings: loading each, caching
+ * them per account, and keeping a stale response from overwriting a newer one.
+ * Called once, by App.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonCache, writeJsonCache } from "../cache";
 import { fetchWithTimeout } from "../network";
@@ -11,6 +16,15 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
   });
 };
 
+/**
+ * Owns the dashboard, weather and air-quality state, each with its loading flag
+ * and error, and returns it with `setDashboard` and `setDashError` for the
+ * handlers that write, the two location-based loaders, and
+ * `clearDashboardDataState` for logout and account deletion. Expects from App
+ * the three cache keys (empty while signed out), `isDashboardRoute`,
+ * `shouldLoadAmbientData` (true on the summary view) and `setGoalForm`, which
+ * each dashboard it loads, cached or fetched, seeds the goals form through.
+ */
 export default function useDashboardData({
   user,
   isDashboardRoute,
@@ -20,6 +34,7 @@ export default function useDashboardData({
   airCacheKey,
   setGoalForm
 }) {
+  // ---- State and refs -------------------------------------------------------
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
@@ -39,10 +54,16 @@ export default function useDashboardData({
   const airRequestRef = useRef(0);
   const hasAutoLoadedEnvironmentRef = useRef(false);
 
+  // ---- Weather and air quality ----------------------------------------------
+
+  // Mirrored into a ref, so the weather loader's error path and the auto-load
+  // below can read the latest reading without depending on it.
   useEffect(() => {
     weatherDataRef.current = weatherData;
   }, [weatherData]);
 
+  // The same mirror for air quality, read by loadAirQuality's error path and
+  // by the auto-load.
   useEffect(() => {
     airQualityDataRef.current = airQualityData;
   }, [airQualityData]);
@@ -69,11 +90,14 @@ export default function useDashboardData({
   }, []);
 
   const loadWeatherRecommendation = useCallback(async () => {
+    // Only the latest call may write state; an older call's result is dropped.
     const requestId = weatherRequestRef.current + 1;
     weatherRequestRef.current = requestId;
     setWeatherLoading(true);
     setWeatherError("");
     try {
+      // Locate the visitor, fetch for that spot, and cache the reading with
+      // the time it arrived.
       const { latitude, longitude } = await getCurrentCoordinates();
       const query = new URLSearchParams({
         latitude: String(latitude),
@@ -99,6 +123,9 @@ export default function useDashboardData({
       });
     } catch (err) {
       if (weatherRequestRef.current !== requestId) return;
+      // A numeric code is a GeolocationPositionError. Every other failure,
+      // GEO_NOT_AVAILABLE included (loadAirQuality reports that one by name),
+      // says the last reading is still showing, when there is one.
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setWeatherError("Location permission was denied.");
@@ -124,11 +151,14 @@ export default function useDashboardData({
   }, [getCurrentCoordinates, weatherCacheKey]);
 
   const loadAirQuality = useCallback(async () => {
+    // Only the latest call may write state; an older call's result is dropped.
     const requestId = airRequestRef.current + 1;
     airRequestRef.current = requestId;
     setAirQualityLoading(true);
     setAirQualityError("");
     try {
+      // Locate the visitor, fetch for that spot, and cache the reading with
+      // the time it arrived.
       const { latitude, longitude } = await getCurrentCoordinates();
       const query = new URLSearchParams({
         latitude: String(latitude),
@@ -154,6 +184,9 @@ export default function useDashboardData({
       });
     } catch (err) {
       if (airRequestRef.current !== requestId) return;
+      // A numeric code is a GeolocationPositionError, and GEO_NOT_AVAILABLE is
+      // getCurrentCoordinates' own. No failure clears the last reading; only the
+      // last branch says it is still showing, when there is one.
       if (typeof err?.code === "number") {
         if (err.code === 1) {
           setAirQualityError("Location permission was denied.");
@@ -174,10 +207,17 @@ export default function useDashboardData({
         );
       }
     } finally {
+      // Guarded, not early-returned, as in the weather loader's finally.
       if (airRequestRef.current === requestId) setAirQualityLoading(false);
     }
   }, [airCacheKey, getCurrentCoordinates]);
 
+  // ---- Caches ---------------------------------------------------------------
+
+  // The cached dashboard fills in as soon as there is a user, on any route and
+  // before any request, without replacing a dashboard already in state; the
+  // goals form is reseeded from the cache either way. It re-runs whenever
+  // `user` is replaced, a profile save included.
   useEffect(() => {
     if (!user || !dashboardCacheKey) return;
     const cached = readJsonCache(dashboardCacheKey);
@@ -187,6 +227,9 @@ export default function useDashboardData({
     applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
   }, [dashboardCacheKey, setGoalForm, user]);
 
+  // The cached weather and the time it arrived fill in the same way, so the card
+  // has something to show before a fresh reading, or in place of one when the
+  // auto-load below skips it.
   useEffect(() => {
     if (!user || !weatherCacheKey) return;
     const cached = readJsonCache(weatherCacheKey);
@@ -197,6 +240,7 @@ export default function useDashboardData({
     }
   }, [user, weatherCacheKey]);
 
+  // Air quality gets the same head start from its own cache entry.
   useEffect(() => {
     if (!user || !airCacheKey) return;
     const cached = readJsonCache(airCacheKey);
@@ -207,6 +251,8 @@ export default function useDashboardData({
     }
   }, [airCacheKey, user]);
 
+  // Every new dashboard is written through to the cache. A cleared one (logout)
+  // is not, which is what keeps the cache for the same account's return.
   useEffect(() => {
     if (!dashboardCacheKey || !dashboard) return;
     writeJsonCache(dashboardCacheKey, {
@@ -215,12 +261,20 @@ export default function useDashboardData({
     });
   }, [dashboard, dashboardCacheKey]);
 
+  // ---- Dashboard load -------------------------------------------------------
+
+  // Fetches the dashboard when a signed-in visitor enters the dashboard routes,
+  // or `user` is replaced while there. Moving between dashboard views does not
+  // refetch: isDashboardRoute stays true.
   useEffect(() => {
     if (!isDashboardRoute || !user || !dashboardCacheKey) return;
+    // Each run takes a new request id. A response to an older run, or one that
+    // lands after this run's cleanup, is dropped.
     const requestId = dashboardRequestRef.current + 1;
     dashboardRequestRef.current = requestId;
     let cancelled = false;
     const loadDashboard = async () => {
+      // The cached copy first, so a slow or failed request still shows data.
       const cachedDashboard = readJsonCache(dashboardCacheKey)?.dashboard || null;
       const hasCachedFallback = Boolean(cachedDashboard);
       if (cachedDashboard) {
@@ -228,6 +282,8 @@ export default function useDashboardData({
         applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
       }
 
+      // Then the server's copy replaces it. On failure the cached copy stays on
+      // screen, and the error says so.
       setDashLoading(true);
       setDashError("");
       try {
@@ -259,11 +315,21 @@ export default function useDashboardData({
     };
   }, [dashboardCacheKey, isDashboardRoute, setGoalForm, user]);
 
+  // ---- One-time weather and air-quality load --------------------------------
+
+  // Leaving the dashboard, or signing out, re-arms the one-time load below for
+  // the next visit.
   useEffect(() => {
     if (isDashboardRoute && user) return;
     hasAutoLoadedEnvironmentRef.current = false;
   }, [isDashboardRoute, user]);
 
+  // Loads weather and air quality once per dashboard visit, the first time the
+  // summary view shows, skipping either one the refs already hold. A cached
+  // reading set in this same commit is not in its ref yet, so opening /dashboard
+  // or signing in still loads; one set a render earlier, as when a returning
+  // visitor's session check on / or /auth redirects here, is skipped. The ref,
+  // not the dependency list, is what keeps it to once.
   useEffect(() => {
     if (!isDashboardRoute || !user || !shouldLoadAmbientData) return;
     if (hasAutoLoadedEnvironmentRef.current) return;
@@ -276,6 +342,10 @@ export default function useDashboardData({
     }
   }, [isDashboardRoute, loadAirQuality, loadWeatherRecommendation, shouldLoadAmbientData, user]);
 
+  // ---- Resets ---------------------------------------------------------------
+
+  // Off the dashboard, or signed out, nothing is loading: a load cut short by
+  // the dashboard loader's cleanup never clears dashLoading itself.
   useEffect(() => {
     if (isDashboardRoute && user) return;
     setDashLoading(false);

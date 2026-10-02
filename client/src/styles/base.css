@@ -1,3 +1,9 @@
+/* The app's base layer: the Google Fonts import, the type scale on :root, the reset, and
+   the page, panel, form, button and modal classes the pages share. Imported by index.css,
+   which main.jsx loads after App, so it follows every stylesheet in the main CSS chunk and
+   wins ties against them; a lazy dashboard view's stylesheet loads after it and wins ties. */
+
+/* ---- Fonts and type scale ------------------------------------------------ */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 :root {
@@ -19,6 +25,7 @@
   --font-h6: 14px;
 }
 
+/* ---- Reset and document -------------------------------------------------- */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -41,6 +48,7 @@ body {
   line-height: 1.5;
 }
 
+/* Set by useBodyScrollLock while a ModalPortal is open. */
 body.no-scroll {
   overflow: hidden;
 }
@@ -51,6 +59,7 @@ video {
   height: auto;
 }
 
+/* ---- Page and title ------------------------------------------------------ */
 .page {
   min-height: 100vh;
   padding: 32px 24px 48px;
@@ -58,6 +67,8 @@ video {
   filter: none;
 }
 
+/* Grid and flex items default to min-width: auto, which lets wide content push them past
+   their track; 0 lets them shrink instead. */
 .page,
 .title,
 .panel,
@@ -76,6 +87,8 @@ video {
   text-align: center;
 }
 
+/* ---- Header row ---------------------------------------------------------- */
+/* Only DashboardHeader uses these. */
 .header-top {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -112,6 +125,7 @@ video {
   justify-self: end;
 }
 
+/* ---- Headings and text sizes --------------------------------------------- */
 h1 {
   font-family: "Fraunces", serif;
   font-size: clamp(var(--font-h1-min), 4vw, var(--font-h1-max));
@@ -155,6 +169,7 @@ button {
   font-size: var(--font-button);
 }
 
+/* ---- Panels -------------------------------------------------------------- */
 .panel {
   background: rgba(12, 16, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -177,6 +192,7 @@ button {
   justify-items: center;
 }
 
+/* ---- Forms --------------------------------------------------------------- */
 .form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -219,6 +235,7 @@ select:focus {
   outline: 2px solid rgba(255, 179, 71, 0.6);
 }
 
+/* ---- Segmented toggle ---------------------------------------------------- */
 .segmented {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.08);
@@ -243,6 +260,7 @@ select:focus {
   color: #ffd9a0;
 }
 
+/* ---- Secondary and primary buttons --------------------------------------- */
 .ghost {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -265,6 +283,7 @@ select:focus {
   box-shadow: 0 12px 30px rgba(255, 95, 109, 0.3);
 }
 
+/* ---- Muted and error text ------------------------------------------------ */
 .muted {
   color: #aab3ff;
   margin-top: 8px;
@@ -276,6 +295,7 @@ select:focus {
   color: #ffb4b4;
 }
 
+/* ---- Modal --------------------------------------------------------------- */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -319,6 +339,7 @@ select:focus {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* ---- Back button gradient ------------------------------------------------ */
 .back-btn,
 .ghost.back-btn,
 .modal .ghost.back-btn {
@@ -356,6 +377,7 @@ select:focus {
   cursor: not-allowed;
 }
 
+/* ---- Modal buttons ------------------------------------------------------- */
 .modal .cta {
   background: #ffffff;
   color: #000000;
@@ -373,6 +395,7 @@ select:focus {
   cursor: not-allowed;
 }
 
+/* ---- Modal layout -------------------------------------------------------- */
 .modal-header,
 .modal-footer {
   display: flex;
@@ -398,6 +421,7 @@ select:focus {
   padding-top: 8px;
 }
 
+/* ---- Round icon buttons -------------------------------------------------- */
 .icon-button {
   display: flex;
   align-items: center;
@@ -413,6 +437,7 @@ select:focus {
   display: block;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   body {
     font-size: 16px;

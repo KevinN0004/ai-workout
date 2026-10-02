@@ -1,3 +1,8 @@
+/**
+ * Per-request context: a request id, a logger that carries it, and the latency
+ * metrics recorded when the response finishes. index.js mounts it first, so
+ * every later middleware and route can use `req.requestId` and `req.log`.
+ */
 import crypto from "crypto";
 import { recordLatencyStats } from "../services/platform/metricsService.js";
 
@@ -14,6 +19,12 @@ const sanitizeRoutePath = (req) => {
   return UNMATCHED_ROUTE_LABEL;
 };
 
+/**
+ * Builds the middleware. It reuses the caller's `X-Request-Id` (cut to 128
+ * characters) or mints a UUID, echoes the id on the response, and counts the
+ * request in `metrics.requestsTotal`. When the response finishes it records the
+ * latency overall and per matched route, and logs one `http_request` line.
+ */
 export const createRequestContextMiddleware =
   ({ metrics, logger, toShortText }) =>
   (req, res, next) => {

@@ -1,5 +1,16 @@
+/**
+ * Reads the plain-text plan Gemini returns, whose prompt asks for weekday
+ * headings and a closing "Coach Notes:" section. Used by App for the plan views
+ * and for the dashboard's copy of the newest plan.
+ */
 const hasNotesHeading = (line) => /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line);
 
+/**
+ * Splits a plan into `days`, each a `title` line and the `lines` under it, and
+ * `notes`. A line starting with a weekday name opens a day; the first notes
+ * heading (Coach notes, Tips, Notes) and everything after it are notes. Text
+ * with no weekday heading becomes one "Your plan" day.
+ */
 export const parsePlanSections = (result) => {
   if (!result) return { days: [], notes: [] };
   const rawLines = String(result)
@@ -8,6 +19,8 @@ export const parsePlanSections = (result) => {
     .filter(Boolean);
   const notesStart = rawLines.findIndex((line) => hasNotesHeading(line));
 
+  // Split off the notes: whatever follows the label on the heading's own line,
+  // then every line below it.
   let lines = rawLines;
   let notes = [];
 
@@ -21,6 +34,7 @@ export const parsePlanSections = (result) => {
     lines = rawLines.slice(0, notesStart);
   }
 
+  // Cut what is left into days at each weekday heading.
   const weekdayMap = [
     ["monday", "Monday"],
     ["tuesday", "Tuesday"],
@@ -50,6 +64,12 @@ export const parsePlanSections = (result) => {
   return { days, notes };
 };
 
+/**
+ * The newest saved plan (`dashboard.plans[0]`) as a map from weekday name to the
+ * lines under that day's heading, notes left out. The heading line itself and
+ * anything before the first heading are dropped, and a day with no lines under
+ * it has no key.
+ */
 export const extractLatestPlanByWeekday = (dashboard) => {
   const plans = dashboard?.plans || [];
   if (!plans.length) return {};

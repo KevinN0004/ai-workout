@@ -1,4 +1,9 @@
-﻿.dashboard-toast {
+﻿/* DashboardPage's toast, fixed near the bottom of the screen with an optional action and a
+   dismiss button, and the glance cards' updated line and retry button. Imported third by
+   DashboardPage.css, after theme.css, whose tokens it uses. */
+
+/* ---- Toast --------------------------------------------------------------- */
+.dashboard-toast {
   position: fixed;
   left: 50%;
   bottom: 20px;
@@ -23,6 +28,8 @@
   line-height: 1.35;
 }
 
+/* ---- Toast tones --------------------------------------------------------- */
+/* DashboardPage adds dashboard-toast-<tone>, success when the toast names no tone. */
 .dashboard-toast-success {
   background:
     linear-gradient(140deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 62%),
@@ -36,6 +43,7 @@
   border-color: #956565;
 }
 
+/* ---- Toast buttons ------------------------------------------------------- */
 .dashboard-page .dashboard-toast .dashboard-toast-action,
 .dashboard-page .dashboard-toast .dashboard-toast-close {
   flex-shrink: 0;
@@ -58,6 +66,7 @@
   font-size: 1rem;
 }
 
+/* ---- Glance card status -------------------------------------------------- */
 .dashboard-glance-updated {
   font-size: 0.75rem;
 }

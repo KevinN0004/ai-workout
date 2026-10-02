@@ -1,6 +1,18 @@
+/**
+ * The home page's physique stage: the silhouette drawn from the visitor's
+ * measurements, with Back and Continue. Rendered by HomePage while its stage is
+ * "visualizer".
+ */
 import { useEffect } from "react";
 import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "./PhysiqueSilhouette2D";
 
+/**
+ * `visualPanelRef` is the panel useHomeStageFlow's morph measures, to and from
+ * this stage, and whose stage and render surface it animates on entry.
+ * `silhouetteRenderSignature` is part of the silhouette's key, so a changed
+ * shape remounts it. `visualLabel` names the silhouette for assistive
+ * technology.
+ */
 export default function HomeVisualizerStage({
   visualPanelRef,
   visualLabel,
@@ -12,6 +24,9 @@ export default function HomeVisualizerStage({
   isIntroTransitioning,
   isStageTransitioning
 }) {
+  // The stage is sized to the viewport, so the page is kept from scrolling, on
+  // html and body alike, for as long as it is mounted; unmounting puts back
+  // whatever inline overflow each had.
   useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
@@ -31,6 +46,8 @@ export default function HomeVisualizerStage({
         ref={visualPanelRef}
       >
         <h2>Physique</h2>
+
+        {/* ---- Silhouette ---- */}
         <div className="visual-stage" role="img" aria-label={visualLabel}>
           <div className="physique-render-surface" data-silhouette-rev={SILHOUETTE_GEOMETRY_REV}>
             <PhysiqueSilhouette2D
@@ -39,6 +56,8 @@ export default function HomeVisualizerStage({
             />
           </div>
         </div>
+
+        {/* ---- Back and Continue ---- */}
         <div className="visualizer-only-actions">
           <button
             type="button"

@@ -1,3 +1,8 @@
+/* WorkoutsView, the dashboard's Logs view: a section for each log (workouts, calories,
+   meals and progress metrics), each a list of rows. Imported by the view, so it loads in
+   the view's lazy chunk. */
+
+/* ---- View and log sections ----------------------------------------------- */
 .workouts-view {
   width: 100%;
   display: grid;
@@ -18,6 +23,7 @@
   background: rgba(0, 0, 0, 0.35);
 }
 
+/* ---- Log rows ------------------------------------------------------------ */
 .workouts-view .log-list,
 .workouts-view .workout-list {
   display: grid;
@@ -59,6 +65,7 @@
   flex-shrink: 0;
 }
 
+/* ---- Empty state --------------------------------------------------------- */
 .workouts-view .log-empty-state {
   display: grid;
   justify-items: start;
@@ -66,6 +73,7 @@
   padding: 8px 0;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .workouts-view .log-section {
     padding: 12px;

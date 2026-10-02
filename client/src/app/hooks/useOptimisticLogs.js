@@ -1,12 +1,28 @@
+/**
+ * Optimistic logging for the dashboard, and its toast: a workout, calorie or
+ * meal entry shows at once, waits out an undo window, and only then is sent.
+ * Called once, by App.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
 
+/**
+ * Owns the pending log entries and the dashboard's toast. Returns the entries,
+ * which App merges into the dashboard it renders; the toast with its show and
+ * clear functions; `queueOptimisticLogCommit`, which the log handlers in
+ * createAppEventHandlers call; and `clearOptimisticOperations`, which empties
+ * the list and cancels every send not yet started. `setDashboard` and
+ * `setDashError` are useDashboardData's: a send that succeeds replaces the
+ * dashboard with the server's, and one that fails reports its error there.
+ */
 export default function useOptimisticLogs({ setDashboard, setDashError }) {
+  // ---- State and refs -------------------------------------------------------
   const [optimisticLogEntries, setOptimisticLogEntries] = useState([]);
   const [dashboardToast, setDashboardToast] = useState(null);
   const dashboardToastTimeoutRef = useRef(null);
   const optimisticOpRef = useRef(new Map());
 
+  // ---- Toast ----------------------------------------------------------------
   const clearDashboardToast = useCallback(() => {
     if (dashboardToastTimeoutRef.current) {
       clearTimeout(dashboardToastTimeoutRef.current);
@@ -27,6 +43,8 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       actionLabel: options?.actionLabel || "",
       onAction: typeof options?.onAction === "function" ? options.onAction : null
     };
+    // Milliseconds. A toast with an action stays longer, so there is time to
+    // reach its button; a positive `durationMs` overrides both.
     const timeoutMs =
       Number(options?.durationMs) > 0
         ? Number(options.durationMs)
@@ -40,6 +58,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     }, timeoutMs);
   }, []);
 
+  // On unmount only: a toast timer still pending is cleared, not left to fire.
   useEffect(() => {
     return () => {
       if (dashboardToastTimeoutRef.current) {
@@ -48,6 +67,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     };
   }, []);
 
+  // ---- Optimistic log entries -----------------------------------------------
   const removeOptimisticEntry = useCallback((operationId) => {
     setOptimisticLogEntries((current) =>
       current.filter((entry) => entry.operationId !== operationId)
@@ -84,6 +104,8 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
   const queueOptimisticLogCommit = useCallback(
     ({ type, item, request, pendingMessage, successMessage, undoMessage }) => {
       const operationId = item.id;
+      // Any earlier error clears, and the entry shows at once, ahead of any
+      // already pending.
       setDashError("");
       setOptimisticLogEntries((current) => [
         {
@@ -95,9 +117,13 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         ...current
       ]);
 
+      // Sent when the window closes, after which the entry leaves the pending
+      // list whatever the outcome: the server's dashboard replaces it on
+      // success, and a failure is reported.
       const commit = async () => {
         const operation = optimisticOpRef.current.get(operationId);
         if (!operation) return;
+        // From here undo is refused: the request is on its way.
         operation.committing = true;
         try {
           const data = await request();
@@ -114,6 +140,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         }
       };
 
+      // Start the undo window, and offer Undo in a toast that outlasts it.
       const timerId = setTimeout(commit, OPTIMISTIC_UNDO_WINDOW_MS);
       optimisticOpRef.current.set(operationId, {
         type,
@@ -132,6 +159,8 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     [removeOptimisticEntry, setDashError, setDashboard, showDashboardToast, undoOptimisticOperation]
   );
 
+  // On unmount, every entry still inside its undo window is dropped, not sent.
+  // clearOptimisticOperations is stable, so this runs only then.
   useEffect(() => {
     return () => {
       clearOptimisticOperations();

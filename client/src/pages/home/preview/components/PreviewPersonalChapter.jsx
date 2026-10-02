@@ -1,5 +1,24 @@
+/**
+ * The preview walkthrough's Personal Info and Generate chapters: a read-only
+ * form, shaped like the home page's personal form, that the walkthrough fills
+ * in and then collapses into a label beside Environment and Focus. Rendered by
+ * PreviewStage for both chapters.
+ */
 import { TRAINING_DAY_OPTIONS } from "../constants";
 
+/**
+ * Shows what `previewFilledFields` holds, which usePreviewChapterFlow fills
+ * over time; a field not filled yet is blank. With `isGenerateView`, for the
+ * Generate chapter, the form is collapsed and the builder shown, whatever the
+ * other two flags say. Otherwise `previewPersonalCollapsed` collapses the form
+ * and `previewPersonalShifted` shows the builder. `previewBuilderStage` reveals
+ * the builder's pieces in turn, and is also a class the stylesheet keys on.
+ * The height field and the unit toggles follow App's `heightUnit` and
+ * `weightUnit`; which height values get filled is usePreviewDerivedData's
+ * previewFillOrder, which follows the locale instead. The visitor cannot change
+ * any of it: the inputs are read-only, a select snaps back to its value, and
+ * the buttons have no handlers.
+ */
 export default function PreviewPersonalChapter({
   isGenerateView = false,
   previewPersonalCollapsed,
@@ -22,6 +41,7 @@ export default function PreviewPersonalChapter({
     <div
       className={`preview-personal-sequence ${isGenerateView ? "is-generate-view" : ""} ${showBuilder ? "is-builder-active" : ""} builder-stage-${previewBuilderStage}`}
     >
+      {/* ---- The form, and the label it collapses into ---- */}
       <div className={`preview-personal-form-shell ${showCollapsed ? "is-collapsed" : ""}`}>
         <div className="preview-personal-morph-surface" aria-hidden="true" />
         <span className="preview-personal-morph-label" aria-hidden="true">
@@ -31,6 +51,7 @@ export default function PreviewPersonalChapter({
           className="form personal-form advanced-mode preview-personal-form"
           onSubmit={(event) => event.preventDefault()}
         >
+          {/* ---- Name, age, height, weight and sex ---- */}
           <label className="field-name">
             Full name
             <textarea
@@ -139,6 +160,7 @@ export default function PreviewPersonalChapter({
             </select>
           </label>
 
+          {/* ---- The advanced fields ---- */}
           <div className="advanced-fields-wrap" aria-hidden={false}>
             <div className="advanced-fields-inner">
               <label>
@@ -236,6 +258,7 @@ export default function PreviewPersonalChapter({
           </div>
         </form>
       </div>
+      {/* ---- The builder: + Environment + Focus, then Generating ---- */}
       <div
         className={`preview-builder-track ${showBuilder ? "is-active" : ""}`}
         aria-hidden={!showBuilder}
