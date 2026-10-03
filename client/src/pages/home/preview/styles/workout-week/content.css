@@ -1,3 +1,9 @@
+/* The week table's cells and text: the label column and day headers, which fade in at
+   stage 2, the body cells at stage 3, the session, duration and workout text, and the
+   highlights list. Imported last by workout-week.css. */
+
+/* ---- Cell borders -------------------------------------------------------- */
+/* Transparent until the rows show (is-rows-visible), when they take over from the outline. */
 .preview-week-table th,
 .preview-week-table td {
   border: 1px solid transparent;
@@ -11,6 +17,7 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* ---- Label column -------------------------------------------------------- */
 .preview-week-row-label {
   width: clamp(74px, 7.2vw, 108px);
   min-width: clamp(74px, 7.2vw, 108px);
@@ -38,6 +45,7 @@
   text-align: center;
 }
 
+/* ---- Day cells ----------------------------------------------------------- */
 .preview-week-day-cell {
   background: rgba(255, 255, 255, 0.035);
   opacity: 0;
@@ -77,6 +85,7 @@
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
 }
 
+/* ---- Cell text ----------------------------------------------------------- */
 .preview-week-day-name {
   margin: 0;
   color: #fff;
@@ -117,6 +126,7 @@
   max-width: 100%;
 }
 
+/* ---- Highlights list ----------------------------------------------------- */
 .preview-week-highlights {
   margin: 0;
   padding: 0;
@@ -125,6 +135,9 @@
   gap: 10px;
 }
 
+/* ---- Row heights that do nothing ----------------------------------------- */
+/* Table cells ignore min-height, so these rules, .preview-week-day-head's above and
+   responsive.css's do not change any row's height. */
 .preview-week-highlights-cell {
   min-height: 220px;
 }
@@ -141,6 +154,7 @@
   min-height: 96px;
 }
 
+/* ---- Highlight items ----------------------------------------------------- */
 .preview-week-highlights li {
   color: rgba(255, 255, 255, 0.9);
   font-size: var(--preview-body-copy-size);

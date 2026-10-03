@@ -1,4 +1,9 @@
-﻿.preview-layout-frame {
+﻿/* The walkthrough's chapter frame: the chapter column, the contents lane, the chapter card
+   and its one page. Imported third by layout.css. Its !important rules pin the header's
+   position and the lane's geometry, the lane's over responsive.css's narrow-screen values. */
+
+/* ---- Chapter column ------------------------------------------------------ */
+.preview-layout-frame {
   width: min(calc(var(--preview-body-width) * var(--preview-step-width-scale, 1)), 100%);
   max-width: calc(var(--preview-body-width) * var(--preview-step-width-scale, 1));
   margin: 0 auto;
@@ -54,6 +59,10 @@
   max-width: calc(1500px * var(--preview-step-card-width-scale, 1));
 }
 
+/* ---- Contents lane ------------------------------------------------------- */
+/* position: fixed, but not to the viewport: styles/base.css's .panel gives the walkthrough's
+   root backdrop-filter, which makes the root its containing block, so the lane scrolls with
+   the walkthrough. */
 .preview-side-tab {
   --preview-chip-collapsed: 44px;
   position: fixed;
@@ -77,7 +86,10 @@
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0));
 }
 
-/* Hard-lock header + TOC geometry so chapter transitions cannot shift them. */
+/* ---- Pinned header and lane ---------------------------------------------- */
+/* These rules pin the header's position, and the contents lane's position and size, with
+   !important, so chapter changes cannot shift them. They also beat responsive.css's
+   narrow-screen top, max-height and z-index for the lane, which never apply. */
 .preview-stage-panel .preview-stage-header {
   position: relative !important;
   top: auto !important;
@@ -100,6 +112,8 @@
   pointer-events: auto !important;
 }
 
+/* This !important transition outranks the reduced-motion blocks in responsive.css and in
+   home/styles/forms-and-motion.css, so the labels still fade and slide under reduced motion. */
 .preview-stage-panel .preview-jump-label,
 .preview-stage-panel .preview-side-tab .preview-jump-chip .preview-jump-label {
   transition:
@@ -107,6 +121,8 @@
     transform 220ms var(--preview-motion-ease) !important;
 }
 
+/* ---- Chapter card -------------------------------------------------------- */
+/* The article PreviewStage wraps every chapter in. Its frame is transparent. */
 .setup-snapshot-card {
   border: none;
   border-radius: 0;
@@ -148,7 +164,9 @@
   box-shadow: none !important;
 }
 
-/* Keep the card hidden only after it collapses into the Personal Info button. */
+/* PreviewStage adds is-personal-collapsed in the Generate chapter, and in Personal Info once
+   the form has collapsed into its label. Like the is-generate-view rule above, this restates
+   the card's transparent frame with !important; it also drops the padding and corner radius. */
 .preview-stage-panel .preview-step-card.is-personal-collapsed {
   border-radius: 0 !important;
   background: transparent !important;
@@ -157,6 +175,10 @@
   box-shadow: none !important;
 }
 
+/* ---- Chapter page -------------------------------------------------------- */
+/* PreviewStage renders one page, always .active, so the hidden state never shows. Nothing
+   here sets .preview-card-page's display, so core/preview.css's display: none, and block when
+   .active, still apply. */
 .preview-card-pages {
   width: 100%;
   height: 100%;
@@ -207,6 +229,10 @@
     visibility 0s linear 0s;
 }
 
+/* ---- Page and builder keyframes ------------------------------------------ */
+/* Only core/preview.css's .preview-card-page.active names preview-card-page-in, and the
+   .preview-card-page.active rule above sets its animation to none, so it never runs. The
+   two builder keyframes are personal.css's. */
 @keyframes preview-card-page-in {
   from {
     opacity: 0;

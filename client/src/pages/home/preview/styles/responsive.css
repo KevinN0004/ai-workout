@@ -1,3 +1,9 @@
+/* The walkthrough's narrower-screen and reduced-motion rules. Imported last by
+   PreviewStage.css, so these override the walkthrough's other sheets at the same
+   specificity, and the home page's responsive.css, which lands before them. */
+
+/* ---- Medium screens ------------------------------------------------------ */
+/* Smaller copy and content height, narrower week labels, and the dashboard in one column. */
 @media (max-width: 1180px) {
   .preview-stage-panel {
     --preview-body-copy-size: 0.72rem;
@@ -62,6 +68,10 @@
   }
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
+/* The contents lane's top, max-height and z-index here never apply: layout/frame.css pins the
+   first two with !important and sets the z-index with a more specific selector. Table cells
+   ignore min-height, so the week cells' min-heights here and above do nothing. */
 @media (max-width: 720px) {
   .preview-stage-panel {
     --preview-body-copy-size: 0.62rem;
@@ -218,6 +228,9 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
+/* The chapter title flows in its stack instead of being placed absolutely, and the chips'
+   labels and the day names may wrap. */
 @media (max-width: 520px) {
   .preview-stage-panel {
     --preview-header-top: 116px;
@@ -265,6 +278,13 @@
   }
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Turns off the walkthrough's transitions and animations, including on the pseudo-elements
+   the home page's block (home/styles/forms-and-motion.css) cannot reach: the Generating
+   spinner and the week's scan and break. That block already stops every element's motion
+   inside the home page, with !important. Neither reaches the contents chips' labels, whose
+   !important transition in layout/frame.css wins, nor PreviewStage's opening scroll, which
+   asks for smooth scrolling from script. */
 @media (prefers-reduced-motion: reduce) {
   html.preview-smooth-scroll {
     scroll-behavior: auto;

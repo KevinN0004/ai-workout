@@ -1,4 +1,9 @@
-﻿.preview-stage-header {
+﻿/* The walkthrough's chapter header: the kicker and the chapter title, which PreviewStage
+   keys on the chapter so each title slides in afresh. Imported second by layout.css. */
+
+/* ---- Header bar ---------------------------------------------------------- */
+/* In flow above the chapter: frame.css pins its position with !important. */
+.preview-stage-header {
   display: grid;
   grid-column: 1;
   grid-row: 1;
@@ -24,6 +29,9 @@
   transform: translateY(0);
 }
 
+/* ---- Title row ----------------------------------------------------------- */
+/* --preview-title-width is set inline by PreviewStage, wide enough for the longest
+   chapter title. */
 .preview-stage-panel .preview-stage-title-row {
   display: flex;
   align-items: center;
@@ -63,15 +71,21 @@
   will-change: transform, opacity;
 }
 
+/* ---- Unused ghost title -------------------------------------------------- */
+/* Nothing renders .preview-stage-title-ghost. */
 .preview-stage-title-ghost {
   pointer-events: none;
   display: none;
 }
 
+/* ---- Title entrance ------------------------------------------------------ */
+/* Every title carries is-sliding-in-right, and PreviewStage keys it on the chapter, so
+   this plays again on each change of chapter. */
 .preview-stage-panel .preview-stage-title.is-sliding-in-right {
   animation: preview-title-enter-right var(--preview-motion-medium) var(--preview-motion-ease) both;
 }
 
+/* ---- Title entrance keyframes -------------------------------------------- */
 @keyframes preview-title-enter-right {
   from {
     opacity: 0;
@@ -84,6 +98,7 @@
   }
 }
 
+/* ---- Guided walkthrough kicker ------------------------------------------- */
 .preview-stage-kicker {
   margin: 0;
   font-size: 0.68rem;

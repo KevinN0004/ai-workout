@@ -1,3 +1,8 @@
+/* Walkthrough styles loaded by the home page through core.css. Most rules here match no
+   rendered element. The rest repeat rules in home/preview/styles/layout/, which loads later
+   and wins where the two conflict, except the two title-row rules: header.css's own title
+   rules override the first and set the same values as the second. */
+
 .preview-stage-panel {
   width: 100%;
   max-width: none;
