@@ -1,8 +1,19 @@
+/* The week table's break at stage 6, when PreviewWorkoutWeekChapter adds is-breaking-apart
+   together with is-anime-particle-break. The last section switches every CSS animation
+   here off for that pair, so usePreviewWeekParticleAnimation's anime.js timeline plays the
+   break and the CSS break's own animations never run. Imported second by workout-week.css. */
+
+/* ---- Break timings ------------------------------------------------------- */
+/* Only the CSS break's animations read these. */
 .preview-week-plan.is-breaking-apart {
   --preview-break-duration: 1500ms;
   --preview-break-total-duration: 3000ms;
 }
 
+/* ---- CSS break: the wrapper ---------------------------------------------- */
+/* The animations in this and the next three sections never run (see the last section).
+   Their other declarations still apply at stage 6: the wrapper's overflow and 3D context,
+   each cell's position and border colour, and the table's clip. */
 .preview-week-plan.is-breaking-apart .preview-week-table-wrap {
   overflow: visible;
   perspective: 1100px;
@@ -113,6 +124,7 @@
     both;
 }
 
+/* ---- CSS break: cells and their pixel clouds ----------------------------- */
 .preview-week-plan.is-breaking-apart .preview-week-table :is(th, td) {
   --preview-break-x: -10px;
   --preview-break-y: -14px;
@@ -210,6 +222,9 @@
   animation-delay: calc(var(--preview-row-break-delay) + var(--preview-col-break-delay) + 40ms);
 }
 
+/* ---- CSS break: row and column offsets ----------------------------------- */
+/* Each row starts later than the one above and each column a little later than the one
+   to its left; the 2n to 5n rules vary the drift. */
 .preview-week-plan.is-breaking-apart .preview-week-table thead tr :is(th, td) {
   --preview-row-break-delay: 0ms;
   --preview-break-y: -12px;
@@ -325,6 +340,7 @@
   --preview-col-break-delay: 210ms;
 }
 
+/* ---- CSS break: cell text and the table ---------------------------------- */
 .preview-week-plan.is-breaking-apart .preview-week-table :is(p, li, h3) {
   animation: preview-week-break-content calc(var(--preview-break-duration) - 80ms) steps(20, end)
     both;
@@ -349,6 +365,11 @@
     cubic-bezier(0.22, 0.8, 0.2, 1) both;
 }
 
+/* ---- The anime.js break -------------------------------------------------- */
+/* PreviewWorkoutWeekChapter sets is-breaking-apart only with is-anime-particle-break, so
+   these rules always apply: no CSS animation runs, the wrapper's background and overlays
+   are cleared, and the cells stay in place at full opacity for
+   usePreviewWeekParticleAnimation to animate. */
 .preview-week-plan.is-breaking-apart.is-anime-particle-break .preview-week-table-wrap {
   animation: none !important;
   overflow: visible;

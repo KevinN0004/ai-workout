@@ -1,3 +1,14 @@
+/**
+ * The meal view's recipe finder: the search box, a loading skeleton, the error,
+ * and the no-results state. Rendered by MealView, which shows the results
+ * themselves as the first course in MealSections.
+ */
+
+/**
+ * Driven by useMealDbSearch, through MealView. Submitting a query starts the
+ * search and empties the box; "Try chicken" (`onTryDefaultSearch`) runs that
+ * search and leaves the word in the box.
+ */
 export default function MealSearchPanel({
   mealDbInput,
   setMealDbInput,
@@ -16,6 +27,7 @@ export default function MealSearchPanel({
           Search for recipe ideas and open any card for ingredients and quick links.
         </p>
       </div>
+      {/* ---- Search box ---- */}
       <form className="form mealdb-search-form" onSubmit={onSubmitMealDbSearch}>
         <label>
           Search
@@ -29,6 +41,7 @@ export default function MealSearchPanel({
           {mealDbLoading ? "Searching..." : "Search"}
         </button>
       </form>
+      {/* ---- Loading, error and no results ---- */}
       {mealDbLoading && (
         <div className="meal-skeleton-grid" aria-hidden="true">
           <div className="meal-skeleton-card" />

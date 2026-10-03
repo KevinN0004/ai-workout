@@ -1,3 +1,8 @@
+/* The home page's base layer, imported first by HomePage.css: layout.css (the page, the
+   nav and the stages), preview.css (walkthrough rules, mostly dead), shell.css (the shared
+   classes inside .home-page) and personal.css (the profile form), all from ./core. Their
+   order is the cascade order. */
+
 @import "./core/layout.css";
 @import "./core/preview.css";
 @import "./core/shell.css";

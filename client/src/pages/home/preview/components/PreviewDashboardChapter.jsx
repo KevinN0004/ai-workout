@@ -1,5 +1,17 @@
+/**
+ * The preview walkthrough's Dashboard chapter: a static stand-in for the
+ * dashboard's summary view, filled from usePreviewDerivedData's figures, whose
+ * cards appear one stage at a time. Rendered by PreviewStage.
+ */
 import { buildPreviewLinePath } from "../utils";
 
+/**
+ * Lays `previewDashboardSummary` out as the overview, today's picks, weekly
+ * progress and recent activity, with the trend window and three charts in a
+ * side column. Each card shows once `previewDashboardStage` reaches the number
+ * it checks, the main column's first, up to PREVIEW_DASHBOARD_FINAL_STAGE. The
+ * link chips and range pills are spans, not controls.
+ */
 export default function PreviewDashboardChapter({
   previewDashboardSummary,
   previewDashboardStage
@@ -36,6 +48,7 @@ export default function PreviewDashboardChapter({
     recentActivity
   } = previewDashboardSummary;
 
+  // ---- Derived values -------------------------------------------------------
   const nextWorkoutDuration = String(nextTrainingPlan?.meta || "50 min")
     .split(" - ")[0]
     .trim();
@@ -49,6 +62,7 @@ export default function PreviewDashboardChapter({
         ? `+${calorieDelta} kcal vs target`
         : `${calorieDelta} kcal vs target`;
 
+  // One chart card, shown from `revealStage`.
   const renderTrendChart = ({ title, subtitle, series, lineClassName, revealStage }) => (
     <section
       key={`preview-chart-${title}`}
@@ -78,9 +92,11 @@ export default function PreviewDashboardChapter({
     </section>
   );
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="preview-dashboard-view" aria-label="Dashboard preview snapshot">
       <div className="preview-dashboard-main">
+        {/* ---- Overview: the plan's settings ---- */}
         <section
           className={`preview-dashboard-card preview-dashboard-overview-panel ${
             previewDashboardStage >= 1 ? "is-visible" : ""
@@ -118,6 +134,7 @@ export default function PreviewDashboardChapter({
           </div>
         </section>
 
+        {/* ---- Today's workout and meals ---- */}
         <section
           className={`preview-dashboard-card ${previewDashboardStage >= 2 ? "is-visible" : ""}`}
         >
@@ -159,6 +176,7 @@ export default function PreviewDashboardChapter({
           </div>
         </section>
 
+        {/* ---- Weekly progress ---- */}
         <section
           className={`preview-dashboard-card ${previewDashboardStage >= 3 ? "is-visible" : ""}`}
         >
@@ -196,6 +214,7 @@ export default function PreviewDashboardChapter({
           <p className="muted">{goalPaceText}</p>
         </section>
 
+        {/* ---- Recent activity ---- */}
         <section
           className={`preview-dashboard-card ${previewDashboardStage >= 4 ? "is-visible" : ""}`}
         >
@@ -215,6 +234,7 @@ export default function PreviewDashboardChapter({
         </section>
       </div>
 
+      {/* ---- Side column: the trend window and the charts ---- */}
       <aside className="preview-dashboard-side">
         <section
           className={`preview-dashboard-card ${previewDashboardStage >= 5 ? "is-visible" : ""}`}

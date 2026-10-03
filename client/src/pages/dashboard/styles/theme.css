@@ -1,4 +1,13 @@
-﻿.dashboard-page,
+﻿/* The dashboard's dark theme: the --dash-* custom properties, and the dark-theme rules for
+   the shared base classes, the header, the cards, each view and the dashboard modals.
+   Imported first by DashboardPage.css; glance-loading.css, toast.css and navigation.css
+   read its tokens. */
+
+/* ---- Tokens -------------------------------------------------------------- */
+/* Set on .drawer as well, because DashboardPage renders the drawer beside .dashboard-page
+   rather than inside it. DashboardBottomNav is beside it too and is not covered, so the
+   tokens navigation.css gives the bottom bar resolve to nothing. */
+.dashboard-page,
 .drawer {
   --dash-page-bg: #000;
   --dash-page-bg-alt: #101010;
@@ -16,6 +25,8 @@
   --dash-focus-ring: #f2f2f2;
 }
 
+/* ---- Page and sticky header ---------------------------------------------- */
+/* .dashboard-page > .title is DashboardHeader's <header>. */
 .dashboard-page {
   color: var(--dash-text);
   background-color: var(--dash-page-bg);
@@ -69,6 +80,9 @@
   height: 40px;
 }
 
+/* ---- Shared classes in the dark theme ------------------------------------ */
+/* :where() adds no specificity, so this counts as a bare div selector and any class that
+   sets a background wins over it. */
 :where(.dashboard-page) div {
   background-color: inherit;
 }
@@ -134,6 +148,10 @@
   outline-offset: 2px;
 }
 
+/* ---- Cards --------------------------------------------------------------- */
+/* A border and background for the card and row classes of the dashboard's views. A lazily
+   loaded view's stylesheet arrives after this one, so where it sets its own at the same
+   specificity, the view's wins. */
 .dashboard-page .overview-card,
 .dashboard-page .summary-list-row,
 .dashboard-page .hub-card,
@@ -187,6 +205,7 @@
   height: 100%;
 }
 
+/* ---- Summary view -------------------------------------------------------- */
 .dashboard-page .summary-view .eyebrow {
   color: #ececec;
 }
@@ -237,6 +256,8 @@
   stroke: #bcbcbc;
 }
 
+/* ---- Calories view ------------------------------------------------------- */
+/* .goal-view is CaloriesView's root. */
 .dashboard-page .goal-view .chart-line {
   stroke: #fff;
   filter: drop-shadow(0 6px 12px #000);
@@ -251,6 +272,7 @@
   color: var(--dash-text-soft);
 }
 
+/* ---- Plans and meal views ------------------------------------------------ */
 .dashboard-page .plans-view .hub-card-hint,
 .dashboard-page .plans-view .meal-day-type,
 .dashboard-page .plans-view .hub-list,
@@ -275,6 +297,7 @@
   color: var(--dash-text-soft);
 }
 
+/* ---- Tips view ----------------------------------------------------------- */
 .dashboard-page .tips-view .tips-filters label,
 .dashboard-page .tips-view .save-feedback,
 .dashboard-page .tips-view .exercise-group,
@@ -289,11 +312,13 @@
   color: var(--dash-text);
 }
 
+/* ---- Settings view ------------------------------------------------------- */
 .dashboard-page .settings-view .settings-tab.active {
   background: var(--dash-pill-bg-strong);
   border-color: var(--dash-card-border-strong);
 }
 
+/* ---- Header title button ------------------------------------------------- */
 .dashboard-page .dashboard-title-button {
   border: 0;
   padding: 0;
@@ -315,6 +340,10 @@
   border-radius: 8px;
 }
 
+/* ---- Primary and back buttons -------------------------------------------- */
+/* styles/base.css declares .back-btn's colours and shadow !important, so the .back-btn
+   selectors here have to be too. No other .cta rule inside .dashboard-page is !important, so
+   the .cta half would win without it. */
 .dashboard-page .cta,
 .dashboard-page .back-btn {
   background: #fff !important;
@@ -335,6 +364,10 @@
   opacity: 0.6 !important;
 }
 
+/* ---- Dashboard modals ---------------------------------------------------- */
+/* The dashboard's modals render through ModalPortal into document.body, outside
+   .dashboard-page, so the tokens do not reach them. These rules use literal colours,
+   mostly the tokens' values. */
 .modal-backdrop.dashboard-modal-backdrop {
   background: rgba(0, 0, 0, 0.86);
   backdrop-filter: blur(4px);
@@ -412,6 +445,9 @@
   color: #ffffff;
 }
 
+/* ---- Weather and air-quality badges -------------------------------------- */
+/* SummaryView.css gives each air-quality band its own gradient. These selectors are more
+   specific, so every band shows this one background instead. */
 .dashboard-page .summary-view .weather-badge,
 .dashboard-page .summary-view .air-quality-badge {
   background: #303030;
@@ -429,6 +465,9 @@
   background: #303030;
 }
 
+/* ---- Narrow screens and reduced motion ----------------------------------- */
+/* Drops the header and modal backdrop blurs and the chart lines' drop shadows, and gives
+   panels a lighter shadow. No animation is involved. */
 @media (max-width: 960px), (prefers-reduced-motion: reduce) {
   .dashboard-page > .title {
     backdrop-filter: none;

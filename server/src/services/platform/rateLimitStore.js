@@ -1,3 +1,7 @@
+/**
+ * The store behind index.js's rate limiters: counts in Redis when the session
+ * store's client is ready, and in memory otherwise.
+ */
 import { MemoryStore } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 
@@ -13,7 +17,7 @@ const defaultCreateRedisStore = ({ getClient, prefix }) =>
  * An express-rate-limit `Store` that counts in Redis when it is available and in
  * memory when it is not.
  *
- * The five limiters in `index.js` are built at module scope, but Redis connects
+ * The limiters in `index.js` are built at module scope, but Redis connects
  * later inside `startServer()`, so a store cannot capture a client at
  * construction time. It resolves one per call through `getClient` instead, and
  * keeps counting in memory whenever there is none -- otherwise a Redis outage
@@ -50,8 +54,8 @@ export const createRateLimitStore = ({
       outageReported = false;
       return result;
     } catch (err) {
-      // Once per outage, not once per request: the session store's bounded retry
-      // exists because an unbounded one logged forever.
+      // Once per outage, not once per request: while Redis is failing, every
+      // request lands here, and logging each one would flood the log.
       if (!outageReported) {
         outageReported = true;
         logger?.error?.(

@@ -1,3 +1,11 @@
+/* The home page's narrower-screen rules, and the workout stage's sample plan cards.
+   Imported last by HomePage.css, so these override core.css and forms-and-motion.css at the
+   same specificity. styles/base.css lands after every home sheet and still wins its ties. */
+
+/* ---- Medium screens ------------------------------------------------------ */
+/* Its walkthrough rules (.preview-*) change nothing: home/preview/styles/responsive.css
+   repeats each at the same width later in the bundle, with the same or its own values, and
+   the rest style classes nothing renders. */
 @media (max-width: 1180px) {
   .preview-stage-panel {
     width: 100%;
@@ -44,6 +52,8 @@
   }
 }
 
+/* ---- Workout stage sample week ------------------------------------------- */
+/* HomeWorkoutStage's sample plan, one card per day. */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -74,6 +84,12 @@
   line-height: 1.4;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
+/* The walkthrough rules here change nothing, as above. The personal form's one column
+   never applies: in basic mode styles/base.css's .form ties it and loads later, and in
+   advanced mode forms-and-motion.css's two-column rule is more specific, so the fields this
+   block puts in column 1 fill half the form. The .header-top, .header-left and
+   .auth-actions rules match nothing (see core/shell.css). */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -288,6 +304,9 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
+/* The Preview button's padding-inline loses to styles/base.css's .ghost padding, which ties
+   it and loads later. */
 @media (max-width: 560px) {
   .home-sticky-nav {
     grid-template-columns: 1fr auto;

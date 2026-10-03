@@ -1,3 +1,8 @@
+/**
+ * The fields of each editable settings tab: name, label, input type, and the
+ * options or bounds. Read by SettingsView, which renders them through
+ * SettingsEditForm.
+ */
 import {
   activityOptions,
   cardioOptions,
@@ -20,8 +25,11 @@ const FIELDS_BY_TAB = {
     { name: "name", label: "Name", type: "text", maxLength: 80 },
     { name: "age", label: "Age", type: "number", bounds: [10, 120] },
     { name: "sex", label: "Sex", type: "select", options: sexOptions },
-    // Bounds per unit, declared rather than converted, so the imperial and
-    // metric ranges cannot drift apart. The metric numbers are the server's.
+    // Bounds per unit, because the form renders in the visitor's locale units.
+    // The metric ones are the server's (apiSchemaService.js), the pound range is
+    // the kilogram one run through toLb, and feet and inches cannot express the
+    // centimetre range exactly, so theirs is looser and the server decides.
+    // settingsFields.test.js pins all three.
     {
       name: "heightCm",
       label: "Height",
@@ -51,4 +59,5 @@ const FIELDS_BY_TAB = {
   ]
 };
 
+/** The fields of a settings tab, or none for a tab that is not editable. */
 export const fieldsForTab = (tabId) => FIELDS_BY_TAB[tabId] || [];

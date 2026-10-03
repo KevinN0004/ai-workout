@@ -1,3 +1,12 @@
+/* The profile form's controls and motion (the advanced fields' reveal, the day and unit
+   toggles, the height fields), the workout and physique stages with the silhouette, and the
+   home page's reduced-motion switch. Imported second by HomePage.css, after core.css.
+   AuthPage renders the height fields and toggles too. */
+
+/* ---- Advanced mode on medium screens ------------------------------------- */
+/* Its .advanced-fields-inner rule never applies: the unconditional one below ties it and
+   comes later, so down to responsive.css's narrow-screen breakpoint the advanced fields
+   stay in three columns. */
 @media (max-width: 980px) {
   .personal-form.advanced-mode {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -19,6 +28,9 @@
   }
 }
 
+/* ---- Advanced fields reveal ---------------------------------------------- */
+/* Collapsed to a 0fr grid row and hidden; opened over --home-animation-ms when the form is
+   in advanced mode. */
 .advanced-fields-wrap {
   grid-column: 1 / -1;
   display: grid;
@@ -53,6 +65,7 @@
   gap: 16px;
 }
 
+/* ---- Full-width fields and the footer ------------------------------------ */
 .personal-form .full {
   grid-column: 1 / -1;
 }
@@ -70,6 +83,7 @@
   align-self: auto;
 }
 
+/* ---- Training-day toggles ------------------------------------------------ */
 .day-toggle-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -104,6 +118,9 @@
   animation: toggle-pop var(--home-animation-ms) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* ---- Toggle buttons ------------------------------------------------------ */
+/* The buttons of core/shell.css's toggles. The active one stays transparent, because the
+   pill sliding behind it marks it. */
 .home-page .unit-toggle button,
 .home-page .segmented button {
   position: relative;
@@ -147,6 +164,7 @@
   transform: scale(0.97);
 }
 
+/* ---- Toggle pop keyframes ------------------------------------------------ */
 @keyframes toggle-pop {
   0% {
     transform: scale(0.94);
@@ -161,6 +179,10 @@
   }
 }
 
+/* ---- Height fields ------------------------------------------------------- */
+/* AuthPage.css has the same four selectors and loads earlier, so these win where the two
+   differ. .height-unit's colour never shows: core/shell.css's .home-page .height-unit is
+   more specific, and every page that renders the field carries home-page. */
 .height-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -187,6 +209,10 @@
   font-size: var(--font-small);
 }
 
+/* ---- Workout sample panel and profile hint ------------------------------- */
+/* Neither rule fully applies. core/shell.css's .home-page .panel:not(.home-intro-panel) sets
+   the panel's background, and styles/base.css's .muted, which ties .personal-hint and loads
+   later, gives the hint its top margin. */
 .muted-panel {
   background: rgba(255, 255, 255, 0.04);
 }
@@ -196,6 +222,9 @@
   text-align: left;
 }
 
+/* ---- Workout stage ------------------------------------------------------- */
+/* HomeWorkoutStage, and HomeWorkoutMeasure's hidden copy of it. The back arrow is centred
+   with a transform, which the last rule here pins in every state with !important. */
 .workout-stage-shell {
   width: 100%;
   max-width: 100%;
@@ -268,6 +297,15 @@
   transform: translateY(-50%) !important;
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Turns off CSS animations and transitions on .home-stage and every element in it, which
+   covers each stage and the walkthrough, and smooth scrolling. * selects no pseudo-elements,
+   so the mode and unit toggles' pills (::before, core/shell.css) still slide; the
+   walkthrough stops its own in home/preview/styles/responsive.css. The contents chips'
+   labels keep the more specific !important transition home/preview/styles/layout/frame.css
+   gives them. Outside .home-stage the nav's Preview button keeps its hover transition, and
+   /auth and /plan render no .home-stage at all. Motion driven from script is out of reach:
+   the physique stage's entrance and pulse, and the walkthrough's opening scroll. */
 @media (prefers-reduced-motion: reduce) {
   html.preview-smooth-scroll {
     scroll-behavior: auto;
@@ -280,6 +318,8 @@
   }
 }
 
+/* ---- Unused metric pills ------------------------------------------------- */
+/* Nothing renders .metric-list or .metric-pill. */
 .metric-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -299,6 +339,9 @@
   font-size: 1rem;
 }
 
+/* ---- Physique stage ------------------------------------------------------ */
+/* HomeVisualizerStage's panel and the square the silhouette is drawn in, sized from the
+   viewport by --visual-stage-size, which responsive.css resizes. */
 .body-visual-panel h2 {
   margin: 0;
   line-height: 1.1;
@@ -340,6 +383,9 @@
   will-change: transform, opacity;
 }
 
+/* ---- Silhouette ---------------------------------------------------------- */
+/* PhysiqueSilhouette2D's SVG. The --outline-* and --anchor-* properties are the palette it
+   sets inline on the SVG; it and physique/geometry.js give the points their classes. */
 .physique-2d-svg {
   width: 100%;
   height: 100%;

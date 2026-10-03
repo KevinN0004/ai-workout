@@ -1,12 +1,16 @@
+/**
+ * The Open-Meteo routes: current conditions, and current conditions with a
+ * training recommendation and a daily forecast. Registered by externalRoutes.js.
+ */
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 // `is_day` is a 0/1 flag rather than a measurement, so it does not go through
 // `toFiniteNumber` -- but it needs the same absent guard for the same reason.
-// `Number(null)` is 0 and `0 === 1` is false, so a payload carrying no daylight
-// reading published a confident "night", while `weatherCode` beside it
-// correctly reported null and the upstream-failure branch of this same route
-// already reported `isDay: null`.
+// `Number(null)` is 0 and `0 === 1` is false, so without the guard a payload
+// whose readings are all null would report a confident "night" beside a null
+// `weatherCode`, and disagree with the fallback branch, which reports
+// `isDay: null`.
 //
 // A value that is present but is not the flag (2, "yes") is still an answer,
 // and it is still not daytime.
@@ -15,6 +19,11 @@ const toDayFlag = (value) => {
   return Number(value) === 1;
 };
 
+/**
+ * Registers GET /api/weather/current and GET /api/weather/recommendation. Every
+ * numeric reading goes through `toFiniteNumber`, and `isDay` through `toDayFlag`,
+ * so a reading Open-Meteo leaves out comes back null rather than 0.
+ */
 export const registerWeatherRoutes = (app, deps) => {
   const {
     toNullableNumber,
@@ -34,6 +43,7 @@ export const registerWeatherRoutes = (app, deps) => {
       if (!query) return;
       const { latitude, longitude } = query;
 
+      // Load the current conditions only.
       const { data, cache } = await fetchOpenMeteo({
         latitude,
         longitude,
@@ -41,6 +51,8 @@ export const registerWeatherRoutes = (app, deps) => {
           "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,relative_humidity_2m,is_day"
       });
 
+      // Rename Open-Meteo's fields to this API's, whose names carry the units
+      // (temperatureC, windSpeedKmh).
       const current = data?.current || {};
       res.json({
         cache,
@@ -62,6 +74,8 @@ export const registerWeatherRoutes = (app, deps) => {
         }
       });
     } catch (err) {
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with every reading null.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({
@@ -98,6 +112,7 @@ export const registerWeatherRoutes = (app, deps) => {
       if (!query) return;
       const { latitude, longitude } = query;
 
+      // Load the current conditions and the daily forecast in one request.
       const { data, cache } = await fetchOpenMeteo({
         latitude,
         longitude,
@@ -106,6 +121,8 @@ export const registerWeatherRoutes = (app, deps) => {
         daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum"
       });
 
+      // Compute the recommendation from the current conditions, and one row per
+      // forecast day from Open-Meteo's parallel daily arrays.
       const current = data?.current || {};
       const recommendation = buildWorkoutRecommendation(current);
       const days = Array.isArray(data?.daily?.time) ? data.daily.time.length : 0;
@@ -143,6 +160,9 @@ export const registerWeatherRoutes = (app, deps) => {
         daily
       });
     } catch (err) {
+      // An outage (any status isUpstreamFailureStatus accepts; an error with no
+      // status counts as 500) answers 200 with every reading null, no forecast,
+      // and a recommendation to train indoors.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({
