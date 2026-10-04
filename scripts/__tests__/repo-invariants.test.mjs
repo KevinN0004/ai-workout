@@ -1,4 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -145,6 +154,90 @@ describe("Claude Code hook wiring", () => {
   });
 });
 
+describe("hooks do not depend on untracked .claude/ scaffolding", () => {
+  // .claude/agents|commands|helpers|skills are gitignored, so a fresh clone or
+  // a cloud session has none of them. A hook that runs `node .claude/helpers/x`
+  // directly fails with "Cannot find module" on every tool call. The only
+  // sanctioned way to reach a helper is scripts/run-claude-helper.cjs, which
+  // exits 0 when the file is absent.
+  const settings = JSON.parse(
+    readFileSync(path.join(repoRoot, ".claude", "settings.json"), "utf8")
+  );
+  const WRAPPER = "scripts/run-claude-helper.cjs";
+
+  const commands = [
+    ...Object.values(settings.hooks).flatMap((groups) =>
+      groups.flatMap((group) => group.hooks.map((hook) => hook.command))
+    ),
+    settings.statusLine.command
+  ];
+
+  const trackedFiles = new Set(
+    execFileSync("git", ["ls-files"], { cwd: repoRoot, encoding: "utf8" }).split("\n")
+  );
+
+  // A command may name a .claude/ path only if it is tracked; everything else
+  // under .claude/ must go through the wrapper as a bare helper file name.
+  const unguarded = (command) =>
+    (command.match(/\.claude\/[A-Za-z0-9_./-]+/g) ?? []).filter((rel) => !trackedFiles.has(rel));
+
+  test("the sweep found hook commands and the wrapper is tracked", () => {
+    expect(commands.length).toBeGreaterThan(10);
+    expect(trackedFiles.has(WRAPPER)).toBe(true);
+    expect(commands.some((command) => command.includes(WRAPPER))).toBe(true);
+  });
+
+  test("no hook command references an untracked .claude/ path directly", () => {
+    const offenders = commands.filter((command) => unguarded(command).length > 0);
+    expect(offenders).toEqual([]);
+  });
+
+  test("the detector flags a direct helper call and passes the wrapped one", () => {
+    // Without this the test above could pass because the matcher is broken.
+    expect(
+      unguarded('node "${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/hook-handler.cjs" status')
+    ).toEqual([".claude/helpers/hook-handler.cjs"]);
+    expect(
+      unguarded(`node "\${CLAUDE_PROJECT_DIR:-.}/${WRAPPER}" hook-handler.cjs status`)
+    ).toEqual([]);
+  });
+});
+
+describe("scripts/run-claude-helper.cjs", () => {
+  const wrapper = path.join(repoRoot, "scripts", "run-claude-helper.cjs");
+  const run = (projectDir, args) =>
+    spawnSync(process.execPath, [wrapper, ...args], {
+      env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+      encoding: "utf8"
+    });
+
+  const projectWith = (source) => {
+    const dir = mkdtempSync(path.join(tmpdir(), "run-claude-helper-"));
+    mkdirSync(path.join(dir, ".claude", "helpers"), { recursive: true });
+    if (source) writeFileSync(path.join(dir, ".claude", "helpers", "h.cjs"), source);
+    return dir;
+  };
+
+  test("is a silent no-op when the helper is missing", () => {
+    const result = run(projectWith(null), ["h.cjs", "status"]);
+    expect([result.status, result.stdout, result.stderr]).toEqual([0, "", ""]);
+  });
+
+  test("runs a present helper with its arguments and passes the exit status through", () => {
+    const dir = projectWith("console.log(process.argv.slice(2).join(','));process.exit(3);");
+    const result = run(dir, ["h.cjs", "a", "b"]);
+    expect(result.stdout).toBe("a,b\n");
+    expect(result.status).toBe(3);
+  });
+
+  test("refuses a name that escapes .claude/helpers", () => {
+    const dir = projectWith(null);
+    writeFileSync(path.join(dir, "evil.cjs"), "console.log('ran');");
+    const result = run(dir, ["../../evil.cjs"]);
+    expect([result.status, result.stdout]).toEqual([0, ""]);
+  });
+});
+
 describe("Neon agent-skills scaffolding stays out of the build", () => {
   // The Neon skill installer scaffolds a Neon project into this repo: a config
   // declaring Neon Auth, three object-storage buckets and a serverless
@@ -225,6 +318,7 @@ describe("Neon agent-skills scaffolding stays out of the build", () => {
     expect(entries).toEqual(
       expect.arrayContaining([
         "scripts/codex-handoff.mjs",
+        "scripts/run-claude-helper.cjs",
         "scripts/scrub-junk-files.cjs",
         "scripts/skill-router.mjs",
         "scripts/**/*.test.mjs"
