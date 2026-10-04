@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { toNumberOrNull } from "../repositories/rowValues.js";
 import { toNullableNumber } from "../services/dashboard/dashboardDataBuildersService.js";
+import { parsePositiveInt } from "../routes/generateRoutes.js";
 import { parseRedisPort } from "../services/auth/sessionService.js";
 import { __testables as errorTracking } from "../services/platform/errorTrackingService.js";
 import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
@@ -65,6 +66,12 @@ const helpers = [
   {
     name: "toPositiveInt",
     call: (value) => indexTestables.toPositiveInt(value, 42),
+    absent: 42,
+    zeroIsValid: false
+  },
+  {
+    name: "parsePositiveInt (generateRoutes)",
+    call: (value) => parsePositiveInt(value, 42),
     absent: 42,
     zeroIsValid: false
   },

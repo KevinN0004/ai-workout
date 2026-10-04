@@ -3,6 +3,12 @@ import crypto from "crypto";
 export const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+// For text that is interpolated into a single prompt line: any run of
+// whitespace, newlines included, becomes one space so a value cannot start a
+// new line of its own.
+export const collapseWhitespace = (value) =>
+  typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+
 export const toNullableNumber = (value, min, max) => {
   if (value === null || value === undefined || value === "") return null;
   const num = Number(value);
