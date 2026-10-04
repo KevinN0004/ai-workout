@@ -64,6 +64,38 @@ describe("pm25ToUsAqi", () => {
     expect(pm25ToUsAqi(pm25)).toBe(expected);
   });
 
+  // The published bands stop at x.0/x.4 and restart at x.1/x.5. A sensor
+  // reading with two decimals lands in the gap, and used to fall through to the
+  // final `return 500`: clean air reported as Hazardous. EPA truncates to one
+  // decimal first, so each gap value takes the band below it.
+  test.each([
+    [12.04, 50],
+    [12.09, 50],
+    [35.45, 100],
+    [55.45, 150],
+    [150.45, 200],
+    [250.45, 300]
+  ])("a gap reading of %s ug/m3 truncates into the band below, AQI %s", (pm25, expected) => {
+    expect(pm25ToUsAqi(pm25)).toBe(expected);
+  });
+
+  test("truncates rather than rounds, so 12.19 stays at the 12.1 breakpoint", () => {
+    expect(pm25ToUsAqi(12.19)).toBe(51);
+    expect(pm25ToUsAqi(35.49)).toBe(100);
+  });
+
+  test("a gap reading never reads as Hazardous", () => {
+    [12.04, 35.45, 55.45, 150.45, 250.45].forEach((pm25) => {
+      expect(pm25ToUsAqi(pm25)).toBeLessThan(301);
+    });
+  });
+
+  test("the last in-table reading is 500.4 and anything above it caps at 500", () => {
+    expect(pm25ToUsAqi(500.4)).toBe(500);
+    expect(pm25ToUsAqi(500.45)).toBe(500);
+    expect(pm25ToUsAqi(500.5)).toBe(500);
+  });
+
   test("interpolates within a band rather than snapping to its edges", () => {
     // Midpoint of the first band: 6.0 ug/m3 sits halfway to AQI 50.
     expect(pm25ToUsAqi(6)).toBe(25);

@@ -370,6 +370,11 @@ export const createExternalDataService = ({
     if (pm25 === null || pm25 === undefined || pm25 === "") return null;
     const value = Number(pm25);
     if (!Number.isFinite(value) || value < 0) return null;
+    // EPA truncates PM2.5 to one decimal before the lookup. The published bands
+    // stop at x.0/x.4 and restart at x.1/x.5, so an unrounded 12.04 or 35.45
+    // sits in the gap between two bands. Every one-decimal value from 0.0 to
+    // 500.4 survives this floor unchanged (checked exhaustively).
+    const truncated = Math.floor(value * 10) / 10;
     const points = [
       { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
       { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
@@ -379,10 +384,13 @@ export const createExternalDataService = ({
       { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 }
     ];
     for (const point of points) {
-      if (value < point.cLow || value > point.cHigh) continue;
-      const ratio = (value - point.cLow) / (point.cHigh - point.cLow || 1);
+      if (truncated < point.cLow || truncated > point.cHigh) continue;
+      const ratio = (truncated - point.cLow) / (point.cHigh - point.cLow || 1);
       return Math.round(point.iLow + ratio * (point.iHigh - point.iLow));
     }
+    // Only reachable past 500.4 ug/m3, off the top of the EPA table. The index
+    // is capped at 500, and a real over-scale reading should read as hazardous,
+    // not as missing. After truncation no in-range value can fall through.
     return 500;
   };
 
