@@ -94,10 +94,10 @@ export default defineConfig({
         PORT: String(SERVER_PORT),
         // Both origins. The chromium project reaches the API through the
         // preview proxy, which passes the browser's Origin header through
-        // unchanged, so express sees the preview origin on its POSTs. The
-        // deployable project talks to the server directly, from the server's
-        // own origin. The cors policy refuses any Origin not listed. CORS
-        // itself is covered by index.cors.test.js.
+        // unchanged, so express sees the preview origin on its POSTs and
+        // DELETEs. The deployable project talks to the server directly, from
+        // the server's own origin. The cors policy refuses any Origin not
+        // listed. CORS itself is covered by index.cors.test.js.
         CLIENT_ORIGIN: `${baseURL},${serverURL}`,
         LOG_LEVEL: "warn"
       }
