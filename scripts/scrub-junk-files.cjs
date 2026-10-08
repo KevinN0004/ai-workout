@@ -8,7 +8,7 @@
 "use strict";
 
 /*
- * The strays are named like shell or code fragments, e.g.
+ * Many of the strays are named like shell or code fragments, e.g.
  * `{console.log('refused')`, `-D)`, `String(taskId`. Their likely source is the
  * ruflo (@claude-flow) background integration re-parsing recent command text,
  * which is third-party and not reproducible on demand, so this is a safe
@@ -29,7 +29,7 @@
  * signature alone misses. Guards 1 and 2 are what make that wider rule safe:
  * gitignored build output is never listed, tracked files are never listed, and
  * anything holding real content is skipped, so the worst case is deleting an
- * empty, untracked file whose name looks wrong.
+ * empty, untracked file whose name guard 3 flags.
  *
  * It ends in exit 0, and catches the git call, the stat and the delete, so it
  * does not break the hook chain it runs in. It prints one line when it removes
@@ -110,7 +110,7 @@ const KNOWN_EXTENSIONS = new Set([
 
 // Legitimate names that carry no extension (or are dotfiles, which Node reports
 // as having no extension). Any other name without a known extension, bar a .env
-// variant, fails guard 3. This repo's CODEOWNERS and .git-blame-ignore-revs are
+// variant, meets guard 3. This repo's CODEOWNERS and .git-blame-ignore-revs are
 // not listed, so like knip.jsonc they rely on guards 1 and 2.
 const KNOWN_NAMES = new Set([
   "Dockerfile",

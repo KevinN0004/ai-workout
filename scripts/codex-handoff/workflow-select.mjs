@@ -11,9 +11,10 @@ const CONV_PREFIX_RE = /^\w+(\([^)]+\))?!?:\s*/;
 const FIX_TYPE_RE = /^fix(\([^)]+\))?!?:/;
 
 /**
- * True when any line of `git log --oneline` output is a revert, or a `fix:`
- * commit (with or without a scope or `!`) whose description contains one of
- * REPAIR_DESC_WORDS. A `fix:` without one of those words does not count.
+ * True when any line of `git log --oneline` output, after its hash, starts
+ * with "revert" in any case, or is a `fix:` commit (with or without a scope or
+ * `!`) whose description contains one of REPAIR_DESC_WORDS. A `fix:` without
+ * one of those words does not count.
  */
 export function detectRepairLanguage(log) {
   return log.split("\n").some((line) => {
@@ -97,8 +98,9 @@ export function buildCodexPrompt({
 /**
  * Picks the workflow and the reason codex-handoff.mjs prints. The first signal
  * that applies wins: a usage limit, then repair language in the recent log,
- * then uncommitted changes, then review words in the task text; with none of
- * those it is Plan → Execute.
+ * then uncommitted changes, untracked files included (Rescue → Review when the
+ * task text has a fix word, else Review → Patch), then review words in the
+ * task text; with none of those it is Plan → Execute.
  */
 export function selectWorkflow({ hasChanges, hasFixInLog, hasUsageLimit = false, taskText = "" }) {
   const text = taskText.toLowerCase();

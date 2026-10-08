@@ -3,17 +3,17 @@
  * `npm run test:e2e:ui`. It starts the API and `vite preview` itself (outside
  * CI it reuses any already running), and preview serves client/dist, so build
  * the client first.
- *
- * Everything else in this repo tests one side of the wire: the client suite
- * mocks fetch, the server suite drives express with supertest. Neither sees the
- * wiring between them -- the CSRF token round trip, the session cookie, the
- * Vite proxy, or whether a write is actually readable afterwards -- nor what a
- * browser makes of the rendered pages, which the axe scans and the deployable
- * checks look at. These suites cover that, and stay small. They run against
- * the built bundle, not the dev server, so a failure that only appears in the
- * shipped artifact is in scope.
  */
 import { defineConfig, devices } from "@playwright/test";
+
+// Everything else in this repo tests one side of the wire: the client suite
+// mocks fetch, the server suite drives express with supertest. Neither sees the
+// wiring between them -- the CSRF token round trip, the session cookie, the
+// Vite proxy, or whether a write is actually readable afterwards -- nor what a
+// browser makes of the rendered pages, which the axe scans and the deployable
+// checks look at. These suites cover that, and stay small. They run against
+// the built bundle, not the dev server, so a failure that only appears in the
+// shipped artifact is in scope.
 
 // `vite preview`'s origin. The port has to match `preview.port` in
 // client/vite.config.js, which is what actually binds it.
@@ -52,8 +52,9 @@ export default defineConfig({
     permissions: []
   },
 
-  // Chromium only. This suite checks wiring, not rendering, so a browser matrix
-  // would triple the CI time for very little extra signal. Add one if a
+  // Chromium only. This suite checks wiring, accessibility and response
+  // headers, not how each engine paints a page, so a browser matrix would
+  // triple the CI time for very little extra signal. Add one if a
   // browser-specific defect ever actually shows up.
   //
   // Two projects, because they point at two different origins. Everything
@@ -91,11 +92,12 @@ export default defineConfig({
         // DATABASE_URL, and `npm run -w server` is what puts the CWD in
         // server/ so dotenv finds server/.env.
         PORT: String(SERVER_PORT),
-        // Both origins: the chromium project reaches the API through the
-        // preview proxy, so the server sees no cross-origin request from it,
-        // but the deployable project talks to the server directly and its
-        // origin has to be allowed. CORS itself is covered by
-        // index.cors.test.js.
+        // Both origins. The chromium project reaches the API through the
+        // preview proxy, which passes the browser's Origin header through
+        // unchanged, so express sees the preview origin on its POSTs. The
+        // deployable project talks to the server directly, from the server's
+        // own origin. The cors policy refuses any Origin not listed. CORS
+        // itself is covered by index.cors.test.js.
         CLIENT_ORIGIN: `${baseURL},${serverURL}`,
         LOG_LEVEL: "warn"
       }

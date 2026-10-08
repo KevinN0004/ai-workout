@@ -1,7 +1,7 @@
 /**
  * The confidence score codex-handoff.mjs prints: how much context a Claude ->
  * Codex handoff carries, judged from the task text, the suggested files, the
- * uncommitted changes and the recent log.
+ * staged and unstaged diffs (untracked files do not count) and the recent log.
  */
 const CRITERIA_WORDS = ["should", "must", "expect", "assert", "given", "when", "then"];
 

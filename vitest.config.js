@@ -1,7 +1,7 @@
 /**
- * The root Vitest project covers the test files under scripts/ only; `npm test`
- * runs it first, as `test:scripts`. The workspaces have their own configs:
- * client/vite.config.js and server/vitest.config.js.
+ * The root Vitest project runs the *.test.mjs files under scripts/ only;
+ * `npm test` runs it first, as `test:scripts`. The workspaces have their own
+ * configs: client/vite.config.js and server/vitest.config.js.
  */
 import { defineConfig } from "vitest/config";
 

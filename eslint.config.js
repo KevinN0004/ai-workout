@@ -1,8 +1,8 @@
 /**
  * ESLint flat config for every JavaScript file bar the ignores below, read by
  * `npm run lint` and `npm run lint:fix`. Its rules target defect classes, not
- * style: formatting is Prettier's, so eslint-config-prettier turns off the
- * rules that would fight it (the last block turns one defect rule back on).
+ * style, which is Prettier's; eslint-config-prettier, near the end, switches
+ * off any style rule enabled above it that would fight Prettier.
  */
 import js from "@eslint/js";
 import globals from "globals";
@@ -15,21 +15,23 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 // Extensions import-x/no-unresolved must try before it reports a miss. The
 // client is why they are needed: it imports .jsx without an extension, which
 // Vite resolves and the default node resolver does not -- without this the rule
-// emits 53 false positives there. The server needs none of it (its one
-// extensionless import, in a test, names a .js file, which the default resolver
-// finds), but both blocks share the setting so the two cannot drift apart.
+// reports every one of those imports as unresolved. The server needs none of it
+// (its one extensionless import, in a test, names a .js file, which the default
+// resolver finds), but both blocks share the setting so the two cannot drift
+// apart.
 const importResolverSettings = {
   "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } }
 };
 
-// jsx-a11y's recommended set, minus two rules that are wrong about this tree.
-// Measured before enabling, the way every other rule here was: recommended
-// reported 153 findings, and 128 of them came from these two.
+// jsx-a11y's recommended set. It already leaves label-has-for and
+// control-has-associated-label off; the two lines below pin that, because both
+// are wrong about this tree.
 //
-// Both fire on `<label>Name <input /></label>`, which is how every form in this
-// app is written. Nesting alone is a valid association -- `label-has-for` is
-// deprecated upstream precisely because it demanded a matching `id` as well,
-// and `control-has-associated-label` does not see through the nesting either.
+// Switched on, both fire on `<label>Name <input /></label>`, which is how every
+// form in this app is written. Nesting alone is a valid association --
+// `label-has-for` is deprecated upstream precisely because it demanded a
+// matching `id` as well, and `control-has-associated-label` does not see
+// through the nesting either.
 // axe, running against the real rendered pages in e2e/a11y.spec.js, reports
 // zero violations on those same forms. When a linter and the accessibility
 // engine disagree about rendered output, the engine is the authority.
@@ -60,7 +62,7 @@ const jsxA11yRules = {
 // One list for both test blocks: one supplies the vitest globals, the other
 // exempts tests from no-console. Kept together because a file that landed in
 // only one would get half the pair -- no-console off but no globals, which
-// trips no-undef, or globals but no exemption, as client/src/test/** was.
+// trips no-undef, or globals but no exemption.
 const testFiles = ["**/*.test.{js,jsx,mjs}", "client/src/test/**"];
 
 // Spread into a block's `rules` alongside `plugins: { "import-x": importX }`;
@@ -95,10 +97,11 @@ export default [
 
   // A config object holding only `ignores` is ESLint 9's global-ignores form.
   // Adding any other key to it -- linterOptions included -- demotes it to an
-  // ordinary config object whose ignores apply to itself alone, which un-ignores
-  // node_modules and .claude. So linterOptions gets its own object. ESLint 9
-  // defaults reportUnusedDisableDirectives to "warn"; promoting it to "error"
-  // stops orphaned suppressions accumulating. Zero unused directives today.
+  // ordinary config object whose ignores apply to itself alone. That un-ignores
+  // everything listed there, .claude included, bar node_modules, which ESLint
+  // ignores by default. So linterOptions gets its own object. ESLint 9 defaults
+  // reportUnusedDisableDirectives to "warn"; promoting it to "error" stops
+  // orphaned suppressions accumulating.
   {
     linterOptions: {
       reportUnusedDisableDirectives: "error"
@@ -162,8 +165,8 @@ export default [
   // ---- Server: node globals, ESM ----------------------------------------
   // "server/**" reaches server/scripts/ too, so no-console covers those CLIs.
   // Root scripts/** is deliberately left out of it: that tree is repo tooling
-  // whose job is to print, and enabling the rule there flags every console call
-  // it makes.
+  // whose job is to print, so the rule would flag its output rather than stray
+  // debugging.
   {
     files: ["server/**/*.js"],
     languageOptions: {
@@ -211,14 +214,17 @@ export default [
   },
 
   // ---- Tests may log: no-console is a production-code guard --------------
-  // files: ["server/**/*.js"] also matches server/src/**/*.test.js, so the
-  // server block's no-console would otherwise apply to suites. No test file
-  // logs today; this is a forward guard.
+  // The client and server blocks' patterns also match their own test files, so
+  // their no-console would otherwise apply to suites.
   {
     files: testFiles,
     rules: { "no-console": "off" }
   },
 
+  // Turns off every rule on eslint-config-prettier's list. Of the rules enabled
+  // above, the only one on it is no-unexpected-multiline, which the next block
+  // turns back on; the rest of the list would switch off any style rule a block
+  // above enabled.
   prettierCompat,
 
   // eslint-config-prettier disables this because some of Prettier's line

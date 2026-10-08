@@ -89,6 +89,7 @@ export function suggestFiles({
   const result = [];
   const seen = new Set();
 
+  // ---- Staged files, then modified ones -------------------------------------
   for (const f of stagedFiles) {
     if (!seen.has(f)) {
       seen.add(f);
@@ -103,6 +104,7 @@ export function suggestFiles({
     }
   }
 
+  // ---- Discovered: test files and call sites --------------------------------
   const allChanged = [...new Set([...stagedFiles, ...changedFiles])];
   const discovered = [];
   const discoveredSeen = new Set(seen);

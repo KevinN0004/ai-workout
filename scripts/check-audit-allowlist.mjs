@@ -2,7 +2,9 @@
 /**
  * Enforces the expiry dates on the audit-ci allowlist. CI runs it before
  * `npm ci`, which it can because it imports only node builtins.
- *
+ */
+
+/*
  * audit-ci has no native expiry support, so a suppression added once would
  * otherwise stay forever. This cross-checks security/audit-ci.json against
  * security/advisory-reviews.json and fails the build when an allowlisted
@@ -52,6 +54,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     );
   }
 
+  // ---- Reviews, indexed by advisory -----------------------------------------
   for (const entry of reviews) {
     const advisory = typeof entry?.advisory === "string" ? entry.advisory.trim() : "";
     if (!advisory) {
@@ -65,6 +68,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     byAdvisory.set(advisory, entry);
   }
 
+  // ---- Each allowlisted advisory needs a live review ------------------------
   for (const advisory of allowlist) {
     const entry = byAdvisory.get(advisory);
     if (!entry) {
@@ -91,6 +95,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     }
   }
 
+  // ---- Each review needs an allowlist entry ---------------------------------
   for (const advisory of byAdvisory.keys()) {
     if (!allowlist.includes(advisory)) {
       errors.push(

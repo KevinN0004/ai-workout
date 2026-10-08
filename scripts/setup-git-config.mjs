@@ -2,7 +2,9 @@
 /**
  * Applies the two repository git settings that live in .git/config rather than
  * in the repository, so a fresh clone gets them without anyone remembering to.
- *
+ */
+
+/*
  * Without them a clone runs without the pre-commit guard, and `git blame`
  * credits the lines the Prettier reformat last touched to that commit. Neither
  * failure announces itself, so a setup step that relies on being remembered is
