@@ -104,6 +104,14 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
 
     So an import-order tidy that moves a stylesheet is proven by building before and after and comparing the CSS files rule by rule. If the order changes, the import stays where it is, with a comment saying why. That is why Task 6 ends at 9 import-order breaks rather than 0: the scanner ranks a stylesheet after local modules, and `HomePage.css` has to stay ahead of `PreviewStage`.
 
+13. **The built bundle, not the source, decides which copy of a rule wins.** Found in Tasks 8 and 9. Three things the source order does not show:
+
+    - **The dashboard views are lazy chunks with their own CSS files.** `DashboardPage.jsx` loads seven views with `React.lazy`, and Vite injects each view's stylesheet when its chunk loads, after `styles/base.css`. So a view's rule that ties a base rule wins, and the same rule in the main chunk loses: `.meal-modal` beats `.modal` while `.plan-modal` does not.
+    - **`/auth` also carries `home-page`.** `AuthPage.css` is the first sheet in the main chunk, so every home stylesheet comes after it and wins its ties.
+    - **A selector list inside `:is()` is not a list of independent selectors.** The rule takes the specificity of its most specific argument, so removing an argument that matches nothing can lower it. `home/preview/styles/form-overrides.css:64-66` holds three dead `:is()` arguments whose removal would take that rule from (0,3,0) to (0,2,1).
+
+    The PR bodies of #187 and #188 record the CSS bugs that come from this, such as a rule that loses a tie it was written to win. None is fixed by this plan.
+
 ## Baseline (from the scanner, `9b85b7d`)
 
 | PR  | Headers first | Exports documented | Effects commented | Long functions sectioned | History | To module scope | Import-order breaks | BOMs |
@@ -3278,7 +3286,7 @@ A class with any hit stays, and the PR names it.
 In each stylesheet, for each rule that names a confirmed class:
 
 - **Every selector in the rule names one:** delete the rule.
-- **Only some selectors in a comma list do:** delete just those selectors. A selector list's members are independent, so removing one that matches nothing changes nothing for the others.
+- **Only some selectors in a comma list do:** delete just those selectors. A top-level selector list's members are independent, so removing one that matches nothing changes nothing for the others. **That does not hold inside `:is()`** (Findings §13): leave a dead argument there in place, and name it in the PR.
 - **An `@media` block left empty:** delete it too.
 
 Change nothing else.
@@ -3424,7 +3432,7 @@ Expected after PR 11:
 - **`core/preview.css`:** `dead 0`, up to 13 duplicates, and 2 live (`.preview-stage-title-row` and `.preview-stage-title-row h2`).
 - **`core/personal.css`:** 9 duplicates.
 - **`core/layout.css`:** 1 duplicate (`html.preview-smooth-scroll`), plus live `.home-preview-btn` and `.home-stage-preview` rules, which stay.
-- **`home/styles/responsive.css`:** 10 live `preview-*` rules inside `@media` blocks, plus `.home-preview-btn` rules, which stay.
+- **`home/styles/responsive.css`:** the `preview-*` rules inside `@media` blocks that PR 11 leaves, plus `.home-preview-btn` rules, which stay. PR 8 found every one of them overridden by, or repeated in, `home/preview/styles/responsive.css`, which loads later.
 
 - [ ] **Step 3: Establish which copy wins today**
 
@@ -3435,7 +3443,7 @@ f=$(grep -l "preview-stage-title-row" client/dist/assets/*.css); echo "$f"
 grep -bo "\.preview-step-shell{[^}]*}" "$f"
 ```
 
-Expected: two matches. The one at the lower byte offset has the declarations of `core/preview.css`'s `.preview-step-shell`, and the higher one those of `layout/frame.css`'s. Match them by eye. If it is the other way round, the merge rule below reverses too: the `core/` copy wins, so its values replace the preview copy's.
+Expected: six matches, four of them inside `@media` blocks (measured in Task 9). Compare the two top-level ones. The one at the lower byte offset has the declarations of `core/preview.css`'s `.preview-step-shell`, and the higher one those of `layout/frame.css`'s. Match them by eye. If it is the other way round, the merge rule below reverses too: the `core/` copy wins, so its values replace the preview copy's.
 
 - [ ] **Step 4: Merge each duplicate**
 
@@ -3452,7 +3460,7 @@ Put the merged declarations at the end of L's rule, so every declaration L alrea
 - **`core/preview.css`** duplicates merge into the preview file that defines the same selector: `layout/frame.css`, `layout/header.css`, `layout/base.css` or `layout/dashboard.css`. Its 2 live rules (`.preview-stage-title-row`, `.preview-stage-title-row h2`) move to the top of `layout/header.css`, after its header, because that file styles the rest of the title row.
 - **`core/personal.css`**'s `.preview-personal-form*` rules merge into `home/preview/styles/form-overrides.css`. The one it shares with `home/preview/styles/personal.css` merges there.
 - **`core/layout.css`**'s `html.preview-smooth-scroll` merges into `home/preview/styles/layout/base.css`.
-- **`home/styles/responsive.css`**'s 10 `preview-*` rules move into `home/preview/styles/responsive.css`, each inside an `@media` block with the **identical** params, reusing one there if it exists. The `.home-nav-spacer, .home-preview-btn` rule stays where it is.
+- **`home/styles/responsive.css`**'s `preview-*` rules are merged, not moved. Each is an **E**, and its **L** is the rule with the same selector inside an `@media` block with the **identical** params in `home/preview/styles/responsive.css`; merge them by the rules above. Where there is no such L, find in the built CSS whether each declaration takes effect today. One that a later rule overrides is dropped rather than moved, because moving it later would make it win. One that takes effect moves into an `@media` block with the identical params. The `.home-nav-spacer, .home-preview-btn` rule stays where it is.
 
 Then delete `home/styles/core/preview.css`, and the line `@import "./core/preview.css";` from `home/styles/core.css`. Update `core.css`'s header, from PR 8, so it no longer lists the file.
 
