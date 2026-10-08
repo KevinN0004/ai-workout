@@ -1,8 +1,8 @@
 /**
  * Column value conversions shared by the repositories: Date columns to ISO
  * strings and date-only keys and back, Decimal columns to numbers, and JSON
- * columns to arrays and objects. An absent date or number reads as "" or null,
- * never as 0, and an absent JSON column as an empty array or object.
+ * values and relation lists to arrays and objects. An absent date or number
+ * reads as "" or null, never as 0, and an absent list or object as empty.
  */
 
 /** A timestamp as an ISO string, or "" when there is none. */
@@ -39,7 +39,10 @@ export const toNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-/** A JSON column read as an array: anything that is not one reads as empty. */
+/**
+ * Any value as an array: one that is not an array reads as empty. Used on JSON
+ * list columns both ways, and by userReadRepository on loaded relation lists.
+ */
 export const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
 /** A JSON column read as an object: arrays, null and scalars read as empty. */

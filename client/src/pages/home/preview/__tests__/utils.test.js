@@ -90,13 +90,11 @@ describe("getPreviewWeekdayName", () => {
   // JS getDay() is Sunday-first; the preview week is Monday-first, so the
   // rotation has to move Sunday to the end rather than the start.
   test("maps a Monday date to the first day of the preview week", () => {
-    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
+    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe("Monday");
   });
 
   test("maps a Sunday date to the last day of the preview week", () => {
-    expect(getPreviewWeekdayName(new Date("2026-06-07T12:00:00Z"))).toBe(
-      PREVIEW_WEEK_DAY_ORDER[PREVIEW_WEEK_DAY_ORDER.length - 1]
-    );
+    expect(getPreviewWeekdayName(new Date("2026-06-07T12:00:00Z"))).toBe("Sunday");
   });
 
   test("falls back to the first day when given something that is not a date", () => {

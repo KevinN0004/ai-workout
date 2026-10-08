@@ -27,8 +27,22 @@ describe("buildLinePath", () => {
 
   test("handles a single value and a flat series", () => {
     expect(buildLinePath([5])).not.toMatch(/NaN/);
-    // The scale always spans 0, so even a flat series has a range to divide by.
+    // The scale runs from 0 to at least 1, so even a flat series has a range.
     expect(buildLinePath([4, 4, 4])).not.toMatch(/NaN/);
+  });
+
+  // The charts rely on where the points land, not only on a well-formed path:
+  // a larger value draws higher, the scale always reaches 0 and at least 1,
+  // and the first and last points sit on the box's inset edges. Each of those
+  // can break without producing a NaN.
+  test.each([
+    ["a rising series, bottom left to top right", [0, 5, 10], "M10,100 L130,55 L250,10"],
+    ["an empty series, as one point on the bottom", [], "M10,100"],
+    ["an all-zero series, along the bottom", [0, 0, 0], "M10,100 L130,100 L250,100"],
+    ["a flat series above 0, along the top", [4, 4, 4], "M10,10 L130,10 L250,10"],
+    ["a series under 1, on a scale of at least 1", [0, 0.5], "M10,100 L250,55"]
+  ])("draws %s", (_label, values, expected) => {
+    expect(buildLinePath(values)).toBe(expected);
   });
 
   test("keeps points inside the requested box", () => {

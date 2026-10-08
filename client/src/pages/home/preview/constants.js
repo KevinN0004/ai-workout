@@ -8,9 +8,11 @@
 // inches and gives the dashboard's target weight in pounds. App's own unit
 // choice reads a private copy of the same set in app/units.js.
 export const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
-// The days the Training days toggles offer. HomePage's personal stage stores
-// the picked ones as they are in `personal.trainingDays`; the walkthrough's
-// personal chapter shows the same toggles, which do nothing there.
+// The days the Training days toggles offer, Monday first. HomePage's personal
+// stage stores the picked ones as they are in `personal.trainingDays`; the
+// walkthrough's personal chapter shows the same toggles, which do nothing
+// there. PREVIEW_WEEK_DAY_ORDER copies this order, and getPreviewWeekdayName's
+// rotation assumes it starts on Monday.
 export const TRAINING_DAY_OPTIONS = [
   "Monday",
   "Tuesday",

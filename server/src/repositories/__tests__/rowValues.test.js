@@ -1,7 +1,7 @@
 /**
- * Pins the JSON-column readers every repository shares. A JSON column can hold
- * anything, so each reader turns whatever is stored into the shape its mapper
- * expects, and anything else into an empty value rather than a crash.
+ * Pins toJsonArray and toJsonObject from rowValues.js: a value of the expected
+ * shape passes through as the same object, and anything else, a JSON-looking
+ * string included, reads as an empty one. Pure, so nothing is stubbed.
  */
 import { describe, expect, test } from "vitest";
 import { toJsonArray, toJsonObject } from "../rowValues.js";
