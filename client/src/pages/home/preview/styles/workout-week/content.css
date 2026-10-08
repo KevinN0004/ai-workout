@@ -3,7 +3,9 @@
    highlights list. Imported last by workout-week.css. */
 
 /* ---- Cell borders -------------------------------------------------------- */
-/* Transparent until the rows show (is-rows-visible), when they take over from the outline. */
+/* Transparent at first. The day headers take .is-visible's border at stage 2; once the rows
+   show (is-rows-visible), every cell takes the fainter border below, which replaces the
+   outline. */
 .preview-week-table th,
 .preview-week-table td {
   border: 1px solid transparent;

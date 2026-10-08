@@ -1,6 +1,6 @@
 ﻿/* PreviewDashboardChapter, the walkthrough's dashboard chapter: its two columns of cards,
    which fade in one stage at a time, and the overview, hub, stats, activity, range pills
-   and trend charts inside them. Imported fourth by layout.css. Its first rules style field
+   and trend charts inside them. Imported fourth by layout.css. Its first rules style
    classes nothing renders. */
 
 /* ---- Unused field rows --------------------------------------------------- */
@@ -208,7 +208,7 @@
   line-height: 1.24;
 }
 
-/* ---- Muted copy ---------------------------------------------------------- */
+/* ---- Card captions ------------------------------------------------------- */
 .preview-dashboard-card .muted {
   margin: 0;
   font-size: var(--preview-body-copy-size);

@@ -3,9 +3,9 @@
    same specificity. styles/base.css lands after every home sheet and still wins its ties. */
 
 /* ---- Medium screens ------------------------------------------------------ */
-/* Its walkthrough rules (.preview-*) change nothing: home/preview/styles/responsive.css
-   repeats each at the same width later in the bundle, with the same or its own values, and
-   the rest style classes nothing renders. */
+/* Its walkthrough rules (.preview-*) change nothing: those on rendered classes are repeated
+   at the same width by home/preview/styles/responsive.css, later in the bundle, with the
+   same or its own values, and .preview-combine-shell is rendered by nothing. */
 @media (max-width: 1180px) {
   .preview-stage-panel {
     width: 100%;
@@ -85,11 +85,11 @@
 }
 
 /* ---- Narrow screens ------------------------------------------------------ */
-/* The walkthrough rules here change nothing, as above. The personal form's one column
-   never applies: in basic mode styles/base.css's .form ties it and loads later, and in
-   advanced mode forms-and-motion.css's two-column rule is more specific, so the fields this
-   block puts in column 1 fill half the form. The .header-top, .header-left and
-   .auth-actions rules match nothing (see core/shell.css). */
+/* The walkthrough rules here change nothing, as above. The personal form's one-column rule
+   never applies: in basic mode styles/base.css's .form ties it and loads later (its auto-fit
+   still drops to one column on the narrowest screens), and in advanced mode
+   forms-and-motion.css's two-column rule is more specific, so the fields this block puts in
+   column 1 fill half the form. .header-top, .header-left and .auth-actions match nothing. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;

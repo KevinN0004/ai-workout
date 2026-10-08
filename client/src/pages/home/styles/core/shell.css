@@ -14,9 +14,9 @@
 }
 
 /* ---- Two-way toggles and their sliding pill ------------------------------ */
-/* The toggle's ::before is a pill that slides under the chosen button when the toggle has
-   pos-1. HomePersonalStage, PreviewPersonalChapter and AuthPage render them; their buttons
-   are styled in forms-and-motion.css. */
+/* The toggle's ::before is the pill behind the chosen button: under the first, and slid
+   under the second when the toggle has pos-1. HomePersonalStage, PreviewPersonalChapter and
+   AuthPage render them; their buttons are styled in forms-and-motion.css. */
 .home-page .segmented,
 .home-page .unit-toggle {
   position: relative;
@@ -121,7 +121,7 @@
   color: #fff;
 }
 
-/* ---- Main content -------------------------------------------------------- */
+/* ---- Page content column ------------------------------------------------- */
 .home-page .content {
   width: 100%;
   max-width: 100%;

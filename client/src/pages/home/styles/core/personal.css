@@ -1,6 +1,7 @@
 /* HomePersonalStage's profile form: the panel, the field grid in basic and advanced mode,
    and the metric fields, whose unit toggle sits in the label row. Imported last by core.css.
-   PreviewPersonalChapter renders the same form, read-only, as .preview-personal-form. */
+   PreviewPersonalChapter renders a read-only copy, always in advanced mode, as
+   .preview-personal-form. */
 
 /* ---- Panel and form grid ------------------------------------------------- */
 .personal-panel {
@@ -37,8 +38,8 @@
 /* ---- The walkthrough's read-only form ------------------------------------ */
 /* PreviewPersonalChapter's copy of the form. home/preview/styles/personal.css and
    form-overrides.css restyle these selectors later in the bundle and win where they differ.
-   What is set only here still applies, except three values later rules override: the label
-   colour (.personal-form label, below), the select colour and the form's top margin. */
+   What is set only here still applies, except where later rules override it: the label and
+   select colours, the top margin, and a selected day's background and border (.active). */
 .preview-personal-form {
   width: min(920px, 100%);
   justify-self: center;

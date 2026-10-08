@@ -1,6 +1,7 @@
 ﻿/* The walkthrough's chapter frame: the chapter column, the contents lane, the chapter card
-   and its one page. Imported third by layout.css. Its !important rules pin the header's
-   position and the lane's geometry, the lane's over responsive.css's narrow-screen values. */
+   and its one page. Imported third by layout.css. Its !important rules pin the header and
+   the lane (over responsive.css's values), keep the chips clickable and the labels'
+   transition, and restate the card's transparent frame in the Generate and collapsed views. */
 
 /* ---- Chapter column ------------------------------------------------------ */
 .preview-layout-frame {

@@ -12,8 +12,9 @@
 
 /* ---- CSS break: the wrapper ---------------------------------------------- */
 /* The animations in this and the next three sections never run (see the last section).
-   Their other declarations still apply at stage 6: the wrapper's overflow and 3D context,
-   each cell's position and border colour, and the table's clip. */
+   Of their other declarations, these still take effect at stage 6: the wrapper's overflow
+   and 3D context, each cell's position, overflow and border colour, and the table's
+   rounded clip. */
 .preview-week-plan.is-breaking-apart .preview-week-table-wrap {
   overflow: visible;
   perspective: 1100px;

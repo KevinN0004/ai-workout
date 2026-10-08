@@ -214,7 +214,8 @@
 }
 
 /* ---- Hidden and active labels -------------------------------------------- */
-/* A label shows only on the active, expanding, hovered or focused chip. */
+/* A label shows only on the active, expanding, hovered or focused chip. The !important also
+   beats animations, so a contracting chip's preview-toc-label-out never shows its fade. */
 .preview-side-tab
   .preview-jump-chip:not(.active):not(.is-expanding):not(:hover):not(:focus-visible)
   .preview-jump-label {

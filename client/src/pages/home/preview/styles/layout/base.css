@@ -12,7 +12,8 @@ html.preview-smooth-scroll {
 /* ---- Root and custom properties ------------------------------------------ */
 /* PreviewStage's inline style (usePreviewDerivedData's previewStageStyle) also sets
    --preview-body-width and --preview-chip-expanded on this element, so those two values here
-   never apply. responsive.css changes the copy size and content height by width. */
+   never apply. responsive.css changes the copy size, content height and header size by
+   width. */
 .preview-stage-panel {
   width: 100%;
   max-width: none;
@@ -101,9 +102,9 @@ html.preview-smooth-scroll {
 }
 
 /* ---- Header and body rows ------------------------------------------------ */
-/* The root's two grid rows. Both keep the contents lane's width free on the left. PreviewStage
-   always sets --preview-body-right-pad (0px on the dashboard chapter), so the body's fallback
-   right padding is never used. */
+/* The root's two grid rows. Both keep the contents lane's width free on the left, down to
+   responsive.css's 720px block. PreviewStage always sets --preview-body-right-pad (0px on
+   the dashboard chapter), so the body's fallback right padding is never used. */
 .preview-view-header-section,
 .preview-view-body-section {
   width: 100%;

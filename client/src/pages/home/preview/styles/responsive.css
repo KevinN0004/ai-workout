@@ -282,7 +282,7 @@
 /* Turns off the walkthrough's transitions and animations, including on the pseudo-elements
    the home page's block (home/styles/forms-and-motion.css) cannot reach: the Generating
    spinner and the week's scan and break. That block already stops every element's motion
-   inside the home page, with !important. Neither reaches the contents chips' labels, whose
+   inside .home-stage, with !important. Neither reaches the contents chips' labels, whose
    !important transition in layout/frame.css wins, nor PreviewStage's opening scroll, which
    asks for smooth scrolling from script. */
 @media (prefers-reduced-motion: reduce) {

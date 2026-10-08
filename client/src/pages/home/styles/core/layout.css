@@ -20,8 +20,8 @@ html.preview-smooth-scroll {
   gap: 24px;
 }
 
-/* The !important background beats the radial gradient App passes each page as an inline
-   style, so /, /auth and /plan are plain black. */
+/* The !important background beats the inline radial gradient App passes HomePage, AuthPage
+   and WorkoutResultPage, so /, /auth and /plan are plain black. */
 .home-page {
   width: 100%;
   max-width: 100%;
@@ -218,9 +218,9 @@ html.preview-smooth-scroll {
 }
 
 /* The walkthrough stage and its panel get no animation, transform, filter or will-change,
-   any of which would make them the containing block of the table of contents' position:
-   fixed. base.css's .panel still gives the panel backdrop-filter: blur(8px), which does the
-   same, so the table of contents scrolls with the panel rather than staying put. */
+   any of which would make them the containing block of the contents lane's position: fixed.
+   styles/base.css's .panel still gives the panel backdrop-filter, which does the same, so
+   the lane scrolls with the panel rather than staying put (see layout/frame.css). */
 .home-stage-preview,
 .home-stage-preview.stage-forward,
 .home-stage-preview.stage-backward,
