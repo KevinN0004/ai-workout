@@ -3,11 +3,8 @@
  * reports whether it matched a user; a route that answers with the updated data
  * then re-reads the user through findUserWithDashboard for the response body.
  */
-import { dateOnlyToDate } from "./rowValues.js";
+import { dateOnlyToDate, toJsonObject } from "./rowValues.js";
 import { getUserPk, userIdWhere } from "./userLookup.js";
-
-const toJsonObject = (value) =>
-  value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 /**
  * Builds the user writers over `prisma`: the profile, goals and password hash,

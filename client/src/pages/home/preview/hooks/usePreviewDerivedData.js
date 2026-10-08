@@ -11,13 +11,8 @@ import {
   PREVIEW_WEEK_DAY_ORDER,
   PREVIEW_WEEK_MIN_WORKOUT_DAYS
 } from "../constants";
-import {
-  normalizePreviewTrainingDay,
-  getRegionFromLocale,
-  clamp,
-  roundTo,
-  getPreviewWeekdayName
-} from "../utils";
+import { normalizePreviewTrainingDay, clamp, roundTo, getPreviewWeekdayName } from "../utils";
+import { getRegionFromLocale } from "../../../../app/units";
 
 // Session names and their exercises, paired by index, handed to the week plan's
 // training days in week order and starting over after the last.

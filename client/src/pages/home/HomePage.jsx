@@ -11,23 +11,12 @@ import useBodyModel from "./hooks/useBodyModel";
 import { APP_BRAND_NAME } from "../../app/constants";
 import useHomeStageFlow from "./hooks/useHomeStageFlow";
 import PreviewStage from "./preview/PreviewStage";
+import { TRAINING_DAY_OPTIONS } from "./preview/constants";
 import HomeIntroStage from "./components/HomeIntroStage";
 import HomePersonalStage from "./components/HomePersonalStage";
 import HomeVisualizerStage from "./components/HomeVisualizerStage";
 import HomeWorkoutStage from "./components/HomeWorkoutStage";
 import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
-
-// The days the personal stage's Training days toggles offer, stored as they
-// are in `personal.trainingDays`.
-const TRAINING_DAY_OPTIONS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday"
-];
 
 // useBodyModel lays out the model's landmarks with these, in view-box units:
 // the view box's height, the same as VIEWBOX_HEIGHT in physique/geometry.js,

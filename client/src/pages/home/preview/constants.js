@@ -1,13 +1,16 @@
 /**
  * Fixed values for the home page's preview walkthrough: the sample profile it
  * falls back on, the day and field lists, and the timings and particle limits
- * it is paced by. Read throughout the walkthrough; HomePage keeps a separate
- * copy of TRAINING_DAY_OPTIONS.
+ * it is paced by. Read throughout the walkthrough, and by HomePage for the
+ * personal stage's training days.
  */
 // The regions for which usePreviewDerivedData types the height in feet and
 // inches and gives the dashboard's target weight in pounds. App's own unit
 // choice reads a private copy of the same set in app/units.js.
 export const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
+// The days the Training days toggles offer. HomePage's personal stage stores
+// the picked ones as they are in `personal.trainingDays`; the walkthrough's
+// personal chapter shows the same toggles, which do nothing there.
 export const TRAINING_DAY_OPTIONS = [
   "Monday",
   "Tuesday",

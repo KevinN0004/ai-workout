@@ -3,7 +3,7 @@
  * dashboard's summary view, filled from usePreviewDerivedData's figures, whose
  * cards appear one stage at a time. Rendered by PreviewStage.
  */
-import { buildPreviewLinePath } from "../utils";
+import { buildLinePath } from "../../../../app/linePath";
 
 /**
  * Lays `previewDashboardSummary` out as the overview, today's picks, weekly
@@ -82,7 +82,7 @@ export default function PreviewDashboardChapter({
       >
         <path
           className={`preview-dashboard-chart-line ${lineClassName}`}
-          d={buildPreviewLinePath(series)}
+          d={buildLinePath(series)}
         />
       </svg>
       <div className="preview-dashboard-chart-labels">
