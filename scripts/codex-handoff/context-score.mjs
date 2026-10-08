@@ -1,5 +1,15 @@
+/**
+ * The confidence score codex-handoff.mjs prints: how much context a Claude ->
+ * Codex handoff carries, judged from the task text, the suggested files, the
+ * uncommitted changes and the recent log.
+ */
 const CRITERIA_WORDS = ["should", "must", "expect", "assert", "given", "when", "then"];
 
+/**
+ * Scores the handoff's context out of 100 and labels it low, medium or high.
+ * Returns `{ score, label, gaps }`, where `gaps` holds a message for each
+ * criterion that scored nothing; codex-handoff.mjs prints them after the score.
+ */
 export function scoreContext({
   taskText = "",
   files = [],
@@ -34,7 +44,7 @@ export function scoreContext({
     gaps.push("no changes detected");
   }
 
-  // Recent log has ≥2 meaningful commits (10 pts)
+  // Recent log has ≥2 lines, one per commit (10 pts)
   const commitCount = recentLog.trim().split("\n").filter(Boolean).length;
   if (commitCount >= 2) {
     score += 10;

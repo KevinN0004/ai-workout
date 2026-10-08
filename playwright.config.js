@@ -1,21 +1,31 @@
+/**
+ * Playwright config for the e2e/ suites, read by `npm run test:e2e` and
+ * `npm run test:e2e:ui`. It starts the API and `vite preview` itself (outside
+ * CI it reuses any already running), and preview serves client/dist, so build
+ * the client first.
+ *
+ * Everything else in this repo tests one side of the wire: the client suite
+ * mocks fetch, the server suite drives express with supertest. Neither sees the
+ * wiring between them -- the CSRF token round trip, the session cookie, the
+ * Vite proxy, or whether a write is actually readable afterwards -- nor what a
+ * browser makes of the rendered pages, which the axe scans and the deployable
+ * checks look at. These suites cover that, and stay small. They run against
+ * the built bundle, not the dev server, so a failure that only appears in the
+ * shipped artifact is in scope.
+ */
 import { defineConfig, devices } from "@playwright/test";
 
-// End-to-end smoke coverage. Everything else in this repo tests one side of the
-// wire: the client suite mocks fetch, the server suite drives express with
-// supertest. Neither sees the wiring between them -- the CSRF token round trip,
-// the session cookie, the Vite proxy, or whether a write is actually readable
-// afterwards. That is the whole point of this suite, so it stays small.
-//
-// It runs against the built bundle via `vite preview`, not the dev server, so a
-// failure that only appears in the shipped artifact is in scope.
-
+// `vite preview`'s origin. The port has to match `preview.port` in
+// client/vite.config.js, which is what actually binds it.
 const PORT = 4173;
 const baseURL = `http://localhost:${PORT}`;
 
 // The express origin. `vite preview` above is the shipped bundle; this is the
 // shipped *server*, which serves that same bundle itself in production. The
-// two differ in every response header, so the deployable project needs its own
-// base URL rather than the proxy's.
+// two do not send the same headers (preview has no helmet), so the deployable
+// project needs its own base URL rather than the proxy's. The port has to
+// match the target of the preview proxy in client/vite.config.js, which is how
+// the chromium project reaches this same server.
 const SERVER_PORT = 5000;
 const serverURL = `http://localhost:${SERVER_PORT}`;
 

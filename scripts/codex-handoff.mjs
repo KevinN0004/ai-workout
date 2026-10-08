@@ -1,3 +1,9 @@
+/**
+ * Claude -> Codex handoff. Claude Code's Stop hook runs it with --hook, from
+ * .claude/settings.json (hence its knip.jsonc entry), to print a JSON
+ * systemMessage: the workflow, why, and how complete the context is. By hand it
+ * also prints the handoff template; --launch runs Codex with it in the prompt.
+ */
 import { execSync, spawn } from "node:child_process";
 import { existsSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -226,7 +232,7 @@ function main() {
     const codexJsUnix = codexJs.replace(/\\/g, "/");
 
     // bash still performs the stdin redirect — see the note above about Windows
-    // piping — but nothing is interpolated into the command string any more.
+    // piping — but nothing is interpolated into the command string.
     // Values arrive as positional parameters ($0 is the script name, $1 and $2
     // the paths, $3 onward the mode flags), so an --approval-mode override
     // containing shell metacharacters is data rather than code.

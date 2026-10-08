@@ -1,11 +1,1 @@
-[
-  "eslint.config.js",
-  "playwright.config.js",
-  "scripts/codex-handoff.mjs",
-  "scripts/codex-handoff/context-score.mjs",
-  "scripts/codex-handoff/file-suggest.mjs",
-  "scripts/codex-handoff/workflow-select.mjs",
-  "scripts/scrub-junk-files.cjs",
-  "scripts/skill-router.mjs",
-  "vitest.config.js"
-]
+[]

@@ -1,3 +1,9 @@
+/**
+ * ESLint flat config for every JavaScript file bar the ignores below, read by
+ * `npm run lint` and `npm run lint:fix`. Its rules target defect classes, not
+ * style: formatting is Prettier's, so eslint-config-prettier turns off the
+ * rules that would fight it (the last block turns one defect rule back on).
+ */
 import js from "@eslint/js";
 import globals from "globals";
 import react from "eslint-plugin-react";
@@ -9,8 +15,9 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 // Extensions import-x/no-unresolved must try before it reports a miss. The
 // client is why they are needed: it imports .jsx without an extension, which
 // Vite resolves and the default node resolver does not -- without this the rule
-// emits 53 false positives there. The server has no extensionless imports, but
-// both blocks share the setting so the two cannot drift apart.
+// emits 53 false positives there. The server needs none of it (its one
+// extensionless import, in a test, names a .js file, which the default resolver
+// finds), but both blocks share the setting so the two cannot drift apart.
 const importResolverSettings = {
   "import-x/resolver": { node: { extensions: [".js", ".jsx", ".json"] } }
 };
@@ -31,7 +38,7 @@ const importResolverSettings = {
 // reason. Their 20 findings are all one pattern: an overlay backdrop whose
 // onClick dismisses it, plus the inner panel's stopPropagation. Keyboard
 // dismissal for every one of those overlays is handled centrally by
-// `useCloseOnEscape` -- ModalPortal calls it for all six modals and
+// `useCloseOnEscape` -- ModalPortal calls it for every modal and
 // DashboardDrawer calls it directly -- so the backdrop click is a redundant
 // mouse affordance rather than the only way out. The rules cannot see that,
 // because it lives in a hook rather than on the element.
@@ -66,13 +73,6 @@ const importRules = {
   "import-x/no-duplicates": "error"
 };
 
-/**
- * Flat config covering both workspaces. The repo had no linter before this, so
- * the rule set is deliberately scoped to defect classes rather than style:
- * unused/undeclared identifiers, unreachable code, and React Hook contract
- * violations. Formatting is left alone -- there is no Prettier here and
- * reflowing 27k lines would bury real findings.
- */
 export default [
   {
     ignores: [
@@ -162,7 +162,8 @@ export default [
   // ---- Server: node globals, ESM ----------------------------------------
   // "server/**" reaches server/scripts/ too, so no-console covers those CLIs.
   // Root scripts/** is deliberately left out of it: that tree is repo tooling
-  // whose job is to print, and enabling the rule there flags 13 valid calls.
+  // whose job is to print, and enabling the rule there flags every console call
+  // it makes.
   {
     files: ["server/**/*.js"],
     languageOptions: {
@@ -195,7 +196,7 @@ export default [
     }
   },
 
-  // ---- Root tooling scripts: CommonJS + node ----------------------------
+  // ---- Root tooling scripts: node globals, CommonJS only in .cjs ------------
   {
     files: ["scripts/**/*.{js,mjs,cjs}"],
     languageOptions: {
@@ -220,9 +221,10 @@ export default [
 
   prettierCompat,
 
-  // eslint-config-prettier disables this because Prettier's output makes it
-  // unreachable. Keep it on regardless: it is a defect rule (ASI hazards) out of
-  // js.configs.recommended, not a style rule, and it still guards code Prettier
-  // does not reach.
+  // eslint-config-prettier disables this because some of Prettier's line
+  // breaks can trip it. Keep it on regardless: it is a defect rule (ASI
+  // hazards) out of js.configs.recommended, not a style rule. Prettier's
+  // rewrite of a hazard usually leaves it nothing to report, so it earns its
+  // place on code that has not been through Prettier yet.
   { rules: { "no-unexpected-multiline": "error" } }
 ];

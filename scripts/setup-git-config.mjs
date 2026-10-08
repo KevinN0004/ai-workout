@@ -3,11 +3,12 @@
  * Applies the two repository git settings that live in .git/config rather than
  * in the repository, so a fresh clone gets them without anyone remembering to.
  *
- * Both used to be documented steps in CLAUDE.md, which meant a clone silently
- * ran without the pre-commit guard and attributed ~3,500 lines to the Prettier
- * reformat until someone noticed. Neither failure announces itself, which is
- * exactly why this runs from `prepare` instead: npm invokes it on every
- * `npm install` and `npm ci`, and installing is already step one of setup.
+ * Without them a clone runs without the pre-commit guard, and `git blame`
+ * credits the lines the Prettier reformat last touched to that commit. Neither
+ * failure announces itself, so a setup step that relies on being remembered is
+ * not enough. This runs from the root package's `prepare` script instead, which
+ * npm runs on a plain `npm install` and on `npm ci`, and installing is already
+ * step one of setup.
  *
  * Fails open. A missing git binary, a tarball with no .git, or a checkout where
  * the target file is absent are all normal situations, not errors worth
