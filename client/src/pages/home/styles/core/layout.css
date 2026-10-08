@@ -219,8 +219,8 @@ html.preview-smooth-scroll {
 
 /* The walkthrough stage and its panel get no animation, transform, filter or will-change,
    any of which would make them the containing block of the contents lane's position: fixed.
-   styles/base.css's .panel still gives the panel backdrop-filter, which does the same, so
-   the lane scrolls with the panel rather than staying put (see layout/frame.css). */
+   styles/base.css's .panel still gives the panel backdrop-filter, which does the same, so the
+   lane scrolls with the panel (see home/preview/styles/layout/frame.css). */
 .home-stage-preview,
 .home-stage-preview.stage-forward,
 .home-stage-preview.stage-backward,

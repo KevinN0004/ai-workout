@@ -280,8 +280,9 @@
 
 /* ---- Reduced motion ------------------------------------------------------ */
 /* Turns off the walkthrough's transitions and animations, including on the pseudo-elements
-   the home page's block (home/styles/forms-and-motion.css) cannot reach: the Generating
-   spinner and the week's scan and break. That block already stops every element's motion
+   home/styles/forms-and-motion.css cannot reach: the Generating spinner and the week's scan.
+   (Its break rules change nothing: break-apart.css switches the CSS break off, and the
+   anime.js break skips itself under reduced motion.) That block stops every element's motion
    inside .home-stage, with !important. Neither reaches the contents chips' labels, whose
    !important transition in layout/frame.css wins, nor PreviewStage's opening scroll, which
    asks for smooth scrolling from script. */

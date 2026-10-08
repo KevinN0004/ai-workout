@@ -301,7 +301,7 @@
 /* Turns off CSS animations and transitions on .home-stage and every element in it, which
    covers each stage and the walkthrough, and smooth scrolling. * selects no pseudo-elements,
    so the mode and unit toggles' pills (::before, core/shell.css) keep their transition;
-   home/preview/styles/responsive.css stops the walkthrough's spinner, scan and break. The chips'
+   home/preview/styles/responsive.css stops the walkthrough's spinner and scan. The chips'
    labels keep the more specific !important transition home/preview/styles/layout/frame.css
    gives them. Outside .home-stage the nav's Preview button keeps its hover transition, and
    /auth and /plan render no .home-stage at all. Motion driven from script is out of reach:
