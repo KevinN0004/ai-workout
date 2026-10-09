@@ -24,14 +24,12 @@
 }
 
 /* ---- Log rows ------------------------------------------------------------ */
-.workouts-view .log-list,
-.workouts-view .workout-list {
+.workouts-view .log-list {
   display: grid;
   gap: 10px;
 }
 
-.workouts-view .log-list-row,
-.workouts-view .workout-list-row {
+.workouts-view .log-list-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -54,14 +52,12 @@
   overflow-wrap: anywhere;
 }
 
-.workouts-view .log-list-row,
-.workouts-view .workout-list-row {
+.workouts-view .log-list-row {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.workouts-view .log-list-row > span,
-.workouts-view .workout-list-row > span {
+.workouts-view .log-list-row > span {
   flex-shrink: 0;
 }
 
@@ -79,14 +75,12 @@
     padding: 12px;
   }
 
-  .workouts-view .log-list-row,
-  .workouts-view .workout-list-row {
+  .workouts-view .log-list-row {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .workouts-view .log-list-row > span,
-  .workouts-view .workout-list-row > span {
+  .workouts-view .log-list-row > span {
     white-space: normal;
   }
 }

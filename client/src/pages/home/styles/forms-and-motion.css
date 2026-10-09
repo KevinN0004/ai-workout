@@ -318,27 +318,6 @@
   }
 }
 
-/* ---- Unused metric pills ------------------------------------------------- */
-/* Nothing renders .metric-list or .metric-pill. */
-.metric-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.metric-pill {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 12px;
-  display: grid;
-  gap: 4px;
-}
-
-.metric-pill strong {
-  font-size: 1rem;
-}
-
 /* ---- Physique stage ------------------------------------------------------ */
 /* HomeVisualizerStage's panel and the square the silhouette is drawn in, sized from the
    viewport by --visual-stage-size, which responsive.css resizes. */
