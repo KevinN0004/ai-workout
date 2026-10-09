@@ -54,7 +54,7 @@ these; nothing else touches `prisma.*` directly.
 | `generatedPlanRepository.js`       | Generated plan inserts                                       |
 | `dashboardCollectionRepository.js` | Paginated reads for all three collections                    |
 | `userLookup.js`                    | UUID-or-legacy user id resolution — load-bearing             |
-| `rowValues.js`                     | Shared date and Decimal conversions                          |
+| `rowValues.js`                     | Shared date, Decimal and JSON conversions                    |
 
 Two conventions worth knowing before adding a write:
 
@@ -320,8 +320,8 @@ patch.
 ## Testing Notes
 
 Server tests run against a real Postgres — there are no database mocks. Start one first,
-or 107 of the 1083 tests fail (and 27 skip) with `Can't reach database server` — measured
-2026-09-28, and environmental, not a regression:
+or the suite fails with `Can't reach database server`, which is environmental, not a
+regression:
 
 ```bash
 npm run postgres:local:start -w server

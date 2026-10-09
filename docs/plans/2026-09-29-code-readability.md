@@ -102,7 +102,7 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
 
 12. **A stylesheet import's position is load-bearing.** Found in Task 6. The built CSS follows import order, so moving a page's `import "./Page.css"` below a local module that brings in its own stylesheet puts that module's rules ahead of the page's, and the cascade changes. In `HomePage.jsx`, moving `./HomePage.css` last reordered 481 of the 899 top-level rules in the main CSS file, because `PreviewStage.css` then landed ahead of it. No gate notices: the E2E suite is a smoke test, and nothing compares the CSS.
 
-    So an import-order tidy that moves a stylesheet is proven by building before and after and comparing the CSS files rule by rule. If the order changes, the import stays where it is, with a comment saying why. That is why Task 6 ends at 9 import-order breaks rather than 0: the scanner ranks a stylesheet after local modules, and `HomePage.css` has to stay ahead of `PreviewStage`.
+    So an import-order tidy that moves a stylesheet is proven by building before and after and comparing the CSS files rule by rule. If the order changes, the import stays where it is, with a comment saying why. That is why Task 6 ends at 9 import-order breaks rather than 0 (10 after PR 10 added an import below it, measured 2026-10-09): the scanner ranks a stylesheet after local modules, and `HomePage.css` has to stay ahead of `PreviewStage`.
 
 13. **The built bundle, not the source, decides which copy of a rule wins.** Found in Tasks 8 and 9. Three things the source order does not show:
 
@@ -3084,6 +3084,8 @@ console.log(
 
 - [ ] **Step 3: Write `$TOOLS/capture.mjs`**
 
+Findings §14 found that this listing does not pause the clock; Task 13, Step 1 has the fixed tool.
+
 ```js
 /**
  * Full-page screenshots of the home page's stages and the preview walkthrough's
@@ -3358,6 +3360,440 @@ Push and open the PR, with the classes removed and the lines removed per file, t
 - **Each capture checks what it shows.** Before each screenshot, assert from the DOM which chapter is active, and fail if it is not the one the file is named for.
 - **Each capture also dumps computed styles.** Write `getComputedStyle` for every element and its `::before` and `::after`, every property, into a JSON file beside the PNG.
 
+This is the fixed tool PR 12 used, saved as `$TOOLS/capture.mjs`:
+
+<!-- prettier-ignore -->
+```js
+/**
+ * Full-page screenshots, and a computed-style dump of every element, of the home
+ * page's stages and the preview walkthrough's four chapters, at a desktop and a
+ * phone viewport, for the CSS PRs (11, 12) of
+ * docs/plans/2026-09-29-code-readability.md. Serves the already-built bundle
+ * (client/dist) with Vite's preview server, so run `npm -w client run build`
+ * first. `compare` mode says whether two runs match, pixels and styles both.
+ *
+ * Fixed for PR 12 (Findings §14): the page clock is paused (pauseAt) and moved
+ * only by runFor; Personal Info is reached with motion not reduced, because
+ * reduced motion skips it; before each capture the DOM is checked for the
+ * chapter the file is named for; and each capture writes
+ * <name>.styles.json.gz, getComputedStyle for every element and its ::before
+ * and ::after, every property.
+ *
+ * Usage: node capture.mjs <repoRoot> <outDir>
+ *        node capture.mjs compare <dirA> <dirB>
+ */
+import { createRequire } from "node:module";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { gunzipSync, gzipSync } from "node:zlib";
+
+// ---- Style dumps: encoding and comparing ------------------------------------
+// A dump stores, per property, its most common value across all entries, and
+// per entry only the values that differ from it. decodeDump rebuilds every
+// entry's full property map, so the encoding loses nothing.
+const decodeDump = (file) => {
+  const dump = JSON.parse(gunzipSync(readFileSync(file)).toString("utf8"));
+  const entries = new Map();
+  for (const [key, label, diffs] of dump.entries) {
+    const values = {};
+    dump.props.forEach((prop, i) => {
+      values[prop] = Object.hasOwn(diffs, i) ? diffs[i] : dump.modes[i];
+    });
+    entries.set(key, { label, values });
+  }
+  return { meta: dump.meta, props: dump.props, entries };
+};
+
+const compareDumps = (fileA, fileB) => {
+  const a = decodeDump(fileA);
+  const b = decodeDump(fileB);
+  const keys = [...new Set([...a.entries.keys(), ...b.entries.keys()])];
+  const props = [...new Set([...a.props, ...b.props])];
+  let first = null;
+  const sample = [];
+  let entriesDiffering = 0;
+  let valuesDiffering = 0;
+  // The page's URL, scroll position and element count are part of the state too.
+  if (JSON.stringify(a.meta) !== JSON.stringify(b.meta)) {
+    first = `meta: ${JSON.stringify(a.meta)} -> ${JSON.stringify(b.meta)}`;
+    sample.push(first);
+    entriesDiffering += 1;
+  }
+  for (const key of keys) {
+    const ea = a.entries.get(key);
+    const eb = b.entries.get(key);
+    if (!ea || !eb) {
+      entriesDiffering += 1;
+      first ??= `${key} (${(ea || eb).label}) only in ${ea ? "A" : "B"}`;
+      continue;
+    }
+    let differs = false;
+    for (const prop of props) {
+      const va = ea.values[prop] ?? "(absent)";
+      const vb = eb.values[prop] ?? "(absent)";
+      if (va === vb) continue;
+      differs = true;
+      valuesDiffering += 1;
+      const line = `${key} (${ea.label}) ${prop}: ${JSON.stringify(va)} -> ${JSON.stringify(vb)}`;
+      first ??= line;
+      if (sample.length < 12) sample.push(line);
+    }
+    if (differs) entriesDiffering += 1;
+  }
+  return {
+    first,
+    sample,
+    entriesDiffering,
+    valuesDiffering,
+    entries: keys.length,
+    props: props.length
+  };
+};
+
+if (process.argv[2] === "compare") {
+  const [dirA, dirB] = process.argv.slice(3);
+  const names = [...new Set([...readdirSync(dirA), ...readdirSync(dirB)])].sort();
+  const shots = names.filter((n) => n.endsWith(".png"));
+  const dumps = names.filter((n) => n.endsWith(".styles.json.gz"));
+  const shotsDiffer = shots.filter((n) => {
+    try {
+      return !readFileSync(path.join(dirA, n)).equals(readFileSync(path.join(dirB, n)));
+    } catch {
+      return true;
+    }
+  });
+  const dumpsDiffer = [];
+  for (const n of dumps) {
+    let result;
+    try {
+      result = compareDumps(path.join(dirA, n), path.join(dirB, n));
+    } catch (error) {
+      dumpsDiffer.push(`${n}: ${error.message}`);
+      continue;
+    }
+    if (result.first)
+      dumpsDiffer.push(
+        `${n}: ${result.entriesDiffering} of ${result.entries} entries, ${result.valuesDiffering} values; first: ${result.first}` +
+          (process.env.CAPTURE_VERBOSE ? `\n      ${result.sample.join("\n      ")}` : "")
+      );
+  }
+  console.log(
+    shotsDiffer.length
+      ? `screenshots DIFFER: ${shotsDiffer.join(", ")}`
+      : `identical: ${shots.length} screenshots`
+  );
+  console.log(
+    dumpsDiffer.length
+      ? `style dumps DIFFER:\n  ${dumpsDiffer.join("\n  ")}`
+      : `identical: ${dumps.length} style dumps`
+  );
+  process.exit(shotsDiffer.length || dumpsDiffer.length ? 1 : 0);
+}
+
+// ---- Capture ----------------------------------------------------------------
+const [repoRoot = "D:/ai-workout", outDir = "shots"] = process.argv.slice(2);
+const require = createRequire(path.join(repoRoot, "client", "package.json"));
+const { preview } = await import(pathToFileURL(require.resolve("vite")).href);
+const { chromium } = createRequire(path.join(repoRoot, "package.json"))("@playwright/test");
+
+const PORT = 4174; // not 4173, so it cannot collide with a preview left running for E2E
+// CAPTURE_WIDTHS="1180,1000" swaps the two standard viewports for others, at
+// 900px tall, for a supplementary check between the breakpoints.
+const VIEWPORTS = process.env.CAPTURE_WIDTHS
+  ? Object.fromEntries(
+      process.env.CAPTURE_WIDTHS.split(",").map((w) => [`w${w}`, { width: Number(w), height: 900 }])
+    )
+  : { desktop: { width: 1440, height: 900 }, phone: { width: 390, height: 844 } };
+const START = new Date("2026-09-29T12:00:00Z");
+
+// Waits poll from Node on real time. Playwright's own waitForFunction and
+// locator.waitFor re-check on animation frames, which the paused clock also
+// stops, so a condition not already true at the first check would never be
+// checked again. Real time passing does not move the paused page clock.
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const waitUntil = async (page, predicate, arg, label) => {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (await page.evaluate(predicate, arg)) return;
+    await sleep(50);
+  }
+  throw new Error(`timed out waiting for ${label}`);
+};
+// Moves the page clock in small steps, letting React render between them, so
+// effects that schedule new timers do so at the fake time they would in use.
+const advance = async (page, totalMs, stepMs = 50) => {
+  for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) {
+    await page.clock.runFor(Math.min(stepMs, totalMs - elapsed));
+    await sleep(25);
+  }
+};
+const hasText = (text) => document.body.innerText.includes(text);
+const selectedTab = () =>
+  document.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim() ?? null;
+
+// Each check runs in the page just before the dump and the screenshot, and
+// returns null when the page shows what the capture is named for, or what it
+// shows instead.
+const tocSettled = () => !document.querySelector(".preview-jump-chip.is-expanding, .preview-jump-chip.is-contracting");
+const STATES = [
+  {
+    name: "intro",
+    motion: "reduce",
+    reach: async (page) => waitUntil(page, hasText, "Get Started", "the intro"),
+    check: () =>
+      document.querySelector(".home-intro-panel") &&
+      !document.querySelector(
+        ".home-stage-preview, .home-stage-personal, .home-stage-visualizer, .home-stage-workout"
+      )
+        ? null
+        : "not the intro"
+  },
+  {
+    name: "personal",
+    motion: "reduce",
+    reach: async (page) => {
+      await page.getByRole("button", { name: "Get Started" }).click();
+      await advance(page, 3000);
+      await waitUntil(page, hasText, "Full name", "the personal form");
+    },
+    check: () =>
+      document.querySelector(".home-stage.home-stage-personal .personal-form") &&
+      !document.querySelector(".home-stage-preview")
+        ? null
+        : "not the personal stage"
+  },
+  {
+    // Reduced motion moves Personal Info straight on to Generate, so this one
+    // plays with motion: 4500 ms after opening, the last field (notes) has
+    // finished typing and the training days are lit, and the form collapses
+    // between 4700 and 4800 ms.
+    name: "preview-personal-info",
+    motion: "no-preference",
+    reach: async (page) => {
+      await page.getByRole("button", { name: "Preview" }).click();
+      await advance(page, 4500);
+    },
+    check: () => {
+      const tab = document.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim();
+      if (tab !== "Personal Info") return `selected tab is ${tab}`;
+      const sequence = document.querySelector(".preview-personal-sequence");
+      const shell = document.querySelector(".preview-personal-form-shell");
+      if (!sequence || sequence.classList.contains("is-generate-view")) return "generate view";
+      if (!shell || shell.classList.contains("is-collapsed")) return "form collapsed";
+      // The sample profile (JOHN_DOE_PREVIEW_PROFILE, preview/constants.js) trains four days.
+      const lit = document.querySelectorAll(".preview-personal-form .day-toggle-btn.active").length;
+      if (lit !== 4) return `${lit} training days lit`;
+      const notes = document.querySelector('.preview-personal-form textarea[name="notes"]');
+      if (notes?.value !== "Minor left-knee sensitivity during deep squats.")
+        return `notes still typing: ${JSON.stringify(notes?.value)}`;
+      return null;
+    }
+  },
+  // [name, tab, a selector that must match, one that must not]. Each pins the
+  // stage reduced motion lands on: the builder's last stage, the week at stage
+  // 4 with its typing done and no scan, and the dashboard with every card shown.
+  ...[
+    ["preview-generate", "Generate", ".preview-personal-sequence.is-generate-view.builder-stage-6", null],
+    [
+      "preview-result",
+      "Result",
+      ".preview-week-plan.is-outline-active.is-headers-visible.is-rows-visible",
+      ".preview-week-plan.is-typing, .preview-week-plan.is-scan-once"
+    ],
+    [
+      "preview-dashboard",
+      "Dashboard",
+      ".preview-dashboard-view .preview-dashboard-card.is-visible",
+      ".preview-dashboard-view .preview-dashboard-card:not(.is-visible)"
+    ]
+  ].map(([name, tab, marker, absent]) => ({
+    name,
+    motion: "reduce",
+    // Under reduced motion each chapter shows its end state at once. Generate
+    // moves on to the week PREVIEW_GENERATING_HOLD_MS after it opens, which
+    // the paused clock never reaches.
+    reach: async (page) => {
+      await page.getByRole("button", { name: "Preview" }).click();
+      await advance(page, 1000);
+      await page.getByRole("tab", { name: tab }).click();
+      await waitUntil(page, (name) => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim() === name, tab, `the ${tab} chapter`);
+      // The contents chips' switch (PREVIEW_TOC_SWITCH_MS) finishes.
+      await advance(page, 800);
+    },
+    check: ([expectedTab, expectedMarker, absentMarker]) => {
+      const selected = document.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim();
+      if (selected !== expectedTab) return `selected tab is ${selected}`;
+      if (!document.querySelector(expectedMarker)) return `no ${expectedMarker}`;
+      if (absentMarker && document.querySelector(absentMarker)) return `found ${absentMarker}`;
+      return null;
+    },
+    checkArg: [tab, marker, absent]
+  }))
+];
+
+// Finishes every finite animation and cancels every infinite one, as the
+// screenshot's animations: "disabled" does, so the dump records the frame the
+// screenshot shows rather than a point part-way through a real-time transition.
+const settleAnimations = () => {
+  for (const animation of document.getAnimations()) {
+    if (!animation.effect || animation.playbackRate === 0) continue;
+    const { endTime } = animation.effect.getComputedTiming();
+    try {
+      if (Number.isFinite(endTime)) animation.finish();
+      else animation.cancel();
+    } catch {
+      // An animation that cannot finish is left as it is, as Playwright does.
+    }
+  }
+};
+
+// getComputedStyle for every element, ::before and ::after, every property:
+// the standard ones Chromium enumerates, plus every custom property any
+// stylesheet or inline style declares.
+const dumpStyles = () => {
+  const customs = new Set();
+  const addCustoms = (style) => {
+    for (let i = 0; i < style.length; i += 1) if (style[i].startsWith("--")) customs.add(style[i]);
+  };
+  const walkRules = (rules) => {
+    for (const rule of rules) {
+      if (rule.style) addCustoms(rule.style);
+      if (rule.cssRules) walkRules(rule.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) walkRules(sheet.cssRules);
+  const elements = [document.documentElement, ...document.documentElement.querySelectorAll("*")];
+  for (const el of elements) if (el.style) addCustoms(el.style);
+  const rootStyle = getComputedStyle(document.documentElement);
+  const standard = [];
+  for (let i = 0; i < rootStyle.length; i += 1)
+    if (!rootStyle[i].startsWith("--")) standard.push(rootStyle[i]);
+  const props = [...standard.sort(), ...[...customs].sort()];
+
+  const paths = new Map();
+  const pathOf = (el) => {
+    if (paths.has(el)) return paths.get(el);
+    const parent = el.parentElement;
+    let index = 1;
+    for (let sib = el.previousElementSibling; sib; sib = sib.previousElementSibling)
+      if (sib.tagName === el.tagName) index += 1;
+    const own = `${el.tagName.toLowerCase()}[${index}]`;
+    const result = parent ? `${pathOf(parent)}/${own}` : own;
+    paths.set(el, result);
+    return result;
+  };
+
+  const rows = [];
+  for (const el of elements) {
+    const cls = typeof el.className === "string" ? el.className.trim().replace(/\s+/g, ".") : "";
+    const label = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}${cls ? `.${cls}` : ""}`;
+    for (const pseudo of [null, "::before", "::after"]) {
+      const cs = getComputedStyle(el, pseudo);
+      rows.push([`${pathOf(el)}${pseudo ?? ""}`, label, props.map((p) => cs.getPropertyValue(p))]);
+    }
+  }
+  const modes = props.map((_, i) => {
+    const counts = new Map();
+    let best = "";
+    let bestCount = -1;
+    for (const row of rows) {
+      const v = row[2][i];
+      const c = (counts.get(v) || 0) + 1;
+      counts.set(v, c);
+      if (c > bestCount) {
+        best = v;
+        bestCount = c;
+      }
+    }
+    return best;
+  });
+  const entries = rows.map(([key, label, values]) => {
+    const diffs = {};
+    values.forEach((v, i) => {
+      if (v !== modes[i]) diffs[i] = v;
+    });
+    return [key, label, diffs];
+  });
+  return {
+    meta: { url: location.href, scrollX, scrollY, elements: elements.length },
+    props,
+    modes,
+    entries
+  };
+};
+
+mkdirSync(outDir, { recursive: true });
+const server = await preview({
+  root: path.join(repoRoot, "client"),
+  preview: { port: PORT, strictPort: true },
+  logLevel: "error"
+});
+const browser = await chromium.launch();
+try {
+  for (const [viewportName, viewport] of Object.entries(VIEWPORTS)) {
+    const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    // The typing animation draws a random delay per character; pin it, as the
+    // unit tests do with vi.spyOn(Math, "random").
+    await context.addInitScript(() => {
+      Math.random = () => 0.5;
+    });
+    for (const state of STATES) {
+      const name = `${viewportName}-${state.name}`;
+      const page = await context.newPage();
+      await page.emulateMedia({ reducedMotion: state.motion });
+      // Installed and paused before the page loads, so every run starts at
+      // the same instant and only runFor moves the clock after that.
+      await page.clock.install({ time: START });
+      await page.clock.pauseAt(new Date(START.getTime() + 1000));
+      await page.goto(`http://localhost:${PORT}/`);
+      await advance(page, 500);
+      await state.reach(page);
+      await page.evaluate(() => document.fonts.ready);
+      // Real time only: images decode and any smooth scroll ends. The page
+      // clock stays where it is.
+      let lastScroll = null;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await sleep(100);
+        const scroll = await page.evaluate(() => `${scrollX},${scrollY}`);
+        if (scroll === lastScroll && attempt >= 5) break;
+        lastScroll = scroll;
+      }
+      const mismatch = await page.evaluate(state.check, state.checkArg ?? null);
+      if (mismatch) throw new Error(`${name}: the page does not show ${state.name}: ${mismatch}`);
+      if (!(await page.evaluate(tocSettled)))
+        throw new Error(`${name}: the contents chips are still switching`);
+      await page.evaluate(settleAnimations);
+      const dump = await page.evaluate(dumpStyles);
+      writeFileSync(path.join(outDir, `${name}.styles.json.gz`), gzipSync(JSON.stringify(dump)));
+      const recheck = await page.evaluate(state.check, state.checkArg ?? null);
+      if (recheck) throw new Error(`${name}: changed during the dump: ${recheck}`);
+      await page.screenshot({
+        path: path.join(outDir, `${name}.png`),
+        fullPage: true,
+        animations: "disabled",
+        caret: "hide"
+      });
+      // The DOM as captured, so a selector can be tested against it later
+      // (element.matches) without replaying the walkthrough.
+      writeFileSync(
+        path.join(outDir, `${name}.dom.html`),
+        await page.evaluate(() => document.documentElement.outerHTML)
+      );
+      const now = await page.evaluate(() => Date.now() - Date.parse("2026-09-29T12:00:00Z"));
+      const tab = await page.evaluate(selectedTab);
+      await page.close();
+      console.log(
+        `captured ${name} (clock +${now} ms, tab ${tab}, ${dump.meta.elements} elements, ${dump.props.length} properties, scroll ${dump.meta.scrollX},${dump.meta.scrollY})`
+      );
+    }
+    await context.close();
+  }
+} finally {
+  await browser.close();
+  await new Promise((resolve) => server.httpServer.close(resolve));
+}
+```
+
 Then prove the fixed tool as Task 12 did: two runs are identical, and the control (an outline on `.preview-stage-kicker`) changes exactly the captures that show it, including the Personal Info ones. Add a `compare` mode for the style dumps that reports the first differing element and property.
 
 ```bash
@@ -3519,18 +3955,18 @@ Expected: every gate `exit=0`, and `19 passed`. Push and open the PR, with the S
 
 ## Self-review against the spec
 
-| Spec requirement                                               | Where                                                       |
-| -------------------------------------------------------------- | ----------------------------------------------------------- |
-| The SOP document                                               | Written on `chore/readability-sop`; indexed in Task 1       |
-| Header ratchet, three assertions, shrink-only, mutation-proven | Task 1, Steps 3–7 (a fourth test guards the scope)          |
-| PR-template checkbox                                           | Task 1, Step 8                                              |
-| `CLAUDE.md` pointer and the `index.js` length                  | Task 1, Step 10                                             |
-| Comments commit proven by bundle or syntax tree                | Tasks 2–10, the "Prove the comments changed no code" steps  |
-| Tidy commit proven by the full gates                           | Tasks 5–7, the "Tidy" steps                                 |
-| Per-PR before/after numbers                                    | `pr_scan N before` and `pr_scan N after` in every area task |
-| `index.js` banners with no statement moved                     | Task 2, Step 3                                              |
-| The eight repository headers                                   | Task 3, Step 3 (nine, with `rowValues.js`)                  |
-| CSS headers and banners only, no rule moved                    | Tasks 8 and 9                                               |
-| PR 10 helpers, each pair re-read                               | Task 11, with the pairs left alone listed and why           |
-| PR 11 dead CSS with screenshots, E2E and axe                   | Task 12                                                     |
-| PR 12 merge in today's cascade order, pixel-identical          | Task 13                                                     |
+| Spec requirement                                                             | Where                                                       |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| The SOP document                                                             | Written on `chore/readability-sop`; indexed in Task 1       |
+| Header ratchet, five tests plus a 20-row table, shrink-only, mutation-proven | Task 1, Steps 3–7 (one of the five tests guards the scope)  |
+| PR-template checkbox                                                         | Task 1, Step 8                                              |
+| `CLAUDE.md` pointer and the `index.js` length                                | Task 1, Step 10                                             |
+| Comments commit proven by bundle or syntax tree                              | Tasks 2–10, the "Prove the comments changed no code" steps  |
+| Tidy commit proven by the full gates                                         | Tasks 5–7, the "Tidy" steps                                 |
+| Per-PR before/after numbers                                                  | `pr_scan N before` and `pr_scan N after` in every area task |
+| `index.js` banners with no statement moved                                   | Task 2, Step 3                                              |
+| The eight repository headers                                                 | Task 3, Step 3 (nine, with `rowValues.js`)                  |
+| CSS headers and banners only, no rule moved                                  | Tasks 8 and 9                                               |
+| PR 10 helpers, each pair re-read                                             | Task 11, with the pairs left alone listed and why           |
+| PR 11 dead CSS with screenshots, E2E and axe                                 | Task 12                                                     |
+| PR 12 merge in today's cascade order, pixel-identical                        | Task 13                                                     |
