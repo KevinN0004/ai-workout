@@ -36,16 +36,11 @@
 }
 
 /* ---- The walkthrough's read-only form ------------------------------------ */
-/* PreviewPersonalChapter's copy of the form is styled in home/preview/styles/, except for
-   these two rules, which stay here because their place in the cascade is what they do. The
-   label colour never applies: .personal-form label below ties it and comes later. The day
-   buttons' colours apply to the days not selected; forms-and-motion.css's
-   .day-toggle-btn.active ties them and comes later, so a selected day is white. In
-   home/preview/styles/ both would come after those rules and win. */
-.preview-personal-form label {
-  color: rgba(255, 255, 255, 0.92);
-}
-
+/* PreviewPersonalChapter's copy of the form is styled in home/preview/styles/, except for its
+   day buttons' colours, which stay here because their place in the cascade is what they do.
+   They apply to the days not selected: forms-and-motion.css's .day-toggle-btn.active ties
+   this rule and comes later, so a selected day is white. In home/preview/styles/ this rule
+   would come after that one and win. */
 .preview-personal-form .day-toggle-btn {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);

@@ -1,7 +1,7 @@
 /* The walkthrough form's overrides: no transitions or pointer events on its controls, a card
    behind it outside the Generate chapter, its fields' box and colours, and the copy size of
    most of the walkthrough's text. Imported fourth by PreviewStage.css, after personal.css, so
-   these win its ties and home/styles/core/personal.css's. */
+   these win its ties and the home sheets' (core/shell.css's .home-page .height-unit, for one). */
 
 /* ---- Controls without motion or pointer events --------------------------- */
 .preview-personal-form input,

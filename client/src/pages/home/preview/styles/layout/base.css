@@ -3,8 +3,8 @@
    Imported first by layout.css. */
 
 /* ---- Walkthrough scrolling ----------------------------------------------- */
-/* PreviewStage puts this class on <html> while it is mounted. The reduced-motion blocks in
-   responsive.css and home/styles/forms-and-motion.css turn the smooth scrolling off. */
+/* PreviewStage puts this class on <html> while it is mounted. responsive.css's reduced-motion
+   block turns the smooth scrolling off. */
 html.preview-smooth-scroll {
   scroll-behavior: smooth;
   scroll-padding-top: clamp(130px, 18vh, 182px);
