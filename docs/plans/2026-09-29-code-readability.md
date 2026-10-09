@@ -112,6 +112,10 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
 
     The PR bodies of #187 and #188 record the CSS bugs that come from this, such as a rule that loses a tie it was written to win. None is fixed by this plan.
 
+14. **The capture tool does not freeze the clock, so it never photographs Personal Info.** Found in Task 12, and confirmed from Playwright's own types. `page.clock.install` leaves time running: timers fire and `Date.now` advances unless `page.clock.pauseAt` is called, and `capture.mjs` never calls it. So during its real-time settle waits the walkthrough moves on, and its four walkthrough captures show Generate, Result, Result and Dashboard. Pausing the clock is not enough on its own: the tool also emulates `reducedMotion: "reduce"`, under which the walkthrough leaves Personal Info at once, with no timer to stop. §8's "three runs of 12 captures were byte-identical" still holds, because the tool repeats what it captures, but it does not capture what its file names say.
+
+    Task 12's proof did not depend on it: no element can match a deleted rule, and the built CSS minus the deleted rules equals the after-bundle entry for entry. Task 13 moves rules, so its captures have to cover every chapter, and Task 13 now fixes the tool first.
+
 ## Baseline (from the scanner, `9b85b7d`)
 
 | PR  | Headers first | Exports documented | Effects commented | Long functions sectioned | History | To module scope | Import-order breaks | BOMs |
@@ -3347,6 +3351,15 @@ Push and open the PR, with the classes removed and the lines removed per file, t
 
 - [ ] **Step 1: Branch and baseline captures**
 
+**Fix the capture first** (Findings §14). Before taking any baseline, change `$TOOLS/capture.mjs` so that:
+
+- **The clock is paused.** Call `page.clock.pauseAt` right after `install`, and move time only with `runFor`, never with a real-time wait.
+- **Personal Info is reached.** Capture it with motion not reduced, the clock paused, and CSS animations disabled in the screenshot. Reduced motion skips the chapter.
+- **Each capture checks what it shows.** Before each screenshot, assert from the DOM which chapter is active, and fail if it is not the one the file is named for.
+- **Each capture also dumps computed styles.** Write `getComputedStyle` for every element and its `::before` and `::after`, every property, into a JSON file beside the PNG.
+
+Then prove the fixed tool as Task 12 did: two runs are identical, and the control (an outline on `.preview-stage-kicker`) changes exactly the captures that show it, including the Personal Info ones. Add a `compare` mode for the style dumps that reports the first differing element and property.
+
 ```bash
 git switch -c refactor/walkthrough-styles
 npm -w client run build > /dev/null 2>&1; echo "build exit=$?"
@@ -3473,7 +3486,7 @@ node "$TOOLS/capture.mjs" compare "$SCRATCH/shots-before" "$SCRATCH/shots-after"
 node "$TOOLS/walkthrough-split.mjs" "$REPO" "$SCRATCH/sweep.txt" 2>&1 | grep -E "walkthrough rules"
 ```
 
-Expected: `identical: 12 screenshots`. `walkthrough-split` no longer lists `core/preview.css`, since the file is gone, and reports `duplicate 0` everywhere else. The only live rules left in `home/` are the `.home-preview-btn` and `.home-stage-preview` ones.
+Expected: `identical: 12 screenshots` **and identical computed-style dumps for every capture**. A style that differs on an element nobody sees still fails: moving a rule must not change the cascade anywhere. `walkthrough-split` no longer lists `core/preview.css`, since the file is gone, and reports `duplicate 0` everywhere else. The only live rules left in `home/` are the `.home-preview-btn` and `.home-stage-preview` ones.
 
 **If a capture differs,** a moved declaration changed places in the cascade relative to some other rule. Find it by bisecting:
 
