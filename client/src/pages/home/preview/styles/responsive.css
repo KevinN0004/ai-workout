@@ -1,6 +1,6 @@
 /* The walkthrough's narrower-screen and reduced-motion rules. Imported last by
    PreviewStage.css, so these override the walkthrough's other sheets at the same
-   specificity, and the home page's responsive.css, which lands before them. */
+   specificity. */
 
 /* ---- Medium screens ------------------------------------------------------ */
 /* Smaller copy and content height, narrower week labels, and the dashboard in one column. */

@@ -1,6 +1,24 @@
 ﻿/* The walkthrough's chapter header: the kicker and the chapter title, which PreviewStage
    keys on the chapter so each title slides in afresh. Imported second by layout.css. */
 
+/* ---- Title row defaults -------------------------------------------------- */
+/* Neither rule changes what renders. The more specific title-row rule below replaces all
+   five of the first one's properties. The second sets the margin and colour
+   .preview-stage-title sets, and the colour home/styles/core/shell.css's .home-page h2
+   sets. */
+.preview-stage-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preview-stage-title-row h2 {
+  margin: 0;
+  color: #fff;
+}
+
 /* ---- Header bar ---------------------------------------------------------- */
 /* In flow above the chapter: frame.css pins its position with !important. */
 .preview-stage-header {

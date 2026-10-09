@@ -3,15 +3,6 @@
    first by core.css. AuthPage and WorkoutResultPage carry home-page too, which is how
    --home-animation-ms and --home-shell-gutter reach /auth and /plan. */
 
-/* ---- Walkthrough scrolling ----------------------------------------------- */
-/* PreviewStage puts this class on <html> while it is mounted. home/preview/styles/layout/
-   base.css repeats the rule with the same values. The reduced-motion blocks in
-   forms-and-motion.css and home/preview/styles/responsive.css turn the smooth scrolling off. */
-html.preview-smooth-scroll {
-  scroll-behavior: smooth;
-  scroll-padding-top: clamp(130px, 18vh, 182px);
-}
-
 /* ---- Page root and main -------------------------------------------------- */
 .content {
   max-width: 100%;

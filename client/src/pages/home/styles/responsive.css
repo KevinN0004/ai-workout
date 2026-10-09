@@ -3,31 +3,7 @@
    same specificity. styles/base.css lands after every home sheet and still wins its ties. */
 
 /* ---- Medium screens ------------------------------------------------------ */
-/* Its walkthrough rules (.preview-*) change nothing: home/preview/styles/responsive.css
-   repeats each at the same width, later in the bundle, with the same or its own values. */
 @media (max-width: 1180px) {
-  .preview-stage-panel {
-    width: 100%;
-  }
-
-  .preview-scroll-story {
-    width: 100%;
-    padding: 0;
-  }
-
-  .preview-step-shell {
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-  }
-
-  .preview-side-tab {
-    width: fit-content;
-    min-width: 112px;
-    max-width: clamp(148px, 19vw, 248px);
-    padding: 4px 4px 4px 2px;
-    box-sizing: border-box;
-  }
-
   .visual-stage {
     --visual-stage-size: min(clamp(500px, 80vmin, 780px), calc(100dvh - 240px), calc(100vw - 28px));
     width: var(--visual-stage-size);
@@ -75,11 +51,11 @@
 }
 
 /* ---- Narrow screens ------------------------------------------------------ */
-/* The walkthrough rules here change nothing, as above. The personal form's one-column rule
-   never applies: in basic mode styles/base.css's .form ties it and loads later (its auto-fit
-   still drops to one column on the narrowest screens), and in advanced mode
-   forms-and-motion.css's two-column rule is more specific, so the fields this block puts in
-   column 1 fill half the form. .header-top, .header-left and .auth-actions match nothing. */
+/* The personal form's one-column rule never applies: in basic mode styles/base.css's .form
+   ties it and loads later (its auto-fit still drops to one column on the narrowest screens),
+   and in advanced mode forms-and-motion.css's two-column rule is more specific, so the fields
+   this block puts in column 1 fill half the form. .header-top, .header-left and .auth-actions
+   match nothing. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -114,57 +90,6 @@
   .home-intro-actions .cta,
   .home-intro-actions .ghost {
     width: 100%;
-  }
-
-  .preview-stage-panel {
-    --preview-header-top: 62px;
-    --preview-header-height: 70px;
-  }
-
-  .preview-stage-header {
-    top: var(--preview-header-top);
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-    padding: 9px 10px;
-  }
-
-  .preview-scroll-story {
-    padding: 0;
-  }
-
-  .preview-step-shell {
-    position: relative;
-    top: auto;
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-    margin: 0 auto;
-    padding: 0;
-  }
-
-  .preview-side-tab {
-    position: fixed;
-    top: var(--preview-header-top);
-    left: 0;
-    transform: none;
-    width: fit-content;
-    min-width: 96px;
-    max-width: min(44vw, 180px);
-    margin: 0;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    z-index: 22;
-    max-height: calc(100vh - var(--preview-header-top) - 8px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 4px 4px 4px 2px;
-    box-sizing: border-box;
-    border-right: 1px solid rgba(255, 255, 255, 0.12);
-    background: linear-gradient(90deg, rgba(0, 0, 0, 0.76), rgba(0, 0, 0, 0));
-    transition: none;
-  }
-
-  .preview-jump-chip {
-    font-size: 0.78rem;
   }
 
   .home-page .title,

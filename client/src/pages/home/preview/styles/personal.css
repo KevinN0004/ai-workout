@@ -124,8 +124,9 @@
     transform var(--personal-morph-duration) var(--personal-morph-ease);
 }
 
-/* ---- Form fade ----------------------------------------------------------- */
-/* Its gap never applies: styles/base.css's .form ties this rule and loads later. */
+/* ---- Form and its fade --------------------------------------------------- */
+/* Its gap and top margin never apply: styles/base.css's .form ties this rule and loads
+   later. */
 .preview-personal-form {
   position: relative;
   z-index: 1;
@@ -135,6 +136,9 @@
     opacity var(--personal-morph-duration) var(--personal-morph-ease),
     filter var(--personal-morph-duration) var(--personal-morph-ease);
   transform-origin: 50% 6%;
+  width: min(920px, 100%);
+  justify-self: center;
+  margin: 0 auto;
 }
 
 /* ---- Collapsed form ------------------------------------------------------ */
