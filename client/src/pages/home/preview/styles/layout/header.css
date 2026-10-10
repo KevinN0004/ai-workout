@@ -71,13 +71,6 @@
   will-change: transform, opacity;
 }
 
-/* ---- Unused ghost title -------------------------------------------------- */
-/* Nothing renders .preview-stage-title-ghost. */
-.preview-stage-title-ghost {
-  pointer-events: none;
-  display: none;
-}
-
 /* ---- Title entrance ------------------------------------------------------ */
 /* Every title carries is-sliding-in-right, and PreviewStage keys it on the chapter, so
    this plays again on each change of chapter. */

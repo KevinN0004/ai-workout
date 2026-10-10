@@ -111,10 +111,6 @@
     --preview-builder-pill-height: 42px;
   }
 
-  .preview-fields-grid {
-    grid-template-columns: 1fr;
-  }
-
   .preview-stage-panel {
     --preview-header-top: 125px;
     --preview-header-height: 70px;
