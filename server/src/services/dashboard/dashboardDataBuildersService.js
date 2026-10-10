@@ -11,6 +11,15 @@ export const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
 /**
+ * Puts text on one line, for a value interpolated into a single prompt line:
+ * every run of whitespace, newlines included, becomes one space, and the ends
+ * are trimmed, so the value cannot start a line of its own. Anything that is
+ * not a string is "".
+ */
+export const collapseWhitespace = (value) =>
+  typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+
+/**
  * A finite number within [min, max], or null. Absent input (null, undefined,
  * "") is null rather than the 0 `Number()` would make it.
  */
