@@ -1,10 +1,7 @@
 /**
- * The CORS origin allowlist.
- *
- * Extracted from index.js so the policy can be exercised directly rather than
- * only by booting the app and issuing a request. It is the control that decides
- * which sites may make authenticated cross-origin calls, so it is worth being
- * readable on its own.
+ * The CORS origin allowlist: the control that decides which sites may make
+ * credentialed cross-origin calls to the API. Kept apart from index.js so it
+ * reads on its own; index.cors.test.js exercises it through the running app.
  */
 
 const isLoopbackOrigin = (origin) => {
@@ -37,7 +34,10 @@ export const createCorsPolicy = (allowedOrigins = []) => {
 
   const corsOptions = {
     origin(origin, callback) {
-      // Same-origin and non-browser callers send no Origin header.
+      // No Origin header: a non-browser caller, or a same-origin navigation or
+      // plain GET. A browser does send one on same-origin writes, and Chromium on
+      // the bundle's crossorigin script and stylesheet loads, so a deployment that
+      // serves its own page must list its own origin.
       if (!origin) return callback(null, true);
       if (isAllowedCorsOrigin(origin)) return callback(null, true);
       // Tag as 4xx so a blocked origin is a client error, not a captured 5xx.

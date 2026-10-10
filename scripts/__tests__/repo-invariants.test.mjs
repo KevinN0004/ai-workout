@@ -353,15 +353,12 @@ describe("every source file opens with a header comment", () => {
   // comment saying what it is for. This checks presence only; whether a header
   // is any good is review's job.
   //
-  // file-header-allowlist.json lists the files that had no header when this
-  // check arrived, and it only shrinks. ALLOWLIST_SIZE pins its length, so a new
-  // entry fails "the allowlist has exactly ALLOWLIST_SIZE entries" unless the
-  // constant is raised in the same diff -- the line a reviewer should refuse.
-  // (Swapping one entry for another keeps the length; only the allowlist's own
-  // diff shows that, as an added line.) An entry whose file gains a header, or
-  // stops being an in-scope file, fails the tests named for those cases, so no
-  // entry outlives the file it excuses. When entries are removed, lower
-  // ALLOWLIST_SIZE in the same change.
+  // file-header-allowlist.json is empty, so every in-scope source file must
+  // open with a header: a new file gets one, never an entry. ALLOWLIST_SIZE
+  // pins the list's length, so an entry fails "the allowlist has exactly
+  // ALLOWLIST_SIZE entries" unless the constant is raised in the same diff --
+  // the line a reviewer should refuse. An entry for a file that has a header,
+  // or that is not an in-scope file, fails the tests named for those cases.
   const ALLOWLIST_SIZE = 0;
 
   const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];

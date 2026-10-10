@@ -110,7 +110,7 @@ export default [
 
   js.configs.recommended,
 
-  // ---- Client: browser globals, JSX, React Hooks rules -------------------
+  // ---- Client: browser globals, JSX, React Hooks rules ----------------------
   {
     files: ["client/**/*.{js,jsx}"],
     languageOptions: {
@@ -139,7 +139,7 @@ export default [
     }
   },
 
-  // ---- Tests: vitest globals -------------------------------------------
+  // ---- Tests: vitest globals ------------------------------------------------
   // client/vite.config.js sets `globals: true`, so suites may use describe /
   // test / expect without importing them. Most files here do import from
   // "vitest" explicitly; the integration suite does not.
@@ -162,7 +162,7 @@ export default [
     }
   },
 
-  // ---- Server: node globals, ESM ----------------------------------------
+  // ---- Server: node globals, ESM --------------------------------------------
   // "server/**" reaches server/scripts/ too, so no-console covers those CLIs.
   // Root scripts/** is deliberately left out of it: that tree is repo tooling
   // whose job is to print, so the rule would flag its output rather than stray
@@ -183,7 +183,7 @@ export default [
     }
   },
 
-  // ---- Playwright: its config reads process.env; the specs do not ---------
+  // ---- Playwright: its config reads process.env; the specs do not -----------
   //
   // Both global sets, because a spec file legitimately contains code for two
   // runtimes: the test body runs in node, while the callback handed to
@@ -213,7 +213,7 @@ export default [
     languageOptions: { sourceType: "commonjs" }
   },
 
-  // ---- Tests may log: no-console is a production-code guard --------------
+  // ---- Tests may log: no-console is a production-code guard -----------------
   // The client and server blocks' patterns also match their own test files, so
   // their no-console would otherwise apply to suites.
   {

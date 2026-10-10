@@ -9,7 +9,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
 
-  // ---- Dev server (npm run dev:client) -------------------------------------
+  // ---- Dev server (npm run dev:client) --------------------------------------
   // /api goes to the Express server, so the client calls relative paths in
   // development exactly as it does in production, where one process serves
   // both the bundle and the API.
@@ -20,7 +20,7 @@ export default defineConfig({
     }
   },
 
-  // ---- Preview server (npm run preview, and the E2E suite) -----------------
+  // ---- Preview server (npm run preview, and the E2E suite) ------------------
   // `vite preview` does not inherit `server.proxy`. The E2E suite runs against
   // the built bundle rather than the dev server, so that it exercises the
   // artifact that actually ships -- which needs the same /api proxy.
@@ -31,7 +31,7 @@ export default defineConfig({
     }
   },
 
-  // ---- Tests and coverage (npm run test -w client) -------------------------
+  // ---- Tests and coverage (npm run test -w client) --------------------------
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.js",

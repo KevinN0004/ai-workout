@@ -11,8 +11,8 @@ The effort that brought the existing tree up to it: `docs/plans/2026-09-29-code-
 ### 1. A header, first in the file
 
 Every non-test source file — `.js`, `.jsx`, `.mjs`, `.cjs`, `.css` — opens with a comment of
-one to four lines, **above the imports**, saying what the module is for and what owns or
-uses it.
+one to four lines of text, **above the imports**, saying what the module is for and what
+owns or uses it. A line holding only a delimiter (`/**`, `/*`, `*/` or `//`) does not count.
 
 - For a factory, also say what it is given and what it returns.
 - For a stylesheet, name the component or page it styles, and say so when it depends on
@@ -21,10 +21,17 @@ uses it.
 - A tool directive (`eslint-disable`, `prettier-ignore`) is not a header. If a file needs
   one, it goes below the header.
 
-`scripts/__tests__/repo-invariants.test.mjs` fails on a source file that does not open
-with a header, unless the file is listed in `scripts/__tests__/file-header-allowlist.json`.
-**That list only shrinks.** Never add a file to it: a new file gets a header instead. When
-you give an allowlisted file a header, delete its line — the same test fails until you do.
+`scripts/__tests__/repo-invariants.test.mjs` fails on a file in its scope that does not
+open with a header. The scope is every tracked `.js`, `.jsx`, `.mjs`, `.cjs` and `.css` file
+under `client/src`, `server/src`, `server/scripts`, `scripts` and `e2e`, plus every
+`*.config.js`, leaving out tests: `*.test.*` and `*.spec.*` files, anything in a
+`__tests__/` folder, and `client/src/test/setup.js`. `server/vitest.setup.js` is test setup
+too, and is outside the scope because it sits in none of those folders.
+
+Its allowlist, `scripts/__tests__/file-header-allowlist.json`, is empty, so every file in
+that scope must open with a header. **Never add a file to it:** a new file gets a header
+instead. `ALLOWLIST_SIZE` in the test pins the list's length, so an entry also means raising
+that constant, which review should refuse.
 
 ### 2. A summary on every export
 
@@ -56,6 +63,10 @@ prose: what it is for, what it returns, and anything it assumes.
 - **No numbers that live elsewhere.** A cap, a count or a line number defined in another
   file changes without the comment noticing. Name where it lives instead: "capped on read
   by userReadRepository", not "capped at 200".
+
+No test enforces rules 2 and 3. To measure them, run the scanner in the plan
+(`docs/plans/2026-09-29-code-readability.md`, Task 0, Steps 2–3): `scan.mjs`, then
+`area.mjs` for a per-file checklist.
 
 ### 4. Present tense
 
@@ -94,8 +105,8 @@ These apply to what you write, not to what already exists:
 
 - a new colour goes through a custom property (`var(--…)`), not a literal;
 - a new `!important` carries a comment saying what it overrides;
-- a new file has no byte-order mark. Leave existing ones alone: 23 files have one, and
-  removing them is a separate change.
+- a new file has no byte-order mark. Leave existing ones alone: removing them is a separate
+  change.
 
 ### 7. Tests
 
@@ -121,7 +132,7 @@ import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.j
    menu button. Loaded by DashboardPage.css after theme.css, whose tokens it uses. */
 ```
 
-**Section banners**, padded with dashes to column 80:
+**Section banners** in JS and CSS, padded with dashes to column 80:
 
 ```js
 // ---- Rate limiters ----------------------------------------------------------
@@ -131,10 +142,15 @@ import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.j
 /* ---- Backdrop ------------------------------------------------------------ */
 ```
 
+In JSX, a banner is a comment among the element's children, on one line and not padded:
+
 ```jsx
-{
-  /* ---- Account actions ---- */
-}
+<div className="modal plan-modal">
+  {/* ---- Header: title and close ---- */}
+  <div className="modal-header">
+    <h2>Your plan</h2>
+  </div>
+</div>
 ```
 
 ## Checklists
@@ -222,8 +238,11 @@ two cannot.
 warnings), `npm run knip`, `npm run format:check`, `npm run build` and `npm run test:e2e`.
 
 **For a change to CSS that moves or merges rules**, which comment-only proofs cannot cover,
-capture full-page screenshots before and after with a frozen clock and compare them byte for
-byte. The capture script and how it was made deterministic are in the plan, Task 12.
+capture full-page screenshots and computed-style dumps before and after with a paused page
+clock, and compare them. Use the capture tool listed in the plan, Task 13, Step 1: it pauses
+the clock, checks from the DOM that each capture shows the state its file is named for, and
+writes every element's computed style beside each screenshot. Task 12's earlier listing
+does not pause the clock, so it never photographs Personal Info (Findings §14).
 
 ## Examples from this codebase
 
@@ -290,9 +309,9 @@ useEffect(() => {
 
 Recorded so nobody mistakes it for an oversight:
 
-- 597 declarations hard-code a colour and 143 carry `!important`; the rules above apply to
-  new ones only.
-- 23 files carry a byte-order mark and the rest do not.
+- Many existing declarations hard-code a colour or carry `!important`; the rules above
+  apply to new ones only.
+- Some files carry a byte-order mark and the rest do not.
 - `.height-split`, `.height-field`, `.height-field input` and `.height-unit` are styled by
   both `AuthPage.css` and `home/styles/forms-and-motion.css`.
 - Large files are not split. `CLAUDE.md` explains why length alone is not a reason.
