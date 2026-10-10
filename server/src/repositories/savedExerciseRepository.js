@@ -3,10 +3,8 @@
  * has -- the same external exercise id, or the same name ignoring case --
  * updates that row instead of adding a second.
  */
-import { toIso } from "./rowValues.js";
+import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
-
-const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
 /**
  * Maps a saved_exercises row to the entry the API returns. `exerciseId` is the

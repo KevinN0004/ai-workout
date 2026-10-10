@@ -1,8 +1,7 @@
 /**
- * Small helpers for the home page's preview walkthrough: day names, the locale's
- * region, clamping and rounding, the typing cadence, random draws and the
- * dashboard chapter's chart path. Used by the walkthrough's hooks and by
- * PreviewDashboardChapter.
+ * Small helpers for the home page's preview walkthrough: day names, clamping
+ * and rounding, the typing cadence and random draws. Used by the walkthrough's
+ * hooks.
  */
 import {
   PREVIEW_TYPING_MAX_MS,
@@ -23,25 +22,6 @@ export const normalizePreviewTrainingDay = (dayValue) => {
     .toLowerCase();
   if (!normalizedKey) return "";
   return PREVIEW_WEEK_DAY_NORMALIZATION[normalizedKey] || "";
-};
-
-/**
- * A locale tag's second subtag, upper-cased and taken as its region, or
- * Intl.Locale's region for a bare language; "" if neither. The same rule as
- * app/units.js's copy.
- */
-export const getRegionFromLocale = (locale) => {
-  if (!locale || typeof locale !== "string") return "";
-  const localeParts = locale.split(/[-_]/).filter(Boolean);
-  if (localeParts.length > 1 && localeParts[1]) {
-    return localeParts[1].toUpperCase();
-  }
-  try {
-    const parsed = new Intl.Locale(locale);
-    return parsed.region ? parsed.region.toUpperCase() : "";
-  } catch {
-    return "";
-  }
 };
 
 /** `value` held between `min` and `max`. A NaN passes through unchanged. */
@@ -70,23 +50,6 @@ export const getPreviewTypingStepMs = (textLength) =>
  * Math.random, so stubbing that fixes the result.
  */
 export const randomBetween = (min, max) => min + Math.random() * (max - min);
-
-/** An SVG path through `values`, spread across a 260 by 110 chart by default. */
-export const buildPreviewLinePath = (values, width = 260, height = 110, padding = 10) => {
-  const safeValues = values.length ? values : [0];
-  const max = Math.max(...safeValues, 1);
-  const min = Math.min(...safeValues, 0);
-  const range = max - min || 1;
-  const stepX = (width - padding * 2) / Math.max(safeValues.length - 1, 1);
-
-  return safeValues
-    .map((value, index) => {
-      const x = padding + stepX * index;
-      const y = height - padding - ((value - min) / range) * (height - padding * 2);
-      return `${index === 0 ? "M" : "L"}${x},${y}`;
-    })
-    .join(" ");
-};
 
 /**
  * The weekday name of a Date, from PREVIEW_WEEK_DAY_ORDER, which starts on

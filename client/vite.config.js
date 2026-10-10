@@ -68,7 +68,7 @@ export default defineConfig({
       // the floor.
       thresholds: {
         statements: 98.7,
-        branches: 93.6,
+        branches: 93.7,
         functions: 98.7,
         lines: 99.3
       }

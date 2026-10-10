@@ -72,7 +72,7 @@ describe("WorkoutsView", () => {
       ["zero", 0],
       ["false", false],
       // The one input that distinguishes the `!value` early return in
-      // `parseDateValue` from the NaN check below it: `new Date(0n)` throws a
+      // `toSortTime` from the NaN check below it: `new Date(0n)` throws a
       // TypeError, where every other falsy value already yields 0 through the
       // NaN branch. A BigInt cannot arrive from JSON, so that guard is
       // defence against a programming error rather than against data -- but it

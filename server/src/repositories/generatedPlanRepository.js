@@ -4,10 +4,8 @@
  * many it reads, so nothing prunes the table and it grows without bound.
  * That is a decision still to be made, not an oversight.
  */
-import { toIso } from "./rowValues.js";
+import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
-
-const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
 /**
  * Maps a generated_plans row to the plan the API returns. `id` is the legacy id

@@ -9,19 +9,20 @@ import "./WorkoutsView.css";
 const INITIAL_VISIBLE_ROWS = 40;
 const ROW_BATCH_SIZE = 40;
 
-// A sort key rather than a date: the timestamp, or 0 so that a row whose date
-// does not parse sorts last. useDashboardMetrics' parseDateValue is a different
-// function, returning a Date or null. This one reads a bare YYYY-MM-DD as UTC
-// midnight, unlike that one, but UTC midnights fall in date order too, so the
-// sort is the same.
-const parseDateValue = (value) => {
+/**
+ * A row's date as a sortable timestamp; a missing or unparseable date sorts as
+ * 0, last. A bare YYYY-MM-DD reads as UTC midnight, unlike useDashboardMetrics'
+ * parseDateValue, which reads it as local midnight, but UTC midnights fall in
+ * date order too, so the sort is the same.
+ */
+const toSortTime = (value) => {
   if (!value) return 0;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
 const sortByDateDesc = (items) =>
-  [...items].sort((a, b) => parseDateValue(b?.date) - parseDateValue(a?.date));
+  [...items].sort((a, b) => toSortTime(b?.date) - toSortTime(a?.date));
 
 /**
  * The four lists arrive deduplicated from useDashboardMetrics. Each shows

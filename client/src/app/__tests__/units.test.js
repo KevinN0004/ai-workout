@@ -127,6 +127,13 @@ describe("getPreferredMeasurementSystem", () => {
 
     expect(getPreferredMeasurementSystem()).toBe("metric");
   });
+
+  // With no navigator there is no locale to read, and reading one would throw.
+  test("chooses metric when there is no navigator at all", () => {
+    vi.stubGlobal("navigator", undefined);
+
+    expect(getPreferredMeasurementSystem()).toBe("metric");
+  });
 });
 
 describe("getLocalDateKey", () => {

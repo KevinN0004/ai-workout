@@ -4,7 +4,7 @@
  * depend on. Each collection is capped here, on read (COLLECTION_LIMITS);
  * nothing prunes the tables.
  */
-import { toDateOnly, toIso } from "./rowValues.js";
+import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
 import { mapWorkoutSession } from "./workoutSessionRepository.js";
@@ -12,9 +12,6 @@ import { mapMealLog } from "./mealLogRepository.js";
 import { mapSavedExercise } from "./savedExerciseRepository.js";
 import { mapGeneratedPlan } from "./generatedPlanRepository.js";
 
-const toJsonArray = (value) => (Array.isArray(value) ? value : []);
-const toJsonObject = (value) =>
-  value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const lower = (value) =>
   String(value || "")
     .trim()

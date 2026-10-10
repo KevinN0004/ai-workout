@@ -2,10 +2,8 @@
  * Prisma-native persistence for workout sessions: the row mapper the API
  * returns, and the save.
  */
-import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
+import { dateOnlyToDate, toDateOnly, toIso, toJsonArray, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
-
-const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
 /**
  * Maps a workout_sessions row to the session the API returns. `intensityRpe`

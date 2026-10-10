@@ -5,6 +5,7 @@
  */
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
+import { buildLinePath } from "../../../app/linePath";
 
 // A Date or null. A bare YYYY-MM-DD is read as local midnight: `new Date` would
 // read it as UTC midnight, which west of UTC falls on the previous local day.
@@ -109,32 +110,14 @@ const progressFallbackKey = (item) =>
     .filter(Boolean)
     .join("::");
 
-// An SVG path through `values`, scaled into a box the size of the charts'
-// viewBox. The scale always spans 0 and at least 1, so an empty or all-zero
-// series runs along the bottom.
-const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
-  const safeValues = values.length ? values : [0];
-  const max = Math.max(...safeValues, 1);
-  const min = Math.min(...safeValues, 0);
-  const range = max - min || 1;
-  const stepX = (width - padding * 2) / Math.max(safeValues.length - 1, 1);
-
-  return safeValues
-    .map((value, index) => {
-      const x = padding + stepX * index;
-      const y = height - padding - ((value - min) / range) * (height - padding * 2);
-      return `${index === 0 ? "M" : "L"}${x},${y}`;
-    })
-    .join(" ");
-};
-
 /**
  * Derives what the dashboard's views chart and summarise. `goalForm` stands in
  * for `dashboard.goals` until there is a dashboard, `formGoal` (the planner
  * form's goal) is the last fallback for the meal plan's goal, and `weekDays`
  * with `latestPlanByWeekday` give the meal plan its days and mark which are
- * training days. Returns the deduplicated lists, `goals`, `buildLinePath` for
- * the charts, and the metrics, all recomputed only when their inputs change.
+ * training days. Returns the deduplicated lists, `goals`, app/linePath.js's
+ * `buildLinePath` for the charts, and the metrics, all recomputed only when
+ * their inputs change.
  */
 export default function useDashboardMetrics({
   dashboard,
