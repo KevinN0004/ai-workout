@@ -1,3 +1,9 @@
+/* AuthPage, the /auth page: the card with its login/sign-up toggle, the form, the sign-up
+   fields it reveals, and the password and remember-me controls. Imported by AuthPage. The
+   page also carries home-page, so the home page's styles reach it; they come later in the
+   bundle, so where one ties a rule here, the home page's wins. */
+
+/* ---- Page and title ------------------------------------------------------ */
 .auth-page {
   width: 100%;
 }
@@ -23,6 +29,7 @@
   justify-items: center;
 }
 
+/* ---- Card and form ------------------------------------------------------- */
 .auth-card {
   width: min(560px, 100%);
   max-width: 100%;
@@ -38,6 +45,8 @@
   width: min(720px, 100%);
 }
 
+/* --auth-animation-ms follows --home-animation-ms from home/styles/core/layout.css, which
+   reaches this page through its home-page class. */
 .auth-form {
   --auth-animation-ms: var(--home-animation-ms, 1400ms);
   width: min(420px, 100%);
@@ -55,6 +64,7 @@
   width: min(720px, 100%);
 }
 
+/* ---- Fields and the unit toggle ------------------------------------------ */
 .auth-form label {
   width: 100%;
   color: #fff;
@@ -79,6 +89,7 @@
   flex-shrink: 0;
 }
 
+/* ---- Password field ------------------------------------------------------ */
 .auth-form .password-field-wrap {
   position: relative;
   width: 100%;
@@ -120,6 +131,9 @@
   height: 18px;
 }
 
+/* ---- Remember-me checkbox ------------------------------------------------ */
+/* appearance: none drops the native checkbox, so the border draws the box and ::before
+   draws the tick, which scales in when checked. */
 .auth-form .auto-signin-toggle {
   display: flex;
   flex-direction: row;
@@ -179,6 +193,9 @@
   line-height: 1.25;
 }
 
+/* ---- Sign-up fields ------------------------------------------------------ */
+/* Collapsed to a 0fr grid row, and opened to 1fr when AuthPage adds .active in sign-up
+   mode. */
 .auth-signup-fields-wrap {
   grid-column: 1 / -1;
   display: grid;
@@ -220,6 +237,7 @@
   grid-column: 1 / -1;
 }
 
+/* ---- Textarea, full-width fields, wrapping and submit -------------------- */
 .auth-form textarea {
   width: 100%;
   min-height: 96px;
@@ -247,6 +265,7 @@
   min-width: 180px;
 }
 
+/* ---- Card top: mode toggle and close ------------------------------------- */
 .auth-card-top {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -270,6 +289,7 @@
   padding: 0;
 }
 
+/* ---- Inputs -------------------------------------------------------------- */
 .auth-page input:not([type="checkbox"]),
 .auth-page select,
 .auth-page textarea {
@@ -295,6 +315,12 @@
   outline-offset: 0;
 }
 
+/* ---- Height fields ------------------------------------------------------- */
+/* home/styles/forms-and-motion.css has the same four selectors and comes later in the
+   bundle, so where the two differ its values win, and its .height-split also beats the
+   one-column .height-split in this file's smallest-screens block. On this page .height-unit
+   takes its colour from .home-page .height-unit in home/styles/core/shell.css, which beats
+   both. */
 .height-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -321,12 +347,14 @@
   font-size: var(--font-small);
 }
 
+/* ---- Errors -------------------------------------------------------------- */
 .auth-card .error {
   margin-top: 0;
   text-align: center;
   color: #ffd4d4;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .auth-page.home-page .content.auth-content {
     min-height: calc(100vh - 88px);
@@ -364,6 +392,7 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
 @media (max-width: 520px) {
   .auth-card {
     gap: 14px;
@@ -391,6 +420,13 @@
   }
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Turns off CSS animations and transitions on the form and everything in it: its width
+   change, the sign-up fields' reveal and the checkbox. * selects no pseudo-elements, so the
+   checkbox's tick (::before) still scales in and the unit toggles' pills (::before, from
+   home/styles/core/shell.css) still slide. Outside the form, the login/sign-up toggle's pill
+   still slides, its buttons keep their colour and hover transitions (forms-and-motion.css),
+   and the close button keeps its hover transition. */
 @media (prefers-reduced-motion: reduce) {
   .auth-form,
   .auth-form * {

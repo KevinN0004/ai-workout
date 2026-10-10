@@ -132,12 +132,12 @@ Run only client tests from the repo root:
 npm run test -w client
 ```
 
-Coverage is `npm run test:coverage -w client`: 98.70% statements / 93.68% branches as
-of 2026-09-28, against a ratchet in `vite.config.js` that must be raised, never
-lowered. Judge where a test is worth writing by whether the code _computes_ anything,
-not by its file suffix: several `*View.jsx` components carry real derivation, and
-`CLAUDE.md` records which files' remaining uncovered branches are unreachable rather
-than untested.
+Coverage is `npm run test:coverage -w client`, measured against a ratchet in
+`vite.config.js` whose floors sit just below the last measurement. Raise them when
+coverage rises; never lower them. Judge where a test is worth writing by whether the
+code _computes_ anything, not by its file suffix: several `*View.jsx` components carry
+real derivation, and `CLAUDE.md` records which files' remaining uncovered branches are
+unreachable rather than untested.
 
 ## Requests and Sign-out
 

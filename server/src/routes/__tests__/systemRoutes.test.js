@@ -3,10 +3,11 @@ import request from "supertest";
 import { describe, expect, test } from "vitest";
 import { registerSystemRoutes } from "../systemRoutes.js";
 
-// /api/metrics was unauthenticated, and reported authFailures, per-route
-// latency and request totals to anyone who asked. These pin the guard that
-// closed it, including the part that is easy to get backwards: an
-// unconfigured PRODUCTION deployment must be closed, not open.
+// The /api/metrics payload maps the route surface (per-route latency and
+// request totals) and counts rate-limited requests live, so it is not for the
+// open internet. These pin the guard in front of it, including the part that
+// is easy to get backwards: an unconfigured PRODUCTION deployment must be
+// closed, not open.
 
 const buildApp = (overrides = {}) => {
   const app = express();

@@ -1,3 +1,8 @@
+/**
+ * The "Files likely involved" list in codex-handoff.mjs's handoff template,
+ * which its context score also counts: the staged and modified files, then
+ * test files and call sites found from them.
+ */
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename, extname, dirname } from "node:path";
@@ -62,6 +67,18 @@ function defaultGrep(symbol, repoRoot) {
   }
 }
 
+/**
+ * Lists the staged files, then the other modified files, then a capped number
+ * of files discovered from them: a test file named after one (beside it, or in
+ * the same place under tests/), and the files `grepFn(symbol, repoRoot)`
+ * returns for each function, class or const it declares with `export`. Each
+ * entry is `{ path, label }`.
+ *
+ * The default grep searches only src/ and backend/ under repoRoot, neither of
+ * which exists at this repo's root, and the tests here sit in __tests__/
+ * folders, which neither test lookup checks. So with this layout only the first
+ * two groups appear.
+ */
 export function suggestFiles({
   changedFiles = [],
   stagedFiles = [],
@@ -72,6 +89,7 @@ export function suggestFiles({
   const result = [];
   const seen = new Set();
 
+  // ---- Staged files, then modified ones -------------------------------------
   for (const f of stagedFiles) {
     if (!seen.has(f)) {
       seen.add(f);
@@ -86,6 +104,7 @@ export function suggestFiles({
     }
   }
 
+  // ---- Discovered: test files and call sites --------------------------------
   const allChanged = [...new Set([...stagedFiles, ...changedFiles])];
   const discovered = [];
   const discoveredSeen = new Set(seen);

@@ -1,8 +1,14 @@
+/**
+ * The migration runner: applies each .sql file in a directory once, in its own
+ * transaction, and records it in `schema_migrations`. Called by
+ * server/scripts/apply-postgres-migrations.js.
+ */
 import nodeFs from "fs/promises";
 import path from "path";
 
-// Matches what console.log did before no-console landed. Callers that want
-// the progress lines elsewhere -- the tests do -- inject `log`.
+// process.stdout rather than console.log, which the no-console lint rule bars
+// in server code. Callers that want the progress lines elsewhere -- the tests
+// do -- inject `log`.
 const logToStdout = (message) => {
   process.stdout.write(`${message}\n`);
 };

@@ -1,3 +1,8 @@
+/* WorkoutsView, the dashboard's Logs view: a section for each log (workouts, calories,
+   meals and progress metrics), each a list of rows. Imported by the view, so it loads in
+   the view's lazy chunk. */
+
+/* ---- View and log sections ----------------------------------------------- */
 .workouts-view {
   width: 100%;
   display: grid;
@@ -18,14 +23,13 @@
   background: rgba(0, 0, 0, 0.35);
 }
 
-.workouts-view .log-list,
-.workouts-view .workout-list {
+/* ---- Log rows ------------------------------------------------------------ */
+.workouts-view .log-list {
   display: grid;
   gap: 10px;
 }
 
-.workouts-view .log-list-row,
-.workouts-view .workout-list-row {
+.workouts-view .log-list-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -48,17 +52,16 @@
   overflow-wrap: anywhere;
 }
 
-.workouts-view .log-list-row,
-.workouts-view .workout-list-row {
+.workouts-view .log-list-row {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.workouts-view .log-list-row > span,
-.workouts-view .workout-list-row > span {
+.workouts-view .log-list-row > span {
   flex-shrink: 0;
 }
 
+/* ---- Empty state --------------------------------------------------------- */
 .workouts-view .log-empty-state {
   display: grid;
   justify-items: start;
@@ -66,19 +69,18 @@
   padding: 8px 0;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .workouts-view .log-section {
     padding: 12px;
   }
 
-  .workouts-view .log-list-row,
-  .workouts-view .workout-list-row {
+  .workouts-view .log-list-row {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .workouts-view .log-list-row > span,
-  .workouts-view .workout-list-row > span {
+  .workouts-view .log-list-row > span {
     white-space: normal;
   }
 }

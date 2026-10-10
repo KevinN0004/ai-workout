@@ -1,19 +1,15 @@
-import { dateOnlyToDate } from "./rowValues.js";
+/**
+ * Prisma-native writes against the user row and its calorie entries. Each one
+ * reports whether it matched a user; a route that answers with the updated data
+ * then re-reads the user through findUserWithDashboard for the response body.
+ */
+import { dateOnlyToDate, toJsonObject } from "./rowValues.js";
 import { getUserPk, userIdWhere } from "./userLookup.js";
 
 /**
- * Prisma-native writes against the user row and its calorie entries.
- *
- * Task 4b of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md -- the
- * remaining User writes once saved exercises moved in 4a.
- *
- * Each function writes and reports whether it matched a user. Callers re-read
- * through User.findOne for the response body, which is what they already did.
+ * Builds the user writers over `prisma`: the profile, goals and password hash,
+ * a calorie entry, and the account itself.
  */
-
-const toJsonObject = (value) =>
-  value && typeof value === "object" && !Array.isArray(value) ? value : {};
-
 export const createUserRepository = ({ prisma }) => {
   /** Replaces the profile JSON wholesale. Callers merge before calling. */
   const updateProfile = async ({ userId, profile }) => {
@@ -27,10 +23,9 @@ export const createUserRepository = ({ prisma }) => {
   /**
    * Patches goals, preserving keys the caller did not send.
    *
-   * The shim expressed this as dotted `$set` paths (`dashboard.goals.x`) and
-   * rebuilt the JSON from the existing row. Goals live in a single JSON column,
-   * so a naive write would silently drop the other goals -- hence the read,
-   * merge, write, and a test that sends one goal and checks the rest survive.
+   * Goals live in a single JSON column, so writing only the patch would
+   * silently drop the other goals -- hence the read, merge, write, and a test
+   * that sends one goal and checks the rest survive.
    *
    * An empty patch is a no-op rather than a write of `{}`.
    */
@@ -60,9 +55,9 @@ export const createUserRepository = ({ prisma }) => {
   };
 
   /**
-   * Two callers: the silent pbkdf2 -> argon2id upgrade that runs on every
-   * successful login, and the user-initiated password change. Only the
-   * latter passes `stampPasswordChange: true`. The login-time rehash is
+   * Called by the silent pbkdf2 -> argon2id upgrade that runs when an account
+   * with a legacy hash signs in, and by the user-initiated password change.
+   * Only the latter passes `stampPasswordChange: true`. The login-time rehash is
    * invisible to the user, so if it moved the column an ordinary sign-in on
    * a legacy-hash account would sign that user out of every other device --
    * strictly worse than the stale-hash problem the rehash exists to fix.
@@ -92,9 +87,10 @@ export const createUserRepository = ({ prisma }) => {
 
   /**
    * Inserts a calorie entry, or updates the existing row with the same legacy
-   * id. The route mints a fresh uuid per submission, so in practice every call
-   * inserts; the update arm exists because the shim had it and a caller could
-   * supply an id.
+   * id. Its one caller, the calories route, mints a fresh uuid per submission,
+   * so every call inserts today; the update arm keeps a repeated id from
+   * colliding with calorie_entries_user_legacy_idx, as the workout, meal and
+   * metric saves do with theirs.
    */
   const saveCalorieEntry = async ({ userId, entry = {} }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -121,9 +117,8 @@ export const createUserRepository = ({ prisma }) => {
   };
 
   /**
-   * Removes the account row. The six AppUser relations all carry
-   * onDelete: Cascade, so workout sessions, meal logs, progress metrics,
-   * calorie entries, generated plans and saved exercises go with it -- there is
+   * Removes the account row. Every AppUser relation carries onDelete: Cascade
+   * in schema.prisma, so every row the user owns goes with it -- there is
    * deliberately no hand-written cascade here to drift out of step with the
    * schema.
    *

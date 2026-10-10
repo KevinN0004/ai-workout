@@ -1,14 +1,23 @@
+/* The walkthrough form's overrides: no transitions or pointer events on its controls, a card
+   behind it outside the Generate chapter, its fields' box and colours, and the copy size of
+   most of the walkthrough's text. Imported fourth by PreviewStage.css, after personal.css, so
+   these win its ties and the home sheets' (core/shell.css's .home-page .height-unit, for one). */
+
+/* ---- Controls without motion or pointer events --------------------------- */
 .preview-personal-form input,
 .preview-personal-form select,
 .preview-personal-form textarea,
 .preview-personal-form button {
   transition: none !important;
+  pointer-events: none;
 }
 
 .preview-personal-form label {
   text-align: left;
 }
 
+/* ---- Form card ----------------------------------------------------------- */
+/* In the Generate chapter the form is collapsed into its label, so it gets no card. */
 .preview-personal-sequence:not(.is-generate-view) .preview-personal-form {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
@@ -19,12 +28,25 @@
   padding: 14px;
 }
 
+/* ---- Fields and toggles -------------------------------------------------- */
 .preview-personal-form input,
 .preview-personal-form select,
 .preview-personal-form textarea {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: #fff;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  line-height: 1.35;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  resize: none;
 }
 
 .preview-personal-form select {
@@ -45,6 +67,10 @@
   transform: none !important;
 }
 
+/* ---- Walkthrough copy size ----------------------------------------------- */
+/* :is() takes its most specific argument, so this counts as (0,3,0) only because of
+   .preview-field-row .preview-field-input, one of three entries that name classes nothing
+   renders; without them it would be (0,2,1). */
 .preview-stage-panel
   :is(
     .preview-stage-kicker,

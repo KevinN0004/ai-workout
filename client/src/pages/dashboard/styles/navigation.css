@@ -1,4 +1,10 @@
-﻿.drawer-backdrop {
+﻿/* The dashboard's navigation: DashboardDrawer and its backdrop, DashboardHeader's profile
+   menu, and DashboardBottomNav, the bar responsive.css shows on narrow screens. Imported
+   fifth by DashboardPage.css; it uses theme.css's tokens, which reach the drawer and the
+   profile menu but not the bottom bar. */
+
+/* ---- Drawer -------------------------------------------------------------- */
+.drawer-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.46);
@@ -10,6 +16,9 @@
   will-change: opacity;
 }
 
+/* Without its animation the drawer sits off-screen. DashboardDrawer mounts it only while
+   open, and drawer-slide-in's fill mode holds it in place, which is why the reduced-motion
+   block in responsive.css resets its transform and opacity as well as the animation. */
 .drawer {
   width: min(320px, 85vw);
   height: 100dvh;
@@ -31,6 +40,7 @@
   backface-visibility: hidden;
 }
 
+/* ---- Keyframes ----------------------------------------------------------- */
 @keyframes drawer-backdrop-fade-in {
   from {
     opacity: 0;
@@ -53,6 +63,7 @@
   }
 }
 
+/* ---- Drawer contents ----------------------------------------------------- */
 .drawer-header {
   display: flex;
   justify-content: space-between;
@@ -118,6 +129,7 @@
   display: grid;
 }
 
+/* ---- Profile menu -------------------------------------------------------- */
 .profile-icon-button {
   width: 40px;
   height: 40px;
@@ -159,6 +171,10 @@
   outline: none;
 }
 
+/* ---- Bottom navigation --------------------------------------------------- */
+/* Hidden until responsive.css shows it on narrow screens. DashboardPage renders the bar
+   beside .dashboard-page, where theme.css sets no tokens, so every var(--dash-*) here is
+   invalid: the bar and its buttons draw no border. */
 .dashboard-bottom-nav {
   position: fixed;
   left: 12px;
@@ -193,6 +209,9 @@
   background: #353535;
 }
 
+/* ---- Narrow screens and reduced motion ----------------------------------- */
+/* Drops the backdrop blurs and lightens the shadows. It stops no animation: the drawer's
+   is switched off in responsive.css. */
 @media (max-width: 960px), (prefers-reduced-motion: reduce) {
   .drawer-backdrop,
   .dashboard-bottom-nav {

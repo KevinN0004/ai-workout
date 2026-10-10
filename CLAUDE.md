@@ -298,6 +298,11 @@ Conventions:
   `recordLatency` in `middleware/requestContext.js` was a second copy of one of
   them. Extracting fixed the coverage and the duplication together.
 
+- **Comments and in-file order follow `docs/code-readability-sop.md`**: a header first in
+  every source file, a prose `/** */` summary on every export, one line on every effect,
+  and present-tense reasons rather than history. `scripts/__tests__/repo-invariants.test.mjs`
+  fails on a source file without a header unless `file-header-allowlist.json` lists it. That
+  list only shrinks, and `ALLOWLIST_SIZE` in the test pins its length — never add to it.
 - Validate user input at system boundaries
 - Sanitize file paths to prevent directory traversal
 - Server config is env-driven — see the Environment Variables table in `README.md`
@@ -554,7 +559,7 @@ the native instance all along.
     When a test stubs a named function of this repo's own, check whether anything
     else exercises it.
   - Thin areas, worst first: `index.js` (76% — app bootstrap and wiring) and
-    `httpCacheService.js` (77%). `index.js` is ~697 lines, and nearly all of
+    `httpCacheService.js` (77%). `index.js` is over 800 lines, and nearly all of
     what is still uncovered in it is the bootstrap the suite deliberately does
     not run: the env preflight sits behind `NODE_ENV !== "test" && !VITEST`, so
     it is verified by booting the server rather than by the unit suite, and
