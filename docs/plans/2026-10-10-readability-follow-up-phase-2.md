@@ -286,7 +286,7 @@ Expected: conflicts in `generateRoutes.js` and `dashboardDataBuildersService.js`
 
 - [ ] **Step 2: The new export**
 
-#192 exports `parsePositiveInt` from `dashboardDataBuildersService.js` and adds it to the numeric-coercion contract test. Check two things:
+The PR (#192) exports `parsePositiveInt` from `dashboardDataBuildersService.js` and adds it to the numeric-coercion contract test. Check two things:
 
 - it has a `/** */` summary, as SOP rule 2 requires;
 - its contract row passes. It must give the absent answer for `null`, `""` and `undefined`. Zero is outside its domain, so its row has `zeroIsValid: false`.
