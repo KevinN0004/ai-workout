@@ -1,7 +1,15 @@
+/**
+ * The portal every modal in the app renders through, from the planner and
+ * plan modals in app/components to the dashboard's own.
+ */
 import { createPortal } from "react-dom";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import useCloseOnEscape from "../hooks/useCloseOnEscape";
 
+/**
+ * Renders `children` into document.body while `open`, and nothing otherwise.
+ * While open, the page behind stops scrolling and Escape calls `onClose`.
+ */
 export default function ModalPortal({ open, onClose, children }) {
   useBodyScrollLock(open);
   // Every modal in the app is portalled through here, so handling Escape once
