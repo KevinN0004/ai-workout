@@ -1,3 +1,8 @@
+/* SettingsView, the dashboard's Settings view: the tab list beside the active tab's body,
+   and the label-and-value rows the tabs show. Imported by the view, so it loads in the
+   view's lazy chunk; theme.css restyles the tabs and rows for the dark theme. */
+
+/* ---- View and layout ----------------------------------------------------- */
 .settings-view {
   width: 100%;
   display: grid;
@@ -12,6 +17,7 @@
   min-width: 0;
 }
 
+/* ---- Tabs ---------------------------------------------------------------- */
 .settings-tabs {
   display: grid;
   gap: 8px;
@@ -47,6 +53,7 @@
   line-height: 1.2;
 }
 
+/* ---- Tab body and value rows --------------------------------------------- */
 .settings-body {
   display: grid;
   gap: 8px;
@@ -95,6 +102,8 @@
   margin-top: 0;
 }
 
+/* ---- Medium screens ------------------------------------------------------ */
+/* The tabs become one row, scrolling sideways, above the body. */
 @media (max-width: 960px) {
   .settings-shell {
     grid-template-columns: 1fr;
@@ -118,6 +127,7 @@
   }
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .settings-list-row {
     width: 100%;

@@ -1,4 +1,8 @@
-﻿@import "../app/styles/planner/base.css";
+﻿/* The planner modals' styles, imported by App after every page: the four sheets in
+   app/styles/planner. Their order is the cascade order; responsive.css overrides the two
+   before it at the same specificity. */
+
+@import "../app/styles/planner/base.css";
 @import "../app/styles/planner/interactions.css";
 @import "../app/styles/planner/responsive.css";
 @import "../app/styles/planner/motion.css";

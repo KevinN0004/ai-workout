@@ -1,4 +1,9 @@
-﻿.dashboard-at-a-glance {
+﻿/* The dashboard's at-a-glance panel (DashboardAtAGlance), the grid the active view sits in,
+   and DashboardPage's loading states: the lazy view's fallback card, the first-load skeleton
+   and the refresh line. Imported second by DashboardPage.css, after theme.css. */
+
+/* ---- At-a-glance panel --------------------------------------------------- */
+.dashboard-at-a-glance {
   display: grid;
   gap: 14px;
   margin-bottom: 24px;
@@ -40,6 +45,7 @@
   gap: 10px;
 }
 
+/* ---- View grid ----------------------------------------------------------- */
 .dashboard-grid {
   width: 100%;
   margin: 0;
@@ -52,6 +58,7 @@
   width: 100%;
 }
 
+/* ---- Loading card and first-load skeleton -------------------------------- */
 .dashboard-loading-card {
   min-height: 260px;
   display: grid;
@@ -71,6 +78,7 @@
   gap: 16px;
 }
 
+/* The shimmer: a gradient wider than the element, slid across it on a loop. */
 .dashboard-skeleton-bar,
 .dashboard-skeleton-chip,
 .dashboard-skeleton-block {
@@ -113,6 +121,7 @@
   border-radius: 14px;
 }
 
+/* ---- Keyframes ----------------------------------------------------------- */
 @keyframes dash-skeleton-shimmer {
   0% {
     background-position: 200% 0;
@@ -122,6 +131,7 @@
   }
 }
 
+/* ---- Refresh status ------------------------------------------------------ */
 .dashboard-inline-status {
   margin-top: 4px;
 }

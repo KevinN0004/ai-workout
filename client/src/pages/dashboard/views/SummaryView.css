@@ -1,3 +1,9 @@
+/* SummaryView, the dashboard's summary view: overview, today's picks, weather and air
+   quality, weekly progress and trend charts, in a main column and a side column. Imported
+   by the view, which DashboardPage imports eagerly and before DashboardPage.css, so this
+   sheet lands ahead of theme.css, which wins ties against it and recolours much of it. */
+
+/* ---- View layout --------------------------------------------------------- */
 .summary-view {
   width: 100%;
   display: grid;
@@ -29,6 +35,7 @@
   margin-bottom: 12px;
 }
 
+/* ---- Overview ------------------------------------------------------------ */
 .summary-view .overview-panel {
   display: grid;
   gap: 20px;
@@ -76,6 +83,7 @@
   word-break: break-word;
 }
 
+/* ---- Lists and stats ----------------------------------------------------- */
 .summary-view .summary-list {
   display: grid;
   gap: 10px;
@@ -110,6 +118,8 @@
   gap: 8px;
 }
 
+/* ---- Trend badges -------------------------------------------------------- */
+/* SummaryView adds trend-up, trend-down or trend-flat; flat keeps the base badge. */
 .summary-view .trend-badge {
   display: inline-flex;
   align-items: center;
@@ -133,6 +143,7 @@
   background: rgba(251, 146, 60, 0.14);
 }
 
+/* ---- Progress bars ------------------------------------------------------- */
 .summary-view .progress-block {
   display: grid;
   gap: 6px;
@@ -158,6 +169,7 @@
   border-radius: 999px;
 }
 
+/* ---- Hub cards ----------------------------------------------------------- */
 .summary-view .hub-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -182,6 +194,7 @@
   justify-content: flex-start;
 }
 
+/* ---- Weather and air-quality badges -------------------------------------- */
 .summary-view .weather-card-header {
   display: flex;
   justify-content: space-between;
@@ -216,6 +229,8 @@
   color: #fff;
 }
 
+/* SummaryView adds air-quality-<level> from the reading's level. theme.css's badge rules
+   are more specific, so they replace these backgrounds. */
 .summary-view .air-quality-good {
   background: linear-gradient(130deg, rgba(34, 197, 94, 0.85), rgba(22, 163, 74, 0.72));
 }
@@ -241,6 +256,7 @@
   background: linear-gradient(130deg, rgba(76, 29, 149, 0.92), rgba(88, 28, 135, 0.8));
 }
 
+/* ---- Hub lists and the forecast ------------------------------------------ */
 .summary-view .hub-list {
   margin-top: 4px;
   padding-left: 16px;
@@ -270,6 +286,7 @@
   flex-wrap: wrap;
 }
 
+/* ---- Range toggle and trend charts --------------------------------------- */
 .summary-view .summary-range-header {
   display: flex;
   justify-content: space-between;
@@ -335,12 +352,14 @@
   margin-top: 4px;
 }
 
+/* ---- Columns stacked ----------------------------------------------------- */
 @media (max-width: 1100px) {
   .summary-view {
     grid-template-columns: 1fr;
   }
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
   .summary-view .stat-row {
     grid-template-columns: 1fr;
