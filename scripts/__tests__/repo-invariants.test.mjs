@@ -335,4 +335,14 @@ describe("the Deploy workflow deploys only this repository's own pushes", () => 
     // One `||` inside the automatic branch would let any single check through.
     expect(automatic).not.toContain("||");
   });
+
+  test("the checkout is pinned to the commit CI passed", () => {
+    // Without a `ref`, a workflow_run event checks out main's current HEAD, so a
+    // later push could have its migrations applied by an earlier commit's deploy.
+    const checkouts = workflow.match(
+      /uses: actions\/checkout@[^\r\n]*\r?\n(?: {8,}(?!uses:)[^\r\n]*\r?\n)*/g
+    );
+    expect(checkouts).toHaveLength(1);
+    expect(checkouts[0]).toContain("ref: ${{ github.event.workflow_run.head_sha || github.sha }}");
+  });
 });
