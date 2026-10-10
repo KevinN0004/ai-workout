@@ -365,7 +365,7 @@ export default function SummaryView({
                     <p className="muted">
                       {airSummary.primaryPollutant || "PM2.5"}: {airSummary.pm25 ?? "--"} ug/m3
                       {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
-                        ? ` | US AQI ${airSummary.aqiUs}`
+                        ? ` | US AQI ${airSummary.aqiUs} from the latest reading`
                         : ""}
                     </p>
                     {airLocation?.name ? (
