@@ -19,6 +19,7 @@
 - [2026-09-22 — Deployment readiness remediation](plans/2026-09-22-deployment-readiness-remediation.md)
 - [2026-09-23 — Repository layout reorganization](plans/2026-09-23-repo-layout-reorganization.md)
 - [2026-09-29 — Code readability](plans/2026-09-29-code-readability.md)
+- [2026-10-10 — Readability follow-up](plans/2026-10-10-readability-follow-up.md)
 
 ## Specs
 
