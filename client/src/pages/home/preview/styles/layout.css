@@ -1,4 +1,9 @@
-﻿@import "./layout/base.css";
+﻿/* The walkthrough's layout, imported first by PreviewStage.css: base.css (the root and its
+   custom properties), header.css (the chapter title), frame.css (the chapter card and the
+   contents lane), dashboard.css (the dashboard chapter) and toc.css (the contents chips),
+   all from ./layout. Their order is the cascade order. */
+
+@import "./layout/base.css";
 @import "./layout/header.css";
 @import "./layout/frame.css";
 @import "./layout/dashboard.css";

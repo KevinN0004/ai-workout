@@ -1,3 +1,14 @@
+/**
+ * The home page's last stage: the Generate Workout button, which opens the
+ * planner, and the sample weekly plan. Rendered by HomePage while its stage is
+ * "workout".
+ */
+
+/**
+ * `workoutShellRef` is what useHomeStageFlow's morph measures for this stage,
+ * with `workoutPanelRef` as its fallback. `error` is App's error from
+ * generating a plan or preparing its PDF, shown under the button.
+ */
 export default function HomeWorkoutStage({
   workoutShellRef,
   workoutPanelRef,
@@ -11,6 +22,7 @@ export default function HomeWorkoutStage({
 }) {
   return (
     <div className="workout-stage-shell" ref={workoutShellRef}>
+      {/* ---- Header, Generate Workout and the error ---- */}
       <section className="panel center-panel stage-panel workout-stage-panel" ref={workoutPanelRef}>
         <div className="workout-header">
           <button
@@ -46,6 +58,7 @@ export default function HomeWorkoutStage({
         {error && <p className="error">{error}</p>}
       </section>
 
+      {/* ---- Sample weekly plan ---- */}
       <section className="panel muted-panel stage-panel">
         <h2>Sample Weekly Plan</h2>
         <div className="grid">

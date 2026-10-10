@@ -1,6 +1,19 @@
+/**
+ * The generated-plan modal: the plan's days as tabs beside the coach notes, with
+ * PDF download and a Login / Sign up button. App builds it and HomePage and
+ * DashboardPage render it, but nothing in the app opens it (see below).
+ */
 import ModalPortal from "../../components/ModalPortal";
 import { APP_BRAND_NAME } from "../constants";
 
+/**
+ * Renders while `planModalOpen` is set and there is a plan (`result`). Nothing
+ * in the app sets `planModalOpen` true: onSubmit in events.js only ever clears
+ * it, and shows a new plan on /plan or the dashboard instead, so only this
+ * file's tests open the modal. `planSections` is that plan split by
+ * parsePlanSections, and `activeDayIndex` picks the day tab shown; App resets
+ * it to the first day for each new plan.
+ */
 export default function GeneratedPlanModal({
   planModalOpen,
   result,
@@ -14,8 +27,8 @@ export default function GeneratedPlanModal({
   if (!planModalOpen) return null;
   // A generated plan is the modal's entire content, so there is nothing to show
   // before one arrives. This is the only guard on that: passing the same
-  // condition to ModalPortal as well used to make both untestable, because
-  // either one alone produced an empty render.
+  // condition to ModalPortal as well would make both untestable, because
+  // either one alone produces an empty render.
   if (!result) return null;
 
   return (
@@ -30,6 +43,7 @@ export default function GeneratedPlanModal({
         aria-labelledby="generated-plan-modal-title"
       >
         <div className="modal plan-modal">
+          {/* ---- Header: title and close ---- */}
           <div className="modal-header">
             <h2 id="generated-plan-modal-title">Your {APP_BRAND_NAME} Plan</h2>
             <div className="modal-actions">
@@ -50,6 +64,7 @@ export default function GeneratedPlanModal({
               </button>
             </div>
           </div>
+          {/* ---- Body: day tabs beside the coach notes ---- */}
           <div className="modal-body">
             <div className="plan-modal-content">
               <section className="plan-modal-plan">
@@ -96,6 +111,7 @@ export default function GeneratedPlanModal({
               </section>
             </div>
           </div>
+          {/* ---- Footer: PDF download and sign-in ---- */}
           <div className="modal-footer plan-modal-footer">
             <div className="modal-actions">
               <button type="button" className="cta" onClick={downloadPlanPdf}>

@@ -1,4 +1,12 @@
-﻿.preview-jump-chip {
+﻿/* PreviewToc's chips, one per chapter: a short pill with its title hidden, widened to show
+   the title when active, hovered or focused. PreviewStage marks the chips it switches between
+   is-expanding and is-contracting for PREVIEW_TOC_SWITCH_MS. Imported last by layout.css;
+   frame.css places the lane they sit in. */
+
+/* ---- Chip and label ------------------------------------------------------ */
+/* The widths are the lane's --preview-chip-collapsed and --preview-chip-expanded, which
+   PreviewToc sets inline from usePreviewDerivedData. */
+.preview-jump-chip {
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
@@ -54,6 +62,7 @@
   pointer-events: none;
 }
 
+/* ---- Hover, focus and switching states ----------------------------------- */
 .preview-jump-chip:hover,
 .preview-jump-chip:focus-visible {
   opacity: 0.96;
@@ -127,6 +136,7 @@
   transform: translateX(0);
 }
 
+/* ---- Chip and label keyframes -------------------------------------------- */
 @keyframes preview-toc-chip-expand {
   0% {
     width: var(--preview-chip-collapsed);
@@ -203,6 +213,9 @@
   }
 }
 
+/* ---- Hidden and active labels -------------------------------------------- */
+/* A label shows only on the active, expanding, hovered or focused chip. The !important also
+   beats animations, so a contracting chip's preview-toc-label-out never shows its fade. */
 .preview-side-tab
   .preview-jump-chip:not(.active):not(.is-expanding):not(:hover):not(:focus-visible)
   .preview-jump-label {

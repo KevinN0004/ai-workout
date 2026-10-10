@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 /**
- * Enforces the expiry dates on the audit-ci allowlist.
- *
+ * Enforces the expiry dates on the audit-ci allowlist. CI runs it before
+ * `npm ci`, which it can because it imports only node builtins.
+ */
+
+/*
  * audit-ci has no native expiry support, so a suppression added once would
  * otherwise stay forever. This cross-checks security/audit-ci.json against
- * security/advisory-reviews.json and fails the build when an entry is past its
- * reviewBy date, has no justification, or has gone stale.
+ * security/advisory-reviews.json and fails the build when an allowlisted
+ * advisory has no review, a review has no allowlist entry or repeats another's
+ * advisory, or a review lacks an advisory id, a reason, or a reviewBy date that
+ * is real and not yet past.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -18,10 +23,10 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  * well-formed and real.
  *
  * The shape check alone fails open twice over. Date.parse("2026-13-45") is NaN,
- * and `NaN < anything` is false, so an impossible date skipped the expiry
- * comparison and the suppression stayed live forever. "2026-02-30" is quieter:
- * V8 rolls it over to 2026-03-02 rather than erroring, silently moving the
- * deadline. Round-tripping back through toISOString rejects both.
+ * and `NaN < anything` is false, so an impossible date would skip the expiry
+ * comparison and the suppression would stay live forever. "2026-02-30" is
+ * quieter: V8 rolls it over to 2026-03-02 rather than erroring, silently moving
+ * the deadline. Round-tripping back through toISOString rejects both.
  */
 const toUtcDate = (isoDate) => {
   if (!DATE_PATTERN.test(isoDate)) return Number.NaN;
@@ -30,6 +35,12 @@ const toUtcDate = (isoDate) => {
   return new Date(parsed).toISOString().slice(0, 10) === isoDate ? parsed : Number.NaN;
 };
 
+/**
+ * Cross-checks the allowlisted advisory ids against the review entries and
+ * returns one message per problem, so an empty array means the allowlist
+ * passes. `today` is the YYYY-MM-DD date each reviewBy is compared with;
+ * main() passes the UTC date.
+ */
 export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) => {
   const errors = [];
   const byAdvisory = new Map();
@@ -43,6 +54,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     );
   }
 
+  // ---- Reviews, indexed by advisory -----------------------------------------
   for (const entry of reviews) {
     const advisory = typeof entry?.advisory === "string" ? entry.advisory.trim() : "";
     if (!advisory) {
@@ -56,6 +68,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     byAdvisory.set(advisory, entry);
   }
 
+  // ---- Each allowlisted advisory needs a live review ------------------------
   for (const advisory of allowlist) {
     const entry = byAdvisory.get(advisory);
     if (!entry) {
@@ -82,6 +95,7 @@ export const checkAdvisoryReviews = ({ allowlist = [], reviews = [], today }) =>
     }
   }
 
+  // ---- Each review needs an allowlist entry ---------------------------------
   for (const advisory of byAdvisory.keys()) {
     if (!allowlist.includes(advisory)) {
       errors.push(

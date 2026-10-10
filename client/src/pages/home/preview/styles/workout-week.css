@@ -1,3 +1,7 @@
+/* The week chapter's styles, imported third by PreviewStage.css: structure.css,
+   break-apart.css, table-base.css, animations.css and content.css, all from
+   ./workout-week. Their order is the cascade order. */
+
 @import "./workout-week/structure.css";
 @import "./workout-week/break-apart.css";
 @import "./workout-week/table-base.css";

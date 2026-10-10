@@ -1,3 +1,7 @@
+/**
+ * The edit form for one settings tab, built from that tab's descriptors in
+ * settingsFields.js. Rendered by SettingsView while the tab is being edited.
+ */
 import { useState } from "react";
 
 const unitsFor = (measurementSystem) =>
@@ -5,6 +9,12 @@ const unitsFor = (measurementSystem) =>
     ? { heightUnit: "ft", weightUnit: "lb" }
     : { heightUnit: "cm", weightUnit: "kg" };
 
+/**
+ * Edits a draft copied once from `values`, the whole stored profile rather than
+ * only this tab's fields, so saving hands `onSave` a complete profile. Height
+ * and weight render in `measurementSystem`'s units, which go to `onSave` with
+ * the draft. `error` and `saving` belong to SettingsView's save.
+ */
 export default function SettingsEditForm({
   fields,
   values,
@@ -42,6 +52,7 @@ export default function SettingsEditForm({
   );
 
   const renderField = (field) => {
+    // Height and weight: inputs in the visitor's units, with that unit's bounds.
     if (field.type === "height") {
       return units.heightUnit === "ft" ? (
         <>
@@ -57,6 +68,7 @@ export default function SettingsEditForm({
       return numberInput("weight", `Weight (${units.weightUnit})`, field.bounds[units.weightUnit]);
     }
 
+    // Every other field by its type, and a text input for anything else.
     if (field.type === "multiselect") {
       return (
         <fieldset>

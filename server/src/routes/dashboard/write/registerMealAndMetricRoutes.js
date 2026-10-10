@@ -1,4 +1,14 @@
+/**
+ * POST routes for meal logs and progress metrics. Registered by
+ * registerDashboardWriteRoutes.js.
+ */
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
+
+/**
+ * Registers POST /api/dashboard/meal-logs and POST /api/dashboard/progress-metrics.
+ * Both require a session, and answer with the refreshed dashboard plus the entry
+ * just saved.
+ */
 export const registerMealAndMetricRoutes = (app, deps) => {
   const {
     requireAuth,
@@ -39,18 +49,8 @@ export const registerMealAndMetricRoutes = (app, deps) => {
       // well as when a new one is added, and a failure leaves neither behind.
       await saveMealLogWithDailySync({ userId: req.user.id, mealLog });
 
-      // A ~110-line Mongo aggregation-pipeline update used to sit here. It
-      // computed the day’s calorie total and wrote it into dashboard.calories
-      // as a `meal_logs`-sourced entry unless a manual entry already existed.
-      //
-      // None of it ran. The shim only matches object updates carrying
-      // $set/$push/$pull, so an array pipeline fell through to a plain re-read.
-      // Verified against a live server: logging a 700-calorie meal leaves
-      // dashboard.calories empty and calorie_entries with no rows.
-      //
-      // Removed rather than repaired: making it work is a behaviour change and
-      // belongs to its own decision, not to this refactor. The working half is
-      // preserved as sumCaloriesForDate in repositories/mealLogRepository.js.
+      // Re-read rather than answer from req.user, which was loaded before these
+      // writes: dashboard.calories in the response has to reflect the sync.
       const updatedDoc = await findUserWithDashboard(req.user.id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
       const updated = mapDbDocToUser(updatedDoc);

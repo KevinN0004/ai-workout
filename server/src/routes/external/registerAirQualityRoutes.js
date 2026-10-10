@@ -1,6 +1,16 @@
+/**
+ * GET /api/air-quality/current: an OpenAQ station's latest readings near the
+ * given coordinates, scored as a US AQI with a training recommendation.
+ * Registered by externalRoutes.js.
+ */
 import { airQualityQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
+/**
+ * Registers the air-quality route. `deps` supplies the OpenAQ client
+ * (`openAqRequest`) and its parsing and scoring helpers from
+ * externalDataService.js.
+ */
 export const registerAirQualityRoutes = (app, deps) => {
   const {
     toNullableNumber,
@@ -17,11 +27,14 @@ export const registerAirQualityRoutes = (app, deps) => {
 
   app.get("/api/air-quality/current", async (req, res) => {
     try {
+      // Validate the coordinates. The search radius defaults to 25 km.
       const query = validateQuery(req, res, airQualityQuerySchema, {
         message: "Valid latitude and longitude are required."
       });
       if (!query) return;
       const { latitude, longitude, radiusKm = 25 } = query;
+
+      // Load the first station OpenAQ lists within the radius.
       const locationResponse = await openAqRequest("locations", {
         coordinates: `${latitude},${longitude}`,
         radius: Math.round(radiusKm * 1000),
@@ -38,6 +51,10 @@ export const registerAirQualityRoutes = (app, deps) => {
         return res.status(502).json({ error: "OpenAQ response missing location id." });
       }
 
+      // Load its latest readings. A reading names its sensor by id, and the
+      // station's sensor list says what that sensor measures, so the two are
+      // joined. Readings with no pollutant or no value are dropped, and the
+      // first reading for each pollutant wins.
       const latestResponse = await openAqRequest(`locations/${Math.trunc(locationId)}/latest`);
       const latestData = latestResponse.data;
       const rawReadings = Array.isArray(latestData?.results) ? latestData.results : [];
@@ -59,6 +76,8 @@ export const registerAirQualityRoutes = (app, deps) => {
       }
       const pollutants = Array.from(byCode.values()).slice(0, 12);
 
+      // Score from PM2.5 alone. A station with no PM2.5 reading scores null and
+      // the "Unknown" band, never AQI 0.
       const pm25Reading =
         pollutants.find((item) => ["pm25", "pm2.5", "pm2_5", "pm2p5"].includes(item.code)) || null;
       const pm25 = pm25Reading?.value ?? null;
@@ -101,6 +120,9 @@ export const registerAirQualityRoutes = (app, deps) => {
         }))
       });
     } catch (err) {
+      // An outage (any status isUpstreamFailureStatus accepts, which covers the
+      // one a missing OPENAQ_API_KEY raises; an error with no status counts as
+      // 500) answers 200 with an "Unknown" reading that advises indoor training.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
         return res.json({

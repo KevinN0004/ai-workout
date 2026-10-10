@@ -1,11 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import { PREVIEW_TYPING_MAX_MS, PREVIEW_TYPING_MIN_MS, PREVIEW_WEEK_DAY_ORDER } from "../constants";
 import {
-  buildPreviewLinePath,
   clamp,
   getPreviewTypingStepMs,
   getPreviewWeekdayName,
-  getRegionFromLocale,
   normalizePreviewTrainingDay,
   randomBetween,
   roundTo
@@ -23,27 +21,6 @@ describe("normalizePreviewTrainingDay", () => {
     expect(normalizePreviewTrainingDay("")).toBe("");
     expect(normalizePreviewTrainingDay(null)).toBe("");
     expect(normalizePreviewTrainingDay(undefined)).toBe("");
-  });
-});
-
-describe("getRegionFromLocale", () => {
-  test("reads the region from a hyphenated or underscored tag", () => {
-    expect(getRegionFromLocale("en-GB")).toBe("GB");
-    expect(getRegionFromLocale("en_us")).toBe("US");
-  });
-
-  test("falls back to Intl parsing for a bare language tag", () => {
-    // "en-US" is what Intl expands "en" to in most runtimes; either a region or
-    // an empty string is acceptable, but it must never throw.
-    expect(() => getRegionFromLocale("en")).not.toThrow();
-    expect(typeof getRegionFromLocale("en")).toBe("string");
-  });
-
-  test("returns an empty string for junk rather than throwing", () => {
-    expect(getRegionFromLocale("!!!")).toBe("");
-    expect(getRegionFromLocale("")).toBe("");
-    expect(getRegionFromLocale(null)).toBe("");
-    expect(getRegionFromLocale(42)).toBe("");
   });
 });
 
@@ -109,59 +86,15 @@ describe("randomBetween", () => {
   });
 });
 
-describe("buildPreviewLinePath", () => {
-  test("starts with a move command and continues with lines", () => {
-    const path = buildPreviewLinePath([1, 2, 3]);
-
-    expect(path.startsWith("M")).toBe(true);
-    expect((path.match(/L/g) || []).length).toBe(2);
-    expect(path).not.toMatch(/NaN|Infinity/);
-  });
-
-  test("produces one point per value", () => {
-    expect(buildPreviewLinePath([1, 2, 3, 4]).split(" ")).toHaveLength(4);
-  });
-
-  test("handles an empty series without dividing by zero", () => {
-    const path = buildPreviewLinePath([]);
-
-    expect(path).not.toMatch(/NaN|Infinity/);
-    expect(path.startsWith("M")).toBe(true);
-  });
-
-  test("handles a single value and a flat series", () => {
-    expect(buildPreviewLinePath([5])).not.toMatch(/NaN/);
-    // A flat series has zero range; the guard keeps it from dividing by zero.
-    expect(buildPreviewLinePath([4, 4, 4])).not.toMatch(/NaN/);
-  });
-
-  test("keeps points inside the requested box", () => {
-    const width = 200;
-    const height = 80;
-    const padding = 10;
-    const path = buildPreviewLinePath([3, 9, 1, 7], width, height, padding);
-
-    path.split(" ").forEach((command) => {
-      const [x, y] = command.slice(1).split(",").map(Number);
-      expect(x).toBeGreaterThanOrEqual(padding - 0.001);
-      expect(x).toBeLessThanOrEqual(width - padding + 0.001);
-      expect(y).toBeGreaterThanOrEqual(padding - 0.001);
-      expect(y).toBeLessThanOrEqual(height - padding + 0.001);
-    });
-  });
-});
-
 describe("getPreviewWeekdayName", () => {
   // JS getDay() is Sunday-first; the preview week is Monday-first, so the
   // rotation has to move Sunday to the end rather than the start.
   test("maps a Monday date to the first day of the preview week", () => {
-    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
+    expect(getPreviewWeekdayName(new Date("2026-06-01T12:00:00Z"))).toBe("Monday");
   });
 
   test("maps a Sunday date to the last day of the preview week", () => {
-    expect(getPreviewWeekdayName(new Date("2026-06-07T12:00:00Z"))).toBe(
-      PREVIEW_WEEK_DAY_ORDER[PREVIEW_WEEK_DAY_ORDER.length - 1]
-    );
+    expect(getPreviewWeekdayName(new Date("2026-06-07T12:00:00Z"))).toBe("Sunday");
   });
 
   test("falls back to the first day when given something that is not a date", () => {

@@ -1,35 +1,9 @@
+/* The home page's narrower-screen rules, and the workout stage's sample plan cards.
+   Imported last by HomePage.css, so these override core.css and forms-and-motion.css at the
+   same specificity. styles/base.css lands after every home sheet and still wins its ties. */
+
+/* ---- Medium screens ------------------------------------------------------ */
 @media (max-width: 1180px) {
-  .preview-stage-panel {
-    width: 100%;
-  }
-
-  .preview-scroll-story {
-    width: 100%;
-    padding: 0;
-  }
-
-  .preview-step-shell {
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-  }
-
-  .preview-side-tab {
-    width: fit-content;
-    min-width: 112px;
-    max-width: clamp(148px, 19vw, 248px);
-    padding: 4px 4px 4px 2px;
-    box-sizing: border-box;
-  }
-
-  .preview-combine-shell {
-    grid-template-columns: 1fr;
-    justify-items: center;
-  }
-
-  .metric-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .visual-stage {
     --visual-stage-size: min(clamp(500px, 80vmin, 780px), calc(100dvh - 240px), calc(100vw - 28px));
     width: var(--visual-stage-size);
@@ -44,6 +18,8 @@
   }
 }
 
+/* ---- Workout stage sample week ------------------------------------------- */
+/* HomeWorkoutStage's sample plan, one card per day. */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -74,6 +50,12 @@
   line-height: 1.4;
 }
 
+/* ---- Narrow screens ------------------------------------------------------ */
+/* The personal form's one-column rule never applies: in basic mode styles/base.css's .form
+   ties it and loads later (its auto-fit still drops to one column on the narrowest screens),
+   and in advanced mode forms-and-motion.css's two-column rule is more specific, so the fields
+   this block puts in column 1 fill half the form. .header-top, .header-left and .auth-actions
+   match nothing. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -108,74 +90,6 @@
   .home-intro-actions .cta,
   .home-intro-actions .ghost {
     width: 100%;
-  }
-
-  .preview-fields-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-stage-panel {
-    --preview-header-top: 62px;
-    --preview-header-height: 70px;
-  }
-
-  .preview-stage-header {
-    top: var(--preview-header-top);
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-    padding: 9px 10px;
-  }
-
-  .preview-scroll-story {
-    padding: 0;
-  }
-
-  .preview-step-shell {
-    position: relative;
-    top: auto;
-    width: min(var(--preview-body-width), calc(100% - (var(--home-shell-gutter) * 2)));
-    max-width: var(--preview-body-width);
-    margin: 0 auto;
-    padding: 0;
-  }
-
-  .preview-side-tab {
-    position: fixed;
-    top: var(--preview-header-top);
-    left: 0;
-    transform: none;
-    width: fit-content;
-    min-width: 96px;
-    max-width: min(44vw, 180px);
-    margin: 0;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    z-index: 22;
-    max-height: calc(100vh - var(--preview-header-top) - 8px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 4px 4px 4px 2px;
-    box-sizing: border-box;
-    border-right: 1px solid rgba(255, 255, 255, 0.12);
-    background: linear-gradient(90deg, rgba(0, 0, 0, 0.76), rgba(0, 0, 0, 0));
-    transition: none;
-  }
-
-  .preview-jump-chip {
-    font-size: 0.78rem;
-  }
-
-  .preview-combine-core {
-    width: min(240px, 100%);
-  }
-
-  .preview-generated-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-dashboard-metrics,
-  .preview-dashboard-panels {
-    grid-template-columns: 1fr;
   }
 
   .home-page .title,
@@ -266,10 +180,6 @@
     align-self: auto;
   }
 
-  .metric-list {
-    grid-template-columns: 1fr;
-  }
-
   .visual-stage {
     --visual-stage-size: min(clamp(360px, 88vmin, 620px), calc(100dvh - 224px), calc(100vw - 24px));
     width: var(--visual-stage-size);
@@ -288,6 +198,9 @@
   }
 }
 
+/* ---- Smallest screens ---------------------------------------------------- */
+/* The Preview button's padding-inline loses to styles/base.css's .ghost padding, which ties
+   it and loads later. */
 @media (max-width: 560px) {
   .home-sticky-nav {
     grid-template-columns: 1fr auto;

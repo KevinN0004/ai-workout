@@ -61,8 +61,14 @@ jobs:
     environment: production
 
     steps:
+      # A workflow_run event checks out the default branch's current HEAD, not
+      # the commit CI passed, so a later push to main would have ITS migrations
+      # applied by the deploy for an earlier, tested commit. Pin the commit CI
+      # ran against. A manual dispatch has no upstream run and uses its own sha.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v7

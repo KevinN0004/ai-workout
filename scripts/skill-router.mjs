@@ -1,3 +1,9 @@
+/**
+ * Claude Code's UserPromptSubmit hook, run from .claude/settings.json, which
+ * knip cannot see: hence this file's entry in knip.jsonc. Prints a note naming
+ * the skill of the first rule in RULES with a keyword in the prompt, which
+ * Claude Code adds to the context, and exits 0 even on input it cannot parse.
+ */
 import { createInterface } from "node:readline";
 
 const RULES = [

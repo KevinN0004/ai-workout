@@ -1,3 +1,9 @@
+/**
+ * The preview walkthrough's timed state machine: on arrival each chapter plays
+ * a sequence of stage changes on timers, or under reduced motion shows its end
+ * state, and Personal Info and Generate then move on to the next chapter by
+ * themselves. Called by PreviewStage.
+ */
 import { useCallback, useEffect } from "react";
 import {
   PREVIEW_INSTANT_FIELDS,
@@ -19,9 +25,35 @@ import {
 } from "../constants";
 import { clamp, getPreviewTypingStepMs } from "../utils";
 
+// When Personal Info's first field starts filling, and the gap before each next
+// one starts, in milliseconds.
 const PREVIEW_FILL_START_DELAY_MS = 420;
 const PREVIEW_FILL_STEP_MS = 220;
 
+/**
+ * Plays `activePreviewChapterId`'s sequence on mount and whenever the chapter
+ * changes, after cancelling whatever the last one scheduled, through the
+ * setters PreviewStage owns:
+ *
+ * - Personal Info types the profile into the form field by field, collapses
+ *   the form, and moves to Generate.
+ * - Generate shows the form collapsed, adds a "+" and Environment, then a "+"
+ *   and Focus, holds on "Generating", and moves to the week.
+ * - The week draws the table's outline, types the headers and then the rows,
+ *   scans it once and sets stage 6. usePreviewWeekParticleAnimation's dissolve
+ *   takes over from there, and it is that hook that moves to the dashboard.
+ * - The dashboard reveals its cards one stage at a time, and stays.
+ *
+ * Under `prefers-reduced-motion` each chapter shows its finished state at
+ * once. Personal Info moves straight to Generate and Generate moves on after
+ * PREVIEW_GENERATING_HOLD_MS, but the week stops at stage 4, before the scan, so
+ * the dissolve never plays and nothing moves to the dashboard.
+ *
+ * What is typed is the profile the walkthrough opened with
+ * (`previewInitialTargetsRef`, `previewInitialFillOrderRef`). Every timer goes
+ * on `previewFillTimeoutsRef`, and `clearPreviewFillTimers`, returned for
+ * PreviewStage's unmount, cancels them all, the particle animation's included.
+ */
 export default function usePreviewChapterFlow({
   activePreviewChapterId,
   generateChapterIndex,
@@ -41,6 +73,7 @@ export default function usePreviewChapterFlow({
   setPreviewWeekHeaderTypingProgress,
   setPreviewWeekTypingProgress
 }) {
+  // The list mixes timeouts and intervals, so each id goes to both clears.
   const clearPreviewFillTimers = useCallback(() => {
     if (!previewFillTimeoutsRef.current.length) return;
     previewFillTimeoutsRef.current.forEach((timeoutId) => {
@@ -51,6 +84,7 @@ export default function usePreviewChapterFlow({
   }, [previewFillTimeoutsRef]);
 
   useEffect(() => {
+    // ---- What gets typed, and filling it all at once ------------------------
     const personalTargets = previewInitialTargetsRef.current || previewPersonalTargets;
     const fillOrder = previewInitialFillOrderRef.current || previewFillOrder;
 
@@ -70,8 +104,14 @@ export default function usePreviewChapterFlow({
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    // Cancels the last chapter's timers. Only Personal Info's animated run
+    // returns a cleanup of its own; for the others, this or PreviewStage's
+    // unmount is what stops them.
     clearPreviewFillTimers();
 
+    // ---- Generate -----------------------------------------------------------
+    // The builder's six stages, PREVIEW_BUILDER_STEP_MS apart, then the move to
+    // the week once the last has held for PREVIEW_GENERATING_HOLD_MS.
     if (activePreviewChapterId === "generate") {
       setPreviewWeekStage(0);
       setPreviewDashboardStage(0);
@@ -115,6 +155,12 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
+    // ---- The week -----------------------------------------------------------
+    // The outline, the headers and the rows start at fixed offsets from
+    // arrival; stage 4, then the scan (5) and the break (6), follow the end of
+    // the row typing. Typing progress is the time elapsed over the typing's
+    // length, sampled every 32 ms, so it keeps to the clock however late a tick
+    // runs.
     if (activePreviewChapterId === "workout-week") {
       setPreviewFilledFields({});
       setPreviewPersonalCollapsed(false);
@@ -184,6 +230,9 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
+    // ---- The dashboard ------------------------------------------------------
+    // A card a stage, up to PREVIEW_DASHBOARD_FINAL_STAGE. It is the last
+    // chapter, so nothing moves on from here.
     if (activePreviewChapterId === "dashboard-preview") {
       setPreviewFilledFields({});
       setPreviewPersonalCollapsed(false);
@@ -215,6 +264,9 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
+    // ---- Any other chapter --------------------------------------------------
+    // Cannot run: usePreviewDerivedData builds only the four chapters handled
+    // here and below.
     if (activePreviewChapterId !== "personal-info") {
       setPreviewWeekStage(0);
       setPreviewDashboardStage(0);
@@ -227,6 +279,7 @@ export default function usePreviewChapterFlow({
       return undefined;
     }
 
+    // ---- Personal Info ------------------------------------------------------
     if (prefersReducedMotion) {
       markAllFilled();
       setPreviewPersonalCollapsed(true);
@@ -246,9 +299,13 @@ export default function usePreviewChapterFlow({
     setPreviewBuilderStage(0);
     let latestCompletionMs = 0;
 
+    // Each field starts PREVIEW_FILL_STEP_MS after the one before, whether or
+    // not that one has finished, so a long value is still typing as the next
+    // begins. latestCompletionMs tracks when the last of them ends.
     fillOrder.forEach((fieldKey, index) => {
       const fieldStartMs = PREVIEW_FILL_START_DELAY_MS + index * PREVIEW_FILL_STEP_MS;
       const timeoutId = window.setTimeout(() => {
+        // The training days light up one at a time.
         if (fieldKey === "trainingDays") {
           const trainingDays = Array.isArray(personalTargets.trainingDays)
             ? personalTargets.trainingDays
@@ -273,6 +330,8 @@ export default function usePreviewChapterFlow({
           return;
         }
 
+        // A select menu is set whole; anything else types a character every
+        // getPreviewTypingStepMs.
         if (PREVIEW_INSTANT_FIELDS.has(fieldKey)) {
           setPreviewFilledFields((prev) => ({ ...prev, [fieldKey]: targetValue }));
           return;
@@ -293,6 +352,7 @@ export default function usePreviewChapterFlow({
       }, fieldStartMs);
       previewFillTimeoutsRef.current.push(timeoutId);
 
+      // When this field ends, worked out ahead from the same timings.
       if (fieldKey === "trainingDays") {
         const trainingDays = Array.isArray(personalTargets.trainingDays)
           ? personalTargets.trainingDays
@@ -316,6 +376,11 @@ export default function usePreviewChapterFlow({
       );
     });
 
+    // PREVIEW_COLLAPSE_DELAY_MS after the last field ends, the form collapses.
+    // Once the morph has had PREVIEW_POST_MORPH_SHIFT_DELAY_MS, the builder
+    // resets and, 42 ms on, the walkthrough moves to Generate, which plays the
+    // builder itself. The arm that plays it here instead is for a walkthrough
+    // with no Generate chapter, which usePreviewDerivedData never builds.
     const collapseTimeoutId = window.setTimeout(() => {
       setPreviewPersonalCollapsed(true);
       const postMorphShiftTimeoutId = window.setTimeout(() => {
@@ -350,8 +415,12 @@ export default function usePreviewChapterFlow({
     // Deliberately keyed on the chapter transition alone. This schedules a
     // timed animation sequence; re-running it because `previewPersonalTargets`
     // or `previewFillOrder` changed would restart that sequence mid-flight,
-    // which is visibly wrong. The remaining "missing" deps are setState
-    // functions and refs, which are stable and would change nothing.
+    // which is visibly wrong. Of the other "missing" deps, only scrollToChapter
+    // changes: PreviewStage makes a new one each render, so listing it would
+    // restart the sequence on every render, and each typed character is one.
+    // The copy captured here reads only refs, setters and the fixed chapter
+    // list, so it acts as a newer one would. The rest are setState functions,
+    // refs and the stable clearPreviewFillTimers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePreviewChapterId, generateChapterIndex, workoutWeekChapterIndex]);
 

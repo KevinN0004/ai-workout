@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /*
- * manual-deploy.mjs
- *
  * Does by hand what .github/workflows/deploy.yml does, in the same order, for
- * when Actions cannot run it -- a billing block, an outage, or a deploy from a
- * machine rather than CI.
+ * when Actions cannot run it: a billing block, an outage, or a deploy from a
+ * machine rather than CI. The usage notes below list its steps, the variables
+ * it reads, and why the order matters.
+ */
+
+/*
+ * Usage
  *
  *   1. Validate the inputs                (the workflow does NOT do this)
  *   2. Apply migrations                   <- must precede the deploy

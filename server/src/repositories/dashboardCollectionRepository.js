@@ -1,16 +1,12 @@
+/**
+ * Paginated reads for the three dashboard collections: workout sessions, meal
+ * logs and progress metrics. One generic loadCollectionPage serves all three,
+ * because dashboardCollectionService drives them through a single code path.
+ */
 import { userIdWhere } from "./userLookup.js";
 import { mapWorkoutSession } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
-
-/**
- * Paginated reads for the three dashboard collections.
- *
- * Task 3b of docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md. This is
- * one task rather than three because dashboardCollectionService drives all
- * three models through a single generic function -- the reason the read side
- * could not be migrated per model the way the plan first assumed.
- */
 
 const COLLECTIONS = {
   workoutSessions: {
@@ -30,15 +26,18 @@ const COLLECTIONS = {
   }
 };
 
+/**
+ * Builds the reader over `prisma`. Returns `loadCollectionPage`, which index.js
+ * hands to the dashboard collection service.
+ */
 export const createDashboardCollectionRepository = ({ prisma }) => {
   /**
-   * One page of a collection, plus the unpaged total.
+   * One page of a collection, newest first by `sortField`, plus the total of
+   * the user's whole collection.
    *
-   * The caller has always asked for `{ [sortField]: -1, _id: -1 }`, but the
-   * shim's sort() read only the first key, so the tiebreaker was silently
-   * discarded and ordering among rows sharing a timestamp was left to whatever
-   * Postgres returned. It is honoured here: without it, paging over tied values
-   * can repeat or skip a row, and the caller was already asking for the fix.
+   * Rows that share a `sortField` value are ordered by id. Without that
+   * tiebreaker their order is whatever Postgres returns, so paging over tied
+   * values can repeat or skip a row.
    */
   const loadCollectionPage = async ({ collection, userId, sortField, limit, offset }) => {
     const spec = COLLECTIONS[collection];

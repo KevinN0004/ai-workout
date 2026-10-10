@@ -1,3 +1,8 @@
+/**
+ * The home page's guided walkthrough, its "preview" stage: a sample of the app
+ * played chapter by chapter, from Personal Info to the dashboard, beside a
+ * table of contents for jumping between them. Rendered by HomePage.
+ */
 import { useEffect, useRef, useState } from "react";
 import { createDefaultPreviewWeekLineOffsets, PREVIEW_TOC_SWITCH_MS } from "./constants";
 import PreviewToc from "./components/PreviewToc";
@@ -10,6 +15,17 @@ import usePreviewWeekParticleAnimation from "./hooks/usePreviewWeekParticleAnima
 import usePreviewDerivedData from "./hooks/usePreviewDerivedData";
 import "./PreviewStage.css";
 
+/**
+ * Owns the walkthrough's state: the current chapter, the table of contents'
+ * switch, each chapter's stage, the fields filled so far and the form's
+ * collapsed and shifted flags, the week outline's line positions and the typing
+ * progress. Its hooks derive the content and play each chapter; the chapter
+ * components render it. `personal` and `form` are App's profile and planner
+ * form and `heightUnit` and `weightUnit` App's units; the converters are
+ * app/units.js's, and the body figures useBodyModel's, both passed down by
+ * HomePage. HomePage mounts it afresh each time the stage opens, so the
+ * walkthrough always starts at Personal Info.
+ */
 export default function PreviewStage({
   personal,
   form,
@@ -21,6 +37,7 @@ export default function PreviewStage({
   resolvedWeightKg,
   effectiveBodyFat
 }) {
+  // ---- Refs and state -------------------------------------------------------
   const previewFillTimeoutsRef = useRef([]);
   const previewStageRef = useRef(null);
   const previewWeekTableWrapRef = useRef(null);
@@ -44,6 +61,7 @@ export default function PreviewStage({
   const [previewWeekHeaderTypingProgress, setPreviewWeekHeaderTypingProgress] = useState(0);
   const [previewWeekTypingProgress, setPreviewWeekTypingProgress] = useState(0);
 
+  // ---- Derived content ------------------------------------------------------
   const {
     previewWeekPlan,
     previewDashboardSummary,
@@ -76,12 +94,14 @@ export default function PreviewStage({
     previewWeekTypingProgress
   });
 
+  // ---- Chapter bodies and switching -----------------------------------------
   const clearPreviewTocSwitchTimer = () => {
     if (!previewTocSwitchTimeoutRef.current) return;
     window.clearTimeout(previewTocSwitchTimeoutRef.current);
     previewTocSwitchTimeoutRef.current = null;
   };
 
+  // Personal Info and Generate are one component, Generate in its builder view.
   const renderPreviewChapterBody = (chapter) =>
     chapter.id === "personal-info" ? (
       <PreviewPersonalChapter
@@ -121,9 +141,7 @@ export default function PreviewStage({
         previewDashboardStage={previewDashboardStage}
       />
     ) : // usePreviewDerivedData builds exactly these four chapters, so nothing
-    // reaches here. This used to render a generic grid of textareas from
-    // `chapter.fields`, which is why those arrays existed at all -- they were
-    // built for an arm that could not run and read nowhere else.
+    // reaches here.
     null;
 
   const scrollPreviewIntoView = () => {
@@ -131,6 +149,10 @@ export default function PreviewStage({
     previewStageRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // Switches to a chapter, held to the list, unless it is the one showing. The
+  // table of contents and the chapter hooks both move on through this, and the
+  // chips keep their expanding and contracting classes for PREVIEW_TOC_SWITCH_MS.
+  // Despite the name it does not scroll; only the mount effect does.
   const scrollToChapter = (targetIndex) => {
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
     const currentIndex = previewStepIndexRef.current;
@@ -147,6 +169,10 @@ export default function PreviewStage({
     }, PREVIEW_TOC_SWITCH_MS);
   };
 
+  // ---- Effects --------------------------------------------------------------
+  // While the walkthrough is mounted, `preview-smooth-scroll` on <html> gives
+  // the page a top scroll padding and, unless the visitor prefers reduced
+  // motion, smooth scrolling (styles/layout/base.css, styles/responsive.css).
   useEffect(() => {
     const rootEl = document.documentElement;
     if (!rootEl) return undefined;
@@ -156,10 +182,20 @@ export default function PreviewStage({
     };
   }, []);
 
+  // Keeps the ref equal to the chapter index for the code that reads it outside
+  // a render: scrollToChapter, and the particle animation's completion. Both
+  // places that set the index write the ref at once too, so this restates a
+  // value the ref already holds.
   useEffect(() => {
     previewStepIndexRef.current = previewStepIndex;
   }, [previewStepIndex]);
 
+  // On mount, the first chapter, and two animation frames on, once the stage
+  // has been painted, a smooth scroll that brings its top up to the page's
+  // scroll padding. The index already starts at 0, so the reset changes nothing
+  // here. The frames are not cancelled, so a PreviewStage that unmounts before
+  // they run reaches scrollPreviewIntoView with no element, which its null
+  // check covers.
   useEffect(() => {
     setPreviewStepIndex(0);
     previewStepIndexRef.current = 0;
@@ -168,6 +204,9 @@ export default function PreviewStage({
     });
   }, []);
 
+  // ---- The chapter hooks ----------------------------------------------------
+  // When more than one of their effects runs in a commit, they run in this
+  // order: the outline's, the chapter flow's, then the particle animation's.
   usePreviewWeekOutline({
     activePreviewChapterId: activePreviewChapter.id,
     previewWeekPlan,
@@ -213,7 +252,9 @@ export default function PreviewStage({
   // Unmount cleanup. Both clear functions are useCallbacks keyed only on refs,
   // so they are stable for the component's life -- listing them cannot make
   // this effect re-run, and it removes the risk of the cleanup closing over a
-  // stale first-render copy.
+  // stale first-render copy. clearPreviewTocSwitchTimer is new each render and
+  // left out; the first render's copy reads only a ref, so it clears the same
+  // timer.
   useEffect(
     () => () => {
       clearPreviewFillTimers();
@@ -223,12 +264,14 @@ export default function PreviewStage({
     [clearPreviewFillTimers, clearPreviewWeekParticleAnimation]
   );
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section
       ref={previewStageRef}
       className="panel preview-stage-panel stage-panel"
       style={previewStageStyle}
     >
+      {/* ---- The chapter's title, keyed on the chapter so each one enters afresh ---- */}
       <div className="preview-view-header-section">
         <header className="preview-stage-header">
           <p className="preview-stage-kicker">Guided walkthrough</p>
@@ -244,6 +287,7 @@ export default function PreviewStage({
           </div>
         </header>
       </div>
+      {/* ---- The table of contents and the current chapter ---- */}
       <div className="preview-view-body-section">
         <div className="preview-layout-frame">
           <PreviewToc

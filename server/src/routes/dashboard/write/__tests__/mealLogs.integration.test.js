@@ -240,8 +240,9 @@ describe("POST /api/dashboard/meal-logs", () => {
     });
   });
 
-  // Each meal is capped at 5000 but calorie_entries allows at most 10000, so a
-  // day's sum can overflow the derived row. This used to 500 after saving the meal.
+  // A single meal is bounded on its own, but calorie_entries bounds the day's derived
+  // row separately (calorie_entries_calories_check), so a day's sum can overflow it.
+  // The sync clamps the entry to that ceiling, so the route answers 200.
   describe("a day whose meals exceed the calorie_entries ceiling", () => {
     const logBigMeals = async (count) => {
       let response;
@@ -256,7 +257,7 @@ describe("POST /api/dashboard/meal-logs", () => {
       return response;
     };
 
-    test("clamps the derived entry to 10000 and keeps every meal", async () => {
+    test("clamps the derived entry to the column ceiling and keeps every meal", async () => {
       const response = await logBigMeals(3);
 
       expect(response.status).toBe(200);
