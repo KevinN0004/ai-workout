@@ -1,3 +1,8 @@
+/* The home page's styles, imported by HomePage ahead of PreviewStage: core.css,
+   forms-and-motion.css and responsive.css, all from ./styles. Their order is the cascade
+   order, and all three land before PreviewStage.css. AuthPage and WorkoutResultPage carry
+   home-page too, so the .home-page rules in these sheets also style /auth and /plan. */
+
 @import "./styles/core.css";
 @import "./styles/forms-and-motion.css";
 @import "./styles/responsive.css";

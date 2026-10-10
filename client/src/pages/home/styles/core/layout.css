@@ -1,8 +1,18 @@
+/* The home page's frame: the .home-page root and its custom properties, the sticky nav,
+   the stage wrapper with its enter, snap and hidden states, and the intro panel. Imported
+   first by core.css. AuthPage and WorkoutResultPage carry home-page too, which is how
+   --home-animation-ms and --home-shell-gutter reach /auth and /plan. */
+
+/* ---- Walkthrough scrolling ----------------------------------------------- */
+/* PreviewStage puts this class on <html> while it is mounted. home/preview/styles/layout/
+   base.css repeats the rule with the same values. The reduced-motion blocks in
+   forms-and-motion.css and home/preview/styles/responsive.css turn the smooth scrolling off. */
 html.preview-smooth-scroll {
   scroll-behavior: smooth;
   scroll-padding-top: clamp(130px, 18vh, 182px);
 }
 
+/* ---- Page root and main -------------------------------------------------- */
 .content {
   max-width: 100%;
   margin: 0;
@@ -10,6 +20,8 @@ html.preview-smooth-scroll {
   gap: 24px;
 }
 
+/* The !important background beats the inline radial gradient App passes HomePage, AuthPage
+   and WorkoutResultPage, so /, /auth and /plan are plain black. */
 .home-page {
   width: 100%;
   max-width: 100%;
@@ -27,6 +39,7 @@ html.preview-smooth-scroll {
   overflow-x: clip;
 }
 
+/* ---- Sticky nav: spacer, brand and Preview button ------------------------ */
 .home-sticky-nav {
   width: min(var(--home-shell-max), calc(100% - (var(--home-shell-gutter) * 2)));
   margin: 0 auto 12px;
@@ -89,6 +102,10 @@ html.preview-smooth-scroll {
   box-shadow: none !important;
 }
 
+/* ---- Stage wrapper ------------------------------------------------------- */
+/* .home-intro-wrap is the intro's <main>. .home-stage is the keyed wrapper HomePage puts
+   around every other stage; the intro's panel carries the class itself. HomePage adds
+   stage-transition-hidden while useHomeStageFlow morphs one stage into the next. */
 .home-intro-wrap {
   min-height: 100%;
   display: grid;
@@ -128,6 +145,9 @@ html.preview-smooth-scroll {
   visibility: hidden !important;
 }
 
+/* ---- Hidden workout copy ------------------------------------------------- */
+/* HomeWorkoutMeasure's invisible copy of the workout stage, which useHomeStageFlow measures
+   before the real stage exists. */
 .stage-measure {
   position: absolute;
   inset: 0;
@@ -147,11 +167,16 @@ html.preview-smooth-scroll {
   align-content: center;
 }
 
+/* ---- Full-height personal stage ------------------------------------------ */
 .home-stage-personal {
   min-height: 100%;
   align-content: center;
 }
 
+/* ---- Stage entrances ----------------------------------------------------- */
+/* Entered forwards, a stage fades and scales in over --home-animation-ms with its children;
+   entered backwards it appears at once. The personal and walkthrough stages never animate,
+   and stage-snap, set while HomePage suppresses the entrance, shows any stage at once. */
 .home-stage.stage-forward {
   animation: stage-enter-forward var(--home-animation-ms) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -192,7 +217,10 @@ html.preview-smooth-scroll {
   transform: none !important;
 }
 
-/* Keep preview stage untransformed so PreviewStage fixed header/TOC anchor to viewport. */
+/* The walkthrough stage and its panel get no animation, transform, filter or will-change,
+   any of which would make them the containing block of the contents lane's position: fixed.
+   styles/base.css's .panel still gives the panel backdrop-filter, which does the same, so the
+   lane scrolls with the panel (see home/preview/styles/layout/frame.css). */
 .home-stage-preview,
 .home-stage-preview.stage-forward,
 .home-stage-preview.stage-backward,
@@ -230,6 +258,7 @@ html.preview-smooth-scroll {
   transform: none !important;
 }
 
+/* ---- Stage entrance keyframes -------------------------------------------- */
 @keyframes stage-enter-forward {
   from {
     opacity: 0;
@@ -256,6 +285,9 @@ html.preview-smooth-scroll {
   }
 }
 
+/* ---- Intro panel --------------------------------------------------------- */
+/* HomeIntroStage's panel, a .home-stage itself. intro-transitioning, set while Get Started
+   hands off to the personal stage, fades the hook line out. */
 .home-intro-panel {
   width: min(560px, 100%);
   min-height: 320px;
@@ -321,6 +353,7 @@ html.preview-smooth-scroll {
   justify-content: center;
 }
 
+/* ---- Full-width walkthrough stage ---------------------------------------- */
 .home-stage-preview {
   width: 100%;
   max-width: 100%;

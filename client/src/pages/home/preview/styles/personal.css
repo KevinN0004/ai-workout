@@ -1,3 +1,11 @@
+/* PreviewPersonalChapter's sequence: the read-only form collapsing into its Personal Info
+   label, then the builder track where Environment and Focus join it and Generating spins.
+   The builder-stage-0 to 6 classes on .preview-personal-sequence drive it. Imported second by
+   PreviewStage.css. */
+
+/* ---- Form shell and its collapse ----------------------------------------- */
+/* The shell clips the form to an inset rectangle. Collapsing shrinks the inset to the label
+   pill's size, and the --personal-*-shift-x values slide it sideways at each builder stage. */
 .preview-personal-form-shell {
   --personal-morph-duration: var(--preview-motion-duration, 1100ms);
   --personal-morph-ease: var(--preview-motion-ease, cubic-bezier(0.22, 0.8, 0.2, 1));
@@ -27,6 +35,9 @@
     clip-path var(--personal-morph-duration) var(--personal-morph-ease);
 }
 
+/* ---- Sequence and builder sizes ------------------------------------------ */
+/* --preview-motion-duration is PREVIEW_MOTION_DURATION_MS in ../constants.js, which must
+   stay equal to it. responsive.css shrinks the builder on narrow screens. */
 .preview-personal-sequence {
   --preview-motion-duration: 1100ms;
   --preview-motion-ease: cubic-bezier(0.22, 0.8, 0.2, 1);
@@ -50,6 +61,7 @@
   min-height: var(--preview-content-height);
 }
 
+/* ---- Morph surface and label --------------------------------------------- */
 .preview-personal-morph-surface {
   position: absolute;
   inset: 0;
@@ -112,6 +124,8 @@
     transform var(--personal-morph-duration) var(--personal-morph-ease);
 }
 
+/* ---- Form fade ----------------------------------------------------------- */
+/* Its gap never applies: styles/base.css's .form ties this rule and loads later. */
 .preview-personal-form {
   position: relative;
   z-index: 1;
@@ -123,6 +137,7 @@
   transform-origin: 50% 6%;
 }
 
+/* ---- Collapsed form ------------------------------------------------------ */
 .preview-personal-form-shell.is-collapsed {
   --personal-collapse-inset-x: calc(
     50% - ((var(--preview-builder-pill-width) / 2) + var(--personal-collapse-pill-bleed))
@@ -178,6 +193,7 @@
   transition-delay: 0ms;
 }
 
+/* ---- Builder track ------------------------------------------------------- */
 .preview-builder-track {
   position: absolute;
   top: 0;
@@ -207,12 +223,14 @@
   opacity: 1;
 }
 
+/* ---- Label position at each builder stage -------------------------------- */
 .preview-personal-sequence.builder-stage-0 .preview-personal-form-shell {
   --personal-button-shift-x: 0px;
   --personal-collapse-shift-x: 0px;
 }
 
-/* In Generate stage 0, render pill + label immediately (no background catch-up slide). */
+/* Entering the Generate chapter, at builder stage 0, the shell, surface and label take their
+   collapsed state at once instead of morphing in from the form. */
 .preview-personal-sequence.is-generate-view.builder-stage-0 .preview-personal-form-shell,
 .preview-personal-sequence.is-generate-view.builder-stage-0
   .preview-personal-form-shell
@@ -254,6 +272,7 @@
   --personal-collapse-shift-x: 0px;
 }
 
+/* ---- Environment and Focus slots ----------------------------------------- */
 .preview-builder-slot {
   width: var(--preview-builder-pill-width);
   display: flex;
@@ -292,6 +311,9 @@
   height: 1px;
 }
 
+/* ---- Track layout at each builder stage ---------------------------------- */
+/* The keyframes these and the plus signs below play, preview-builder-shift-left and
+   preview-builder-rise-up, are in layout/frame.css. */
 .preview-personal-sequence.builder-stage-1 .preview-builder-track,
 .preview-personal-sequence.builder-stage-2 .preview-builder-track {
   grid-template-columns:
@@ -373,6 +395,7 @@
   opacity: 0;
 }
 
+/* ---- Slot pills and plus signs ------------------------------------------- */
 .preview-builder-btn {
   width: 100%;
   min-width: 0;
@@ -440,6 +463,8 @@
   transform: translateY(0);
 }
 
+/* ---- Generating spinner -------------------------------------------------- */
+/* Shown at builder stage 6. responsive.css's reduced-motion block stops its ::after's spin. */
 .preview-builder-generating {
   --preview-generating-size: clamp(132px, 16vw, 174px);
   position: absolute;
@@ -504,6 +529,7 @@
   transform: translate(-50%, -50%);
 }
 
+/* ---- Spinner keyframes --------------------------------------------------- */
 @keyframes preview-generating-spin {
   from {
     transform: rotate(0deg);

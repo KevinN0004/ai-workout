@@ -1,3 +1,6 @@
+/* The week chapter's <table>: full width, with fixed column widths that the typed-in text
+   cannot change. Imported third by workout-week.css; content.css styles its cells. */
+
 .preview-week-table {
   width: 100%;
   min-width: 0;

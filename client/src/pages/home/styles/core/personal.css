@@ -1,3 +1,9 @@
+/* HomePersonalStage's profile form: the panel, the field grid in basic and advanced mode,
+   and the metric fields, whose unit toggle sits in the label row. Imported last by core.css.
+   PreviewPersonalChapter renders a read-only copy, always in advanced mode, as
+   .preview-personal-form. */
+
+/* ---- Panel and form grid ------------------------------------------------- */
 .personal-panel {
   display: grid;
   gap: 18px;
@@ -15,6 +21,9 @@
   min-height: 0;
 }
 
+/* The form also carries .form, and styles/base.css's .form ties this rule and loads later,
+   so .form's grid-template-columns, gap and margin-top are the ones that apply. The
+   advanced-mode columns below are more specific and do apply. */
 .personal-form {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   align-items: start;
@@ -26,6 +35,11 @@
   grid-auto-flow: row dense;
 }
 
+/* ---- The walkthrough's read-only form ------------------------------------ */
+/* PreviewPersonalChapter's copy of the form. home/preview/styles/personal.css and
+   form-overrides.css restyle these selectors later in the bundle and win where they differ.
+   What is set only here still applies, except where later rules override it: the label and
+   select colours, the top margin, and a selected day's background and border (.active). */
 .preview-personal-form {
   width: min(920px, 100%);
   justify-self: center;
@@ -85,6 +99,9 @@
   transform: none;
 }
 
+/* ---- Labels and metric fields -------------------------------------------- */
+/* A metric field's label row keeps --metric-toggle-slot free on the right for its unit
+   toggle; .metric-height and .field-weight set the slot's width. */
 .personal-form label {
   width: 100%;
   display: grid;
@@ -146,6 +163,7 @@
   --metric-toggle-slot: 92px;
 }
 
+/* ---- Field placement in basic mode --------------------------------------- */
 .personal-form.basic-mode .field-name {
   grid-column: 1 / -1;
 }
@@ -195,6 +213,7 @@
   margin-top: 0;
 }
 
+/* ---- Label text beside a unit toggle ------------------------------------- */
 .personal-form .label-row {
   width: 100%;
   align-items: center;
@@ -206,6 +225,7 @@
   flex-shrink: 0;
 }
 
+/* ---- Field placement in advanced mode ------------------------------------ */
 .personal-form.advanced-mode {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
