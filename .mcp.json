@@ -1,21 +1,21 @@
 {
   "mcpServers": {
     "context7": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"],
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@4.1.1"],
       "env": {
         "npm_config_update_notifier": "false"
       },
       "autoStart": false
     },
     "codebase-memory-mcp": {
-      "command": "cmd",
-      "args": ["/c", "codebase-memory-mcp", "--ui=true", "--port=9749"],
+      "command": "codebase-memory-mcp",
+      "args": ["--ui=true", "--port=9749"],
       "autoStart": false
     },
     "ruflo": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "ruflo@latest", "mcp", "start"],
+      "command": "npx",
+      "args": ["-y", "ruflo@3.51.1", "mcp", "start"],
       "env": {
         "npm_config_update_notifier": "false",
         "CLAUDE_FLOW_MODE": "v3",

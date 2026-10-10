@@ -401,26 +401,25 @@ export const createExternalDataService = ({
     if (pm25 === null || pm25 === undefined || pm25 === "") return null;
     const value = Number(pm25);
     if (!Number.isFinite(value) || value < 0) return null;
-    // The US EPA's PM2.5 breakpoints as they stood before its 2024 revision,
-    // which lowered the top of Good and moved the Unhealthy, Very unhealthy and
-    // Hazardous bands; this table has not been updated. Each band maps a
-    // concentration range in ug/m3 linearly onto an AQI range. The EPA truncates
-    // a reading to one decimal first; this does not, so a value in the gap
-    // between two bands falls through to 500.
+    // The US EPA's PM2.5 breakpoints from its 2024 revision. Each band maps a
+    // concentration range in ug/m3 linearly onto an AQI range. The EPA
+    // truncates a reading to one decimal before the lookup, which is what puts
+    // a value between two bands' published edges into the lower band, and it
+    // extends the top band's slope past its last breakpoint rather than
+    // capping the index.
+    const truncated = Math.floor(value * 10) / 10;
     const points = [
-      { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
-      { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
+      { cLow: 0.0, cHigh: 9.0, iLow: 0, iHigh: 50 },
+      { cLow: 9.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
       { cLow: 35.5, cHigh: 55.4, iLow: 101, iHigh: 150 },
-      { cLow: 55.5, cHigh: 150.4, iLow: 151, iHigh: 200 },
-      { cLow: 150.5, cHigh: 250.4, iLow: 201, iHigh: 300 },
-      { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 }
+      { cLow: 55.5, cHigh: 125.4, iLow: 151, iHigh: 200 },
+      { cLow: 125.5, cHigh: 225.4, iLow: 201, iHigh: 300 },
+      { cLow: 225.5, cHigh: 325.4, iLow: 301, iHigh: 500 }
     ];
-    for (const point of points) {
-      if (value < point.cLow || value > point.cHigh) continue;
-      const ratio = (value - point.cLow) / (point.cHigh - point.cLow || 1);
-      return Math.round(point.iLow + ratio * (point.iHigh - point.iLow));
-    }
-    return 500;
+    const interpolate = ({ cLow, cHigh, iLow, iHigh }) =>
+      Math.round(iLow + ((truncated - cLow) / (cHigh - cLow)) * (iHigh - iLow));
+    const band = points.find((point) => truncated <= point.cHigh);
+    return interpolate(band || points[points.length - 1]);
   };
 
   const aqiBand = (aqi) => {

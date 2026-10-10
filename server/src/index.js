@@ -342,7 +342,7 @@ const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashb
   createUserReadRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
-const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
+const { saveMealLogWithDailySync } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser } =
@@ -697,8 +697,7 @@ registerApiRoutes(app, {
   goalsBodySchema,
   mealLogBodySchema,
   buildMealLogEntry,
-  saveMealLog,
-  syncDerivedCalorieEntry,
+  saveMealLogWithDailySync,
   progressMetricBodySchema,
   buildProgressMetricEntry,
   saveProgressMetric,

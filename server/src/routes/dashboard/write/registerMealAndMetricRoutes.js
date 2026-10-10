@@ -15,8 +15,7 @@ export const registerMealAndMetricRoutes = (app, deps) => {
     validateBody,
     mealLogBodySchema,
     buildMealLogEntry,
-    saveMealLog,
-    syncDerivedCalorieEntry,
+    saveMealLogWithDailySync,
     findUserWithDashboard,
     mapDbDocToUser,
     buildDashboardResponse,
@@ -45,10 +44,10 @@ export const registerMealAndMetricRoutes = (app, deps) => {
           .json({ error: "Add calories or at least one macro value for the meal." });
       }
 
-      await saveMealLog({ userId: req.user.id, mealLog });
-      // Recomputes the whole day, so this is correct when an existing meal is
-      // edited by id as well as when a new one is added.
-      await syncDerivedCalorieEntry({ userId: req.user.id, date: mealLog.date });
+      // One transaction: saves the meal and recomputes the whole day's derived
+      // calorie entry, so it is correct when an existing meal is edited by id as
+      // well as when a new one is added, and a failure leaves neither behind.
+      await saveMealLogWithDailySync({ userId: req.user.id, mealLog });
 
       // Re-read rather than answer from req.user, which was loaded before these
       // writes: dashboard.calories in the response has to reflect the sync.
