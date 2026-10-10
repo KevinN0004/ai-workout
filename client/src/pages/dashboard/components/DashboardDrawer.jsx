@@ -1,5 +1,14 @@
+/**
+ * The dashboard's slide-in navigation drawer, opened from the header's menu
+ * button. Rendered by DashboardPage; whether it is open is App's state.
+ */
 import useCloseOnEscape from "../../../hooks/useCloseOnEscape";
 
+/**
+ * Lists `items` as view links, apart from "settings", which always has its own
+ * button in the footer. Closes on Escape, on a backdrop click and from its
+ * close button; `onNavigate` receives the view key.
+ */
 export default function DashboardDrawer({ open, dashView, items, onClose, onNavigate }) {
   // The drawer is not portalled through ModalPortal, so it needs the same
   // Escape handling directly. Called before the early return to keep the hook

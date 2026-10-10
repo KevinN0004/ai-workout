@@ -1,3 +1,10 @@
+/**
+ * The dashboard's goal tracks and weekly meal plan: the track a goal belongs to,
+ * a day's calorie target on that track, and a week of meals from the track's
+ * templates. Used by the meal, plans and tips views and useDashboardMetrics.
+ */
+
+// Meal ideas per track, which buildWeeklyMealPlan cycles through by day.
 const WEEKLY_MEAL_TEMPLATES = {
   lean_strength: {
     breakfast: [
@@ -85,6 +92,13 @@ const WEEKLY_MEAL_TEMPLATES = {
   }
 };
 
+/**
+ * Maps goal text to a track by keyword, tried in order: fat_loss, endurance,
+ * recovery, and lean_strength when none match. A keyword matches anywhere in
+ * the text, inside a longer word included. Of goalOptions, "Cardio" has no
+ * keyword and so lands on lean_strength. The four names also key the meal
+ * templates here, the meal suggestions in meal/data and the tips' categories.
+ */
 export const detectTrack = (goalText = "") => {
   const lower = goalText.toLowerCase();
   if (lower.includes("fat loss") || lower.includes("cut") || lower.includes("conditioning")) {
@@ -99,6 +113,13 @@ export const detectTrack = (goalText = "") => {
   return "lean_strength";
 };
 
+/**
+ * One day's calorie target on a track. Starts from `baseCalories`, with a
+ * default for a missing, zero or non-numeric one. A training day keeps the base,
+ * or gains a little on endurance. A rest day keeps it on endurance and
+ * otherwise gets a little less, but never less than a floor, even when that
+ * floor is above the base.
+ */
 export const getDailyCalories = (track, baseCalories, trainingDay) => {
   const base = Number(baseCalories) || 2200;
   if (track === "fat_loss") return trainingDay ? base : Math.max(base - 250, 1400);
@@ -107,6 +128,13 @@ export const getDailyCalories = (track, baseCalories, trainingDay) => {
   return trainingDay ? base : Math.max(base - 150, 1500);
 };
 
+/**
+ * A week of meals for a goal: one entry per `weekDays` day, cycling through the
+ * track's template meals and prep notes, with that day's calorie target. A day
+ * is a training day when `latestPlanByWeekday`, the newest saved plan by
+ * weekday, has lines for it. Returns the goal text and target it used, after
+ * their defaults, with the track and the days.
+ */
 export const buildWeeklyMealPlan = ({
   weekDays,
   latestPlanByWeekday,

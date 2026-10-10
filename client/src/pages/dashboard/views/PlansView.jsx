@@ -1,3 +1,8 @@
+/**
+ * The dashboard's Weekly plan view, the plan hub: the workout week, the saved
+ * exercises, the meals week and the week's tips. Rendered by DashboardPage,
+ * which loads it lazily.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
 import ModalPortal from "../../../components/ModalPortal";
@@ -5,6 +10,16 @@ import "./PlansView.css";
 
 const SAVED_EXERCISE_PAGE_SIZE = 24;
 
+/**
+ * The week comes from `latestPlanByWeekday`, the newest saved plan's lines by
+ * weekday; `openPlannerFromProfile` opens the planner to make a new one. A day's
+ * card opens a details modal for its workout or its meals. The saved exercises
+ * show SAVED_EXERCISE_PAGE_SIZE at a time, and `onRemoveSavedExercise` takes the
+ * saved entry's `id`, not its wger `exerciseId`. The meals week follows the
+ * latest plan's goal, else the planner form's (`fallbackPlan`); the
+ * `goals.goalType` step between them never applies, because the server's goals
+ * carry none.
+ */
 export default function PlansView({
   weekDays,
   latestPlanByWeekday,
@@ -14,6 +29,7 @@ export default function PlansView({
   onRemoveSavedExercise,
   onOpenGuides
 }) {
+  // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [visibleSavedCount, setVisibleSavedCount] = useState(SAVED_EXERCISE_PAGE_SIZE);
 
@@ -42,6 +58,8 @@ export default function PlansView({
     };
   }, [selectedDetail, weeklyMealPlan.days, latestPlanByWeekday]);
 
+  // Escape closes the day details while they are open. ModalPortal's own
+  // Escape handling already does the same, so this listener is a second copy.
   useEffect(() => {
     if (!selectedDay) return undefined;
     const onKeyDown = (event) => {
@@ -51,16 +69,22 @@ export default function PlansView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedDay]);
 
+  // ---- Tips week ------------------------------------------------------------
   const { trainingDays, recoveryDays, dailyTips, weeklyTips } = useMemo(() => {
+    // A training day is a weekday the plan has lines for; the rest are recovery.
     const trainingDays = weekDays.filter(
       ({ key }) => (latestPlanByWeekday[key] || []).length > 0
     ).length;
     const recoveryDays = Math.max(weekDays.length - trainingDays, 0);
 
+    // One cue per day, picked by keyword from the day's lines.
     const dailyTips = weekDays.map(({ label, key }) => {
       const lines = latestPlanByWeekday[key] || [];
       const merged = lines.join(" ").toLowerCase();
 
+      // A day without lines gets the recovery cue. Otherwise the first focus
+      // that matches wins, in the order push, pull, legs, conditioning, and a
+      // general cue covers a day that matches none.
       if (!lines.length) {
         return {
           label,
@@ -126,6 +150,7 @@ export default function PlansView({
       };
     });
 
+    // The weekly principles always ask for at least one recovery day.
     const minRecoveryDays = Math.max(recoveryDays, 1);
     const weeklyTips = [
       "Progressive overload: add 1 rep or small load increases only when form stays clean.",
@@ -137,7 +162,10 @@ export default function PlansView({
     return { trainingDays, recoveryDays, dailyTips, weeklyTips };
   }, [weekDays, latestPlanByWeekday]);
 
-  // The `: []` branch minted a fresh array every render, defeating the memo below.
+  // ---- Saved exercises ------------------------------------------------------
+
+  // Memoized because the `: []` fallback would otherwise be a new array every
+  // render, defeating the memo below.
   const savedExercises = useMemo(
     () => (Array.isArray(dashboard?.savedExercises) ? dashboard.savedExercises : []),
     [dashboard]
@@ -147,6 +175,8 @@ export default function PlansView({
     [savedExercises, visibleSavedCount]
   );
 
+  // The list collapses back to its first page whenever the number of saved
+  // exercises changes, a save or a removal included.
   useEffect(() => {
     setVisibleSavedCount(SAVED_EXERCISE_PAGE_SIZE);
   }, [savedExercises.length]);
@@ -155,10 +185,12 @@ export default function PlansView({
     ({ key }) => (latestPlanByWeekday[key] || []).length > 0
   );
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="panel plans-view">
       <h2>Plan hub</h2>
       <div className="plan-rows">
+        {/* ---- Workout week ---- */}
         <section className="plan-row">
           <div className="plan-row-header">
             <div>
@@ -216,6 +248,7 @@ export default function PlansView({
           </div>
         </section>
 
+        {/* ---- Saved exercises ---- */}
         <section className="plan-row">
           <div className="plan-row-header">
             <div>
@@ -302,6 +335,7 @@ export default function PlansView({
           </div>
         </section>
 
+        {/* ---- Meals week ---- */}
         <section className="plan-row">
           <div className="plan-row-header">
             <div>
@@ -355,6 +389,7 @@ export default function PlansView({
           </div>
         </section>
 
+        {/* ---- Tips week ---- */}
         <section className="plan-row">
           <div className="plan-row-header">
             <div>
@@ -397,6 +432,7 @@ export default function PlansView({
         </section>
       </div>
 
+      {/* ---- Day details ---- */}
       {selectedDay && (
         <ModalPortal open={Boolean(selectedDay)} onClose={() => setSelectedDetail(null)}>
           <div

@@ -1,3 +1,17 @@
+/**
+ * The meal log: a form for one meal's date, type, name, calories, macros and
+ * notes, with the latest entries beneath it. Rendered by MealView.
+ */
+
+/**
+ * A controlled form over MealView's meal-log form, saved by `onSubmitMealLog`
+ * (submitMealLog in events.js). The list shows the first few of `safeMealLogs`,
+ * which arrive most recently logged first. With none, "Log first meal" fills in
+ * a date and a meal type where the form has none, then focuses the name field
+ * through `mealLogNameInputRef`. The date it fills is the UTC one
+ * (toISOString), not getLocalDateKey's, so in the evening west of UTC it is
+ * tomorrow.
+ */
 export default function MealLogPanel({
   safeMealLogForm,
   safeMealLogs,
@@ -11,6 +25,7 @@ export default function MealLogPanel({
         <h3>Meal log history</h3>
         <p className="muted">Track meals and macros. Saved to your account.</p>
       </div>
+      {/* ---- Form ---- */}
       <form className="form meal-log-form" onSubmit={onSubmitMealLog}>
         <label>
           Date
@@ -114,6 +129,7 @@ export default function MealLogPanel({
         </button>
       </form>
 
+      {/* ---- Latest entries, or the empty state ---- */}
       <div className="meal-log-list">
         {safeMealLogs.slice(0, 8).map((item) => (
           <div key={item.id} className="meal-log-row">

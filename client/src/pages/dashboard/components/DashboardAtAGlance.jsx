@@ -1,3 +1,17 @@
+/**
+ * The dashboard's "Today at a glance" panel: four status cards and three
+ * shortcuts. DashboardPage renders it above the active view, on every view.
+ */
+
+/**
+ * Shows the next or latest workout, the calorie gap, and the weather and air
+ * quality, the last two each with a line saying when they were updated.
+ * DashboardPage derives every value: `nextWorkout` carries a `context` of
+ * "Upcoming" or "Latest", `caloriesGap` is the goal minus `avgCalories`
+ * (positive means under target), and `formatRelativeUpdatedAt` words the update
+ * times. The weather and air cards offer Retry while their last load has an
+ * error; a reading already on screen stays in place of the error text.
+ */
 export default function DashboardAtAGlance({
   nextWorkout,
   caloriesGap,
@@ -25,6 +39,7 @@ export default function DashboardAtAGlance({
         <p className="muted">Quick status and shortcuts for your day.</p>
       </div>
       <div className="dashboard-at-a-glance-grid equal-card-grid">
+        {/* ---- Next workout ---- */}
         <article className="dashboard-glance-card card-shell">
           <div className="card-section-head">
             <h3>{nextWorkout ? `${nextWorkout.context} workout` : "Workout status"}</h3>
@@ -42,6 +57,7 @@ export default function DashboardAtAGlance({
             )}
           </div>
         </article>
+        {/* ---- Calorie gap ---- */}
         <article className="dashboard-glance-card card-shell">
           <div className="card-section-head">
             <h3>Calories gap</h3>
@@ -59,6 +75,7 @@ export default function DashboardAtAGlance({
             </p>
           </div>
         </article>
+        {/* ---- Weather ---- */}
         <article className="dashboard-glance-card card-shell">
           <div className="card-section-head">
             <h3>Weather</h3>
@@ -96,6 +113,7 @@ export default function DashboardAtAGlance({
             </p>
           </div>
         </article>
+        {/* ---- Air quality ---- */}
         <article className="dashboard-glance-card card-shell">
           <div className="card-section-head">
             <h3>Air quality</h3>
@@ -128,6 +146,7 @@ export default function DashboardAtAGlance({
           </div>
         </article>
       </div>
+      {/* ---- Shortcuts ---- */}
       <div className="dashboard-glance-actions">
         <button type="button" className="ghost" onClick={onAddWorkout}>
           Add workout
