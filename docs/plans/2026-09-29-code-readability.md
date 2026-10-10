@@ -45,9 +45,10 @@ Scratch tools do the measuring and proving. They are written out in full below, 
   - the allowlist as `0	N`, removals only;
   - the test as `1	1`, the constant.
 
-  Every area commit stages both files, as the steps below do. If the allowlist line's first column is above 0, an entry was added: stop. If `make-allowlist.mjs` exits 1 and lists files, those files lack a header, so give each one a header. Never add them to the list.
+  Every area commit stages both files, as the steps below do. Compare test counts only after `pr_allowlist`: until the list shrinks, the headers you have just added make the ratchet's "still lacks one" test fail, by design, and `npm test` stops after the scripts suite. If the allowlist line's first column is above 0, an entry was added: stop. If `make-allowlist.mjs` exits 1 and lists files, those files lack a header, so give each one a header. Never add them to the list.
 
 - **Checklist line numbers** come from the baseline scan of `9b85b7d`. They drift as a file is edited, so re-run `area.mjs` for current ones.
+- **Check every claim a comment makes against the code it names, before writing it.** That includes another file's behaviour, a status code and a limit. Never copy a number that lives elsewhere, such as a cap, a count or a line number. Name where it lives instead: "capped on read by userReadRepository". PR 1's review found four comments that said things the code does not do. The scan caught none of them, because it only counts.
 - **"Move header to top"** means the scanner found a comment before the file's first statement but not at line 1. Read it before moving it:
   - If it describes the module, move it above the imports.
   - If it describes the statement below it, as the `dotenv.config()` comment in `server/src/index.js` does, leave it where it is and write a new header.
@@ -1553,13 +1554,15 @@ Work through the file list, following the SOP's "Factory or route registrar" che
 
 ```js
 /**
- * The API server's bootstrap: reads the environment, builds the Express app,
- * wires every repository and service into the routes, and exports `app` for
- * the test suites and `startServer` for the entry-point guard at the bottom.
+ * The API server's bootstrap: reads the environment, builds the Express app and
+ * wires every repository and service into the routes. Exports `app` for the
+ * test suites; the guard at the bottom runs `startServer` only outside them.
  */
 ```
 
-Then add these banners. Each one goes on its own line directly above the anchor, and above any comment already attached to the anchor. Each anchor is the first line in the file that begins with this text:
+(Revised after review: the first version said `startServer` is exported for the guard, but nothing imports it. The guard calls the function directly.)
+
+Then add these banners. Each one goes on its own line directly above the anchor, and above any comment already attached to the anchor. Each anchor is the first line in the file that begins with this text, except Entry point's. Its condition also opens the environment preflight near the top, so its anchor is the **last** such line.
 
 | Banner                                                                             | Anchor                                                                                     |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -1575,6 +1578,7 @@ Then add these banners. Each one goes on its own line directly above the anchor,
 | `// ---- Static client and error handler ----------------------------------------` | `// After the API routes so /api keeps its own 404s, and before the error`                 |
 | `// ---- Startup ----------------------------------------------------------------` | `const startServer = async () => {`                                                        |
 | `// ---- Exports ----------------------------------------------------------------` | `export { app, startServer };`                                                             |
+| `// ---- Entry point ------------------------------------------------------------` | the last `if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {`                   |
 
 Delete the line `// Progress-metric writes go straight to Prisma; the shim still backs its reads.` It is false: nothing reads through the shim, which is gone, and the Repositories banner now names the block. Move no statement.
 
@@ -1590,19 +1594,19 @@ Delete the line `// Progress-metric writes go straight to Prisma; the shim still
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr1-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr1-same.txt"
 git grep -nE "shim|prismaDataModels|Mongo|Mongoose|toObject" -- server/src/index.js server/src/middleware server/src/routes ':!*__tests__*'; echo "grep exit=$? (1 = none left)"
-pr_counts pr1-comments && diff "$SCRATCH/pr1-before-counts.txt" "$SCRATCH/pr1-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `same-code exit=0` with `comment-only: 21 source file(s)` (or however many you touched, with no `FAIL`), `grep exit=1`, and `counts identical exit=0`.
+Expected: `same-code exit=0` with `comment-only: 21 source file(s)` (or however many you touched, with no `FAIL`), and `grep exit=1`. The test counts are compared in Step 5, once the allowlist has shrunk.
 
 - [ ] **Step 5: Shrink the allowlist**
 
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr1-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr1-comments && diff "$SCRATCH/pr1-before-counts.txt" "$SCRATCH/pr1-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `wrote 164 entries`, numstat `0	21	scripts/__tests__/file-header-allowlist.json` (no additions), and `test:scripts exit=0`.
+Expected: `wrote 164 entries`, numstat `0	21	scripts/__tests__/file-header-allowlist.json` (no additions), `test:scripts exit=0` and `counts identical exit=0`.
 
 - [ ] **Step 6: Measure**
 
@@ -1624,6 +1628,7 @@ and test counts are unchanged. Adds a header to each file, a summary to
 each export, section banners to index.js without moving any statement,
 and replaces the comments narrating the retired Mongo pipeline with what
 the code does now.
+Shrinks the header allowlist by 21 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -1721,8 +1726,8 @@ pr_counts pr2-before
 ```js
 /**
  * Prisma-native persistence for generated workout plans. It only inserts:
- * plans are read newest first by `createdAt`, and userReadRepository caps them
- * at 200 on read, so nothing prunes the table and it grows without bound.
+ * plans are read newest first by `createdAt`, and userReadRepository caps how
+ * many it reads, so nothing prunes the table and it grows without bound.
  * That is a decision still to be made, not an oversight.
  */
 ```
@@ -1809,24 +1814,26 @@ pr_counts pr2-before
 
 **`dashboardDataBuildersService.js:28` and `externalDataService.js:36`** hold real guard rationales. Keep the reason, drop the commit hash and the "used to". Also add a header to every file in the list that lacks one.
 
+**`errorResponseService.js`**'s comment on `safeErrorMessage` says client-caused (4xx) messages "are already curated by the routes, so they pass through". PR 1's review found that an upstream 4xx raised in `externalDataService.js` keeps its status, so its message may reach the browser too. Trace what an upstream 4xx's `err.message` holds, then make the comment say what actually passes through.
+
 - [ ] **Step 4: Prove the comments changed no code**
 
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr2-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr2-same.txt"
 git grep -nE "shim|prismaDataModels|Mongo|Mongoose|toObject|Task [0-9]+[a-z]? of" -- server/src ':!*__tests__*' ':!*.test.*'; echo "grep exit=$? (1 = none left)"
-pr_counts pr2-comments && diff "$SCRATCH/pr2-before-counts.txt" "$SCRATCH/pr2-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `same-code exit=0` with no `FAIL`, `grep exit=1`, and `counts identical exit=0`.
+Expected: `same-code exit=0` with no `FAIL`, and `grep exit=1`.
 
 - [ ] **Step 5: Shrink the allowlist**
 
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr2-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr2-comments && diff "$SCRATCH/pr2-before-counts.txt" "$SCRATCH/pr2-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: numstat `0	25	…` and `test:scripts exit=0`.
+Expected: numstat `0	25	…`, `test:scripts exit=0` and `counts identical exit=0`.
 
 - [ ] **Step 6: Measure**
 
@@ -1846,6 +1853,7 @@ docs(server): comment the services, repositories and db layer per the SOP
 Comment-only: identical syntax trees in every file, unchanged test counts.
 Rewrites the repository headers, which cited plan tasks and described the
 retired Mongo shim as still live, to state what each file does now.
+Shrinks the header allowlist by 25 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -1921,19 +1929,19 @@ Follow the SOP's component, hook and plain-module checklists. The SOP's worked e
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr3-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr3-same.txt"
 pr_dist_same
-pr_counts pr3-comments && diff "$SCRATCH/pr3-before-counts.txt" "$SCRATCH/pr3-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `same-code exit=0`, `dist identical exit=0`, and `counts identical exit=0`. The `vite.config.js` edit is judged by `same-code`, since it is not part of the bundle.
+Expected: `same-code exit=0` and `dist identical exit=0`. The `vite.config.js` edit is judged by `same-code`, since it is not part of the bundle.
 
 - [ ] **Step 5: Shrink the allowlist**
 
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr3-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr3-comments && diff "$SCRATCH/pr3-before-counts.txt" "$SCRATCH/pr3-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: numstat `0	20	…` and `exit=0`.
+Expected: numstat `0	20	…`, `test:scripts exit=0` and `counts identical exit=0`.
 
 - [ ] **Step 6: Measure**
 
@@ -1952,6 +1960,7 @@ docs(client): comment the app shell, shared hooks and Vite config per the SOP
 
 Comment-only: the built bundle is byte-identical, every file's syntax tree
 is unchanged, and test counts match.
+Shrinks the header allowlist by 20 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -2040,29 +2049,30 @@ Follow the SOP's component and hook checklists.
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr4-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr4-same.txt"
 pr_dist_same
-pr_counts pr4-comments && diff "$SCRATCH/pr4-before-counts.txt" "$SCRATCH/pr4-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `same-code exit=0`, `dist identical exit=0` and `counts identical exit=0`.
+Expected: `same-code exit=0` and `dist identical exit=0`.
 
 - [ ] **Step 5: Shrink the allowlist and commit the comments**
 
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr4-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr4-comments && diff "$SCRATCH/pr4-before-counts.txt" "$SCRATCH/pr4-comments-counts.txt"; echo "counts identical exit=$?"
 git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(dashboard): comment the dashboard page per the SOP
 
 Comment-only: the built bundle is byte-identical, every syntax tree is
 unchanged, and test counts match.
+Shrinks the header allowlist by 32 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
 echo "commit exit=$?"
 ```
 
-Expected: numstat `0	32	…`, `test:scripts exit=0` and `commit exit=0`.
+Expected: numstat `0	32	…`, `test:scripts exit=0`, `counts identical exit=0` and `commit exit=0`.
 
 - [ ] **Step 6: Tidy — `dashViewOrder` to module scope**
 
@@ -2155,15 +2165,16 @@ Also: the fallback table gets one line giving its units. The `CLAUDE.md` note on
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr5-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr5-same.txt"
 pr_dist_same
-pr_counts pr5-comments && diff "$SCRATCH/pr5-before-counts.txt" "$SCRATCH/pr5-comments-counts.txt"; echo "counts identical exit=$?"
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr5-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr5-comments && diff "$SCRATCH/pr5-before-counts.txt" "$SCRATCH/pr5-comments-counts.txt"; echo "counts identical exit=$?"
 git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(home): comment the home page and physique silhouette per the SOP
 
 Comment-only: the built bundle is byte-identical, every syntax tree is
 unchanged, and test counts match.
+Shrinks the header allowlist by 16 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -2268,15 +2279,16 @@ pr_dist_snapshot
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr6-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr6-same.txt"
 pr_dist_same
-pr_counts pr6-comments && diff "$SCRATCH/pr6-before-counts.txt" "$SCRATCH/pr6-comments-counts.txt"; echo "counts identical exit=$?"
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr6-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr6-comments && diff "$SCRATCH/pr6-before-counts.txt" "$SCRATCH/pr6-comments-counts.txt"; echo "counts identical exit=$?"
 git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(preview): comment the walkthrough, auth and workout-result pages per the SOP
 
 Comment-only: the built bundle is byte-identical, every syntax tree is
 unchanged, and test counts match.
+Shrinks the header allowlist by 13 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -2375,14 +2387,13 @@ Follow the SOP's "Stylesheet" checklist and its CSS formats.
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr7-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr7-same.txt"
 pr_dist_same
-pr_counts pr7-comments && diff "$SCRATCH/pr7-before-counts.txt" "$SCRATCH/pr7-comments-counts.txt"; echo "counts identical exit=$?"
 pr_scan 7 after
 ```
 
 Expected:
 
 - `same-code exit=0`. Its CSS check fails any comment written inside a declaration value.
-- `dist identical exit=0` and `counts identical exit=0`.
+- `dist identical exit=0`.
 - The **After** line, including `byte-order marks 13`.
 
 - [ ] **Step 4: Shrink the allowlist, commit, gates, PR**
@@ -2390,12 +2401,14 @@ Expected:
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr7-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr7-comments && diff "$SCRATCH/pr7-before-counts.txt" "$SCRATCH/pr7-comments-counts.txt"; echo "counts identical exit=$?"
 git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(css): headers and section banners for the app, dashboard and auth styles
 
 Comment-only: the built CSS is byte-identical, postcss finds the same
 rules and declarations in every file, and no byte-order mark was lost.
+Shrinks the header allowlist by 25 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -2470,23 +2483,24 @@ Before committing that sentence, confirm its last clause from the built CSS, as 
 ```bash
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr8-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr8-same.txt"
 pr_dist_same
-pr_counts pr8-comments && diff "$SCRATCH/pr8-before-counts.txt" "$SCRATCH/pr8-comments-counts.txt"; echo "counts identical exit=$?"
 pr_scan 8 after
 ```
 
-Expected: `same-code exit=0`, `dist identical exit=0`, `counts identical exit=0`, and the **After** line with `byte-order marks 6`.
+Expected: `same-code exit=0`, `dist identical exit=0`, and the **After** line with `byte-order marks 6`.
 
 - [ ] **Step 4: Shrink the allowlist, commit, gates, PR**
 
 ```bash
 pr_allowlist
 npm run test:scripts > "$SCRATCH/pr8-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr8-comments && diff "$SCRATCH/pr8-before-counts.txt" "$SCRATCH/pr8-comments-counts.txt"; echo "counts identical exit=$?"
 git add -A client scripts/__tests__/file-header-allowlist.json scripts/__tests__/repo-invariants.test.mjs && git status --porcelain
 git commit -F - <<'EOF'
 docs(css): headers and section banners for the home page and walkthrough styles
 
 Comment-only: the built CSS is byte-identical, postcss finds the same
 rules and declarations in every file, and no byte-order mark was lost.
+Shrinks the header allowlist by 24 and lowers ALLOWLIST_SIZE to match.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
@@ -2538,7 +2552,6 @@ The three hook scripts (`codex-handoff.mjs`, `scrub-junk-files.cjs`, `skill-rout
 node "$TOOLS/same-code.mjs" "$REPO" > "$SCRATCH/pr9-same.txt" 2>&1; echo "same-code exit=$?"; tail -2 "$SCRATCH/pr9-same.txt"
 node scripts/codex-handoff.mjs --hook > /dev/null 2>&1; echo "codex-handoff exit=$?"
 node scripts/scrub-junk-files.cjs --dry-run > /dev/null 2>&1; echo "scrub exit=$?"
-pr_counts pr9-comments && diff "$SCRATCH/pr9-before-counts.txt" "$SCRATCH/pr9-comments-counts.txt"; echo "counts identical exit=$?"
 pr_scan 9 after
 ```
 
@@ -2550,9 +2563,10 @@ Expected: every exit `0`, and the **After** line.
 pr_allowlist
 cat scripts/__tests__/file-header-allowlist.json
 npm run test:scripts > "$SCRATCH/pr9-scripts.txt" 2>&1; echo "test:scripts exit=$?"
+pr_counts pr9-comments && diff "$SCRATCH/pr9-before-counts.txt" "$SCRATCH/pr9-comments-counts.txt"; echo "counts identical exit=$?"
 ```
 
-Expected: `wrote 0 entries`, the file contains `[]`, and `test:scripts exit=0`.
+Expected: `wrote 0 entries; ALLOWLIST_SIZE 9 -> 0`, the file contains `[]`, `test:scripts exit=0` and `counts identical exit=0`.
 
 The ratchet stays. With an empty list and `ALLOWLIST_SIZE` at 0:
 
@@ -2568,7 +2582,7 @@ docs(tooling): comment the repo scripts and root configs per the SOP
 
 Comment-only: every syntax tree is unchanged, the hook scripts still exit
 0, and test counts match. Empties the header allowlist: every in-scope
-source file now opens with a header.
+source file now opens with a header, and ALLOWLIST_SIZE is 0.
 
 Co-Authored-By: claude-flow <ruv@ruv.net>
 EOF
