@@ -31,7 +31,9 @@ export const mapMealLog = (row = {}) => ({
 // (001_foundation.sql) bounds, while the meal schema bounds a single meal on its own,
 // so a day's meals can sum past what one derived row may hold. Clamping the entry to
 // the column ceiling keeps the meal log writable (rejecting the meal would punish the
-// user for logging what they ate) while every meal stays stored in full.
+// user for logging what they ate) while every meal stays stored in full. The
+// calories view then shows that day at the ceiling, under the true sum; the meal
+// list still carries every meal.
 const MAX_DERIVED_DAILY_CALORIES = 10000;
 
 /**
