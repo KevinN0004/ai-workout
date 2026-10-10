@@ -20,6 +20,7 @@
 - [2026-09-23 — Repository layout reorganization](plans/2026-09-23-repo-layout-reorganization.md)
 - [2026-09-29 — Code readability](plans/2026-09-29-code-readability.md)
 - [2026-10-10 — Readability follow-up](plans/2026-10-10-readability-follow-up.md)
+- [2026-10-10 — Readability follow-up, Phase 2](plans/2026-10-10-readability-follow-up-phase-2.md)
 
 ## Specs
 
