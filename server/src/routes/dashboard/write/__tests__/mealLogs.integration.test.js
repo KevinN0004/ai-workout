@@ -4,13 +4,11 @@ import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
 import { createMealLogRepository } from "../../../../repositories/mealLogRepository.js";
 
-// Pins POST /api/dashboard/meal-logs against real Postgres.
-//
-// One of these tests asserts behaviour that is a KNOWN BUG rather than the
-// behaviour anyone wants -- a meal log never produces a calorie entry. It is
-// pinned deliberately so the migration is a faithful refactor and the bug is
-// fixed as its own decision, not smuggled in under a refactor. See
-// docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
+// Pins POST /api/dashboard/meal-logs against real Postgres: each save writes
+// the meal and, in the same transaction, keeps that day's derived calorie
+// entry in step with the day's meals. A manual entry for the day suppresses
+// it, it is clamped to its column's ceiling, and it goes when the day's
+// meals carry no calories.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
