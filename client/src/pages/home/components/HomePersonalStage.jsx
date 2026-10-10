@@ -1,3 +1,18 @@
+/**
+ * The home page's profile form, in Basic and Advanced modes, with the account
+ * controls. Rendered by HomePage while its stage is "personal".
+ */
+
+/**
+ * The fields edit App's `personal`. Continue submits to HomePage's
+ * onPersonalSubmit, which moves on to the physique stage once useBodyModel
+ * reports the five required fields complete; Back returns to the intro, and
+ * going there resets the form. The Advanced fields stay mounted in Basic mode,
+ * hidden by forms-and-motion.css, which animates their reveal, and the scored
+ * ones (all but Goal timeline and Additional Info) still feed the silhouette.
+ * `personalPanelRef` is the panel useHomeStageFlow's morph measures for this
+ * stage.
+ */
 export default function HomePersonalStage({
   personalPanelRef,
   personalMode,
@@ -30,6 +45,7 @@ export default function HomePersonalStage({
       className={`panel personal-panel stage-panel ${personalMode === "advanced" ? "personal-panel-advanced" : "personal-panel-basic"}`}
       ref={personalPanelRef}
     >
+      {/* ---- Heading, mode switch and account ---- */}
       <header className="stage-header">
         <div className="stage-header-main">
           <h2>Personal Info</h2>
@@ -70,6 +86,7 @@ export default function HomePersonalStage({
         className={`form personal-form ${personalMode === "advanced" ? "advanced-mode" : "basic-mode"}`}
         onSubmit={onPersonalSubmit}
       >
+        {/* ---- Basic fields: name, age, height, weight and sex ---- */}
         <label className="field-name">
           Full name
           <input
@@ -225,6 +242,7 @@ export default function HomePersonalStage({
           </select>
         </label>
 
+        {/* ---- Advanced fields ---- */}
         <div className="advanced-fields-wrap" aria-hidden={personalMode !== "advanced"}>
           <div className="advanced-fields-inner">
             <label>
@@ -321,6 +339,8 @@ export default function HomePersonalStage({
             </label>
           </div>
         </div>
+
+        {/* ---- Hint, Back and Continue ---- */}
         <div className="personal-footer full">
           {!isPersonalComplete && (
             <p className="muted personal-hint">

@@ -1,5 +1,16 @@
+/**
+ * The skeleton and muscle guide segments of the physique silhouette, added by
+ * geometry.js once it has placed the landmarks they join.
+ */
 import { clamp } from "./math";
 
+/**
+ * Pushes each guide through the two push functions geometry.js passes in: the
+ * spine as four segments down the centre line, and every other guide on both
+ * sides through `pushMirrorGuide`. The rest of the argument is geometry.js's
+ * landmark positions and sizes, in view-box units. geometry.js returns the
+ * result as `guides`, which PhysiqueSilhouette2D does not draw.
+ */
 export const appendDefaultGuides = ({
   pushGuide,
   pushMirrorGuide,
@@ -49,6 +60,7 @@ export const appendDefaultGuides = ({
   calfX,
   calfY
 }) => {
+  // ---- Bones ----------------------------------------------------------------
   pushGuide("spine-1", centerX, neckBaseY, centerX, chestY, "bone");
   pushGuide("spine-2", centerX, chestY, centerX, waistY, "bone");
   pushGuide("spine-3", centerX, waistY, centerX, pelvisY, "bone");
@@ -64,6 +76,7 @@ export const appendDefaultGuides = ({
   pushMirrorGuide("foot-long", ankleX, ankleY, toeX, footY, "bone");
   pushMirrorGuide("foot-heel", ankleX, ankleY, heelX, soleY - 1, "bone");
 
+  // ---- Muscles --------------------------------------------------------------
   pushMirrorGuide("chest-band", chestX, chestY, waistX, waistY, "muscle");
   pushMirrorGuide("oblique", chestX, chestY, hipX, hipY, "muscle");
   pushMirrorGuide("lat", underarmX, underarmY, waistX, waistY, "muscle");
