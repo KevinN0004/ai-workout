@@ -33,11 +33,12 @@ const ABSENT = [
   ["undefined", undefined]
 ];
 
-// `zeroIsValid` is not decoration. `toPositiveInt` and `parseRedisPort`
-// legitimately exclude 0 from their domain -- a port 0 and a limit of 0 are not
-// meaningful -- so for them a measured 0 correctly gives the absent answer, and
-// asserting otherwise would be wrong. Flattening this column would either force
-// a false assertion or quietly drop the zero check for everyone.
+// `zeroIsValid` is not decoration. `toPositiveInt`, `parsePositiveInt` and
+// `parseRedisPort` legitimately exclude 0 from their domain -- a port 0, a
+// limit of 0 and a zero-length generation timeout are not meaningful -- so for
+// them a measured 0 correctly gives the absent answer, and asserting otherwise
+// would be wrong. Flattening this column would either force a false assertion
+// or quietly drop the zero check for everyone.
 const helpers = [
   {
     name: "toNumberOrNull",

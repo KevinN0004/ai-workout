@@ -12,7 +12,8 @@ import {
 // The plan generator, at 75% statements and 48% branch -- the weakest branch
 // coverage left on the server. Two things live here: the equipment context
 // that decides what the model is told the user can train with, and the route
-// that defaults the rest of the form and persists the result.
+// that defaults the rest of the form, holds the call to its guardrails, and
+// persists the result.
 //
 // Only the Gemini client is stubbed. Everything else is the real injected
 // function, so the prompt under test is the one that would be sent.
@@ -45,7 +46,8 @@ const buildApp = (overrides = {}, { user } = {}) => {
 
 const body = (overrides = {}) => ({ goal: "Build strength", days: 4, ...overrides });
 
-// The text actually handed to the model.
+// The user message handed to the model, and the config sent with it: the
+// system instruction, the token cap and the abort signal.
 const promptSent = () => generateContent.mock.calls[0][0].contents;
 const configSent = () => generateContent.mock.calls[0][0].config;
 

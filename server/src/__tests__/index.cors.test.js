@@ -63,7 +63,8 @@ describe("CORS with no allowlist configured", () => {
   const openApp = () => startApp(undefined);
 
   test("a caller that sends no Origin at all is served", async () => {
-    // Same-origin browser requests and non-browser callers send no Origin.
+    // Non-browser callers, and a browser's same-origin navigations and plain
+    // GETs, send no Origin.
     const baseUrl = await openApp();
 
     const res = await get(baseUrl, undefined);

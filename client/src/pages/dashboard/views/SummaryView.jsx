@@ -1,3 +1,9 @@
+/**
+ * The dashboard's summary view, the one /dashboard opens on: the planner's
+ * settings, today's picks, weather and air quality, weekly progress and the
+ * trends. Rendered by DashboardPage, which imports it eagerly, unlike the
+ * other views.
+ */
 import { useState } from "react";
 import "./SummaryView.css";
 
@@ -27,6 +33,15 @@ function TrendChart({
   );
 }
 
+/**
+ * `form` is App's planner form, so the overview shows the settings the next
+ * plan will use rather than the saved plan's. The progress and trend numbers
+ * come from useDashboardMetrics, and the charts draw with its `buildLinePath`;
+ * the weather and air-quality figures are useDashboardData's readings. App's
+ * `dashView` being "summary", not this view rendering, is what starts their
+ * one-time load. The two cards' refresh buttons are always there, and each card
+ * shows its error alongside any reading it still has.
+ */
 export default function SummaryView({
   form,
   openPlannerFromProfile,
@@ -54,6 +69,7 @@ export default function SummaryView({
   onOpenPlans,
   onOpenMeal
 }) {
+  // ---- Derived values -------------------------------------------------------
   const [trendRange, setTrendRange] = useState("week");
   const activeTrend = trendRanges?.[trendRange] || trendRanges?.week || null;
   const selectedMeal = todayRecommendation?.mealPlan || null;
@@ -65,9 +81,9 @@ export default function SummaryView({
     : [];
   const isCommercialEnvironment = form?.environment === "Commercial";
   const environmentSelections = Array.isArray(form?.equipment) ? form.equipment : [];
-  // Guarded the same way as equipment above. Not a live bug -- the planner form
-  // always ships focuses as an array -- but the two reads sat side by side with
-  // only one defended, and an undefended read here crashes the whole dashboard.
+  // Guarded the same way as equipment above. The planner form always holds
+  // focuses as an array, so this is defensive, but an unguarded read here would
+  // crash the whole dashboard.
   const focusSelections = Array.isArray(form?.focuses) ? form.focuses : [];
   const emptyEnvironmentSelectionLabel = isCommercialEnvironment
     ? "No rooms or operations selected yet."
@@ -97,9 +113,11 @@ export default function SummaryView({
     );
   };
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="summary-view">
       <div className="summary-main">
+        {/* ---- Planner settings ---- */}
         <section className="panel summary-card overview-panel">
           <div className="overview-header">
             <div>
@@ -159,6 +177,7 @@ export default function SummaryView({
           </div>
         </section>
 
+        {/* ---- Today: workout, meals, weather and air quality ---- */}
         <section className="panel summary-card">
           <div className="overview-header">
             <div>
@@ -346,7 +365,7 @@ export default function SummaryView({
                     <p className="muted">
                       {airSummary.primaryPollutant || "PM2.5"}: {airSummary.pm25 ?? "--"} ug/m3
                       {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
-                        ? ` | US AQI ${airSummary.aqiUs}`
+                        ? ` | US AQI ${airSummary.aqiUs} from the latest reading`
                         : ""}
                     </p>
                     {airLocation?.name ? (
@@ -376,6 +395,7 @@ export default function SummaryView({
           </div>
         </section>
 
+        {/* ---- Weekly progress ---- */}
         <section className="panel summary-card">
           <h2>Weekly progress</h2>
           <div className="stat-row">
@@ -435,6 +455,7 @@ export default function SummaryView({
           </div>
         </section>
 
+        {/* ---- Recent workouts ---- */}
         <section className="panel summary-card">
           <h2>Recent activity</h2>
           <div className="summary-list">
@@ -452,6 +473,7 @@ export default function SummaryView({
         </section>
       </div>
 
+      {/* ---- Trends: the week or month ---- */}
       <aside className="summary-side">
         <section className="panel summary-card">
           <div className="summary-range-header">

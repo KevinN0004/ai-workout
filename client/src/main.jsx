@@ -1,3 +1,7 @@
+/**
+ * The client's entry point, loaded by index.html: starts error tracking, then
+ * renders App into #root under StrictMode.
+ */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";

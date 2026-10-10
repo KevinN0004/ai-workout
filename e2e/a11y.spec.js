@@ -1,12 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-// Accessibility coverage against the real rendered pages. This exists because
-// nothing else in the repo checks accessibility at all, and because the linter
-// is not a substitute: jsx-a11y's recommended set reported 153 findings here,
-// 128 of them false positives on `<label>Name <input /></label>`, which axe
-// passes without complaint. When the two disagree about rendered output, this
-// file is the authority -- so three jsx-a11y rules are switched off in
+// Accessibility coverage against the real rendered pages. The linter is not a
+// substitute: jsx-a11y's two label rules, which its recommended set already
+// leaves off and eslint.config.js pins off, fire on
+// `<label>Name <input /></label>` when switched on, and axe passes that markup
+// without complaint. When the two disagree about rendered output, this file is
+// the authority -- so three more jsx-a11y rules are switched off in
 // eslint.config.js on the strength of it, and it is what should catch a real
 // keyboard trap if one ever ships.
 //

@@ -1,6 +1,19 @@
+/**
+ * The meal view's suggestion sections: one card per meal, grouped by course.
+ * Rendered by MealView.
+ */
+
+/**
+ * Renders `displayedSections`, already narrowed by MealView to the chosen
+ * course. A card passes its meal's id to `onSelectMeal`, which opens the meal's
+ * details. A course with no meals says so, and so does an empty list. MealDB
+ * meals carry no calories (mapMealDbMeal on the server sets them to null), so
+ * in the app every card reads "Calories not provided".
+ */
 export default function MealSections({ displayedSections, onSelectMeal, handleImageError }) {
   return (
     <div className="meal-sections">
+      {/* ---- One section per course ---- */}
       {displayedSections.map((section) => (
         <section key={section.key} className="meal-section">
           <div className="meal-section-header">
@@ -47,6 +60,7 @@ export default function MealSections({ displayedSections, onSelectMeal, handleIm
           )}
         </section>
       ))}
+      {/* ---- No sections at all ---- */}
       {!displayedSections.length && (
         <p className="muted">No course options are available right now.</p>
       )}

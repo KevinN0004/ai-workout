@@ -45,36 +45,56 @@ describe("pm25ToUsAqi", () => {
     expect(pm25ToUsAqi(-1)).toBeNull();
   });
 
-  // The EPA breakpoints. Each pair is (concentration, published AQI) at the
-  // edge of a band, which is where an off-by-one in the table would show.
+  test("keeps a measured zero, given as a number or a numeric string", () => {
+    expect(pm25ToUsAqi(0)).toBe(0);
+    expect(pm25ToUsAqi("0")).toBe(0);
+  });
+
+  // The EPA's 2024 breakpoints. Each pair is (concentration, published AQI) at
+  // the edge of a band, which is where an off-by-one in the table would show.
   test.each([
     [0, 0],
-    [12.0, 50],
-    [12.1, 51],
+    [9.0, 50],
+    [9.1, 51],
     [35.4, 100],
     [35.5, 101],
     [55.4, 150],
     [55.5, 151],
-    [150.4, 200],
-    [150.5, 201],
-    [250.4, 300],
-    [250.5, 301],
-    [500.4, 500]
+    [125.4, 200],
+    [125.5, 201],
+    [225.4, 300],
+    [225.5, 301],
+    [325.4, 500]
   ])("maps %s ug/m3 to AQI %s", (pm25, expected) => {
     expect(pm25ToUsAqi(pm25)).toBe(expected);
   });
 
-  test("interpolates within a band rather than snapping to its edges", () => {
-    // Midpoint of the first band: 6.0 ug/m3 sits halfway to AQI 50.
-    expect(pm25ToUsAqi(6)).toBe(25);
+  // An unrounded reading between two bands' published edges. Truncating to one
+  // decimal, as the EPA does, puts it at the lower band's top.
+  test.each([
+    [9.05, 50],
+    [35.45, 100],
+    [55.45, 150],
+    [125.45, 200],
+    [225.45, 300]
+  ])("scores %s ug/m3, between two bands, as AQI %s", (pm25, expected) => {
+    expect(pm25ToUsAqi(pm25)).toBe(expected);
   });
 
-  test("caps at 500 for concentrations past the top of the table", () => {
-    expect(pm25ToUsAqi(9999)).toBe(500);
+  test("interpolates within a band rather than snapping to its edges", () => {
+    // Midpoint of the first band: 4.5 ug/m3 sits halfway to AQI 50.
+    expect(pm25ToUsAqi(4.5)).toBe(25);
+  });
+
+  test("extends the top band's slope past its last breakpoint", () => {
+    // 425.3 is one band-width (99.9 ug/m3) past 325.4, so it scores one
+    // band-height (199) past 500, and still reads as hazardous.
+    expect(pm25ToUsAqi(425.3)).toBe(699);
+    expect(aqiBand(pm25ToUsAqi(425.3)).level).toBe("Hazardous");
   });
 
   test("rises monotonically across the whole range", () => {
-    const samples = [0, 5, 12, 20, 35, 50, 80, 150, 200, 260, 400, 500];
+    const samples = [0, 5, 9, 20, 35, 50, 80, 125, 200, 230, 325, 400];
     const values = samples.map(pm25ToUsAqi);
     values.forEach((value, index) => {
       if (index === 0) return;

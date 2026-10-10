@@ -1,4 +1,9 @@
-﻿@keyframes planner-backdrop-in {
+﻿/* PlannerSetupModal's keyframes, named by interactions.css: the entrances and the
+   environment toggle's pop, and its reduced-motion switch. Imported last of the four planner
+   sheets by styles/app.css. */
+
+/* ---- Keyframes ----------------------------------------------------------- */
+@keyframes planner-backdrop-in {
   from {
     opacity: 0;
   }
@@ -66,6 +71,10 @@
   }
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Turns off every CSS animation and transition on the setup modal, its backdrop and its
+   descendants. A pseudo-element is not a descendant, so the environment toggle's pill
+   (::before in interactions.css) still slides. */
 @media (prefers-reduced-motion: reduce) {
   .planner-backdrop,
   .planner-setup-modal,

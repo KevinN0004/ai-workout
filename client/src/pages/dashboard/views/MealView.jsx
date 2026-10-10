@@ -1,3 +1,8 @@
+/**
+ * The dashboard's Meal prep view: the meal log, a recipe search, and meal
+ * suggestions for the visitor's goal. Rendered by DashboardPage, which loads it
+ * lazily.
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectTrack } from "../planUtils";
 import { COURSE_ALL_KEY } from "../meal/data";
@@ -10,6 +15,13 @@ import MealSections from "../meal/MealSections";
 import MealDetailsModal from "../meal/MealDetailsModal";
 import "./MealView.css";
 
+/**
+ * Lays out the panels in meal/ around useMealDbSearch. The suggestions follow
+ * the goal's track (detectTrack): the latest saved plan's goal, then
+ * `goals.goalType`, which the server's goals do not carry, then the planner
+ * form's (`fallbackPlan`). Each meal-log prop has a stand-in so the view renders
+ * without it, though DashboardPage passes all four.
+ */
 export default function MealView({
   dashboard,
   fallbackPlan,
@@ -18,10 +30,12 @@ export default function MealView({
   submitMealLog,
   mealLogs
 }) {
+  // ---- State ----------------------------------------------------------------
   const [activeMealId, setActiveMealId] = useState(null);
   const [activeCourseKey, setActiveCourseKey] = useState(COURSE_ALL_KEY);
   const mealLogNameInputRef = useRef(null);
 
+  // ---- Meal log props, with stand-ins ---------------------------------------
   const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];
   const safeMealLogForm = mealLogForm || {
     date: "",
@@ -38,6 +52,7 @@ export default function MealView({
   const onSubmitMealLog =
     typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
 
+  // ---- Goal track and recipe search -----------------------------------------
   const latestPlan = dashboard?.plans?.[0];
   const goalTextForMeals =
     latestPlan?.goal ||
@@ -60,11 +75,17 @@ export default function MealView({
     runMealDbSearch
   } = useMealDbSearch(mealTrack);
 
+  // ---- Sections and course options ------------------------------------------
   const mealContext = useMemo(() => {
+    // The header's context lines.
     const targetCalories = Number(dashboard?.goals?.targetCalories || 2200);
     const weeklyDays = Number(
       latestPlan?.days || dashboard?.goals?.weeklyWorkouts || fallbackPlan?.days || 3
     );
+
+    // The calorie band picks each meal's portion note from `portionByCalorie`.
+    // No meal the MealDB route returns carries one, so in the app the note is
+    // always empty.
     const calorieBand = getCalorieBand(targetCalories);
     const withPortions = (items) =>
       items.map((meal) => ({
@@ -72,6 +93,8 @@ export default function MealView({
         portionNote: meal.portionByCalorie?.[calorieBand] || meal.portionByCalorie?.balanced || ""
       }));
 
+    // The search results come first, then the suggestions. Each section is a
+    // course; "All courses" counts the meals of every section together.
     const recommendationSections = mealDbRecommendations.map((section) => ({
       key: section.key,
       title: section.title,
@@ -118,6 +141,9 @@ export default function MealView({
     goalTextForMeals
   ]);
 
+  // ---- The chosen course and the open meal ----------------------------------
+  // "All courses" leaves out empty sections; a single course shows even when
+  // empty, so MealSections can say so.
   const displayedSections = useMemo(() => {
     if (activeCourseKey === COURSE_ALL_KEY) {
       return mealContext.sections.filter(
@@ -137,6 +163,8 @@ export default function MealView({
     : [];
   const activeMealRecipes = Array.isArray(activeMeal?.recipes) ? activeMeal.recipes : [];
 
+  // Escape closes the meal details while they are open. ModalPortal's own
+  // Escape handling already does the same, so this listener is a second copy.
   useEffect(() => {
     if (!activeMeal) return undefined;
     const onKeyDown = (event) => {
@@ -146,14 +174,19 @@ export default function MealView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeMeal]);
 
+  // A chosen course that is no longer among the sections falls back to "All
+  // courses": the suggestions failed and were cleared, or reloaded for a new
+  // goal track with different keys.
   useEffect(() => {
     if (activeCourseKey === COURSE_ALL_KEY) return;
     const hasActiveCourse = mealContext.sections.some((section) => section.key === activeCourseKey);
     if (!hasActiveCourse) setActiveCourseKey(COURSE_ALL_KEY);
   }, [activeCourseKey, mealContext.sections]);
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="panel meal-view">
+      {/* ---- Goal context ---- */}
       <div className="meal-view-header">
         <div>
           <h2>Meal prep</h2>
@@ -172,6 +205,7 @@ export default function MealView({
         </aside>
       </div>
 
+      {/* ---- Meal log and recipe search ---- */}
       <MealLogPanel
         safeMealLogForm={safeMealLogForm}
         safeMealLogs={safeMealLogs}
@@ -191,6 +225,7 @@ export default function MealView({
         onTryDefaultSearch={() => runMealDbSearch("chicken")}
       />
 
+      {/* ---- Suggestions, by course ---- */}
       {mealDbRecommendationsLoading && (
         <div className="meal-skeleton-grid" aria-hidden="true">
           <div className="meal-skeleton-card" />
@@ -212,6 +247,7 @@ export default function MealView({
         handleImageError={handleImageError}
       />
 
+      {/* ---- Meal details ---- */}
       <MealDetailsModal
         activeMeal={activeMeal}
         activeMealIngredients={activeMealIngredients}
