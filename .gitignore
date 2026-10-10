@@ -14,8 +14,11 @@ playwright/.cache/
 
 # ---- Secrets ----------------------------------------------------------------
 # server/.env holds the Gemini key and the Postgres connection string. The
-# committed template is env.example.
+# committed template is env.example. Variants such as .env.local and
+# server/.env.production, which Vite and other tools also read, are ignored too;
+# the template's name has no leading dot, so the second rule never matches it.
 .env
+.env.*
 
 # ---- Local Postgres ---------------------------------------------------------
 # Data directory and generated password, both written by
