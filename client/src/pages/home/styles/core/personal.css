@@ -1,3 +1,9 @@
+/* HomePersonalStage's profile form: the panel, the field grid in basic and advanced mode,
+   and the metric fields, whose unit toggle sits in the label row. Imported last by core.css.
+   PreviewPersonalChapter renders a read-only copy, always in advanced mode, as
+   .preview-personal-form. */
+
+/* ---- Panel and form grid ------------------------------------------------- */
 .personal-panel {
   display: grid;
   gap: 18px;
@@ -15,6 +21,9 @@
   min-height: 0;
 }
 
+/* The form also carries .form, and styles/base.css's .form ties this rule and loads later,
+   so .form's grid-template-columns, gap and margin-top are the ones that apply. The
+   advanced-mode columns below are more specific and do apply. */
 .personal-form {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   align-items: start;
@@ -26,65 +35,20 @@
   grid-auto-flow: row dense;
 }
 
-.preview-personal-form {
-  width: min(920px, 100%);
-  justify-self: center;
-  margin: 0 auto;
-}
-
-.preview-personal-form input,
-.preview-personal-form select,
-.preview-personal-form textarea,
-.preview-personal-form button {
-  pointer-events: none;
-}
-
-.preview-personal-form label {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.preview-personal-form input,
-.preview-personal-form select,
-.preview-personal-form textarea {
-  width: 100%;
-  max-width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 12px;
-  color: #fff;
-  padding: 10px 12px;
-  font-family: inherit;
-  line-height: 1.35;
-  box-sizing: border-box;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  overflow-x: hidden;
-  resize: none;
-}
-
-.preview-personal-form select {
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.preview-personal-form .height-unit {
-  color: rgba(255, 255, 255, 0.9);
-}
-
+/* ---- The walkthrough's read-only form ------------------------------------ */
+/* PreviewPersonalChapter's copy of the form is styled in home/preview/styles/, except for its
+   day buttons' colours, which stay here because their place in the cascade is what they do.
+   They apply to the days not selected: forms-and-motion.css's .day-toggle-btn.active ties
+   this rule and comes later, so a selected day is white. In home/preview/styles/ this rule
+   would come after that one and win. */
 .preview-personal-form .day-toggle-btn {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);
 }
 
-.preview-personal-form .day-toggle-btn {
-  cursor: default;
-}
-
-.preview-personal-form .day-toggle-btn:hover,
-.preview-personal-form .day-toggle-btn:active {
-  transform: none;
-}
-
+/* ---- Labels and metric fields -------------------------------------------- */
+/* A metric field's label row keeps --metric-toggle-slot free on the right for its unit
+   toggle; .metric-height and .field-weight set the slot's width. */
 .personal-form label {
   width: 100%;
   display: grid;
@@ -146,6 +110,7 @@
   --metric-toggle-slot: 92px;
 }
 
+/* ---- Field placement in basic mode --------------------------------------- */
 .personal-form.basic-mode .field-name {
   grid-column: 1 / -1;
 }
@@ -195,6 +160,7 @@
   margin-top: 0;
 }
 
+/* ---- Label text beside a unit toggle ------------------------------------- */
 .personal-form .label-row {
   width: 100%;
   align-items: center;
@@ -206,6 +172,7 @@
   flex-shrink: 0;
 }
 
+/* ---- Field placement in advanced mode ------------------------------------ */
 .personal-form.advanced-mode {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

@@ -1,10 +1,8 @@
 /**
  * Builds the routine run on SIGTERM/SIGINT: stop accepting connections, drain,
- * then release every external resource before exiting.
- *
- * Dependencies are injected so the sequence is unit-testable by direct call.
- * That matters because Windows does not deliver POSIX signals to Node the way
- * the Linux CI runner does, so signal-driven tests would not run locally.
+ * then release every external resource before exiting. Its dependencies are
+ * injected so the sequence can be tested by direct call: Windows does not
+ * deliver POSIX signals to Node the way the Linux CI runner does.
  */
 export const createShutdownHandler = ({
   logger,

@@ -1,3 +1,8 @@
+/**
+ * App's event handlers: plan generation and PDF export, sign-up, sign-in and
+ * logout, the dashboard's logs, goals and saved exercises, and the account
+ * settings. App rebuilds them from its current state on every render.
+ */
 import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -12,9 +17,9 @@ import { getLocalDateKey, splitFullName } from "./units";
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-// jspdf pulls in html2canvas and dompurify, roughly a quarter of the bundle, for
-// a path most sessions never take. Importing it on demand keeps it out of the
-// initial download; the export button is the only caller and can await it.
+// jspdf is one of the largest chunks in the build, for a path most sessions
+// never take. Importing it on demand keeps it out of the initial download; the
+// Download PDF buttons are its only callers and can await it.
 const downloadPlanPdfFromText = async (planText) => {
   if (!planText) return;
   const { jsPDF } = await import("jspdf");
@@ -38,6 +43,16 @@ const downloadPlanPdfFromText = async (planText) => {
   doc.save("ai-workout-plan.pdf");
 };
 
+/**
+ * Builds the handlers from App's state and setters, all passed in one object.
+ * Rebuilt every render, each handler sees the values of the render that built
+ * it. The members that need a word: `apiFetch` (useApiClient, which adds the
+ * CSRF header to writes); `queueOptimisticLogCommit` and `showDashboardToast`
+ * (useOptimisticLogs, which shows a workout, calorie or meal log as pending and
+ * sends it after the undo window); and the resets logout and account deletion
+ * run, `clearOptimisticOperations`, `clearDashboardDataState`,
+ * `clearDashboardToast` and `resetPersonalFlow`.
+ */
 export const createAppEventHandlers = ({
   apiFetch,
   user,
@@ -99,6 +114,8 @@ export const createAppEventHandlers = ({
     setResult("");
 
     try {
+      // Generate. For a signed-in visitor the server also saves the plan and
+      // returns it as savedPlan, which goes to the head of the dashboard's list.
       const res = await apiFetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -117,6 +134,10 @@ export const createAppEventHandlers = ({
           prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev
         );
       }
+
+      // Close the planner, then go to the dashboard's summary when generating
+      // from the dashboard, or to /plan, which shows the new plan, from
+      // anywhere else.
       closePlanner();
       if (isDashboardRoute) {
         setPlanModalOpen(false);
@@ -134,6 +155,9 @@ export const createAppEventHandlers = ({
   };
 
   const openSignupWithPrefilledProfile = () => {
+    // The signup form carries height in centimetres and in feet and inches, and
+    // weight in the visitor's unit and in kilograms, so the home flow's entries
+    // are converted from whichever unit the visitor typed in.
     const { firstName, lastName } = splitFullName(personal.name);
     const fallbackHeightCm = String(personal.heightCm || "").trim();
     const computedHeightCm =
@@ -150,6 +174,8 @@ export const createAppEventHandlers = ({
     const normalizedWeight = String(personal.weight || "").trim();
     const computedWeightKg = weightUnit === "lb" ? toKg(normalizedWeight, "lb") : normalizedWeight;
 
+    // Then signup opens on clean credentials, in the visitor's units, with the
+    // profile filled in.
     setAuthForm({ ...defaultAuthForm });
     setAuthMode("signup");
     setAuthError("");
@@ -177,9 +203,9 @@ export const createAppEventHandlers = ({
 
   const downloadPlanPdf = () =>
     downloadPlanPdfFromText(result).catch((err) => {
-      // Loading jspdf on demand introduces a failure the static import did not
-      // have: a chunk fetch can fail on a flaky network or against a stale
-      // deploy. Surface it instead of leaving an unhandled rejection.
+      // Loading jspdf on demand can fail where a static import cannot: the
+      // chunk fetch can fail on a flaky network or against a stale deploy.
+      // Surface it instead of leaving an unhandled rejection.
       setError(err?.message || "Could not prepare the PDF. Please try again.");
     });
 
@@ -212,6 +238,8 @@ export const createAppEventHandlers = ({
     setAuthLoading(true);
     setAuthError("");
     try {
+      // Sign-up: the profile goes in centimetres and kilograms, converted from
+      // the form's units, and the new account comes back signed in.
       if (authMode === "signup") {
         const normalizedProfile = {
           ...signupProfileForm,
@@ -246,6 +274,7 @@ export const createAppEventHandlers = ({
         return;
       }
 
+      // Otherwise authMode is "login", which names the route.
       const res = await apiFetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -272,10 +301,10 @@ export const createAppEventHandlers = ({
 
   const onLogout = async () => {
     // Signing out locally must not depend on the request succeeding. The button
-    // is wired straight to this, so a rejection used to skip every clear below
-    // and leave the previous account's dashboard on screen -- with nothing
-    // catching it, and no sign to the user that Log out had not worked. A dead
-    // network, or apiFetch refusing to send without a CSRF token, both get here.
+    // is wired straight to this, so an uncaught rejection would skip every clear
+    // below and leave the previous account's dashboard on screen, with no sign
+    // that Log out had not worked. A dead network, or apiFetch refusing to send
+    // without a CSRF token, both get here.
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
     } catch {
@@ -300,6 +329,9 @@ export const createAppEventHandlers = ({
       ...workoutForm,
       exercises: normalizedExercises
     };
+
+    // The entry shows at once and is sent only when the undo window closes,
+    // unless it is undone first (useOptimisticLogs).
     const operationId = buildOptimisticId("workout");
     const optimisticWorkout = {
       id: operationId,
@@ -334,6 +366,7 @@ export const createAppEventHandlers = ({
       undoMessage: "Workout entry removed."
     });
 
+    // The form resets and the modal closes without waiting for the request.
     setWorkoutForm({
       date: getLocalDateKey(),
       focus: "",
@@ -426,14 +459,13 @@ export const createAppEventHandlers = ({
       const data = await res.json();
       // Only the user is updated, deliberately. `personal` is the home flow's
       // form state, not account state: it is read by HomePage and the signup
-      // prefill, both of which only a signed-out visitor reaches, and it is
-      // blanked on logout. Settings reads user.profile.
+      // prefill, both meant for a signed-out visitor, and it is blanked on
+      // logout. Settings reads user.profile.
       //
-      // Writing it here used to look like keeping the two in sync, but nothing
-      // hydrates `personal` on load -- so it would have been correct right after
-      // a save and blank on the next page load. Half-synced state is worse than
-      // unsynced, and a mutation removing the write failed only the two tests
-      // that asserted the write itself.
+      // Writing it here would look like keeping the two in sync, but nothing
+      // hydrates `personal` on load -- so it would be correct right after a save
+      // and blank on the next page load. Half-synced state is worse than
+      // unsynced.
       setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
       showDashboardToast("Profile updated.");
       return { ok: true };
@@ -461,7 +493,7 @@ export const createAppEventHandlers = ({
       // No error toast, deliberately. SettingsAccountPanel renders this same
       // string in a role="alert" region attached to the form the visitor is
       // looking at. The toast is role="status" aria-live="polite", so raising
-      // both announced every failure twice, at two politeness levels. The
+      // both would announce every failure twice, at two politeness levels. The
       // inline region is the one that survives: it is tied to the field that
       // needs correcting, and it stays put instead of timing out.
       const message = err.message || "Unable to change password.";
@@ -502,9 +534,7 @@ export const createAppEventHandlers = ({
     // The keys are built before setUser(null) for readability only. `user` is
     // a parameter of createAppEventHandlers, so it is a closure constant:
     // setUser sets React state and cannot reassign it, and nothing here does
-    // either. Reading it after the reset would give the same value. Do not
-    // reorder this on the belief that the position is load-bearing -- it is
-    // not, and an earlier draft of this comment wrongly claimed it was.
+    // either, so building the keys after the reset would read the same value.
     const scopedCacheKeysToClear = [
       DASHBOARD_CACHE_PREFIX,
       WEATHER_CACHE_PREFIX,
@@ -526,6 +556,7 @@ export const createAppEventHandlers = ({
     const operationId = buildOptimisticId("meal");
     const payload = { ...mealLogForm };
 
+    // Queued like a workout: shown at once, sent when the undo window closes.
     queueOptimisticLogCommit({
       type: "meal",
       item: {
@@ -557,6 +588,7 @@ export const createAppEventHandlers = ({
       undoMessage: "Meal entry removed."
     });
 
+    // The form resets without waiting for the request.
     setMealLogForm({
       date: getLocalDateKey(),
       mealType: "breakfast",

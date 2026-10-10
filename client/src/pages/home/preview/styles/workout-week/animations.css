@@ -1,3 +1,8 @@
+/* The week chapter's keyframes: the stage-5 scan, which structure.css plays, and the CSS
+   break, which break-apart.css names but never plays (is-anime-particle-break switches it
+   off). Imported fourth by workout-week.css. */
+
+/* ---- Scan keyframes ------------------------------------------------------ */
 @keyframes preview-week-live-scan-once {
   0% {
     opacity: 0;
@@ -19,6 +24,8 @@
   }
 }
 
+/* ---- CSS break keyframes ------------------------------------------------- */
+/* Never run: see break-apart.css's last section. */
 @keyframes preview-week-break-shell {
   0% {
     opacity: 1;

@@ -1,3 +1,8 @@
+/**
+ * The API server's bootstrap: reads the environment, builds the Express app and
+ * wires every repository and service into the routes. Exports `app` for the
+ * test suites; the guard at the bottom runs `startServer` only outside them.
+ */
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
@@ -73,6 +78,7 @@ import {
 import { validateEnv } from "./services/platform/envValidationService.js";
 import { createRateLimitStore } from "./services/platform/rateLimitStore.js";
 
+// ---- Environment ------------------------------------------------------------
 // quiet: dotenv 17+ prints "injected env (N) from .env" to stderr on every
 // call, as an unstructured line beside pino's JSON. prisma.js, the migration
 // script and vitest.setup.js pass it for the same reason.
@@ -80,10 +86,10 @@ dotenv.config({ quiet: true });
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   // Must run before any other module-scope code reads process.env below
-  // (the pino logger, argon2 options, the port, ~30 vars in all) -- a
-  // check that runs after those reads is not a preflight, it is a report
-  // filed after the crash. Kept in its own guard so the suite, which
-  // imports `app` from this module, never trips a fatal env check.
+  // (the pino logger, argon2 options, the port, and every base URL, rate limit
+  // and cache TTL) -- a check that runs after those reads is not a preflight,
+  // it is a report filed after the crash. Kept in its own guard so the suite,
+  // which imports `app` from this module, never trips a fatal env check.
   const envErrors = validateEnv(process.env);
   if (envErrors.length > 0) {
     // process.stderr rather than the pino logger: the logger is not yet
@@ -96,6 +102,7 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   }
 }
 
+// ---- App, logging and metrics -----------------------------------------------
 const app = express();
 const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
@@ -118,8 +125,8 @@ const defaultRedactedLogPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
   "req.headers.x-csrf-token",
-  // Guards /api/metrics. Belongs here with the other credential headers --
-  // it was the one bearer token the list missed.
+  // The /api/metrics token: a credential like the three headers above, so it is
+  // redacted with them.
   "req.headers.x-metrics-token",
   "authorization",
   "cookie",
@@ -158,6 +165,7 @@ let errorTracker = {
   flush: async () => {}
 };
 
+// ---- Request pipeline -------------------------------------------------------
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
@@ -234,6 +242,7 @@ app.use(
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
+// ---- Configuration ----------------------------------------------------------
 // Built only when a key is configured. The key is optional by design, and the
 // SDK console.warns on every keyless construction, bypassing pino. With no
 // client, /api/generate answers its own "Missing GEMINI_API_KEY." 500.
@@ -247,10 +256,9 @@ const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 
-// Guards before it coerces. The `> 0` below already rejected the 0 that
-// `Number(null)` and `Number("")` produce, so this changes no answer -- it just
-// stops the safety being a side effect of the range. A later helper copying
-// this shape for a range that includes 0 would not have been so lucky.
+// Guards before it coerces. The `> 0` below would also reject the 0 that
+// `Number(null)` and `Number("")` produce, but only by accident of the range;
+// a copy of this shape for a range that includes 0 needs the guard to be right.
 const toPositiveInt = (value, fallback) => {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
@@ -328,12 +336,13 @@ const mealDbBaseUrl = cleanText(
   240
 );
 const mealDbTimeoutMs = 12000;
+
+// ---- Repositories -----------------------------------------------------------
 const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
   createUserReadRepository({ prisma });
-// Progress-metric writes go straight to Prisma; the shim still backs its reads.
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
-const { saveMealLog, syncDerivedCalorieEntry } = createMealLogRepository({ prisma });
+const { saveMealLogWithDailySync } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
 const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser } =
@@ -341,6 +350,8 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, delete
     prisma
   });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
+
+// ---- Services ---------------------------------------------------------------
 // The cache is built here but sessionService, which owns the Redis client, is not
 // created until further down. This indirection is set once that happens; reaching
 // for `sessionService` directly from here would be a temporal dead zone hazard.
@@ -477,8 +488,9 @@ const dashboardCollectionService = createDashboardCollectionService({
 const { parseDashboardPagination, getDashboardCollections, buildDashboardResponse } =
   dashboardCollectionService;
 
+// ---- Rate limiters ----------------------------------------------------------
 // Counters live in Redis when it is up, so they survive a restart or the free
-// tier's 15-minute idle spin-down -- the same reason sessions moved off memory.
+// tier's 15-minute idle spin-down -- which is also why sessions are kept there.
 // Each limiter gets its own store and prefix so their counts stay separate, and
 // each falls back to memory on its own if Redis is unavailable.
 const rateLimitStore = (scope) =>
@@ -605,6 +617,7 @@ const anonGenerateLimiter = rateLimit({
   }
 });
 
+// ---- Limits and CSRF on /api ------------------------------------------------
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
@@ -614,6 +627,7 @@ app.use("/api/generate", attachOptionalUser, anonGenerateLimiter, generateLimite
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
 
+// ---- API routes -------------------------------------------------------------
 registerApiRoutes(app, {
   findUserWithDashboard,
   metrics,
@@ -683,8 +697,7 @@ registerApiRoutes(app, {
   goalsBodySchema,
   mealLogBodySchema,
   buildMealLogEntry,
-  saveMealLog,
-  syncDerivedCalorieEntry,
+  saveMealLogWithDailySync,
   progressMetricBodySchema,
   buildProgressMetricEntry,
   saveProgressMetric,
@@ -704,6 +717,8 @@ registerApiRoutes(app, {
   saveGeneratedPlan,
   toCleanArray
 });
+
+// ---- Static client and error handler ----------------------------------------
 // After the API routes so /api keeps its own 404s, and before the error
 // handler so a sendFile failure still reaches it. See staticClient.js for why
 // the client must be served from this origin rather than deployed separately.
@@ -724,6 +739,7 @@ app.use(
   })
 );
 
+// ---- Startup ----------------------------------------------------------------
 const startServer = async () => {
   try {
     errorTracker = await initErrorTracking({ logger, toShortText });
@@ -797,6 +813,7 @@ const startServer = async () => {
   }
 };
 
+// ---- Exports ----------------------------------------------------------------
 export { app, startServer };
 
 export const __testables = {
@@ -831,6 +848,7 @@ export const __testables = {
   parseEnvBoolean
 };
 
+// ---- Entry point ------------------------------------------------------------
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   startServer();
 }

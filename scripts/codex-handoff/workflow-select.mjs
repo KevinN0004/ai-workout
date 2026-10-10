@@ -1,3 +1,8 @@
+/**
+ * How codex-handoff.mjs chooses a Claude -> Codex workflow (Rescue → Review,
+ * Review → Patch or Plan → Execute), the Codex sandbox flags for each, and the
+ * prompt its --launch sends Codex.
+ */
 const FIX_WORDS = ["fix", "broken", "failing", "repair"];
 const REVIEW_WORDS = ["review", "audit", "confidence", "looks right"];
 const REPAIR_DESC_WORDS = ["broken", "failing", "regression", "hotfix"];
@@ -5,6 +10,12 @@ const HASH_RE = /^[a-f0-9]+ /;
 const CONV_PREFIX_RE = /^\w+(\([^)]+\))?!?:\s*/;
 const FIX_TYPE_RE = /^fix(\([^)]+\))?!?:/;
 
+/**
+ * True when any line of `git log --oneline` output, after its hash, starts
+ * with "revert" in any case, or is a `fix:` commit (with or without a scope or
+ * `!`) whose description contains one of REPAIR_DESC_WORDS. A `fix:` without
+ * one of those words does not count.
+ */
 export function detectRepairLanguage(log) {
   return log.split("\n").some((line) => {
     const withoutHash = line.toLowerCase().replace(HASH_RE, "");
@@ -15,6 +26,8 @@ export function detectRepairLanguage(log) {
   });
 }
 
+// The Codex sandbox flags for each workflow. codex-handoff.mjs's --launch uses
+// them unless --approval-mode overrides them.
 export const APPROVAL_MODE_MAP = {
   "Rescue → Review": "--sandbox workspace-write",
   "Review → Patch": "--sandbox workspace-write",
@@ -42,6 +55,14 @@ const WORKFLOW_INSTRUCTIONS = {
     "Plan and implement the requested feature from a clean state. Write failing tests first, then make them pass."
 };
 
+/**
+ * Builds the prompt codex-handoff.mjs's --launch feeds `codex exec` on stdin:
+ * the workflow and its reason, the task, plan and git state it was given, and
+ * the workflow's instruction. The Superpowers controller protocol follows when
+ * `superpowers` is set or a plan reference or contract is given, then the
+ * contract. codex-handoff.mjs always passes a contract, so its prompts always
+ * carry the protocol.
+ */
 export function buildCodexPrompt({
   workflow,
   reason,
@@ -74,9 +95,17 @@ export function buildCodexPrompt({
   return lines.join("\n");
 }
 
+/**
+ * Picks the workflow and the reason codex-handoff.mjs prints. The first signal
+ * that applies wins: a usage limit, then repair language in the recent log,
+ * then uncommitted changes, untracked files included (Rescue → Review when the
+ * task text has a fix word, else Review → Patch), then review words in the
+ * task text; with none of those it is Plan → Execute.
+ */
 export function selectWorkflow({ hasChanges, hasFixInLog, hasUsageLimit = false, taskText = "" }) {
   const text = taskText.toLowerCase();
 
+  // ---- Signals checked before the working tree ------------------------------
   if (hasUsageLimit) {
     return {
       workflow: "Review → Patch",
@@ -91,6 +120,7 @@ export function selectWorkflow({ hasChanges, hasFixInLog, hasUsageLimit = false,
     };
   }
 
+  // ---- Uncommitted changes --------------------------------------------------
   if (hasChanges) {
     if (FIX_WORDS.some((k) => text.includes(k))) {
       return {
@@ -104,6 +134,7 @@ export function selectWorkflow({ hasChanges, hasFixInLog, hasUsageLimit = false,
     };
   }
 
+  // ---- No uncommitted changes detected --------------------------------------
   if (REVIEW_WORDS.some((k) => text.includes(k))) {
     return {
       workflow: "Review → Patch",

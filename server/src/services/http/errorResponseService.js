@@ -1,10 +1,18 @@
+/**
+ * The error response for route handlers that catch their own errors: the
+ * unmasked message is logged (no stack), and the response carries a masked
+ * message and the request id. Nothing here reports to error tracking.
+ */
 const GENERIC_SERVER_ERROR = "Server error.";
 
 /**
  * Mirrors the masking rule in middleware/errorHandler.js for handlers that catch
  * their own errors: 5xx responses never carry the underlying message, because
  * Prisma and pg errors embed schema, constraint, and connection detail.
- * Client-caused (4xx) messages are already curated by the routes, so they pass through.
+ * A 4xx keeps its message, and that includes an upstream API's:
+ * externalDataService keeps an upstream 4xx's status, so the external routes
+ * pass that API's own error text, or the service's fixed fallback, through to
+ * the browser.
  */
 const safeErrorMessage = (err, status = 500) => {
   if (status >= 500) return GENERIC_SERVER_ERROR;

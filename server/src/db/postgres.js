@@ -1,3 +1,8 @@
+/**
+ * The raw pg pool and its connection status. The migration script applies the
+ * schema through the pool; index.js opens it at startup as a probe, and the
+ * readiness route reports its status. Prisma keeps its own connection (prisma.js).
+ */
 let postgresPool = null;
 
 const cleanText = (value, maxLen = 500) =>
@@ -31,6 +36,12 @@ let postgresStatus = {
   databaseUrl: ""
 };
 
+/**
+ * Reads the connection settings from `env`: the URL (DATABASE_URL, else
+ * POSTGRES_URL), a copy with the credentials redacted for logs and status, and
+ * the SSL flags. SSL is off unless POSTGRES_SSL is true; with it on, the server
+ * certificate is verified unless POSTGRES_SSL_REJECT_UNAUTHORIZED is false.
+ */
 export const resolvePostgresConfig = (env = process.env) => {
   const databaseUrl = cleanText(env.DATABASE_URL || env.POSTGRES_URL || "", 1000);
   return {
@@ -42,10 +53,21 @@ export const resolvePostgresConfig = (env = process.env) => {
   };
 };
 
+/**
+ * A copy of the last known status: whether a URL is configured, whether the
+ * startup probe connected, its error, and the redacted URL. Nothing re-probes,
+ * so it changes only when connectPostgres or closePostgres runs.
+ */
 export const getPostgresStatus = () => ({ ...postgresStatus });
 
+/** The open pool, or null before connectPostgres succeeds and after closePostgres. */
 export const getPostgresPool = () => postgresPool;
 
+/**
+ * Opens the pool and proves it with one `select 1`, then returns the status.
+ * With no URL configured it opens nothing. On a failure it records the error in
+ * the status, ends the half-open pool and rethrows.
+ */
 export const connectPostgres = async ({ env = process.env } = {}) => {
   const config = resolvePostgresConfig(env);
   postgresStatus = {
@@ -61,9 +83,10 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
     const { Pool } = await import("pg");
     postgresPool = new Pool({
       connectionString: config.databaseUrl,
-      // No `options: "-c timezone=UTC"` here, deliberately -- PgBouncer rejects
-      // that startup parameter and this pool is what applies the migrations, so
-      // carrying it would make the schema unreachable on any pooled database.
+      // No `options: "-c timezone=UTC"` here, deliberately -- a pooler may
+      // reject that startup parameter (PgBouncer before 1.20 does by default),
+      // and this pool is what applies the migrations, so carrying it could make
+      // the schema unreachable on a pooled database.
       // UTC comes from the database default instead; see
       // server/db/postgres/003_utc_timezone.sql.
       ssl: config.ssl
@@ -104,6 +127,7 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
   }
 };
 
+/** Ends the pool, if one is open, and marks the status disconnected. */
 export const closePostgres = async () => {
   if (!postgresPool) return;
   await postgresPool.end();

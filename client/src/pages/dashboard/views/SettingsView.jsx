@@ -1,3 +1,8 @@
+/**
+ * The dashboard's Settings view: the account's profile and settings by tab,
+ * editing in place for three of them, and the account panel. Rendered by
+ * DashboardPage, which loads it lazily.
+ */
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";
@@ -34,9 +39,20 @@ const displayValue = (value) => {
   return String(value);
 };
 
+/**
+ * Shows the stored profile tab by tab, height and weight in the visitor's
+ * locale units, and edits the profile, training and lifestyle tabs one at a
+ * time (EDITABLE_TABS). `onSaveProfile` is submitProfile in events.js, which
+ * resolves to `{ ok: true }` or `{ ok: false, error }`; the account handlers go
+ * to SettingsAccountPanel on the Account tab. The connected-apps, privacy and
+ * notifications tabs show fixed text.
+ */
 export default function SettingsView({ user, onSaveProfile, onChangePassword, onDeleteAccount }) {
-  // Both memoized because their fallback branches minted a fresh object/array
-  // every render, defeating the tabs memo that depends on them.
+  // ---- Profile and units ----------------------------------------------------
+
+  // Memoized so the memos below keep their inputs: the profile fallback and the
+  // units would otherwise be a new object every render. The locale is read once
+  // per mount.
   const profile = useMemo(() => user?.profile || {}, [user]);
   const measurementSystem = useMemo(() => getPreferredMeasurementSystem(), []);
   const units = useMemo(
@@ -47,20 +63,17 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
     [measurementSystem]
   );
 
-  // Everything this view shows and edits comes from the stored profile, through
-  // the same mapper the save path uses in reverse.
-  //
-  // Six of these rows -- timeline, experience, trainingDays, goal, nutrition,
-  // cardio -- used to read App's in-memory `personal` instead. That was only
-  // ever correct while those fields were unpersisted, which is the defect this
-  // whole change set out to fix. A signed-in visitor's `personal` is never
-  // populated: they are redirected off "/" to the dashboard before the home
-  // flow that fills it can run. So those rows read "Not set" whatever the
-  // server had stored, and the edit form seeded blanks over a real profile.
+  // The rows that show profile fields, and the edit form, read the stored
+  // profile: some rows and all the form's values through profileToPersonal, the
+  // mapper the save path uses in reverse. App's in-memory `personal` is no
+  // substitute: it is the home flow's form, and a returning visitor who signs
+  // in never passes through that flow, so rows read from it would say "Not
+  // set" over a stored profile and the edit form would seed blanks.
   const stored = useMemo(() => profileToPersonal(profile, units), [profile, units]);
   const fullName = stored.name;
   const trainingDays = stored.trainingDays;
 
+  // ---- Tabs and their rows --------------------------------------------------
   const [activeTab, setActiveTab] = useState("profile");
   const [editingTab, setEditingTab] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -159,33 +172,29 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
   );
   const activeTabData = tabs.find((tab) => tab.id === activeTab) || tabs[0];
 
+  // ---- Editing --------------------------------------------------------------
   const isEditing = editingTab === activeTabData.id;
-  // Gated on the profile having arrived, which is now the same condition the
-  // form's values are derived from -- so there is no window where Edit opens a
-  // blank form over a real profile.
-  //
-  // An earlier version gated on user?.profile while the form seeded from App's
-  // `personal`, which is a different thing entirely: a signed-in visitor has a
-  // profile but an empty `personal`, so Edit appeared, the form opened blank,
-  // and saving wrote those blanks over the stored profile. Guarding one source
-  // while reading another is worse than not guarding at all, because it looks
-  // deliberate.
+  // Gated on the profile having arrived, the same source the form's values come
+  // from, so Edit never opens a blank form over a real profile. The gate and the
+  // values must read the same thing: gating on one source while seeding from
+  // another opens a blank form whose save writes blanks over the stored profile,
+  // and a guard on the wrong source looks deliberate, which is worse than none.
   const canEdit = EDITABLE_TABS.includes(activeTabData.id) && Boolean(user?.profile);
 
   const handleSave = async (draft, formUnits) => {
     setSaving(true);
     setSaveError("");
-    // The spread over `stored` is deliberately redundant TODAY, and a mutation
-    // removing it survives -- SettingsEditForm seeds its draft from the whole
-    // values object rather than only the fields it renders, so `draft` is
-    // already a complete profile. That invariant is pinned in
-    // SettingsEditForm.test.jsx ("carries fields it never rendered through to
-    // the save"), because it is invisible from this side.
+    // The spread over `stored` is redundant while SettingsEditForm seeds its
+    // draft from the whole values object rather than only the fields it renders,
+    // as it does: `draft` is already a complete profile, so a mutation removing
+    // the spread survives. SettingsEditForm.test.jsx pins that invariant
+    // ("carries fields it never rendered through to the save"), because it is
+    // invisible from this side.
     //
-    // It stays because the cost is nothing and the failure it guards is severe:
-    // if the form is ever narrowed to return only its own tab's fields, this is
-    // what stops editing one tab blanking the other two. Kept as a known
-    // equivalent mutant rather than as an untested guard.
+    // The spread stays because it costs nothing and the failure it guards is
+    // severe: were the form narrowed to return only its own tab's fields, this
+    // is what would stop editing one tab blanking the other two. It is a known
+    // equivalent mutant rather than an untested guard.
     //
     // The units are forwarded unchanged because submitProfile must convert with
     // the same ones the form rendered in.
@@ -198,6 +207,7 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
     setSaveError(result?.error || "Unable to save profile.");
   };
 
+  // ---- Render ---------------------------------------------------------------
   return (
     <section className="panel settings-view">
       <div className="panel-header">
@@ -207,6 +217,7 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
         </div>
       </div>
       <div className="settings-shell">
+        {/* ---- Tab list ---- */}
         <div className="settings-tabs" role="tablist" aria-label="Profile sections">
           {tabs.map((tab) => (
             <button
@@ -228,6 +239,7 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
             </button>
           ))}
         </div>
+        {/* ---- The active tab: its rows, or the edit form ---- */}
         <section
           className="panel settings-body"
           role="tabpanel"

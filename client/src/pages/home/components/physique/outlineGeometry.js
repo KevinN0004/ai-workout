@@ -1,3 +1,8 @@
+/**
+ * The silhouette outline built from geometry.js's anchors: the right half
+ * traced, thinned and mirrored into one closed path. geometry.js falls back to
+ * it when templateOutline.js builds no path.
+ */
 import { mirrorX } from "./math";
 import {
   selectImportantSegmentPoints,
@@ -5,6 +10,18 @@ import {
   buildSmoothClosedPath
 } from "./outlineUtils";
 
+/**
+ * Traces the right half from the head top down the top of the arm, round the
+ * fingertips and back along its underside, down the torso and outer leg, round
+ * the foot and up the inner leg to the crotch; thins that with
+ * simplifyPerimeterByImportance; and mirrors it across `centerX` for the left
+ * half. Only the right-side (`-r`) anchors are read, and an anchor that is
+ * missing is skipped.
+ *
+ * Returns the closed run of points, its smoothed path, and `outlineMarkers` for
+ * the debug overlay: every point and every segment's midpoint, with any two
+ * that round to the same tenth of a unit kept once.
+ */
 export const buildSymmetricOutline = ({
   anchors,
   rightHeadArc,
@@ -15,6 +32,7 @@ export const buildSymmetricOutline = ({
   quadOuterUpperX,
   pelvisBaseCenterY
 }) => {
+  // ---- Anchor lookup and pickers --------------------------------------------
   const anchorLookup = new Map(anchors.map((point) => [point.id, point]));
   const toPoint = (point) => (point ? { id: point.id, x: point.x, y: point.y } : null);
   const getAnchorPoint = (id) => toPoint(anchorLookup.get(id));
@@ -24,6 +42,10 @@ export const buildSymmetricOutline = ({
     if (previous && previous.x === point.x && previous.y === point.y) return;
     collection.push(point);
   };
+  // Each picks one point of a trapezoid sample's top-and-bottom pair.
+  // pushMirrorLimbTrapezoidAnchors in geometry.js always pushes both, so the
+  // one-sided fallbacks are insurance for an uneven anchor set rather than a
+  // path geometry.js takes.
   const chooseYUpper = (top, bottom) => {
     if (top && bottom) return top.y <= bottom.y ? top : bottom;
     return top || bottom || null;
@@ -58,6 +80,7 @@ export const buildSymmetricOutline = ({
       .filter(Boolean);
   };
 
+  // ---- Limb edges from the trapezoid samples, thinned -----------------------
   const upperArmTop = selectImportantSegmentPoints(
     extractCurvePoints("upper-arm-trapezoid", "r", chooseYUpper),
     { minSpacing: 2.4, minDeviation: 0.32, minTurn: 0.03, maxStride: 2 }
@@ -101,6 +124,7 @@ export const buildSymmetricOutline = ({
     .filter(Boolean)
     .sort((left, right) => left.y - right.y);
 
+  // ---- The right half, head top to crotch -----------------------------------
   const rightPerimeter = [];
   appendPoint(rightPerimeter, { id: "head-top", x: centerX, y: headTopY });
   rightHeadArc.forEach((point, index) =>
@@ -187,6 +211,9 @@ export const buildSymmetricOutline = ({
   appendPoint(rightPerimeter, getAnchorPoint("pelvis-inner-bridge-r"));
   appendPoint(rightPerimeter, { id: "pelvis-base-center", x: centerX, y: pelvisBaseCenterY });
 
+  // ---- Thin, mirror and close -----------------------------------------------
+  // The first and last points, the head top and the crotch, sit on the centre
+  // line, so the mirrored half leaves them out rather than doubling them.
   const refinedRightPerimeter = simplifyPerimeterByImportance(rightPerimeter, {
     minSpacing: 2.1,
     minDeviation: 0.34,
@@ -208,6 +235,7 @@ export const buildSymmetricOutline = ({
     minCornerFactor: 0.24
   });
 
+  // ---- Debug markers --------------------------------------------------------
   const outlineMarkers = [];
   const outlineMarkerKeys = new Set();
   const pushOutlineMarker = (x, y) => {

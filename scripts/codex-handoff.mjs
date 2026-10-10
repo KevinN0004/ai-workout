@@ -1,3 +1,9 @@
+/**
+ * Claude -> Codex handoff. Claude Code's Stop hook runs it with --hook, from
+ * .claude/settings.json (hence its knip.jsonc entry), to print a JSON
+ * systemMessage: the workflow, why, and how complete the context is. By hand it
+ * prints those as lines, then the handoff template, which --launch sends Codex.
+ */
 import { execSync, spawn } from "node:child_process";
 import { existsSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -98,6 +104,7 @@ function buildHandoffTemplate(
 }
 
 function main() {
+  // ---- Flags ----------------------------------------------------------------
   const taskText = parseArgValue("--task");
   const hasUsageLimit = process.argv.includes("--usage-limit");
   const shouldLaunch = process.argv.includes("--launch");
@@ -106,6 +113,8 @@ function main() {
   const approvalModeOverride = parseArgValue("--approval-mode");
   const planFile = parseArgValue("--plan");
   const taskId = parseArgValue("--task-id");
+
+  // ---- Git state ------------------------------------------------------------
   let hasChanges = false;
   let hasFixInLog = false;
   let gitAvailable = true;
@@ -141,6 +150,7 @@ function main() {
     repoRoot = probe("git rev-parse --show-toplevel")?.trim() ?? process.cwd();
   }
 
+  // ---- No git and no task: default to Plan → Execute ------------------------
   if (!gitAvailable && !taskText) {
     console.log("Workflow:  Plan → Execute");
     console.log(
@@ -157,6 +167,7 @@ function main() {
     return;
   }
 
+  // ---- Score and pick the workflow ------------------------------------------
   const files = suggestFiles({ changedFiles, stagedFiles: stagedFilesList, repoRoot });
   const { score, label, gaps } = scoreContext({
     taskText,
@@ -168,6 +179,7 @@ function main() {
 
   const { workflow, reason } = selectWorkflow({ hasChanges, hasFixInLog, hasUsageLimit, taskText });
 
+  // ---- Stop hook: one JSON systemMessage ------------------------------------
   if (hookMode) {
     const gapSuffix = gaps.length ? ` — gaps: ${gaps.join(", ")}` : "";
     console.log(
@@ -178,11 +190,13 @@ function main() {
     return;
   }
 
+  // ---- By hand: the summary lines -------------------------------------------
   const gapSuffix = gaps.length ? ` — gaps: ${gaps.join(", ")}` : "";
   console.log(`Workflow:  ${workflow}`);
   console.log(`Confidence: ${score}% (${label})${gapSuffix}`);
   console.log(`Reason:    ${reason}\n`);
 
+  // ---- --launch: run Codex with the prompt on stdin -------------------------
   if (shouldLaunch) {
     const handoffContract = buildHandoffTemplate(files, { workflow, reason, planFile, taskId });
     const prompt = buildCodexPrompt({
@@ -208,8 +222,7 @@ function main() {
 
     // On Windows, Node.js child_process stdin piping to cmd.exe or even
     // direct node spawns fails to deliver the buffer to codex reliably.
-    // Write the prompt to a temp file and use bash's '<' redirection instead
-    // — bash piping works correctly on this machine.
+    // Write the prompt to a temp file and use bash's '<' redirection instead.
     // mkdtemp rather than a Date.now() filename in the shared temp dir: that name
     // is guessable, so another local user can pre-create the path as a symlink and
     // redirect this write (CodeQL js/insecure-temporary-file). mkdtemp creates the
@@ -225,15 +238,16 @@ function main() {
     }
     const codexJsUnix = codexJs.replace(/\\/g, "/");
 
-    // bash still performs the stdin redirect — see the note above about Windows
-    // piping — but nothing is interpolated into the command string any more.
+    // bash performs the stdin redirect — see the note above about Windows
+    // piping — but nothing is interpolated into the command string.
     // Values arrive as positional parameters ($0 is the script name, $1 and $2
     // the paths, $3 onward the mode flags), so an --approval-mode override
     // containing shell metacharacters is data rather than code.
     //
-    // Verified: with the old interpolated form, a mode of `x; echo INJECTED`
-    // ran `echo` as a separate command. With this form the same string arrives
-    // as one literal argument. CodeQL js/indirect-command-line-injection.
+    // Interpolated into the command string instead, a mode of
+    // `x; echo INJECTED` would run `echo` as a separate command; passed this
+    // way it arrives as one literal argument. CodeQL
+    // js/indirect-command-line-injection.
     const child = spawn(
       "bash",
       [
@@ -269,6 +283,7 @@ function main() {
     return; // handoffContract already printed above; do not fall through
   }
 
+  // ---- By hand: the handoff template ----------------------------------------
   console.log(buildHandoffTemplate(files, { workflow, reason, planFile, taskId }));
 }
 

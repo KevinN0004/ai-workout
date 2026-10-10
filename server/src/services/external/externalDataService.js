@@ -1,3 +1,22 @@
+/**
+ * The four upstream APIs -- Open-Meteo, OpenAQ, wger and TheMealDB -- each behind
+ * one cached, retrying request, plus the helpers that turn their payloads into
+ * this API's readings and advice. Built once in index.js.
+ */
+
+/**
+ * Builds the service and returns its requests and helpers, which index.js hands
+ * to the external routes.
+ *
+ * @param deps `readThroughExternalCache` and `buildExternalCacheKey` come from
+ *   httpCacheService, and `recordExternalApiLatency` from metricsService. Each
+ *   upstream takes a base URL, a timeout in ms and a cache TTL in seconds.
+ *   `openAqApiKey` is required for OpenAQ, `wgerApiToken` is optional, and
+ *   `wgerDefaultLanguage` is the wger language id used when none is asked for.
+ *   A request that times out, fails on the network or fails with a 5xx status
+ *   is retried up to `externalApiRetries` times, the wait doubling each time
+ *   from `externalApiRetryBaseDelayMs`.
+ */
 export const createExternalDataService = ({
   cleanText,
   toNullableNumber,
@@ -26,14 +45,12 @@ export const createExternalDataService = ({
   mealDbCacheTtlSec
 }) => {
   // Absent input is rejected before conversion, because Number(null) and
-  // Number("") are both 0. Callers all test the result against null to decide
-  // whether a reading exists -- isOutdoorFriendlyNow gates every check on
-  // `!== null`, and buildWorkoutRecommendation maps null to "Unknown" -- so
-  // converting an absent value to 0 made those guards unreachable for the input
-  // they were written for. A null weather code read as code 0, "Clear sky"; a
-  // null temperature read as 0C and was reported as too cold to train outdoors.
-  // undefined already behaved correctly, which is why an omitted key and an
-  // explicit null used to give opposite answers.
+  // Number("") are both 0. Callers read null as "no reading" --
+  // isOutdoorFriendlyNow gates every check on `!== null`, and
+  // buildWorkoutRecommendation maps null to "Unknown" -- so converting an
+  // absent value to 0 would make those guards unreachable for the input they
+  // are written for: a null weather code would read as code 0, "Clear sky", and
+  // a null temperature as 0C, too cold to train outdoors.
   const toFiniteNumber = (value) => {
     if (value === null || value === undefined || value === "") return null;
     const num = Number(value);
@@ -42,11 +59,10 @@ export const createExternalDataService = ({
 
   // Absent input is rejected before Number(), for the same reason toFiniteNumber
   // does it: Number(null) and Number("") are both 0, and 0 is "Clear sky". The
-  // weather routes build weatherCode with toFiniteNumber but weatherText from
-  // the raw upstream value, so one response reported weatherCode null alongside
-  // weatherText "Clear sky" -- and the text is the half a user reads. undefined
-  // already fell through to "Unknown", which is why an omitted key and an
-  // explicit null disagreed. A real code 0 is still a clear sky.
+  // weather routes build weatherCode with toFiniteNumber but pass the raw
+  // upstream value here for weatherText, so without this guard a response could
+  // carry weatherCode null beside weatherText "Clear sky" -- and the text is the
+  // half a user reads. A real code 0 is still a clear sky.
   const weatherCodeToText = (code) => {
     if (code === null || code === undefined || code === "") return "Unknown";
     const value = Number(code);
@@ -62,6 +78,8 @@ export const createExternalDataService = ({
 
   const isSevereWeatherCode = (code) => [95, 96, 99].includes(Number(code));
 
+  // The thresholds here and in buildWorkoutRecommendation are in Open-Meteo's
+  // default units, which the requests keep: degrees C, km/h and mm.
   const isOutdoorFriendlyNow = (current = {}) => {
     const temperature = toFiniteNumber(current.temperature_2m);
     const wind = toFiniteNumber(current.wind_speed_10m);
@@ -172,6 +190,8 @@ export const createExternalDataService = ({
             throw err;
           }
 
+          // Build the URL. Absent query values are left off, and times come back
+          // in the location's own timezone.
           const url = new URL(openMeteoBaseUrl);
           for (const [key, value] of Object.entries(query || {})) {
             if (value === undefined || value === null || value === "") continue;
@@ -179,6 +199,9 @@ export const createExternalDataService = ({
           }
           url.searchParams.set("timezone", "auto");
 
+          // Fetch, aborting at the timeout. An upstream 4xx keeps its status, with
+          // Open-Meteo's `reason` as the message; a 5xx becomes 502 and a
+          // timeout 504.
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
           try {
@@ -227,6 +250,8 @@ export const createExternalDataService = ({
             throw err;
           }
 
+          // Build the URL: base and endpoint joined by exactly one slash, and
+          // absent query values left off.
           const base = openAqBaseUrl.replace(/\/+$/, "");
           const path = String(endpoint || "").replace(/^\/+/, "");
           const url = new URL(`${base}/${path}`);
@@ -235,6 +260,10 @@ export const createExternalDataService = ({
             url.searchParams.set(key, String(value));
           }
 
+          // Fetch, aborting at the timeout. The body is read as text first because
+          // an error can arrive as a JSON object, a JSON array of validation
+          // errors or plain text; the message comes from whichever arrived. An
+          // upstream 4xx keeps its status; a 5xx becomes 502 and a timeout 504.
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), openAqTimeoutMs);
           try {
@@ -301,9 +330,9 @@ export const createExternalDataService = ({
   };
 
   // Walks the shapes an upstream might use until one carries a value. This
-  // depends on toFiniteNumber rejecting absent input: while it converted null
-  // to 0, the first candidate being null ended the search here at 0 and the
-  // later shapes were never tried. A real 0 is still a measurement.
+  // depends on toFiniteNumber rejecting absent input: if it converted null to
+  // 0, a null first candidate would end the search at 0 and the later shapes
+  // would never be tried. A real 0 is still a measurement.
   const firstFinite = (values) => {
     for (const value of values) {
       const num = toFiniteNumber(value);
@@ -321,6 +350,8 @@ export const createExternalDataService = ({
   };
 
   const extractOpenAqMeasurement = (item = {}) => {
+    // The parameter, value, unit and time can each sit in several places in an
+    // OpenAQ item, so each is taken from the first candidate that carries one.
     const parameterObj =
       item?.parameter ||
       item?.sensor?.parameter ||
@@ -370,23 +401,29 @@ export const createExternalDataService = ({
     if (pm25 === null || pm25 === undefined || pm25 === "") return null;
     const value = Number(pm25);
     if (!Number.isFinite(value) || value < 0) return null;
+    // The US EPA's PM2.5 breakpoints from its 2024 revision. Each band maps a
+    // concentration range in ug/m3 linearly onto an AQI range. The EPA
+    // truncates a reading to one decimal before the lookup, which is what puts
+    // a value between two bands' published edges into the lower band, and it
+    // extends the top band's slope past its last breakpoint rather than
+    // capping the index.
+    const truncated = Math.floor(value * 10) / 10;
     const points = [
-      { cLow: 0.0, cHigh: 12.0, iLow: 0, iHigh: 50 },
-      { cLow: 12.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
+      { cLow: 0.0, cHigh: 9.0, iLow: 0, iHigh: 50 },
+      { cLow: 9.1, cHigh: 35.4, iLow: 51, iHigh: 100 },
       { cLow: 35.5, cHigh: 55.4, iLow: 101, iHigh: 150 },
-      { cLow: 55.5, cHigh: 150.4, iLow: 151, iHigh: 200 },
-      { cLow: 150.5, cHigh: 250.4, iLow: 201, iHigh: 300 },
-      { cLow: 250.5, cHigh: 500.4, iLow: 301, iHigh: 500 }
+      { cLow: 55.5, cHigh: 125.4, iLow: 151, iHigh: 200 },
+      { cLow: 125.5, cHigh: 225.4, iLow: 201, iHigh: 300 },
+      { cLow: 225.5, cHigh: 325.4, iLow: 301, iHigh: 500 }
     ];
-    for (const point of points) {
-      if (value < point.cLow || value > point.cHigh) continue;
-      const ratio = (value - point.cLow) / (point.cHigh - point.cLow || 1);
-      return Math.round(point.iLow + ratio * (point.iHigh - point.iLow));
-    }
-    return 500;
+    const interpolate = ({ cLow, cHigh, iLow, iHigh }) =>
+      Math.round(iLow + ((truncated - cLow) / (cHigh - cLow)) * (iHigh - iLow));
+    const band = points.find((point) => truncated <= point.cHigh);
+    return interpolate(band || points[points.length - 1]);
   };
 
   const aqiBand = (aqi) => {
+    // No reading, or an unreadable one: the advice errs indoors.
     if (aqi === null || aqi === undefined || aqi === "") {
       return {
         level: "Unknown",
@@ -402,6 +439,7 @@ export const createExternalDataService = ({
         guidance: "Air quality data is limited. Prefer flexible indoor options."
       };
     }
+    // The US AQI categories, each with its training advice.
     if (value <= 50) {
       return {
         level: "Good",
@@ -485,6 +523,8 @@ export const createExternalDataService = ({
             throw err;
           }
 
+          // Build the URL. Absent query values are left off, and an array value
+          // becomes the same parameter repeated once per item.
           const base = wgerBaseUrl.replace(/\/+$/, "");
           const path = String(endpoint || "").replace(/^\/+/, "");
           const url = new URL(`${base}/${path}`);
@@ -501,6 +541,9 @@ export const createExternalDataService = ({
             url.searchParams.set(key, String(value));
           }
 
+          // Fetch, aborting at the timeout, with the API token when one is set.
+          // An upstream 4xx keeps its status and its own message; a 5xx becomes
+          // 502 and a timeout 504.
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), wgerTimeoutMs);
           try {
@@ -559,6 +602,9 @@ export const createExternalDataService = ({
             url.searchParams.set(key, String(value));
           }
 
+          // Fetch, aborting at the timeout. A body that is not JSON reads as {},
+          // so its error falls back to the fixed message. An upstream 4xx keeps
+          // its status; a 5xx becomes 502 and a timeout 504.
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), mealDbTimeoutMs);
           try {
@@ -655,6 +701,8 @@ export const createExternalDataService = ({
   };
 
   const mapWgerExercise = (exercise, preferredLanguage = wgerDefaultLanguage) => {
+    // The name and description come from one translation: the requested
+    // language, else English, else the first with a name, else the first.
     const translation = pickWgerTranslation(exercise?.translations, preferredLanguage);
     const images = (Array.isArray(exercise?.images) ? exercise.images : [])
       .map((item) => ({
@@ -676,6 +724,8 @@ export const createExternalDataService = ({
       name: cleanText(translation?.name, 180),
       description: normalizePlainText(translation?.description || "", 2200),
       language: toFiniteNumber(translation?.language),
+      // The category, muscles and equipment may each arrive as an object or as
+      // a bare id.
       category: {
         id: exercise?.category?.id ?? toFiniteNumber(exercise?.category),
         name: cleanText(exercise?.category?.name, 120)

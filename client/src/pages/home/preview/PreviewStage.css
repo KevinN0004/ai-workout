@@ -1,3 +1,8 @@
+/* The walkthrough's styles, imported by PreviewStage: layout.css, personal.css,
+   workout-week.css, form-overrides.css and responsive.css, all from ./styles. Their order
+   is the cascade order. They land after HomePage.css's sheets, so where one of their rules
+   ties a rule in home/styles/, theirs wins; styles/base.css lands after both. */
+
 @import "./styles/layout.css";
 @import "./styles/personal.css";
 @import "./styles/workout-week.css";

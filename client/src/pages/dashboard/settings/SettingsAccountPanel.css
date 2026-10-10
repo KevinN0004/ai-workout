@@ -1,3 +1,7 @@
+/* SettingsAccountPanel, the Settings view's Account tab: the change-password form, and the
+   delete-account box with its confirmation form. Imported by the panel, so it loads in
+   SettingsView's lazy chunk. */
+
 .settings-account-panel {
   display: grid;
   gap: 20px;

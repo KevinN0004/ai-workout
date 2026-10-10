@@ -1,3 +1,8 @@
+/* PreviewWorkoutWeekChapter's frame: the week plan and its table wrapper, the layer the
+   break's particles are drawn into, and the outline that draws itself around the table
+   before the rows appear. Imported first by workout-week.css. */
+
+/* ---- Plan and table wrapper ---------------------------------------------- */
 .preview-week-plan {
   width: 100%;
   height: var(--preview-content-height);
@@ -26,6 +31,9 @@
   overflow-y: hidden;
 }
 
+/* ---- Wrapper overlays ---------------------------------------------------- */
+/* ::before is a scan-line texture only the CSS break would show, and that never runs (see
+   break-apart.css). ::after is the bar the stage-5 scan sweeps down the table. */
 .preview-week-table-wrap::before,
 .preview-week-table-wrap::after {
   content: "";
@@ -57,6 +65,9 @@
   mix-blend-mode: screen;
 }
 
+/* ---- Particle layer ------------------------------------------------------ */
+/* usePreviewWeekParticleAnimation fills it with .preview-week-particle and
+   .preview-week-chunk elements for the break; empty, it is not displayed. */
 .preview-week-particle-layer {
   position: absolute;
   inset: 0;
@@ -90,6 +101,11 @@
   will-change: transform, opacity;
 }
 
+/* ---- Outline ------------------------------------------------------------- */
+/* usePreviewWeekOutline measures where the table's row and column edges fall, and each
+   line gets its position as --preview-line-offset. From stage 1 (is-outline-active) each
+   line and corner grows in after its --preview-line-delay; the outline fades once the rows
+   show (is-rows-visible). */
 .preview-week-outline {
   position: absolute;
   inset: 0;
@@ -210,6 +226,9 @@
   transition: opacity var(--preview-motion-fast) ease 120ms;
 }
 
+/* ---- Scan ---------------------------------------------------------------- */
+/* Stage 5. Its duration is PREVIEW_WEEK_SCAN_DURATION_MS in ../../constants.js, which must
+   stay equal to it; the break begins as the scan ends. */
 .preview-week-plan.is-scan-once .preview-week-table-wrap::after {
   animation: preview-week-live-scan-once 5000ms linear 1 both;
 }

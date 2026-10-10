@@ -2,15 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest"
 import request from "supertest";
 import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
+import { createMealLogRepository } from "../../../../repositories/mealLogRepository.js";
 
-// Pins POST /api/dashboard/meal-logs against real Postgres before that route is
-// migrated off the Mongo compatibility shim.
-//
-// One of these tests asserts behaviour that is a KNOWN BUG rather than the
-// behaviour anyone wants -- a meal log never produces a calorie entry. It is
-// pinned deliberately so the migration is a faithful refactor and the bug is
-// fixed as its own decision, not smuggled in under a refactor. See
-// docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
+// Pins POST /api/dashboard/meal-logs against real Postgres: each save writes
+// the meal and, in the same transaction, keeps that day's derived calorie
+// entry in step with the day's meals. A manual entry for the day suppresses
+// it, it is clamped to its column's ceiling, and it goes when the day's
+// meals carry no calories.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
@@ -237,6 +235,111 @@ describe("POST /api/dashboard/meal-logs", () => {
       expect(response.status).toBe(200);
       expect(await prisma.calorieEntry.count()).toBe(0);
     });
+  });
+
+  // A single meal is bounded on its own, but calorie_entries bounds the day's derived
+  // row separately (calorie_entries_calories_check), so a day's sum can overflow it.
+  // The sync clamps the entry to that ceiling, so the route answers 200.
+  describe("a day whose meals exceed the calorie_entries ceiling", () => {
+    const logBigMeals = async (count) => {
+      let response;
+      for (let i = 0; i < count; i += 1) {
+        response = await postMeal(agent, csrfToken, {
+          id: `big-${i}`,
+          date: "2026-06-16",
+          name: `Feast ${i}`,
+          calories: 4000
+        });
+      }
+      return response;
+    };
+
+    test("clamps the derived entry to the column ceiling and keeps every meal", async () => {
+      const response = await logBigMeals(3);
+
+      expect(response.status).toBe(200);
+      expect(await prisma.mealLog.count()).toBe(3);
+      expect(response.body.dashboard.mealLogs).toHaveLength(3);
+      const rows = await prisma.calorieEntry.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].calories).toBe(10000);
+    });
+
+    test("a retry of the same meal id does not add a meal", async () => {
+      await logBigMeals(3);
+      const retry = await postMeal(agent, csrfToken, {
+        id: "big-2",
+        date: "2026-06-16",
+        name: "Feast 2",
+        calories: 4000
+      });
+
+      expect(retry.status).toBe(200);
+      expect(await prisma.mealLog.count()).toBe(3);
+    });
+  });
+
+  test("a failing derived-entry write rolls the meal back", async () => {
+    const [user] = await prisma.appUser.findMany({ select: { id: true } });
+    // Real delegates everywhere except the derived write, which throws. Both the
+    // root client and the transaction client are built this way, so the sync fails
+    // on the same error whether or not it runs inside the transaction; only the
+    // transaction decides whether the meal survives.
+    const failingOver = (client) => ({
+      appUser: client.appUser,
+      mealLog: client.mealLog,
+      calorieEntry: {
+        findFirst: (args) => client.calorieEntry.findFirst(args),
+        create: () => Promise.reject(new Error("derived write failed")),
+        update: () => Promise.reject(new Error("derived write failed")),
+        upsert: () => Promise.reject(new Error("derived write failed"))
+      }
+    });
+    const failingPrisma = {
+      ...failingOver(prisma),
+      $transaction: (callback) => prisma.$transaction((tx) => callback(failingOver(tx)))
+    };
+    const { saveMealLogWithDailySync } = createMealLogRepository({ prisma: failingPrisma });
+
+    await expect(
+      saveMealLogWithDailySync({
+        userId: user.id,
+        mealLog: { id: "rollback-1", date: "2026-06-17", name: "Lost", calories: 500 }
+      })
+    ).rejects.toThrow("derived write failed");
+
+    expect(await prisma.mealLog.count()).toBe(0);
+  });
+
+  test("editing the only calorie meal to macros only removes the derived entry", async () => {
+    const first = await postMeal(agent, csrfToken, {
+      id: "zero-1",
+      date: "2026-06-19",
+      name: "Shake",
+      calories: 300
+    });
+    expect(first.status).toBe(200);
+    expect(await prisma.calorieEntry.count()).toBe(1);
+
+    const edit = await postMeal(agent, csrfToken, {
+      id: "zero-1",
+      date: "2026-06-19",
+      name: "Shake",
+      proteinG: 30
+    });
+
+    expect(edit.status).toBe(200);
+    expect(await prisma.mealLog.count()).toBe(1);
+    expect(await prisma.calorieEntry.count()).toBe(0);
+  });
+
+  test("saveMealLogWithDailySync returns null for an unknown user", async () => {
+    const { saveMealLogWithDailySync } = createMealLogRepository({ prisma });
+    const result = await saveMealLogWithDailySync({
+      userId: "00000000-0000-4000-8000-000000000000",
+      mealLog: { date: "2026-06-18", name: "Ghost", calories: 100 }
+    });
+    expect(result).toBeNull();
   });
 
   test("requires authentication", async () => {
