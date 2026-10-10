@@ -1,6 +1,6 @@
 /* The shared classes inside .home-page: panels, the segmented and unit toggles, buttons,
    the title and text colours; then the stages' shared panel, header and action rows.
-   Imported third by core.css. AuthPage and WorkoutResultPage carry home-page, so the
+   Imported second by core.css. AuthPage and WorkoutResultPage carry home-page, so the
    .home-page rules style /auth and /plan too. */
 
 /* ---- Translucent panels -------------------------------------------------- */

@@ -1,14 +1,15 @@
-/* The walkthrough form's overrides: no transitions on its controls, a card behind it outside
-   the Generate chapter, its field colours, and --preview-body-copy-size on most of the
-   walkthrough's text. Imported fourth by PreviewStage.css, after personal.css, so these win
-   its ties and home/styles/core/personal.css's. */
+/* The walkthrough form's overrides: no transitions or pointer events on its controls, a card
+   behind it outside the Generate chapter, its fields' box and colours, and the copy size of
+   most of the walkthrough's text. Imported fourth by PreviewStage.css, after personal.css, so
+   these win its ties and the home sheets' (core/shell.css's .home-page .height-unit, for one). */
 
-/* ---- Controls without motion --------------------------------------------- */
+/* ---- Controls without motion or pointer events --------------------------- */
 .preview-personal-form input,
 .preview-personal-form select,
 .preview-personal-form textarea,
 .preview-personal-form button {
   transition: none !important;
+  pointer-events: none;
 }
 
 .preview-personal-form label {
@@ -34,6 +35,18 @@
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.22);
   color: #fff;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  line-height: 1.35;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  resize: none;
 }
 
 .preview-personal-form select {

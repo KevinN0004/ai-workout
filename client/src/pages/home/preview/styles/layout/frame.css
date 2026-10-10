@@ -177,9 +177,7 @@
 }
 
 /* ---- Chapter page -------------------------------------------------------- */
-/* PreviewStage renders one page, always .active, so the hidden state never shows. Nothing
-   here sets .preview-card-page's display, so core/preview.css's display: none, and block when
-   .active, still apply. */
+/* PreviewStage renders one page, always .active, so the hidden state never shows. */
 .preview-card-pages {
   width: 100%;
   height: 100%;
@@ -215,6 +213,7 @@
     visibility 0s linear var(--preview-motion-medium);
   will-change: opacity;
   backface-visibility: hidden;
+  display: none;
 }
 
 .preview-card-page.active {
@@ -224,30 +223,15 @@
   transform: none;
   filter: none;
   z-index: 3;
-  animation: none;
   transition:
     opacity var(--preview-motion-medium) var(--preview-motion-ease),
     visibility 0s linear 0s;
+  display: block;
 }
 
-/* ---- Page and builder keyframes ------------------------------------------ */
-/* Only core/preview.css's .preview-card-page.active names preview-card-page-in, and the
-   .preview-card-page.active rule above sets its animation to none, so it never runs. The
-   two builder keyframes are personal.css's. */
-@keyframes preview-card-page-in {
-  from {
-    opacity: 0;
-    transform: none;
-    filter: none;
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-}
-
+/* ---- Builder keyframes --------------------------------------------------- */
+/* personal.css's builder plays these: the Environment slot and the first plus sign shift
+   left, and the plus signs rise in. */
 @keyframes preview-builder-shift-left {
   from {
     transform: translateX(var(--preview-shift-x, 0px));

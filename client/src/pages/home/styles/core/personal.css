@@ -36,67 +36,14 @@
 }
 
 /* ---- The walkthrough's read-only form ------------------------------------ */
-/* PreviewPersonalChapter's copy of the form. home/preview/styles/personal.css and
-   form-overrides.css restyle these selectors later in the bundle and win where they differ.
-   What is set only here still applies, except where later rules override it: the label and
-   select colours, the top margin, and a selected day's background and border (.active). */
-.preview-personal-form {
-  width: min(920px, 100%);
-  justify-self: center;
-  margin: 0 auto;
-}
-
-.preview-personal-form input,
-.preview-personal-form select,
-.preview-personal-form textarea,
-.preview-personal-form button {
-  pointer-events: none;
-}
-
-.preview-personal-form label {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.preview-personal-form input,
-.preview-personal-form select,
-.preview-personal-form textarea {
-  width: 100%;
-  max-width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 12px;
-  color: #fff;
-  padding: 10px 12px;
-  font-family: inherit;
-  line-height: 1.35;
-  box-sizing: border-box;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  overflow-x: hidden;
-  resize: none;
-}
-
-.preview-personal-form select {
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.preview-personal-form .height-unit {
-  color: rgba(255, 255, 255, 0.9);
-}
-
+/* PreviewPersonalChapter's copy of the form is styled in home/preview/styles/, except for its
+   day buttons' colours, which stay here because their place in the cascade is what they do.
+   They apply to the days not selected: forms-and-motion.css's .day-toggle-btn.active ties
+   this rule and comes later, so a selected day is white. In home/preview/styles/ this rule
+   would come after that one and win. */
 .preview-personal-form .day-toggle-btn {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);
-}
-
-.preview-personal-form .day-toggle-btn {
-  cursor: default;
-}
-
-.preview-personal-form .day-toggle-btn:hover,
-.preview-personal-form .day-toggle-btn:active {
-  transform: none;
 }
 
 /* ---- Labels and metric fields -------------------------------------------- */
