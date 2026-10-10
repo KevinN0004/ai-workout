@@ -5,12 +5,13 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, test } from "vitest";
+import { afterAll, describe, expect, test } from "vitest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -157,7 +158,7 @@ describe("Claude Code hook wiring", () => {
 describe("hooks do not depend on untracked .claude/ scaffolding", () => {
   // .claude/agents|commands|helpers|skills are gitignored, so a fresh clone or
   // a cloud session has none of them. A hook that runs `node .claude/helpers/x`
-  // directly fails with "Cannot find module" on every tool call. The only
+  // directly fails with "Cannot find module" each time that hook fires. The only
   // sanctioned way to reach a helper is scripts/run-claude-helper.cjs, which
   // exits 0 when the file is absent.
   const settings = JSON.parse(
@@ -211,8 +212,16 @@ describe("scripts/run-claude-helper.cjs", () => {
       encoding: "utf8"
     });
 
+  // Each test builds a throwaway project in the OS temp folder; all of them
+  // are removed when this block finishes.
+  const projects = [];
+  afterAll(() => {
+    for (const dir of projects) rmSync(dir, { recursive: true, force: true });
+  });
+
   const projectWith = (source) => {
     const dir = mkdtempSync(path.join(tmpdir(), "run-claude-helper-"));
+    projects.push(dir);
     mkdirSync(path.join(dir, ".claude", "helpers"), { recursive: true });
     if (source) writeFileSync(path.join(dir, ".claude", "helpers", "h.cjs"), source);
     return dir;

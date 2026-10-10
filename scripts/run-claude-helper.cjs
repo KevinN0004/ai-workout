@@ -17,8 +17,9 @@
  *   node "${CLAUDE_PROJECT_DIR:-.}/scripts/run-claude-helper.cjs" hook-handler.cjs pre-bash
  *
  * A missing helper is a silent exit 0. A present helper gets stdin, stdout and
- * stderr untouched and its exit status is passed through. This is plain node,
- * so it behaves the same under sh, cmd and PowerShell.
+ * stderr untouched and its exit status is passed through, or 1 when it ends
+ * without one, as on a signal. This is plain node, so it behaves the same
+ * under sh, cmd and PowerShell.
  */
 
 const { existsSync } = require("node:fs");
