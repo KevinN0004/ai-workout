@@ -14,8 +14,7 @@ export const cleanText = (value, maxLen = 120) =>
  * Puts text on one line, for a value interpolated into a single prompt line:
  * every run of whitespace, newlines included, becomes one space, and the ends
  * are trimmed, so the value cannot start a line of its own. Anything that is
- * not a string is "". generateRoutes imports it directly rather than through
- * index.js.
+ * not a string is "".
  */
 export const collapseWhitespace = (value) =>
   typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
