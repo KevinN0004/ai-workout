@@ -27,3 +27,4 @@
 - [2026-09-18 — Development roadmap](specs/2026-09-18-development-roadmap-design.md)
 - [2026-09-23 — Repository layout reorganization](specs/2026-09-23-repo-layout-reorganization-design.md)
 - [2026-09-29 — Code readability](specs/2026-09-29-code-readability-design.md)
+- [2026-10-10 — Readability follow-up](specs/2026-10-10-readability-follow-up-design.md)
