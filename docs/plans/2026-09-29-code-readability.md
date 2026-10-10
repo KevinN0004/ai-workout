@@ -92,6 +92,14 @@ These change what some tasks do, relative to the spec. The spec is a dated recor
     - **Directives are matched on the comment's first line of content.** That catches a directive split across lines. ESLint's rule settings and `global(s)` lists count only inside block comments, and `global(s)` only in JS. So `// global error handler` and a stylesheet's `/* global tokens */` are both headers.
     - **One gap is accepted by design.** Swapping one entry for another keeps the length, and only the allowlist's own diff shows the added line. Closing that would need CI to compare against the base branch's history.
 
+11. **A JSX comment is not invisible to the parser.** Found before Task 4. `{/* … */}` parses as a container holding an empty expression, and it splits the whitespace text around it, so the first `same-code.mjs` reported every JSX section comment, which the SOP prescribes, as a code change. Simply ignoring those nodes would be wrong in the other direction: between two lines of text, a comment changes what renders, because each text node is trimmed on its own ("Get Started" becomes "GetStarted"). The tool now applies the JSX transform's own whitespace rule, Babel's `cleanJSXElementLiteralChild`, to each text node and drops empty containers. Measured on 2026-10-01 against the real bundle:
+
+- **A comment between two elements:** the old tool failed it, the new one passes it, and `client/dist` stays byte-identical.
+- **A comment splitting a text run:** both tools fail it, and `client/dist` changes.
+- **A class-name edit:** both tools fail it.
+
+The original Task 0 proofs still pass on the new version.
+
 ## Baseline (from the scanner, `9b85b7d`)
 
 | PR  | Headers first | Exports documented | Effects commented | Long functions sectioned | History | To module scope | Import-order breaks | BOMs |
@@ -561,19 +569,69 @@ const postcss = require("postcss");
 const git = (...args) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
-// Syntax tree without positions. Comments are not in espree's tree unless asked for.
+// Babel's rule for JSX text (cleanJSXElementLiteralChild): each line is trimmed
+// at its inner edges, lines left empty are dropped, and the rest are joined with
+// one space. Applied to each text node on its own, so a comment that splits a
+// run of text -- which does change what renders -- still reads as a change.
+const cleanJsxText = (value) => {
+  const lines = value.split(/\r\n|\n|\r/);
+  let lastNonEmpty = 0;
+  lines.forEach((line, i) => {
+    if (/[^ \t]/.test(line)) lastNonEmpty = i;
+  });
+  let out = "";
+  lines.forEach((line, i) => {
+    let text = line.replace(/\t/g, " ");
+    if (i !== 0) text = text.replace(/^[ ]+/, "");
+    if (i !== lines.length - 1) text = text.replace(/[ ]+$/, "");
+    if (text) out += i === lastNonEmpty ? text : `${text} `;
+  });
+  return out;
+};
+
+// A JSX comment, {/* ... */}, parses as a container holding an empty
+// expression, and splits the whitespace text around it. Both are dropped here,
+// as the JSX transform drops them, so a comment between elements compares as
+// no change.
+const normaliseJsx = (node) => {
+  if (Array.isArray(node)) return node.map(normaliseJsx);
+  if (!node || typeof node !== "object") return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) out[key] = normaliseJsx(value);
+  if (Array.isArray(out.children) && /^JSX(Element|Fragment)$/.test(out.type)) {
+    out.children = out.children
+      .filter(
+        (child) =>
+          !(
+            child.type === "JSXExpressionContainer" &&
+            child.expression?.type === "JSXEmptyExpression"
+          )
+      )
+      .map((child) =>
+        child.type === "JSXText" ? { type: "JSXText", value: cleanJsxText(child.value) } : child
+      )
+      .filter((child) => !(child.type === "JSXText" && child.value === ""));
+  }
+  return out;
+};
+
+// Syntax tree without positions, comments or insignificant JSX whitespace.
+// Comments are not in espree's tree unless asked for.
 const jsShape = (text) => {
   const opts = { ecmaVersion: "latest", ecmaFeatures: { jsx: true } };
-  const src = text.replace(/^\uFEFF/, "");
+  const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   let ast;
   try {
     ast = espree.parse(src, { ...opts, sourceType: "module" });
   } catch {
     ast = espree.parse(src, { ...opts, sourceType: "script" });
   }
-  return JSON.stringify(ast, (key, value) =>
-    ["start", "end", "loc", "range"].includes(key) ? undefined : value
+  const bare = JSON.parse(
+    JSON.stringify(ast, (key, value) =>
+      ["start", "end", "loc", "range"].includes(key) ? undefined : value
+    )
   );
+  return JSON.stringify(normaliseJsx(bare));
 };
 
 // Every non-comment node in order, with its selector/at-rule/declaration content.
