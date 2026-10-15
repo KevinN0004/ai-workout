@@ -1,12 +1,38 @@
 /**
  * Sessions and CSRF: the session store (Redis if configured and connected at
- * startup, else memory, chosen once; a session whose Redis write fails lands in
- * memory, which reads then never consult), the session and CSRF cookies, and the
+ * startup, else memory, chosen once; while Redis is the store, a failed command
+ * is a 503, never a fallback to memory), the session and CSRF cookies, and the
  * middleware requiring a signed-in user or a matching CSRF token. Built in index.js.
  */
 import crypto from "crypto";
 import { createClient } from "redis";
 import { sendErrorResponse } from "../http/errorResponseService.js";
+
+// How long a Redis command may wait to reach the socket, in ms. node-redis
+// queues commands while it reconnects and its own limit is 5 s, so without this
+// a sign-in during an outage waits that long for its 503. 1.5 s still rides out
+// the immediate reconnect that follows a dropped connection.
+const REDIS_COMMAND_TIMEOUT_MS = 1500;
+
+/**
+ * Thrown by a session operation when Redis is the store and a command on it
+ * failed. It carries status 503, and the Redis error as its `cause`.
+ */
+export class SessionStoreUnavailableError extends Error {
+  constructor(cause) {
+    super("Session store unavailable.", { cause });
+    this.name = "SessionStoreUnavailableError";
+    this.status = 503;
+  }
+}
+
+/**
+ * The status a route answers for an error from a session operation: 503 when
+ * the session store was unavailable, because the server could not check the
+ * session, where a 401 would say there is none; 500 for anything else.
+ */
+export const sessionErrorStatus = (err) =>
+  err instanceof SessionStoreUnavailableError ? 503 : 500;
 
 /**
  * Parses a Cookie header into a name-to-value object. A value that is not valid
@@ -111,7 +137,10 @@ export const createSessionService = ({
   // node-redis retries a failed connection forever by default, which leaves the
   // initial connect() pending and stops the process from ever reaching listen().
   // Retries stay bounded until startup settles, then revert to open-ended backoff
-  // so a Redis blip during normal operation still recovers on its own.
+  // so a Redis blip during normal operation still recovers on its own. When a
+  // ready connection drops, node-redis reconnects at once and then passes
+  // retries 1, 2, 3... here for each failed attempt, so the waits run 1 s, 2 s,
+  // 4 s and on up to 30 s.
   let redisStartupSettled = false;
   const maxStartupReconnectAttempts = 5;
 
@@ -153,6 +182,31 @@ export const createSessionService = ({
     }
   };
 
+  // Runs one command while Redis is the session store. A failure is logged and
+  // kept as the store's last error, then thrown as SessionStoreUnavailableError:
+  // reads consult only Redis, so a fallback would hide the failure, not fix it.
+  const runSessionCommand = async (event, message, command) => {
+    try {
+      const result = await command();
+      redisLastError = "";
+      return result;
+    } catch (err) {
+      redisLastError = cleanText(err?.message || String(err), 260);
+      logger.error({ event, error: redisLastError }, message);
+      throw new SessionStoreUnavailableError(err);
+    }
+  };
+
+  // A stored value that is not JSON, or names no user, is not a session.
+  const parseStoredSession = (raw) => {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && cleanText(parsed.userId, 120) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
   const initSessionStore = async (env = process.env) => {
     const redisUrl = cleanText(env.REDIS_URL || "", 500);
     const redisHost = cleanText(env.REDIS_HOST || "", 255);
@@ -184,9 +238,13 @@ export const createSessionService = ({
       // RESP2, pinned: node-redis 6 defaults to RESP3, which this app gains
       // nothing from, and Upstash's docs do not say it speaks RESP3. A failed
       // handshake there would drop every session to memory.
+      const clientOptions = {
+        RESP: 2,
+        commandOptions: { timeout: REDIS_COMMAND_TIMEOUT_MS }
+      };
       client = hasSocketConfig
         ? createClient({
-            RESP: 2,
+            ...clientOptions,
             username: redisUsername,
             password: redisPassword || undefined,
             socket: {
@@ -196,7 +254,7 @@ export const createSessionService = ({
               tls: redisTls
             }
           })
-        : createClient({ RESP: 2, url: redisUrl, socket: socketOptions });
+        : createClient({ ...clientOptions, url: redisUrl, socket: socketOptions });
 
       client.on("error", (err) => {
         redisLastError = cleanText(err?.message || String(err), 260);
@@ -267,19 +325,12 @@ export const createSessionService = ({
     const token = crypto.randomBytes(24).toString("hex");
     const session = { userId, createdAt: Date.now() };
     if (redisSessionsEnabled && redisClient) {
-      try {
-        await redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
+      await runSessionCommand("redis_session_create_failed", "Redis create session failed.", () =>
+        redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
           EX: Math.floor(sessionTtlMs / 1000)
-        });
-        redisLastError = "";
-        return token;
-      } catch (err) {
-        redisLastError = cleanText(err?.message || String(err), 260);
-        logger.error(
-          { event: "redis_session_create_failed", error: redisLastError },
-          "Redis create session failed."
-        );
-      }
+        })
+      );
+      return token;
     }
     pruneExpiredInMemorySessions();
     inMemorySessions.set(token, session);
@@ -289,29 +340,22 @@ export const createSessionService = ({
   const getSessionByToken = async (token) => {
     if (!token) return null;
     if (redisSessionsEnabled && redisClient) {
-      try {
-        const raw = await redisClient.get(sessionRedisKey(token));
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !cleanText(parsed.userId, 120)) {
-          await redisClient.del(sessionRedisKey(token));
-          return null;
-        }
-        redisLastError = "";
-        return parsed;
-      } catch (err) {
-        redisLastError = cleanText(err?.message || String(err), 260);
-        logger.error(
-          { event: "redis_session_get_failed", error: redisLastError },
-          "Redis get session failed."
+      const key = sessionRedisKey(token);
+      const raw = await runSessionCommand(
+        "redis_session_get_failed",
+        "Redis get session failed.",
+        () => redisClient.get(key)
+      );
+      if (!raw) return null;
+      const session = parseStoredSession(raw);
+      // Junk under a session key is removed, so it is not parsed again on every
+      // request.
+      if (!session) {
+        await runSessionCommand("redis_session_delete_failed", "Redis delete session failed.", () =>
+          redisClient.del(key)
         );
-        try {
-          await redisClient.del(sessionRedisKey(token));
-        } catch {
-          // Ignore cleanup failures.
-        }
-        return null;
       }
+      return session;
     }
     pruneExpiredInMemorySessions();
     return inMemorySessions.get(token) || null;
@@ -320,16 +364,9 @@ export const createSessionService = ({
   const deleteSession = async (token) => {
     if (!token) return;
     if (redisSessionsEnabled && redisClient) {
-      try {
-        await redisClient.del(sessionRedisKey(token));
-        redisLastError = "";
-      } catch (err) {
-        redisLastError = cleanText(err?.message || String(err), 260);
-        logger.error(
-          { event: "redis_session_delete_failed", error: redisLastError },
-          "Redis delete session failed."
-        );
-      }
+      await runSessionCommand("redis_session_delete_failed", "Redis delete session failed.", () =>
+        redisClient.del(sessionRedisKey(token))
+      );
       return;
     }
     inMemorySessions.delete(token);
@@ -378,7 +415,7 @@ export const createSessionService = ({
       req.user = user;
       next();
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   };
 

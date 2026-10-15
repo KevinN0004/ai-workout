@@ -5,13 +5,15 @@
  */
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
+import { sessionErrorStatus } from "../services/auth/sessionService.js";
 
 /**
  * Registers the account routes on `app`, taking the session helpers, user
  * repositories and password functions from the shared `deps` object. Every
  * failed password check counts toward `metrics.authFailures`, which nothing
  * reports at present. Signup and login both start a session that defaults to
- * "remember me".
+ * "remember me". A route that reads or writes a session answers 503 when the
+ * session store is unavailable (see sessionErrorStatus), and 500 otherwise.
  */
 export const registerAuthRoutes = (app, deps) => {
   const {
@@ -63,7 +65,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
@@ -114,6 +116,9 @@ export const registerAuthRoutes = (app, deps) => {
       }
 
       // Write the account, then sign it in: a session cookie and a new CSRF token.
+      // A session store that is down fails createSession before either cookie
+      // is set, so the answer is a 503 with no cookie, and the account it
+      // leaves behind signs in once the store is back.
       const { salt, hash, passwordAlgo } = await hashPassword(password);
       const newUser = {
         id: crypto.randomUUID(),
@@ -137,7 +142,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
@@ -180,7 +185,8 @@ export const registerAuthRoutes = (app, deps) => {
         }
       }
 
-      // Sign in: a session cookie and a new CSRF token.
+      // Sign in: a session cookie and a new CSRF token, both set only once
+      // createSession has stored the session.
       const token = await createSession(user.id);
       setSessionCookie(res, token, rememberMe);
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
@@ -192,7 +198,7 @@ export const registerAuthRoutes = (app, deps) => {
         }
       });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
@@ -248,7 +254,7 @@ export const registerAuthRoutes = (app, deps) => {
 
       res.json({ ok: true });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
@@ -274,7 +280,7 @@ export const registerAuthRoutes = (app, deps) => {
 
       res.json({ ok: true });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
@@ -282,12 +288,15 @@ export const registerAuthRoutes = (app, deps) => {
     try {
       const cookies = parseCookies(req.headers.cookie || "");
       const token = cookies.sid;
-      if (token) await deleteSession(token);
+      // The cookies are cleared first, so this browser is signed out even when
+      // the delete fails. That failure still answers 503: the session itself
+      // stays valid in the store until it expires.
       clearSessionCookie(res);
       clearCsrfCookie(res);
+      if (token) await deleteSession(token);
       res.json({ ok: true });
     } catch (err) {
-      sendErrorResponse(req, res, err, 500);
+      sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 };
