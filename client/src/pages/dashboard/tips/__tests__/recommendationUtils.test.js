@@ -3,6 +3,7 @@ import {
   buildContextCategories,
   buildEquipmentKeywords,
   buildGuideCards,
+  buildInjuryText,
   detectInjuryFlags,
   getExerciseImage,
   normalizeText,
@@ -589,5 +590,29 @@ describe("buildGuideCards", () => {
         /No injury note detected/
       );
     });
+  });
+});
+
+// The planner's injuries field defaults to "None", and a profile note can say
+// "n/a". Those answer the question with no injury, so they are not a note.
+describe("buildInjuryText", () => {
+  test.each([["None"], ["none"], ["N/A"], ["n/a"], ["No"], ["  none  "]])(
+    "reads the answer %s as no injury",
+    (answer) => {
+      expect(buildInjuryText(answer, "")).toBe("");
+      expect(buildInjuryText("", answer)).toBe("");
+    }
+  );
+
+  test("joins a real injury and a real note", () => {
+    expect(buildInjuryText("Knee", "sore after runs")).toBe("Knee sore after runs");
+  });
+
+  test("keeps a real note beside a None answer", () => {
+    expect(buildInjuryText("None", "lower back twinges")).toBe("lower back twinges");
+  });
+
+  test("reads absent values as nothing", () => {
+    expect(buildInjuryText(undefined, null)).toBe("");
   });
 });

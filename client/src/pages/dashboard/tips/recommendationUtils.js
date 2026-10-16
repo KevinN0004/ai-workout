@@ -161,6 +161,21 @@ export const detectInjuryFlags = (injuryText) => {
   return active;
 };
 
+// Answers to "any injuries?" that mean there are none. The planner's injuries
+// field defaults to the first of them.
+const NO_INJURY_ANSWERS = new Set(["none", "n/a", "no"]);
+
+/**
+ * The injury note the guide reads: the planner's injuries answer and the
+ * profile's notes, trimmed and joined with a space, each left out when it is
+ * empty or answers none, n/a or no.
+ */
+export const buildInjuryText = (injuries, notes) =>
+  [injuries, notes]
+    .map((value) => String(value || "").trim())
+    .filter((value) => value && !NO_INJURY_ANSWERS.has(value.toLowerCase()))
+    .join(" ");
+
 /**
  * Scores one exercise against TipsView's context, with the reasons the tiles
  * and the details modal show. Points come from a favoured category, the weather

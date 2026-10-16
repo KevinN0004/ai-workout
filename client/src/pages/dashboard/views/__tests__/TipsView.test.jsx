@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import TipsView from "../TipsView";
+import { createDefaultPlannerForm } from "../../../../app/constants";
 
 // The largest untested view in the client, and not just markup: it owns two
 // fetches, a debounced search, and the error and empty states a visitor
@@ -575,6 +576,17 @@ describe("TipsView", () => {
       setView("guides");
 
       expect(document.querySelectorAll(".training-card").length).toBeGreaterThan(0);
+    });
+
+    test("a planner left at its default injuries answer reads as no injury note", async () => {
+      // Built from what the planner stores: its injuries default is "None".
+      withExercises([]);
+      renderView({ form: createDefaultPlannerForm() });
+      await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+      setView("guides");
+
+      expect(screen.getByText(/No injury note detected/)).toBeInTheDocument();
     });
   });
 
