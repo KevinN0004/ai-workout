@@ -1,13 +1,23 @@
 /**
- * The paginated dashboard: one page of each collection, and the dashboard
- * response that combines those pages with the rest of the stored dashboard.
- * Built once in index.js over dashboardCollectionRepository's reader.
+ * The paginated dashboard: a page of one collection for the per-collection
+ * routes, and the dashboard response that combines a page of each with the
+ * rest of the stored dashboard. Built once in index.js over
+ * dashboardCollectionRepository's reader.
  */
 
+// The three collections, and the field each one's pages are ordered by.
+const COLLECTION_SORT_FIELDS = {
+  workoutSessions: "createdAt",
+  mealLogs: "loggedAt",
+  progressMetrics: "loggedAt"
+};
+
+const emptyPage = () => ({ items: [], total: 0, limit: 0, offset: 0, source: "collection" });
+
 /**
- * Builds the service. Returns the pagination parser and the collection loader
- * the dashboard read routes use, and `buildDashboardResponse`, which the read
- * and write routes both answer with.
+ * Builds the service. Returns the pagination parser and the one-collection
+ * loader the paginated read routes use, and `buildDashboardResponse`, which the
+ * read and write routes both answer with.
  *
  * @param deps `defaultLimit` is a page's size when the caller names none, and a
  *   requested size above `maxLimit` falls back to it; index.js reads both from
@@ -55,55 +65,39 @@ export const createDashboardCollectionService = ({
     };
   };
 
+  // One page of one collection: the caller's pagination for it, else the
+  // default first page.
+  const loadPage = (collection, userId, pagination = {}) => {
+    const { limit, offset } = { ...parseDashboardPagination({}, defaultLimit), ...pagination };
+    return toCollectionPage({
+      collection,
+      userId,
+      sortField: COLLECTION_SORT_FIELDS[collection],
+      limit,
+      offset
+    });
+  };
+
+  // One collection, for the paginated routes. No user id: an empty page,
+  // without a query.
+  const getDashboardCollection = async (user, collection, pagination) => {
+    const userId = cleanText(user?.id, 120);
+    if (!userId) return emptyPage();
+    return loadPage(collection, userId, pagination);
+  };
+
+  // All three, for the full dashboard. No user id: an empty page of each,
+  // without a query.
   const getDashboardCollections = async (user, pagination = {}) => {
-    // No user id: an empty page of each, without a query.
     const userId = cleanText(user?.id, 120);
     if (!userId) {
-      return {
-        workoutSessions: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
-        mealLogs: { items: [], total: 0, limit: 0, offset: 0, source: "collection" },
-        progressMetrics: { items: [], total: 0, limit: 0, offset: 0, source: "collection" }
-      };
+      return { workoutSessions: emptyPage(), mealLogs: emptyPage(), progressMetrics: emptyPage() };
     }
 
-    // Each collection gets the caller's pagination for it, else the default
-    // first page.
-    const workoutPagination = {
-      ...parseDashboardPagination({}, defaultLimit),
-      ...(pagination.workoutSessions || {})
-    };
-    const mealPagination = {
-      ...parseDashboardPagination({}, defaultLimit),
-      ...(pagination.mealLogs || {})
-    };
-    const metricPagination = {
-      ...parseDashboardPagination({}, defaultLimit),
-      ...(pagination.progressMetrics || {})
-    };
-
-    // All three pages load at once, even for a route that answers with one.
     const [workoutSessions, mealLogs, progressMetrics] = await Promise.all([
-      toCollectionPage({
-        collection: "workoutSessions",
-        userId,
-        sortField: "createdAt",
-        limit: workoutPagination.limit,
-        offset: workoutPagination.offset
-      }),
-      toCollectionPage({
-        collection: "mealLogs",
-        userId,
-        sortField: "loggedAt",
-        limit: mealPagination.limit,
-        offset: mealPagination.offset
-      }),
-      toCollectionPage({
-        collection: "progressMetrics",
-        userId,
-        sortField: "loggedAt",
-        limit: metricPagination.limit,
-        offset: metricPagination.offset
-      })
+      loadPage("workoutSessions", userId, pagination.workoutSessions),
+      loadPage("mealLogs", userId, pagination.mealLogs),
+      loadPage("progressMetrics", userId, pagination.progressMetrics)
     ]);
 
     return {
@@ -149,7 +143,7 @@ export const createDashboardCollectionService = ({
 
   return {
     parseDashboardPagination,
-    getDashboardCollections,
+    getDashboardCollection,
     buildDashboardResponse
   };
 };

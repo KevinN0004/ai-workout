@@ -486,7 +486,7 @@ const dashboardCollectionService = createDashboardCollectionService({
   loadCollectionPage,
   buildDashboard
 });
-const { parseDashboardPagination, getDashboardCollections, buildDashboardResponse } =
+const { parseDashboardPagination, getDashboardCollection, buildDashboardResponse } =
   dashboardCollectionService;
 
 // ---- Rate limiters ----------------------------------------------------------
@@ -690,7 +690,7 @@ registerApiRoutes(app, {
   clearCsrfCookie,
   buildDashboardResponse,
   parseDashboardPagination,
-  getDashboardCollections,
+  getDashboardCollection,
   workoutSessionBodySchema,
   buildWorkoutSessionEntry,
   saveWorkoutSession,

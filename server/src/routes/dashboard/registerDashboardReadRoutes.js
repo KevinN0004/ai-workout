@@ -12,7 +12,7 @@ import { sendErrorResponse } from "../../services/http/errorResponseService.js";
  * in index.js.
  */
 export const registerDashboardReadRoutes = (app, deps) => {
-  const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollections } =
+  const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollection } =
     deps;
 
   app.get("/api/dashboard", requireAuth, async (req, res) => {
@@ -24,25 +24,26 @@ export const registerDashboardReadRoutes = (app, deps) => {
     }
   });
 
-  // One page of one collection each. `limit` and `offset` are validated here
-  // and defaulted by parseDashboardPagination. `pagination.total` counts the
-  // user's whole collection, not the page, so the caller can tell whether there
-  // is another page to ask for.
+  // One page of one collection each, and only that collection is read. `limit`
+  // and `offset` are validated here and defaulted by parseDashboardPagination.
+  // `pagination.total` counts the user's whole collection, not the page, so the
+  // caller can tell whether there is another page to ask for.
   app.get("/api/dashboard/workout-sessions", requireAuth, async (req, res) => {
     try {
       const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
       if (!queryInput) return;
-      const pagination = parseDashboardPagination(queryInput);
-      const collections = await getDashboardCollections(req.user, {
-        workoutSessions: pagination
-      });
+      const page = await getDashboardCollection(
+        req.user,
+        "workoutSessions",
+        parseDashboardPagination(queryInput)
+      );
       return res.json({
-        workoutSessions: collections.workoutSessions.items,
+        workoutSessions: page.items,
         pagination: {
-          total: collections.workoutSessions.total,
-          limit: collections.workoutSessions.limit,
-          offset: collections.workoutSessions.offset,
-          source: collections.workoutSessions.source
+          total: page.total,
+          limit: page.limit,
+          offset: page.offset,
+          source: page.source
         }
       });
     } catch (err) {
@@ -54,17 +55,18 @@ export const registerDashboardReadRoutes = (app, deps) => {
     try {
       const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
       if (!queryInput) return;
-      const pagination = parseDashboardPagination(queryInput);
-      const collections = await getDashboardCollections(req.user, {
-        mealLogs: pagination
-      });
+      const page = await getDashboardCollection(
+        req.user,
+        "mealLogs",
+        parseDashboardPagination(queryInput)
+      );
       return res.json({
-        mealLogs: collections.mealLogs.items,
+        mealLogs: page.items,
         pagination: {
-          total: collections.mealLogs.total,
-          limit: collections.mealLogs.limit,
-          offset: collections.mealLogs.offset,
-          source: collections.mealLogs.source
+          total: page.total,
+          limit: page.limit,
+          offset: page.offset,
+          source: page.source
         }
       });
     } catch (err) {
@@ -76,17 +78,18 @@ export const registerDashboardReadRoutes = (app, deps) => {
     try {
       const queryInput = validateQuery(req, res, dashboardPaginationQuerySchema);
       if (!queryInput) return;
-      const pagination = parseDashboardPagination(queryInput);
-      const collections = await getDashboardCollections(req.user, {
-        progressMetrics: pagination
-      });
+      const page = await getDashboardCollection(
+        req.user,
+        "progressMetrics",
+        parseDashboardPagination(queryInput)
+      );
       return res.json({
-        progressMetrics: collections.progressMetrics.items,
+        progressMetrics: page.items,
         pagination: {
-          total: collections.progressMetrics.total,
-          limit: collections.progressMetrics.limit,
-          offset: collections.progressMetrics.offset,
-          source: collections.progressMetrics.source
+          total: page.total,
+          limit: page.limit,
+          offset: page.offset,
+          source: page.source
         }
       });
     } catch (err) {
