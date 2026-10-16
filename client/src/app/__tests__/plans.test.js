@@ -19,6 +19,18 @@ const weekPlan = plan(
   "Hydrate between sets"
 );
 
+// The prompt ends every plan with a "Coach Notes:" section, and a note in it
+// can open with a weekday name. That line is a note, not a Saturday.
+const coachNotesNamingADay = plan(
+  "Monday - Push",
+  "Bench 4x6",
+  "Tuesday - Pull",
+  "Rows 4x8",
+  "Coach Notes:",
+  "Saturday: light walk",
+  "Sleep 8 hours"
+);
+
 describe("parsePlanSections", () => {
   describe("nothing to parse", () => {
     test.each([
@@ -178,6 +190,30 @@ describe("parsePlanSections", () => {
         expect(notes).toEqual(["sleep well"]);
       }
     );
+
+    // With no Coach Notes section, a Tips heading below the last weekday is
+    // the notes, and a tip above it still belongs to its day.
+    test("keeps a tip inside its day when the notes are headed Tips", () => {
+      const { days, notes } = parsePlanSections(
+        plan("Monday", "Bench", "Tip: brace hard", "Tuesday", "Rows", "Tips: hydrate")
+      );
+
+      expect(days).toEqual([
+        { title: "Monday", lines: ["Bench", "Tip: brace hard"] },
+        { title: "Tuesday", lines: ["Rows"] }
+      ]);
+      expect(notes).toEqual(["hydrate"]);
+    });
+
+    test("a coach note that opens with a weekday stays in the notes", () => {
+      const { days, notes } = parsePlanSections(coachNotesNamingADay);
+
+      expect(days).toEqual([
+        { title: "Monday - Push", lines: ["Bench 4x6"] },
+        { title: "Tuesday - Pull", lines: ["Rows 4x8"] }
+      ]);
+      expect(notes).toEqual(["Saturday: light walk", "Sleep 8 hours"]);
+    });
   });
 
   // The generator is asked for plain text, but a model that reaches for
@@ -285,6 +321,12 @@ describe("extractLatestPlanByWeekday", () => {
     );
 
     expect(week).toEqual({ Monday: ["Bench", "Tip: brace hard"], Tuesday: ["Rows"] });
+  });
+
+  test("does not read a coach note that opens with a weekday as that day", () => {
+    const week = extractLatestPlanByWeekday(dashboard(coachNotesNamingADay));
+
+    expect(week).toEqual({ Monday: ["Bench 4x6"], Tuesday: ["Rows 4x8"] });
   });
 
   test("agrees with parsePlanSections about which lines belong to a day", () => {

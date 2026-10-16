@@ -20,19 +20,26 @@ const isWeekdayHeading = (line) => {
 
 const hasNotesHeading = (line) => /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line);
 
-// The notes open at the first notes heading below the last weekday heading. A
-// "Tip:" or "Note:" line above that sits inside a day and belongs to it.
+const hasCoachNotesHeading = (line) => /^(coach\s*notes?|coach's\s*notes?)\b/i.test(line);
+
+// The notes open at the first Coach Notes heading, wherever it is, since the
+// prompt asks for that section and a note in it can start with a weekday
+// name. With none, they open at the first Tip or Note heading below the last
+// weekday heading; one higher up sits inside a day and belongs to it.
 const findNotesStart = (lines) => {
+  const coachNotes = lines.findIndex(hasCoachNotesHeading);
+  if (coachNotes >= 0) return coachNotes;
   const lastWeekday = lines.findLastIndex(isWeekdayHeading);
   return lines.findIndex((line, index) => index > lastWeekday && hasNotesHeading(line));
 };
 
 /**
  * Splits a plan into `days`, each a `title` line and the `lines` under it, and
- * `notes`. A line starting with a weekday name opens a day. The first notes
- * heading (Coach notes, Tips, Notes) below the last weekday heading, and
- * everything after it, are notes; one higher up is a line of its day. Text
- * with no weekday heading becomes one "Your plan" day.
+ * `notes`. A line starting with a weekday name opens a day. The notes are the
+ * first Coach Notes heading and everything after it, a weekday line among them
+ * included. Without one, they are the first Tips or Notes heading below the
+ * last weekday heading and everything after it; one higher up is a line of its
+ * day. Text with no weekday heading becomes one "Your plan" day.
  */
 export const parsePlanSections = (result) => {
   if (!result) return { days: [], notes: [] };
