@@ -443,8 +443,7 @@ export default function App() {
   }, []);
 
   // The URL picks the dashboard view on every route change, back and forward
-  // included. A path that names no view leaves the last one as it was, except a
-  // slug that routing.js resolves to an inherited member, which replaces it.
+  // included. A path that names no view leaves the last one as it was.
   useEffect(() => {
     const routeDashView = resolveDashViewFromPath(route);
     if (!routeDashView) return;
