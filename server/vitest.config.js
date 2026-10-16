@@ -26,17 +26,17 @@ export default defineConfig({
       exclude: ["**/*.test.js", "src/generated/**"],
       reporter: ["text", "html"],
       // A ratchet, not a target -- see the note in client/vite.config.js.
-      // Measured 2026-10-10 (94.50 / 86.97 / 95.56 / 95.75), floored one
-      // decimal below. Branches read higher in CI than locally (87.40 against
-      // 86.97 on 2026-10-10), so the floor follows the local figure, the lower
+      // Measured 2026-10-15 (95.07 / 88.20 / 96.22 / 96.23), floored one
+      // decimal below. Branches read higher in CI than locally (88.62 against
+      // 88.20 on 2026-10-15), so the floor follows the local figure, the lower
       // of the two. One decimal rather than whole percent, which would leave
       // up to a point of measured coverage free to slip without tripping
       // anything.
       thresholds: {
-        statements: 94.5,
-        branches: 86.9,
-        functions: 95.5,
-        lines: 95.7
+        statements: 95,
+        branches: 88.2,
+        functions: 96.2,
+        lines: 96.2
       }
     }
   }
