@@ -61,9 +61,9 @@
 }
 
 /* ---- Contents lane ------------------------------------------------------- */
-/* position: fixed, but not to the viewport: styles/base.css's .panel gives the walkthrough's
-   root backdrop-filter, which makes the root its containing block, so the lane scrolls with
-   the walkthrough. */
+/* position: fixed to the viewport, so the lane stays put while the page scrolls. A
+   transform, filter or backdrop-filter on the stage or the walkthrough's root would make that
+   element its containing block instead: core/layout.css and layout/base.css clear them. */
 .preview-side-tab {
   --preview-chip-collapsed: 44px;
   position: fixed;
