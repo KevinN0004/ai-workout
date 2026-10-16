@@ -93,7 +93,7 @@
 }
 
 /* ---- Loading skeleton ---------------------------------------------------- */
-/* No reduced-motion rule stops this shimmer. */
+/* The reduced-motion block at the end of this file holds the shimmer still. */
 .tips-view .tips-skeleton-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -392,5 +392,14 @@
   .exercise-modal .video-link {
     width: 100%;
     overflow-wrap: anywhere;
+  }
+}
+
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Here rather than in the dashboard's responsive.css: this sheet loads later, in the view's
+   chunk, so a rule there would lose the tie with the shimmer above. */
+@media (prefers-reduced-motion: reduce) {
+  .tips-view .tips-skeleton-card {
+    animation: none;
   }
 }

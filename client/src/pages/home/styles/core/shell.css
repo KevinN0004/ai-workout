@@ -55,6 +55,16 @@
   transform: translateX(100%);
 }
 
+/* ---- Reduced motion ------------------------------------------------------ */
+/* The pill moves under the chosen button at once. Every page that renders these toggles
+   carries home-page, so this reaches each of them, /auth's login/sign-up toggle included. */
+@media (prefers-reduced-motion: reduce) {
+  .home-page .segmented::before,
+  .home-page .unit-toggle::before {
+    transition: none;
+  }
+}
+
 /* ---- White buttons with a glow ------------------------------------------- */
 .home-page .ghost,
 .home-page .cta {
