@@ -543,3 +543,69 @@ describe("a send still out when the account signs out", () => {
     expect(result.current.dashboardToast?.tone).not.toBe("error");
   });
 });
+
+// Logout's first step. An entry still inside its undo window has been told it
+// is saved, so it is sent at once, on the account's own session, and logout
+// waits for every send the account started before it ends that session.
+describe("flushOptimisticOperations", () => {
+  test("sends an entry still inside its undo window at once", async () => {
+    const { result } = render();
+    const options = queue({ dashboard: { mealLogs: [] } });
+    act(() => result.current.queueOptimisticLogCommit(options));
+
+    await act(async () => {
+      await result.current.flushOptimisticOperations();
+    });
+
+    expect(options.request).toHaveBeenCalledTimes(1);
+    expect(setDashboard).toHaveBeenCalledWith({ mealLogs: [] });
+  });
+
+  test("does not send it a second time when its window would have closed", async () => {
+    const { result } = render();
+    const options = queue({ dashboard: {} });
+    act(() => result.current.queueOptimisticLogCommit(options));
+
+    await act(async () => {
+      await result.current.flushOptimisticOperations();
+    });
+    await runUndoWindow();
+
+    expect(options.request).toHaveBeenCalledTimes(1);
+  });
+
+  test("waits for a send that was already out", async () => {
+    const { result } = render();
+    const pending = deferred();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => pending.promise) })
+      )
+    );
+    await runUndoWindow();
+
+    let settled = false;
+    let flushing;
+    act(() => {
+      flushing = result.current.flushOptimisticOperations().then(() => {
+        settled = true;
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(settled).toBe(false);
+
+    await act(async () => {
+      pending.resolve({ dashboard: {} });
+      await flushing;
+    });
+    expect(settled).toBe(true);
+  });
+
+  test("settles at once with nothing queued", async () => {
+    const { result } = render();
+
+    await expect(result.current.flushOptimisticOperations()).resolves.toBeUndefined();
+  });
+});

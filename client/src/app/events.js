@@ -14,6 +14,20 @@ import {
 import { personalToProfile } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
+// The longest logout waits for the sends it flushes, in milliseconds. A save
+// still running when it passes may be lost: logout goes ahead without it.
+const LOGOUT_FLUSH_CAP_MS = 5000;
+
+// Settles when `promise` does or after `ms`, whichever comes first, and clears
+// its timer either way, so a quick promise leaves no timer behind.
+const settleWithin = (promise, ms) => {
+  let timerId;
+  const cap = new Promise((resolve) => {
+    timerId = setTimeout(resolve, ms);
+  });
+  return Promise.race([promise, cap]).finally(() => clearTimeout(timerId));
+};
+
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -51,7 +65,9 @@ const downloadPlanPdfFromText = async (planText) => {
  * (useOptimisticLogs, which shows a workout, calorie or meal log as pending and
  * sends it after the undo window); `captureAccount` (useOptimisticLogs), which
  * every handler that writes account state after an await calls before it
- * sends and checks once the answer is in; and the resets logout and account
+ * sends and checks once the answer is in; `flushOptimisticOperations`, which
+ * logout runs before anything else and waits on for at most
+ * LOGOUT_FLUSH_CAP_MS; and the resets logout and account
  * deletion run, `clearOptimisticOperations`, `clearDashboardDataState`,
  * `clearDashboardToast` and `resetPersonalFlow`.
  */
@@ -92,6 +108,7 @@ export const createAppEventHandlers = ({
   setUser,
   authAutoSignIn,
   clearOptimisticOperations,
+  flushOptimisticOperations,
   captureAccount,
   clearDashboardDataState,
   clearDashboardToast,
@@ -306,6 +323,13 @@ export const createAppEventHandlers = ({
   };
 
   const onLogout = async () => {
+    // The entries still inside their undo window go first, on this account's
+    // session: their toast said they were saved, and the server refuses them
+    // once the session ends. The flush waits for every send this account
+    // started, but for no longer than LOGOUT_FLUSH_CAP_MS. A send still
+    // running then may be lost, because logout goes ahead without it rather
+    // than leaving the user signed in behind a request that may never answer.
+    await settleWithin(flushOptimisticOperations(), LOGOUT_FLUSH_CAP_MS);
     // Signing out locally must not depend on the request succeeding. The button
     // is wired straight to this, so an uncaught rejection would skip every clear
     // below and leave the previous account's dashboard on screen, with no sign

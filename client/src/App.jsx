@@ -166,6 +166,7 @@ export default function App() {
     showDashboardToast,
     queueOptimisticLogCommit,
     clearOptimisticOperations,
+    flushOptimisticOperations,
     captureAccount
   } = useOptimisticLogs({
     setDashboard,
@@ -368,6 +369,7 @@ export default function App() {
     setUser,
     authAutoSignIn,
     clearOptimisticOperations,
+    flushOptimisticOperations,
     captureAccount,
     clearDashboardDataState,
     clearDashboardToast,

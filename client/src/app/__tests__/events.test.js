@@ -91,6 +91,7 @@ beforeEach(() => {
     showDashboardToast: vi.fn(),
     // The account never changes in these tests unless one says so.
     captureAccount: () => () => true,
+    flushOptimisticOperations: vi.fn(async () => {}),
     mealLogForm: {},
     setMealLogForm: vi.fn(),
     progressForm: {},
@@ -99,6 +100,67 @@ beforeEach(() => {
 });
 
 describe("onLogout", () => {
+  // The entries still inside their undo window go first, on this account's
+  // session. The server refuses them once logout has ended it, and two
+  // requests in flight together can land in either order.
+  test("sends the pending entries before it ends the session", async () => {
+    let releaseFlush;
+    const flushOptimisticOperations = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          releaseFlush = resolve;
+        })
+    );
+
+    const loggingOut = build({ flushOptimisticOperations }).onLogout();
+    await Promise.resolve();
+
+    expect(flushOptimisticOperations).toHaveBeenCalledTimes(1);
+    expect(deps.apiFetch).not.toHaveBeenCalled();
+
+    releaseFlush();
+    await loggingOut;
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+  });
+
+  // The wait is capped at LOGOUT_FLUSH_CAP_MS (5000 ms). A send that never
+  // settles must not keep the user signed in. The clock is faked, so the cap is
+  // reached by advancing it rather than by waiting.
+  test("stops waiting at the cap while a send is still out", async () => {
+    vi.useFakeTimers();
+    try {
+      const flushOptimisticOperations = vi.fn(() => new Promise(() => {}));
+
+      const loggingOut = build({ flushOptimisticOperations }).onLogout();
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(deps.apiFetch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+
+      await loggingOut;
+      expect(deps.clearOptimisticOperations).toHaveBeenCalledTimes(1);
+      expect(deps.go).toHaveBeenCalledWith("/");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // With no clock advanced at all, logout still finishes, and it leaves no
+  // timer behind, so a quick flush never costs the user the cap.
+  test("does not wait for the cap when the sends settle sooner", async () => {
+    vi.useFakeTimers();
+    try {
+      await build().onLogout();
+
+      expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("tells the server to end the session", async () => {
     await build().onLogout();
 
