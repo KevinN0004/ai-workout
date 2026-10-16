@@ -300,10 +300,26 @@ describe("PreviewStage", () => {
   });
 
   describe("scrolling and page-level side effects", () => {
-    test("scrolls itself into view on arrival", () => {
+    test("scrolls itself into view on arrival, leaving the behaviour to the page", () => {
+      // An explicit behavior would override html.preview-smooth-scroll's
+      // scroll-behavior, including the instant one under reduced motion.
       renderPreview();
 
-      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    });
+
+    test("puts preview-smooth-scroll on <html> before it scrolls", () => {
+      // That class's rules decide how the scroll moves, so it must be there
+      // when the scroll starts.
+      let classOnScroll = null;
+      scrollIntoView.mockImplementation(() => {
+        classOnScroll = document.documentElement.classList.contains("preview-smooth-scroll");
+      });
+
+      renderPreview();
+
+      expect(classOnScroll).toBe(true);
     });
 
     test("turns smooth scrolling on for the document, and off again on the way out", () => {

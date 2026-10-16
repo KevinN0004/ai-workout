@@ -144,9 +144,11 @@ export default function PreviewStage({
     // reaches here.
     null;
 
+  // Passes no behavior, so the page's scroll-behavior decides: smooth while
+  // `preview-smooth-scroll` is on <html>, instant under reduced motion.
   const scrollPreviewIntoView = () => {
     if (!previewStageRef.current) return;
-    previewStageRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    previewStageRef.current.scrollIntoView({ block: "start" });
   };
 
   // Switches to a chapter, held to the list, unless it is the one showing. The
@@ -191,11 +193,13 @@ export default function PreviewStage({
   }, [previewStepIndex]);
 
   // On mount, the first chapter, and two animation frames on, once the stage
-  // has been painted, a smooth scroll that brings its top up to the page's
-  // scroll padding. The index already starts at 0, so the reset changes nothing
-  // here. The frames are not cancelled, so a PreviewStage that unmounts before
-  // they run reaches scrollPreviewIntoView with no element, which its null
-  // check covers.
+  // has been painted, a scroll that brings its top up to the page's scroll
+  // padding. It is smooth, because the effect above has already put
+  // `preview-smooth-scroll` on <html>, unless the visitor prefers reduced
+  // motion. The index already starts at 0, so the reset changes nothing here.
+  // The frames are not cancelled, so a PreviewStage that unmounts before they
+  // run reaches scrollPreviewIntoView with no element, which its null check
+  // covers.
   useEffect(() => {
     setPreviewStepIndex(0);
     previewStepIndexRef.current = 0;

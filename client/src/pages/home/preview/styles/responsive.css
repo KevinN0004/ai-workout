@@ -280,8 +280,8 @@
    (Its break rules change nothing: break-apart.css switches the CSS break off, and the
    anime.js break skips itself under reduced motion.) That block stops every element's motion
    inside .home-stage, with !important. Neither reaches the contents chips' labels, whose
-   !important transition in layout/frame.css wins, nor PreviewStage's opening scroll, which
-   asks for smooth scrolling from script. */
+   !important transition in layout/frame.css wins. The first rule below also makes
+   PreviewStage's opening scroll instant, since that scroll leaves its behavior to the page. */
 @media (prefers-reduced-motion: reduce) {
   html.preview-smooth-scroll {
     scroll-behavior: auto;

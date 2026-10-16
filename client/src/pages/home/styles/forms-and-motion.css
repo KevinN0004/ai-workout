@@ -304,8 +304,9 @@
    home/preview/styles/responsive.css stops the walkthrough's spinner and scan. The chips'
    labels keep the more specific !important transition home/preview/styles/layout/frame.css
    gives them. Outside .home-stage the nav's Preview button keeps its hover transition, and
-   /auth and /plan render no .home-stage at all. Motion driven from script is out of reach:
-   the physique stage's entrance and pulse, and the walkthrough's opening scroll. */
+   /auth and /plan render no .home-stage at all. Motion driven from script is out of reach,
+   so useHomeStageFlow skips the physique stage's entrance and pulse itself, and
+   PreviewStage's opening scroll takes html.preview-smooth-scroll's scroll-behavior. */
 @media (prefers-reduced-motion: reduce) {
   .home-stage,
   .home-stage * {
