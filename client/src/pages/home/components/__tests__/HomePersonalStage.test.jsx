@@ -178,6 +178,23 @@ describe("HomePersonalStage", () => {
       expect(next.heightInches).toBe("");
     });
 
+    // The unit already in use has nothing to convert from: the other unit's
+    // fields were never typed into, so converting them would wipe the entry.
+    test.each([
+      ["ft", "ft/in", { heightFeet: "5", heightInches: "9" }],
+      ["cm", "cm", { heightCm: "175" }]
+    ])(
+      "clicking %s while it is already the unit keeps what was typed",
+      (heightUnit, label, typed) => {
+        const { setPersonal, setHeightUnit } = renderStage({ heightUnit, personal: typed });
+
+        fireEvent.click(unitButton(label));
+
+        expect(setPersonal).not.toHaveBeenCalled();
+        expect(setHeightUnit).not.toHaveBeenCalled();
+      }
+    );
+
     test.each([
       ["cm", "cm", "ft/in"],
       ["ft", "ft/in", "cm"]

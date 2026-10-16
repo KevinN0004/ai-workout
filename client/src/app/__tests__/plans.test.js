@@ -19,6 +19,18 @@ const weekPlan = plan(
   "Hydrate between sets"
 );
 
+// The prompt ends every plan with a "Coach Notes:" section, and a note in it
+// can open with a weekday name. That line is a note, not a Saturday.
+const coachNotesNamingADay = plan(
+  "Monday - Push",
+  "Bench 4x6",
+  "Tuesday - Pull",
+  "Rows 4x8",
+  "Coach Notes:",
+  "Saturday: light walk",
+  "Sleep 8 hours"
+);
+
 describe("parsePlanSections", () => {
   describe("nothing to parse", () => {
     test.each([
@@ -145,13 +157,62 @@ describe("parsePlanSections", () => {
       expect(days[0].lines).toEqual(["Noteworthy: form check"]);
     });
 
-    // A model that leads with its notes leaves nothing above them, and the
-    // whole plan is read as notes.
-    test("produces no days when the notes heading comes first", () => {
+    // A notes heading counts only below the last weekday heading, so a model
+    // that leads with its notes still has its week read. Those notes sit above
+    // the first weekday and are dropped with the rest of the preamble.
+    test("still reads the week when a notes heading comes first", () => {
       const { days, notes } = parsePlanSections(plan("Notes: warm up first", "Monday", "Bench"));
 
-      expect(days).toEqual([]);
-      expect(notes).toEqual(["warm up first", "Monday", "Bench"]);
+      expect(days).toEqual([{ title: "Monday", lines: ["Bench"] }]);
+      expect(notes).toEqual([]);
+    });
+
+    // The prompt asks for guidance on every day, so a tip inside a day is
+    // expected output, and only the closing section is the notes.
+    test.each(["Tip: keep rest at 90s", "Note: go lighter if your knee aches"])(
+      "keeps %s inside the day it appears in",
+      (line) => {
+        const { days, notes } = parsePlanSections(
+          plan(
+            "Monday - Push",
+            "Bench press 4x6",
+            line,
+            "Tuesday - Pull",
+            "Barbell row 4x6",
+            "Coach Notes: sleep well"
+          )
+        );
+
+        expect(days).toEqual([
+          { title: "Monday - Push", lines: ["Bench press 4x6", line] },
+          { title: "Tuesday - Pull", lines: ["Barbell row 4x6"] }
+        ]);
+        expect(notes).toEqual(["sleep well"]);
+      }
+    );
+
+    // With no Coach Notes section, a Tips heading below the last weekday is
+    // the notes, and a tip above it still belongs to its day.
+    test("keeps a tip inside its day when the notes are headed Tips", () => {
+      const { days, notes } = parsePlanSections(
+        plan("Monday", "Bench", "Tip: brace hard", "Tuesday", "Rows", "Tips: hydrate")
+      );
+
+      expect(days).toEqual([
+        { title: "Monday", lines: ["Bench", "Tip: brace hard"] },
+        { title: "Tuesday", lines: ["Rows"] }
+      ]);
+      expect(notes).toEqual(["hydrate"]);
+    });
+
+    test("a coach note that opens with a weekday stays in the notes", () => {
+      const { days, notes } = parsePlanSections(coachNotesNamingADay);
+
+      expect(days).toEqual([
+        { title: "Monday - Push", lines: ["Bench 4x6"] },
+        { title: "Tuesday - Pull", lines: ["Rows 4x8"] }
+      ]);
+      expect(notes).toEqual(["Saturday: light walk", "Sleep 8 hours"]);
     });
   });
 
@@ -243,6 +304,29 @@ describe("extractLatestPlanByWeekday", () => {
 
     expect(extractLatestPlanByWeekday(dashboard(planText))).toEqual({});
     expect(parsePlanSections(planText).days).toHaveLength(1);
+  });
+
+  test("keeps a tip inside a day rather than ending the week at it", () => {
+    const week = extractLatestPlanByWeekday(
+      dashboard(
+        plan(
+          "Monday - Push",
+          "Bench",
+          "Tip: brace hard",
+          "Tuesday - Pull",
+          "Rows",
+          "Coach Notes: rest"
+        )
+      )
+    );
+
+    expect(week).toEqual({ Monday: ["Bench", "Tip: brace hard"], Tuesday: ["Rows"] });
+  });
+
+  test("does not read a coach note that opens with a weekday as that day", () => {
+    const week = extractLatestPlanByWeekday(dashboard(coachNotesNamingADay));
+
+    expect(week).toEqual({ Monday: ["Bench 4x6"], Tuesday: ["Rows 4x8"] });
   });
 
   test("agrees with parsePlanSections about which lines belong to a day", () => {

@@ -10,10 +10,11 @@ import "./AuthPage.css";
  * change and for the submit; it holds no state of its own. In login mode the
  * profile fields stay rendered but hidden, and their fieldset is disabled, so
  * their `required` does not block a login. The ft/in button fills feet and
- * inches from the centimetres field and the cm button does the reverse; the lb
- * and kg buttons convert the weight from the unit in use. All four use App's
- * converters from app/units.js. `gradient` is App's page background, and the
- * close button goes home through `go`.
+ * inches from the centimetres field and the cm button does the reverse, and
+ * either does nothing when its unit is already in use, since there is nothing
+ * to convert from; the lb and kg buttons convert the weight from the unit in
+ * use. All four use App's converters from app/units.js. `gradient` is App's
+ * page background, and the close button goes home through `go`.
  */
 export default function AuthPage({
   gradient,
@@ -170,6 +171,7 @@ export default function AuthPage({
                           type="button"
                           className={signupHeightUnit === "ft" ? "active" : ""}
                           onClick={() => {
+                            if (signupHeightUnit === "ft") return;
                             const next = toFeetInchesFromCm(signupProfileForm.heightCm);
                             setSignupField("heightFeet", next.feet);
                             setSignupField("heightInches", next.inches);
@@ -182,6 +184,7 @@ export default function AuthPage({
                           type="button"
                           className={signupHeightUnit === "cm" ? "active" : ""}
                           onClick={() => {
+                            if (signupHeightUnit === "cm") return;
                             setSignupField(
                               "heightCm",
                               toCmFromFeetInches(

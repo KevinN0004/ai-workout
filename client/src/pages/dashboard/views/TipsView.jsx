@@ -16,7 +16,8 @@ import {
   buildEquipmentKeywords,
   detectInjuryFlags,
   scoreExercise,
-  buildGuideCards
+  buildGuideCards,
+  buildInjuryText
 } from "../tips/recommendationUtils";
 import "./TipsView.css";
 
@@ -30,9 +31,9 @@ const LIBRARY_PAGE_SIZE = 24;
  * equipment, today's plan lines, the weather and any injury note), a training
  * guide (buildGuideCards), and the exercise list. The search and filters drive
  * the one exercise load both lists share. An injury note is the planner form's
- * injuries plus the profile's notes. `onSaveExerciseToPlan` is
- * saveExerciseToPlan in events.js, which resolves to `{ ok: true }` or
- * `{ ok: false, error }`.
+ * injuries plus the profile's notes, each left out when it answers none, n/a
+ * or no (buildInjuryText). `onSaveExerciseToPlan` is saveExerciseToPlan in
+ * events.js, which resolves to `{ ok: true }` or `{ ok: false, error }`.
  */
 export default function TipsView({
   user,
@@ -173,7 +174,7 @@ export default function TipsView({
     dashboard?.goals?.goalType ||
     form?.goal ||
     "Build lean strength and energy";
-  const injuryText = `${form?.injuries || ""} ${user?.profile?.notes || ""}`.trim();
+  const injuryText = buildInjuryText(form?.injuries, user?.profile?.notes);
   const weatherMode = weatherData?.recommendation?.workoutType || "";
   const track = detectTrack(goalText);
   const weeklyWorkouts = Number(dashboard?.goals?.weeklyWorkouts || form?.days || 3);

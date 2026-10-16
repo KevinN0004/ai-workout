@@ -177,6 +177,24 @@ describe("AuthPage", () => {
       expect(document.querySelector(`[name="${hidden}"]`)).toBeNull();
     });
 
+    // As on the home form: the unit already in use has nothing to convert.
+    test.each([
+      ["ft", "ft/in"],
+      ["cm", "cm"]
+    ])(
+      "clicking %s while it is already the unit leaves the entry alone",
+      (signupHeightUnit, label) => {
+        const onSignupProfileChange = vi.fn();
+        const setSignupHeightUnit = vi.fn();
+        renderSignup({ signupHeightUnit, onSignupProfileChange, setSignupHeightUnit });
+
+        fireEvent.click(unitButton("Height units", label));
+
+        expect(onSignupProfileChange).not.toHaveBeenCalled();
+        expect(setSignupHeightUnit).not.toHaveBeenCalled();
+      }
+    );
+
     test.each([
       ["ft", "pos-0", "ft/in"],
       ["cm", "pos-1", "cm"]
