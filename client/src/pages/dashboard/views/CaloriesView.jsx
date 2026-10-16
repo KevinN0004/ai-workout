@@ -92,8 +92,8 @@ export default function CaloriesView({
                 Calories
                 <input
                   type="number"
-                  min="1200"
-                  max="5000"
+                  min="800"
+                  max="10000"
                   value={calorieForm.calories}
                   onChange={(e) =>
                     setCalorieForm((prev) => ({
@@ -166,7 +166,7 @@ export default function CaloriesView({
                 <input
                   type="number"
                   min="1200"
-                  max="4000"
+                  max="4500"
                   value={goalForm.targetCalories}
                   onChange={(e) =>
                     setGoalForm((prev) => ({
@@ -187,10 +187,13 @@ export default function CaloriesView({
                     }))
                   }
                 >
+                  <option value="1">1</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                   <option value="4">4</option>
                   <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
                 </select>
               </label>
             </form>
