@@ -1,7 +1,7 @@
 ﻿/* The dashboard's navigation: DashboardDrawer and its backdrop, DashboardHeader's profile
    menu, and DashboardBottomNav, the bar responsive.css shows on narrow screens. Imported
-   fifth by DashboardPage.css; it uses theme.css's tokens, which reach the drawer and the
-   profile menu but not the bottom bar. */
+   fifth by DashboardPage.css; it uses theme.css's tokens, which theme.css sets on the
+   drawer and the bottom bar as well as the page. */
 
 /* ---- Drawer -------------------------------------------------------------- */
 .drawer-backdrop {
@@ -173,8 +173,7 @@
 
 /* ---- Bottom navigation --------------------------------------------------- */
 /* Hidden until responsive.css shows it on narrow screens. DashboardPage renders the bar
-   beside .dashboard-page, where theme.css sets no tokens, so every var(--dash-*) here is
-   invalid: the bar and its buttons draw no border. */
+   beside .dashboard-page, so theme.css sets the --dash-* tokens on the bar itself. */
 .dashboard-bottom-nav {
   position: fixed;
   left: 12px;

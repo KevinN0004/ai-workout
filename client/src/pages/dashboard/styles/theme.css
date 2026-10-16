@@ -4,11 +4,11 @@
    read its tokens. */
 
 /* ---- Tokens -------------------------------------------------------------- */
-/* Set on .drawer as well, because DashboardPage renders the drawer beside .dashboard-page
-   rather than inside it. DashboardBottomNav is beside it too and is not covered, so the
-   tokens navigation.css gives the bottom bar resolve to nothing. */
+/* Set on .drawer and .dashboard-bottom-nav as well, because DashboardPage renders the
+   drawer and DashboardBottomNav beside .dashboard-page rather than inside it. */
 .dashboard-page,
-.drawer {
+.drawer,
+.dashboard-bottom-nav {
   --dash-page-bg: #000;
   --dash-page-bg-alt: #101010;
   --dash-panel-bg: #141414;
