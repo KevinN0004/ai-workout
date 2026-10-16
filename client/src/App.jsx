@@ -139,6 +139,7 @@ export default function App() {
     dashLoading,
     dashError,
     setDashError,
+    dashboardPagination,
     weatherData,
     weatherLoading,
     weatherError,
@@ -551,6 +552,7 @@ export default function App() {
         setDashNavOpen={setDashNavOpen}
         dashLoading={dashLoading}
         dashError={dashError}
+        dashboardPagination={dashboardPagination}
         workoutModalOpen={workoutModalOpen}
         setWorkoutModalOpen={setWorkoutModalOpen}
         workoutForm={workoutForm}

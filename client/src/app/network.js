@@ -1,4 +1,4 @@
-/** fetch with a deadline, for the dashboard's reads in useDashboardData. */
+/** fetch with a deadline, for the dashboard's reads: useDashboardData's and useOlderLogPages'. */
 
 /**
  * fetch that aborts after `timeoutMs` and then rejects with a message fit to

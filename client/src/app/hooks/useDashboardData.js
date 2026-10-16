@@ -18,7 +18,9 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
 
 /**
  * Owns the dashboard, weather and air-quality state, each with its loading flag
- * and error, and returns it with `setDashboard` and `setDashError` for the
+ * and error, and `dashboardPagination`, the collection totals the last
+ * dashboard load carried (null until one does), for the Logs view. It returns
+ * them with `setDashboard` and `setDashError` for the
  * handlers that write, the two location-based loaders, and
  * `clearDashboardDataState` for logout and account deletion. Expects from App
  * the three cache keys (empty while signed out), `isDashboardRoute`,
@@ -38,6 +40,7 @@ export default function useDashboardData({
   const [dashboard, setDashboard] = useState(null);
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
+  const [dashboardPagination, setDashboardPagination] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
@@ -295,6 +298,7 @@ export default function useDashboardData({
         const data = await res.json();
         if (cancelled || dashboardRequestRef.current !== requestId) return;
         setDashboard(data.dashboard);
+        setDashboardPagination(data.pagination || null);
         applyGoalFormFromDashboard(data.dashboard, setGoalForm);
         setDashError("");
       } catch (err) {
@@ -355,6 +359,7 @@ export default function useDashboardData({
     setDashboard(null);
     setDashLoading(false);
     setDashError("");
+    setDashboardPagination(null);
     setWeatherData(null);
     setWeatherLoading(false);
     setWeatherError("");
@@ -371,6 +376,7 @@ export default function useDashboardData({
     dashLoading,
     dashError,
     setDashError,
+    dashboardPagination,
     weatherData,
     weatherLoading,
     weatherError,
