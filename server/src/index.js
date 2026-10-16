@@ -35,6 +35,7 @@ import {
   validateBody,
   workoutSessionBodySchema
 } from "./services/http/apiSchemaService.js";
+import { setErrorResponseTracker } from "./services/http/errorResponseService.js";
 import { createExternalDataService } from "./services/external/externalDataService.js";
 import { initErrorTracking } from "./services/platform/errorTrackingService.js";
 import {
@@ -729,13 +730,19 @@ registerClientStatic(app, {
   logger
 });
 
+// The one path to error tracking, for the error middleware and for routes that
+// answer their own 5xx through sendErrorResponse. It reads errorTracker when
+// called, because startServer replaces it after this module has run.
+const reportToErrorTracker = (error, context = {}) => {
+  errorTracker.captureException(error, context);
+};
+setErrorResponseTracker(reportToErrorTracker);
+
 app.use(
   createErrorHandler({
     logger,
     toShortText,
-    captureException: (error, context = {}) => {
-      errorTracker.captureException(error, context);
-    }
+    captureException: reportToErrorTracker
   })
 );
 

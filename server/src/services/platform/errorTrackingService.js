@@ -1,7 +1,7 @@
 /**
  * Sentry error tracking, on only when SENTRY_DSN is set. index.js initialises it
- * at startup, the error middleware reports 5xx errors through it, and the
- * shutdown handler flushes it.
+ * at startup, the error middleware and sendErrorResponse report 5xx errors
+ * through it, and the shutdown handler flushes it.
  */
 const disabledTracker = () => ({
   enabled: false,
