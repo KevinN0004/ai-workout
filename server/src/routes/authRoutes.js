@@ -10,8 +10,8 @@ import { sessionErrorStatus } from "../services/auth/sessionService.js";
 /**
  * Registers the account routes on `app`, taking the session helpers, user
  * repositories and password functions from the shared `deps` object. Every
- * failed password check counts toward `metrics.authFailures`, which nothing
- * reports at present. Signup and login both start a session that defaults to
+ * failed password check counts toward `metrics.authFailures`, which
+ * /api/metrics reports. Signup and login both start a session that defaults to
  * "remember me". A route that reads or writes a session answers 503 when the
  * session store is unavailable (see sessionErrorStatus), and 500 otherwise.
  */
@@ -133,6 +133,9 @@ export const registerAuthRoutes = (app, deps) => {
       await createUser(newUser);
       const token = await createSession(newUser.id);
       setSessionCookie(res, token, rememberMe);
+      // A new CSRF token replaces the one the browser held while signed out.
+      // useApiClient reads this cookie before every write, so the client's
+      // next request sends the new token.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
       res.json({
         user: {
@@ -189,6 +192,7 @@ export const registerAuthRoutes = (app, deps) => {
       // createSession has stored the session.
       const token = await createSession(user.id);
       setSessionCookie(res, token, rememberMe);
+      // Replaces the signed-out CSRF token, as signup does.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
       res.json({
         user: {

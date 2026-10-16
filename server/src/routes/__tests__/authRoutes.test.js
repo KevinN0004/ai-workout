@@ -296,6 +296,19 @@ describe("POST /api/auth/signup", () => {
     expect(rows[0].email).toBe("not-an-email");
   });
 
+  // The browser arrives holding the token ensureCsrfTokenCookie issued while it
+  // was signed out. Signup replaces it rather than keeping it.
+  test("issues a new csrf token rather than keeping the one it was sent", async () => {
+    await request(buildApp())
+      .post("/api/auth/signup")
+      .set("Cookie", "csrfToken=signed-out-token")
+      .send(signupBody());
+
+    expect(cookieCalls.csrf).toHaveLength(1);
+    expect(cookieCalls.csrf[0]).toMatch(/^[0-9a-f]{48}$/);
+    expect(cookieCalls.csrf[0]).not.toBe("signed-out-token");
+  });
+
   test("remembers the session by default", async () => {
     await request(buildApp()).post("/api/auth/signup").send(signupBody());
 
@@ -483,6 +496,21 @@ describe("POST /api/auth/login", () => {
       .send({ email: "person@example.com", password: "StrongPass123!", rememberMe: false });
 
     expect(cookieCalls.session[0].rememberMe).toBe(false);
+  });
+
+  test("issues a new csrf token rather than keeping the one it was sent", async () => {
+    const app = buildApp();
+    await registered(app);
+
+    await request(app)
+      .post("/api/auth/login")
+      .set("Cookie", "csrfToken=signed-out-token")
+      .send({ email: "person@example.com", password: "StrongPass123!" })
+      .expect(200);
+
+    expect(cookieCalls.csrf).toHaveLength(1);
+    expect(cookieCalls.csrf[0]).toMatch(/^[0-9a-f]{48}$/);
+    expect(cookieCalls.csrf[0]).not.toBe("signed-out-token");
   });
 
   // Omitting the field means remembered, the same as it does at signup. This
