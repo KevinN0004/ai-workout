@@ -4,7 +4,11 @@ import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { registerAuthRoutes } from "../authRoutes.js";
 import { createAuthUserService } from "../../services/auth/authUserService.js";
-import { parseCookies } from "../../services/auth/sessionService.js";
+import {
+  createSessionService,
+  parseCookies,
+  SessionStoreUnavailableError
+} from "../../services/auth/sessionService.js";
 import {
   accountDeleteBodySchema,
   loginBodySchema,
@@ -59,6 +63,28 @@ const buildApp = (overrides = {}) => {
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
   return app;
+};
+
+// What sessionService throws when Redis is the store and a command fails.
+const storeDown = () => new SessionStoreUnavailableError(new Error("redis is on fire"));
+
+// The real cookie writers, for the tests that read what reached the response's
+// Set-Cookie header rather than what the recording stubs saw.
+const realCookieWriters = () => {
+  const { setSessionCookie, setCsrfCookie, clearSessionCookie, clearCsrfCookie } =
+    createSessionService({
+      cleanText,
+      logger: { info() {}, warn() {}, error() {} },
+      toShortText: (value) => String(value ?? ""),
+      findUserById: async () => null,
+      sessionTtlMs: 60000,
+      cookieSecure: "",
+      csrfCookieName: "csrfToken",
+      csrfHeaderName: "x-csrf-token",
+      csrfUnsafeMethods: new Set(["POST"]),
+      redisSessionKeyPrefix: "session:sid:"
+    });
+  return { setSessionCookie, setCsrfCookie, clearSessionCookie, clearCsrfCookie };
 };
 
 // A real legacy record, hashed the way the pre-argon2 code did it -- the same
@@ -295,6 +321,24 @@ describe("POST /api/auth/signup", () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
+  });
+
+  // The account is written before the session, so it exists and can sign in
+  // once the store is back; what must not happen is a cookie for a session
+  // that was never stored.
+  test("answers 503 with no cookie when the session store is unavailable", async () => {
+    const app = buildApp({
+      ...realCookieWriters(),
+      createSession: async () => {
+        throw storeDown();
+      }
+    });
+
+    const response = await request(app).post("/api/auth/signup").send(signupBody());
+
+    expect(response.status).toBe(503);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(JSON.stringify(response.body)).not.toMatch(/on fire/);
   });
 });
 
@@ -583,6 +627,19 @@ describe("POST /api/auth/login", () => {
     expect(response.status).toBe(500);
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
   });
+
+  test("answers 503 with no cookie when the session store is unavailable", async () => {
+    const app = buildApp(realCookieWriters());
+    await registered(app);
+    deps.createSession.mockRejectedValueOnce(storeDown());
+
+    const response = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "person@example.com", password: "StrongPass123!" });
+
+    expect(response.status).toBe(503);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
 });
 
 describe("POST /api/auth/password", () => {
@@ -799,6 +856,44 @@ describe("POST /api/auth/password", () => {
     expect(metrics.authFailures).toBe(0);
   });
 
+  test("answers 503 when the replacement session cannot be stored", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+    deps.createSession.mockRejectedValueOnce(storeDown());
+
+    const response = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" });
+
+    expect(response.status).toBe(503);
+  });
+
+  // The new password is already stored, and passwordChangedAt already
+  // invalidates the old session, so a failure to delete the old token is
+  // logged and the change goes on to issue the replacement session.
+  test("still issues the new session when the old one cannot be deleted", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+    deps.deleteSession.mockRejectedValueOnce(storeDown());
+
+    const response = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" });
+
+    expect(response.status).toBe(200);
+    expect(cookieCalls.session).toHaveLength(2);
+    expect(`sid=${cookieCalls.session[1].token}`).not.toBe(cookie);
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "previous_session_delete_failed",
+        error: expect.stringContaining("Session store unavailable")
+      }),
+      expect.any(String)
+    );
+  });
+
   test("does not leak whether the failure was the password or the session", async () => {
     // A 401 for a wrong current password must not be distinguishable in body
     // text from any other 401 in a way that helps an attacker who has stolen
@@ -927,6 +1022,31 @@ describe("DELETE /api/auth/me", () => {
     await request(app).delete("/api/auth/me").send({ password: "whatever" }).expect(401);
   });
 
+  // The account is already gone when the session delete runs, so this browser
+  // must be signed out whatever the store says. The 503 reports only that the
+  // session itself could not be ended.
+  test("answers 503, and still clears both cookies, when the store cannot drop the session", async () => {
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+    deps.deleteSession.mockRejectedValueOnce(storeDown());
+
+    const response = await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password });
+
+    expect(response.status).toBe(503);
+    expect(cookieCalls.clearedSession).toBe(1);
+    expect(cookieCalls.clearedCsrf).toBe(1);
+    expect(rows).toHaveLength(0);
+  });
+
   // cookieCalls is not an array of call names -- see the shared beforeEach
   // above, which tracks clears as counters (clearedSession/clearedCsrf), the
   // same shape the logout tests below already assert on.
@@ -1039,17 +1159,32 @@ describe("GET /api/auth/me", () => {
     expect(JSON.stringify(response.body)).not.toMatch(/argon2id\$secret|legacy-salt/);
   });
 
-  test("answers 500 without detail when the session store fails", async () => {
+  test("answers 500 without detail when the lookup fails", async () => {
     const app = buildApp({
       getSessionUser: async () => {
-        throw new Error("redis is on fire");
+        throw new Error("connection terminated unexpectedly");
       }
     });
 
     const response = await request(app).get("/api/auth/me");
 
     expect(response.status).toBe(500);
-    expect(JSON.stringify(response.body)).not.toMatch(/redis is on fire/);
+    expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
+  });
+
+  // The session may well exist: the store could not be asked. A 401 would say
+  // there is none.
+  test("answers 503 without detail when the session store is unavailable", async () => {
+    const app = buildApp({
+      getSessionUser: async () => {
+        throw storeDown();
+      }
+    });
+
+    const response = await request(app).get("/api/auth/me");
+
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(response.body)).not.toMatch(/on fire/);
   });
 });
 
@@ -1220,16 +1355,36 @@ describe("POST /api/auth/logout", () => {
     expect(cookieCalls.clearedSession).toBe(1);
   });
 
-  test("still clears cookies when the session store fails", async () => {
+  test("still clears cookies when the delete fails", async () => {
     const app = buildApp({
       deleteSession: async () => {
-        throw new Error("redis is on fire");
+        throw new Error("connection terminated unexpectedly");
       }
     });
 
     const response = await request(app).post("/api/auth/logout").set("Cookie", "sid=sess-1");
 
     expect(response.status).toBe(500);
-    expect(JSON.stringify(response.body)).not.toMatch(/redis is on fire/);
+    expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
+    expect(cookieCalls.clearedSession).toBe(1);
+    expect(cookieCalls.clearedCsrf).toBe(1);
+  });
+
+  // This browser is signed out either way. The 503 says the session itself
+  // could not be ended, so it stays valid in the store until it expires.
+  test("answers 503, and still clears both cookies, when the store is unavailable", async () => {
+    const app = buildApp({
+      ...realCookieWriters(),
+      deleteSession: async () => {
+        throw storeDown();
+      }
+    });
+
+    const response = await request(app).post("/api/auth/logout").set("Cookie", "sid=sess-1");
+
+    expect(response.status).toBe(503);
+    const cookies = response.headers["set-cookie"].join("\n");
+    expect(cookies).toMatch(/^sid=;/m);
+    expect(cookies).toMatch(/^csrfToken=;/m);
   });
 });
