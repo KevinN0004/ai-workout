@@ -2,15 +2,15 @@
  * The meal log: a form for one meal's date, type, name, calories, macros and
  * notes, with the latest entries beneath it. Rendered by MealView.
  */
+import { getLocalDateKey } from "../../../app/units";
 
 /**
  * A controlled form over MealView's meal-log form, saved by `onSubmitMealLog`
  * (submitMealLog in events.js). The list shows the first few of `safeMealLogs`,
  * which arrive most recently logged first. With none, "Log first meal" fills in
- * a date and a meal type where the form has none, then focuses the name field
- * through `mealLogNameInputRef`. The date it fills is the UTC one
- * (toISOString), not getLocalDateKey's, so in the evening west of UTC it is
- * tomorrow.
+ * today's local date (getLocalDateKey, as the other log forms do) and a meal
+ * type where the form has none, then focuses the name field through
+ * `mealLogNameInputRef`.
  */
 export default function MealLogPanel({
   safeMealLogForm,
@@ -156,7 +156,7 @@ export default function MealLogPanel({
               onClick={() => {
                 updateMealLogForm((prev) => ({
                   ...prev,
-                  date: prev?.date || new Date().toISOString().slice(0, 10),
+                  date: prev?.date || getLocalDateKey(),
                   mealType: prev?.mealType || "breakfast"
                 }));
                 mealLogNameInputRef.current?.focus();

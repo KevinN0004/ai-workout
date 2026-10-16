@@ -8,9 +8,13 @@ import { buildWeeklyMealPlan } from "../planUtils";
 import { buildLinePath } from "../../../app/linePath";
 import { toNumberOrNull } from "../../../app/units";
 
-// A Date or null. A bare YYYY-MM-DD is read as local midnight: `new Date` would
-// read it as UTC midnight, which west of UTC falls on the previous local day.
-const parseDateValue = (value) => {
+/**
+ * A date value as a Date, or null when it is missing or does not parse. A bare
+ * YYYY-MM-DD is read as local midnight: `new Date` would read it as UTC
+ * midnight, which west of UTC falls on the previous local day. DashboardPage
+ * reads the next workout's date through it too.
+ */
+export const parseDateValue = (value) => {
   if (!value) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
   if (match) {

@@ -84,6 +84,9 @@ vi.mock("../views/DashboardHomeView", () => ({
 
 import DashboardPage from "../DashboardPage";
 
+// The zone the run started in, restored after each test that pins its own.
+const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 const USER = { email: "a@b.c", profile: {} };
 
 const renderPage = (props = {}) => {
@@ -205,30 +208,26 @@ describe("DashboardPage", () => {
       expect(nextWorkout().context).toBe("Upcoming");
     });
 
-    test("a session dated today is labelled by timezone, which is a bug", () => {
-      // Pinning what it does, and it is wrong west of UTC.
-      //
-      // `parseDateAsTime` here is `new Date(value)` with no local-date branch,
-      // so a plain "2026-09-11" is UTC midnight. It is then compared against
-      // `todayStart`, which is *local* midnight. West of UTC, local midnight
-      // is later in absolute time, so today's own session sorts before the
-      // cutoff, drops out of "upcoming", and is labelled "Latest" -- as though
-      // the visitor had already done it.
-      //
-      // The difference is exactly the UTC offset, so this affects every user
-      // in the Americas and none east of Greenwich. `useDashboardMetrics`
-      // solves the same problem with an explicit YYYY-MM-DD branch in its own
-      // `parseDateValue`; this copy never got one.
-      //
-      // Asserted as a property rather than a fixed string, so the test states
-      // the rule in both directions instead of encoding one machine's zone.
-      renderPage(withWorkouts([{ id: "today", date: "2026-09-11" }]));
+    // A bare YYYY-MM-DD is a calendar date, so a session dated today is ahead
+    // of the visitor wherever they are. Read as UTC midnight it would sit
+    // before local midnight west of UTC, and be labelled "Latest", as though
+    // already done. Los Angeles is the zone that tells the two readings apart;
+    // UTC and Tokyo pin the other two sides of it.
+    test.each(["America/Los_Angeles", "UTC", "Asia/Tokyo"])(
+      "a session dated today is upcoming in %s",
+      (zone) => {
+        process.env.TZ = zone;
+        vi.setSystemTime(new Date(2026, 8, 11, 12, 0, 0));
+        try {
+          renderPage(withWorkouts([{ id: "today", date: "2026-09-11" }]));
 
-      const westOfUtc = new Date(2026, 8, 11).getTime() > new Date("2026-09-11").getTime();
-
-      expect(nextWorkout().id).toBe("today");
-      expect(nextWorkout().context).toBe(westOfUtc ? "Latest" : "Upcoming");
-    });
+          expect(nextWorkout().id).toBe("today");
+          expect(nextWorkout().context).toBe("Upcoming");
+        } finally {
+          process.env.TZ = SYSTEM_ZONE;
+        }
+      }
+    );
 
     test("a session dated tomorrow is upcoming in every timezone", () => {
       // A full day of margin swamps any offset, so this is the assertion that

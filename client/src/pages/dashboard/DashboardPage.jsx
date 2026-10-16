@@ -10,7 +10,7 @@ import DashboardDrawer from "./components/DashboardDrawer";
 import DashboardBottomNav from "./components/DashboardBottomNav";
 import DashboardAtAGlance from "./components/DashboardAtAGlance";
 import DashboardWorkoutModal from "./components/DashboardWorkoutModal";
-import useDashboardMetrics from "./hooks/useDashboardMetrics";
+import useDashboardMetrics, { parseDateValue } from "./hooks/useDashboardMetrics";
 import { getLocalDateKey } from "../../app/units";
 import "./DashboardPage.css";
 
@@ -156,15 +156,11 @@ export default function DashboardPage({
   // previous render.", crashing the page.
   //
   // The glance panel's workout: the earliest dated today or later, else the
-  // most recent. The dates go through `new Date`, which reads a bare
-  // YYYY-MM-DD as UTC midnight, so west of UTC a workout dated today falls
-  // before local midnight and is not counted as upcoming.
+  // most recent. A bare YYYY-MM-DD is read as local midnight, as
+  // useDashboardMetrics reads it, so a workout dated today counts as upcoming
+  // in every time zone. A missing or unparseable date is 0, long past.
   const nextWorkout = useMemo(() => {
-    const parseDateAsTime = (value) => {
-      if (!value) return 0;
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
-    };
+    const parseDateAsTime = (value) => parseDateValue(value)?.getTime() || 0;
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const upcoming = recentWorkouts
