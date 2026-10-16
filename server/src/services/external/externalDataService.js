@@ -15,7 +15,7 @@
  *   `wgerDefaultLanguage` is the wger language id used when none is asked for.
  *   A request that times out, fails on the network or fails with a 5xx status
  *   is retried up to `externalApiRetries` times, the wait doubling each time
- *   from `externalApiRetryBaseDelayMs`.
+ *   from `externalApiRetryBaseDelayMs`. A missing OpenAQ key fails at once.
  */
 export const createExternalDataService = ({
   cleanText,
@@ -237,13 +237,18 @@ export const createExternalDataService = ({
       serviceName: "openAq",
       cacheKey,
       ttlSec: openAqCacheTtlSec,
-      requestFn: async () =>
-        runExternalRequestWithRetry("openAq", async () => {
-          if (!openAqApiKey) {
-            const err = new Error("OpenAQ API key is not configured. Set OPENAQ_API_KEY.");
-            err.status = 503;
-            throw err;
-          }
+      requestFn: async () => {
+        // Checked before the retry wrapper, because no retry can supply a key:
+        // the 503 reaches the route's fallback at once, and this warning is
+        // the one place the cause shows.
+        if (!openAqApiKey) {
+          const message = "OpenAQ API key is not configured. Set OPENAQ_API_KEY.";
+          logger.warn({ event: "openaq_api_key_missing", message });
+          const err = new Error(message);
+          err.status = 503;
+          throw err;
+        }
+        return runExternalRequestWithRetry("openAq", async () => {
           if (typeof fetch !== "function") {
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
@@ -311,7 +316,8 @@ export const createExternalDataService = ({
           } finally {
             clearTimeout(timeout);
           }
-        })
+        });
+      }
     });
   };
 

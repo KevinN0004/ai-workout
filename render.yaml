@@ -96,8 +96,8 @@ services:
       # outage and answers 200 with `fallback: true` and no readings, so the
       # dashboard shows air quality as unavailable rather than breaking -- a
       # permanently dead air-quality panel rather than an outage. The browser
-      # sees no error status; the server log is where it shows, as
-      # `external_api_retry` warnings naming the missing key.
+      # sees no error status; the server log is where it shows, as an
+      # `openaq_api_key_missing` warning for each air-quality request.
       - key: OPENAQ_API_KEY
         sync: false
 

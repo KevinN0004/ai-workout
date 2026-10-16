@@ -187,3 +187,45 @@ describe("external request retry", () => {
     expect(url.searchParams.get("timezone")).toBe("auto");
   });
 });
+
+// A missing OpenAQ key is configuration, not an outage: no retry can supply
+// one, so retrying only holds the request through the backoff before the route
+// falls back.
+describe("a missing OpenAQ key", () => {
+  const withoutKey = () =>
+    buildService({
+      openAqBaseUrl: "https://example.invalid/v3",
+      openAqApiKey: "",
+      openAqTimeoutMs: 50,
+      openAqCacheTtlSec: 60
+    });
+
+  test("fails at once, without a retry or a request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, metrics, logger } = withoutKey();
+
+    await expect(service.openAqRequest("locations")).rejects.toMatchObject({ status: 503 });
+
+    expect(metrics.externalApiRetries.openAq).toBeUndefined();
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: "external_api_retry" })
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The route answers with its fallback body, so the log is where an operator
+  // sees that the key is missing.
+  test("logs a warning naming the setting", async () => {
+    const { service, logger } = withoutKey();
+
+    await expect(service.openAqRequest("locations")).rejects.toThrow();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "openaq_api_key_missing",
+        message: expect.stringContaining("OPENAQ_API_KEY")
+      })
+    );
+  });
+});
