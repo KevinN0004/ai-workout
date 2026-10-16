@@ -416,6 +416,43 @@ describe("useDashboardMetrics", () => {
 
       expect(metrics.weeklyTrends.latestWeight).toBe(172);
     });
+
+    // The server stores a weight left blank as null, and the form sends "".
+    // Either is no reading, and must never be a weight of 0 lb. An absent key
+    // is in the table because it always behaved, which is what made the
+    // other two hard to see.
+    test.each([
+      ["null", null],
+      ["an empty string", ""],
+      ["an absent key", undefined]
+    ])("a newest metric whose weight is %s is not a reading", (_label, weightLb) => {
+      const metrics = render({
+        dashboard: {
+          progressMetrics: [
+            { id: "p3", date: "2026-03-01", weightLb, bodyFatPct: 18 },
+            { id: "p2", date: "2026-02-20", weightLb: 172 },
+            { id: "p1", date: "2026-02-10", weightLb: 175 }
+          ]
+        }
+      });
+
+      expect(metrics.weeklyTrends.latestWeight).toBe(172);
+      expect(metrics.weeklyTrends.weightDelta).toBe(-3);
+    });
+
+    test("metrics with only blank weights report no latest weight at all", () => {
+      const metrics = render({
+        dashboard: {
+          progressMetrics: [
+            { id: "p2", date: "2026-03-01", weightLb: null },
+            { id: "p1", date: "2026-02-20", weightLb: "" }
+          ]
+        }
+      });
+
+      expect(metrics.weeklyTrends.latestWeight).toBeNull();
+      expect(metrics.weeklyTrends.weightDelta).toBeNull();
+    });
   });
 
   describe("goals and progress", () => {
