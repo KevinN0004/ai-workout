@@ -143,8 +143,8 @@ six-hour buffer that serves old data when an upstream is down.
    like an upstream outage and answers 200 with `fallback: true`, so the
    dashboard shows "Air quality data is unavailable" rather than breaking. The
    symptom is a permanently dead air-quality panel rather than an outage, and
-   the place to spot it is the server log: `external_api_retry` warnings that
-   name the missing key.
+   the place to spot it is the server log: an `openaq_api_key_missing`
+   warning for each air-quality request.
 
    **`METRICS_TOKEN`** — guards `/api/metrics`, which reports `authFailures`,
    per-route latency and request totals. Generate any long random string and
