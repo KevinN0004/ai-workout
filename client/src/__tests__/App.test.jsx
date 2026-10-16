@@ -164,6 +164,15 @@ describe("App", () => {
       expect(dash.props.dashView).toBe("summary");
     });
 
+    test("a slug naming an inherited member opens the summary", () => {
+      // As a view, Object itself is a function, and a function as dashView
+      // turns off the summary's weather and air-quality load.
+      setPath("/dashboard/constructor");
+      render(<App />);
+
+      expect(dash.props.dashView).toBe("summary");
+    });
+
     test("navigating between dashboard views follows the URL", () => {
       setPath("/dashboard");
       render(<App />);

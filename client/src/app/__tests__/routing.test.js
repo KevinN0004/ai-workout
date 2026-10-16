@@ -42,4 +42,13 @@ describe("resolveDashViewFromPath", () => {
     // explicit "" -> summary entry for exactly this.
     expect(resolveDashViewFromPath("/dashboard//x")).toBe("summary");
   });
+
+  // The map is a plain object, so a slug naming a member every object inherits
+  // must still be unknown rather than resolve to that member.
+  test.each([["constructor"], ["toString"], ["hasOwnProperty"], ["__proto__"]])(
+    "/dashboard/%s resolves to null",
+    (slug) => {
+      expect(resolveDashViewFromPath(`/dashboard/${slug}`)).toBeNull();
+    }
+  );
 });

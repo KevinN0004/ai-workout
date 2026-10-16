@@ -246,9 +246,9 @@ export default function DashboardPage({
       <p className="muted">Loading view...</p>
     </section>
   );
-  // A name outside the list falls back to the summary. App can hand over one:
-  // DASHBOARD_ROUTE_VIEW_MAP is a plain object, so a slug such as
-  // /dashboard/constructor resolves to an inherited member rather than null.
+  // A name outside the list falls back to the summary. App only hands over the
+  // names routing.js maps, so this guards the page rather than a path the app
+  // takes.
   const activeDashView = DASH_VIEW_ORDER.includes(dashView) ? dashView : "summary";
   // One branch per view. The summary is imported eagerly; every other view is
   // lazy and waits behind the same Suspense fallback.
