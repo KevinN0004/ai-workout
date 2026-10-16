@@ -10,8 +10,10 @@ import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
  * Owns the pending log entries and the dashboard's toast. Returns the entries,
  * which App merges into the dashboard it renders; the toast with its show and
  * clear functions; `queueOptimisticLogCommit`, which the log handlers in
- * createAppEventHandlers call; and `clearOptimisticOperations`, which empties
- * the list and cancels every send not yet started. `setDashboard` and
+ * createAppEventHandlers call; `clearOptimisticOperations`, which empties the
+ * list, cancels every send not yet started and disowns every send already out;
+ * and `captureAccount`, which returns a check that stays true until the next
+ * clear, for a request to read once its answer is in. `setDashboard` and
  * `setDashError` are useDashboardData's: a send that succeeds replaces the
  * dashboard with the server's, and one that fails reports its error there.
  */
@@ -21,6 +23,10 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
   const [dashboardToast, setDashboardToast] = useState(null);
   const dashboardToastTimeoutRef = useRef(null);
   const optimisticOpRef = useRef(new Map());
+  // Bumped by clearOptimisticOperations, which logout, account deletion and
+  // unmount all run. A request sent before the bump answers for an account
+  // that is no longer on screen.
+  const generationRef = useRef(0);
 
   // ---- Toast ----------------------------------------------------------------
   const clearDashboardToast = useCallback(() => {
@@ -67,6 +73,12 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     };
   }, []);
 
+  // ---- The account a request belongs to -------------------------------------
+  const captureAccount = useCallback(() => {
+    const generation = generationRef.current;
+    return () => generationRef.current === generation;
+  }, []);
+
   // ---- Optimistic log entries -----------------------------------------------
   const removeOptimisticEntry = useCallback((operationId) => {
     setOptimisticLogEntries((current) =>
@@ -75,6 +87,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
   }, []);
 
   const clearOptimisticOperations = useCallback(() => {
+    generationRef.current += 1;
     optimisticOpRef.current.forEach((operation) => {
       if (operation?.timerId) {
         clearTimeout(operation.timerId);
@@ -119,7 +132,10 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
 
       // Sent when the window closes, after which the entry leaves the pending
       // list whatever the outcome: the server's dashboard replaces it on
-      // success, and a failure is reported.
+      // success, and a failure is reported. An answer that arrives after a
+      // logout or a deletion touches nothing, since the list, the dashboard
+      // and the toast are the next account's by then.
+      const isSameAccount = captureAccount();
       const commit = async () => {
         const operation = optimisticOpRef.current.get(operationId);
         if (!operation) return;
@@ -127,11 +143,13 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         operation.committing = true;
         try {
           const data = await request();
+          if (!isSameAccount()) return;
           optimisticOpRef.current.delete(operationId);
           removeOptimisticEntry(operationId);
           setDashboard(data.dashboard);
           showDashboardToast(successMessage || "Saved.");
         } catch (err) {
+          if (!isSameAccount()) return;
           optimisticOpRef.current.delete(operationId);
           removeOptimisticEntry(operationId);
           const message = err?.message || `Unable to save ${type}.`;
@@ -156,7 +174,14 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         durationMs: OPTIMISTIC_UNDO_WINDOW_MS + 1000
       });
     },
-    [removeOptimisticEntry, setDashError, setDashboard, showDashboardToast, undoOptimisticOperation]
+    [
+      captureAccount,
+      removeOptimisticEntry,
+      setDashError,
+      setDashboard,
+      showDashboardToast,
+      undoOptimisticOperation
+    ]
   );
 
   // On unmount, every entry still inside its undo window is dropped, not sent.
@@ -173,6 +198,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     clearDashboardToast,
     showDashboardToast,
     queueOptimisticLogCommit,
-    clearOptimisticOperations
+    clearOptimisticOperations,
+    captureAccount
   };
 }
