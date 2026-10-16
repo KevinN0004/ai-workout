@@ -56,13 +56,15 @@ html.preview-smooth-scroll {
 }
 
 /* The rule above again, more specific: it clears the background, border, shadow and padding
-   that styles/base.css's .panel and core/shell.css's .home-page .panel give the root.
-   .panel's border-radius and backdrop-filter still apply (see frame.css). */
+   that styles/base.css's .panel and core/shell.css's .home-page .panel give the root, and
+   .panel's backdrop-filter, which would make the root the containing block of the contents
+   lane's position: fixed (frame.css). .panel's border-radius still applies. */
 .home-page .preview-stage-panel.panel {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
+  backdrop-filter: none;
 }
 
 /* ---- Scrollbars ---------------------------------------------------------- */
