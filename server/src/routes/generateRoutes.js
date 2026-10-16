@@ -211,7 +211,9 @@ export const registerGenerateRoutes = (app, deps) => {
     try {
       // `gemini` is null when no key was configured at boot; see index.js.
       if (!process.env.GEMINI_API_KEY || !gemini) {
-        return res.status(500).json({ error: "Missing GEMINI_API_KEY." });
+        return res
+          .status(500)
+          .json({ error: "Missing GEMINI_API_KEY.", requestId: req.requestId || "" });
       }
 
       // Validate, then default every field the prompt uses. Free text is

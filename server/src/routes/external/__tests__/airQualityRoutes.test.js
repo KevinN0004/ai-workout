@@ -44,8 +44,12 @@ const { mergeCacheStatuses } = createHttpCacheService({
   defaultStaleTtlSec: 60
 });
 
-const buildApp = (openAqRequest) => {
+const buildApp = (openAqRequest, { requestId } = {}) => {
   const app = express();
+  app.use((req, _res, next) => {
+    if (requestId) req.requestId = requestId;
+    next();
+  });
   registerAirQualityRoutes(app, {
     toNullableNumber,
     openAqRequest,
@@ -182,6 +186,17 @@ describe("GET /api/air-quality/current", () => {
 
       expect(response.status).toBe(502);
       expect(String(response.body?.error)).toMatch(/missing location id/i);
+    });
+
+    test("carries the request id on that 502", async () => {
+      const openAqRequest = vi
+        .fn()
+        .mockResolvedValueOnce({ data: { results: [station({ id: null })] }, cache: "miss" });
+
+      const response = await get(buildApp(openAqRequest, { requestId: "req-aq-1" }));
+
+      expect(response.status).toBe(502);
+      expect(response.body.requestId).toBe("req-aq-1");
     });
   });
 

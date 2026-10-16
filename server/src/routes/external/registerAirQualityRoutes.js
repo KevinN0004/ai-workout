@@ -48,7 +48,9 @@ export const registerAirQualityRoutes = (app, deps) => {
 
       const locationId = toNullableNumber(location?.id, 1, 1000000000);
       if (locationId === null) {
-        return res.status(502).json({ error: "OpenAQ response missing location id." });
+        return res
+          .status(502)
+          .json({ error: "OpenAQ response missing location id.", requestId: req.requestId || "" });
       }
 
       // Load its latest readings. A reading names its sensor by id, and the

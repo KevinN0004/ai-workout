@@ -22,11 +22,12 @@ const gemini = { models: { generateContent } };
 
 let saveGeneratedPlan;
 
-const buildApp = (overrides = {}, { user } = {}) => {
+const buildApp = (overrides = {}, { user, requestId } = {}) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     if (user) req.user = user;
+    if (requestId) req.requestId = requestId;
     req.log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
     next();
   });
@@ -224,6 +225,17 @@ describe("POST /api/generate", () => {
 
     expect(response.status).toBe(500);
     expect(response.body.error).toMatch(/missing gemini_api_key/i);
+  });
+
+  // The id the request's log lines carry, so a report of this 500 can be found
+  // in them.
+  test("carries the request id when it refuses to run", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const response = await post(buildApp({}, { requestId: "req-gen-1" }));
+
+    expect(response.status).toBe(500);
+    expect(response.body.requestId).toBe("req-gen-1");
   });
 
   test("uses the configured model", async () => {
