@@ -119,7 +119,8 @@ export const registerSystemRoutes = (app, deps) => {
   });
 
   // The payload maps the route surface (per-route latency and request totals)
-  // and counts rate-limited requests live, so it is not for the open internet.
+  // and counts rate-limited requests and failed password checks live, so it is
+  // not for the open internet.
   //
   // Secure by default rather than opt-in: with no METRICS_TOKEN set it stays
   // open in development, where it is a debugging convenience and the process is
@@ -162,6 +163,7 @@ export const registerSystemRoutes = (app, deps) => {
       uptimeSec: Math.round((Date.now() - serverBootAtMs) / 1000),
       requestsTotal: metrics.requestsTotal,
       rateLimited: metrics.rateLimited,
+      authFailures: metrics.authFailures,
       requestLatencyMs: {
         ...summarizeLatencyBucket(metrics.requestLatencyMs),
         byRoute: routeLatency

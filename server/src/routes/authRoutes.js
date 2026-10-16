@@ -10,8 +10,8 @@ import { sessionErrorStatus } from "../services/auth/sessionService.js";
 /**
  * Registers the account routes on `app`, taking the session helpers, user
  * repositories and password functions from the shared `deps` object. Every
- * failed password check counts toward `metrics.authFailures`, which nothing
- * reports at present. Signup and login both start a session that defaults to
+ * failed password check counts toward `metrics.authFailures`, which
+ * /api/metrics reports. Signup and login both start a session that defaults to
  * "remember me". A route that reads or writes a session answers 503 when the
  * session store is unavailable (see sessionErrorStatus), and 500 otherwise.
  */

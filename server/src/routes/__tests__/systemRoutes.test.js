@@ -57,6 +57,16 @@ describe("GET /api/metrics", () => {
     expect(JSON.stringify(response.body)).not.toMatch(/authFailures|requestsTotal/);
   });
 
+  // authRoutes.js counts every failed password check; this is where the count
+  // is read.
+  test("reports the failed password checks", async () => {
+    const response = await request(buildApp({ metricsToken: "", isProduction: false })).get(
+      "/api/metrics"
+    );
+
+    expect(response.body.authFailures).toBe(3);
+  });
+
   test("allows a request carrying the right token", async () => {
     const response = await request(buildApp({ metricsToken: "s3cret", isProduction: true }))
       .get("/api/metrics")
