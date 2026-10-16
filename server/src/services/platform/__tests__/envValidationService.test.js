@@ -100,6 +100,30 @@ describe("validateEnv", () => {
     expect(errors[0]).toContain("REDIS_PORT must be <= 65535");
   });
 
+  // index.js reads both through toPositiveInt, which falls back to its default
+  // on anything unusable, so without these rows a typo would quietly loosen
+  // or tighten the limit on password re-verification.
+  test.each([
+    ["CREDENTIAL_RATE_LIMIT_WINDOW_MS", "ten minutes", "must be a number"],
+    ["CREDENTIAL_RATE_LIMIT_WINDOW_MS", "500", "must be >= 1000"],
+    ["CREDENTIAL_RATE_LIMIT_MAX", "ten", "must be a number"],
+    ["CREDENTIAL_RATE_LIMIT_MAX", "0", "must be >= 1"]
+  ])("rejects %s=%s", (name, value, message) => {
+    const errors = validateEnv({ ...validEnv, [name]: value });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain(`${name} ${message}`);
+  });
+
+  test("accepts the credential limiter's documented defaults", () => {
+    expect(
+      validateEnv({
+        ...validEnv,
+        CREDENTIAL_RATE_LIMIT_WINDOW_MS: "600000",
+        CREDENTIAL_RATE_LIMIT_MAX: "10"
+      })
+    ).toEqual([]);
+  });
+
   test("rejects a WGER_DEFAULT_LANGUAGE above the reader's 1..100 range", () => {
     // toNullableNumber(value, 1, 100) silently drops anything outside this
     // range and falls back to its default -- an unbounded validator would

@@ -22,6 +22,8 @@ const NUMERIC_VARS = [
   { name: "API_RATE_LIMIT_MAX", min: 1 },
   { name: "AUTH_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "AUTH_RATE_LIMIT_MAX", min: 1 },
+  { name: "CREDENTIAL_RATE_LIMIT_WINDOW_MS", min: 1000 },
+  { name: "CREDENTIAL_RATE_LIMIT_MAX", min: 1 },
   { name: "GENERATE_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "GENERATE_RATE_LIMIT_MAX", min: 1 },
   { name: "ANON_GENERATE_RATE_LIMIT_WINDOW_MS", min: 1000 },
