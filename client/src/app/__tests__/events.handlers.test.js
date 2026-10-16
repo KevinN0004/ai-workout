@@ -875,6 +875,29 @@ describe("deleteAccount", () => {
       vi.restoreAllMocks();
     });
 
+    test("deletion still finishes when the browser blocks site data", async () => {
+      // The server has already deleted the account by the time the cache is
+      // cleared, so a throw here would leave the visitor on a signed-out
+      // dashboard instead of home. Restored before this describe's afterEach,
+      // which removes the keys through window.localStorage.
+      const deps = clearDeps();
+      const { handlers } = buildDeps({
+        ...deps,
+        apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+      });
+      const getter = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      });
+      try {
+        const result = await handlers.deleteAccount("old-pass");
+
+        expect(result).toEqual({ ok: true });
+        expect(deps.go).toHaveBeenCalledWith("/");
+      } finally {
+        getter.mockRestore();
+      }
+    });
+
     test("onLogout leaves the cache in place", async () => {
       seedCache();
       const { handlers } = buildDeps({

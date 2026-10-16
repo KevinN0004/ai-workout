@@ -208,6 +208,30 @@ describe("useDashboardData", () => {
       await waitFor(() => expect(result.current.dashLoading).toBe(false));
       expect(result.current.dashError).toBe("");
     });
+
+    test("still loads when the browser blocks site data", async () => {
+      // Every cache effect reads window.localStorage as soon as there is a
+      // user, and with site data blocked that read throws a SecurityError.
+      // Restored here rather than by the beforeEach, which clears storage
+      // before it restores mocks.
+      const getter = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      });
+      try {
+        const dashboard = { workouts: [{ id: "w1" }], goals: {} };
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => jsonResponse({ dashboard }))
+        );
+
+        const { result } = render({ weatherCacheKey: WEATHER_KEY, airCacheKey: AIR_KEY });
+
+        await waitFor(() => expect(result.current.dashboard).toEqual(dashboard));
+        expect(result.current.dashError).toBe("");
+      } finally {
+        getter.mockRestore();
+      }
+    });
   });
 
   describe("errors", () => {

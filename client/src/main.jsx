@@ -1,10 +1,11 @@
 /**
  * The client's entry point, loaded by index.html: starts error tracking, then
- * renders App into #root under StrictMode.
+ * renders App, inside the root error boundary, into #root under StrictMode.
  */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import AppErrorBoundary from "./app/components/AppErrorBoundary.jsx";
 import { initErrorTracking } from "./app/errorTracking.js";
 import "./styles/index.css";
 
@@ -14,6 +15,8 @@ initErrorTracking();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </React.StrictMode>
 );

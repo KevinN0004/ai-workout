@@ -106,6 +106,31 @@ describe("removeJsonCache", () => {
   });
 });
 
+// Blocking site data makes the localStorage property itself throw, before any
+// getItem, setItem or removeItem can be tried. The spy is restored by the
+// afterEach at the top of this file, before it clears storage.
+const blockSiteData = () =>
+  vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+    throw new DOMException("The operation is insecure.", "SecurityError");
+  });
+
+describe("when the browser blocks site data", () => {
+  test("readJsonCache returns null", () => {
+    blockSiteData();
+    expect(readJsonCache("k")).toBeNull();
+  });
+
+  test("writeJsonCache does nothing", () => {
+    blockSiteData();
+    expect(() => writeJsonCache("k", { a: 1 })).not.toThrow();
+  });
+
+  test("removeJsonCache does nothing", () => {
+    blockSiteData();
+    expect(() => removeJsonCache("k")).not.toThrow();
+  });
+});
+
 describe("readCookie", () => {
   const setCookie = (value) => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(value);
