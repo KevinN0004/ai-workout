@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import MealView from "../MealView";
 import { MEALDB_RECOMMENDATION_QUERIES } from "../../meal/data";
 
+// The zone the run started in, restored after each test that pins its own.
+const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 // MealView is the coordinator for the meal tab: it picks the recommendation
 // track from the account's goal text, derives the calorie band and the portion
 // note attached to every meal, builds the course filter, and owns the details
@@ -685,6 +688,26 @@ describe("MealView", () => {
         expect(
           setMealLogForm.mock.calls.at(-1)[0]({ date: "2026-01-01", mealType: "dinner" })
         ).toEqual({ date: "2026-01-01", mealType: "dinner" });
+      });
+
+      test("seeds the local date, not the UTC one", async () => {
+        // 03:00 UTC on 11 September is still the evening of the 10th in Los
+        // Angeles (UTC-7), so the UTC date is a day ahead there. The zone is
+        // set before the clock, so the instant is the one named.
+        process.env.TZ = "America/Los_Angeles";
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-11T03:00:00Z"));
+        try {
+          const { setMealLogForm } = renderView();
+          await vi.waitFor(() => expect(coursePill("All courses")).toBeTruthy());
+
+          fireEvent.click(screen.getByText("Log first meal"));
+
+          expect(setMealLogForm.mock.calls.at(-1)[0]({}).date).toBe("2026-09-10");
+        } finally {
+          vi.useRealTimers();
+          process.env.TZ = SYSTEM_ZONE;
+        }
       });
     });
 
