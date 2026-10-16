@@ -22,6 +22,7 @@ const buildDeps = (overrides = {}) => {
     setDashboard: vi.fn(),
     setDashError: vi.fn(),
     showDashboardToast: vi.fn(),
+    captureAccount: () => () => true,
     workoutForm: {
       date: "2026-03-01",
       focus: "Push",

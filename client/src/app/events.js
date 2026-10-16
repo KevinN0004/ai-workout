@@ -49,8 +49,10 @@ const downloadPlanPdfFromText = async (planText) => {
  * it. The members that need a word: `apiFetch` (useApiClient, which adds the
  * CSRF header to writes); `queueOptimisticLogCommit` and `showDashboardToast`
  * (useOptimisticLogs, which shows a workout, calorie or meal log as pending and
- * sends it after the undo window); and the resets logout and account deletion
- * run, `clearOptimisticOperations`, `clearDashboardDataState`,
+ * sends it after the undo window); `captureAccount` (useOptimisticLogs), which
+ * every handler that writes account state after an await calls before it
+ * sends and checks once the answer is in; and the resets logout and account
+ * deletion run, `clearOptimisticOperations`, `clearDashboardDataState`,
  * `clearDashboardToast` and `resetPersonalFlow`.
  */
 export const createAppEventHandlers = ({
@@ -90,6 +92,7 @@ export const createAppEventHandlers = ({
   setUser,
   authAutoSignIn,
   clearOptimisticOperations,
+  captureAccount,
   clearDashboardDataState,
   clearDashboardToast,
   resetPersonalFlow,
@@ -112,6 +115,7 @@ export const createAppEventHandlers = ({
     setLoading(true);
     setError("");
     setResult("");
+    const isSameAccount = captureAccount();
 
     try {
       // Generate. For a signed-in visitor the server also saves the plan and
@@ -129,7 +133,9 @@ export const createAppEventHandlers = ({
 
       const data = await res.json();
       setResult(data.plan);
-      if (data.savedPlan) {
+      // Generation can outlast a logout. The saved plan joins the dashboard only
+      // while the account that asked for it is still the one signed in.
+      if (data.savedPlan && isSameAccount()) {
         setDashboard((prev) =>
           prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev
         );
@@ -419,6 +425,7 @@ export const createAppEventHandlers = ({
   const submitGoals = async (event) => {
     event.preventDefault();
     setDashError("");
+    const isSameAccount = captureAccount();
     try {
       const res = await apiFetch("/api/dashboard/goals", {
         method: "POST",
@@ -430,6 +437,9 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to save goals.");
       }
       const data = await res.json();
+      // The account that sent this has signed out since: its dashboard must not
+      // reach whoever is signed in now.
+      if (!isSameAccount()) return;
       setDashboard(data.dashboard);
       showDashboardToast("Goals updated.");
     } catch (err) {
@@ -446,6 +456,7 @@ export const createAppEventHandlers = ({
   // and store 170 lb as 170 kg. The app-level values remain the default for any
   // caller that does not pass units.
   const submitProfile = async (draft, units = { heightUnit, weightUnit }) => {
+    const isSameAccount = captureAccount();
     try {
       const res = await apiFetch("/api/profile", {
         method: "POST",
@@ -457,6 +468,9 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to save profile.");
       }
       const data = await res.json();
+      // Saved, but for an account that has signed out since: its profile must
+      // not land on whoever is signed in now.
+      if (!isSameAccount()) return { ok: true };
       // Only the user is updated, deliberately. `personal` is the home flow's
       // form state, not account state: it is read by HomePage and the signup
       // prefill, both meant for a signed-out visitor, and it is blanked on
@@ -604,6 +618,7 @@ export const createAppEventHandlers = ({
   const submitProgressMetric = async (event) => {
     event.preventDefault();
     setDashError("");
+    const isSameAccount = captureAccount();
     try {
       const res = await apiFetch("/api/dashboard/progress-metrics", {
         method: "POST",
@@ -615,6 +630,9 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to save progress metric.");
       }
       const data = await res.json();
+      // As in submitGoals: an answer for an account that has signed out since
+      // is dropped.
+      if (!isSameAccount()) return;
       setDashboard(data.dashboard);
       setProgressForm({
         date: getLocalDateKey(),
@@ -634,6 +652,7 @@ export const createAppEventHandlers = ({
 
   const saveExerciseToPlan = async (exercisePayload) => {
     setDashError("");
+    const isSameAccount = captureAccount();
     try {
       const res = await apiFetch("/api/dashboard/saved-exercises", {
         method: "POST",
@@ -645,6 +664,8 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to save exercise.");
       }
       const data = await res.json();
+      // As in submitGoals. The caller still hears that the save went through.
+      if (!isSameAccount()) return { ok: true, data };
       setDashboard(data.dashboard);
       showDashboardToast("Exercise saved to your plan.");
       return { ok: true, data };
@@ -658,6 +679,7 @@ export const createAppEventHandlers = ({
 
   const removeSavedExercise = async (entryId) => {
     setDashError("");
+    const isSameAccount = captureAccount();
     try {
       const res = await apiFetch(`/api/dashboard/saved-exercises/${entryId}`, {
         method: "DELETE"
@@ -667,6 +689,8 @@ export const createAppEventHandlers = ({
         throw new Error(payload?.error || "Unable to remove saved exercise.");
       }
       const data = await res.json();
+      // As in submitGoals. The caller still hears that the removal went through.
+      if (!isSameAccount()) return { ok: true, data };
       setDashboard(data.dashboard);
       showDashboardToast("Saved exercise removed.");
       return { ok: true, data };

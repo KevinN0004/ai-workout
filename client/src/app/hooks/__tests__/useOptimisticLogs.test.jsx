@@ -468,3 +468,78 @@ describe("unmounting", () => {
     }).not.toThrow();
   });
 });
+
+// A request the test releases by hand, so a logout can be staged while it is
+// still out.
+const deferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+describe("captureAccount", () => {
+  test("stays true until the operations are cleared", () => {
+    const { result } = render();
+
+    const isSameAccount = result.current.captureAccount();
+    expect(isSameAccount()).toBe(true);
+
+    act(() => result.current.clearOptimisticOperations());
+    expect(isSameAccount()).toBe(false);
+  });
+
+  test("a check captured after the clear belongs to the new account", () => {
+    const { result } = render();
+
+    act(() => result.current.clearOptimisticOperations());
+
+    expect(result.current.captureAccount()()).toBe(true);
+  });
+});
+
+// Logout and account deletion clear the operations while a send may still be
+// out. Its answer belongs to an account that is no longer on screen, and the
+// dashboard it carries would otherwise be cached under the next account.
+describe("a send still out when the account signs out", () => {
+  test("a late success touches neither the dashboard nor the toast", async () => {
+    const { result } = render();
+    const pending = deferred();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => pending.promise) })
+      )
+    );
+    await runUndoWindow();
+
+    act(() => result.current.clearOptimisticOperations());
+    await act(async () => {
+      pending.resolve({ dashboard: { mealLogs: [{ id: "previous-account" }] } });
+    });
+
+    expect(setDashboard).not.toHaveBeenCalled();
+    expect(result.current.dashboardToast?.message).not.toBe("Meal saved.");
+  });
+
+  test("a late failure reports nothing", async () => {
+    const { result } = render();
+    const pending = deferred();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => pending.promise) })
+      )
+    );
+    await runUndoWindow();
+
+    act(() => result.current.clearOptimisticOperations());
+    await act(async () => {
+      pending.reject(new Error("network down"));
+    });
+
+    expect(setDashError).not.toHaveBeenCalledWith("network down");
+    expect(result.current.dashboardToast?.tone).not.toBe("error");
+  });
+});

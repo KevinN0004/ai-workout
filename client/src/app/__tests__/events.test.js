@@ -89,6 +89,8 @@ beforeEach(() => {
     goalForm: {},
     setDashError: vi.fn(),
     showDashboardToast: vi.fn(),
+    // The account never changes in these tests unless one says so.
+    captureAccount: () => () => true,
     mealLogForm: {},
     setMealLogForm: vi.fn(),
     progressForm: {},
@@ -800,6 +802,64 @@ describe("direct submissions", () => {
       expect(result).toEqual({ ok: false, error: "Not found." });
       expect(deps.setDashboard).not.toHaveBeenCalled();
     });
+  });
+});
+
+// A write still out when its account signs out. The answer arrives for an
+// account that is no longer on screen, and must not reach the next one: the
+// dashboard it carries would be cached under the next account's key.
+describe("an answer that arrives after the account signed out", () => {
+  // The account changes while the request is out: captured as the same
+  // account before it, read as a different one after.
+  const signedOutMidRequest = (body) => {
+    let sameAccount = true;
+    return {
+      captureAccount: () => () => sameAccount,
+      apiFetch: vi.fn(async () => {
+        sameAccount = false;
+        return jsonResponse(body);
+      })
+    };
+  };
+
+  test.each([
+    ["submitGoals", (handlers) => handlers.submitGoals(submitEvent())],
+    ["submitProgressMetric", (handlers) => handlers.submitProgressMetric(submitEvent())],
+    ["saveExerciseToPlan", (handlers) => handlers.saveExerciseToPlan({ name: "Row" })],
+    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")]
+  ])("%s leaves the dashboard and the toast alone", async (_name, run) => {
+    await run(build(signedOutMidRequest({ dashboard: { goals: {} } })));
+
+    expect(deps.setDashboard).not.toHaveBeenCalled();
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["saveExerciseToPlan", (handlers) => handlers.saveExerciseToPlan({ name: "Row" })],
+    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")]
+  ])("%s still tells its caller the write went through", async (_name, run) => {
+    const result = await run(build(signedOutMidRequest({ dashboard: { goals: {} } })));
+
+    expect(result).toEqual({ ok: true, data: { dashboard: { goals: {} } } });
+  });
+
+  test("submitProfile leaves the next user's profile alone and still reports success", async () => {
+    const result = await build(
+      signedOutMidRequest({ profile: { firstName: "Ada" } })
+    ).submitProfile({ name: "Ada" });
+
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.showDashboardToast).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("onSubmit shows the plan but keeps its saved copy off the dashboard", async () => {
+    await build(
+      signedOutMidRequest({ plan: "Monday - Push", savedPlan: { id: "p-new" } })
+    ).onSubmit(submitEvent());
+
+    expect(deps.setResult).toHaveBeenLastCalledWith("Monday - Push");
+    expect(deps.setDashboard).not.toHaveBeenCalled();
   });
 });
 
