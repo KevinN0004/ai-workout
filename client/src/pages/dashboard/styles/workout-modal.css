@@ -199,9 +199,10 @@
 }
 
 /* ---- Actions ------------------------------------------------------------- */
-/* The row is also .modal-submit, whose justify-content in styles/base.css ties this one and
-   comes later, so the buttons are centred; responsive.css's stretch loses the same way. */
-.dashboard-workout-actions {
+/* The row is also .modal-submit, so the selector names both: styles/base.css's
+   .modal-submit centres the buttons, and alone this class would tie it and lose, since that
+   sheet comes later. responsive.css's narrow-screen rule names both for the same reason. */
+.modal-submit.dashboard-workout-actions {
   justify-content: flex-end;
   gap: 12px;
   padding-top: 8px;
