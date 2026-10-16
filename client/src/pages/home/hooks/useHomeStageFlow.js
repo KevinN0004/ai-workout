@@ -39,11 +39,10 @@ const STAGE_CROSSFADE_MS = 220;
  *
  * Both animations switch straight to the next stage under
  * `prefers-reduced-motion`, and when what they would animate is missing or,
- * for the morph, has no size. The visualizer's entrance and pulse (the first
- * effect) run under reduced motion too: they are script-driven, so the
- * stylesheet's reduced-motion block does not reach them. `samplePlanLength`
- * and `personalMode` are read only to re-measure a panel whose size they
- * change.
+ * for the morph, has no size. Under the same preference the visualizer's
+ * entrance and pulse (the first effect) do not run, and the stage shows as its
+ * stylesheet draws it. `samplePlanLength` and `personalMode` are read only to
+ * re-measure a panel whose size they change.
  */
 export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
   // ---- Refs: DOM handles, animations, pending timers and measurements -------
@@ -490,9 +489,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   // ---- Effects --------------------------------------------------------------
 
   // Runs the visualizer's entrance and starts its slow pulse whenever that
-  // stage is entered. After the morph the entrance plays out while the stage is
-  // still hidden under the clone, so it is seen only on Back and on the paths
-  // that skip the morph. Leaving the stage, or unmounting, stops both.
+  // stage is entered, unless the visitor prefers reduced motion. After the
+  // morph the entrance plays out while the stage is still hidden under the
+  // clone, so it is seen only on Back and on the paths that skip the morph.
+  // Leaving the stage, or unmounting, stops both.
   useEffect(() => {
     if (homeStage !== "visualizer" || !visualPanelRef.current) return undefined;
 
@@ -502,6 +502,10 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     const stageEl = visualPanelRef.current.querySelector(".visual-stage");
     const renderSurfaceEl = visualPanelRef.current.querySelector(".physique-render-surface");
     if (!stageEl || !renderSurfaceEl) return undefined;
+    // anime.js writes these styles inline, where the stylesheet's reduced-motion
+    // block cannot reach, so the preference is read here, as the morph and Get
+    // Started read it. Left alone, both elements show the entrance's last frame.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
 
     visualIntroTimelineRef.current = createTimeline({
       defaults: { ease: "outCubic", duration: UNIFIED_ANIMATION_MS }

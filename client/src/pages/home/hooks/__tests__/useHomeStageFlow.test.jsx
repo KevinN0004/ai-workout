@@ -6,12 +6,17 @@ import useHomeStageFlow from "../useHomeStageFlow";
 // whole output of the morph arithmetic. Recording them turns "it did not
 // throw" into an assertion about where the morph actually travels. The real
 // library still runs underneath -- only the call is observed.
-const anime = vi.hoisted(() => ({ adds: [] }));
+const anime = vi.hoisted(() => ({ adds: [], animates: [] }));
 
 vi.mock("animejs", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
+    // The visualizer's pulse is a lone animate call, recorded the same way.
+    animate: (target, params) => {
+      anime.animates.push({ target, params });
+      return actual.animate(target, params);
+    },
     createTimeline: (...args) => {
       const timeline = actual.createTimeline(...args);
       const add = timeline.add.bind(timeline);
@@ -67,6 +72,7 @@ const render = (overrides = {}) => {
 beforeEach(() => {
   stubMatchMedia(false);
   anime.adds.length = 0;
+  anime.animates.length = 0;
 });
 
 afterEach(() => {
@@ -1044,6 +1050,45 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
       expect(() => act(() => result.current.goToStage("visualizer"))).not.toThrow();
       expect(result.current.homeStage).toBe("visualizer");
+    });
+
+    test("plays the entrance on both surfaces and starts the pulse", () => {
+      const { result } = render();
+      const cleanup = buildVisualPanel(result);
+      try {
+        act(() => result.current.goToStage("visualizer"));
+
+        const panel = result.current.visualPanelRef.current;
+        const surface = panel.querySelector(".physique-render-surface");
+        expect(anime.adds.map(({ target }) => target)).toEqual([
+          panel.querySelector(".visual-stage"),
+          surface
+        ]);
+        expect(anime.animates).toHaveLength(1);
+        expect(anime.animates[0].target).toBe(surface);
+        expect(anime.animates[0].params.loop).toBe(true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("under reduced motion, runs neither and leaves both surfaces as drawn", () => {
+      // The stylesheet's reduced-motion block cannot reach styles a script
+      // writes inline, so the hook has to skip these itself.
+      stubMatchMedia(true);
+      const { result } = render();
+      const cleanup = buildVisualPanel(result);
+      try {
+        act(() => result.current.goToStage("visualizer"));
+
+        const panel = result.current.visualPanelRef.current;
+        expect(anime.adds).toEqual([]);
+        expect(anime.animates).toEqual([]);
+        expect(panel.querySelector(".visual-stage").getAttribute("style")).toBeNull();
+        expect(panel.querySelector(".physique-render-surface").getAttribute("style")).toBeNull();
+      } finally {
+        cleanup();
+      }
     });
 
     test("tears down when the visitor leaves the stage", () => {
