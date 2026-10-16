@@ -145,14 +145,39 @@ describe("parsePlanSections", () => {
       expect(days[0].lines).toEqual(["Noteworthy: form check"]);
     });
 
-    // A model that leads with its notes leaves nothing above them, and the
-    // whole plan is read as notes.
-    test("produces no days when the notes heading comes first", () => {
+    // A notes heading counts only below the last weekday heading, so a model
+    // that leads with its notes still has its week read. Those notes sit above
+    // the first weekday and are dropped with the rest of the preamble.
+    test("still reads the week when a notes heading comes first", () => {
       const { days, notes } = parsePlanSections(plan("Notes: warm up first", "Monday", "Bench"));
 
-      expect(days).toEqual([]);
-      expect(notes).toEqual(["warm up first", "Monday", "Bench"]);
+      expect(days).toEqual([{ title: "Monday", lines: ["Bench"] }]);
+      expect(notes).toEqual([]);
     });
+
+    // The prompt asks for guidance on every day, so a tip inside a day is
+    // expected output, and only the closing section is the notes.
+    test.each(["Tip: keep rest at 90s", "Note: go lighter if your knee aches"])(
+      "keeps %s inside the day it appears in",
+      (line) => {
+        const { days, notes } = parsePlanSections(
+          plan(
+            "Monday - Push",
+            "Bench press 4x6",
+            line,
+            "Tuesday - Pull",
+            "Barbell row 4x6",
+            "Coach Notes: sleep well"
+          )
+        );
+
+        expect(days).toEqual([
+          { title: "Monday - Push", lines: ["Bench press 4x6", line] },
+          { title: "Tuesday - Pull", lines: ["Barbell row 4x6"] }
+        ]);
+        expect(notes).toEqual(["sleep well"]);
+      }
+    );
   });
 
   // The generator is asked for plain text, but a model that reaches for
@@ -243,6 +268,23 @@ describe("extractLatestPlanByWeekday", () => {
 
     expect(extractLatestPlanByWeekday(dashboard(planText))).toEqual({});
     expect(parsePlanSections(planText).days).toHaveLength(1);
+  });
+
+  test("keeps a tip inside a day rather than ending the week at it", () => {
+    const week = extractLatestPlanByWeekday(
+      dashboard(
+        plan(
+          "Monday - Push",
+          "Bench",
+          "Tip: brace hard",
+          "Tuesday - Pull",
+          "Rows",
+          "Coach Notes: rest"
+        )
+      )
+    );
+
+    expect(week).toEqual({ Monday: ["Bench", "Tip: brace hard"], Tuesday: ["Rows"] });
   });
 
   test("agrees with parsePlanSections about which lines belong to a day", () => {

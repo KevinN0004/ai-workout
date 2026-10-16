@@ -3,12 +3,35 @@
  * headings and a closing "Coach Notes:" section. Used by App for the plan views
  * and for the dashboard's copy of the newest plan.
  */
+const WEEKDAY_NAMES = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday"
+];
+
+const isWeekdayHeading = (line) => {
+  const lower = line.toLowerCase();
+  return WEEKDAY_NAMES.some((day) => lower.startsWith(day));
+};
+
 const hasNotesHeading = (line) => /^(coach\s*notes?|coach's\s*notes?|tips?|notes?)\b/i.test(line);
+
+// The notes open at the first notes heading below the last weekday heading. A
+// "Tip:" or "Note:" line above that sits inside a day and belongs to it.
+const findNotesStart = (lines) => {
+  const lastWeekday = lines.findLastIndex(isWeekdayHeading);
+  return lines.findIndex((line, index) => index > lastWeekday && hasNotesHeading(line));
+};
 
 /**
  * Splits a plan into `days`, each a `title` line and the `lines` under it, and
- * `notes`. A line starting with a weekday name opens a day; the first notes
- * heading (Coach notes, Tips, Notes) and everything after it are notes. Text
+ * `notes`. A line starting with a weekday name opens a day. The first notes
+ * heading (Coach notes, Tips, Notes) below the last weekday heading, and
+ * everything after it, are notes; one higher up is a line of its day. Text
  * with no weekday heading becomes one "Your plan" day.
  */
 export const parsePlanSections = (result) => {
@@ -17,7 +40,7 @@ export const parsePlanSections = (result) => {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  const notesStart = rawLines.findIndex((line) => hasNotesHeading(line));
+  const notesStart = findNotesStart(rawLines);
 
   // Split off the notes: whatever follows the label on the heading's own line,
   // then every line below it.
@@ -35,19 +58,8 @@ export const parsePlanSections = (result) => {
   }
 
   // Cut what is left into days at each weekday heading.
-  const weekdayMap = [
-    ["monday", "Monday"],
-    ["tuesday", "Tuesday"],
-    ["wednesday", "Wednesday"],
-    ["thursday", "Thursday"],
-    ["friday", "Friday"],
-    ["saturday", "Saturday"],
-    ["sunday", "Sunday"]
-  ];
-  const isWeekdayHeader = (line) => weekdayMap.some(([key]) => line.toLowerCase().startsWith(key));
-
   const dayIndices = lines
-    .map((line, index) => (isWeekdayHeader(line) ? index : -1))
+    .map((line, index) => (isWeekdayHeading(line) ? index : -1))
     .filter((index) => index >= 0);
 
   const days = dayIndices.length
@@ -66,9 +78,9 @@ export const parsePlanSections = (result) => {
 
 /**
  * The newest saved plan (`dashboard.plans[0]`) as a map from weekday name to the
- * lines under that day's heading, notes left out. The heading line itself and
- * anything before the first heading are dropped, and a day with no lines under
- * it has no key.
+ * lines under that day's heading, the notes (as parsePlanSections finds them)
+ * left out. The heading line itself and anything before the first heading are
+ * dropped, and a day with no lines under it has no key.
  */
 export const extractLatestPlanByWeekday = (dashboard) => {
   const plans = dashboard?.plans || [];
@@ -78,7 +90,7 @@ export const extractLatestPlanByWeekday = (dashboard) => {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  const notesStart = lines.findIndex((line) => hasNotesHeading(line));
+  const notesStart = findNotesStart(lines);
   const planLines = notesStart >= 0 ? lines.slice(0, notesStart) : lines;
   const week = {};
   let current = null;
