@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import WorkoutsView from "../WorkoutsView";
 
@@ -414,6 +414,72 @@ describe("WorkoutsView", () => {
 
       expect(rowsIn(name)).toHaveLength(3);
       expect(datesIn(name)).toEqual(["2026-01-01", "2026-01-01", "--"]);
+    });
+  });
+
+  // The dashboard holds only the first page of meal logs and metrics. Past it,
+  // "Show more" asks the collection's paged route for the next page. fetch is
+  // stubbed at the network boundary.
+  describe("pages past the dashboard's first", () => {
+    const COLLECTIONS = [
+      ["mealLogs", "meals", "Show more meals", "/api/dashboard/meal-logs"],
+      ["progressMetrics", "progress", "Show more metrics", "/api/dashboard/progress-metrics"]
+    ];
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    test.each(COLLECTIONS)(
+      "%s: Show more fetches the next page once the held rows run out",
+      async (prop, name, label, path) => {
+        const fetchMock = vi.fn(async () => ({
+          ok: true,
+          json: async () => ({
+            [prop]: [dated("2025-12-30"), dated("2025-12-31")],
+            pagination: { total: 5 }
+          })
+        }));
+        vi.stubGlobal("fetch", fetchMock);
+        renderView({ [prop]: many(3), pagination: { [prop]: { total: 5 } } });
+
+        fireEvent.click(within(section(name)).getByText(label));
+
+        await waitFor(() => expect(rowsIn(name)).toHaveLength(5));
+        expect(String(fetchMock.mock.calls[0][0])).toBe(`${path}?limit=50&offset=3`);
+        expect(within(section(name)).queryByText(label)).toBeNull();
+      }
+    );
+
+    test.each(COLLECTIONS)(
+      "%s: a page that fails to load says so and keeps the button",
+      async (prop, name, label) => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+        );
+        renderView({ [prop]: many(3), pagination: { [prop]: { total: 5 } } });
+
+        fireEvent.click(within(section(name)).getByText(label));
+
+        expect(await within(section(name)).findByRole("alert")).toHaveTextContent(
+          "Unable to load older entries. Try again."
+        );
+        expect(within(section(name)).getByText(label)).toBeInTheDocument();
+      }
+    );
+
+    test("rows the dashboard still holds are not fetched", () => {
+      // 45 held rows: the first Show more reveals the last five without asking
+      // the server, even though the server has more.
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      renderView({ mealLogs: many(45), pagination: { mealLogs: { total: 120 } } });
+
+      fireEvent.click(screen.getByText("Show more meals"));
+
+      expect(rowsIn("meals")).toHaveLength(45);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });

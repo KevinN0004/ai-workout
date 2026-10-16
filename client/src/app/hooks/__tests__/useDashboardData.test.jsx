@@ -329,6 +329,48 @@ describe("useDashboardData", () => {
       expect(result.current.airQualityData).toBeNull();
     });
   });
+
+  // The dashboard response carries each collection's total. The Logs view
+  // reads it to know whether there is a page past the first.
+  describe("pagination", () => {
+    const pagination = { mealLogs: { total: 120, limit: 50, offset: 0, source: "collection" } };
+
+    test("keeps the totals the dashboard response carries", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals: {} }, pagination }))
+      );
+
+      const { result } = render();
+
+      await waitFor(() => expect(result.current.dashboardPagination).toEqual(pagination));
+    });
+
+    test("has none until a response carries them", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals: {} } }))
+      );
+
+      const { result } = render();
+
+      await waitFor(() => expect(result.current.dashLoading).toBe(false));
+      expect(result.current.dashboardPagination).toBeNull();
+    });
+
+    test("drops them with the rest of the dashboard state", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals: {} }, pagination }))
+      );
+      const { result } = render();
+      await waitFor(() => expect(result.current.dashboardPagination).toEqual(pagination));
+
+      act(() => result.current.clearDashboardDataState());
+
+      expect(result.current.dashboardPagination).toBeNull();
+    });
+  });
 });
 
 // The weather and air-quality half of the hook, which was the uncovered part.

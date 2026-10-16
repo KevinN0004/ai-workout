@@ -427,12 +427,31 @@ describe("App", () => {
       await renderSettled("/dashboard");
       await waitFor(() => expect(dash.props.user).toBeTruthy());
 
-      act(() => dash.props.submitMealLog({ preventDefault() {} }));
+      // Awaited: submitMealLog is async, and an act scope left open holds back
+      // every render in the tests after this one.
+      await act(async () => dash.props.submitMealLog({ preventDefault() {} }));
       await act(async () => {
         await dash.props.onLogout();
       });
 
       expect(posts).toEqual(["/api/dashboard/meal-logs", "/api/auth/logout"]);
+    });
+  });
+
+  describe("the dashboard's pagination", () => {
+    test("is handed from the dashboard response to the dashboard page", async () => {
+      const pagination = { mealLogs: { total: 120 } };
+      stubSession(async (url) => ({
+        ok: true,
+        json: async () =>
+          String(url).startsWith("/api/dashboard")
+            ? { dashboard: { mealLogs: [] }, pagination }
+            : { user: { email: "ada@example.com" } }
+      }));
+
+      await renderSettled("/dashboard");
+
+      await waitFor(() => expect(dash.props.dashboardPagination).toEqual(pagination));
     });
   });
 });

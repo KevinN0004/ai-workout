@@ -4,6 +4,7 @@
  */
 import { useMemo, useState } from "react";
 import { getLocalDateKey } from "../../../app/units";
+import useOlderLogPages from "../hooks/useOlderLogPages";
 import "./WorkoutsView.css";
 
 const INITIAL_VISIBLE_ROWS = 40;
@@ -24,18 +25,29 @@ const toSortTime = (value) => {
 const sortByDateDesc = (items) =>
   [...items].sort((a, b) => toSortTime(b?.date) - toSortTime(a?.date));
 
+// The dashboard's rows, then each fetched row whose id it does not already
+// hold: useOlderLogPages' list starts with a copy of the dashboard's page.
+const mergeById = (held, older) => {
+  const heldIds = new Set(held.map((item) => item?.id));
+  return [...held, ...older.filter((item) => !heldIds.has(item?.id))];
+};
+
 /**
  * The four lists arrive deduplicated from useDashboardMetrics. Each shows
- * INITIAL_VISIBLE_ROWS and grows by ROW_BATCH_SIZE on "Show more", over rows the
- * dashboard already holds; nothing is fetched here. Both Add workout buttons set
- * the workout form's date to today and open the Log workout modal; the other
- * empty states link to the view where that log is entered.
+ * INITIAL_VISIBLE_ROWS and grows by ROW_BATCH_SIZE on "Show more". Workouts and
+ * calories page over rows the dashboard already holds. Meal logs and metrics
+ * do too, and once those run out "Show more" also fetches the next page
+ * (useOlderLogPages), for as long as `pagination`, the dashboard response's,
+ * says the server holds more. Both Add workout buttons set the workout form's
+ * date to today and open the Log workout modal; the other empty states link to
+ * the view where that log is entered.
  */
 export default function WorkoutsView({
   workouts,
   calories,
   mealLogs,
   progressMetrics,
+  pagination,
   setWorkoutForm,
   setWorkoutModalOpen,
   onOpenCalories,
@@ -49,6 +61,26 @@ export default function WorkoutsView({
     progress: INITIAL_VISIBLE_ROWS
   });
 
+  // Meal logs and metrics past the dashboard's first page come from their
+  // paged routes, a page at a time, once the rows the dashboard holds run out.
+  const heldMealLogs = useMemo(() => (Array.isArray(mealLogs) ? mealLogs : []), [mealLogs]);
+  const heldProgressMetrics = useMemo(
+    () => (Array.isArray(progressMetrics) ? progressMetrics : []),
+    [progressMetrics]
+  );
+  const olderMeals = useOlderLogPages({
+    path: "/api/dashboard/meal-logs",
+    collection: "mealLogs",
+    heldItems: heldMealLogs,
+    total: pagination?.mealLogs?.total
+  });
+  const olderMetrics = useOlderLogPages({
+    path: "/api/dashboard/progress-metrics",
+    collection: "progressMetrics",
+    heldItems: heldProgressMetrics,
+    total: pagination?.progressMetrics?.total
+  });
+
   const workoutLogs = useMemo(
     () => sortByDateDesc(Array.isArray(workouts) ? workouts : []),
     [workouts]
@@ -58,12 +90,12 @@ export default function WorkoutsView({
     [calories]
   );
   const mealLogItems = useMemo(
-    () => sortByDateDesc(Array.isArray(mealLogs) ? mealLogs : []),
-    [mealLogs]
+    () => sortByDateDesc(mergeById(heldMealLogs, olderMeals.items)),
+    [heldMealLogs, olderMeals.items]
   );
   const progressLogs = useMemo(
-    () => sortByDateDesc(Array.isArray(progressMetrics) ? progressMetrics : []),
-    [progressMetrics]
+    () => sortByDateDesc(mergeById(heldProgressMetrics, olderMetrics.items)),
+    [heldProgressMetrics, olderMetrics.items]
   );
 
   const visibleWorkoutLogs = useMemo(
@@ -85,6 +117,13 @@ export default function WorkoutsView({
 
   const expandRows = (key) => {
     setVisibleRows((prev) => ({ ...prev, [key]: prev[key] + ROW_BATCH_SIZE }));
+  };
+
+  // The next batch of rows. Once every row held is on screen it fetches the
+  // next page as well, and the batch fills in when the page arrives.
+  const showMore = (key, rows, older) => {
+    if (rows.length <= visibleRows[key]) older.loadMore();
+    expandRows(key);
   };
 
   // ---- Render ---------------------------------------------------------------
@@ -232,10 +271,20 @@ export default function WorkoutsView({
                 </button>
               </div>
             )}
-            {mealLogItems.length > visibleRows.meals && (
-              <button type="button" className="ghost" onClick={() => expandRows("meals")}>
+            {(mealLogItems.length > visibleRows.meals || olderMeals.hasMore) && (
+              <button
+                type="button"
+                className="ghost"
+                disabled={olderMeals.loading}
+                onClick={() => showMore("meals", mealLogItems, olderMeals)}
+              >
                 Show more meals
               </button>
+            )}
+            {olderMeals.error && (
+              <p className="muted" role="alert">
+                {olderMeals.error}
+              </p>
             )}
           </div>
         </section>
@@ -267,10 +316,20 @@ export default function WorkoutsView({
                 </button>
               </div>
             )}
-            {progressLogs.length > visibleRows.progress && (
-              <button type="button" className="ghost" onClick={() => expandRows("progress")}>
+            {(progressLogs.length > visibleRows.progress || olderMetrics.hasMore) && (
+              <button
+                type="button"
+                className="ghost"
+                disabled={olderMetrics.loading}
+                onClick={() => showMore("progress", progressLogs, olderMetrics)}
+              >
                 Show more metrics
               </button>
+            )}
+            {olderMetrics.error && (
+              <p className="muted" role="alert">
+                {olderMetrics.error}
+              </p>
             )}
           </div>
         </section>

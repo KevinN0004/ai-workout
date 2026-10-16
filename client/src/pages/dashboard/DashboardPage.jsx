@@ -58,7 +58,8 @@ const DASH_VIEW_ORDER = [
 /**
  * Lays the dashboard out around the view App's `dashView` names; every view but
  * the summary loads lazily. Its data and handlers are App's: the dashboard and
- * the weather and air-quality readings (useDashboardData), the forms, and the
+ * the weather and air-quality readings and the dashboard's pagination totals
+ * (useDashboardData), the forms, and the
  * events.js handlers. The page derives its numbers through useDashboardMetrics
  * and keeps only the profile menu's state. Signed out, it renders the header
  * alone, which offers sign-in.
@@ -79,6 +80,7 @@ export default function DashboardPage({
   setDashNavOpen,
   dashLoading,
   dashError,
+  dashboardPagination,
   workoutModalOpen,
   setWorkoutModalOpen,
   workoutForm,
@@ -297,6 +299,7 @@ export default function DashboardPage({
             calories={calories}
             mealLogs={mealLogs}
             progressMetrics={progressMetrics}
+            pagination={dashboardPagination}
             setWorkoutForm={setWorkoutForm}
             setWorkoutModalOpen={setWorkoutModalOpen}
             onOpenCalories={() => navigateDashView("calories")}

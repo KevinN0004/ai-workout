@@ -538,6 +538,15 @@ describe("DashboardPage", () => {
 
       expect(await screen.findByTestId("summary-view")).toBeInTheDocument();
     });
+
+    test("the Logs view gets the dashboard's pagination", async () => {
+      const dashboardPagination = { mealLogs: { total: 120 } };
+      renderPage({ dashView: "workouts", dashboardPagination });
+
+      await screen.findByTestId("workouts-view");
+
+      expect(workoutsView.props.pagination).toBe(dashboardPagination);
+    });
   });
 
   describe("navigating from the drawer and the bottom bar", () => {
