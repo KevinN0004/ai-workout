@@ -51,11 +51,10 @@
 }
 
 /* ---- Narrow screens ------------------------------------------------------ */
-/* The personal form's one-column rule never applies: in basic mode styles/base.css's .form
-   ties it and loads later (its auto-fit still drops to one column on the narrowest screens),
-   and in advanced mode forms-and-motion.css's two-column rule is more specific, so the fields
-   this block puts in column 1 fill half the form. .header-top, .header-left and .auth-actions
-   match nothing. */
+/* The personal stage's form goes to one column in both modes. Its selector names the stage,
+   to outrank styles/base.css's .form (which ties .personal-form and loads later) and
+   forms-and-motion.css's two-column advanced-mode rule. The walkthrough's copy of the form
+   keeps its two columns. .header-top, .header-left and .auth-actions match nothing. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -151,7 +150,7 @@
     justify-content: center;
   }
 
-  .personal-form {
+  .home-stage-personal .personal-form {
     grid-template-columns: 1fr;
   }
 
