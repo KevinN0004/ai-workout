@@ -1,5 +1,5 @@
 /* DashboardHomeView, the view at /dashboard/home, which no nav item lists: one panel with a
-   back-btn to "/". Imported by the view, so it loads in the view's lazy chunk. */
+   back-btn to /dashboard. Imported by the view, so it loads in the view's lazy chunk. */
 
 .dashboard-home-view {
   width: 100%;
