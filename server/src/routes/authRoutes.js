@@ -133,6 +133,9 @@ export const registerAuthRoutes = (app, deps) => {
       await createUser(newUser);
       const token = await createSession(newUser.id);
       setSessionCookie(res, token, rememberMe);
+      // A new CSRF token replaces the one the browser held while signed out.
+      // useApiClient reads this cookie before every write, so the client's
+      // next request sends the new token.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
       res.json({
         user: {
@@ -189,6 +192,7 @@ export const registerAuthRoutes = (app, deps) => {
       // createSession has stored the session.
       const token = await createSession(user.id);
       setSessionCookie(res, token, rememberMe);
+      // Replaces the signed-out CSRF token, as signup does.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
       res.json({
         user: {
