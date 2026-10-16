@@ -161,14 +161,15 @@
   text-wrap: balance;
 }
 
-/* Keeps .dashboard-workout-grid's twelve columns. The metrics grid inside it sets no
-   grid-column, so it takes one of them until responsive.css makes both one column. */
+/* Keeps .dashboard-workout-grid's twelve columns; the exercises field spans them all, and
+   so does the metrics grid inside it. */
 .dashboard-workout-grid-exercise {
   display: grid;
   gap: 12px;
 }
 
 .dashboard-workout-grid-metrics {
+  grid-column: 1 / -1;
   grid-template-columns: minmax(72px, 0.8fr) minmax(72px, 0.8fr) minmax(150px, 1.4fr);
   gap: 10px 12px;
   align-items: end;
