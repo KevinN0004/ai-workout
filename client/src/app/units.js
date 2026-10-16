@@ -27,20 +27,18 @@ export const splitFullName = (nameValue) => {
 
 /**
  * The region of a locale tag, upper-cased ("en-US" and "en_us" both give "US"),
- * or "" when there is none. It takes the second subtag when there is one, so it
- * assumes language-REGION; a bare language is asked of Intl.Locale.
+ * or "" when there is none. Intl.Locale reads the tag, so a script subtag is not
+ * taken for the region ("zh-Hant-TW" gives "TW"). A tag it cannot parse falls
+ * back to its second subtag.
  */
 export const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
-  const localeParts = locale.split(/[-_]/).filter(Boolean);
-  if (localeParts.length > 1 && localeParts[1]) {
-    return localeParts[1].toUpperCase();
-  }
   try {
-    const parsed = new Intl.Locale(locale);
-    return parsed.region ? parsed.region.toUpperCase() : "";
+    // Intl.Locale takes hyphens only, and returns the region upper-cased.
+    return new Intl.Locale(locale.replace(/_/g, "-")).region || "";
   } catch {
-    return "";
+    const localeParts = locale.split(/[-_]/).filter(Boolean);
+    return localeParts.length > 1 ? localeParts[1].toUpperCase() : "";
   }
 };
 
