@@ -392,7 +392,7 @@ describe("when Redis fails after connecting", () => {
     expect(fakeRedis.del).not.toHaveBeenCalled();
   });
 
-  test("a failed read of junk still refuses rather than returning nobody", async () => {
+  test("a failed delete of junk after a successful read still refuses", async () => {
     const { service } = await connected();
     fakeRedis.store.set("session:sid:junk", "{not json");
     fakeRedis.del = failing();
@@ -425,6 +425,24 @@ describe("when Redis fails after connecting", () => {
     await expect(service.getSessionUser(req("any"))).rejects.toThrow();
 
     expect(service.getRedisLastError()).toBe("socket gone");
+  });
+
+  // node-redis's TimeoutError, which a command gets when it cannot reach the
+  // socket in time, has no message. Its class name is the useful text.
+  test("records an Error with no message by its class name", async () => {
+    class TimeoutError extends Error {}
+    const { service } = await connected();
+    fakeRedis.get = vi.fn(async () => {
+      throw new TimeoutError();
+    });
+
+    await expect(service.getSessionUser(req("any"))).rejects.toThrow();
+
+    expect(service.getRedisLastError()).toBe("TimeoutError");
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "redis_session_get_failed", error: "TimeoutError" }),
+      expect.any(String)
+    );
   });
 
   test("requireAuth answers 503, not 401, when the read fails", async () => {

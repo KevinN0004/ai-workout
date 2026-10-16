@@ -245,8 +245,27 @@ export const registerAuthRoutes = (app, deps) => {
       // rejected by getSessionUser. This device would be too, so it gets a
       // fresh token -- minted after the stamp, and compared with a strict `<`,
       // so it survives even in the same millisecond.
+      //
+      // The new password is stored by now. Deleting the old token only tidies
+      // up, since passwordChangedAt already rejects it, so a failure there is
+      // logged and the change goes on. A failure to create the replacement
+      // session still answers 503: the password has changed, but this device
+      // holds no valid session and signs in again with the new password, as
+      // a sign-up does when its session cannot be stored.
       const previousToken = parseCookies(req.headers.cookie || "").sid;
-      if (previousToken) await deleteSession(previousToken);
+      if (previousToken) {
+        try {
+          await deleteSession(previousToken);
+        } catch (deleteErr) {
+          req.log?.error(
+            {
+              event: "previous_session_delete_failed",
+              error: toShortText(String(deleteErr), 240)
+            },
+            "Old session delete failed after a password change. Continuing."
+          );
+        }
+      }
       const token = await createSession(req.user.id);
       // rememberMe is not recoverable from the old session, which stores only
       // userId and createdAt. Defaulting to true matches signup and login.
@@ -273,10 +292,14 @@ export const registerAuthRoutes = (app, deps) => {
       // removes every row the user owns along with the account.
       await deleteUser({ userId: req.user.id });
 
+      // The cookies are cleared before the session delete, as in logout, so a
+      // browser whose account is gone is signed out even when that delete
+      // fails. The failure still answers 503: the session stays in the store
+      // until it expires, though it names a user that no longer exists.
       const token = parseCookies(req.headers.cookie || "").sid;
-      if (token) await deleteSession(token);
       clearSessionCookie(res);
       clearCsrfCookie(res);
+      if (token) await deleteSession(token);
 
       res.json({ ok: true });
     } catch (err) {

@@ -869,6 +869,31 @@ describe("POST /api/auth/password", () => {
     expect(response.status).toBe(503);
   });
 
+  // The new password is already stored, and passwordChangedAt already
+  // invalidates the old session, so a failure to delete the old token is
+  // logged and the change goes on to issue the replacement session.
+  test("still issues the new session when the old one cannot be deleted", async () => {
+    const app = passwordApp();
+    const cookie = await signUpAndGetCookie(app);
+    deps.deleteSession.mockRejectedValueOnce(storeDown());
+
+    const response = await request(app)
+      .post("/api/auth/password")
+      .set("Cookie", cookie)
+      .send({ currentPassword: signupBody().password, newPassword: "BrandNewPass456!" });
+
+    expect(response.status).toBe(200);
+    expect(cookieCalls.session).toHaveLength(2);
+    expect(`sid=${cookieCalls.session[1].token}`).not.toBe(cookie);
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "previous_session_delete_failed",
+        error: expect.stringContaining("Session store unavailable")
+      }),
+      expect.any(String)
+    );
+  });
+
   test("does not leak whether the failure was the password or the session", async () => {
     // A 401 for a wrong current password must not be distinguishable in body
     // text from any other 401 in a way that helps an attacker who has stolen
@@ -997,8 +1022,17 @@ describe("DELETE /api/auth/me", () => {
     await request(app).delete("/api/auth/me").send({ password: "whatever" }).expect(401);
   });
 
-  test("answers 503 when the session store cannot drop the session", async () => {
-    const app = deleteApp({ deleteUser: async () => true });
+  // The account is already gone when the session delete runs, so this browser
+  // must be signed out whatever the store says. The 503 reports only that the
+  // session itself could not be ended.
+  test("answers 503, and still clears both cookies, when the store cannot drop the session", async () => {
+    const app = deleteApp({
+      deleteUser: async ({ userId }) => {
+        const index = rows.findIndex((row) => row.userId === userId);
+        if (index >= 0) rows.splice(index, 1);
+        return true;
+      }
+    });
     const cookie = await signUpAndGetCookie(app);
     deps.deleteSession.mockRejectedValueOnce(storeDown());
 
@@ -1008,6 +1042,9 @@ describe("DELETE /api/auth/me", () => {
       .send({ password: signupBody().password });
 
     expect(response.status).toBe(503);
+    expect(cookieCalls.clearedSession).toBe(1);
+    expect(cookieCalls.clearedCsrf).toBe(1);
+    expect(rows).toHaveLength(0);
   });
 
   // cookieCalls is not an array of call names -- see the shared beforeEach

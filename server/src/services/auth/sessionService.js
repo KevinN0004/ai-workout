@@ -11,7 +11,9 @@ import { sendErrorResponse } from "../http/errorResponseService.js";
 // How long a Redis command may wait to reach the socket, in ms. node-redis
 // queues commands while it reconnects and its own limit is 5 s, so without this
 // a sign-in during an outage waits that long for its 503. 1.5 s still rides out
-// the immediate reconnect that follows a dropped connection.
+// the immediate reconnect that follows a dropped connection. It is set on the
+// client, so the rate-limit store and the HTTP cache, which share this client,
+// get it too; both check isReady before using it.
 const REDIS_COMMAND_TIMEOUT_MS = 1500;
 
 /**
@@ -134,6 +136,10 @@ export const createSessionService = ({
   let redisSessionsEnabled = false;
   let redisConfigured = false;
   let redisLastError = "";
+  // The text kept and logged for a Redis failure. node-redis's TimeoutError
+  // has no message, so an Error without one is named by its class.
+  const redisErrorText = (err) =>
+    cleanText(err instanceof Error ? err.message || err.constructor.name : String(err), 260);
   // node-redis retries a failed connection forever by default, which leaves the
   // initial connect() pending and stops the process from ever reaching listen().
   // Retries stay bounded until startup settles, then revert to open-ended backoff
@@ -191,7 +197,7 @@ export const createSessionService = ({
       redisLastError = "";
       return result;
     } catch (err) {
-      redisLastError = cleanText(err?.message || String(err), 260);
+      redisLastError = redisErrorText(err);
       logger.error({ event, error: redisLastError }, message);
       throw new SessionStoreUnavailableError(err);
     }
@@ -257,7 +263,7 @@ export const createSessionService = ({
         : createClient({ ...clientOptions, url: redisUrl, socket: socketOptions });
 
       client.on("error", (err) => {
-        redisLastError = cleanText(err?.message || String(err), 260);
+        redisLastError = redisErrorText(err);
         logger.error(
           { event: "redis_session_store_error", error: redisLastError },
           "Redis session store error."
@@ -278,7 +284,7 @@ export const createSessionService = ({
       logger.info({ event: "redis_connected" }, "Redis session store connected.");
     } catch (err) {
       redisStartupSettled = true;
-      redisLastError = cleanText(err?.message || String(err), 260);
+      redisLastError = redisErrorText(err);
       logger.error(
         {
           event: "redis_connect_failed",
