@@ -77,8 +77,8 @@ export default function DashboardWorkoutModal({
                     <span className="dashboard-workout-label">Duration (minutes)</span>
                     <input
                       type="number"
-                      min="10"
-                      max="180"
+                      min="5"
+                      max="360"
                       value={workoutForm.duration}
                       onChange={(e) =>
                         setWorkoutForm((prev) => ({
