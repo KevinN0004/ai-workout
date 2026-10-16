@@ -39,6 +39,8 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     setDashboardToast(null);
   }, []);
 
+  // Returns the new toast's id, which a queued entry keeps so that its send
+  // can tell whether the toast on screen is still its own.
   const showDashboardToast = useCallback((message, tone = "success", options = {}) => {
     if (!message) return;
     if (dashboardToastTimeoutRef.current) {
@@ -64,6 +66,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
       dashboardToastTimeoutRef.current = null;
     }, timeoutMs);
+    return nextToast.id;
   }, []);
 
   // On unmount only: a toast timer still pending is cleared, not left to fire.
@@ -154,8 +157,15 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       const commit = async () => {
         const operation = optimisticOpRef.current.get(operationId);
         if (!operation) return;
-        // From here undo is refused: the request is on its way.
+        // From here undo is refused: the request is on its way. So the toast
+        // stops offering it, if the toast is still this entry's: a newer
+        // entry's Undo is left. Its id stays, so its own timer still clears it.
         operation.committing = true;
+        setDashboardToast((current) =>
+          current?.id === operation.undoToastId
+            ? { ...current, message: "Saving...", actionLabel: "", onAction: null }
+            : current
+        );
         try {
           const data = await request();
           if (!isSameAccount()) return;
@@ -183,7 +193,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       };
       queued.timerId = setTimeout(queued.send, OPTIMISTIC_UNDO_WINDOW_MS);
       optimisticOpRef.current.set(operationId, queued);
-      showDashboardToast(pendingMessage || "Saved locally.", "success", {
+      queued.undoToastId = showDashboardToast(pendingMessage || "Saved locally.", "success", {
         actionLabel: "Undo",
         onAction: () => {
           undoOptimisticOperation(operationId, { showToast: true });
