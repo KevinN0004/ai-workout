@@ -62,10 +62,29 @@ describe("getRegionFromLocale", () => {
     expect(getRegionFromLocale(locale)).toBe(expected);
   });
 
-  // A bare language has no region in the tag, so it falls through to Intl,
-  // which does not invent one either.
+  // A bare language has no region, and Intl.Locale does not invent one.
   test("returns nothing for a bare language", () => {
     expect(getRegionFromLocale("en")).toBe("");
+  });
+
+  // A script subtag sits between the language and the region, so the second
+  // subtag is not always the region.
+  test.each([
+    ["zh-Hant-TW", "TW"],
+    ["en-Latn-US", "US"],
+    ["sr-Latn-RS", "RS"]
+  ])("reads the region, not the script, out of %s", (locale, expected) => {
+    expect(getRegionFromLocale(locale)).toBe(expected);
+  });
+
+  test("a script with no region gives no region", () => {
+    expect(getRegionFromLocale("zh-Hant")).toBe("");
+  });
+
+  // Intl.Locale refuses a doubled separator; the fallback still reads the
+  // second subtag, as before.
+  test("a tag Intl.Locale cannot parse falls back to its second subtag", () => {
+    expect(getRegionFromLocale("en--us")).toBe("US");
   });
 
   test.each([
@@ -92,6 +111,12 @@ describe("getPreferredMeasurementSystem", () => {
   // The three countries that do not use metric for body measurements.
   test.each(["en-US", "en-LR", "my-MM"])("chooses imperial for %s", (locale) => {
     withLanguages([locale]);
+
+    expect(getPreferredMeasurementSystem()).toBe("imperial");
+  });
+
+  test("chooses imperial for a US locale that names its script", () => {
+    withLanguages(["en-Latn-US"]);
 
     expect(getPreferredMeasurementSystem()).toBe("imperial");
   });
