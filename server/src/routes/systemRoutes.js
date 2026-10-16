@@ -62,6 +62,14 @@ export const registerSystemRoutes = (app, deps) => {
     // isOpen stays true while the client is merely reconnecting; isReady is only
     // true when the connection can actually serve commands.
     const redisConnected = redisSessionsEnabled() && Boolean(redisClient()?.isReady);
+    // "unavailable" while Redis is the store but cannot serve commands: sessions
+    // then answer 503 rather than fall back. Memory holds them only when Redis
+    // was never configured or did not connect at startup.
+    const redisMode = redisConnected
+      ? "redis"
+      : redisSessionsEnabled()
+        ? "unavailable"
+        : "in_memory_fallback";
     const postgresStatus = postgresStatusRef?.() || {
       configured: false,
       connected: false,
@@ -96,7 +104,7 @@ export const registerSystemRoutes = (app, deps) => {
         redis: {
           configured: redisConfigured(),
           connected: redisConnected,
-          mode: redisConnected ? "redis" : "in_memory_fallback"
+          mode: redisMode
         },
         errorTracking: {
           configured: errorTrackingConfigured(),

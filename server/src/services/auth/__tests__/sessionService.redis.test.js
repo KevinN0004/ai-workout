@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { createSessionService } from "../sessionService.js";
+import { createSessionService, SessionStoreUnavailableError } from "../sessionService.js";
 
 // The Redis-backed session paths. Reaching them needs the redis module mocked
-// rather than a dependency injected, which is why they were the last part of
-// sessionService left uncovered.
+// rather than a dependency injected; the fake below is a node-redis lookalike.
 //
-// The behaviour worth having is the fallback. Redis holds sessions when it is
-// up, but a blip must not cost anyone their sign-in: every operation catches,
-// records the error, and carries on against the in-memory map.
+// The behaviour worth having is failing closed. While Redis is the store, a
+// failed command records the error and throws SessionStoreUnavailableError,
+// which the routes answer with a 503. Nothing falls back to memory, so no
+// session exists that only one process can read, and a caller whose session
+// could not be checked is never told it does not exist.
 
 const createClient = vi.fn();
 vi.mock("redis", () => ({ createClient: (...args) => createClient(...args) }));
@@ -71,6 +72,29 @@ const connected = async (serviceOverrides = {}, env = { REDIS_URL: "redis://loca
 
 const req = (token) => ({ headers: { cookie: `sid=${token}` } });
 
+// Just enough of an express response for requireAuth.
+const buildRes = () => {
+  const res = {
+    statusCode: null,
+    body: null,
+    status: vi.fn((code) => {
+      res.statusCode = code;
+      return res;
+    }),
+    json: vi.fn((payload) => {
+      res.body = payload;
+      return res;
+    })
+  };
+  return res;
+};
+
+// Makes one fake command fail the way a dropped connection does.
+const failing = (message = "redis is on fire") =>
+  vi.fn(async () => {
+    throw new Error(message);
+  });
+
 beforeEach(() => {
   logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   findUserById = vi.fn(async (userId) => ({ id: userId }));
@@ -131,6 +155,18 @@ describe("connecting", () => {
     await connected({}, env);
 
     expect(createClient.mock.calls[0][0].RESP).toBe(2);
+  });
+
+  // node-redis queues a command while it reconnects and fails it only after
+  // its own 5 s default, so a sign-in during an outage would hang that long
+  // before its 503. Both configuration shapes get the shorter limit.
+  test.each([
+    ["a url", { REDIS_URL: "redis://localhost:6379" }],
+    ["a host and port", { REDIS_HOST: "cache.internal", REDIS_PORT: "6380" }]
+  ])("gives every command a 1.5 s timeout when configured with %s", async (_label, env) => {
+    await connected({}, env);
+
+    expect(createClient.mock.calls[0][0].commandOptions).toEqual({ timeout: 1500 });
   });
 
   test("sends no password when none was configured", async () => {
@@ -194,6 +230,38 @@ describe("connecting", () => {
   });
 });
 
+// Recovery after an outage is node-redis's reconnect loop, driven by this
+// strategy; /api/ready reads the client's live state, so it reports "redis"
+// again as soon as a reconnect succeeds. node-redis 6.3 asks the strategy with
+// retries 0 when a ready socket drops, reconnects at once, then passes 1, 2,
+// 3... for each failed attempt.
+describe("reconnecting", () => {
+  const strategyOf = () => createClient.mock.calls[0][0].socket.reconnectStrategy;
+
+  test("after startup, never gives up, doubling from 1 s to a 30 s cap", async () => {
+    await connected();
+
+    const waits = [1, 2, 3, 4, 5, 6, 50].map((retries) => strategyOf()(retries));
+
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+  });
+
+  // Before startup settles the strategy is bounded, so a Redis that is down at
+  // boot cannot hold the server back from listen(): it returns an Error after
+  // five retries, which ends connect().
+  test("during startup, gives up after five retries", async () => {
+    let waits = [];
+    fakeRedis.connect = vi.fn(async () => {
+      waits = [0, 1, 4, 5].map((retries) => strategyOf()(retries));
+    });
+
+    await connected();
+
+    expect(waits.slice(0, 3)).toEqual([100, 200, 1000]);
+    expect(waits[3]).toBeInstanceOf(Error);
+  });
+});
+
 describe("sessions in Redis", () => {
   test("writes the session under the prefixed key with a ttl", async () => {
     const { service } = await connected();
@@ -254,63 +322,36 @@ describe("sessions in Redis", () => {
   });
 });
 
-// The reason the fallback exists: Redis going away mid-request must not sign
-// anyone out or stop new sign-ins.
+// A command failing while Redis is the store: the session operation refuses
+// with a 503 rather than inventing an answer, and leaves nothing in memory.
 describe("when Redis fails after connecting", () => {
-  test("a failed write still returns a token rather than throwing", async () => {
+  test("a failed write refuses the session rather than returning a token", async () => {
     const { service } = await connected();
-    fakeRedis.set = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
+    fakeRedis.set = failing();
 
-    const token = await service.createSession("u-1");
-
-    expect(token).toMatch(/^[0-9a-f]{48}$/);
+    await expect(service.createSession("u-1")).rejects.toBeInstanceOf(SessionStoreUnavailableError);
     expect(service.getRedisLastError()).toMatch(/redis is on fire/);
   });
 
-  // Recorded as it behaves, because the shape is surprising. createSession
-  // falls back to the in-memory map when the Redis write fails, but
-  // getSessionByToken consults only Redis while Redis is enabled -- a miss
-  // returns null and memory is never checked. So the session written during
-  // the blip cannot be read back, and the user is signed out on their next
-  // request. The fallback write is unreachable by any read until Redis is
-  // disabled entirely.
-  test("a session written during a blip cannot be read back", async () => {
+  // The token the failed write would have used resolves to nobody even after
+  // closeSessionStore switches the service to its in-memory map, so nothing was
+  // written there either.
+  test("a failed write leaves no session in memory", async () => {
     const { service } = await connected();
-    fakeRedis.set = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
-    const token = await service.createSession("u-1");
+    fakeRedis.set = failing();
+    await expect(service.createSession("u-1")).rejects.toThrow();
+    const token = fakeRedis.set.mock.calls[0][0].slice("session:sid:".length);
 
-    expect(await service.getSessionUser(req(token))).toBeNull();
-  });
-
-  // The other half of the same asymmetry: sign-out returns after the Redis
-  // delete, so the memory entry is never removed either.
-  test("signing out does not clear the entry that blip left in memory", async () => {
-    const { service } = await connected();
-    fakeRedis.set = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
-    const token = await service.createSession("u-1");
-
-    await service.deleteSession(token);
-    // Still invisible while Redis is up...
-    expect(await service.getSessionUser(req(token))).toBeNull();
-
-    // ...but it is still in the map, so closing Redis brings it back.
     await service.closeSessionStore();
-    expect(await service.getSessionUser(req(token))).toMatchObject({ id: "u-1" });
+
+    expect(await service.getSessionUser(req(token))).toBeNull();
   });
 
   test("a failed write is reported to an operator", async () => {
     const { service } = await connected();
-    fakeRedis.set = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
+    fakeRedis.set = failing();
 
-    await service.createSession("u-1");
+    await expect(service.createSession("u-1")).rejects.toThrow();
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ event: "redis_session_create_failed" }),
@@ -318,72 +359,121 @@ describe("when Redis fails after connecting", () => {
     );
   });
 
-  test("a failed read resolves to nobody rather than throwing", async () => {
+  test("the error carries status 503 and the Redis failure as its cause", async () => {
+    const { service } = await connected();
+    fakeRedis.set = failing();
+
+    const err = await service.createSession("u-1").catch((caught) => caught);
+
+    expect(err.status).toBe(503);
+    expect(err.cause.message).toBe("redis is on fire");
+  });
+
+  test("a failed read rejects rather than resolving to nobody", async () => {
     const { service } = await connected();
     const token = await service.createSession("u-1");
-    fakeRedis.get = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
+    fakeRedis.get = failing();
 
-    await expect(service.getSessionUser(req(token))).resolves.toBeNull();
+    await expect(service.getSessionUser(req(token))).rejects.toBeInstanceOf(
+      SessionStoreUnavailableError
+    );
     expect(service.getRedisLastError()).toMatch(/redis is on fire/);
   });
 
-  test("a failed read still tries to clear the key", async () => {
+  // A delete after a failed read would wait out its own timeout during the
+  // same outage, and could not remove anything the failed read could not see.
+  test("a failed read issues no cleanup delete", async () => {
     const { service } = await connected();
     const token = await service.createSession("u-1");
-    fakeRedis.get = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
+    fakeRedis.get = failing();
 
-    await service.getSessionUser(req(token));
+    await expect(service.getSessionUser(req(token))).rejects.toThrow();
 
-    expect(fakeRedis.del).toHaveBeenCalledWith(`session:sid:${token}`);
+    expect(fakeRedis.del).not.toHaveBeenCalled();
   });
 
-  // The cleanup is best-effort; failing it must not turn a failed read into a
-  // thrown request.
-  test("survives the cleanup failing too", async () => {
+  test("a failed delete of junk after a successful read still refuses", async () => {
     const { service } = await connected();
-    const token = await service.createSession("u-1");
-    fakeRedis.get = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
-    fakeRedis.del = vi.fn(async () => {
-      throw new Error("still on fire");
-    });
+    fakeRedis.store.set("session:sid:junk", "{not json");
+    fakeRedis.del = failing();
 
-    await expect(service.getSessionUser(req(token))).resolves.toBeNull();
+    await expect(service.getSessionUser(req("junk"))).rejects.toBeInstanceOf(
+      SessionStoreUnavailableError
+    );
   });
 
-  test("a failed delete is recorded rather than thrown", async () => {
+  test("a failed delete rejects, so sign-out can report it", async () => {
     const { service } = await connected();
     const token = await service.createSession("u-1");
-    fakeRedis.del = vi.fn(async () => {
-      throw new Error("redis is on fire");
-    });
+    fakeRedis.del = failing();
 
-    await expect(service.deleteSession(token)).resolves.toBeUndefined();
+    await expect(service.deleteSession(token)).rejects.toBeInstanceOf(SessionStoreUnavailableError);
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ event: "redis_session_delete_failed" }),
       expect.any(String)
     );
   });
 
-  // A success after a failure clears the recorded error, so the status does
-  // not keep reporting a problem that has passed.
-  test("a later success clears the recorded error", async () => {
+  // node-redis rejects with Error objects, but the recorded text must not
+  // depend on that.
+  test("records a rejection that is not an Error as its text", async () => {
     const { service } = await connected();
-    fakeRedis.set = vi.fn(async () => {
-      throw new Error("redis is on fire");
+    fakeRedis.get = vi.fn(async () => {
+      throw "socket gone";
     });
-    await service.createSession("u-1");
+
+    await expect(service.getSessionUser(req("any"))).rejects.toThrow();
+
+    expect(service.getRedisLastError()).toBe("socket gone");
+  });
+
+  // node-redis's TimeoutError, which a command gets when it cannot reach the
+  // socket in time, has no message. Its class name is the useful text.
+  test("records an Error with no message by its class name", async () => {
+    class TimeoutError extends Error {}
+    const { service } = await connected();
+    fakeRedis.get = vi.fn(async () => {
+      throw new TimeoutError();
+    });
+
+    await expect(service.getSessionUser(req("any"))).rejects.toThrow();
+
+    expect(service.getRedisLastError()).toBe("TimeoutError");
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "redis_session_get_failed", error: "TimeoutError" }),
+      expect.any(String)
+    );
+  });
+
+  test("requireAuth answers 503, not 401, when the read fails", async () => {
+    const { service } = await connected();
+    const token = await service.createSession("u-1");
+    fakeRedis.get = failing();
+    const res = buildRes();
+    const next = vi.fn();
+
+    await service.requireAuth({ ...req(token), log: { error: vi.fn() } }, res, next);
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.stringify(res.body)).not.toMatch(/on fire/);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // A success after a failure clears the recorded error, so the status does
+  // not keep reporting a problem that has passed, and the next sign-in is
+  // stored in Redis as normal.
+  test("a later success clears the recorded error and stores the session", async () => {
+    const { service } = await connected();
+    const working = fakeRedis.set;
+    fakeRedis.set = failing();
+    await expect(service.createSession("u-1")).rejects.toThrow();
     expect(service.getRedisLastError()).toBeTruthy();
 
-    fakeRedis.set = vi.fn(async () => "OK");
-    await service.createSession("u-2");
+    fakeRedis.set = working;
+    const token = await service.createSession("u-2");
 
     expect(service.getRedisLastError()).toBe("");
+    expect(await service.getSessionUser(req(token))).toMatchObject({ id: "u-2" });
   });
 });
 

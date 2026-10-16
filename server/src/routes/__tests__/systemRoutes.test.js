@@ -96,6 +96,70 @@ describe("GET /api/metrics", () => {
   });
 });
 
+describe("GET /api/ready reports which store sessions are using", () => {
+  const readyWith = (overrides) =>
+    request(buildApp({ redisConfigured: () => true, ...overrides })).get("/api/ready");
+
+  test("redis while its client can serve commands", async () => {
+    const response = await readyWith({
+      redisSessionsEnabled: () => true,
+      redisClient: () => ({ isReady: true })
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.dependencies.redis).toEqual({
+      configured: true,
+      connected: true,
+      mode: "redis"
+    });
+  });
+
+  // Sessions answer 503 while the client reconnects. They do not fall back to
+  // memory, so the mode must not say they do.
+  test("unavailable while Redis is the store but its client is reconnecting", async () => {
+    const response = await readyWith({
+      redisSessionsEnabled: () => true,
+      redisClient: () => ({ isReady: false })
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.body.dependencies.redis).toEqual({
+      configured: true,
+      connected: false,
+      mode: "unavailable"
+    });
+  });
+
+  test("in_memory_fallback when Redis failed to connect at startup", async () => {
+    const response = await readyWith({
+      redisSessionsEnabled: () => false,
+      redisClient: () => null
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.body.dependencies.redis.mode).toBe("in_memory_fallback");
+  });
+
+  // Recovery is node-redis's own reconnect loop. Readiness reads the client's
+  // state on every request, so it follows a reconnect without a restart.
+  test("reports redis again on the next request once the client is ready", async () => {
+    const client = { isReady: false };
+    const app = buildApp({
+      redisConfigured: () => true,
+      redisSessionsEnabled: () => true,
+      redisClient: () => client
+    });
+    const during = await request(app).get("/api/ready");
+
+    client.isReady = true;
+    const after = await request(app).get("/api/ready");
+
+    expect(during.body.dependencies.redis.mode).toBe("unavailable");
+    expect(after.status).toBe(200);
+    expect(after.body.dependencies.redis.mode).toBe("redis");
+  });
+});
+
 describe("the probes stay open", () => {
   // Load balancers and uptime monitors are unauthenticated by nature. If the
   // metrics guard ever leaked onto these, deploys would fail their health
