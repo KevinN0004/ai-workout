@@ -609,3 +609,78 @@ describe("flushOptimisticOperations", () => {
     await expect(result.current.flushOptimisticOperations()).resolves.toBeUndefined();
   });
 });
+
+// The request starts when the undo window closes, while the Undo toast lasts a
+// second longer. Undo can no longer stop it, so the toast stops offering it,
+// but only when it is still this entry's own toast.
+describe("once the send has started", () => {
+  test("the toast stops offering Undo", async () => {
+    const { result } = render();
+    const pending = deferred();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => pending.promise) })
+      )
+    );
+
+    await runUndoWindow();
+
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Saving...",
+      actionLabel: "",
+      onAction: null
+    });
+  });
+
+  // Logout sends the entry before its window closes, through the same send.
+  test("the toast stops offering Undo when logout sends it early", () => {
+    const { result } = render();
+    const pending = deferred();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => pending.promise) })
+      )
+    );
+
+    act(() => {
+      result.current.flushOptimisticOperations();
+    });
+
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Saving...",
+      actionLabel: "",
+      onAction: null
+    });
+  });
+
+  test("a newer entry's Undo toast is left as it is", async () => {
+    const { result } = render();
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: vi.fn(() => new Promise(() => {})) })
+      )
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(
+          { dashboard: {} },
+          { item: { id: "op-2", title: "Eggs" }, pendingMessage: "Eggs added. Undo?" }
+        )
+      )
+    );
+
+    // The first entry's window closes and its send starts; the second's has
+    // two seconds to go.
+    await act(async () => {
+      vi.advanceTimersByTime(OPTIMISTIC_UNDO_WINDOW_MS - 2000);
+    });
+
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Eggs added. Undo?",
+      actionLabel: "Undo"
+    });
+  });
+});
