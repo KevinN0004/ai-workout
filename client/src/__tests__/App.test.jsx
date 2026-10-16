@@ -399,4 +399,40 @@ describe("App", () => {
       expect(window.location.pathname).toBe("/plan");
     });
   });
+
+  // The whole path: the meal form's handler queues the entry behind its undo
+  // window, and Log out, wired through createAppEventHandlers to the hook,
+  // must send it before the session ends. The network is the only boundary
+  // stubbed.
+  describe("logging out", () => {
+    test("sends a log still inside its undo window before the logout request", async () => {
+      const posts = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url, options = {}) => {
+          const path = String(url);
+          if (options.method === "POST") posts.push(path);
+          if (path === "/api/auth/me") {
+            return { ok: true, json: async () => ({ user: { email: "ada@example.com" } }) };
+          }
+          if (path === "/api/csrf-token") {
+            return { ok: true, json: async () => ({ csrfToken: "t" }) };
+          }
+          if (path.startsWith("/api/dashboard")) {
+            return { ok: true, json: async () => ({ dashboard: { mealLogs: [] } }) };
+          }
+          return { ok: true, json: async () => ({}) };
+        })
+      );
+      await renderSettled("/dashboard");
+      await waitFor(() => expect(dash.props.user).toBeTruthy());
+
+      act(() => dash.props.submitMealLog({ preventDefault() {} }));
+      await act(async () => {
+        await dash.props.onLogout();
+      });
+
+      expect(posts).toEqual(["/api/dashboard/meal-logs", "/api/auth/logout"]);
+    });
+  });
 });

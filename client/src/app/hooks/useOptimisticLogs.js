@@ -12,7 +12,9 @@ import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
  * clear functions; `queueOptimisticLogCommit`, which the log handlers in
  * createAppEventHandlers call; `clearOptimisticOperations`, which empties the
  * list, cancels every send not yet started and disowns every send already out;
- * and `captureAccount`, which returns a check that stays true until the next
+ * `flushOptimisticOperations`, which logout runs first: it sends every entry
+ * still inside its undo window and resolves once every send has settled; and
+ * `captureAccount`, which returns a check that stays true until the next
  * clear, for a request to read once its answer is in. `setDashboard` and
  * `setDashError` are useDashboardData's: a send that succeeds replaces the
  * dashboard with the server's, and one that fails reports its error there.
@@ -97,6 +99,19 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     setOptimisticLogEntries([]);
   }, []);
 
+  // Never rejects: each send catches and reports its own failure.
+  const flushOptimisticOperations = useCallback(async () => {
+    const sends = [];
+    optimisticOpRef.current.forEach((operation) => {
+      if (!operation.committing) {
+        clearTimeout(operation.timerId);
+        operation.send();
+      }
+      sends.push(operation.sending);
+    });
+    await Promise.all(sends);
+  }, []);
+
   const undoOptimisticOperation = useCallback(
     (operationId, { showToast = true } = {}) => {
       const operation = optimisticOpRef.current.get(operationId);
@@ -158,14 +173,16 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         }
       };
 
-      // Start the undo window, and offer Undo in a toast that outlasts it.
-      const timerId = setTimeout(commit, OPTIMISTIC_UNDO_WINDOW_MS);
-      optimisticOpRef.current.set(operationId, {
-        type,
-        timerId,
-        committing: false,
-        undoMessage
-      });
+      // Start the undo window, and offer Undo in a toast that outlasts it. The
+      // timer runs `send`, and flushOptimisticOperations can run it sooner;
+      // `sending` keeps the started send for the flush to wait on.
+      const queued = { type, timerId: null, committing: false, undoMessage, sending: null };
+      queued.send = () => {
+        queued.sending = commit();
+        return queued.sending;
+      };
+      queued.timerId = setTimeout(queued.send, OPTIMISTIC_UNDO_WINDOW_MS);
+      optimisticOpRef.current.set(operationId, queued);
       showDashboardToast(pendingMessage || "Saved locally.", "success", {
         actionLabel: "Undo",
         onAction: () => {
@@ -199,6 +216,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     showDashboardToast,
     queueOptimisticLogCommit,
     clearOptimisticOperations,
+    flushOptimisticOperations,
     captureAccount
   };
 }
