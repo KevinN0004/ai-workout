@@ -1,8 +1,8 @@
 /**
  * localStorage helpers for the per-account caches (dashboard, weather, air
- * quality), and the cookie reader useApiClient takes the CSRF token from. A
- * failed getItem, setItem or removeItem is swallowed: a cache that cannot be
- * used only costs a page its head start.
+ * quality), and the cookie reader useApiClient takes the CSRF token from. Any
+ * storage failure is swallowed, reaching window.localStorage included, since a
+ * cache that cannot be used only costs a page its head start.
  */
 
 /**
@@ -17,12 +17,14 @@ export const buildScopedCacheKey = (prefix, user) => {
 
 /**
  * The parsed entry under `key`, or null when there is no key, no storage, no
- * entry, no valid JSON, or getItem throws.
+ * entry, no valid JSON, or storage throws.
  */
 export const readJsonCache = (key) => {
-  if (!key || typeof window === "undefined" || !window.localStorage) return null;
+  if (!key || typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(key);
+    // The property is read inside the try: with site data blocked, reading it
+    // throws a SecurityError before getItem is reached.
+    const raw = window.localStorage?.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -30,23 +32,23 @@ export const readJsonCache = (key) => {
   }
 };
 
-/** Stores `value` as JSON under `key`; does nothing without a key or storage. */
+/** Stores `value` as JSON under `key`; does nothing without a key or usable storage. */
 export const writeJsonCache = (key, value) => {
-  if (!key || typeof window === "undefined" || !window.localStorage) return;
+  if (!key || typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage?.setItem(key, JSON.stringify(value));
   } catch {
-    // Ignore cache write failures (private mode, quota, etc.)
+    // Blocked site data, a full quota or a private mode: the write is skipped.
   }
 };
 
 /** Deletes the entry under `key`, if storage is there to delete it from. */
 export const removeJsonCache = (key) => {
-  if (!key || typeof window === "undefined" || !window.localStorage) return;
+  if (!key || typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(key);
+    window.localStorage?.removeItem(key);
   } catch {
-    // Ignore a failed removeItem: deleteAccount calls this for each cache key
+    // Ignore a failed removal: deleteAccount calls this for each cache key
     // after the account is gone, and a throw would skip the rest of them and its
     // redirect home.
   }
