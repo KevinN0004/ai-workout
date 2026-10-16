@@ -5,26 +5,23 @@ dotenv.config({ quiet: true });
 /**
  * Refuses to run the server suite against anything but a local database.
  *
- * Twelve call sites across eight test files run `prisma.appUser.deleteMany({})`
- * with no `where` -- an unscoped truncate of the account table. Every AppUser
- * relation carries `onDelete: Cascade`, so each one also removes that account's
- * workout sessions, meal logs, progress metrics, calorie entries, generated
- * plans and saved exercises. That is correct for a disposable local database
- * and catastrophic anywhere else.
+ * Several suites run `prisma.appUser.deleteMany({})` with no `where` -- an
+ * unscoped truncate of the account table; `git grep -n "deleteMany({})" --
+ * server/src` lists them. Every AppUser relation carries `onDelete: Cascade`,
+ * so each one also removes that account's workout sessions, meal logs, progress
+ * metrics, calorie entries, generated plans and saved exercises. That is correct
+ * for a disposable local database and catastrophic anywhere else.
  *
- * Nothing prevented "anywhere else". `prisma.js` resolves its connection from
- * `dotenv.config()` and `process.env.DATABASE_URL` -- the same file, resolved
- * the same way, in tests as in production -- and the suite had no setupFiles,
- * no NODE_ENV check and no host allowlist. A `server/.env` holding a staging or
- * production URL meant `npm test` deleted every account in it.
+ * `prisma.js` resolves its connection from `dotenv.config()` and
+ * `process.env.DATABASE_URL` -- the same file, resolved the same way, in tests
+ * as in production -- and this is the only check on where that URL points. A
+ * `server/.env` holding a staging or production URL would otherwise let
+ * `npm test` delete every account in it, and a real DATABASE_URL first appears
+ * in someone's `server/.env` exactly when they prepare a deployment.
  *
- * The risk is not theoretical and it rises from here: a real DATABASE_URL first
- * appears in someone's `server/.env` exactly when they prepare a deployment,
- * which is what this branch was built for.
- *
- * This converts that silent catastrophe into a startup error. It deliberately
- * has no escape hatch: an env var to bypass it would be set by the same person,
- * in the same file, under the same time pressure that causes the mistake.
+ * This turns that silent catastrophe into a startup error. It deliberately has
+ * no escape hatch: an env var to bypass it would be set by the same person, in
+ * the same file, under the same time pressure that causes the mistake.
  */
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", ""]);
