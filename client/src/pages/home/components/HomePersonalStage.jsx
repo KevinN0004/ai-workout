@@ -120,6 +120,9 @@ export default function HomePersonalStage({
                 type="button"
                 className={heightUnit === "ft" ? "active" : ""}
                 onClick={() => {
+                  // Already in feet: the centimetre field was never typed into,
+                  // and converting it would wipe the entry.
+                  if (heightUnit === "ft") return;
                   const next = toFeetInchesFromCm(personal.heightCm);
                   setPersonal((prev) => ({
                     ...prev,
@@ -135,6 +138,8 @@ export default function HomePersonalStage({
                 type="button"
                 className={heightUnit === "cm" ? "active" : ""}
                 onClick={() => {
+                  // Already in centimetres, for the same reason.
+                  if (heightUnit === "cm") return;
                   setPersonal((prev) => ({
                     ...prev,
                     heightCm: toCmFromFeetInches(prev.heightFeet, prev.heightInches)
