@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toProfileNumber } from "../app/profileMapping";
+import { toNumberOrNull } from "../app/units";
 
 // The client half of the invariant asserted in
 // server/src/__tests__/numericCoercion.contract.test.js:
@@ -9,9 +10,10 @@ import { toProfileNumber } from "../app/profileMapping";
 //
 // `Number(null)` and `Number("")` are both 0 and both finite, so a helper that
 // coerces before it guards turns "no reading" into a real-looking measurement.
-// Two of the five shipped instances of this were on the client: an unentered
-// body fat modelled at 3%, and a silhouette dimension collapsing to its minimum
-// because a null bypassed the caller's fallback.
+// On the client it has shipped as an unentered body fat modelled at 3%, a
+// silhouette dimension collapsing to its minimum because a null bypassed the
+// caller's fallback, and a metric logged without a weight shown as "Latest
+// weight 0 lb".
 //
 // Add a row when you add a numeric helper.
 
@@ -30,6 +32,11 @@ const helpers = [
   {
     name: "toProfileNumber (app/profileMapping)",
     call: (value) => toProfileNumber(value),
+    absent: null
+  },
+  {
+    name: "toNumberOrNull (app/units)",
+    call: (value) => toNumberOrNull(value),
     absent: null
   }
 ];

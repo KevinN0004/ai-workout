@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
 import { buildLinePath } from "../../../app/linePath";
+import { toNumberOrNull } from "../../../app/units";
 
 // A Date or null. A bare YYYY-MM-DD is read as local midnight: `new Date` would
 // read it as UTC midnight, which west of UTC falls on the previous local day.
@@ -319,11 +320,11 @@ export default function useDashboardMetrics({
     const workoutDeltaVsLastWeek = last7Workouts.length - previous7Workouts.length;
     const calorieDeltaVsLastWeek = Math.round(avgCalories - previousAvgCalories);
 
-    // The latest weight by date, and its change since the one before.
-    // Number(null) is 0, which is finite, so a metric logged without a weight
-    // passes this filter as a reading of 0 lb.
+    // The latest weight by date, and its change since the one before. A metric
+    // logged without a weight carries null or "", which toNumberOrNull reads as
+    // no reading rather than as 0 lb.
     const weightTrendCandidates = [...progressMetrics]
-      .filter((item) => Number.isFinite(Number(item?.weightLb)))
+      .filter((item) => toNumberOrNull(item?.weightLb) !== null)
       .sort((a, b) => {
         const dateA = parseDateValue(a?.date)?.getTime() || 0;
         const dateB = parseDateValue(b?.date)?.getTime() || 0;

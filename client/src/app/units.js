@@ -1,7 +1,8 @@
 /**
  * Units, locale and form-value helpers shared by the home flow and its preview,
  * sign-up, the dashboard and the profile mapping: name splitting, the visitor's
- * measurement system, today's local date key, and height and weight conversion.
+ * measurement system, today's local date key, height and weight conversion, and
+ * reading a value that may be absent as a number or null.
  */
 const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
 
@@ -74,6 +75,19 @@ export const getLocalDateKey = () => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+/**
+ * A value as a number, or null when it is absent (null, undefined or "") or
+ * not a number. It guards before it coerces, because `Number(null)` and
+ * `Number("")` are both 0: testing afterwards would turn a missing reading into
+ * a measured zero, while a measured 0 stays 0. Same shape as toNumberOrNull in
+ * the server's repositories/rowValues.js.
+ */
+export const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 /**
