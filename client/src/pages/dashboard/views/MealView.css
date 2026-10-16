@@ -164,7 +164,7 @@
 }
 
 /* ---- Loading skeleton ---------------------------------------------------- */
-/* No reduced-motion rule stops this shimmer. */
+/* The reduced-motion block at the end of this file holds the shimmer still. */
 .meal-view .meal-skeleton-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -418,5 +418,14 @@
 
   .meal-view .mealdb-search-form input {
     width: 100%;
+  }
+}
+
+/* ---- Reduced motion ------------------------------------------------------ */
+/* Here rather than in the dashboard's responsive.css: this sheet loads later, in the view's
+   chunk, so a rule there would lose the tie with the shimmer above. */
+@media (prefers-reduced-motion: reduce) {
+  .meal-view .meal-skeleton-card {
+    animation: none;
   }
 }

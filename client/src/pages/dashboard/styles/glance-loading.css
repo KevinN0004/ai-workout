@@ -78,7 +78,8 @@
   gap: 16px;
 }
 
-/* The shimmer: a gradient wider than the element, slid across it on a loop. */
+/* The shimmer: a gradient wider than the element, slid across it on a loop. responsive.css
+   holds it still under reduced motion. */
 .dashboard-skeleton-bar,
 .dashboard-skeleton-chip,
 .dashboard-skeleton-block {

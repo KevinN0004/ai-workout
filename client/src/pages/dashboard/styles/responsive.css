@@ -150,12 +150,19 @@
 }
 
 /* ---- Reduced motion ------------------------------------------------------ */
-/* Opens the drawer and its backdrop without their entrance animations. Nothing else in the
-   dashboard's stylesheets is switched off: the drawer buttons' hover transition, the views'
-   card and pill hover transitions and all three loading skeletons' shimmers still run. */
+/* Opens the drawer and its backdrop without their entrance animations, and holds the
+   first-load skeleton's shimmer (glance-loading.css) still; MealView.css and TipsView.css
+   hold their own skeletons'. The drawer buttons' hover transition and the views' card and
+   pill hover transitions still run. */
 @media (prefers-reduced-motion: reduce) {
   .drawer-backdrop,
   .drawer {
+    animation: none;
+  }
+
+  .dashboard-skeleton-bar,
+  .dashboard-skeleton-chip,
+  .dashboard-skeleton-block {
     animation: none;
   }
 

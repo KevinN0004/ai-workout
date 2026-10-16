@@ -113,13 +113,22 @@
   pointer-events: auto !important;
 }
 
-/* This !important transition outranks the reduced-motion blocks in responsive.css and in
-   home/styles/forms-and-motion.css, so the labels still fade and slide under reduced motion. */
+/* This transition is !important, so it outranks the reduced-motion blocks in responsive.css
+   and home/styles/forms-and-motion.css. The block below turns it off with the same
+   selectors, since only a later !important declaration of equal specificity beats it. */
 .preview-stage-panel .preview-jump-label,
 .preview-stage-panel .preview-side-tab .preview-jump-chip .preview-jump-label {
   transition:
     opacity var(--preview-motion-fast) var(--preview-motion-ease),
     transform 220ms var(--preview-motion-ease) !important;
+}
+
+/* ---- Reduced motion ------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .preview-stage-panel .preview-jump-label,
+  .preview-stage-panel .preview-side-tab .preview-jump-chip .preview-jump-label {
+    transition: none !important;
+  }
 }
 
 /* ---- Chapter card -------------------------------------------------------- */

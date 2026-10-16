@@ -72,13 +72,15 @@
 }
 
 /* ---- Reduced motion ------------------------------------------------------ */
-/* Turns off every CSS animation and transition on the setup modal, its backdrop and its
-   descendants. A pseudo-element is not a descendant, so the environment toggle's pill
-   (::before in interactions.css) still slides. */
+/* Turns off every CSS animation and transition on the setup modal, its backdrop, its
+   descendants and their pseudo-elements, the environment toggle's pill (::before in
+   interactions.css) among them. */
 @media (prefers-reduced-motion: reduce) {
   .planner-backdrop,
   .planner-setup-modal,
-  .planner-setup-modal * {
+  .planner-setup-modal *,
+  .planner-setup-modal *::before,
+  .planner-setup-modal *::after {
     animation: none !important;
     transition: none !important;
   }

@@ -421,15 +421,16 @@
 }
 
 /* ---- Reduced motion ------------------------------------------------------ */
-/* Turns off CSS animations and transitions on the form and everything in it: its width
-   change, the sign-up fields' reveal and the checkbox. * selects no pseudo-elements, so the
-   checkbox's tick (::before) still scales in and the unit toggles' pills (::before, from
-   home/styles/core/shell.css) still slide. Outside the form, the login/sign-up toggle's pill
-   still slides, its buttons keep their colour and hover transitions (forms-and-motion.css),
-   and the close button keeps its hover transition. */
+/* Turns off CSS animations and transitions on the form, everything in it and their
+   pseudo-elements: its width change, the sign-up fields' reveal, the checkbox and its tick.
+   home/styles/core/shell.css stops the toggles' pills, the login/sign-up one outside the
+   form included. Outside the form, the login/sign-up toggle's buttons keep their colour and
+   hover transitions (forms-and-motion.css), and the close button keeps its hover transition. */
 @media (prefers-reduced-motion: reduce) {
   .auth-form,
-  .auth-form * {
+  .auth-form *,
+  .auth-form *::before,
+  .auth-form *::after {
     animation: none !important;
     transition: none !important;
   }
