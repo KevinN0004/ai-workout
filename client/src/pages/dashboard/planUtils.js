@@ -95,16 +95,22 @@ const WEEKLY_MEAL_TEMPLATES = {
 /**
  * Maps goal text to a track by keyword, tried in order: fat_loss, endurance,
  * recovery, and lean_strength when none match. A keyword matches anywhere in
- * the text, inside a longer word included. Of goalOptions, "Cardio" has no
- * keyword and so lands on lean_strength. The four names also key the meal
- * templates here, the meal suggestions in meal/data and the tips' categories.
+ * the text, inside a longer word included. Of goalOptions, only "Build lean
+ * strength and energy" has no keyword, and lean_strength is the track it is
+ * meant for. The four names also key the meal templates here, the meal
+ * suggestions in meal/data and the tips' categories.
  */
 export const detectTrack = (goalText = "") => {
   const lower = goalText.toLowerCase();
   if (lower.includes("fat loss") || lower.includes("cut") || lower.includes("conditioning")) {
     return "fat_loss";
   }
-  if (lower.includes("endurance") || lower.includes("athletic") || lower.includes("performance")) {
+  if (
+    lower.includes("endurance") ||
+    lower.includes("athletic") ||
+    lower.includes("performance") ||
+    lower.includes("cardio")
+  ) {
     return "endurance";
   }
   if (lower.includes("mobility") || lower.includes("recovery") || lower.includes("joint")) {

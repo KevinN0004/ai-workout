@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { buildWeeklyMealPlan, detectTrack, getDailyCalories } from "../planUtils";
+import { goalOptions } from "../../../app/constants";
 
 describe("planUtils", () => {
   test("detectTrack maps goal text to expected tracks", () => {
@@ -7,6 +8,24 @@ describe("planUtils", () => {
     expect(detectTrack("Endurance and athletic performance")).toBe("endurance");
     expect(detectTrack("Mobility and recovery focus")).toBe("recovery");
     expect(detectTrack("Build lean strength and energy")).toBe("lean_strength");
+  });
+
+  // Every goal the form offers, and the track it is meant to land on. A goal
+  // added to goalOptions without a row here fails the first test.
+  const INTENDED_TRACKS = {
+    "Build lean strength and energy": "lean_strength",
+    "Fat loss + conditioning": "fat_loss",
+    Mobility: "recovery",
+    Recovery: "recovery",
+    Cardio: "endurance"
+  };
+
+  test("has an intended track for every goal the form offers", () => {
+    expect(Object.keys(INTENDED_TRACKS).sort()).toEqual([...goalOptions].sort());
+  });
+
+  test.each(goalOptions)("detectTrack maps the goal %s to its intended track", (goal) => {
+    expect(detectTrack(goal)).toBe(INTENDED_TRACKS[goal]);
   });
 
   test("getDailyCalories applies track rules and minimum floors", () => {
