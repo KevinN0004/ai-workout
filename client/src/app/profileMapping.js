@@ -3,24 +3,15 @@
  * it: personalToProfile for a save (submitProfile in events.js), and
  * profileToPersonal to seed Settings' form from user.profile.
  */
-import { splitFullName, toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "./units";
+import {
+  splitFullName,
+  toCmFromFeetInches,
+  toFeetInchesFromCm,
+  toKg,
+  toLb,
+  toNumberOrNull
+} from "./units";
 import { defaultPersonalForm } from "./constants";
-
-/**
- * A form value as a profile number, or null when it is blank or not a number.
- * It guards before it coerces: `Number("")` and `Number(null)` are both 0 and
- * both finite, so testing afterwards would turn an unfilled field into a
- * measured 0. A 0 is outside every numeric range in the server's profile schema
- * (apiSchemaService.js), so the whole save would be refused with a 400, and a
- * blank height in personalToProfile's active unit could not fall back to the
- * other one.
- * Same shape as toNullableNumber in the server's dashboardDataBuildersService.
- */
-export const toProfileNumber = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
 
 // The mirror: a stored null is an empty form field, never the string "0".
 const toFormValue = (value) => (value === null || value === undefined ? "" : String(value));
@@ -30,9 +21,14 @@ const toDayList = (value) => (Array.isArray(value) ? value : []);
 /**
  * Form state shaped like the home flow's `personal` (Settings' draft is one) as
  * the body POST /api/profile takes: the name split, numbers through
- * toProfileNumber, height in centimetres from whichever unit is active, and
+ * toNumberOrNull, height in centimetres from whichever unit is active, and
  * weight in kilograms. `units` holds `heightUnit` ("cm" or "ft") and
  * `weightUnit` ("kg" or "lb"), metric when absent.
+ *
+ * A blank field is null, never 0: a 0 is outside every numeric range in the
+ * server's profile schema (apiSchemaService.js), so the whole save would be
+ * refused with a 400, and a blank height in the active unit could not fall back
+ * to the other one.
  *
  * Both arguments are read through `|| {}` rather than a `= {}` default, which
  * only fires on undefined: this is a shared module, and a future caller can
@@ -47,15 +43,15 @@ export const personalToProfile = (personal, units) => {
   // field is whatever was last converted into it and may be stale. This is the
   // same pick useBodyModel makes, deliberately -- the two must agree or the
   // silhouette and the stored profile disagree about the same person.
-  const fromCm = toProfileNumber(source.heightCm);
-  const fromImperial = toProfileNumber(toCmFromFeetInches(source.heightFeet, source.heightInches));
+  const fromCm = toNumberOrNull(source.heightCm);
+  const fromImperial = toNumberOrNull(toCmFromFeetInches(source.heightFeet, source.heightInches));
   const heightCm = heightUnit === "ft" ? (fromImperial ?? fromCm) : (fromCm ?? fromImperial);
 
   return {
     firstName,
     lastName,
     name: source.name || "",
-    age: toProfileNumber(source.age),
+    age: toNumberOrNull(source.age),
     heightCm,
     // The weight field holds a bare number in the active unit, so the unit is
     // not optional information -- without it 170 lb is stored as 170 kg.
@@ -65,9 +61,9 @@ export const personalToProfile = (personal, units) => {
     // state, where inputs are always strings, so this is unreachable rather
     // than shipped -- noted because it is the falsiness-swallows-zero shape one
     // level removed, in a helper this module does not own.
-    weightKg: toProfileNumber(toKg(source.weight, weightUnit)),
+    weightKg: toNumberOrNull(toKg(source.weight, weightUnit)),
     sex: source.sex || "",
-    bodyFat: toProfileNumber(source.bodyFat),
+    bodyFat: toNumberOrNull(source.bodyFat),
     activity: source.activity || "",
     notes: source.notes || "",
     sleep: source.sleep || "",
