@@ -100,6 +100,9 @@ export const withTimeout = (promise, timeoutMs, message) => {
   });
 };
 
+// The CSRF check's one comparison. An empty token never matches, not even an
+// empty one: timingSafeEqual calls two empty buffers equal, so requireCsrfToken
+// relies on this to refuse a write that carries neither cookie nor header.
 const tokensMatch = (a, b) => {
   const left = Buffer.from(String(a || ""), "utf8");
   const right = Buffer.from(String(b || ""), "utf8");
@@ -478,7 +481,7 @@ export const createSessionService = ({
     const cookieToken = cleanText(cookies[csrfCookieName], 128);
     const headerToken = cleanText(req.headers[csrfHeaderName], 128);
 
-    if (!cookieToken || !headerToken || !tokensMatch(cookieToken, headerToken)) {
+    if (!tokensMatch(cookieToken, headerToken)) {
       req.log?.warn(
         {
           event: "csrf_check_failed",
