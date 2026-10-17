@@ -116,7 +116,6 @@ export default function HomePage({
     resolvedHeightCm,
     resolvedWeightKg,
     isPersonalComplete,
-    effectiveBodyFat,
     silhouetteShape,
     silhouetteRenderSignature
   } = useBodyModel({
@@ -186,7 +185,6 @@ export default function HomePage({
                 toLb={toLb}
                 resolvedHeightCm={resolvedHeightCm}
                 resolvedWeightKg={resolvedWeightKg}
-                effectiveBodyFat={effectiveBodyFat}
               />
             )}
 
