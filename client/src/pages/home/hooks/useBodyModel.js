@@ -5,15 +5,7 @@
  * HomePage.
  */
 import { useMemo } from "react";
-
-// Guards before it coerces, because `Number("")` and `Number(null)` are both 0
-// and both finite -- so testing afterwards turns an unfilled field into a real
-// measurement. Same shape as `toNumberOrNull` in the server's rowValues.js.
-const toFiniteNumber = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+import { toNumberOrNull } from "../../../app/units";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 // The form stores each option's label verbatim ("Moderate", "HIIT",
@@ -137,8 +129,8 @@ export default function useBodyModel({
   // personalToProfile in app/profileMapping.js makes the same pick, and the two
   // must agree.
   const resolvedHeightCm = useMemo(() => {
-    const fromCmInput = toFiniteNumber(personal.heightCm);
-    const fromImperialInput = toFiniteNumber(
+    const fromCmInput = toNumberOrNull(personal.heightCm);
+    const fromImperialInput = toNumberOrNull(
       toCmFromFeetInches(personal.heightFeet, personal.heightInches)
     );
     const picked =
@@ -153,7 +145,7 @@ export default function useBodyModel({
   ]);
 
   const resolvedWeightKg = useMemo(() => {
-    const normalized = toFiniteNumber(toKg(personal.weight, weightUnit));
+    const normalized = toNumberOrNull(toKg(personal.weight, weightUnit));
     return normalized && normalized > 0 ? normalized : null;
   }, [personal.weight, toKg, weightUnit]);
 
@@ -165,7 +157,7 @@ export default function useBodyModel({
 
   // ---- Whether the personal step is complete --------------------------------
   // The five fields HomePersonalStage's hint asks for.
-  const ageValue = useMemo(() => toFiniteNumber(personal.age), [personal.age]);
+  const ageValue = useMemo(() => toNumberOrNull(personal.age), [personal.age]);
   const hasValidName = Boolean(personal.name?.trim());
   const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 99;
   const isPersonalComplete =
@@ -181,7 +173,7 @@ export default function useBodyModel({
   // No home-page field writes `personal.bodyFat`, so in the app this is null
   // and the model runs on the estimate.
   const explicitBodyFat = useMemo(() => {
-    const value = toFiniteNumber(personal.bodyFat);
+    const value = toNumberOrNull(personal.bodyFat);
     return value === null ? null : clamp(value, 3, 60);
   }, [personal.bodyFat]);
 

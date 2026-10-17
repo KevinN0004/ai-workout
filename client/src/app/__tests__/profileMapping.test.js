@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { personalToProfile, profileToPersonal, toProfileNumber } from "../profileMapping";
+import { personalToProfile, profileToPersonal } from "../profileMapping";
 
 // The two shapes disagree about names, about units, and about how they spell
 // "no value": `personal` uses "" because it backs form inputs, `profile` uses
@@ -10,34 +10,6 @@ import { personalToProfile, profileToPersonal, toProfileNumber } from "../profil
 // 170 lb as 170 kg. Height has the same problem in the other direction: the cm
 // field and the feet/inches fields both exist, and whichever one the user is
 // not currently typing into is stale.
-
-describe("toProfileNumber", () => {
-  test.each([
-    ["an empty string", ""],
-    ["null", null],
-    ["undefined", undefined]
-  ])("treats %s as absent", (_label, value) => {
-    expect(toProfileNumber(value)).toBeNull();
-  });
-
-  // Both spellings matter. A guard written as `if (!value)` still passes the
-  // string "0", which is truthy, and only fails on the number -- so testing the
-  // string alone lets the forbidden falsiness guard through.
-  test.each([
-    ["a numeric string", "0"],
-    ["a number", 0]
-  ])("keeps a measured zero given as %s", (_label, value) => {
-    expect(toProfileNumber(value)).toBe(0);
-  });
-
-  test("parses a real measurement", () => {
-    expect(toProfileNumber("34")).toBe(34);
-  });
-
-  test("treats a non-numeric string as absent", () => {
-    expect(toProfileNumber("not-a-number")).toBeNull();
-  });
-});
 
 describe("personalToProfile", () => {
   test("splits the display name into first and last", () => {

@@ -5,7 +5,7 @@ import useBodyModel from "../useBodyModel";
 // Stands in for app/units.js. The empty case matters and is easy to get wrong:
 // the real helper returns "" when neither field holds anything usable, not 0.
 // A stub that returned 0 would hand the hook a number where the app hands it an
-// empty string, which is exactly the difference the guard in toFiniteNumber
+// empty string, which is exactly the difference the guard in toNumberOrNull
 // turns on -- so the stub would quietly test something the app never does.
 const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feet = Number(feetValue);
@@ -166,12 +166,11 @@ describe("absent and unusable inputs", () => {
   const model = (overrides) => renderBodyModel(overrides).result.current;
 
   describe("body fat", () => {
-    // This used to resolve to 3%, because `toFiniteNumber` converted before it
-    // tested: `Number("")` is 0 and `Number.isFinite(0)` is true, so an
-    // unentered body fat became an explicit 0, `clamp(0, 3, 60)` lifted it to
-    // 3, and the `??` below treated that as a real answer. The visitor was
-    // modelled leaner than an elite athlete and `estimatedBodyFat` was
-    // unreachable. The guard now runs before the coercion.
+    // `toNumberOrNull` tests before it converts. Converted first, `Number("")`
+    // is 0 and `Number.isFinite(0)` is true, so an unentered body fat would
+    // become an explicit 0, `clamp(0, 3, 60)` would lift it to 3, and the `??`
+    // below would treat that as a real answer: the visitor modelled leaner than
+    // an elite athlete, and `estimatedBodyFat` unreachable.
     test("an unentered body fat falls back to the BMI estimate", () => {
       const withoutBodyFat = model({
         personal: { bodyFat: "", heightFeet: "5", heightInches: "11", weight: "180" }

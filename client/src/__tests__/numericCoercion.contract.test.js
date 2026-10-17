@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
-import { toProfileNumber } from "../app/profileMapping";
 import { toNumberOrNull } from "../app/units";
 
 // The client half of the invariant asserted in
@@ -28,11 +27,6 @@ const helpers = [
     name: "toFiniteNumber (physique/math)",
     call: (value) => toFiniteNumber(value, 42),
     absent: 42
-  },
-  {
-    name: "toProfileNumber (app/profileMapping)",
-    call: (value) => toProfileNumber(value),
-    absent: null
   },
   {
     name: "toNumberOrNull (app/units)",
@@ -69,14 +63,7 @@ describe.each(helpers)("$name", ({ call, absent }) => {
   });
 });
 
-// Deliberately not in the table, both checked rather than assumed:
-//
-// - `useBodyModel.js` has a module-private `toFiniteNumber` of its own. It has
-//   the right shape, and its null-vs-empty-string equivalence is already pinned
-//   behaviourally in useBodyModel.test.jsx, which asserts that a body fat given
-//   as null and one given as "" produce the same model. Reaching it from here
-//   would mean adding a `__testables` bag to a React hook module to duplicate a
-//   test that already exists.
+// Deliberately not in the table, checked rather than assumed:
 //
 // - `toKg` / `toLb` in app/units.js open with `if (!value) return ""`, which is
 //   the falsiness test this class warns against. They are safe as used: every
