@@ -68,15 +68,11 @@
 }
 
 /* ---- Walkthrough copy size ----------------------------------------------- */
-/* :is() takes its most specific argument, so this counts as (0,3,0) only because of
-   .preview-field-row .preview-field-input, one of three entries that name classes nothing
-   renders; without them it would be (0,2,1). */
+/* :is() takes its most specific argument, so this counts as (0,2,1), from the entries
+   that pair a class with an element, such as .preview-personal-form label. */
 .preview-stage-panel
   :is(
     .preview-stage-kicker,
-    .preview-generate-label,
-    .preview-field-row span,
-    .preview-field-row .preview-field-input,
     .preview-personal-form label,
     .preview-personal-form input,
     .preview-personal-form select,

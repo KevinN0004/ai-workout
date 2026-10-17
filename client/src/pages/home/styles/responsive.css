@@ -54,7 +54,7 @@
 /* The personal stage's form goes to one column in both modes. Its selector names the stage,
    to outrank styles/base.css's .form (which ties .personal-form and loads later) and
    forms-and-motion.css's two-column advanced-mode rule. The walkthrough's copy of the form
-   keeps its two columns. .header-top, .header-left and .auth-actions match nothing. */
+   keeps its two columns. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -104,24 +104,6 @@
   .home-stage,
   .stage-measure .home-stage {
     min-height: 100%;
-  }
-
-  .home-page .header-top {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .home-page .header-left {
-    grid-column: auto;
-    justify-items: center;
-    text-align: center;
-  }
-
-  .home-page .auth-actions {
-    grid-column: auto;
-    justify-self: center;
-    justify-content: center;
   }
 
   .home-intro-wrap {
