@@ -21,20 +21,6 @@ const DEFAULT_MAX_PLAN_CHARS = 20000;
 // mid-line passes it.
 const WEEKDAY_HEADING = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
 
-/**
- * Reads a positive integer setting, or returns `fallback`. Absent input (null,
- * undefined, a blank string) is tested before `Number()` runs, because
- * `Number(null)` and `Number("")` are both 0. Zero, negatives, fractions and
- * non-numeric text are outside the domain of every setting read through here,
- * so they give `fallback` too.
- */
-export const parsePositiveInt = (value, fallback) => {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === "string" && value.trim() === "") return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-};
-
 // Sent as the system instruction, apart from the client data in the user
 // message. The weekday headings and "Coach Notes:" it asks for are what
 // client/src/app/plans.js parses, so that wording is a contract.
@@ -191,7 +177,8 @@ export const buildGenerationEquipmentContext = ({ environment, equipment }) => {
  * Registers POST /api/generate.
  *
  * @param deps `gemini` is the Gemini client, or null when GEMINI_API_KEY is
- *   unset.
+ *   unset. `toPositiveInt` is index.js's reader for a positive integer
+ *   setting, which the three GEMINI_* limits go through.
  */
 export const registerGenerateRoutes = (app, deps) => {
   const {
@@ -201,6 +188,7 @@ export const registerGenerateRoutes = (app, deps) => {
     cleanText,
     toCleanArray,
     toNullableNumber,
+    toPositiveInt,
     saveGeneratedPlan
   } = deps;
 
@@ -263,15 +251,12 @@ export const registerGenerateRoutes = (app, deps) => {
 
       // Generate under the GEMINI_MAX_OUTPUT_TOKENS cap and within GEMINI_TIMEOUT_MS,
       // past which the answer is a 504. A call that fails is a 500.
-      const maxOutputTokens = parsePositiveInt(
+      const maxOutputTokens = toPositiveInt(
         process.env.GEMINI_MAX_OUTPUT_TOKENS,
         DEFAULT_MAX_OUTPUT_TOKENS
       );
-      const timeoutMs = parsePositiveInt(process.env.GEMINI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
-      const maxPlanChars = parsePositiveInt(
-        process.env.GEMINI_MAX_PLAN_CHARS,
-        DEFAULT_MAX_PLAN_CHARS
-      );
+      const timeoutMs = toPositiveInt(process.env.GEMINI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+      const maxPlanChars = toPositiveInt(process.env.GEMINI_MAX_PLAN_CHARS, DEFAULT_MAX_PLAN_CHARS);
 
       // abortSignal cancels the client side of the request; the race makes the
       // deadline hold even if the call ignores the signal.

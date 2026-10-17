@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { toNumberOrNull } from "../repositories/rowValues.js";
 import { toNullableNumber } from "../services/dashboard/dashboardDataBuildersService.js";
-import { parsePositiveInt } from "../routes/generateRoutes.js";
 import { parseRedisPort } from "../services/auth/sessionService.js";
 import { __testables as errorTracking } from "../services/platform/errorTrackingService.js";
 import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
@@ -33,9 +32,9 @@ const ABSENT = [
   ["undefined", undefined]
 ];
 
-// `zeroIsValid` is not decoration. `toPositiveInt`, `parsePositiveInt` and
-// `parseRedisPort` legitimately exclude 0 from their domain -- a port 0, a
-// limit of 0 and a zero-length generation timeout are not meaningful -- so for
+// `zeroIsValid` is not decoration. `toPositiveInt` and `parseRedisPort`
+// legitimately exclude 0 from their domain -- a port 0, a limit of 0 and a
+// zero-length generation timeout are not meaningful -- so for
 // them a measured 0 correctly gives the absent answer, and asserting otherwise
 // would be wrong. Flattening this column would either force a false assertion
 // or quietly drop the zero check for everyone.
@@ -67,12 +66,6 @@ const helpers = [
   {
     name: "toPositiveInt",
     call: (value) => indexTestables.toPositiveInt(value, 42),
-    absent: 42,
-    zeroIsValid: false
-  },
-  {
-    name: "parsePositiveInt (generateRoutes)",
-    call: (value) => parsePositiveInt(value, 42),
     absent: 42,
     zeroIsValid: false
   },

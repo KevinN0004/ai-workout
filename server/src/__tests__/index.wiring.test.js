@@ -1,4 +1,17 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+
+// /api/generate needs a Gemini client to get past its first check, and index.js
+// builds that client when it is imported, so the client is replaced and a key
+// set before the import below runs.
+const { generateContent } = vi.hoisted(() => {
+  process.env.GEMINI_API_KEY ||= "wiring-test-key";
+  return { generateContent: vi.fn(async () => ({ text: "Monday - Push\nBench press" })) };
+});
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: function GoogleGenAI() {
+    return { models: { generateContent } };
+  }
+}));
 import { app } from "../index.js";
 import { prisma } from "../db/prisma.js";
 
@@ -246,5 +259,26 @@ describe("account management routes are wired into the real app", () => {
     expect(replacement).toMatch(/^sid=/);
     expect(replacement).not.toBe(secondSession);
     expect(await meWith(replacement)).toBe(200);
+  });
+});
+
+// The route reads its GEMINI_* limits through the toPositiveInt index.js puts in
+// the deps object. Without it the call throws inside the route's try, and the
+// caller gets a 500 instead of a plan.
+describe("plan generation is wired into the real app", () => {
+  test("POST /api/generate reads its limits through the injected toPositiveInt", async () => {
+    vi.stubEnv("GEMINI_MAX_OUTPUT_TOKENS", "1234");
+    try {
+      const response = await withCsrf("/api/generate", "POST", {
+        body: { goal: "Build strength", days: 3 }
+      });
+
+      expect(response.status).toBe(200);
+      expect(generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ config: expect.objectContaining({ maxOutputTokens: 1234 }) })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
