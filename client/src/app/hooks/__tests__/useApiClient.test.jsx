@@ -195,8 +195,8 @@ describe("apiFetch", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    // Once a token has been issued it is remembered, so a burst of writes does
-    // not each pay for a round trip.
+    // The endpoint sets the cookie, and later writes read it there, so a burst
+    // of writes does not each pay for a round trip.
     test("reuses a token across later writes", async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse({ csrfToken: "issued-token" }));
       const { current } = render();

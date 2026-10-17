@@ -3,7 +3,7 @@
  * cookie and adds the CSRF token. Called once, by App, which passes `apiFetch`
  * to createAppEventHandlers.
  */
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../constants";
 import { readCookie } from "../cache";
 
@@ -15,8 +15,6 @@ import { readCookie } from "../cache";
  * for, or when fetching one fails.
  */
 export default function useApiClient() {
-  const csrfTokenRef = useRef("");
-
   // ---- CSRF token -----------------------------------------------------------
   // The server sets the token as a cookie scripts can read, and /api/csrf-token
   // also returns it in the body. The cookie wins, and the body is the fallback
@@ -24,7 +22,6 @@ export default function useApiClient() {
   const ensureCsrfToken = useCallback(async () => {
     const existingToken = readCookie(CSRF_COOKIE_NAME);
     if (existingToken) {
-      csrfTokenRef.current = existingToken;
       return existingToken;
     }
     const response = await fetch("/api/csrf-token", {
@@ -37,7 +34,6 @@ export default function useApiClient() {
     const issuedToken =
       readCookie(CSRF_COOKIE_NAME) ||
       (typeof payload?.csrfToken === "string" ? payload.csrfToken.trim() : "");
-    csrfTokenRef.current = issuedToken;
     return issuedToken;
   }, []);
 
@@ -53,8 +49,7 @@ export default function useApiClient() {
       };
 
       if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-        const csrfToken =
-          (await ensureCsrfToken()) || csrfTokenRef.current || readCookie(CSRF_COOKIE_NAME);
+        const csrfToken = await ensureCsrfToken();
         if (!csrfToken) {
           throw new Error("Security token unavailable. Refresh and try again.");
         }
