@@ -22,7 +22,7 @@ import thumbCommercialCourt from "../assets/planner-thumbs/commercial-court.svg"
 import thumbCommercialRecovery from "../assets/planner-thumbs/commercial-recovery.svg";
 
 const plannerHeaderTitleByStep = {
-  1: "Enviroment",
+  1: "Environment",
   2: "Schedule",
   3: "Focus"
 };

@@ -71,7 +71,7 @@ describe("PlannerSetupModal", () => {
 
   describe("the header", () => {
     test.each([
-      [1, "Enviroment"],
+      [1, "Environment"],
       [2, "Schedule"],
       [3, "Focus"]
     ])("step %i is titled %s", (plannerStep, title) => {
@@ -83,7 +83,7 @@ describe("PlannerSetupModal", () => {
       // The step is held in App's state and has been out of range during a
       // reset; a blank header reads as a broken modal.
       renderModal({ plannerStep: 9 });
-      expect(within(dialog()).getByText("Enviroment")).toBeInTheDocument();
+      expect(within(dialog()).getByText("Environment")).toBeInTheDocument();
     });
 
     test("there is no back arrow on the first step", () => {
