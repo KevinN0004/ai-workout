@@ -8,6 +8,7 @@ import {
   toCleanArray,
   toNullableNumber
 } from "../../services/dashboard/dashboardDataBuildersService.js";
+import { __testables as indexTestables } from "../../index.js";
 
 // The plan generator. Two things live here: the equipment context that
 // decides what the model is told the user can train with, and the route that
@@ -38,6 +39,7 @@ const buildApp = (overrides = {}, { user, requestId } = {}) => {
     cleanText,
     toCleanArray,
     toNullableNumber,
+    toPositiveInt: indexTestables.toPositiveInt,
     saveGeneratedPlan,
     ...overrides
   });
@@ -435,6 +437,7 @@ describe("POST /api/generate", () => {
         cleanText,
         toCleanArray,
         toNullableNumber,
+        toPositiveInt: indexTestables.toPositiveInt,
         saveGeneratedPlan
       });
 
