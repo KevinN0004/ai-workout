@@ -36,12 +36,12 @@ const TRAINING_EXERCISE_TEMPLATES = [
 /**
  * Derives the walkthrough's content from the visitor's `personal` profile and
  * planner `form`, with JOHN_DOE_PREVIEW_PROFILE filling what they leave empty,
- * and from the chapter state PreviewStage passes in. `resolvedHeightCm`,
- * `resolvedWeightKg` and `effectiveBodyFat` are useBodyModel's figures, passed
- * down by HomePage, and `toFeetInchesFromCm` and `toLb` are app/units.js's
- * converters. Returns the derived values; refs holding the values to type and
- * their order as they were on the first render; and helpers that size a
- * textarea and cut the week's text down to what has been typed so far.
+ * and from the chapter state PreviewStage passes in. `resolvedHeightCm` and
+ * `resolvedWeightKg` are useBodyModel's figures, passed down by HomePage, and
+ * `toFeetInchesFromCm` and `toLb` are app/units.js's converters. Returns the
+ * derived values; refs holding the values to type and their order as they were
+ * on the first render; and helpers that size a textarea and cut the week's text
+ * down to what has been typed so far.
  */
 export default function usePreviewDerivedData({
   personal,
@@ -51,7 +51,6 @@ export default function usePreviewDerivedData({
   toLb,
   resolvedHeightCm,
   resolvedWeightKg,
-  effectiveBodyFat,
   previewStepIndex,
   previewWeekStage,
   previewWeekHeaderTypingProgress,
@@ -95,11 +94,11 @@ export default function usePreviewDerivedData({
   // ---- The profile: the visitor's, with the sample filling the gaps ---------
   // Every field comes out set. A text field or list the visitor left empty
   // takes the sample's value (`days` falls back first to the count of training
-  // days picked), and a missing height, weight or body fat takes the sample's
-  // number. What follows reads the fields on that basis, so a guard further
-  // down that only tests for a missing value, such as the `?? ""` and
-  // Array.isArray in previewPersonalTargets, cannot fire; one that tests the
-  // value itself, like the session length's `> 0`, is not covered by this.
+  // days picked), and a missing height or weight takes the sample's number.
+  // What follows reads the fields on that basis, so a guard further down that
+  // only tests for a missing value, such as the `?? ""` and Array.isArray in
+  // previewPersonalTargets, cannot fire; one that tests the value itself, like
+  // the session length's `> 0`, is not covered by this.
   // usePreviewDerivedData.test.jsx pins the guarantee.
   const activePreviewProfile = useMemo(
     () => ({
@@ -109,7 +108,6 @@ export default function usePreviewDerivedData({
       sex: personal.sex || JOHN_DOE_PREVIEW_PROFILE.sex,
       heightCm: resolvedHeightCm ?? JOHN_DOE_PREVIEW_PROFILE.heightCm,
       weightKg: resolvedWeightKg ?? JOHN_DOE_PREVIEW_PROFILE.weightKg,
-      bodyFat: effectiveBodyFat ?? JOHN_DOE_PREVIEW_PROFILE.bodyFat,
       activity: personal.activity || JOHN_DOE_PREVIEW_PROFILE.activity,
       sleep: personal.sleep || JOHN_DOE_PREVIEW_PROFILE.sleep,
       timeline: personal.timeline || JOHN_DOE_PREVIEW_PROFILE.timeline,
@@ -134,7 +132,7 @@ export default function usePreviewDerivedData({
           ? form.focuses
           : JOHN_DOE_PREVIEW_PROFILE.focuses
     }),
-    [effectiveBodyFat, form, inferredTrainingDayCount, personal, resolvedHeightCm, resolvedWeightKg]
+    [form, inferredTrainingDayCount, personal, resolvedHeightCm, resolvedWeightKg]
   );
 
   // ---- Body figures and the personal chapter's height and weight ------------
@@ -145,10 +143,6 @@ export default function usePreviewDerivedData({
     Number(activePreviewProfile.heightCm) > 0 ? Number(activePreviewProfile.heightCm) : 175;
   const activeWeightKg =
     Number(activePreviewProfile.weightKg) > 0 ? Number(activePreviewProfile.weightKg) : 72;
-  const previewBmi = Number((activeWeightKg / (activeHeightCm / 100) ** 2).toFixed(1));
-  const previewBodyFat = Number.isFinite(Number(activePreviewProfile.bodyFat))
-    ? roundTo(clamp(Number(activePreviewProfile.bodyFat), 3, 60), 1)
-    : roundTo(clamp(1.35 * previewBmi - 13.5, 3, 60), 1);
 
   const previewHeightSplit = toFeetInchesFromCm(String(Math.round(activeHeightCm)));
   const previewHeightFeet = previewHeightSplit?.feet || "5";
@@ -444,8 +438,6 @@ export default function usePreviewDerivedData({
   ]);
 
   // ---- What the personal chapter types, and in what order -------------------
-  // computedBodyFat is in neither fill order and PreviewPersonalChapter has no
-  // field for it, so nothing reads it.
   const previewPersonalTargets = useMemo(
     () => ({
       name: String(defaultName ?? ""),
@@ -464,8 +456,7 @@ export default function usePreviewDerivedData({
       notes: String(activePreviewProfile.notes ?? ""),
       trainingDays: Array.isArray(activePreviewProfile.trainingDays)
         ? activePreviewProfile.trainingDays
-        : [],
-      computedBodyFat: String(previewBodyFat)
+        : []
     }),
     [
       defaultName,
@@ -482,8 +473,7 @@ export default function usePreviewDerivedData({
       activePreviewProfile.nutrition,
       activePreviewProfile.cardio,
       activePreviewProfile.notes,
-      activePreviewProfile.trainingDays,
-      previewBodyFat
+      activePreviewProfile.trainingDays
     ]
   );
 

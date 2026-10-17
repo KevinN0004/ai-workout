@@ -107,7 +107,6 @@ const renderPreview = (props = {}) =>
       toLb={() => "170"}
       resolvedHeightCm={178}
       resolvedWeightKg={77}
-      effectiveBodyFat={18}
       {...props}
     />
   );
