@@ -47,7 +47,6 @@ vi.mock("../hooks/useBodyModel", () => ({
     resolvedHeightCm: 178,
     resolvedWeightKg: 77,
     isPersonalComplete: flow.state.isPersonalComplete,
-    effectiveBodyFat: 18,
     silhouetteShape: { shoulderHalf: 40 },
     silhouetteRenderSignature: "sig"
   })

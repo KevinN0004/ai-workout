@@ -22,7 +22,6 @@ const render = (overrides = {}) =>
       toLb,
       resolvedHeightCm: null,
       resolvedWeightKg: null,
-      effectiveBodyFat: null,
       previewStepIndex: 0,
       previewWeekStage: 0,
       previewWeekHeaderTypingProgress: 0,
@@ -263,8 +262,7 @@ describe("usePreviewDerivedData", () => {
         trainingDays: ["monday", "wednesday", "friday"]
       },
       resolvedHeightCm: 170,
-      resolvedWeightKg: 65,
-      effectiveBodyFat: 22
+      resolvedWeightKg: 65
     };
 
     test("every field comes back as a string", () => {
@@ -401,67 +399,19 @@ describe("usePreviewDerivedData", () => {
   });
 
   describe("the measurements it derives", () => {
-    test("a supplied body fat is used as given", () => {
-      const { previewPersonalTargets } = render({ effectiveBodyFat: 22.4 });
-      expect(previewPersonalTargets.computedBodyFat).toBe("22.4");
-    });
-
-    test.each([
-      ["below the floor", 1, "3"],
-      ["above the ceiling", 90, "60"]
-    ])("a body fat %s is clamped", (_label, input, expected) => {
-      // These come from a free-text field, so an implausible figure reaches
-      // here and would otherwise drive the whole dashboard estimate.
-      const { previewPersonalTargets } = render({ effectiveBodyFat: input });
-      expect(previewPersonalTargets.computedBodyFat).toBe(expected);
-    });
-
-    test("a null body fat falls back to the sample's rather than estimating", () => {
-      // `??` only falls through on null, so the sample figure is still a real
-      // number here and the BMI estimate is not reached.
-      const { previewPersonalTargets } = render({ effectiveBodyFat: null });
-      expect(previewPersonalTargets.computedBodyFat).toBe(String(JOHN_DOE.bodyFat));
-    });
-
-    test("an unparseable body fat is estimated from BMI rather than left blank", () => {
-      const { previewPersonalTargets } = render({
-        effectiveBodyFat: "not a number",
-        resolvedHeightCm: 180,
-        resolvedWeightKg: 80
-      });
-
-      // 80 / 1.8^2 = 24.7 BMI, and 1.35 * 24.7 - 13.5 is 19.8.
-      expect(previewPersonalTargets.computedBodyFat).toBe("19.8");
-    });
-
     test.each([
       ["zero", 0],
       ["negative", -20]
     ])("a %s height is replaced with a usable default", (_label, heightCm) => {
-      // Dividing by a zero height makes BMI infinite, which clamps to 60 -- a
-      // number still inside every plausible range, so the estimate has to be
-      // checked exactly. The unparseable body fat forces the BMI path; with a
-      // usable one the height never reaches the arithmetic at all.
-      const { previewPersonalTargets } = render({
-        effectiveBodyFat: "unparseable",
-        resolvedHeightCm: heightCm,
-        resolvedWeightKg: 84
-      });
-
-      // Falls back to 175cm, so 84 / 1.75^2 = 27.4 BMI and 1.35 * 27.4 - 13.5.
-      expect(previewPersonalTargets.computedBodyFat).toBe("23.5");
+      // An untyped height field is typed from the resolved height, so one that
+      // cannot be a height falls back to 175cm rather than typing "0" or "-20".
+      const { previewPersonalTargets } = render({ resolvedHeightCm: heightCm });
+      expect(previewPersonalTargets.heightCm).toBe("175");
     });
 
     test("a zero weight is replaced too", () => {
-      // Unguarded this is a BMI of 0, which clamps to the 3% floor.
-      const { previewPersonalTargets } = render({
-        effectiveBodyFat: "unparseable",
-        resolvedWeightKg: 0,
-        resolvedHeightCm: 183
-      });
-
-      // Falls back to 72kg, so 72 / 1.83^2 = 21.5 BMI.
-      expect(previewPersonalTargets.computedBodyFat).toBe("15.5");
+      const { previewPersonalTargets } = render({ resolvedWeightKg: 0 });
+      expect(previewPersonalTargets.weight).toBe("72");
     });
 
     test("a typed height is preferred over the resolved one", () => {
@@ -893,7 +843,6 @@ describe("usePreviewDerivedData", () => {
           toLb,
           resolvedHeightCm: null,
           resolvedWeightKg: null,
-          effectiveBodyFat: null,
           previewStepIndex: 0,
           previewWeekStage: 0,
           previewWeekHeaderTypingProgress: 0,

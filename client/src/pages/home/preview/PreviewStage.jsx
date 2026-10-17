@@ -34,8 +34,7 @@ export default function PreviewStage({
   toFeetInchesFromCm,
   toLb,
   resolvedHeightCm,
-  resolvedWeightKg,
-  effectiveBodyFat
+  resolvedWeightKg
 }) {
   // ---- Refs and state -------------------------------------------------------
   const previewFillTimeoutsRef = useRef([]);
@@ -87,7 +86,6 @@ export default function PreviewStage({
     toLb,
     resolvedHeightCm,
     resolvedWeightKg,
-    effectiveBodyFat,
     previewStepIndex,
     previewWeekStage,
     previewWeekHeaderTypingProgress,
