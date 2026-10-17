@@ -21,7 +21,6 @@ import {
 } from "./app/constants";
 import { buildScopedCacheKey } from "./app/cache";
 import PlannerSetupModal from "./app/components/PlannerSetupModal";
-import GeneratedPlanModal from "./app/components/GeneratedPlanModal";
 import { mergeOptimisticDashboard } from "./app/dashboard";
 import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
@@ -42,8 +41,8 @@ import "./styles/app.css";
 /**
  * Routes on window.location.pathname without a router: /auth, /plan and
  * /dashboard with its subpaths each have a page, and any other path renders
- * HomePage. The planner and generated-plan modals are built here and passed to
- * HomePage and DashboardPage, which both render them.
+ * HomePage. The planner modal is built here and passed to HomePage and
+ * DashboardPage, which both render it.
  */
 export default function App() {
   // ---- State ----------------------------------------------------------------
@@ -115,8 +114,6 @@ export default function App() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [activeDayIndex, setActiveDayIndex] = useState(0);
 
   // ---- Dashboard data and the API client ------------------------------------
   const { apiFetch, ensureCsrfToken } = useApiClient();
@@ -343,7 +340,6 @@ export default function App() {
     setDashboard,
     closePlanner,
     isDashboardRoute,
-    setPlanModalOpen,
     setDashView,
     go,
     personal,
@@ -408,27 +404,6 @@ export default function App() {
   );
 
   const planSections = useMemo(() => parsePlanSections(result), [result]);
-
-  const generatedPlanModal = (
-    <GeneratedPlanModal
-      planModalOpen={planModalOpen}
-      result={result}
-      setPlanModalOpen={setPlanModalOpen}
-      planSections={planSections}
-      activeDayIndex={activeDayIndex}
-      setActiveDayIndex={setActiveDayIndex}
-      downloadPlanPdf={downloadPlanPdf}
-      go={go}
-    />
-  );
-
-  // A new plan opens on its first day. Only GeneratedPlanModal reads
-  // activeDayIndex. `result` is listed as well as the day count so that a plan
-  // with as many days as the last one still resets.
-  useEffect(() => {
-    if (!planSections.days.length) return;
-    setActiveDayIndex(0);
-  }, [planSections.days.length, result]);
 
   const latestPlanByWeekday = useMemo(() => extractLatestPlanByWeekday(dashboard), [dashboard]);
 
@@ -587,7 +562,6 @@ export default function App() {
         onSaveExerciseToPlan={saveExerciseToPlan}
         onRemoveSavedExercise={removeSavedExercise}
         plannerModal={plannerModal}
-        generatedPlanModal={generatedPlanModal}
         dashboardToast={dashboardToast}
         clearDashboardToast={clearDashboardToast}
       />
@@ -619,7 +593,6 @@ export default function App() {
       error={error}
       samplePlan={samplePlan}
       plannerModal={plannerModal}
-      generatedPlanModal={generatedPlanModal}
     />
   );
 }

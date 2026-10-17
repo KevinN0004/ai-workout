@@ -74,7 +74,6 @@ const props = {
   onSaveExerciseToPlan: vi.fn(),
   onRemoveSavedExercise: vi.fn(),
   plannerModal: null,
-  generatedPlanModal: null,
   dashboardToast: null,
   clearDashboardToast: vi.fn()
 };

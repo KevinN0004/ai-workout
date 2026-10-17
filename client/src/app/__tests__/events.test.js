@@ -50,7 +50,6 @@ beforeEach(() => {
     setDashboard: vi.fn(),
     closePlanner: vi.fn(),
     isDashboardRoute: false,
-    setPlanModalOpen: vi.fn(),
     setDashView: vi.fn(),
     go: vi.fn(),
     personal: {},
@@ -1038,13 +1037,12 @@ describe("onSubmit", () => {
       expect(deps.setDashView).not.toHaveBeenCalled();
     });
 
-    test("closes the planner and its modal either way", async () => {
+    test("closes the planner either way", async () => {
       deps.apiFetch.mockResolvedValue(generated());
 
       await build().onSubmit(submitEvent());
 
       expect(deps.closePlanner).toHaveBeenCalledTimes(1);
-      expect(deps.setPlanModalOpen).toHaveBeenCalledWith(false);
     });
   });
 

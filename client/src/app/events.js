@@ -33,7 +33,7 @@ const buildOptimisticId = (type) =>
 
 // jspdf is one of the largest chunks in the build, for a path most sessions
 // never take. Importing it on demand keeps it out of the initial download; the
-// Download PDF buttons are its only callers and can await it.
+// plan page's Download PDF button is its only caller and can await it.
 const downloadPlanPdfFromText = async (planText) => {
   if (!planText) return;
   const { jsPDF } = await import("jspdf");
@@ -81,7 +81,6 @@ export const createAppEventHandlers = ({
   setDashboard,
   closePlanner,
   isDashboardRoute,
-  setPlanModalOpen,
   setDashView,
   go,
   personal,
@@ -163,11 +162,9 @@ export const createAppEventHandlers = ({
       // anywhere else.
       closePlanner();
       if (isDashboardRoute) {
-        setPlanModalOpen(false);
         setDashView("summary");
         go("/dashboard");
       } else {
-        setPlanModalOpen(false);
         go("/plan");
       }
     } catch (err) {
