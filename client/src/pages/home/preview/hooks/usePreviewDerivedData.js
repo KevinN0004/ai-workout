@@ -6,13 +6,12 @@
  */
 import { useMemo, useRef } from "react";
 import {
-  IMPERIAL_REGION_CODES,
   JOHN_DOE_PREVIEW_PROFILE,
   PREVIEW_WEEK_DAY_ORDER,
   PREVIEW_WEEK_MIN_WORKOUT_DAYS
 } from "../constants";
 import { normalizePreviewTrainingDay, clamp, roundTo, getPreviewWeekdayName } from "../utils";
-import { getRegionFromLocale } from "../../../../app/units";
+import { IMPERIAL_REGION_CODES, getRegionFromLocale } from "../../../../app/units";
 
 // Session names and their exercises, paired by index, handed to the week plan's
 // training days in week order and starting over after the last.

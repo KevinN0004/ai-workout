@@ -4,7 +4,13 @@
  * measurement system, today's local date key, height and weight conversion, and
  * reading a value that may be absent as a number or null.
  */
-const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
+
+/**
+ * The regions that measure height in feet and inches and weight in pounds.
+ * getPreferredMeasurementSystem picks App's units by it, and usePreviewDerivedData
+ * the walkthrough's.
+ */
+export const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
 
 /**
  * Splits a full name at whitespace: the first word is the first name and the
