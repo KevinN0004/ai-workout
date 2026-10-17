@@ -1,6 +1,6 @@
-﻿/* The planner modals on smaller screens: the training form in one column, the generated
-   plan modal sized to the screen, and smaller setup modal controls. Imported third by
-   styles/app.css, after the planner rules it overrides at the same specificity. */
+﻿/* The planner modal on smaller screens: the training form in one column and smaller
+   controls. Imported third by styles/app.css, after the planner rules it overrides at the
+   same specificity. */
 
 /* ---- Training form in one column ----------------------------------------- */
 @media (max-width: 860px) {
@@ -11,47 +11,6 @@
 
 /* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
-  .plan-modal-backdrop {
-    padding: 14px;
-  }
-
-  .plan-modal {
-    width: min(1200px, 100%);
-    height: auto;
-    max-height: calc(100dvh - 28px);
-    border-radius: 18px;
-    padding: 18px 14px;
-  }
-
-  .plan-modal-content {
-    gap: 16px;
-  }
-
-  .plan-day {
-    padding: 14px;
-  }
-
-  .plan-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: thin;
-  }
-
-  .plan-tabs button {
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
-  .plan-modal-footer .modal-actions {
-    width: 100%;
-  }
-
-  .plan-modal-footer .modal-actions .ghost,
-  .plan-modal-footer .modal-actions .cta {
-    width: 100%;
-  }
-
   .planner-setup-modal .modal-header {
     grid-template-columns: 40px 1fr 40px;
   }

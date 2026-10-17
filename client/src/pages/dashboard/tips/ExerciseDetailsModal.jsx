@@ -22,8 +22,7 @@ export default function ExerciseDetailsModal({
   // condition there would add a check that is always true by the time it runs,
   // so no test could tell it working from broken. The children read
   // `selectedExercise.name` before ModalPortal runs, so this guard is also what
-  // keeps a null exercise from throwing. GeneratedPlanModal follows the same
-  // one-guard rule.
+  // keeps a null exercise from throwing.
   if (!selectedExercise) return null;
 
   return (

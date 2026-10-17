@@ -1,6 +1,6 @@
 /**
  * The dashboard page: header, navigation, the glance panel and the active view,
- * with the toast, the workout modal and App's planner modals. Rendered by App
+ * with the toast, the workout modal and App's planner modal. Rendered by App
  * on /dashboard and every path under it.
  */
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
@@ -113,7 +113,6 @@ export default function DashboardPage({
   onSaveExerciseToPlan,
   onRemoveSavedExercise,
   plannerModal,
-  generatedPlanModal,
   dashboardToast,
   clearDashboardToast
 }) {
@@ -538,7 +537,6 @@ export default function DashboardPage({
         />
 
         {plannerModal}
-        {generatedPlanModal}
       </div>
 
       {/* ---- Navigation: the drawer and the bottom bar ---- */}

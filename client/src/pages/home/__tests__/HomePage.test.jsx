@@ -105,7 +105,6 @@ const renderHome = (overrides = {}, props = {}) => {
       error=""
       samplePlan={[{ day: "Monday" }]}
       plannerModal={<div data-testid="planner-modal" />}
-      generatedPlanModal={<div data-testid="generated-modal" />}
       {...props}
     />
   );
@@ -159,12 +158,11 @@ describe("HomePage", () => {
       );
     });
 
-    test("the measure shell and both modals render whatever the stage", () => {
+    test("the measure shell and the planner modal render whatever the stage", () => {
       renderHome({ homeStage: "intro" });
 
       expect(screen.getByTestId("workout-measure")).toBeInTheDocument();
       expect(screen.getByTestId("planner-modal")).toBeInTheDocument();
-      expect(screen.getByTestId("generated-modal")).toBeInTheDocument();
     });
   });
 

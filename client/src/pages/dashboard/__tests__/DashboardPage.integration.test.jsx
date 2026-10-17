@@ -124,7 +124,6 @@ function DashboardHarness() {
       onSaveExerciseToPlan={noop}
       onRemoveSavedExercise={noop}
       plannerModal={null}
-      generatedPlanModal={null}
       dashboardToast={toast}
       clearDashboardToast={() => setToast(null)}
     />

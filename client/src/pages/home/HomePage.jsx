@@ -1,8 +1,7 @@
 ﻿/**
  * The home page: the intro, the walkthrough preview, the profile form, the
  * physique silhouette and the workout stage, one at a time, with the planner
- * and generated-plan modals App builds. Rendered by App for any path it does
- * not route elsewhere.
+ * modal App builds. Rendered by App for any path it does not route elsewhere.
  */
 // First on purpose, ahead of PreviewStage: imported after it, this sheet would
 // follow PreviewStage.css in the built stylesheet and reorder the cascade.
@@ -44,8 +43,8 @@ const VISUAL_LABEL =
  * Shows the stage useHomeStageFlow is on, feeding the stages the body model
  * useBodyModel derives from App's `personal` form. Most props are App's form
  * state, setters and unit converters, passed through to the stage that uses
- * them. `samplePlan` is the plan the workout stage shows; `plannerModal` and
- * `generatedPlanModal` are App's elements, rendered here whatever the stage.
+ * them. `samplePlan` is the plan the workout stage shows; `plannerModal` is
+ * App's element, rendered here whatever the stage.
  * The hidden workout copy is always rendered too, so the workout panel can be
  * measured before its stage exists.
  */
@@ -72,8 +71,7 @@ export default function HomePage({
   openPlannerFromProfile,
   error,
   samplePlan,
-  plannerModal,
-  generatedPlanModal
+  plannerModal
 }) {
   // ---- Training days --------------------------------------------------------
   const toggleTrainingDay = (day) => {
@@ -253,9 +251,8 @@ export default function HomePage({
         </main>
       )}
 
-      {/* ---- App's modals, and the hidden workout copy ---- */}
+      {/* ---- App's planner modal, and the hidden workout copy ---- */}
       {plannerModal}
-      {generatedPlanModal}
 
       <HomeWorkoutMeasure
         workoutMeasureShellRef={workoutMeasureShellRef}
