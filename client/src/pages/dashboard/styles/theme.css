@@ -420,16 +420,14 @@
   border-color: #eee;
 }
 
-.modal.dashboard-modal .cta,
-.modal.dashboard-modal .back-btn {
+.modal.dashboard-modal .cta {
   background: #fff !important;
   color: #000 !important;
   border: 1px solid #fff !important;
   box-shadow: none !important;
 }
 
-.modal.dashboard-modal .cta:hover:not(:disabled),
-.modal.dashboard-modal .back-btn:hover:not(:disabled) {
+.modal.dashboard-modal .cta:hover:not(:disabled) {
   background: #e5e5e5 !important;
   color: #000 !important;
   border-color: #e5e5e5 !important;

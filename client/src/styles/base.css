@@ -340,9 +340,7 @@ select:focus {
 }
 
 /* ---- Back button gradient ------------------------------------------------ */
-.back-btn,
-.ghost.back-btn,
-.modal .ghost.back-btn {
+.back-btn {
   appearance: none;
   -webkit-appearance: none;
   border-radius: 999px;
@@ -358,9 +356,7 @@ select:focus {
     0 0 28px rgba(255, 135, 58, 0.38) !important;
 }
 
-.back-btn:hover:not(:disabled),
-.ghost.back-btn:hover:not(:disabled),
-.modal .ghost.back-btn:hover:not(:disabled) {
+.back-btn:hover:not(:disabled) {
   background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
   border-color: rgba(255, 106, 88, 0.94) !important;
   color: #fff !important;
@@ -369,9 +365,7 @@ select:focus {
     0 0 34px rgba(255, 135, 58, 0.46) !important;
 }
 
-.back-btn:disabled,
-.ghost.back-btn:disabled,
-.modal .ghost.back-btn:disabled {
+.back-btn:disabled {
   opacity: 1;
   box-shadow: none;
   cursor: not-allowed;
@@ -479,8 +473,7 @@ select:focus {
     flex-wrap: wrap;
   }
 
-  .modal-actions .cta,
-  .modal-actions .back-btn {
+  .modal-actions .cta {
     width: 100%;
   }
 

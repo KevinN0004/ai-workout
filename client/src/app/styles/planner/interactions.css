@@ -144,7 +144,6 @@
 .planner-setup-modal .segmented button,
 .planner-setup-modal .equip-card,
 .planner-setup-modal .focus-chip,
-.planner-setup-modal .modal-actions .ghost,
 .planner-setup-modal .modal-actions .cta,
 .planner-setup-modal .planner-close-icon {
   transition:
@@ -159,7 +158,6 @@
 .planner-setup-modal .segmented button:hover,
 .planner-setup-modal .equip-card:hover,
 .planner-setup-modal .focus-chip:hover,
-.planner-setup-modal .modal-actions .ghost:hover,
 .planner-setup-modal .modal-actions .cta:hover,
 .planner-setup-modal .planner-close-icon:hover {
   transform: translateY(-1px);
@@ -168,43 +166,9 @@
 .planner-setup-modal .segmented button:active,
 .planner-setup-modal .equip-card:active,
 .planner-setup-modal .focus-chip:active,
-.planner-setup-modal .modal-actions .ghost:active,
 .planner-setup-modal .modal-actions .cta:active,
 .planner-setup-modal .planner-close-icon:active {
   transform: scale(0.97);
-}
-
-/* ---- Back button in the actions row -------------------------------------- */
-/* Matches nothing: PlannerSetupModal puts only .cta buttons in .modal-actions. Its back
-   button is the header arrow, styled below. */
-.planner-setup-modal .modal-actions .back-btn {
-  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
-  border-color: rgba(255, 106, 88, 0.94) !important;
-  color: #fff !important;
-  box-shadow:
-    0 0 12px rgba(255, 61, 88, 0.56),
-    0 0 28px rgba(255, 135, 58, 0.38) !important;
-}
-
-.planner-setup-modal .modal-actions .back-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
-  border-color: rgba(255, 106, 88, 0.94) !important;
-  color: #fff !important;
-  box-shadow:
-    0 0 16px rgba(255, 61, 88, 0.68),
-    0 0 34px rgba(255, 135, 58, 0.46) !important;
-}
-
-.planner-setup-modal .modal-actions .back-btn:active:not(:disabled),
-.planner-setup-modal .modal-actions .back-btn:focus-visible {
-  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
-  border-color: rgba(255, 106, 88, 0.94) !important;
-  color: #fff !important;
-}
-
-.planner-setup-modal .modal-actions .back-btn:disabled {
-  opacity: 1;
-  box-shadow: none;
 }
 
 /* ---- Header back arrow --------------------------------------------------- */
