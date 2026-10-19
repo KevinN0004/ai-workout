@@ -15,13 +15,11 @@ vi.mock("@google/genai", () => ({
 import { app } from "../index.js";
 import { prisma } from "../db/prisma.js";
 
-// Task 5 and 6 added POST /api/auth/password and DELETE /api/auth/me to
-// authRoutes.js and fully tested them against a hand-built buildApp(overrides)
-// test harness. That harness passes every dependency directly, so it proves
-// nothing about the real app: index.js injects the actual dependency object
-// into registerApiRoutes, and a missing key there is invisible until someone
-// calls the route at runtime -- registerAuthRoutes destructures an absent key
-// as undefined with no error at import time.
+// authRoutes.test.js and generateRoutes.equipment.test.js build their routes
+// from dependencies passed by hand, which proves nothing about the real app:
+// index.js injects the actual dependency object into registerApiRoutes, and a
+// missing key there is invisible until someone calls the route at runtime -- a
+// route destructures an absent key as undefined with no error at import time.
 //
 // This file pins that wiring against the real `app`.
 //

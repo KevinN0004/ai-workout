@@ -5,8 +5,8 @@
       // The first four are Claude Code hook targets, invoked from
       // .claude/settings.json, which knip cannot see. Without them knip reports
       // all of them as unused files, then cascades to scripts/codex-handoff/*.mjs
-      // because their only importer looks dead -- six false positives inviting
-      // you to delete live hook wiring.
+      // because their only importer looks dead -- a false positive for every hook
+      // file, inviting you to delete live hook wiring.
       "entry": [
         "scripts/codex-handoff.mjs",
         "scripts/run-claude-helper.cjs",

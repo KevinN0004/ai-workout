@@ -188,8 +188,8 @@ describe("passwordChangedAt invalidation", () => {
   });
 
   test("a session created in the same millisecond as the change survives", async () => {
-    // Task 5 mints a replacement session immediately after stamping
-    // passwordChangedAt, so the two can share a millisecond. Strict `<` is what
+    // POST /api/auth/password mints a replacement session immediately after
+    // stamping passwordChangedAt, so the two can share a millisecond. Strict `<` is what
     // lets that session live; `<=` would sign the user out the moment they
     // changed their password.
     let changedAt = null;
