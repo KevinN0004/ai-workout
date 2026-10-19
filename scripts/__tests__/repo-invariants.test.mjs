@@ -663,3 +663,68 @@ describe("every source file opens with a header comment", () => {
     ).toBe(ALLOWLIST_SIZE);
   });
 });
+
+describe("the coverage floors agree with their measurement notes", () => {
+  // CLAUDE.md names no floor: it points at the two configs, where each side's
+  // `thresholds` sits under a note giving the figures it was floored from,
+  // "Measured <date> (statements / branches / functions / lines)", as
+  // coverage-summary.json reports them, to two decimals. Each floor is its
+  // figure truncated to one decimal, so a floor PR changes a note and its floors
+  // together. This fails when one changes without the other, and when a figure
+  // rose past a tenth and its floor was not raised with it.
+  const CONFIGS = ["client/vite.config.js", "server/vitest.config.js"];
+  const METRICS = ["statements", "branches", "functions", "lines"];
+
+  // "98.86" -> 98.8, "99" -> 99. Done on the text, which is exact.
+  const toTenths = (figure) => {
+    const [whole, fraction = ""] = figure.split(".");
+    return Number(`${whole}.${fraction.slice(0, 1) || "0"}`);
+  };
+
+  // Read as text rather than imported: the note is a comment, and importing
+  // client/vite.config.js would load its Vite plugins for nothing.
+  const readConfig = (file) => {
+    const text = readFileSync(path.join(repoRoot, file), "utf8");
+    const block = text.match(/thresholds:\s*\{([^}]*)\}/)?.[1] ?? "";
+    const floors = METRICS.map((metric) => {
+      const match = block.match(new RegExp(String.raw`\b${metric}:\s*(\d+(?:\.\d+)?)`));
+      return match ? Number(match[1]) : undefined;
+    });
+    const note = text.match(
+      /Measured \d{4}-\d{2}-\d{2} \((\d+(?:\.\d+)?) \/ (\d+(?:\.\d+)?) \/ (\d+(?:\.\d+)?) \/ (\d+(?:\.\d+)?)\)/
+    );
+    return { floors, measured: note ? note.slice(1, 5) : [] };
+  };
+  const byMetric = (values) => Object.fromEntries(METRICS.map((metric, i) => [metric, values[i]]));
+
+  test.each([
+    ["98.86", 98.8],
+    ["99.50", 99.5],
+    ["88.29", 88.2],
+    ["96.2", 96.2],
+    ["99", 99]
+  ])("a measured %s floors to %s", (figure, floor) => {
+    expect(toTenths(figure)).toBe(floor);
+  });
+
+  test.each(CONFIGS)("%s has four floors and a measurement note", (file) => {
+    // Guards the parsing: without it a moved note would pass the next test
+    // vacuously, with nothing compared.
+    const { floors, measured } = readConfig(file);
+    expect(floors.every((floor) => Number.isFinite(floor))).toBe(true);
+    expect(measured).toHaveLength(4);
+  });
+
+  test.each(CONFIGS)("%s: each floor is its measured figure truncated to one decimal", (file) => {
+    const { floors, measured } = readConfig(file);
+    expect(
+      byMetric(floors),
+      "a floor PR updates the note and the floors together (spec rule 3)"
+    ).toEqual(byMetric(measured.map(toTenths)));
+  });
+
+  test("CLAUDE.md points at both configs for the floors", () => {
+    const claude = readFileSync(path.join(repoRoot, "CLAUDE.md"), "utf8");
+    for (const file of CONFIGS) expect(claude).toContain(`\`${file}\``);
+  });
+});
