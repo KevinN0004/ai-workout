@@ -159,7 +159,8 @@ describe("POST /api/dashboard/meal-logs", () => {
   });
 
   // Meal logs feeding the calories view. The rules are taken from the Mongo
-  // pipeline that was supposed to do this and never ran -- see the plan doc.
+  // pipeline that was supposed to do this and never ran; see
+  // docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md.
   describe("derived calorie entries", () => {
     test("creates a meal_logs entry holding the day's total", async () => {
       const response = await postMeal(agent, csrfToken, {

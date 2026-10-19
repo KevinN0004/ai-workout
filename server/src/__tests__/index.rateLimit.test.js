@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-// The four limiters are the app's only defence against credential stuffing and
-// against an anonymous caller burning the Gemini quota, and each one's handler
-// -- the 429 body, the scope label on the log line, the metrics counter -- ran
-// untested. index.test.js already loops until it sees *a* 429 on /api/generate,
-// but it never asserts which limiter answered, so three of the four handlers
-// were uncovered and any of them could have returned another's message.
+// The five limiters are the app's only defence against credential stuffing and
+// against an anonymous caller burning the Gemini quota. index.test.js loops
+// until it sees *a* 429 on /api/generate but never asserts which limiter
+// answered, so this file does: each limiter has a case that expects its own 429
+// body, and one case checks the metrics counter a limited request moves.
 //
 // Every limit is read from the environment once at import, so each case gets a
 // freshly imported app with the one limit under test set to 1 and the rest set
@@ -123,10 +122,10 @@ describe("rate limiters", () => {
     expect((await limited.json()).error).toBe("Too many sign-in attempts. Please try again later.");
   });
 
-  // Finding 1: the password-change and account-deletion routes previously had
-  // only the global /api budget behind them, ~8x looser than login for a
-  // guess that costs the same argon2id verify. This is the credential
-  // limiter's own regression coverage.
+  // Without the credential limiter, the password-change and account-deletion
+  // routes would have only the global /api budget behind them: at the defaults,
+  // about eight times looser than login's for a guess that costs the same
+  // argon2id verify.
   test("the credential limiter answers repeated password-verification attempts with 429", async () => {
     const baseUrl = await startApp("CREDENTIAL_RATE_LIMIT_MAX");
 
@@ -153,10 +152,10 @@ describe("rate limiters", () => {
     expect((await limited.json()).error).toBe("Too many attempts. Please try again later.");
   });
 
-  // The regression this finding explicitly warns against: binding the
-  // credential limiter to the whole /api/auth/me path (app.use) rather than
-  // to DELETE alone would also throttle this GET, which the client calls on
-  // every page load to check the session.
+  // The regression to guard against here: binding the credential limiter to
+  // the whole /api/auth/me path (app.use) rather than to DELETE alone would
+  // also throttle this GET, which the client calls on every page load to check
+  // the session.
   test("GET /api/auth/me is not subject to the credential limiter", async () => {
     const baseUrl = await startApp("CREDENTIAL_RATE_LIMIT_MAX");
 

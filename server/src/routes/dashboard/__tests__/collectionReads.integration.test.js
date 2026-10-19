@@ -3,12 +3,10 @@ import request from "supertest";
 import { app } from "../../../index.js";
 import { prisma } from "../../../db/prisma.js";
 
-// Pins the paginated dashboard collection reads against real Postgres before
-// loadCollectionPage is migrated off the Mongo compatibility shim.
-//
-// All three collections share one generic read path, so they are covered
-// together -- that shared-ness is why the read side cannot be migrated one model
-// at a time the way the plan originally assumed.
+// Pins the paginated dashboard collection reads against real Postgres. The
+// three collections (workout sessions, meal logs, progress metrics) share one
+// generic read path, loadCollectionPage in
+// repositories/dashboardCollectionRepository.js, so they are covered together.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
