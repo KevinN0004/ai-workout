@@ -57,9 +57,10 @@ services:
         sync: false
 
       # Required when NODE_ENV=production, and the preflight refuses to start
-      # without it. Same-origin serving means CORS is barely exercised, but the
-      # check is unconditional. Set it to this service's own URL, e.g.
-      # https://ai-workout.onrender.com
+      # without it. Same-origin serving still goes through CORS: a browser sends
+      # an Origin header on same-origin writes, and Chromium on the bundle's
+      # crossorigin script and stylesheet loads, so an unlisted origin gets 403.
+      # Set it to this service's own URL, e.g. https://ai-workout.onrender.com
       - key: CLIENT_ORIGIN
         sync: false
 
