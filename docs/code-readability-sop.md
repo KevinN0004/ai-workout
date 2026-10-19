@@ -22,7 +22,8 @@ owns or uses it. A line holding only a delimiter (`/**`, `/*`, `*/` or `//`) doe
   one, it goes below the header.
 
 `scripts/__tests__/repo-invariants.test.mjs` fails on a file in its scope that does not
-open with a header. The scope is every tracked `.js`, `.jsx`, `.mjs`, `.cjs` and `.css` file
+open with a header, or whose header has more than four lines of text. The scope is every
+tracked `.js`, `.jsx`, `.mjs`, `.cjs` and `.css` file
 under `client/src`, `server/src`, `server/scripts`, `scripts` and `e2e`, plus every
 `*.config.js`, leaving out tests: `*.test.*` and `*.spec.*` files, anything in a
 `__tests__/` folder, and `client/src/test/setup.js`. `server/vitest.setup.js` is test setup

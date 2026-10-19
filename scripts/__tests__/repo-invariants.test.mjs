@@ -452,8 +452,8 @@ describe("the Deploy workflow deploys only this repository's own pushes", () => 
 
 describe("every source file opens with a header comment", () => {
   // docs/code-readability-sop.md asks every non-test source file to open with a
-  // comment saying what it is for. This checks presence only; whether a header
-  // is any good is review's job.
+  // comment of one to four lines saying what it is for. This checks that the
+  // header is there and how long it is; whether it is any good is review's job.
   //
   // file-header-allowlist.json is empty, so every in-scope source file must
   // open with a header: a new file gets one, never an entry. ALLOWLIST_SIZE
@@ -484,9 +484,12 @@ describe("every source file opens with a header comment", () => {
     /^(eslint-(disable|enable|env)\b|prettier-ignore\b|(istanbul|c8|v8)\s+ignore\b|@ts-(check|nocheck|ignore|expect-error)\b|@vitest-environment\b)/;
   const BLOCK_ONLY_DIRECTIVE = /^eslint\s+[\w@/-]+\s*:/;
   const JS_BLOCK_ONLY_DIRECTIVE = /^globals?(\s|$)/;
-  // True when, after a byte-order mark and a shebang line, the text opens with a
-  // comment whose first line of content is not a tool directive.
-  const hasHeaderText = (file, text) => {
+  // The comment the text opens with, after a byte-order mark and a shebang
+  // line: a run of `//` lines, or one block comment. `content` is its lines of
+  // text, each without its comment marker; a line left empty is dropped, which
+  // is rule 1's "a line holding only a delimiter does not count". Null when the
+  // text opens with neither.
+  const headerOf = (text) => {
     const withoutBom = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
     const body = withoutBom.replace(/^#!.*\r?\n/, "").trimStart();
     const isBlock = body.startsWith("/*");
@@ -501,16 +504,29 @@ describe("every source file opens with a header comment", () => {
       const end = body.indexOf("*/", 2);
       lines = body.slice(2, end === -1 ? undefined : end).split(/\r?\n/);
     } else {
-      return false;
+      return null;
     }
-    const content =
-      lines.map((line) => line.replace(/^\s*[*!]+/, "").trim()).find((line) => line !== "") ?? "";
-    if (content === "" || TOOL_DIRECTIVE.test(content)) return false;
-    if (!isBlock) return true;
-    if (BLOCK_ONLY_DIRECTIVE.test(content)) return false;
-    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(content));
+    const content = lines
+      .map((line) => line.replace(/^\s*[*!]+/, "").trim())
+      .filter((line) => line !== "");
+    return { isBlock, content };
+  };
+  // True when the text opens with a comment whose first line of content is not
+  // a tool directive.
+  const hasHeaderText = (file, text) => {
+    const header = headerOf(text);
+    if (!header) return false;
+    const first = header.content[0] ?? "";
+    if (first === "" || TOOL_DIRECTIVE.test(first)) return false;
+    if (!header.isBlock) return true;
+    if (BLOCK_ONLY_DIRECTIVE.test(first)) return false;
+    return !(/\.(js|jsx|mjs|cjs)$/.test(file) && JS_BLOCK_ONLY_DIRECTIVE.test(first));
   };
   const hasHeader = (file) => hasHeaderText(file, readFileSync(path.join(repoRoot, file), "utf8"));
+
+  // Rule 1 allows one to four lines of text.
+  const HEADER_MAX_LINES = 4;
+  const headerLineCount = (text) => headerOf(text)?.content.length ?? 0;
 
   const allowlist = JSON.parse(
     readFileSync(path.join(repoRoot, "scripts", "__tests__", "file-header-allowlist.json"), "utf8")
@@ -593,6 +609,33 @@ describe("every source file opens with a header comment", () => {
     expect(
       missing,
       "give each file a header comment (docs/code-readability-sop.md, rule 1); never add it to file-header-allowlist.json"
+    ).toEqual([]);
+  });
+
+  test.each([
+    ["a four-line block", "/**\n * One.\n * Two.\n * Three.\n * Four.\n */\n", 4],
+    ["a CSS block with text on its delimiter lines", "/* One.\n   Two.\n   Three. */\n", 3],
+    ["a blank line inside a block", "/**\n * One.\n *\n * Two.\n */\n", 2],
+    [
+      "line comments, up to the first line that is not one",
+      "// One.\n// Two.\n\n// Not the header.\n",
+      2
+    ],
+    ["CRLF line endings", "/**\r\n * One.\r\n * Two.\r\n */\r\n", 2],
+    ["a five-line block", "/**\n * 1.\n * 2.\n * 3.\n * 4.\n * 5.\n */\n", 5],
+    ["no comment first", 'import x from "y";\n', 0]
+  ])("the header's lines of text: %s", (_label, text, expected) => {
+    expect(headerLineCount(text)).toBe(expected);
+  });
+
+  test("every source file's header is at most HEADER_MAX_LINES lines of text", () => {
+    const long = sources
+      .map((file) => [file, headerLineCount(readFileSync(path.join(repoRoot, file), "utf8"))])
+      .filter(([, count]) => count > HEADER_MAX_LINES)
+      .map(([file, count]) => `${file}: ${count} lines`);
+    expect(
+      long,
+      "trim each header to four lines of text (docs/code-readability-sop.md, rule 1); move the rest to a comment below it"
     ).toEqual([]);
   });
 
