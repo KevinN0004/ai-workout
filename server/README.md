@@ -5,7 +5,8 @@ The server is an Express API for AI Workout. It handles authentication, sessions
 ## Main Responsibilities
 
 - User signup, login, logout, session lookup, and profile updates
-- Cookie sessions with optional Redis storage and in-memory fallback
+- Cookie sessions, stored in Redis when it is configured and connects at startup, in
+  memory otherwise
 - CSRF protection for unsafe API methods
 - Dashboard reads and writes for workouts, calories, goals, meals, progress metrics, plans, and saved exercises
 - Postgres persistence through Prisma Client
@@ -237,10 +238,11 @@ there, and only the generate-route tests will say so.
 
 ## Sessions
 
-Redis-backed when `REDIS_URL`, or `REDIS_HOST` **and** a valid `REDIS_PORT`, are set;
-in-memory otherwise. A host without a usable port counts as _no_ configuration rather
-than a broken one, and a failed connection falls back to memory and disconnects the
-client so it does not retry and log forever.
+Redis-backed when `REDIS_URL`, or `REDIS_HOST` **and** a valid `REDIS_PORT`, are set and
+Redis connects at startup; in-memory otherwise. A host without a usable port counts as
+_no_ configuration rather than a broken one, and a connection that fails at startup falls
+back to memory and disconnects the client so it does not retry and log forever. The store
+is chosen once, there.
 
 **The two cookies differ deliberately.** `sid` is `HttpOnly` so script cannot read it;
 the CSRF cookie is **not**, because the client has to read it to echo it back in a header
@@ -248,20 +250,14 @@ for the double-submit check to mean anything. `appendSetCookieHeader` accumulate
 than overwrites — signup writes both on one response, and overwriting would silently drop
 whichever went first. Remember-me is the presence or absence of `Max-Age` on `sid`.
 
-**Known inconsistency in the Redis fallback.** When Redis is connected:
-
-- `createSession` catches a write failure and falls back to the in-memory map.
-- `getSessionByToken` consults **only** Redis — a miss returns null; memory is never read.
-- `deleteSession` returns after the Redis delete and never touches memory.
-
-So a session created during a Redis blip is written to memory but cannot be read back —
-the user is signed out on their next request — and sign-out cannot clear it. It is not
-inert either: if Redis is later disabled (including by `closeSessionStore`), those
-entries begin resolving as live sessions. There are tests pinning both halves.
-
-Making the read fall back to memory would fix the sign-out but would also let a _deleted_
-session return, so this wants a decision about which store is authoritative rather than a
-patch.
+**While Redis is the store, a failed session command is a 503, never a fallback to
+memory.** `createSession`, `getSessionByToken` and `deleteSession` each run their Redis
+command through `runSessionCommand`, which logs the failure and throws
+`SessionStoreUnavailableError` (status 503), and `sessionErrorStatus` is how a route turns
+it into that answer. So a sign-in during an outage gets a 503 and no cookie, rather than a
+session written to memory that the next request, which reads only Redis, could not find.
+`REDIS_COMMAND_TIMEOUT_MS` (1.5 s) bounds how long a command waits to reach the socket, so
+that answer comes quickly.
 
 ## Security Notes
 

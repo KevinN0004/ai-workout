@@ -7,7 +7,7 @@ The client is a React 19 + Vite application for the AI Workout user experience. 
 - Multi-step home flow for profile capture, body visualization, workout setup, and preview
 - Authentication screens for login and signup
 - Dashboard routes for summary, workout logs, goals, weekly plans, meal prep, exercise guides, and settings
-- Workout plan generation modal with PDF export support
+- The planner setup modal, and the generated plan's page (`/plan`) with PDF export
 - CSRF-aware API helper for authenticated writes
 - Local caching for dashboard, weather, and air-quality data
 
@@ -21,7 +21,8 @@ client/
 |   |-- main.jsx                # Entry point
 |   |-- App.jsx                 # Top-level routing and app state
 |   |-- app/                    # Shared constants, hooks, routing, cache, API helpers;
-|   |                           #   the planner modals with their CSS and images
+|   |                           #   the planner setup modal, the error boundary, and
+|   |                           #   the planner's CSS and images
 |   |-- components/             # Shared UI components
 |   |-- hooks/                  # Shared hooks
 |   |-- pages/                  # One folder per route, with its own parts
@@ -86,9 +87,9 @@ Use `src/app/network.js` when a request should have an explicit timeout.
 
 ## Bundle Notes
 
-The main chunk is ~487 kB (~149 kB gzipped) and the build emits no size warning, but
-only ~13 kB separates it from the 500 kB threshold. It was ~407 kB until React 19, which
-alone added the difference. Two things keep it under:
+The main chunk sits close under Vite's 500 kB warning: `npm run build` prints its size,
+as `dist/assets/index-*.js`, and today the build emits no warning. It was ~407 kB until
+React 19, which alone added the difference. Two things keep it under:
 
 - **`jspdf` is imported dynamically**, inside the export handler in `app/events.js`.
   It is ~399 kB on its own and most sessions never export a PDF. Turning that back into

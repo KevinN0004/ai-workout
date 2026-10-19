@@ -159,8 +159,10 @@ six-hour buffer that serves old data when an upstream is down.
 
    It looks like `https://ai-workout.onrender.com`, with no trailing slash.
 
-   The server refuses to start in production without it. Same-origin serving
-   means CORS is barely exercised, but the startup check is unconditional.
+   The server refuses to start in production without it, and it matters after
+   that too: a browser sends an `Origin` header on every same-origin write, and
+   Chromium on the bundle's `crossorigin` script and stylesheet loads, so a
+   service that does not list its own URL answers those requests 403.
 
 5. Create the service. The first Docker build takes several minutes.
 

@@ -2,11 +2,13 @@
 
 Playwright suites: the only tests that run the client and the server together. Everything else tests one side of the wire. The client suite mocks `fetch` and the server suite drives Express with supertest, so a defect in the wiring between them passes both.
 
-| Suite                | Tests | Covers                                                                                                                                                                        |
-| -------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `smoke.spec.js`      | 4     | Sign up, log a workout that survives a reload, change the password without being signed out, delete the account                                                               |
-| `a11y.spec.js`       | 10    | axe scans that must find zero violations: login, signup, the dashboard, an open modal, keyboard-only modal dismissal, the settings forms and every state of the account panel |
-| `deployable.spec.js` | 5     | The Express-served app: renders with no CSP violations, loads its fonts, reaches its own API, serves client routes while still 404ing unknown `/api` paths, caches correctly  |
+| Suite                | Covers                                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `smoke.spec.js`      | Sign up, log a workout that survives a reload, change the password without being signed out, delete the account                                                               |
+| `a11y.spec.js`       | axe scans that must find zero violations: login, signup, the dashboard, an open modal, keyboard-only modal dismissal, the settings forms and every state of the account panel |
+| `deployable.spec.js` | The Express-served app: renders with no CSP violations, loads its fonts, reaches its own API, serves client routes while still 404ing unknown `/api` paths, caches correctly  |
+
+`npx playwright test --list` lists every test, by project.
 
 ## Running
 

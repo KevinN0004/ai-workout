@@ -7,7 +7,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 - React 19 and Vite for the frontend
 - Express 5 for the API server
 - Postgres with Prisma Client for user and dashboard data
-- Optional Redis-backed sessions with in-memory fallback
+- Sessions in Redis when it is configured and connects at startup, in memory otherwise
 - Google Gemini for weekly workout plan generation
 - Vitest for client and server tests
 
@@ -21,7 +21,8 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |       |-- main.jsx          # entry point
 |       |-- App.jsx           # top-level routing and state
 |       |-- app/              # app-wide logic: API client, cache, events, routing,
-|       |                     #   units; the planner modals with their CSS and images
+|       |                     #   units; the planner setup modal, the error boundary,
+|       |                     #   and the planner's CSS and images
 |       |-- components/       # shared components: modal portal
 |       |-- hooks/            # shared hooks: scroll lock, close on Escape
 |       |-- pages/            # one folder per route: auth, dashboard, home,
@@ -389,7 +390,10 @@ session store and sign every user out.
    required.
    Set `CLIENT_ORIGIN` to the service's own URL once Render assigns it, e.g.
    `https://ai-workout.onrender.com` — the production preflight refuses to start
-   without it, even though same-origin serving means CORS is barely exercised.
+   without it. Serving the page from the same origin does not take CORS out of the
+   path: a browser sends an `Origin` header on every same-origin write, and Chromium
+   on the bundle's `crossorigin` script and stylesheet loads, so a service that does
+   not list its own URL answers those requests 403.
 4. **GitHub** — add three repository secrets: `PRODUCTION_DATABASE_URL` (the same
    Neon URL), `RENDER_DEPLOY_HOOK_URL` (Render → the service → Settings → Deploy
    Hook) and `RENDER_SERVICE_URL`.

@@ -18,9 +18,18 @@ The four hook scripts are wired in `.claude/settings.json`, which knip cannot se
 
 - every resolved `qs` stays on a patched release;
 - `env.example` lists exactly the variables the server reads;
-- every `scripts/` path in `.claude/settings.json` exists;
+- every `scripts/` path in `.claude/settings.json` exists, and no hook reaches an
+  untracked `.claude/` file except through `run-claude-helper.cjs`, whose behaviour it
+  also tests;
+- no Neon scaffolding reaches a manifest, and `knip.jsonc` is the only knip config and
+  still declares the hook scripts;
 - the rate-limit store and limiter majors are a pairing this repo has actually run;
-- the deploy workflow only deploys this repository's own pushes.
+- the deploy workflow only deploys this repository's own pushes, from the commit CI
+  passed;
+- every source file opens with a header of at most four lines of text
+  ([`docs/code-readability-sop.md`](../docs/code-readability-sop.md), rule 1);
+- each coverage floor is its config's measurement note truncated to one decimal, and
+  `CLAUDE.md` points at both configs for them.
 
 ```bash
 npm run test:scripts
