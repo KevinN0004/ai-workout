@@ -46,8 +46,8 @@ describe("toFiniteNumber", () => {
 
   // Absent input is rejected before the coercion, because Number(null) and
   // Number("") are both 0 and both finite -- so testing afterwards turns a
-  // missing measurement into a real one. Same shape as toNumberOrNull in the
-  // server's rowValues.js and toFiniteNumber in useBodyModel.js.
+  // missing measurement into a real one. Same shape as toNumberOrNull in
+  // app/units.js and in the server's rowValues.js.
   //
   // undefined already returned the fallback, so an omitted key and an explicit
   // null used to give opposite answers for the same missing data. All three

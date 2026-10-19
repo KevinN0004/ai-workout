@@ -172,7 +172,7 @@ beforeEach(() => {
     verifyPassword: authUserService.verifyPassword,
     shouldUpgradePasswordToArgon2id: authUserService.shouldUpgradePasswordToArgon2id,
     upgradeUserPasswordToArgon2id: authUserService.upgradeUserPasswordToArgon2id,
-    // A stand-in for the Task 4b repository function: mutates the row's hash
+    // A stand-in for userRepository's updatePasswordHash: mutates the row's hash
     // the same way, and only stamps passwordChangedAt when the caller passes
     // the intent flag -- the repository owns the clock, so this fake mints
     // its own timestamp rather than accepting one.
@@ -827,8 +827,9 @@ describe("POST /api/auth/password", () => {
 
   test("the replacement session is a different token from the one it replaces", async () => {
     // Not cosmetic. If the route reused the old token, that token predates
-    // the stamp and Task 3's rule would reject it on the very next request --
-    // signing the user out the instant they changed their password.
+    // the stamp, and getSessionUser's passwordChangedAt check would reject it
+    // on the very next request -- signing the user out the instant they changed
+    // their password.
     //
     // The shared createSession mock names tokens from sessions.length, which
     // a real crypto-random token generator never would. Combined with this
@@ -948,7 +949,8 @@ describe("DELETE /api/auth/me", () => {
   // shared stub that would pass unconditionally, proving nothing. So this
   // block builds its own requireAuth that genuinely resolves the signed-in
   // row from the cookie via the same sessions/rows fixtures, mirroring
-  // Task 5's realRequireAuth rather than reusing the shared stub.
+  // the POST /api/auth/password block's realRequireAuth rather than reusing the
+  // shared stub.
   const realRequireAuth = async (req, res, next) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const session = sessions.find((item) => item.token === cookies.sid);
