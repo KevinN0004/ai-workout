@@ -25,6 +25,7 @@
 - [2026-10-15 — Readability follow-up, Phase 3 client track](plans/2026-10-15-readability-follow-up-phase-3-client.md)
 - [2026-10-16 — Readability follow-up, Phase 4](plans/2026-10-16-readability-follow-up-phase-4.md)
 - [2026-10-16 — Readability follow-up, Phase 5](plans/2026-10-16-readability-follow-up-phase-5.md)
+- [2026-10-17 — Readability follow-up, Phase 6](plans/2026-10-17-readability-follow-up-phase-6.md)
 
 ## Specs
 
