@@ -107,7 +107,7 @@ AI Workout is a full-stack fitness planning app using **npm workspaces** (`clien
 
 - **Client**: React 19 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
 - **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
-- **Sessions**: Redis-backed when `REDIS_URL` is set, with in-memory fallback
+- **Sessions**: in Redis when `REDIS_URL` (or `REDIS_HOST` and `REDIS_PORT`) is set and Redis connects at startup, otherwise in memory. The store is chosen once: while Redis is the store, a failed session command answers 503 and never falls back to memory (`services/auth/sessionService.js`)
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
 - **Tests**: Vitest on both sides
@@ -148,7 +148,7 @@ before testing turns missing data into a real-looking measurement.
 **Guard absent input before `Number()`, never after.** `toFiniteNumber` and
 `weatherCodeToText` in `externalDataService.js`, and `toNumberOrNull` in
 `repositories/rowValues.js`, all do this; copy that shape rather than writing a fresh
-coercion.
+coercion. On the client, `toNumberOrNull` in `app/units.js` is that shape: import it.
 
 **Guarding the converter does not protect a caller that bypasses it.** This class has
 recurred three times, and the third was in code I had already declared fixed:
@@ -223,9 +223,9 @@ answer. Anyone who filled in height and weight but not body fat was modelled at
 floored the silhouette's whole adiposity channel: `fatScore` clamped to `0` for
 an ordinary BMI-25.8 profile.
 
-The guard now runs before the coercion, copying `toNumberOrNull` in
-`repositories/rowValues.js`. Two things follow from that, and both are worth
-knowing:
+The guard now runs before the coercion: `useBodyModel.js` reads through the client's
+`toNumberOrNull` (`app/units.js`), the same shape as `repositories/rowValues.js`'s.
+Two things follow from that, and both are worth knowing:
 
 - **An unentered body fat now reaches the BMI estimate**, and `""`, `null` and
   an absent key all agree. An entered `"0"` is still a measurement and still
@@ -243,7 +243,7 @@ weight was unaffected because `toKg` returns `""` for a falsy value and the
 **A fifth instance sat in `pages/home/components/physique/math.js`, and it is fixed too.**
 That file carried a _third_ `toFiniteNumber`, the only one taking an explicit
 `fallback` argument, written the wrong way round like the others. It is the copy
-the silhouette runs on: about sixty calls across `geometry.js`,
+the silhouette runs on: dozens of calls across `geometry.js`,
 `templateOutline.js`, `outlineUtils.js` and `palette.js`.
 
 It was never reachable from the app — `useBodyModel`'s `silhouetteShape` puts
@@ -281,7 +281,7 @@ Conventions:
 
   What matters is how many _things_ a file is, not how long it is. Eight of those
   nine are one exported thing plus its private helpers: `templateOutline.js` has a
-  single export at line 472, and `externalDataService.js` and `events.js` are
+  single export, `buildTemplateOutline`, and `externalDataService.js` and `events.js` are
   closure factories. Splitting those means exporting internals to satisfy a line
   count, which trades real encapsulation for a number. **Leave them.**
 
@@ -301,8 +301,9 @@ Conventions:
 - **Comments and in-file order follow `docs/code-readability-sop.md`**: a header first in
   every source file, a prose `/** */` summary on every export, one line on every effect,
   and present-tense reasons rather than history. `scripts/__tests__/repo-invariants.test.mjs`
-  fails on a source file without a header unless `file-header-allowlist.json` lists it. That
-  list only shrinks, and `ALLOWLIST_SIZE` in the test pins its length — never add to it.
+  fails on a source file without a header unless `file-header-allowlist.json` lists it,
+  and on any header over four lines of text. That list is empty and only shrinks, and
+  `ALLOWLIST_SIZE` in the test pins its length — never add to it.
 - Validate user input at system boundaries
 - Sanitize file paths to prevent directory traversal
 - Server config is env-driven — see the Environment Variables table in `README.md`
@@ -318,7 +319,8 @@ npm run dev:server       # Express server only (node --watch)
 
 npm run build            # builds the CLIENT only
 npm run start            # starts the server
-npm test                 # client tests, then server tests (Vitest)
+npm test                 # scripts/ tests, then client, then server (Vitest)
+npm run test:scripts     # the scripts/ tests only: repo invariants, the header ratchet
 npm run test:coverage    # the same suites with a v8 coverage report
 npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
 npm run test:e2e:ui      # the same suite in Playwright's UI mode
@@ -327,17 +329,19 @@ npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
 
-**A client test can import server modules directly, and two do.** The running
-app cannot reach across the wire, but Vitest can resolve
-`../../../../server/src/...` from `client/src/app/__tests__`, so a contract between the two sides
-can be asserted without a browser or a database. `app/__tests__/constants.test.js` pins the
+**A client test can import server modules directly, and the contract tests do.** The
+running app cannot reach across the wire, but Vitest can resolve a relative
+`server/src/...` path from a client test, so a contract between the two sides can be
+asserted without a browser or a database. `app/__tests__/constants.test.js` pins the
 option lists against the server's `allowed*Values`, and
 `app/__tests__/profileContract.test.js` walks a form draft through
 `personalToProfile` → `profileBodySchema` → `buildProfile` → `profileToPersonal`
 and back. Both were verified to catch divergence the owning side's own suite
 misses: narrowing the server's height range to 100-170 makes a 178cm profile
-store `null`, and the server's tests never try 178. Keep such imports to test
-files — confirmed they do not reach the bundle.
+store `null`, and the server's tests never try 178. A third,
+`__tests__/serverBounds.contract.test.jsx`, renders every form that posts a number and
+holds each input's range to the schema the server validates it with. Keep such imports
+to test files — confirmed they do not reach the bundle.
 
 **Otherwise the E2E suite is the only thing that runs both halves together.**
 Everything else tests one side of the wire — the client suite mocks `fetch`, the
@@ -392,9 +396,10 @@ removing the client's CSRF header, and making the workout route answer 200
 without writing, are both caught — and both pass every other suite in the repo.
 
 **Accessibility is checked by axe against rendered pages, not by the linter, and
-that order is deliberate.** `e2e/a11y.spec.js` scans the login form, the signup
-form, the dashboard and an open modal, and asserts zero violations. It rides the
-same Playwright job, so it is already in CI.
+that order is deliberate.** `e2e/a11y.spec.js` scans the login and signup forms, the
+dashboard, an open modal, the settings forms and the account panel's states, asserts
+zero violations, and checks that a modal can be dismissed from the keyboard alone. It
+rides the same Playwright job, so it is already in CI.
 
 The linter is the junior authority here, and the numbers say why. jsx-a11y's
 recommended set reported **153 findings; 128 were false positives** from
@@ -409,8 +414,9 @@ What axe actually found, and what was fixed:
 - **`aria-dialog-name` (serious).** Four of six modals had `role="dialog"` with
   no accessible name, so a screen reader announced "dialog" and nothing else.
   `MealDetailsModal` and `PlansView` already set `aria-label`; the rest did not.
-  All six are now named by `aria-labelledby` pointing at their own visible
-  heading, so the name cannot drift from what is on screen.
+  The four are now named by `aria-labelledby` pointing at their own visible
+  heading, so the name cannot drift from what is on screen. (One of the four,
+  `GeneratedPlanModal`, has since been deleted.)
 - **`region` (moderate).** The header note and the at-a-glance cards sat between
   `<header>` and `<main>` as bare children of the page. Wrapped in a named
   `<section>`. Safe because `.dashboard-page` is plain block flow and the only
@@ -421,7 +427,7 @@ What axe actually found, and what was fixed:
 `click-events-have-key-events`, `no-static-element-interactions` and
 `no-noninteractive-element-interactions` produced 20 findings, all one pattern:
 an overlay backdrop whose `onClick` dismisses it. Keyboard dismissal is now
-handled by `useCloseOnEscape` — `ModalPortal` calls it for all six modals,
+handled by `useCloseOnEscape` — `ModalPortal` calls it for every modal,
 `DashboardDrawer` calls it directly because it is the one overlay not portalled
 — so the backdrop click is a redundant mouse affordance. The rules cannot see
 that, because it lives in a hook rather than on the element. They are off as one
@@ -439,22 +445,35 @@ asserting nothing: removing a modal's `aria-labelledby`, removing the landmark
 wrapper, and disabling the Escape handler are all caught, and all three pass
 every unit suite.
 
+**Reduced motion is handled where each motion is, not by a global reset.** Script
+reads `matchMedia("(prefers-reduced-motion: reduce)")` before it animates
+(`useHomeStageFlow.js`, `usePreviewChapterFlow.js`,
+`usePreviewWeekParticleAnimation.js`), and the stylesheets carry their own
+`@media (prefers-reduced-motion: reduce)` blocks beside the rules they stop. A global
+`*` reset was considered and left out (the Phase 4 plan, Task M2): it cannot stop the
+script, it loses to the `!important` transitions it would need to stop, and it would
+change every element's computed animation and transition, so a screenshot compare could
+not list what it expects. Hover and press feedback still moves under reduced motion,
+which that plan leaves to the owner.
+
 **`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
 about it are load-bearing:
 
 - **It must declare the hook scripts as entry points.** `codex-handoff.mjs`,
-  `scrub-junk-files.cjs` and `skill-router.mjs` are invoked from
-  `.claude/settings.json`, which knip cannot see — so without the config it
-  reports all three as unused files, then cascades and reports
-  `codex-handoff/*.mjs` too, because their only importer looks dead. **That is
-  six false positives inviting you to delete the whole hook wiring.** They are
-  live; see the Fresh Clone Setup checklist that runs them.
+  `run-claude-helper.cjs`, `scrub-junk-files.cjs` and `skill-router.mjs` are invoked
+  from `.claude/settings.json`, which knip cannot see — so without the config it
+  reports every one of them as an unused file, then cascades and reports
+  `codex-handoff/*.mjs` too, because their only importer looks dead. **That is a
+  false positive for every hook file, inviting you to delete the whole hook wiring.**
+  They are live; see the Fresh Clone Setup checklist that runs them.
 - **"Unused export" usually means the export, not the value.** Of the 17 knip
   originally reported, 12 were constants used inside their own module to derive
   others that _are_ consumed — `PREVIEW_WEEK_LINE_DRAW_MS` feeds
   `PREVIEW_WEEK_OUTLINE_DRAW_MS`, and so on. Those were narrowed to
   module-private rather than deleted. Only `goalOptions` and the two meal
-  libraries were genuinely dead.
+  libraries were genuinely dead, and `goalOptions` has since come back (`a498ff2`):
+  Settings offers it as the goal select, and `createDefaultPlannerForm` falls back to
+  its first entry.
 
 **Deleting dead source does not necessarily shrink the bundle**, and assuming it
 does is how you overstate a cleanup. `MEAL_LIBRARY` and `EXTRA_MEAL_LIBRARY` were
@@ -507,9 +526,27 @@ the native instance all along.
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. As of 2026-09-28:
-  server **94.32%** statements / 86.67% branches (87.10% in CI), client **98.70%** /
-  93.68%.
+- **Coverage is measured, not estimated.** `npm run test:coverage`. The current figures
+  are in the comment above `thresholds` in each side's config, `client/vite.config.js`
+  and `server/vitest.config.js`
+  (`Measured <date> (statements / branches / functions / lines)`), and each floor is its
+  figure truncated to one decimal;
+  `scripts/__tests__/repo-invariants.test.mjs` fails when a floor and its note disagree.
+  For exact counts, add `--coverage.reporter=json-summary` and read
+  `<side>/coverage/coverage-summary.json`: the text table's two decimals are too coarse
+  when a metric sits a fraction above its floor, and a metric passes exactly when
+  `covered >= floor / 100 × total`.
+  **Floors are raised once per phase of work, by one floor PR per side.** A fix PR keeps
+  coverage at or above the floors and leaves the floor lines alone. The floor PR
+  re-measures `main`, raises each floor whose truncated measurement went up, and updates
+  the note beside it; a floor is never lowered
+  (`docs/specs/2026-10-10-readability-follow-up-design.md`, rule 3).
+  **Two things move a measurement with no code changing.** Server branches read higher
+  in CI than locally, so the server floor follows the local figure. And with
+  `client/dist` present, `index.js` serves the bundle, so `staticClient.js`'s no-bundle
+  arm goes unreached and server branches read one lower; the gates build before they
+  measure, so measure a server floor with a build on disk. The server config's note
+  records both.
   On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
   before it, and the ratchet correctly did not trip, which is the floor doing its job
   rather than failing at it: it sits one decimal below the measurement, so a
@@ -519,8 +556,8 @@ the native instance all along.
   entry below went uncovered. One arm is about 0.03 points, which the truncated report
   can show as 0.02, so it may have been that rather than rounding. Nobody re-measured it.
   How much a floor tolerates is whatever truncation leaves, and that can be nothing:
-  client statements sits at 98.7053% against 98.7, so one new uncovered statement fails
-  CI.
+  when the slack, `covered - floor / 100 × total`, is under one, a single new uncovered
+  statement, branch or function can fail CI.
   Both configs measure all of `src/**` and exclude only the tests themselves, because a
   narrower `include` reports a better number rather than a truer one.
   **Both sides carry a ratchet**, floored one decimal below the measured value — the
@@ -540,27 +577,28 @@ the native instance all along.
     branches is 93.59%, under the 93.6% floor, which is what CI hit on a Tuesday.
     Either one alone stayed above it. Both now have tests, and a sweep of nine dates and
     times measures identical coverage, which is what the tight floors in
-    `client/vite.config.js` rely on. `TZ` cannot be set here (see the `TZ` entry below),
-    but the date can: a `NODE_OPTIONS=--import` preload that shifts `Date` reaches
-    Vitest's workers, and diffing the per-arm JSON across such a sweep is what found
-    both. Pin the clock in any test whose branches follow `new Date()`; stage a race
+    `client/vite.config.js` rely on. A `TZ` set in the shell does not reach Node here
+    (see the `TZ` entry below), but the date can be moved: a `NODE_OPTIONS=--import`
+    preload that shifts `Date` reaches Vitest's workers, and diffing the per-arm JSON
+    across such a sweep is what found both. Pin the clock in any test whose branches
+    follow `new Date()`; stage a race
     with deferred promises.
   - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
-    repositories have almost none and sit near 95%, because the dashboard integration
-    suites drive them; several 500-line view components have no test and sit at 0%.
+    repositories have few tests of their own (three files for ten modules) and are well
+    covered anyway, because the dashboard integration suites drive them.
   - **A function being stubbed is not a function being tested.** `openAqRequest`
     was 79 lines that never executed once — 53 uncovered branches, the largest
     single gap on the server — because `airQualityRoutes.test.js` stubs it as its
     network boundary. Stubbing it at every call site is what made it invisible:
     the routes above it were at 100%, so nothing in the coverage table pointed
     here. It is the request layer for the surface where the null-pm2.5-as-AQI-0
-    bug shipped. Now at 96.7% statements / 94.6% branches, covered in
-    `externalRequests.test.js` alongside the wger and MealDB wrappers.
+    bug shipped. It is now covered in `externalRequests.test.js`, alongside the wger
+    and MealDB wrappers.
     When a test stubs a named function of this repo's own, check whether anything
     else exercises it.
-  - Thin areas, worst first: `index.js` (76% — app bootstrap and wiring) and
-    `httpCacheService.js` (77%). `index.js` is over 800 lines, and nearly all of
-    what is still uncovered in it is the bootstrap the suite deliberately does
+  - Thin areas, worst first by uncovered statements: `index.js` (app bootstrap and
+    wiring) and `httpCacheService.js`. Nearly all of
+    what is still uncovered in `index.js` is the bootstrap the suite deliberately does
     not run: the env preflight sits behind `NODE_ENV !== "test" && !VITEST`, so
     it is verified by booting the server rather than by the unit suite, and
     `startServer` is verified the same way.
@@ -571,16 +609,16 @@ the native instance all along.
     `requestContext.js` from 84% to 79% branches while its statements went to
     100%. Server totals rose across both moves. Judge this file by what is left
     uncovered, not by its percentage.
-    Its CORS layer is now covered end to end, and so are all four rate limiters
+    Its CORS layer is now covered end to end, and so is every rate limiter
     — see `index.rateLimit.test.js`, which sets the limit under test to 1 and
-    the other three far out of the way, because the limiters are layered and the
+    the others far out of the way, because the limiters are layered and the
     global `/api` one would otherwise answer first. `postgres.js` was the worst
     at 53% and is now at 100% on every metric; its redaction of the database
     password is the part that mattered, and the fallback for a URL too malformed
     to parse had never been exercised.
-    **Every route file is at or above 81%, every route the user's data passes
-    through is at 100%, and every service is at or above 82%.** What is left on
-    the server is infrastructure rather than request handling.
+    For today's per-file figures, read `server/coverage/coverage-summary.json` after a
+    run with `--coverage.reporter=json-summary`; a figure written here goes stale with
+    the next merge.
   - **Re-importing a server module does not give you a clean environment.**
     `index.js` and `prisma.js` both call `dotenv.config()` at module scope, and
     dotenv fills in any key that is _absent_ from `process.env`. So
@@ -597,13 +635,12 @@ the native instance all along.
     Re-importing is otherwise safe here: `index.js` exports `startServer` rather
     than calling it, and `prisma.js` caches its client on `globalThis` outside
     production, so no second database client is created.
-    On the client, ranked by **uncovered branches** rather than by percentage —
-    that is what says where the untested behaviour actually is:
-    Current ranking, re-measured 2026-09-18: `usePreviewDerivedData.js` (33),
-    `outlineGeometry.js` (28), `templateOutline.js` (22), `useDashboardMetrics.js`
-    (11), and a three-way tie at 10: `useDashboardData.js`, `useMealDbSearch.js`
-    and `useHomeStageFlow.js`.
-    **The two geometry files at the top are the same dead-defensive pattern**:
+    On the client, rank by **uncovered branches** rather than by percentage —
+    that is what says where the untested behaviour actually is. Compute the ranking
+    from `client/coverage/coverage-summary.json` (`branches.total - branches.covered`
+    per file) rather than keeping one here: it changes with every merge.
+    **The two geometry files near the top of it, `outlineGeometry.js` and
+    `templateOutline.js`, are the same dead-defensive pattern**:
     `outlineGeometry.js`'s uncovered arms are the `top || bottom || null`
     fallbacks in `chooseYUpper`/`chooseXOuter` and friends, reachable only with
     asymmetric anchor data that `geometry.js` never produces. They are
@@ -619,16 +656,16 @@ the native instance all along.
     a ranking here; it goes stale every time anything lands.
     `PreviewStage.jsx` (31), `PreviewDashboardChapter.jsx` (28),
     `HomePage.jsx` (25), `DashboardPage.jsx` (23), `App.jsx` (20),
-    `CaloriesView.jsx` (16), `AuthPage.jsx` (15) and `GeneratedPlanModal.jsx`
-    (14, and the last client file at 0% on every metric) all used to head this
-    list and are done.
+    `CaloriesView.jsx` (16) and `AuthPage.jsx` (15) all used to head this
+    list and are done. `GeneratedPlanModal.jsx` (14) was there too, and was
+    deleted rather than tested, because nothing could open it.
     **Much of what is left is not a missing test.** `usePreviewDerivedData.js`
     went 46 → 34 by deleting branches rather than covering them: seven guards
     re-applied `activePreviewProfile.X || JOHN_DOE_PREVIEW_PROFILE.X` to a value
     that had already been through that exact guard 100 lines earlier, where the
     profile is built. The else arms could not fire. Check whether an uncovered
     arm is reachable at all before writing a test to reach it — and see the
-    `GeneratedPlanModal` note below for how to tell.
+    note below on two guards testing the same thing, for how to tell.
     **`CaloriesView.jsx`'s two guards on `progressMetrics` used to disagree, and
     the fix is worth copying.** The rows were guarded with `Array.isArray`, the
     empty state beneath them with `?.length` — which a string satisfies — so a
@@ -650,7 +687,7 @@ the native instance all along.
     `PreviewDashboardChapter.jsx` and `HomePage.jsx` reached 100% on every metric.
     `DashboardPage.jsx`'s one remaining uncovered branch is unreachable, and so
     is the `return null` under it: `activeDashView` is constrained to the eight
-    names in `dashViewOrder` by the line that computes it, and the router below
+    names in `DASH_VIEW_ORDER` by the line that computes it, and the router below
     handles all eight, so it never falls past the last `if`.
     **`App.jsx` carries a redundant pair worth knowing about.** The `useState`
     initializers for `heightUnit` and `weightUnit` derive the visitor's units
@@ -685,19 +722,18 @@ the native instance all along.
       `""` for on its first line. It could only ever return `""`, so its
       path-building body and the `round3` helper that served it went with it; the
       guard now returns `""` directly.
-      **`usePreviewDerivedData.js` should not be picked up again.** It is at 99.5%
-      statements and 100% functions, and its 40 remaining uncovered branches are
-      **double-guarded fallbacks that cannot fire**. `activePreviewProfile` spreads
-      `JOHN_DOE_PREVIEW_PROFILE` and then overrides every field with
-      `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every field is non-empty for
-      any input — including all-null. Roughly thirty branches further down the file
-      then re-apply the _identical_ `|| JOHN_DOE_PREVIEW_PROFILE.x` to those same
-      fields (`focuses`, `equipment`, `environment`, `goal`, `trainingDays`), and
-      the block of `String(x ?? "")` at lines 406-420 does it a third time. None of
-      the second or third guards can ever take their fallback side. The invariant
-      that makes them dead is now pinned by a test, so if someone removes a guard
-      from `activePreviewProfile` the suite says so.
-      The locale block at lines 30-50 was the one genuinely reachable part, and it
+      **`usePreviewDerivedData.js`'s largest group of uncovered branches cannot
+      fire.** `activePreviewProfile` spreads `JOHN_DOE_PREVIEW_PROFILE` and then
+      overrides every field with `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every
+      field is non-empty for any input — including all-null. The `String(x ?? "")`
+      block that builds `previewPersonalTargets`, what the personal chapter types,
+      guards those same values again, and none of its fallbacks can fire. The
+      invariant that makes them dead is pinned by a test, so if someone removes a
+      guard from `activePreviewProfile` the suite says so. The file's other uncovered
+      arms are `||` and `?:` fallbacks on the derived week and dashboard figures
+      (`todayPlan?.workout || ""` and the like); trace each one's producer before
+      writing a test for it.
+      The locale block (`usesImperialUnits`) was the one genuinely reachable part, and it
       is now covered: `navigator.languages`, `navigator.language` and
       `Intl.DateTimeFormat` are all boundaries, stubbed exactly as
       `SettingsView.test.jsx` stubs them. It decides whether the whole walkthrough
@@ -712,16 +748,16 @@ the native instance all along.
       mutants survived because of it. Pin `navigator.languages[0]` and
       `navigator.language` to _different_ regions, and stub the ambient format
       to a metric one, so each step is distinguishable from the step after it.
-      Done, and worth copying from: `SettingsView.jsx` (89%),
-      `WorkoutResultPage.jsx` (100%), `MealView.jsx` (100%, which took the five
-      `meal/*` panels with it), `useHomeStageFlow.js` (99% / 94% branches),
-      `usePreviewChapterFlow.js` (100% / 100%),
-      `usePreviewWeekParticleAnimation.js` (100% / 96%) and
-      `usePreviewDerivedData.js` (99% / 84%) and
-      `WorkoutsView.jsx` (100% / 99%), `TipsView.jsx` (97% / 95%),
-      `SummaryView.jsx` (100% / 96%), `PlansView.jsx` (93% / 91%) and
-      `useDashboardMetrics.js` (99% / 89%) both preview chapter components
-      (100% / 100%) `App.jsx` (99% / 99%) `DashboardPage.jsx` (99% / 99%) `usePreviewWeekOutline.js` (98% / 94%) `PlannerSetupModal.jsx` (100% / 95%) `HomePersonalStage.jsx` (100% / 100%) `useDashboardData.js` (99% / 94%) `events.js` (100% / 99%) `useBodyModel.js` (100% / 100%) `DashboardAtAGlance.jsx` (100% / 100%) `PreviewStage.jsx` (97% / 87%) `PreviewDashboardChapter.jsx` (100% / 100%) `HomePage.jsx` (100% / 100%) `CaloriesView.jsx` (100% / 100%) and `AuthPage.jsx` (95% / 100%).
+      Done, and worth copying from: `SettingsView.jsx`, `WorkoutResultPage.jsx`,
+      `MealView.jsx` (which took the five `meal/*` panels with it),
+      `useHomeStageFlow.js`, `usePreviewChapterFlow.js`,
+      `usePreviewWeekParticleAnimation.js`, `usePreviewDerivedData.js`,
+      `WorkoutsView.jsx`, `TipsView.jsx`, `SummaryView.jsx`, `PlansView.jsx`,
+      `useDashboardMetrics.js`, both preview chapter components, `App.jsx`,
+      `DashboardPage.jsx`, `usePreviewWeekOutline.js`, `PlannerSetupModal.jsx`,
+      `HomePersonalStage.jsx`, `useDashboardData.js`, `events.js`, `useBodyModel.js`,
+      `DashboardAtAGlance.jsx`, `PreviewStage.jsx`, `PreviewDashboardChapter.jsx`,
+      `HomePage.jsx`, `CaloriesView.jsx` and `AuthPage.jsx`.
       `PreviewStage.jsx` (then `PreviewPage.jsx`) had a chapter-body router whose final `else` arm no
       chapter id could reach: `usePreviewDerivedData` builds exactly
       `personal-info`, `generate`, `workout-week` and `dashboard-preview`, and
@@ -740,7 +776,7 @@ the native instance all along.
       like coverage of a real behaviour. That assertion now reads
       `previewFillOrder`, which is the sequence the typing animation walks.
       **There are no animation write-offs left.** All three hooks that were listed
-      as untestable are now at or above 94% branches.
+      as untestable are now covered.
   - **Check before calling something untestable.** This entry said for months
     that the animation hooks were limited because they measure real element
     rects, which jsdom does not provide. Every part of that turned out wrong,
@@ -767,14 +803,21 @@ the native instance all along.
 
     Reach for those before writing anything off.
 
-  - **`TZ` does not reach Node on this machine, so timezone claims cannot be
-    verified locally.** `TZ=Asia/Tokyo node -e 'process.env.TZ'` prints
+  - **A `TZ` set in the shell does not reach Node on this machine; one set inside the
+    process does.** `TZ=Asia/Tokyo node -e 'console.log(process.env.TZ)'` prints
     `undefined` here, inline or exported, and the process keeps the system
-    zone. A suite re-run under several `TZ` values therefore proves nothing —
+    zone. A suite re-run under several shell `TZ` values therefore proves nothing —
     it is the same zone every time, and the passes are not independent. This
     has already produced a false claim in a merged PR description.
-    What is actually available: the system zone (UTC-7) locally and **UTC in
-    CI**, which sit on opposite sides of the boundary that matters, so a test
+    Assigning `process.env.TZ` inside the test does work, at once: the hour of
+    `new Date(0)` reads 9 under `Asia/Tokyo` and 0 under `UTC`. `DashboardPage.test.jsx`
+    and `MealView.test.jsx` pin a calendar-date test to a zone that way. **Restore it by
+    assigning the zone captured at load**,
+    `Intl.DateTimeFormat().resolvedOptions().timeZone`, **not with `delete`**: deleting
+    it leaves Node on UTC, not on the system zone — the opposite of the dotenv entry
+    above, where an absent key is deleted.
+    Beyond that: the system zone (UTC-7) locally and **UTC in
+    CI** sit on opposite sides of the boundary that matters, so a test
     that passes in both is genuinely exercised either side of midnight.
     Beyond that, reason arithmetically rather than by running: `new Date("Y-M-D")`
     is UTC midnight and `new Date(y, m, d)` is local midnight, and the signed
@@ -791,7 +834,7 @@ the native instance all along.
     `canvastext`. A test that pinned the old answer failed on the upgrade.
   - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
     `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
-    `useApiClient.js` and `app/events.js` are all at or above 95% — pure functions,
+    `useApiClient.js` and `app/events.js` are all well covered — pure functions,
     state machines, the request layer and every user action. That part holds.
     What did **not** hold is the corollary this file used to draw, that a view
     component is therefore more lines for less risk. Five of them were tested in
@@ -805,8 +848,8 @@ the native instance all along.
     (0% → 42%). Judge a component by whether it _computes_ anything, not by its suffix.
     A genuinely presentational view really is low value; these five were not.
   - **The auth path and the external routes are now covered**, and are the worked
-    examples to copy. `authUserService.js`, `authRoutes.js` and `errorHandler.js` are
-    at 100% statements; the weather and air-quality routes are covered end to end.
+    examples to copy: `authUserService.js`, `authRoutes.js` and `errorHandler.js`, and
+    the weather and air-quality routes end to end.
     Both suites stub only the boundary — the database, session store and cookie
     writers for auth; `fetchOpenMeteo` and `openAqRequest` for the external routes —
     and use the real injected function everywhere else, so password hashing is real
@@ -824,8 +867,9 @@ the native instance all along.
     rather than a heredoc**, and use `String.raw` for any pattern containing a
     backslash. The prompt in `generateRoutes.js` is the awkward case: its newlines are
     the two characters backslash-n inside a template literal.
-    **On CRLF:** no committed file is, or ever was, CRLF — none of the 2457 blobs in
-    the history holds a carriage return, and `.gitattributes` stores text as LF (`.bat`
+    **On CRLF:** no committed file is, or ever was, CRLF — no blob in the history
+    holds a carriage return (checked on 2026-10-17 over every blob
+    `git rev-list --objects --all` reaches), and `.gitattributes` stores text as LF (`.bat`
     and `.cmd` excepted; none are tracked). A working copy can still be CRLF, and git
     hides one of the two ways it gets there. A CRLF rewrite that has not been staged
     shows as modified, with an empty `git diff`. A file committed while CRLF is stored as LF
@@ -852,14 +896,14 @@ the native instance all along.
     invisibly. The test suite missed it because the fixtures were written in lower case;
     **build fixtures from what the form actually stores**, not from what the lookup expects.
   - **An unexpected survivor can mean two guards are testing the same thing, not
-    that the test is weak.** `GeneratedPlanModal.jsx` opened with
+    that the test is weak.** `GeneratedPlanModal.jsx` (since deleted) opened with
     `if (!planModalOpen || !result) return null` and then passed
     `open={Boolean(planModalOpen && result)}` to `ModalPortal`. Mutating the
     early return survived, because with no result the portal rendered nothing
     anyway — the two guards are the same condition, so **no test could tell them
     apart, which is a proof of duplication rather than a gap**. The fix was to
-    collapse it: the early return is now the only guard and the portal just gets
-    `open`. The same mutation is caught now. When a survivor looks like a test
+    collapse it: the early return became the only guard and the portal just got
+    `open`, and the same mutation was then caught. When a survivor looks like a test
     gap, check first whether something else is already enforcing the condition.
     `ExerciseDetailsModal.jsx` carried the identical pair and got the identical
     fix, so **if you add a modal, give it one guard, not two** — the second one
@@ -940,26 +984,54 @@ the native instance all along.
     was never excluded, because it had a fixed point. The pathological case grows without
     bound; a file that stops changing is merely awkward. Measure before excluding one, and
     check byte-stability across ~3 consecutive passes rather than a single clean `--check`.
+
+  - **Prettier rewrites number literals, not comments.** In JS, `93.80` becomes `93.8`
+    and `5.` becomes `5`, but `99.0` stays `99.0`; in CSS, `99.0%` becomes `99%`
+    (Prettier 3.9.10, measured). So a floor in `thresholds` is never written with two
+    decimals, while the measurement note above it, a comment, keeps `99.50`. The
+    phase plans' "Prettier writes a whole number without `.0`" is wrong for JS: a
+    floor reads `99` because it was written so.
 - `eslint.config.js` ignores `.claude/**` and `.githooks/**`, but **does** lint `scripts/**`
 - **Lint is clean: 0 errors and 0 warnings.** It used to carry 12
   `react-hooks/exhaustive-deps` warnings; those are resolved, and the three that were
   deliberate now carry an inline disable explaining why. A new warning means you
   introduced it.
 - **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
-  that went away when `jspdf` moved to a dynamic import. The main chunk is ~487 kB,
-  which leaves only ~13 kB before the warning. It was ~407 kB until React 19, which
-  alone added the difference -- measured by building with nothing else changed, not
-  estimated. If the warning appears, check first whether something got pulled onto
-  the eager path; if nothing did, the margin simply ran out.
+  that went away when `jspdf` moved to a dynamic import. The main chunk sits close under
+  that warning (the build prints its size, as `dist/assets/index-*.js`). It was ~407 kB
+  until React 19, which alone added the difference -- measured by building with nothing
+  else changed, not estimated. If the warning appears, check first whether something got
+  pulled onto the eager path; if nothing did, the margin simply ran out.
+- **A CSS or motion change is proved by screenshot, not by reading.** Capture `main`
+  once, then compare each CSS PR against that capture, listing the visual and
+  computed-style changes the PR expects (`docs/specs/2026-10-10-readability-follow-up-design.md`,
+  rule 7). The capture tool is `capture.mjs`, printed in full in the Tools section of
+  `docs/plans/2026-10-16-readability-follow-up-phase-4.md`: write it out with the Write
+  tool, give it an absolute repo root (`D:/ai-workout`), and it captures a build's page
+  states with each one's DOM and computed styles; `compare` takes an expectation file.
+  **Lightning CSS rewrites every built rule, so search the build for one declaration,
+  never for a rule as written.** It reorders a rule's declarations
+  (`display: grid; grid-template-columns: 44px 1fr 44px; align-items: center` builds as
+  `grid-template-columns:44px 1fr 44px;align-items:center;display:grid`), adds prefixes
+  (`-webkit-backdrop-filter`), shortens colours (`rgba(12, 16, 30, 0.85)` becomes
+  `#0c101ed9`) and rewrites selectors (`*::before` becomes ` :before`).
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
-- Server tests need Postgres: `npm run postgres:local:start -w server` first, or **107**
-  of the **1083** fail (and 27 skip) with `Can't reach database server`, which is
-  environmental, not a regression (measured 2026-09-28; it was 96 of 1042 on 2026-09-12,
-  and this entry said ~40 before that). The compose database works just as well —
+- Server tests need Postgres: `npm run postgres:local:start -w server` first, or every
+  test that reaches the database fails with `Can't reach database server`, which is
+  environmental, not a regression. Read the run's `Tests` line for failures before
+  trusting any server count. The compose database works just as well —
   `docker compose up -d`, `npm -w server run migrate:postgres`, then the `DATABASE_URL`
-  from `env.example`. It ran all 1042 server tests green on Postgres 16 when measured;
-  compose is on 18 now, and CI runs the full suite on that same `postgres:18` image. The
-  E2E suite is **19** across two projects.
+  from `env.example`; CI runs the full suite on the same `postgres:18` image compose
+  uses. `npx playwright test --list` lists the E2E suite's tests, across its two
+  projects.
+- **Run one server test file from the workspace, not with `--root server`.**
+  `npm run test -w server -- <path>` (or `npm -w server exec vitest run <path>`) runs in
+  `server/`. `npx vitest run <path> --root server` from the repository root does not:
+  `index.js`, `db/prisma.js` and `vitest.setup.js` call `dotenv.config()` with no path,
+  and dotenv reads `.env` from the working directory, so the suite never sees
+  `server/.env` and a test that reaches Postgres fails with
+  `SASL: client password must be a string`. No client code calls dotenv, so
+  `--root client` from the root is unaffected.
 
 ## Fresh Clone Setup
 
@@ -970,8 +1042,10 @@ Not tracked: `.claude/agents/`, `commands/`, `helpers/`, `skills/` — claude-fl
 The pre-commit hook is in the repo; only its activation is not, which is what the
 `core.hooksPath` line below sets.
 
-**15 of the 19 configured hooks, plus the status line, invoke `.claude/helpers/*`, which is
-not in the repo.** Regenerate the scaffolding after cloning:
+**Most of the configured hooks, and the status line, run a `.claude/helpers/*` script,
+which is not in the repo.** They reach it through `scripts/run-claude-helper.cjs`, which
+exits 0 without a word when the helper is absent, so on a fresh clone those hooks fire and
+do nothing. Regenerate the scaffolding after cloning:
 
 ```bash
 npx ruflo@latest init                 # regenerate .claude/agents|commands|helpers|skills
@@ -1003,13 +1077,17 @@ echo '{"prompt":"fix a bug"}' | node scripts/skill-router.mjs
 Capture exit codes without a pipe (`cmd >/dev/null 2>&1; echo $?`) — a piped command
 reports the last stage's status, not the command's.
 
+Check a helper directly, as the first line does, not through the wrapper: the wrapper
+exits 0 whether the helper is there or not, so it cannot tell you which.
+
 If `npx ruflo@latest init` overwrites `.claude/settings.json`, its permission allowlist is
 hand-trimmed and worth keeping: restore with `git checkout -- .claude/settings.json`.
 
 Re-run the verification checklist above after **any** `ruflo init`, not just a fresh clone.
 A regenerated `settings.json` silently reverts the `scrub-junk-files.cjs` hook path to the
-stale `.js` name, and a broken hook does not announce itself — the exit-code checks are the
-only thing that will catch it.
+stale `.js` name, and a broken hook does not announce itself. `npm run test:scripts`
+catches that, and any hook that calls `.claude/` directly instead of through the wrapper
+(the hook-wiring blocks in `repo-invariants.test.mjs`); the exit-code checks catch the rest.
 
 ## Security Rules
 
