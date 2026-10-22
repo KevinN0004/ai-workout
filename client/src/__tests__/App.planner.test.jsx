@@ -46,7 +46,11 @@ const toggle = (item) => act(() => planner.props.toggleEquipment(item));
 beforeEach(() => {
   planner.props = null;
   window.history.pushState({}, "", "/");
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+  // Signed out: the session check answers 401.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) })
+  );
   render(<App />);
 });
 
