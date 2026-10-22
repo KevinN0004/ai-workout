@@ -758,7 +758,7 @@ const startServer = async () => {
       process.env.NODE_ENV === "production"
     );
     try {
-      const postgresStatus = await connectPostgres();
+      const postgresStatus = await connectPostgres({ logger, metrics });
       await connectPrisma();
       postgresLastError = "";
       if (postgresStatus.configured) {
