@@ -296,9 +296,22 @@ export const registerGenerateRoutes = (app, deps) => {
       }
       const plan = typeof result?.text === "string" ? result.text : "";
 
-      // Check the answer. An empty or whitespace-only plan, or one longer than
-      // GEMINI_MAX_PLAN_CHARS, is a 502 and is not saved. One naming no weekday
-      // is logged and still served.
+      // Check the answer. A plan the model stopped at the token cap, an empty or
+      // whitespace-only plan, or one longer than GEMINI_MAX_PLAN_CHARS, is a 502
+      // and is not saved. One naming no weekday is logged and still served.
+      // "MAX_TOKENS" is @google/genai's FinishReason.MAX_TOKENS; a cut-off plan
+      // still has text, often every weekday heading, so only this tells it apart.
+      if (result?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+        req.log?.warn(
+          { event: "generate_truncated", maxOutputTokens },
+          "Generated plan stopped at the token cap."
+        );
+        return res.status(502).json({
+          error: "The plan was cut off before it was finished. Please try again.",
+          requestId: req.requestId || ""
+        });
+      }
+
       if (!plan.trim()) {
         return res
           .status(502)

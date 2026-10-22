@@ -23,13 +23,13 @@ const gemini = { models: { generateContent } };
 
 let saveGeneratedPlan;
 
-const buildApp = (overrides = {}, { user, requestId } = {}) => {
+const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     if (user) req.user = user;
     if (requestId) req.requestId = requestId;
-    req.log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+    req.log = log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
     next();
   });
   registerGenerateRoutes(app, {
@@ -396,6 +396,40 @@ describe("POST /api/generate", () => {
       const response = await post(buildApp());
 
       expect(response.status).toBe(200);
+    });
+
+    // A reply cut off at the token cap still has text, often with every
+    // weekday heading, so only the finish reason tells it from a whole plan.
+    test("answers 502 and saves nothing for a plan cut off at the token cap", async () => {
+      generateContent.mockResolvedValue({
+        text: "Monday - Push\nBench press\nTuesday - Pull\nRows, 3 x",
+        candidates: [{ finishReason: "MAX_TOKENS" }]
+      });
+      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const app = buildApp({}, { user: { id: "u-1" }, log });
+
+      const response = await post(app);
+
+      expect(response.status).toBe(502);
+      expect(response.body.error).toMatch(/cut off/);
+      expect("requestId" in response.body).toBe(true);
+      expect(saveGeneratedPlan).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: "generate_truncated" }),
+        expect.any(String)
+      );
+    });
+
+    test("serves a plan the model finished", async () => {
+      generateContent.mockResolvedValue({
+        text: "Monday - Push",
+        candidates: [{ finishReason: "STOP" }]
+      });
+
+      const response = await post(buildApp());
+
+      expect(response.status).toBe(200);
+      expect(response.body.plan).toBe("Monday - Push");
     });
 
     test("rejects a whitespace-only plan", async () => {
