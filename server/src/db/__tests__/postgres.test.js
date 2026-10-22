@@ -12,7 +12,8 @@ const pg = vi.hoisted(() => ({
   connect: null,
   end: null,
   query: null,
-  releases: 0
+  releases: 0,
+  listeners: {}
 }));
 
 vi.mock("pg", () => {
@@ -28,6 +29,12 @@ vi.mock("pg", () => {
 
     end() {
       return pg.end();
+    }
+
+    // Only 'error' matters here; the test emits it by calling the listener.
+    on(event, listener) {
+      pg.listeners[event] = listener;
+      return this;
     }
   }
   return { Pool, default: { Pool } };
@@ -54,6 +61,7 @@ beforeEach(() => {
   pg.poolArgs = [];
   pg.poolThrows = null;
   pg.releases = 0;
+  pg.listeners = {};
   pg.query = vi.fn();
   pg.connect = vi.fn(async () => workingClient());
   pg.end = vi.fn(async () => {});
@@ -362,6 +370,60 @@ describe("when connecting fails", () => {
     await expect(connectPostgres({ env })).rejects.toBe("just a string");
 
     expect(getPostgresStatus().lastError).toBe("just a string");
+  });
+});
+
+// pg emits 'error' on the pool when an idle client's connection drops. An
+// EventEmitter with no 'error' listener throws, which ends the process, so the
+// pool must always have one.
+describe("an idle connection failing", () => {
+  const env = { DATABASE_URL: "postgres://u:secret@host:5432/db" };
+
+  test("is logged and counted rather than thrown", async () => {
+    const logger = { error: vi.fn() };
+    const metrics = { postgresPoolErrors: 0 };
+    const { connectPostgres } = await loadPostgres();
+    await connectPostgres({ env, logger, metrics });
+
+    expect(() => pg.listeners.error(new Error("terminating connection"))).not.toThrow();
+
+    expect(metrics.postgresPoolErrors).toBe(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      { event: "postgres_pool_error", error: "terminating connection" },
+      expect.any(String)
+    );
+  });
+
+  test("records a value that is not an Error as its text", async () => {
+    const logger = { error: vi.fn() };
+    const metrics = { postgresPoolErrors: 0 };
+    const { connectPostgres } = await loadPostgres();
+    await connectPostgres({ env, logger, metrics });
+
+    pg.listeners.error("socket closed");
+
+    expect(logger.error).toHaveBeenCalledWith(
+      { event: "postgres_pool_error", error: "socket closed" },
+      expect.any(String)
+    );
+  });
+
+  // The migration script opens the pool with neither; the listener is still
+  // there, so the script is not ended by an idle connection either.
+  test("is survived with no logger or metrics to report to", async () => {
+    const { connectPostgres } = await loadPostgres();
+    await connectPostgres({ env });
+
+    expect(() => pg.listeners.error("socket closed")).not.toThrow();
+  });
+
+  test("leaves the reported status alone", async () => {
+    const { connectPostgres, getPostgresStatus } = await loadPostgres();
+    await connectPostgres({ env });
+
+    pg.listeners.error(new Error("terminating connection"));
+
+    expect(getPostgresStatus()).toMatchObject({ connected: true, lastError: "" });
   });
 });
 

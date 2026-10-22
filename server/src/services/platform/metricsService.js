@@ -36,6 +36,7 @@ export const createMetrics = () => ({
   requestsTotal: 0,
   authFailures: 0,
   rateLimited: 0,
+  postgresPoolErrors: 0,
   requestLatencyMs: initLatencyStats(),
   routeLatencyMs: {},
   externalCache: {

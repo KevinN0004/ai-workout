@@ -66,9 +66,15 @@ export const getPostgresPool = () => postgresPool;
 /**
  * Opens the pool and proves it with one `select 1`, then returns the status.
  * With no URL configured it opens nothing. On a failure it records the error in
- * the status, ends the half-open pool and rethrows.
+ * the status, ends the half-open pool and rethrows. An idle connection that
+ * fails later is logged to `logger` and counted in `metrics.postgresPoolErrors`
+ * when they are given (index.js gives both; the migration script neither).
  */
-export const connectPostgres = async ({ env = process.env } = {}) => {
+export const connectPostgres = async ({
+  env = process.env,
+  logger = null,
+  metrics = null
+} = {}) => {
   const config = resolvePostgresConfig(env);
   postgresStatus = {
     configured: config.configured,
@@ -94,6 +100,18 @@ export const connectPostgres = async ({ env = process.env } = {}) => {
             rejectUnauthorized: config.sslRejectUnauthorized
           }
         : undefined
+    });
+    // pg emits 'error' on the pool when an idle client's connection fails (the
+    // database restarted, or an administrator ended the session). With no
+    // listener Node throws it and the process exits. The pool has already
+    // dropped that client and opens a new one for the next query, so the error
+    // is reported and the status is left as it is.
+    postgresPool.on("error", (err) => {
+      if (metrics) metrics.postgresPoolErrors += 1;
+      logger?.error(
+        { event: "postgres_pool_error", error: cleanText(err?.message || String(err), 300) },
+        "An idle Postgres connection failed. The pool replaces it."
+      );
     });
 
     const client = await postgresPool.connect();
