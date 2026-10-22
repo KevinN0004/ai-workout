@@ -44,9 +44,13 @@ const setPath = (path) => {
 // The session lookup fires on mount whatever the route, so every test needs a
 // fetch that settles.
 const stubSession = (impl) => vi.stubGlobal("fetch", vi.fn(impl));
+// A refusal is a 401 unless the test names another status.
 const sessionResponse =
-  (body, ok = true) =>
-  async () => ({ ok, json: async () => body });
+  (body, ok = true, status = ok ? 200 : 401) =>
+  async () => ({ ok, status, json: async () => body });
+
+const SESSION_NOTICE = /can't reach the server to check your sign-in/i;
+const sessionLookups = () => fetch.mock.calls.filter(([url]) => url === "/api/auth/me").length;
 
 // The session effect is three microtasks deep (fetch, json, setUser). Until it
 // settles, `user` is still its initial null -- so asserting "nobody is signed
@@ -212,9 +216,6 @@ describe("App", () => {
     });
 
     test("a lookup that throws does not take the page down", async () => {
-      // Equivalent-mutant note: the catch's `setUser(null)` cannot be
-      // distinguished from doing nothing, because `user` is already null on the
-      // only render where this effect runs. Kept for the "does not throw" half.
       stubSession(() => Promise.reject(new Error("offline")));
       await renderSettled("/dashboard");
 
@@ -227,8 +228,114 @@ describe("App", () => {
       render(<App />);
 
       await waitFor(() =>
-        expect(fetch).toHaveBeenCalledWith("/api/auth/me", { credentials: "include" })
+        expect(fetch).toHaveBeenCalledWith(
+          "/api/auth/me",
+          expect.objectContaining({ credentials: "include" })
+        )
       );
+    });
+  });
+
+  // A reload during a session-store outage gets a 503 from /api/auth/me. That
+  // is the server saying it cannot tell, not that nobody is signed in, so the
+  // visitor is told and the question is asked again until it has an answer.
+  describe("a session check the server cannot answer", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("a 503 is not read as signed out: it says so, then asks again", async () => {
+      const answers = [
+        sessionResponse({}, false, 503),
+        sessionResponse({ user: { email: "ada@example.com" } })
+      ];
+      stubSession((url) =>
+        url === "/api/auth/me" ? answers.shift()() : sessionResponse({}, false)()
+      );
+      await renderSettled("/dashboard");
+
+      expect(screen.getByRole("status")).toHaveTextContent(SESSION_NOTICE);
+      expect(sessionLookups()).toBe(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(sessionLookups()).toBe(2);
+      expect(dash.props.user).toEqual({ email: "ada@example.com" });
+      expect(screen.queryByText(SESSION_NOTICE)).not.toBeInTheDocument();
+    });
+
+    test("a network error is not read as signed out either", async () => {
+      stubSession(() => Promise.reject(new TypeError("Failed to fetch")));
+      await renderSettled("/");
+
+      expect(screen.getByRole("status")).toHaveTextContent(SESSION_NOTICE);
+    });
+
+    test("a 401 is signed out, with no notice and no second ask", async () => {
+      await renderSettled("/");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60000);
+      });
+
+      expect(screen.queryByText(SESSION_NOTICE)).not.toBeInTheDocument();
+      expect(sessionLookups()).toBe(1);
+    });
+
+    test("asks less often the longer the server cannot answer", async () => {
+      stubSession(sessionResponse({}, false, 503));
+      await renderSettled("/");
+      const lookupsAfter = async (ms) => {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(ms);
+        });
+        return sessionLookups();
+      };
+
+      expect(await lookupsAfter(1999)).toBe(1);
+      expect(await lookupsAfter(1)).toBe(2);
+      expect(await lookupsAfter(5000)).toBe(3);
+      expect(await lookupsAfter(15000)).toBe(4);
+      expect(await lookupsAfter(30000)).toBe(5);
+      expect(await lookupsAfter(30000)).toBe(6);
+    });
+
+    test("stops asking once App is gone", async () => {
+      stubSession(sessionResponse({}, false, 503));
+      const { unmount } = await renderSettled("/");
+
+      unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60000);
+      });
+
+      expect(sessionLookups()).toBe(1);
+    });
+
+    test("an answer that arrives after App is gone schedules nothing", async () => {
+      let answer;
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? new Promise((resolve) => {
+              answer = resolve;
+            })
+          : sessionResponse({}, false)()
+      );
+      setPath("/");
+      const { unmount } = render(<App />);
+
+      unmount();
+      await act(async () => {
+        answer({ ok: false, status: 503, json: async () => ({}) });
+        await vi.advanceTimersByTimeAsync(60000);
+      });
+
+      expect(sessionLookups()).toBe(1);
     });
   });
 
