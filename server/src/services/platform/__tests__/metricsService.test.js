@@ -77,6 +77,10 @@ describe("createMetrics", () => {
     ]);
   });
 
+  test("starts the Postgres pool's error count at zero", () => {
+    expect(createMetrics().postgresPoolErrors).toBe(0);
+  });
+
   test("hands out independent buckets rather than one shared object", () => {
     const metrics = createMetrics();
 

@@ -164,6 +164,7 @@ export const registerSystemRoutes = (app, deps) => {
       requestsTotal: metrics.requestsTotal,
       rateLimited: metrics.rateLimited,
       authFailures: metrics.authFailures,
+      postgresPoolErrors: metrics.postgresPoolErrors,
       requestLatencyMs: {
         ...summarizeLatencyBucket(metrics.requestLatencyMs),
         byRoute: routeLatency

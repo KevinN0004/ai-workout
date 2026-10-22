@@ -16,6 +16,7 @@ const buildApp = (overrides = {}) => {
       requestsTotal: 7,
       rateLimited: 0,
       authFailures: 3,
+      postgresPoolErrors: 2,
       requestLatencyMs: {},
       routeLatencyMs: {},
       externalCache: { hits: 1, misses: 1 },
@@ -65,6 +66,16 @@ describe("GET /api/metrics", () => {
     );
 
     expect(response.body.authFailures).toBe(3);
+  });
+
+  // postgres.js counts every idle connection the pool lost; this is where the
+  // count is read.
+  test("reports the Postgres pool's connection errors", async () => {
+    const response = await request(buildApp({ metricsToken: "", isProduction: false })).get(
+      "/api/metrics"
+    );
+
+    expect(response.body.postgresPoolErrors).toBe(2);
   });
 
   test("allows a request carrying the right token", async () => {
