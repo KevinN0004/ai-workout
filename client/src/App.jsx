@@ -20,11 +20,13 @@ import {
   weekDays
 } from "./app/constants";
 import { buildScopedCacheKey } from "./app/cache";
+import AppNotice from "./app/components/AppNotice";
 import PlannerSetupModal from "./app/components/PlannerSetupModal";
 import { mergeOptimisticDashboard } from "./app/dashboard";
 import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
+import { fetchWithTimeout } from "./app/network";
 import { parsePlanSections, extractLatestPlanByWeekday } from "./app/plans";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
@@ -37,6 +39,10 @@ import {
   toLb
 } from "./app/units";
 import "./styles/app.css";
+
+// How long the session check waits before asking again while the server cannot
+// answer it, in milliseconds: one delay per failed attempt, the last repeated.
+const SESSION_RETRY_DELAYS_MS = [2000, 5000, 15000, 30000];
 
 /**
  * Routes on window.location.pathname without a router: /auth, /plan and
@@ -57,6 +63,8 @@ export default function App() {
   const [plannerStep, setPlannerStep] = useState(1);
   const [route, setRoute] = useState(window.location.pathname);
   const [user, setUser] = useState(null);
+  // True while the session check has had no answer from the server it can trust.
+  const [sessionUnchecked, setSessionUnchecked] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -425,20 +433,42 @@ export default function App() {
     setDashView((current) => (current === routeDashView ? current : routeDashView));
   }, [route]);
 
-  // Once, on load: the session cookie is HttpOnly, so asking the server is the
-  // only way to learn who is signed in.
+  // On load: the session cookie is HttpOnly, so asking the server is the only
+  // way to learn who is signed in. Only a 401 means signed out. Any other
+  // failure, such as a 503 while the session store is down, a network error or
+  // a timeout, means the server could not say: the visitor is told so and the
+  // check is asked again, rather than shown the signed-out page as the answer.
+  // An unmount stops the asking.
   useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+    let attempt = 0;
     const loadSession = async () => {
+      let answered = false;
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (!res.ok) return;
-        const data = await res.json();
-        setUser(data.user || null);
+        const res = await fetchWithTimeout("/api/auth/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user || null);
+          answered = true;
+        } else {
+          answered = res.status === 401;
+        }
       } catch {
-        setUser(null);
+        // No answer: a network error, a timeout or a body that is not JSON.
       }
+      if (cancelled) return;
+      setSessionUnchecked(!answered);
+      if (answered) return;
+      const delay = SESSION_RETRY_DELAYS_MS[Math.min(attempt, SESSION_RETRY_DELAYS_MS.length - 1)];
+      attempt += 1;
+      retryTimer = setTimeout(loadSession, delay);
     };
     loadSession();
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+    };
   }, []);
 
   // Fetches the CSRF token up front, so the first write need not wait for it.
@@ -467,8 +497,20 @@ export default function App() {
   }, [go, route, user]);
 
   // ---- The page for the route -----------------------------------------------
+  // Every page renders with the session notice after it, while the session
+  // check is still waiting for an answer.
+  const sessionNotice = sessionUnchecked ? (
+    <AppNotice message="Can't reach the server to check your sign-in. Trying again..." />
+  ) : null;
+  const withNotice = (page) => (
+    <>
+      {page}
+      {sessionNotice}
+    </>
+  );
+
   if (route === "/auth" || route === "/auth/") {
-    return (
+    return withNotice(
       <AuthPage
         gradient={gradient}
         authMode={authMode}
@@ -498,7 +540,7 @@ export default function App() {
   }
 
   if (route === "/plan" || route === "/plan/") {
-    return (
+    return withNotice(
       <WorkoutResultPage
         gradient={gradient}
         user={user}
@@ -512,7 +554,7 @@ export default function App() {
   }
 
   if (isDashboardRoute) {
-    return (
+    return withNotice(
       <DashboardPage
         user={user}
         go={go}
@@ -568,7 +610,7 @@ export default function App() {
     );
   }
 
-  return (
+  return withNotice(
     <HomePage
       gradient={gradient}
       user={user}
