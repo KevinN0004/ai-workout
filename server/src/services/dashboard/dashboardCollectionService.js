@@ -41,12 +41,8 @@ export const createDashboardCollectionService = ({
     };
   };
 
-  const stripUserIdField = (doc = {}) => {
-    const { userId: _omitUserId, ...rest } = doc;
-    return rest;
-  };
-
-  // Shape the repository page into the response envelope the routes expect.
+  // Shape the repository page into the response envelope the routes expect. The
+  // items are the repository's row mappers' output, which carries no owner id.
   const toCollectionPage = async ({ collection, userId, sortField, limit, offset }) => {
     const { items, total } = await loadCollectionPage({
       collection,
@@ -56,7 +52,7 @@ export const createDashboardCollectionService = ({
       offset
     });
     return {
-      items: items.map(stripUserIdField),
+      items,
       total,
       limit,
       offset,
