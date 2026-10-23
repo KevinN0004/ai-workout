@@ -424,8 +424,8 @@
 /* Turns off CSS animations and transitions on the form, everything in it and their
    pseudo-elements: its width change, the sign-up fields' reveal, the checkbox and its tick.
    home/styles/core/shell.css stops the toggles' pills, the login/sign-up one outside the
-   form included. Outside the form, the login/sign-up toggle's buttons keep their colour and
-   hover transitions (forms-and-motion.css), and the close button keeps its hover transition. */
+   form included. Outside the form, forms-and-motion.css stops the login/sign-up toggle's
+   buttons' transitions and lift, and core/shell.css the close button's. */
 @media (prefers-reduced-motion: reduce) {
   .auth-form,
   .auth-form *,

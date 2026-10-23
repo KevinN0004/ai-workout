@@ -102,6 +102,23 @@
   box-shadow: none;
 }
 
+/* Under reduced motion these buttons change their glow at once on hover and press, and do
+   not lift or press in. That reaches the nav's Preview button and /auth's close button,
+   which no other reduced-motion block covers. */
+@media (prefers-reduced-motion: reduce) {
+  .home-page .ghost,
+  .home-page .cta {
+    transition: none;
+  }
+
+  .home-page .ghost:hover:not(:disabled),
+  .home-page .cta:hover:not(:disabled),
+  .home-page .ghost:active:not(:disabled),
+  .home-page .cta:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* ---- Page title and text colours ----------------------------------------- */
 /* The home page renders no .title, so this styles AuthPage's and WorkoutResultPage's. */
 .home-page .title {

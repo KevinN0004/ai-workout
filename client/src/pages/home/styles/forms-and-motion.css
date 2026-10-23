@@ -164,6 +164,23 @@
   transform: scale(0.97);
 }
 
+/* Under reduced motion the toggle buttons change colour at once and do not lift or press
+   in; core/shell.css stops the pill behind them. That reaches /auth's login/sign-up toggle,
+   which sits outside .home-stage and .auth-form and so outside their blocks. */
+@media (prefers-reduced-motion: reduce) {
+  .home-page .unit-toggle button,
+  .home-page .segmented button {
+    transition: none;
+  }
+
+  .home-page .segmented button:hover,
+  .home-page .unit-toggle button:hover,
+  .home-page .segmented button:active,
+  .home-page .unit-toggle button:active {
+    transform: none;
+  }
+}
+
 /* ---- Toggle pop keyframes ------------------------------------------------ */
 @keyframes toggle-pop {
   0% {
@@ -303,7 +320,7 @@
    stops the mode and unit toggles' pills itself, and home/preview/styles/responsive.css the
    walkthrough's spinner and scan. The chips' labels' more specific !important transition
    beats this block, so home/preview/styles/layout/frame.css switches it off. Outside
-   .home-stage the nav's Preview button keeps its hover transition, and
+   .home-stage core/shell.css stops the nav's Preview button's hover and press, and
    /auth and /plan render no .home-stage at all. Motion driven from script is out of reach,
    so useHomeStageFlow skips the physique stage's entrance and pulse itself, and
    PreviewStage's opening scroll takes html.preview-smooth-scroll's scroll-behavior. */
