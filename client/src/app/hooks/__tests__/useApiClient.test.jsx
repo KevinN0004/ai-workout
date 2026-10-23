@@ -55,7 +55,10 @@ describe("ensureCsrfToken", () => {
     const { current } = render();
 
     await expect(current.ensureCsrfToken()).resolves.toBe("issued-token");
-    expect(fetchMock).toHaveBeenCalledWith("/api/csrf-token", { credentials: "include" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/csrf-token",
+      expect.objectContaining({ credentials: "include" })
+    );
   });
 
   // The endpoint sets the cookie as well as returning the token; the cookie is
@@ -265,6 +268,78 @@ describe("apiFetch", () => {
       const { current } = render();
 
       await expect(current.apiFetch("/api/dashboard")).rejects.toThrow("network down");
+    });
+  });
+
+  // A request the server never answers would leave its caller waiting for
+  // good: a save spinning, a sign-out that never finishes. Each one now gives
+  // up at a deadline, 15 s unless the caller names its own.
+  describe("a deadline", () => {
+    // A fetch that only ever ends by being aborted, as a real one does; with no
+    // signal to abort it, it never ends.
+    const hanging = () =>
+      vi.fn(
+        (_url, options) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          })
+      );
+    const settledBy = async (promise, ms) => {
+      const outcome = promise.then(
+        () => "answered",
+        (error) => error.message
+      );
+      await vi.advanceTimersByTimeAsync(ms);
+      return Promise.race([outcome, Promise.resolve("still waiting")]);
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("gives up on a request the server never answers, at 15 s", async () => {
+      vi.stubGlobal("fetch", hanging());
+      const { current } = render();
+      const request = current.apiFetch("/api/dashboard");
+
+      expect(await settledBy(request, 14999)).toBe("still waiting");
+      expect(await settledBy(request, 1)).toBe("Request timed out. Please try again.");
+    });
+
+    test("waits as long as the caller asks", async () => {
+      vi.stubGlobal("fetch", hanging());
+      const { current } = render();
+      const request = current.apiFetch("/api/generate", { timeoutMs: 40000 });
+
+      expect(await settledBy(request, 39999)).toBe("still waiting");
+      expect(await settledBy(request, 1)).toBe("Request timed out. Please try again.");
+    });
+
+    test("gives up on the token fetch too", async () => {
+      vi.stubGlobal("fetch", hanging());
+      const { current } = render();
+      const request = current.apiFetch("/api/dashboard/meal-logs", { method: "POST" });
+
+      expect(await settledBy(request, 15000)).toBe("Request timed out. Please try again.");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0][0]).toBe("/api/csrf-token");
+    });
+
+    test("does not hand timeoutMs on to fetch", async () => {
+      const { current } = render();
+
+      await current.apiFetch("/api/dashboard", { timeoutMs: 40000 });
+
+      expect(fetchMock.mock.calls[0][1]).not.toHaveProperty("timeoutMs");
+      expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
     });
   });
 });

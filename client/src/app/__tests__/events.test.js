@@ -121,7 +121,10 @@ describe("onLogout", () => {
     releaseFlush();
     await loggingOut;
 
-    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(deps.apiFetch).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" })
+    );
   });
 
   // The wait is capped at LOGOUT_FLUSH_CAP_MS (5000 ms). A send that never
@@ -137,7 +140,10 @@ describe("onLogout", () => {
       expect(deps.apiFetch).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(1);
-      expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+      expect(deps.apiFetch).toHaveBeenCalledWith(
+        "/api/auth/logout",
+        expect.objectContaining({ method: "POST" })
+      );
 
       await loggingOut;
       expect(deps.clearOptimisticOperations).toHaveBeenCalledTimes(1);
@@ -154,7 +160,10 @@ describe("onLogout", () => {
     try {
       await build().onLogout();
 
-      expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+      expect(deps.apiFetch).toHaveBeenCalledWith(
+        "/api/auth/logout",
+        expect.objectContaining({ method: "POST" })
+      );
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
@@ -164,7 +173,18 @@ describe("onLogout", () => {
   test("tells the server to end the session", async () => {
     await build().onLogout();
 
-    expect(deps.apiFetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(deps.apiFetch).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  // The browser signs out whatever the answer, so the request gets the same
+  // cap as the flush before it, LOGOUT_FLUSH_CAP_MS.
+  test("waits no longer than 5 s for the server's answer", async () => {
+    await build().onLogout();
+
+    expect(deps.apiFetch.mock.calls[0][1].timeoutMs).toBe(5000);
   });
 
   test("clears the signed-in user and sends them home", async () => {
@@ -968,6 +988,16 @@ describe("onSubmit", () => {
     expect(url).toBe("/api/generate");
     expect(options.method).toBe("POST");
     expect(JSON.parse(options.body)).toEqual({ goal: "build muscle", days: 4 });
+  });
+
+  // The server gives Gemini 30 s by default (GEMINI_TIMEOUT_MS), so the
+  // client's 15 s default would give up on every slow plan the server serves.
+  test("waits longer than the server's own generation deadline", async () => {
+    deps.apiFetch.mockResolvedValue(generated());
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.apiFetch.mock.calls[0][1].timeoutMs).toBe(40000);
   });
 
   test("clears the previous result and error before starting", async () => {
