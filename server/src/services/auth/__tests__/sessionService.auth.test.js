@@ -346,11 +346,12 @@ describe("attachOptionalUser", () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  // The point of this middleware: a route open to anonymous callers must not
-  // start refusing everyone because the session store is unwell.
+  // A failure that is not the session store's, here the account lookup, does
+  // not refuse a route open to anonymous callers: the caller goes on as
+  // anonymous. A store outage is a 503 (sessionService.redis.test.js).
   test("continues as anonymous when the lookup throws", async () => {
     findUserById = vi.fn(async () => {
-      throw new Error("redis is on fire");
+      throw new Error("database is on fire");
     });
     const service = buildService();
     const token = await service.createSession("u-1");
