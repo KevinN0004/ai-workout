@@ -289,6 +289,7 @@ describe("POST /api/dashboard/meal-logs", () => {
     const failingOver = (client) => ({
       appUser: client.appUser,
       mealLog: client.mealLog,
+      $queryRaw: (...args) => client.$queryRaw(...args),
       calorieEntry: {
         findFirst: (args) => client.calorieEntry.findFirst(args),
         create: () => Promise.reject(new Error("derived write failed")),
@@ -332,6 +333,75 @@ describe("POST /api/dashboard/meal-logs", () => {
     expect(edit.status).toBe(200);
     expect(await prisma.mealLog.count()).toBe(1);
     expect(await prisma.calorieEntry.count()).toBe(0);
+  });
+
+  // Two meals saved at once for the same day. Each save sums the day's meals
+  // in its own transaction, and neither can see the other's uncommitted meal,
+  // so without a lock each derives the day's entry from its own meal alone:
+  // the second write either collides with the first's entry (a unique
+  // violation, and its meal rolled back) or overwrites it with a total that
+  // leaves the first meal out. The barrier holds each save after its sum until
+  // the other has summed too, or 300 ms have passed, which makes that
+  // interleaving certain rather than lucky.
+  test("two meals saved at once for the same day both count", async () => {
+    const [user] = await prisma.appUser.findMany({ select: { id: true } });
+    let arrived = 0;
+    let releaseAll;
+    const allArrived = new Promise((resolve) => {
+      releaseAll = resolve;
+    });
+    const meet = async () => {
+      arrived += 1;
+      if (arrived >= 2) releaseAll();
+      await Promise.race([allArrived, new Promise((resolve) => setTimeout(resolve, 300))]);
+    };
+    // The transaction client, with mealLog.aggregate waiting at the barrier
+    // once its sum is read. Everything else is the real client.
+    const pausingAfterSum = (tx) =>
+      new Proxy(tx, {
+        get(target, prop) {
+          if (prop === "mealLog") {
+            return {
+              ...target.mealLog,
+              findFirst: (args) => target.mealLog.findFirst(args),
+              create: (args) => target.mealLog.create(args),
+              update: (args) => target.mealLog.update(args),
+              aggregate: async (args) => {
+                const sum = await target.mealLog.aggregate(args);
+                await meet();
+                return sum;
+              }
+            };
+          }
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+      });
+    const racingPrisma = new Proxy(prisma, {
+      get(target, prop) {
+        if (prop === "$transaction") {
+          return (callback) => target.$transaction((tx) => callback(pausingAfterSum(tx)));
+        }
+        return Reflect.get(target, prop);
+      }
+    });
+    const { saveMealLogWithDailySync } = createMealLogRepository({ prisma: racingPrisma });
+
+    const results = await Promise.allSettled([
+      saveMealLogWithDailySync({
+        userId: user.id,
+        mealLog: { id: "race-1", date: "2026-06-21", name: "Oats", calories: 400 }
+      }),
+      saveMealLogWithDailySync({
+        userId: user.id,
+        mealLog: { id: "race-2", date: "2026-06-21", name: "Soup", calories: 300 }
+      })
+    ]);
+
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
+    expect(await prisma.mealLog.count()).toBe(2);
+    const entries = await prisma.calorieEntry.findMany({ select: { calories: true } });
+    expect(entries).toEqual([{ calories: 700 }]);
   });
 
   test("saveMealLogWithDailySync returns null for an unknown user", async () => {
