@@ -65,6 +65,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   // True while the session check has had no answer from the server it can trust.
   const [sessionUnchecked, setSessionUnchecked] = useState(false);
+  // True after a sign-out the server could not complete, until dismissed.
+  const [signOutUnfinished, setSignOutUnfinished] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -372,6 +374,7 @@ export default function App() {
     signupWeightUnit,
     authForm,
     setUser,
+    setSignOutUnfinished,
     authAutoSignIn,
     clearOptimisticOperations,
     flushOptimisticOperations,
@@ -497,10 +500,16 @@ export default function App() {
   }, [go, route, user]);
 
   // ---- The page for the route -----------------------------------------------
-  // Every page renders with the session notice after it, while the session
-  // check is still waiting for an answer.
+  // Every page renders with the session notice after it: while the session
+  // check is still waiting for an answer, or after a sign-out the server could
+  // not complete, until it is dismissed or someone signs in.
   const sessionNotice = sessionUnchecked ? (
     <AppNotice message="Can't reach the server to check your sign-in. Trying again..." />
+  ) : signOutUnfinished && !user ? (
+    <AppNotice
+      message="Signed out on this device, but the server could not end your session. It stays valid until it expires."
+      onDismiss={() => setSignOutUnfinished(false)}
+    />
   ) : null;
   const withNotice = (page) => (
     <>

@@ -74,6 +74,7 @@ beforeEach(() => {
     signupWeightUnit: "kg",
     authForm: { email: "person@example.com", password: "StrongPass123!" },
     setUser: vi.fn(),
+    setSignOutUnfinished: vi.fn(),
     authAutoSignIn: false,
     clearOptimisticOperations: vi.fn(),
     clearDashboardDataState: vi.fn(),
@@ -173,6 +174,22 @@ describe("onLogout", () => {
     expect(deps.go).toHaveBeenCalledWith("/");
   });
 
+  // The server's 503 says the session could not be ended, and stays valid in
+  // the store until it expires. The visitor is signed out here either way, and
+  // is told which of the two it was.
+  test("says nothing more when the server ended the session", async () => {
+    await build().onLogout();
+
+    expect(deps.setSignOutUnfinished).toHaveBeenCalledWith(false);
+  });
+
+  test("tells the visitor when the server could not end the session", async () => {
+    await build({ apiFetch: vi.fn(async () => ({ ok: false, status: 503 })) }).onLogout();
+
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+    expect(deps.setSignOutUnfinished).toHaveBeenCalledWith(true);
+  });
+
   // Everything holding the previous account's data has to go, or the next
   // person at the same browser sees it.
   test("clears every piece of local dashboard state", async () => {
@@ -203,6 +220,12 @@ describe("onLogout", () => {
 
       expect(deps.setUser).toHaveBeenCalledWith(null);
       expect(deps.go).toHaveBeenCalledWith("/");
+    });
+
+    test("tells the visitor the session may still be open", async () => {
+      await build(failing()).onLogout();
+
+      expect(deps.setSignOutUnfinished).toHaveBeenCalledWith(true);
     });
 
     test("still clears the dashboard data", async () => {

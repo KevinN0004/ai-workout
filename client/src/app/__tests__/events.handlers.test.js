@@ -822,6 +822,7 @@ describe("deleteAccount", () => {
       user,
       go: vi.fn(),
       setUser: vi.fn(),
+      setSignOutUnfinished: vi.fn(),
       clearOptimisticOperations: vi.fn(),
       clearDashboardDataState: vi.fn(),
       clearDashboardToast: vi.fn(),
