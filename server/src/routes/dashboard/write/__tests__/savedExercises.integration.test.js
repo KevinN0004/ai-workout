@@ -3,14 +3,10 @@ import request from "supertest";
 import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
 
-// Pins the saved-exercise routes against real Postgres before they move off the
-// Mongo compatibility shim.
-//
-// Unlike the workout and meal pipelines, this one is genuinely live: the shim's
-// extractFirstConcatEntry matches this exact pipeline shape and routes it to an
-// upsert. So these tests pin working behaviour, not a dead path -- in
-// particular the two-way deduplication, by external exercise id or by
-// case-insensitive name.
+// Pins the saved-exercise routes against real Postgres: saving, the two-way
+// deduplication savedExerciseRepository does (by external exercise id, or by
+// name compared case-insensitively), removal by id, and that one user cannot
+// remove another's.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");

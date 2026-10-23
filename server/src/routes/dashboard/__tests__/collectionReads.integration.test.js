@@ -183,10 +183,9 @@ describe("dashboard collection reads", () => {
     expect(response.body.pagination.total).toBe(0);
   });
 
-  // Paging with tied sort values must not drop or repeat a row. The shim's
-  // sort() reads only the first key of { createdAt: -1, _id: -1 }, so the
-  // tiebreaker the caller asks for is discarded and stability is left to
-  // Postgres. This asserts the property the caller actually wants.
+  // Paging with tied sort values must not drop or repeat a row.
+  // loadCollectionPage orders by the sort field and then by id, both
+  // descending, so rows sharing a timestamp keep one order from page to page.
   test("pages through rows with identical timestamps without loss or repeats", async () => {
     await seedWorkouts(6);
     const tied = new Date("2026-07-01T00:00:00.000Z");
