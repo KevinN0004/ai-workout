@@ -51,10 +51,10 @@
 }
 
 /* ---- Narrow screens ------------------------------------------------------ */
-/* The personal stage's form goes to one column in both modes. Its selector names the stage,
-   to outrank styles/base.css's .form (which ties .personal-form and loads later) and
-   forms-and-motion.css's two-column advanced-mode rule. The walkthrough's copy of the form
-   keeps its two columns. */
+/* The personal stage's form, and the walkthrough's copy of it, go to one column in both
+   modes. Each selector names an ancestor, the stage's wrapper or the walkthrough's panel, to
+   outrank styles/base.css's .form (which ties .personal-form and loads later) and
+   forms-and-motion.css's two-column advanced-mode rule. */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -132,7 +132,8 @@
     justify-content: center;
   }
 
-  .home-stage-personal .personal-form {
+  .home-stage-personal .personal-form,
+  .preview-stage-panel .personal-form {
     grid-template-columns: 1fr;
   }
 
