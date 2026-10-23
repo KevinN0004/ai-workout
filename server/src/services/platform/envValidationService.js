@@ -5,11 +5,14 @@
  */
 
 // Every min/max here is meant to match what the corresponding reader in
-// index.js / sessionService.js actually accepts, not just what sounds
-// reasonable in isolation -- a floor the reader silently discards (falling
-// back to its default) is worse than no floor: it tells the operator their
-// setting took effect when it did not. Check the call site before changing
-// a bound. ARGON2_TIME_COST and ARGON2_MEMORY_COST carry floors stricter than
+// index.js / sessionService.js / generateRoutes.js actually accepts, not just
+// what sounds reasonable in isolation -- a floor the reader silently discards
+// (falling back to its default) is worse than no floor: it tells the operator
+// their setting took effect when it did not. Check the call site before
+// changing a bound. For the same reason every value must be a whole number:
+// toPositiveInt and parseRedisPort replace anything else with their default.
+// WGER_DEFAULT_LANGUAGE's reader would take a fraction, but a language id is
+// a whole number. ARGON2_TIME_COST and ARGON2_MEMORY_COST carry floors stricter than
 // toPositiveInt's. They are this app's floors, not limits argon2 enforces (the
 // library accepts lower costs), so lowering one is a security decision, not a
 // compatibility one.
@@ -43,7 +46,10 @@ const NUMERIC_VARS = [
   { name: "WGER_CACHE_TTL_SEC", min: 1 },
   { name: "MEALDB_CACHE_TTL_SEC", min: 1 },
   { name: "WGER_DEFAULT_LANGUAGE", min: 1, max: 100 },
-  { name: "SENTRY_SHUTDOWN_TIMEOUT_MS", min: 1 }
+  { name: "SENTRY_SHUTDOWN_TIMEOUT_MS", min: 1 },
+  { name: "GEMINI_MAX_OUTPUT_TOKENS", min: 1 },
+  { name: "GEMINI_TIMEOUT_MS", min: 1 },
+  { name: "GEMINI_MAX_PLAN_CHARS", min: 1 }
 ];
 
 // Only HTTP endpoints are parsed. Postgres and Redis connection strings are
@@ -78,6 +84,10 @@ export const validateEnv = (env = {}) => {
     const value = Number(env[name]);
     if (!Number.isFinite(value)) {
       errors.push(`${name} must be a number (received "${env[name]}").`);
+      continue;
+    }
+    if (!Number.isInteger(value)) {
+      errors.push(`${name} must be a whole number (received ${value}).`);
       continue;
     }
     if (min !== undefined && value < min) {

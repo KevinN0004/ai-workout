@@ -45,6 +45,31 @@ describe("validateEnv", () => {
     expect(errors[0]).toContain("PORT must be <= 65535");
   });
 
+  // Every reader of these settings takes whole numbers only (toPositiveInt,
+  // parseRedisPort), and replaces anything else with its default. Accepting
+  // 1500.5 here would tell the operator the setting took when it did not.
+  test("rejects a setting that is not a whole number", () => {
+    const errors = validateEnv({ ...validEnv, API_RATE_LIMIT_MAX: "1500.5" });
+    expect(errors).toEqual(["API_RATE_LIMIT_MAX must be a whole number (received 1500.5)."]);
+  });
+
+  // generateRoutes.js reads these three per request through toPositiveInt.
+  test.each(["GEMINI_MAX_OUTPUT_TOKENS", "GEMINI_TIMEOUT_MS", "GEMINI_MAX_PLAN_CHARS"])(
+    "checks %s like every other limit",
+    (name) => {
+      expect(validateEnv({ ...validEnv, [name]: "0" })).toEqual([
+        `${name} must be >= 1 (received 0).`
+      ]);
+      expect(validateEnv({ ...validEnv, [name]: "lots" })).toEqual([
+        `${name} must be a number (received "lots").`
+      ]);
+      expect(validateEnv({ ...validEnv, [name]: "2.5" })).toEqual([
+        `${name} must be a whole number (received 2.5).`
+      ]);
+      expect(validateEnv({ ...validEnv, [name]: "9000" })).toEqual([]);
+    }
+  );
+
   test("ignores optional numeric settings that are unset or blank", () => {
     expect(
       validateEnv({ ...validEnv, ARGON2_TIME_COST: "", EXTERNAL_API_RETRIES: undefined })
