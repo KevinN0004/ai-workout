@@ -604,6 +604,44 @@ describe("buildInjuryText", () => {
     }
   );
 
+  // A profile note is free text, so "no injuries" is said many ways. Each is
+  // read as the whole answer, with case, spacing and closing punctuation
+  // ignored.
+  test.each([
+    ["No injuries"],
+    ["no injury"],
+    ["No injuries."],
+    ["none!"],
+    ["Nothing"],
+    ["Nope"],
+    ["NA"],
+    ["n/a."],
+    ["No known injuries"],
+    ["No current injuries"],
+    ["No limitations"],
+    ["no issues"],
+    ["No problems"],
+    ["No pain"],
+    ["No injuries or limitations"],
+    ["Injury-free"],
+    ["injury free"],
+    ["  no   injuries  "]
+  ])("reads the note %j as no injury", (note) => {
+    expect(buildInjuryText("None", note)).toBe("");
+  });
+
+  // Only the whole answer counts, so a note that goes on to name something is
+  // kept, and the guide can still find the injury in it.
+  test.each([
+    ["No injuries except a sore knee"],
+    ["no pain running, but my left knee clicks"],
+    ["None of the above, shoulder only"],
+    ["Nothing major, lower back twinges"],
+    ["knee"]
+  ])("keeps the note %j", (note) => {
+    expect(buildInjuryText("None", note)).toBe(note);
+  });
+
   test("joins a real injury and a real note", () => {
     expect(buildInjuryText("Knee", "sore after runs")).toBe("Knee sore after runs");
   });

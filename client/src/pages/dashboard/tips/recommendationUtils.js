@@ -161,19 +161,33 @@ export const detectInjuryFlags = (injuryText) => {
   return active;
 };
 
-// Answers to "any injuries?" that mean there are none. The planner's injuries
-// field defaults to the first of them.
-const NO_INJURY_ANSWERS = new Set(["none", "n/a", "no"]);
+// Whole answers to "any injuries?" that mean there are none: the planner's
+// injuries field defaults to "None", and a profile note may say so in words
+// ("No injuries", "no known issues", "injury-free"). Anchored at both ends, so
+// a note that goes on to name something ("no injuries except a sore knee") is
+// a note.
+const NO_INJURY_ANSWER =
+  /^(none|nothing|nope|no|n\/?a|injury[- ]free|no (current |known )?(injur(y|ies)|limitations?|issues?|problems?|pain)( or (injur(y|ies)|limitations?|issues?|problems?|pain))?)$/;
+
+// Lower-cased, with runs of spaces collapsed and closing . ! dropped, so
+// "No  injuries." reads as "no injuries".
+const isNoInjuryAnswer = (value) =>
+  NO_INJURY_ANSWER.test(
+    value
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[.!]+$/, "")
+  );
 
 /**
  * The injury note the guide reads: the planner's injuries answer and the
  * profile's notes, trimmed and joined with a space, each left out when it is
- * empty or answers none, n/a or no.
+ * empty or is a whole answer meaning none (NO_INJURY_ANSWER).
  */
 export const buildInjuryText = (injuries, notes) =>
   [injuries, notes]
     .map((value) => String(value || "").trim())
-    .filter((value) => value && !NO_INJURY_ANSWERS.has(value.toLowerCase()))
+    .filter((value) => value && !isNoInjuryAnswer(value))
     .join(" ");
 
 /**

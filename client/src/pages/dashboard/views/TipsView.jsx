@@ -31,9 +31,10 @@ const LIBRARY_PAGE_SIZE = 24;
  * equipment, today's plan lines, the weather and any injury note), a training
  * guide (buildGuideCards), and the exercise list. The search and filters drive
  * the one exercise load both lists share. An injury note is the planner form's
- * injuries plus the profile's notes, each left out when it answers none, n/a
- * or no (buildInjuryText). `onSaveExerciseToPlan` is saveExerciseToPlan in
- * events.js, which resolves to `{ ok: true }` or `{ ok: false, error }`.
+ * injuries plus the profile's notes, each left out when it is a whole answer
+ * meaning none, such as "None" or "No injuries" (buildInjuryText).
+ * `onSaveExerciseToPlan` is saveExerciseToPlan in events.js, which resolves to
+ * `{ ok: true }` or `{ ok: false, error }`.
  */
 export default function TipsView({
   user,
