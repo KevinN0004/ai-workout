@@ -24,3 +24,14 @@
 .app-notice p {
   margin: 0;
 }
+
+.app-notice button {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}

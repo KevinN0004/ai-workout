@@ -69,7 +69,8 @@ const downloadPlanPdfFromText = async (planText) => {
  * logout runs before anything else and waits on for at most
  * LOGOUT_FLUSH_CAP_MS; and the resets logout and account
  * deletion run, `clearOptimisticOperations`, `clearDashboardDataState`,
- * `clearDashboardToast` and `resetPersonalFlow`.
+ * `clearDashboardToast` and `resetPersonalFlow`; and `setSignOutUnfinished`,
+ * which logout sets when the server could not end the session.
  */
 export const createAppEventHandlers = ({
   apiFetch,
@@ -105,6 +106,7 @@ export const createAppEventHandlers = ({
   signupWeightUnit,
   authForm,
   setUser,
+  setSignOutUnfinished,
   authAutoSignIn,
   clearOptimisticOperations,
   flushOptimisticOperations,
@@ -332,8 +334,10 @@ export const createAppEventHandlers = ({
     // below and leave the previous account's dashboard on screen, with no sign
     // that Log out had not worked. A dead network, or apiFetch refusing to send
     // without a CSRF token, both get here.
+    let sessionEnded = false;
     try {
-      await apiFetch("/api/auth/logout", { method: "POST" });
+      const res = await apiFetch("/api/auth/logout", { method: "POST" });
+      sessionEnded = res.ok;
     } catch {
       // The cookie is HttpOnly and cannot be cleared from here, so the server
       // session may outlive this. Clearing what we can beats clearing nothing.
@@ -344,6 +348,9 @@ export const createAppEventHandlers = ({
     clearDashboardToast();
     resetPersonalFlow();
     go("/");
+    // Any answer but OK, the server's 503 included, means the session may still
+    // be valid in the store until it expires, so the visitor is told.
+    setSignOutUnfinished(!sessionEnded);
   };
 
   const submitWorkout = async (event) => {
