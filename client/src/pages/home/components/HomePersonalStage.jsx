@@ -104,7 +104,7 @@ export default function HomePersonalStage({
             onChange={onPersonalChange}
             type="number"
             min="10"
-            max="99"
+            max="120"
             placeholder="28"
           />
         </label>
@@ -157,8 +157,8 @@ export default function HomePersonalStage({
               value={personal.heightCm}
               onChange={onPersonalChange}
               type="number"
-              min="120"
-              max="230"
+              min="100"
+              max="260"
               placeholder="175"
             />
           ) : (
@@ -170,7 +170,7 @@ export default function HomePersonalStage({
                   onChange={onPersonalChange}
                   type="number"
                   min="3"
-                  max="7"
+                  max="8"
                   placeholder="5"
                 />
                 <span className="height-unit">ft</span>
@@ -231,8 +231,8 @@ export default function HomePersonalStage({
             value={personal.weight}
             onChange={onPersonalChange}
             type="number"
-            min={weightUnit === "kg" ? "35" : "77"}
-            max={weightUnit === "kg" ? "200" : "440"}
+            min={weightUnit === "kg" ? "25" : "55"}
+            max={weightUnit === "kg" ? "400" : "882"}
             placeholder={weightUnit === "kg" ? "72" : "160"}
           />
         </label>

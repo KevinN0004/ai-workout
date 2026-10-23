@@ -151,8 +151,8 @@ describe("PreviewPersonalChapter", () => {
     });
 
     test.each([
-      ["kg", "35", "200"],
-      ["lb", "77", "440"]
+      ["kg", "25", "400"],
+      ["lb", "55", "882"]
     ])("the weight field's bounds follow the %s unit", (weightUnit, min, max) => {
       // A kilogram range on a pounds field would reject every plausible entry.
       renderChapter({ weightUnit });
