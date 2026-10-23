@@ -15,7 +15,8 @@ import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
  * `flushOptimisticOperations`, which logout runs first: it sends every entry
  * still inside its undo window and resolves once every send has settled; and
  * `captureAccount`, which returns a check that stays true until the next
- * clear, for a request to read once its answer is in. `setDashboard` and
+ * clear, for a request to read once its answer is in. A send's answer shows in
+ * the toast unless the toast is offering a later entry's Undo, which stays. `setDashboard` and
  * `setDashError` are useDashboardData's: a send that succeeds replaces the
  * dashboard with the server's, and one that fails reports its error there.
  */
@@ -29,6 +30,10 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
   // unmount all run. A request sent before the bump answers for an account
   // that is no longer on screen.
   const generationRef = useRef(0);
+  // The id of the toast on screen while it offers Undo, else null. A send's
+  // answer does not replace that toast: it is the only way to call its entry
+  // off, so it stays until that entry's own send starts.
+  const undoToastIdRef = useRef(null);
 
   // ---- Toast ----------------------------------------------------------------
   const clearDashboardToast = useCallback(() => {
@@ -36,6 +41,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
       clearTimeout(dashboardToastTimeoutRef.current);
       dashboardToastTimeoutRef.current = null;
     }
+    undoToastIdRef.current = null;
     setDashboardToast(null);
   }, []);
 
@@ -61,6 +67,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         : nextToast.onAction
           ? 5200
           : 3200;
+    undoToastIdRef.current = nextToast.onAction ? nextToast.id : null;
     setDashboardToast(nextToast);
     dashboardToastTimeoutRef.current = setTimeout(() => {
       setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
@@ -161,6 +168,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
         // stops offering it, if the toast is still this entry's: a newer
         // entry's Undo is left. Its id stays, so its own timer still clears it.
         operation.committing = true;
+        if (undoToastIdRef.current === operation.undoToastId) undoToastIdRef.current = null;
         setDashboardToast((current) =>
           current?.id === operation.undoToastId
             ? { ...current, message: "Saving...", actionLabel: "", onAction: null }
@@ -172,14 +180,17 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
           optimisticOpRef.current.delete(operationId);
           removeOptimisticEntry(operationId);
           setDashboard(data.dashboard);
-          showDashboardToast(successMessage || "Saved.");
+          // A later entry's Undo toast is left up (undoToastIdRef).
+          if (!undoToastIdRef.current) showDashboardToast(successMessage || "Saved.");
         } catch (err) {
           if (!isSameAccount()) return;
           optimisticOpRef.current.delete(operationId);
           removeOptimisticEntry(operationId);
           const message = err?.message || `Unable to save ${type}.`;
+          // The page shows the error either way; the toast yields to a later
+          // entry's Undo, as a success does.
           setDashError(message);
-          showDashboardToast(message, "error");
+          if (!undoToastIdRef.current) showDashboardToast(message, "error");
         }
       };
 

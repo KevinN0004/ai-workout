@@ -150,10 +150,12 @@ export const createAppEventHandlers = ({
       }
 
       const data = await res.json();
+      // Generation can outlast a logout. A plan asked for by an account that is
+      // no longer signed in is dropped: not shown, not added to the dashboard,
+      // and no trip to /plan.
+      if (!isSameAccount()) return;
       setResult(data.plan);
-      // Generation can outlast a logout. The saved plan joins the dashboard only
-      // while the account that asked for it is still the one signed in.
-      if (data.savedPlan && isSameAccount()) {
+      if (data.savedPlan) {
         setDashboard((prev) =>
           prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev
         );

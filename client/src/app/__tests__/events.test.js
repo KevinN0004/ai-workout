@@ -937,13 +937,17 @@ describe("an answer that arrives after the account signed out", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  test("onSubmit shows the plan but keeps its saved copy off the dashboard", async () => {
+  // The plan was asked for by the account that signed out, so neither it nor
+  // its saved copy is shown to whoever is at the browser now.
+  test("onSubmit drops the plan, its saved copy and the trip to /plan", async () => {
     await build(
       signedOutMidRequest({ plan: "Monday - Push", savedPlan: { id: "p-new" } })
     ).onSubmit(submitEvent());
 
-    expect(deps.setResult).toHaveBeenLastCalledWith("Monday - Push");
+    expect(deps.setResult).not.toHaveBeenCalledWith("Monday - Push");
     expect(deps.setDashboard).not.toHaveBeenCalled();
+    expect(deps.go).not.toHaveBeenCalled();
+    expect(deps.setLoading).toHaveBeenLastCalledWith(false);
   });
 });
 
