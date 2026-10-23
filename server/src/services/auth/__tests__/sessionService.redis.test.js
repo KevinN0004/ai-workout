@@ -445,6 +445,89 @@ describe("when Redis fails after connecting", () => {
     );
   });
 
+  // node-redis drops its own timeout once a command is written, so a Redis
+  // that accepts the command and never answers (a paused container, a
+  // half-open socket) would hold the request open for good. The session
+  // commands have their own deadline, 2 s.
+  test("a read that is written and never answered fails at the reply deadline", async () => {
+    const { service } = await connected();
+    const token = await service.createSession("u-1");
+    fakeRedis.get = vi.fn(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    try {
+      const outcome = service.getSessionUser(req(token)).then(
+        () => "answered",
+        (err) => err
+      );
+
+      await vi.advanceTimersByTimeAsync(2000);
+      const settled = await Promise.race([outcome, Promise.resolve("still waiting")]);
+
+      expect(settled).toBeInstanceOf(SessionStoreUnavailableError);
+      expect(service.getRedisLastError()).toMatch(/did not answer/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a write that is never answered refuses the session at the reply deadline", async () => {
+    const { service } = await connected();
+    fakeRedis.set = vi.fn(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    try {
+      const outcome = service.createSession("u-1").then(
+        () => "answered",
+        (err) => err
+      );
+
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(await Promise.race([outcome, Promise.resolve("still waiting")])).toBe("still waiting");
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(await Promise.race([outcome, Promise.resolve("still waiting")])).toBeInstanceOf(
+        SessionStoreUnavailableError
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // /api/generate runs attachOptionalUser. A caller whose session cookie
+  // cannot be read is not anonymous: going on as anonymous would charge the
+  // anonymous quota and save nothing, while telling them nothing was wrong.
+  test("attachOptionalUser answers 503, not anonymous, when the read fails", async () => {
+    const { service } = await connected();
+    const token = await service.createSession("u-1");
+    fakeRedis.get = failing();
+    const res = buildRes();
+    const next = vi.fn();
+
+    await service.attachOptionalUser(
+      { ...req(token), log: { error: vi.fn(), warn: vi.fn() } },
+      res,
+      next
+    );
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.stringify(res.body)).not.toMatch(/on fire/);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // With no cookie there is nothing to read, so the store is never asked and
+  // an anonymous caller is served during the outage.
+  test("attachOptionalUser still serves a caller with no session cookie", async () => {
+    const { service } = await connected();
+    fakeRedis.get = failing();
+    const request = { headers: {} };
+    const next = vi.fn();
+
+    await service.attachOptionalUser(request, buildRes(), next);
+
+    expect(request.user).toBeNull();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(fakeRedis.get).not.toHaveBeenCalled();
+  });
+
   test("requireAuth answers 503, not 401, when the read fails", async () => {
     const { service } = await connected();
     const token = await service.createSession("u-1");

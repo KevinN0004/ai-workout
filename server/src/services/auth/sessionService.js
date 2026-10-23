@@ -16,6 +16,14 @@ import { sendErrorResponse } from "../http/errorResponseService.js";
 // get it too; both check isReady before using it.
 const REDIS_COMMAND_TIMEOUT_MS = 1500;
 
+// How long a session command may wait for Redis's answer, in ms. node-redis
+// drops the timeout above once a command is written, so a Redis that accepts
+// the command and never answers (a paused container, a half-open connection)
+// would leave the request waiting with no end. This deadline covers the whole
+// command, so it is longer than the queueing timeout, which answers first while
+// the client reconnects.
+const REDIS_SESSION_REPLY_TIMEOUT_MS = 2000;
+
 /**
  * Thrown by a session operation when Redis is the store and a command on it
  * failed. It carries status 503, and the Redis error as its `cause`.
@@ -191,12 +199,17 @@ export const createSessionService = ({
     }
   };
 
-  // Runs one command while Redis is the session store. A failure is logged and
+  // Runs one command while Redis is the session store, within
+  // REDIS_SESSION_REPLY_TIMEOUT_MS. A failure or a missed deadline is logged and
   // kept as the store's last error, then thrown as SessionStoreUnavailableError:
   // reads consult only Redis, so a fallback would hide the failure, not fix it.
   const runSessionCommand = async (event, message, command) => {
     try {
-      const result = await command();
+      const result = await withTimeout(
+        command(),
+        REDIS_SESSION_REPLY_TIMEOUT_MS,
+        `Redis did not answer within ${REDIS_SESSION_REPLY_TIMEOUT_MS}ms.`
+      );
       redisLastError = "";
       return result;
     } catch (err) {
@@ -429,14 +442,19 @@ export const createSessionService = ({
   };
 
   /**
-   * Resolves the session user when one is present but never rejects the request.
-   * Lets a route stay open to anonymous callers while still letting rate limiters
-   * and handlers tell the two apart.
+   * Resolves the session user when one is present, so a route can stay open to
+   * anonymous callers while rate limiters and handlers tell the two apart. A
+   * session cookie the unavailable store cannot read answers 503, as
+   * requireAuth does: going on as anonymous would charge the anonymous quota and
+   * save nothing. Any other lookup failure goes on as anonymous.
    */
   const attachOptionalUser = async (req, res, next) => {
     try {
       req.user = (await getSessionUser(req)) || null;
     } catch (err) {
+      if (err instanceof SessionStoreUnavailableError) {
+        return sendErrorResponse(req, res, err, 503);
+      }
       req.user = null;
       req.log?.warn(
         {
