@@ -117,8 +117,10 @@ export const registerAuthRoutes = (app, deps) => {
 
       // Write the account, then sign it in: a session cookie and a new CSRF token.
       // A session store that is down fails createSession before either cookie
-      // is set, so the answer is a 503 with no cookie, and the account it
-      // leaves behind signs in once the store is back.
+      // is set, so the answer is a 503 with no cookie. The account is deleted
+      // again first: the visitor is told the sign-up failed, so a retry has to
+      // be a fresh sign-up, not a 409. If that delete fails too, the account
+      // stays (it signs in once the store is back) and the failure is logged.
       const { salt, hash, passwordAlgo } = await hashPassword(password);
       const newUser = {
         id: crypto.randomUUID(),
@@ -131,7 +133,20 @@ export const registerAuthRoutes = (app, deps) => {
         dashboard: defaultDashboard()
       };
       await createUser(newUser);
-      const token = await createSession(newUser.id);
+      let token;
+      try {
+        token = await createSession(newUser.id);
+      } catch (sessionErr) {
+        try {
+          await deleteUser({ userId: newUser.id });
+        } catch (undoErr) {
+          req.log?.error(
+            { event: "signup_undo_failed", error: toShortText(String(undoErr), 240) },
+            "Could not delete the account of a sign-up whose session was not stored."
+          );
+        }
+        throw sessionErr;
+      }
       setSessionCookie(res, token, rememberMe);
       // A new CSRF token replaces the one the browser held while signed out.
       // useApiClient reads this cookie before every write, so the client's
@@ -254,8 +269,7 @@ export const registerAuthRoutes = (app, deps) => {
       // up, since passwordChangedAt already rejects it, so a failure there is
       // logged and the change goes on. A failure to create the replacement
       // session still answers 503: the password has changed, but this device
-      // holds no valid session and signs in again with the new password, as
-      // a sign-up does when its session cannot be stored.
+      // holds no valid session and signs in again with the new password.
       const previousToken = parseCookies(req.headers.cookie || "").sid;
       if (previousToken) {
         try {
@@ -316,11 +330,12 @@ export const registerAuthRoutes = (app, deps) => {
       const cookies = parseCookies(req.headers.cookie || "");
       const token = cookies.sid;
       // The cookies are cleared first, so this browser is signed out even when
-      // the delete fails. That failure still answers 503: the session itself
-      // stays valid in the store until it expires.
+      // the delete fails. It can then no longer end the session itself, so a
+      // failed delete is tried once more; a second failure answers 503, and the
+      // session stays valid in the store until it expires.
       clearSessionCookie(res);
       clearCsrfCookie(res);
-      if (token) await deleteSession(token);
+      if (token) await deleteSession(token).catch(() => deleteSession(token));
       res.json({ ok: true });
     } catch (err) {
       sendErrorResponse(req, res, err, sessionErrorStatus(err));
