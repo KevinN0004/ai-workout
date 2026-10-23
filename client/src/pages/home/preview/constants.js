@@ -27,7 +27,6 @@ export const JOHN_DOE_PREVIEW_PROFILE = {
   sex: "Male",
   heightCm: 183,
   weightKg: 84,
-  bodyFat: 18.4,
   activity: "Moderate",
   sleep: "7 - 8 hours",
   timeline: "12 weeks to build lean strength",
@@ -41,8 +40,7 @@ export const JOHN_DOE_PREVIEW_PROFILE = {
   duration: "50",
   environment: "Commercial",
   equipment: ["Full gym access"],
-  focuses: ["Strength", "Conditioning", "Core"],
-  personalComplete: true
+  focuses: ["Strength", "Conditioning", "Core"]
 };
 
 // The personal chapter's select menus, which the walkthrough sets whole instead
