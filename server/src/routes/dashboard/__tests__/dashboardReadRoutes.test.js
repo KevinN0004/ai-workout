@@ -44,7 +44,7 @@ const buildApp = ({ user = { id: "u-1", dashboard: {} } } = {}) => {
 
 beforeEach(() => {
   loadCollectionPage = vi.fn(async ({ collection }) => ({
-    items: [{ id: `${collection}-1`, userId: "u-1" }],
+    items: [{ id: `${collection}-1` }],
     total: 1
   }));
 });
