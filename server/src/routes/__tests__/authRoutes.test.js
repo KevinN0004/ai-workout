@@ -190,6 +190,13 @@ beforeEach(() => {
     deleteSession: vi.fn(async (token) => {
       sessions = sessions.filter((item) => item.token !== token);
     }),
+    // A stand-in for userRepository's deleteUser: drops the row, and reports
+    // whether there was one.
+    deleteUser: vi.fn(async ({ userId }) => {
+      const before = rows.length;
+      rows = rows.filter((item) => item.userId !== userId);
+      return rows.length < before;
+    }),
     clearSessionCookie: vi.fn(() => {
       cookieCalls.clearedSession += 1;
     }),
@@ -336,9 +343,8 @@ describe("POST /api/auth/signup", () => {
     expect(JSON.stringify(response.body)).not.toMatch(/connection terminated/);
   });
 
-  // The account is written before the session, so it exists and can sign in
-  // once the store is back; what must not happen is a cookie for a session
-  // that was never stored.
+  // The account is written before the session. What must not happen is a
+  // cookie for a session that was never stored.
   test("answers 503 with no cookie when the session store is unavailable", async () => {
     const app = buildApp({
       ...realCookieWriters(),
@@ -352,6 +358,50 @@ describe("POST /api/auth/signup", () => {
     expect(response.status).toBe(503);
     expect(response.headers["set-cookie"]).toBeUndefined();
     expect(JSON.stringify(response.body)).not.toMatch(/on fire/);
+  });
+
+  // The visitor was told the sign-up failed, so the account it wrote must not
+  // be left to answer their retry with 409.
+  test("undoes the account when its session cannot be stored, so a retry signs up", async () => {
+    let storeUp = false;
+    const app = buildApp({
+      createSession: async (userId) => {
+        if (!storeUp) throw storeDown();
+        sessions.push({ token: "sess-retry", userId });
+        return "sess-retry";
+      }
+    });
+
+    const first = await request(app).post("/api/auth/signup").send(signupBody());
+    expect(first.status).toBe(503);
+    expect(rows).toHaveLength(0);
+
+    storeUp = true;
+    const retry = await request(app).post("/api/auth/signup").send(signupBody());
+
+    expect(retry.status).toBe(200);
+    expect(rows).toHaveLength(1);
+  });
+
+  // The undo can fail too, with the database. The answer is still the
+  // session's 503, and the account left behind is recorded for an operator.
+  test("still answers 503, and records it, when the undo fails", async () => {
+    const app = buildApp({
+      createSession: async () => {
+        throw storeDown();
+      },
+      deleteUser: async () => {
+        throw new Error("connection terminated unexpectedly");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/signup").send(signupBody());
+
+    expect(response.status).toBe(503);
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "signup_undo_failed" }),
+      expect.any(String)
+    );
   });
 });
 
@@ -1403,18 +1453,34 @@ describe("POST /api/auth/logout", () => {
   // This browser is signed out either way. The 503 says the session itself
   // could not be ended, so it stays valid in the store until it expires.
   test("answers 503, and still clears both cookies, when the store is unavailable", async () => {
-    const app = buildApp({
-      ...realCookieWriters(),
-      deleteSession: async () => {
-        throw storeDown();
-      }
+    const deleteSession = vi.fn(async () => {
+      throw storeDown();
     });
+    const app = buildApp({ ...realCookieWriters(), deleteSession });
 
     const response = await request(app).post("/api/auth/logout").set("Cookie", "sid=sess-1");
 
     expect(response.status).toBe(503);
+    expect(deleteSession).toHaveBeenCalledTimes(2);
     const cookies = response.headers["set-cookie"].join("\n");
     expect(cookies).toMatch(/^sid=;/m);
     expect(cookies).toMatch(/^csrfToken=;/m);
+  });
+
+  // The cleared cookie means this browser cannot ask again, so the server
+  // tries the delete a second time before it gives up.
+  test("retries a failed delete once, and succeeds when the retry does", async () => {
+    const deleteSession = vi
+      .fn()
+      .mockRejectedValueOnce(storeDown())
+      .mockResolvedValueOnce(undefined);
+    const app = buildApp({ deleteSession });
+
+    const response = await request(app).post("/api/auth/logout").set("Cookie", "sid=sess-1");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true });
+    expect(deleteSession).toHaveBeenCalledTimes(2);
+    expect(deleteSession).toHaveBeenLastCalledWith("sess-1");
   });
 });
