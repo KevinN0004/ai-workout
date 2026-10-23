@@ -239,12 +239,13 @@ export default function usePreviewDerivedData({
   const previewDashboardSummary = useMemo(() => {
     // ---- The weekly goal and the workouts done ------------------------------
     // Every planned training day counts as done, and the plan always holds at
-    // least as many as the goal, so progress is always full and the pace text
-    // below always says the goal is reached.
+    // least as many as the goal, and at least PREVIEW_WEEK_MIN_WORKOUT_DAYS, so
+    // progress is always full and the pace text below is always the goal
+    // reached.
     const trainingDays = previewWeekPlan.filter((item) => item.isTraining);
     const requestedGoalDays = Number(activePreviewProfile.days);
     const weeklyGoal = clamp(
-      Number.isFinite(requestedGoalDays) ? Math.round(requestedGoalDays) : trainingDays.length || 4,
+      Number.isFinite(requestedGoalDays) ? Math.round(requestedGoalDays) : trainingDays.length,
       1,
       PREVIEW_WEEK_DAY_ORDER.length
     );
@@ -290,30 +291,31 @@ export default function usePreviewDerivedData({
 
     // ---- Today and the next session -----------------------------------------
     // Today is the real weekday when the summary is built; nothing rebuilds it
-    // at midnight. The next session is the first training day after today,
-    // going round the week.
+    // at midnight. previewWeekPlan holds one entry per day of
+    // PREVIEW_WEEK_DAY_ORDER, in that order, each with its session, workout and
+    // meta filled in, and getPreviewWeekdayName always names one of those days,
+    // so today's entry is the one at today's index. The next session is the
+    // first training day after today, going round the week: offsets 1 to 7 come
+    // back to today, and the plan always holds training days, so one is found.
     const todayName = getPreviewWeekdayName(new Date());
-    const todayPlan = previewWeekPlan.find((item) => item.day === todayName) || previewWeekPlan[0];
-    const todayWorkoutLines = String(todayPlan?.workout || "")
+    const todayIndex = PREVIEW_WEEK_DAY_ORDER.indexOf(todayName);
+    const todayPlan = previewWeekPlan[todayIndex];
+    const todayWorkoutLines = todayPlan.workout
       .split(" - ")
       .map((line) => line.trim())
       .filter(Boolean)
       .slice(0, 3);
-    const todayDuration = String(todayPlan?.meta || "50 min")
-      .split(" - ")[0]
-      .trim();
+    const todayDuration = todayPlan.meta.split(" - ")[0].trim();
 
-    const todayIndex = Math.max(0, PREVIEW_WEEK_DAY_ORDER.indexOf(todayPlan?.day || todayName));
     let nextTrainingPlan = null;
     for (let offset = 1; offset <= PREVIEW_WEEK_DAY_ORDER.length; offset += 1) {
       const nextIndex = (todayIndex + offset) % PREVIEW_WEEK_DAY_ORDER.length;
       const candidate = previewWeekPlan[nextIndex];
-      if (candidate?.isTraining) {
+      if (candidate.isTraining) {
         nextTrainingPlan = candidate;
         break;
       }
     }
-    if (!nextTrainingPlan) nextTrainingPlan = trainingDays[0] || previewWeekPlan[0];
 
     // ---- Trend series, a value per day of the week --------------------------
     // Calories 2% over the goal on training days and 10% under it on rest days,
@@ -340,7 +342,8 @@ export default function usePreviewDerivedData({
 
     // ---- Streak, recent activity, the overview's settings and the pace ------
     // The streak is the longest run of training days from Monday to Sunday,
-    // not wrapping round, held between 1 and the weekly goal.
+    // not wrapping round, held to the weekly goal. The plan always holds a
+    // training day, so it is at least 1.
     let runningStreak = 0;
     let bestStreak = 0;
     previewWeekPlan.forEach((dayPlan) => {
@@ -351,32 +354,22 @@ export default function usePreviewDerivedData({
         runningStreak = 0;
       }
     });
-    const streakDays = Math.max(1, Math.min(bestStreak || completedWorkouts || 1, weeklyGoal));
+    const streakDays = Math.min(bestStreak, weeklyGoal);
 
     const recentActivity = trainingDays.slice(0, 4).map((dayPlan) => ({
       day: dayPlan.day,
       session: dayPlan.session,
-      duration: String(dayPlan.meta || "50 min")
-        .split(" - ")[0]
-        .trim()
+      duration: dayPlan.meta.split(" - ")[0].trim()
     }));
     const focusPicks = activePreviewProfile.focuses.slice(0, 3);
     const environmentText = String(activePreviewProfile.environment);
     const equipmentList = activePreviewProfile.equipment.slice(0, 3);
     const scheduleText = `${weeklyGoal} days - ${Number(activePreviewProfile.duration) || 50} min`;
-    const avgDailyWorkouts = completedWorkouts / 7;
-    const remainingWorkouts = Math.max(weeklyGoal - completedWorkouts, 0);
-    const daysToGoal =
-      avgDailyWorkouts > 0 ? Math.ceil(remainingWorkouts / avgDailyWorkouts) : null;
-    const goalPaceText =
-      remainingWorkouts === 0
-        ? "Weekly workout goal reached."
-        : avgDailyWorkouts > 0
-          ? `At this pace, ${daysToGoal} day${daysToGoal === 1 ? "" : "s"} to reach ${weeklyGoal} workouts.`
-          : "Log a workout to start your pace estimate.";
+    // Always the goal reached: see the weekly goal above.
+    const goalPaceText = "Weekly workout goal reached.";
 
     // ---- Today's meals: a training-day menu or a rest-day one ---------------
-    const mealPlan = todayPlan?.isTraining
+    const mealPlan = todayPlan.isTraining
       ? {
           breakfast: "Greek yogurt + oats + berries",
           lunch: "Chicken rice bowl with mixed greens",
@@ -399,7 +392,7 @@ export default function usePreviewDerivedData({
       equipmentList,
       focusPicks,
       todayName,
-      todaySession: String(todayPlan?.session || "Training Session"),
+      todaySession: todayPlan.session,
       todayDuration,
       todayWorkoutLines,
       todayMealPlan: mealPlan,

@@ -622,11 +622,11 @@ describe("usePreviewDerivedData", () => {
     });
 
     test("and says it for every input, because the preview always completes its week", () => {
-      // `goalPaceText` has three branches, and only this one is reachable.
-      // The week is built to satisfy the same day count the goal is read from,
-      // so `completedWorkouts` always meets `weeklyGoal` and the two "at this
-      // pace" messages are dead. Swept here rather than reasoned about: the
-      // day count is clamped twice and it is not obvious by inspection.
+      // `goalPaceText` is a fixed string, which is right only because the week
+      // is built to satisfy the same day count the goal is read from, so
+      // `completedWorkouts` always meets `weeklyGoal`. That is what this pins.
+      // Swept here rather than reasoned about: the day count is clamped twice
+      // and it is not obvious by inspection.
       const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
       for (let picked = 0; picked <= 6; picked += 1) {
@@ -636,6 +636,9 @@ describe("usePreviewDerivedData", () => {
             form: { days }
           });
 
+          expect(previewDashboardSummary.completedWorkouts).toBe(
+            previewDashboardSummary.weeklyGoal
+          );
           expect(previewDashboardSummary.goalPaceText).toBe("Weekly workout goal reached.");
         });
       }
