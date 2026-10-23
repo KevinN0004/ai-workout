@@ -5,6 +5,7 @@ import { parseRedisPort } from "../services/auth/sessionService.js";
 import { __testables as errorTracking } from "../services/platform/errorTrackingService.js";
 import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
 import { __testables as indexTestables } from "../index.js";
+import { validateEnv } from "../services/platform/envValidationService.js";
 
 // The invariant this file exists to hold:
 //
@@ -25,6 +26,23 @@ import { __testables as indexTestables } from "../index.js";
 // Note this asserts a CONTRACT, not an implementation. A helper is free to
 // guard however it likes as long as the three absent forms agree and a measured
 // zero survives.
+
+// The startup check and the reader must agree on what a positive integer
+// setting is. A value the check passes but toPositiveInt replaces with its
+// default is a setting the operator was told took effect when it did not.
+describe("validateEnv accepts a positive integer setting exactly when toPositiveInt keeps it", () => {
+  test.each(["1", "42", " 42 ", "1e3", "0x10", "1500.5", "0", "-3", "Infinity", "lots"])(
+    "%j",
+    (value) => {
+      const accepted =
+        validateEnv({ DATABASE_URL: "postgresql://u@127.0.0.1/db", GEMINI_TIMEOUT_MS: value })
+          .length === 0;
+      const kept = indexTestables.toPositiveInt(value, -1) !== -1;
+
+      expect(accepted).toBe(kept);
+    }
+  );
+});
 
 const ABSENT = [
   ["null", null],
