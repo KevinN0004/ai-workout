@@ -1,6 +1,6 @@
 /**
  * fetch with a deadline, for the dashboard's reads (useDashboardData's and
- * useOlderLogPages') and App's session check.
+ * useOlderLogPages'), App's session check and every apiFetch request.
  */
 
 /**
