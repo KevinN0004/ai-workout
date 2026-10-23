@@ -18,6 +18,12 @@ import { getLocalDateKey, splitFullName } from "./units";
 // still running when it passes may be lost: logout goes ahead without it.
 const LOGOUT_FLUSH_CAP_MS = 5000;
 
+// How long plan generation may take before the client gives up, in
+// milliseconds: the server's own deadline (GEMINI_TIMEOUT_MS, 30 s unless set)
+// plus room for the save and the network. A deployment that raises that
+// setting past about 35 s has to raise this with it.
+const GENERATE_TIMEOUT_MS = 40000;
+
 // Settles when `promise` does or after `ms`, whichever comes first, and clears
 // its timer either way, so a quick promise leaves no timer behind.
 const settleWithin = (promise, ms) => {
@@ -141,7 +147,8 @@ export const createAppEventHandlers = ({
       const res = await apiFetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(form),
+        timeoutMs: GENERATE_TIMEOUT_MS
       });
 
       if (!res.ok) {
@@ -338,7 +345,11 @@ export const createAppEventHandlers = ({
     // without a CSRF token, both get here.
     let sessionEnded = false;
     try {
-      const res = await apiFetch("/api/auth/logout", { method: "POST" });
+      // Waited on no longer than the flush: the browser signs out either way.
+      const res = await apiFetch("/api/auth/logout", {
+        method: "POST",
+        timeoutMs: LOGOUT_FLUSH_CAP_MS
+      });
       sessionEnded = res.ok;
     } catch {
       // The cookie is HttpOnly and cannot be cleared from here, so the server

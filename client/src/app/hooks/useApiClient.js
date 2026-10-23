@@ -1,18 +1,25 @@
 /**
  * The fetch every API write in the client goes through: it sends the session
- * cookie and adds the CSRF token. Called once, by App, which passes `apiFetch`
- * to createAppEventHandlers.
+ * cookie, adds the CSRF token and gives up at a deadline. Called once, by App,
+ * which passes `apiFetch` to createAppEventHandlers.
  */
 import { useCallback } from "react";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../constants";
 import { readCookie } from "../cache";
+import { fetchWithTimeout } from "../network";
+
+// How long a request waits for an answer, in milliseconds, unless its caller
+// names `timeoutMs`: network.js's own default, which the dashboard's reads use.
+const API_TIMEOUT_MS = 15000;
 
 /**
  * Returns `apiFetch`, fetch with credentials included and, for any method other
  * than GET, HEAD or OPTIONS, the CSRF header set; and `ensureCsrfToken`, which
  * resolves the token, fetching one when no cookie holds it. Both are stable
  * across renders. `apiFetch` rejects before sending a write it has no token
- * for, or when fetching one fails.
+ * for, or when fetching one fails, and rejects with "Request timed out. Please
+ * try again." when the server has not answered within `options.timeoutMs`
+ * (API_TIMEOUT_MS by default), as does the token fetch.
  */
 export default function useApiClient() {
   // ---- CSRF token -----------------------------------------------------------
@@ -24,7 +31,7 @@ export default function useApiClient() {
     if (existingToken) {
       return existingToken;
     }
-    const response = await fetch("/api/csrf-token", {
+    const response = await fetchWithTimeout("/api/csrf-token", {
       credentials: "include"
     });
     if (!response.ok) {
@@ -40,11 +47,12 @@ export default function useApiClient() {
   // ---- Requests -------------------------------------------------------------
   const apiFetch = useCallback(
     async (url, options = {}) => {
-      const method = String(options?.method || "GET").toUpperCase();
-      const headers = new Headers(options?.headers || {});
+      const { timeoutMs = API_TIMEOUT_MS, ...requestOptions } = options;
+      const method = String(requestOptions.method || "GET").toUpperCase();
+      const headers = new Headers(requestOptions.headers || {});
       const nextOptions = {
-        ...options,
-        credentials: options?.credentials || "include",
+        ...requestOptions,
+        credentials: requestOptions.credentials || "include",
         headers
       };
 
@@ -55,7 +63,7 @@ export default function useApiClient() {
         }
         headers.set(CSRF_HEADER_NAME, csrfToken);
       }
-      return fetch(url, nextOptions);
+      return fetchWithTimeout(url, nextOptions, timeoutMs);
     },
     [ensureCsrfToken]
   );
