@@ -68,8 +68,7 @@ describe("userReadRepository", () => {
   });
 
   // Goals live in one JSON column, so a partial write must patch rather than
-  // replace. The shim expressed this as dotted $set paths; the repository does
-  // a read-merge-write. Either way this property is the one that matters.
+  // replace: the repository reads, merges and writes the column.
   test("updateGoals merges instead of replacing sibling keys", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
@@ -164,9 +163,8 @@ describe("userReadRepository", () => {
     expect(await updatePasswordHash({ userId, hash: "x" })).toBe(false);
   });
 
-  // Saved-exercise writes moved to repositories/savedExerciseRepository.js.
-  // This still spans both: the repository removes the row, and the shim's user
-  // read has to stop reporting it.
+  // This spans two repositories: savedExerciseRepository removes the row, and
+  // userReadRepository's read of the user has to stop reporting it.
   test("removing a saved exercise clears it from the user's dashboard", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
@@ -301,9 +299,8 @@ describe("dashboard collection repositories", () => {
     expect(result.items[0].focus).toBe("Legs");
   });
 
-  // The caller has always asked for a secondary sort on id. The shim dropped it,
-  // leaving ordering among tied timestamps to Postgres; the repository honours
-  // it, so paging over ties cannot repeat or skip a row.
+  // loadCollectionPage breaks ties on the sort field by id, so paging over tied
+  // timestamps cannot repeat or skip a row.
   test("pages tied timestamps without repeating or dropping a row", async () => {
     const userId = await seedUser();
     const tied = new Date(Date.UTC(2026, 2, 2)).toISOString();
@@ -352,8 +349,8 @@ describe("dashboard collection repositories", () => {
   });
 
   // Prisma's _sum returns null when no row carries a value, which is not the
-  // same as a zero total. The Mongo pipeline this replaced used $ifNull to make
-  // both cases 0; the repository preserves that rather than leaking null.
+  // same as a zero total. sumCaloriesForDate turns it into 0, because an empty
+  // day's total is zero, not absent.
   test("meal calorie total is 0, not null, when no meal carries calories", async () => {
     const userId = await seedUser();
     await saveMealLog({

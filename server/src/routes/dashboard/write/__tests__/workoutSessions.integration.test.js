@@ -3,14 +3,10 @@ import request from "supertest";
 import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
 
-// Pins POST /api/dashboard/workouts and its /workout-sessions alias against real
-// Postgres before that route is migrated off the Mongo compatibility shim.
-//
-// Beyond the write itself, these tests pin the three properties the route's
-// Mongo aggregation-pipeline update claims to provide -- newest first, no
-// duplicate ids, and a cap on dashboard.workouts. They are asserted here as
-// observable behaviour so that removing the pipeline has to preserve them
-// rather than being taken on trust.
+// Pins POST /api/dashboard/workout-sessions and its /workouts alias against
+// real Postgres: the write, an update in place for a resent id, and the
+// dashboard the route answers with, its workouts newest first and with no
+// duplicate ids.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
@@ -120,8 +116,9 @@ describe("POST /api/dashboard/workout-sessions", () => {
     expect(rows[0].durationMinutes).toBe(50);
   });
 
-  // The pipeline update dedupes dashboard.workouts by id. Asserted through the
-  // response so it holds however the route is implemented.
+  // A resent id updates its row rather than adding a second, so the dashboard
+  // lists it once. Asserted through the response so it holds however the
+  // route is implemented.
   test("does not duplicate a resubmitted id in the dashboard", async () => {
     await postWorkout(agent, csrfToken, {
       id: "w-dupe",

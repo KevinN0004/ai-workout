@@ -3,11 +3,10 @@ import request from "supertest";
 import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
 
-// Pins the behaviour of POST /api/dashboard/progress-metrics against real
-// Postgres before that route is migrated off the Mongo compatibility shim.
-// Written to guard a refactor, so it asserts observable behaviour only -- the
-// response shape and what ends up in the database -- and says nothing about
-// which data layer produced it.
+// Pins POST /api/dashboard/progress-metrics against real Postgres: the
+// response and what ends up in the database, an update in place for a resent
+// id, the validation, and that each user sees only their own metrics. It
+// asserts observable behaviour only, not how the repository writes the row.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");

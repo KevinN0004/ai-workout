@@ -3,13 +3,11 @@ import request from "supertest";
 import { app } from "../../../../index.js";
 import { prisma } from "../../../../db/prisma.js";
 
-// Pins the remaining User write paths against real Postgres before they move
-// off the Mongo compatibility shim: profile $set, goals $set with dotted paths,
-// and the calories $push.
+// Pins the profile, goals and calories writes against real Postgres.
 //
-// The goals merge is the one with a sharp edge. The shim rebuilds the goals
-// JSON from the existing row and patches only the keys present, so sending one
-// goal must not erase the others. That is asserted directly.
+// The goals merge is the one with a sharp edge. userRepository.updateGoals
+// reads the stored goals and patches only the keys sent, so sending one goal
+// must not erase the others. That is asserted directly.
 
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
