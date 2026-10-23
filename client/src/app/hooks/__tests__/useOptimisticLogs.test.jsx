@@ -684,3 +684,98 @@ describe("once the send has started", () => {
     });
   });
 });
+
+// An earlier entry's send can answer while a later entry's Undo toast is up.
+// The Undo is the only way to call that later entry off, so the answer does
+// not replace it; a failure still reaches the page through setDashError.
+describe("an answer that arrives while a later entry offers Undo", () => {
+  // Entry one is sent at 4.5 s and answers when the test says; entry two is
+  // queued at 2 s, so its Undo toast is up, and its window open, until 6.5 s.
+  const stage = async (result, request) => {
+    act(() => result.current.queueOptimisticLogCommit(queue(undefined, { request })));
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(
+          { dashboard: {} },
+          { item: { id: "op-2", title: "Eggs" }, pendingMessage: "Eggs added. Undo?" }
+        )
+      )
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(OPTIMISTIC_UNDO_WINDOW_MS - 2000);
+    });
+  };
+
+  test("a success leaves the later entry's Undo toast up", async () => {
+    const { result } = render();
+    const pending = deferred();
+    await stage(
+      result,
+      vi.fn(() => pending.promise)
+    );
+
+    await act(async () => {
+      pending.resolve({ dashboard: { mealLogs: [] } });
+    });
+
+    expect(setDashboard).toHaveBeenCalledWith({ mealLogs: [] });
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Eggs added. Undo?",
+      actionLabel: "Undo"
+    });
+  });
+
+  test("a failure leaves it up too, and still reports the error", async () => {
+    const { result } = render();
+    const pending = deferred();
+    await stage(
+      result,
+      vi.fn(() => pending.promise)
+    );
+
+    await act(async () => {
+      pending.reject(new Error("Server error."));
+    });
+
+    expect(setDashError).toHaveBeenLastCalledWith("Server error.");
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Eggs added. Undo?",
+      actionLabel: "Undo"
+    });
+  });
+
+  test("once the later entry is undone, the answer shows again", async () => {
+    const { result } = render();
+    const pending = deferred();
+    await stage(
+      result,
+      vi.fn(() => pending.promise)
+    );
+
+    act(() => result.current.dashboardToast.onAction());
+    await act(async () => {
+      pending.resolve({ dashboard: {} });
+    });
+
+    expect(result.current.dashboardToast).toMatchObject({ message: "Meal saved." });
+  });
+
+  test("once the toast is dismissed by hand, the answer shows again", async () => {
+    const { result } = render();
+    const pending = deferred();
+    await stage(
+      result,
+      vi.fn(() => pending.promise)
+    );
+
+    act(() => result.current.clearDashboardToast());
+    await act(async () => {
+      pending.resolve({ dashboard: {} });
+    });
+
+    expect(result.current.dashboardToast).toMatchObject({ message: "Meal saved." });
+  });
+});
