@@ -83,7 +83,7 @@ second maps URL back to view.
 
 Use `src/app/hooks/useApiClient.js` for unsafe requests. It ensures the CSRF cookie exists and sends `X-CSRF-Token` with `POST`, `PUT`, `PATCH`, and `DELETE` requests.
 
-Use `src/app/network.js` when a request should have an explicit timeout.
+`apiFetch` has a deadline of its own: 15 s, or the caller's `timeoutMs` (40 s for plan generation, 5 s for logout), and a request past it rejects with "Request timed out. Please try again." Both it and the dashboard's reads go through `src/app/network.js`'s `fetchWithTimeout`.
 
 ## Bundle Notes
 
@@ -159,7 +159,8 @@ the request was awaited bare, a rejection skipped every clear and left the previ
 account's dashboard on screen. Both a dead network and `apiFetch` refusing to send
 without a CSRF token reach that path. The session cookie is HttpOnly and cannot be
 cleared from here, so a failed request may leave the server session alive — clearing
-what we can is deliberate.
+what we can is deliberate. When it does, or the server answers anything but OK, App says
+so with a notice (`AppNotice`) that stays until it is dismissed or someone signs in.
 
 ## Logging an Entry
 
@@ -187,6 +188,9 @@ If the save fails, the optimistic entry is **removed** rather than left on scree
 entry that stays would look saved and would not be. Undo is refused once the request is
 in flight (`operation.committing`), because calling it off at that point would leave the
 dashboard disagreeing with the server.
+
+A send's answer, success or failure, does not replace a later entry's Undo toast while
+that entry's window is open; a failure still shows as the dashboard's error line.
 
 `clearOptimisticOperations` cancels the queued requests as well as clearing the entries;
 that is what stops a write queued before a sign-out firing against the next account.
