@@ -630,13 +630,15 @@ describe("buildInjuryText", () => {
     expect(buildInjuryText("None", note)).toBe("");
   });
 
-  // Only the whole answer counts, so a note that goes on to name something is
-  // kept, and the guide can still find the injury in it.
+  // Only the whole answer counts, so a note that names something before or
+  // after a none phrase is kept, and the guide can still find the injury in it.
   test.each([
     ["No injuries except a sore knee"],
+    ["No injuries, but my shoulder clicks"],
     ["no pain running, but my left knee clicks"],
     ["None of the above, shoulder only"],
     ["Nothing major, lower back twinges"],
+    ["Left knee, otherwise none"],
     ["knee"]
   ])("keeps the note %j", (note) => {
     expect(buildInjuryText("None", note)).toBe(note);
