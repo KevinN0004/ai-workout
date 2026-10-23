@@ -156,10 +156,11 @@ export default function useBodyModel({
   }, [resolvedHeightCm, resolvedWeightKg]);
 
   // ---- Whether the personal step is complete --------------------------------
-  // The five fields HomePersonalStage's hint asks for.
+  // The five fields HomePersonalStage's hint asks for. The age range is the
+  // server's (profileBodySchema), as the form's own bounds are.
   const ageValue = useMemo(() => toNumberOrNull(personal.age), [personal.age]);
   const hasValidName = Boolean(personal.name?.trim());
-  const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 99;
+  const hasValidAge = ageValue !== null && ageValue >= 10 && ageValue <= 120;
   const isPersonalComplete =
     hasValidName &&
     hasValidAge &&

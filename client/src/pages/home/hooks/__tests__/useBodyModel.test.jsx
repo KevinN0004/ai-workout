@@ -375,7 +375,7 @@ describe("absent and unusable inputs", () => {
     test.each([
       ["empty", ""],
       ["too young", "9"],
-      ["too old", "100"],
+      ["too old", "121"],
       ["unusable", "grown up"]
     ])("is incomplete with a %s age", (_label, age) => {
       // An empty age coerces to 0, which the range check rejects -- the same
@@ -383,7 +383,8 @@ describe("absent and unusable inputs", () => {
       expect(base({ age }).isPersonalComplete).toBe(false);
     });
 
-    test.each([["10"], ["99"]])("accepts an age of %s, at the boundary", (age) => {
+    // The server's range, profileBodySchema's age (10 to 120).
+    test.each([["10"], ["120"]])("accepts an age of %s, at the boundary", (age) => {
       expect(base({ age }).isPersonalComplete).toBe(true);
     });
   });
