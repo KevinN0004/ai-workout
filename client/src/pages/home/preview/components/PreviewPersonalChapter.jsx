@@ -68,7 +68,7 @@ export default function PreviewPersonalChapter({
               value={getFieldValue("age")}
               type="number"
               min="10"
-              max="99"
+              max="120"
               readOnly
             />
           </label>
@@ -93,8 +93,8 @@ export default function PreviewPersonalChapter({
                 name="heightCm"
                 value={getFieldValue("heightCm")}
                 type="number"
-                min="120"
-                max="230"
+                min="100"
+                max="260"
                 readOnly
               />
             ) : (
@@ -105,7 +105,7 @@ export default function PreviewPersonalChapter({
                     value={getFieldValue("heightFeet")}
                     type="number"
                     min="3"
-                    max="7"
+                    max="8"
                     readOnly
                   />
                   <span className="height-unit">ft</span>
@@ -144,8 +144,8 @@ export default function PreviewPersonalChapter({
               name="weight"
               value={getFieldValue("weight")}
               type="number"
-              min={weightUnit === "kg" ? "35" : "77"}
-              max={weightUnit === "kg" ? "200" : "440"}
+              min={weightUnit === "kg" ? "25" : "55"}
+              max={weightUnit === "kg" ? "400" : "882"}
               readOnly
             />
           </label>

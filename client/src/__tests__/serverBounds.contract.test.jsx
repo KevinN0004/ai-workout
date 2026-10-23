@@ -4,6 +4,9 @@ import AuthPage from "../pages/auth/AuthPage";
 import CaloriesView from "../pages/dashboard/views/CaloriesView";
 import DashboardWorkoutModal from "../pages/dashboard/components/DashboardWorkoutModal";
 import MealLogPanel from "../pages/dashboard/meal/MealLogPanel";
+import HomePersonalStage from "../pages/home/components/HomePersonalStage";
+import PreviewPersonalChapter from "../pages/home/preview/components/PreviewPersonalChapter";
+import { toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "../app/units";
 import { fieldsForTab } from "../pages/dashboard/settings/settingsFields";
 import {
   caloriesBodySchema,
@@ -21,9 +24,12 @@ import {
 // range tighter than the server's makes a value the server accepts
 // unenterable, and a looser one lets through a value the server answers 400.
 //
-// The home form and the walkthrough are left out: neither posts its fields,
-// and sign-up, which does, is here. Feet and inches, and pounds, are converted
-// before they are sent, and settingsFields.test.js pins how.
+// The home form and the walkthrough are here too. Neither posts its fields,
+// but the home form's answers prefill sign-up, which does, and the walkthrough
+// shows the same form: a narrower range would turn away a visitor sign-up
+// accepts. Feet and inches, and pounds, are converted before they are sent,
+// and settingsFields.test.js pins how; the imperial ranges of the three forms
+// are held to sign-up's below.
 
 const noop = () => {};
 
@@ -90,7 +96,51 @@ const renderWorkoutModal = () =>
     />
   );
 
-const renderSignup = () =>
+const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
+  render(
+    <HomePersonalStage
+      personalPanelRef={{ current: null }}
+      personalMode="basic"
+      setPersonalMode={noop}
+      user={null}
+      onLogout={noop}
+      go={noop}
+      onPersonalSubmit={noop}
+      personal={{ heightCm: "", heightFeet: "", heightInches: "", weight: "", trainingDays: [] }}
+      onPersonalChange={noop}
+      heightUnit={heightUnit}
+      setHeightUnit={noop}
+      toFeetInchesFromCm={toFeetInchesFromCm}
+      toCmFromFeetInches={toCmFromFeetInches}
+      setPersonal={noop}
+      weightUnit={weightUnit}
+      setWeightUnit={noop}
+      toLb={toLb}
+      toKg={toKg}
+      trainingDayOptions={[]}
+      toggleTrainingDay={noop}
+      isPersonalComplete={false}
+      backBtnStyle={{}}
+      goToStage={noop}
+      isIntroTransitioning={false}
+      isStageTransitioning={false}
+    />
+  );
+
+const renderWalkthroughForm = (heightUnit = "cm", weightUnit = "kg") =>
+  render(
+    <PreviewPersonalChapter
+      previewPersonalCollapsed={false}
+      previewPersonalShifted={false}
+      previewBuilderStage={0}
+      previewFilledFields={{}}
+      heightUnit={heightUnit}
+      weightUnit={weightUnit}
+      getPreviewTextRows={() => 1}
+    />
+  );
+
+const renderSignup = (signupHeightUnit = "cm", signupWeightUnit = "kg") =>
   render(
     <AuthPage
       gradient={{}}
@@ -102,9 +152,9 @@ const renderSignup = () =>
       onAuthChange={noop}
       signupProfileForm={{ heightCm: "", heightFeet: "", heightInches: "", weight: "" }}
       onSignupProfileChange={noop}
-      signupHeightUnit="cm"
+      signupHeightUnit={signupHeightUnit}
       setSignupHeightUnit={noop}
-      signupWeightUnit="kg"
+      signupWeightUnit={signupWeightUnit}
       setSignupWeightUnit={noop}
       toCmFromFeetInches={() => ""}
       toFeetInchesFromCm={() => ({ feet: "", inches: "" })}
@@ -192,7 +242,23 @@ const INPUTS = [
   ],
   ["Sign-up: age", renderSignup, byName("age"), profileBodySchema.shape.age],
   ["Sign-up: height in cm", renderSignup, byName("heightCm"), profileBodySchema.shape.heightCm],
-  ["Sign-up: weight in kg", renderSignup, byName("weight"), profileBodySchema.shape.weightKg]
+  ["Sign-up: weight in kg", renderSignup, byName("weight"), profileBodySchema.shape.weightKg],
+  ["Home form: age", renderHomeForm, byName("age"), profileBodySchema.shape.age],
+  ["Home form: height in cm", renderHomeForm, byName("heightCm"), profileBodySchema.shape.heightCm],
+  ["Home form: weight in kg", renderHomeForm, byName("weight"), profileBodySchema.shape.weightKg],
+  ["Walkthrough: age", renderWalkthroughForm, byName("age"), profileBodySchema.shape.age],
+  [
+    "Walkthrough: height in cm",
+    renderWalkthroughForm,
+    byName("heightCm"),
+    profileBodySchema.shape.heightCm
+  ],
+  [
+    "Walkthrough: weight in kg",
+    renderWalkthroughForm,
+    byName("weight"),
+    profileBodySchema.shape.weightKg
+  ]
 ];
 
 const accepts = (field, value) => field.safeParse(value).success;
@@ -213,6 +279,26 @@ describe("client input bounds match the server's", () => {
     expect(accepts(field, max)).toBe(true);
     expect(accepts(field, nudge(min - stepOf(input)))).toBe(false);
     expect(accepts(field, nudge(max + stepOf(input)))).toBe(false);
+  });
+
+  // The imperial inputs have no schema of their own, so they are held to
+  // sign-up's, whose conversions settingsFields.test.js pins.
+  test.each([
+    ["the home form", renderHomeForm],
+    ["the walkthrough", renderWalkthroughForm]
+  ])("%s's feet, inches and pounds bounds are sign-up's", (_label, renderForm) => {
+    const boundsOf = () =>
+      ["heightFeet", "heightInches", "weight"].map((name) => {
+        const input = byName(name)();
+        return [name, input.min, input.max];
+      });
+    const { unmount } = renderSignup("ft", "lb");
+    const signup = boundsOf();
+    unmount();
+
+    renderForm("ft", "lb");
+
+    expect(boundsOf()).toEqual(signup);
   });
 
   test("Goal: the weekly workouts offered are every count the server accepts", () => {
