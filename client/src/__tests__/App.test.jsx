@@ -19,8 +19,12 @@ vi.mock("../pages/home/HomePage", () => ({
   }
 }));
 
+const auth = vi.hoisted(() => ({ props: null }));
 vi.mock("../pages/auth/AuthPage", () => ({
-  default: () => <div data-testid="auth-page">Auth page</div>
+  default: (props) => {
+    auth.props = props;
+    return <div data-testid="auth-page">Auth page</div>;
+  }
 }));
 
 vi.mock("../pages/dashboard/DashboardPage", () => ({
@@ -551,6 +555,75 @@ describe("App", () => {
       });
 
       expect(posts).toEqual(["/api/dashboard/meal-logs", "/api/auth/logout"]);
+    });
+
+    // Sign-out clears this browser's cookies whatever happens, so a 503 means
+    // the session itself is still valid in the store. The visitor is told,
+    // can dismiss it, and does not see it once someone signs in again.
+    describe("when the server could not end the session", () => {
+      const SIGN_OUT_NOTICE = /the server could not end your session/i;
+
+      const signedInThenOutage = () =>
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url) => {
+            const path = String(url);
+            if (path === "/api/auth/me" || path === "/api/auth/login") {
+              return {
+                ok: true,
+                status: 200,
+                json: async () => ({ user: { email: "ada@example.com" } })
+              };
+            }
+            if (path === "/api/csrf-token") {
+              return { ok: true, status: 200, json: async () => ({ csrfToken: "t" }) };
+            }
+            if (path === "/api/auth/logout") {
+              return { ok: false, status: 503, json: async () => ({ error: "Server error." }) };
+            }
+            return { ok: true, status: 200, json: async () => ({ dashboard: {} }) };
+          })
+        );
+
+      const logOut = async () => {
+        await renderSettled("/dashboard");
+        await waitFor(() => expect(dash.props.user).toBeTruthy());
+        await act(async () => {
+          await dash.props.onLogout();
+        });
+      };
+
+      test("says so after signing out here", async () => {
+        signedInThenOutage();
+        await logOut();
+
+        expect(home.props.user).toBeNull();
+        expect(screen.getByRole("status")).toHaveTextContent(SIGN_OUT_NOTICE);
+      });
+
+      test("can be dismissed", async () => {
+        signedInThenOutage();
+        await logOut();
+
+        await act(async () => {
+          screen.getByRole("button", { name: "Dismiss" }).click();
+        });
+
+        expect(screen.queryByText(SIGN_OUT_NOTICE)).not.toBeInTheDocument();
+      });
+
+      test("is gone once someone signs in again", async () => {
+        signedInThenOutage();
+        await logOut();
+        act(() => home.props.go("/auth"));
+
+        await act(async () => {
+          await auth.props.onAuthSubmit({ preventDefault() {} });
+        });
+
+        expect(dash.props.user).toEqual({ email: "ada@example.com" });
+        expect(screen.queryByText(SIGN_OUT_NOTICE)).not.toBeInTheDocument();
+      });
     });
   });
 
