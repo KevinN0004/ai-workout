@@ -8,7 +8,9 @@
  * Signed in, the menu button and the profile menu (View profile, Log out) take
  * the place of the button and the prompt. `profileMenuRef` goes on the menu's
  * wrapper, which is how DashboardPage tells a click outside the menu from one
- * inside it.
+ * inside it. The title button has no aria-label: its accessible name is its
+ * visible text, "Hub", so a voice-control user can say what they see, and its
+ * `title` says where it goes.
  */
 export default function DashboardHeader({
   user,
@@ -33,7 +35,6 @@ export default function DashboardHeader({
                 type="button"
                 className="dashboard-title-button"
                 onClick={onNavigateSummary}
-                aria-label="Go to dashboard summary"
                 title="Go to summary"
               >
                 Hub
@@ -84,7 +85,6 @@ export default function DashboardHeader({
               type="button"
               className="dashboard-title-button"
               onClick={onNavigateSummary}
-              aria-label="Go to dashboard summary"
               title="Go to summary"
             >
               Hub

@@ -30,7 +30,8 @@ describe("DashboardHeader", () => {
     await user.click(screen.getByRole("button", { name: /login \/ sign up/i }));
     expect(go).toHaveBeenCalledWith("/auth");
 
-    await user.click(screen.getByRole("button", { name: /go to dashboard summary/i }));
+    // The title's accessible name is its visible text, so voice control can reach it.
+    await user.click(screen.getByRole("button", { name: "Hub" }));
     expect(onNavigateSummary).toHaveBeenCalled();
   });
 
