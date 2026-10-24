@@ -461,9 +461,9 @@ change every element's computed animation and transition, so a screenshot compar
 not list what it expects. Hover and press feedback has blocks of its own beside the white
 buttons (`core/shell.css`) and the mode and unit toggles (`forms-and-motion.css`), which
 stop the lift and the press-in as well as the transition. The home form's training-day
-buttons have none: `.home-stage *` stops their transition, so under reduced motion they
-still lift 1 px on hover and press in to 97%, at once rather than animated (measured in
-Chromium).
+buttons are stopped in the same `forms-and-motion.css` block: `.home-stage *` stops their
+transition and that block their transform, so under reduced motion they neither lift on
+hover nor press in (measured in Chromium against the built bundle: `none` both ways).
 
 **`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
 about it are load-bearing:
