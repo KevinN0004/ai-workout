@@ -164,9 +164,11 @@
   transform: scale(0.97);
 }
 
-/* Under reduced motion the toggle buttons change colour at once and do not lift or press
-   in; core/shell.css stops the pill behind them. That reaches /auth's login/sign-up toggle,
-   which sits outside .home-stage and .auth-form and so outside their blocks. */
+/* Under reduced motion the toggle buttons and the training-day buttons change colour at once
+   and do not lift or press in; core/shell.css stops the pill behind the toggles. That
+   reaches /auth's login/sign-up toggle, which sits outside .home-stage and .auth-form and so
+   outside their blocks. .home-stage * stops the day buttons' transition. Each selector here
+   ties the one it overrides and wins by coming later. */
 @media (prefers-reduced-motion: reduce) {
   .home-page .unit-toggle button,
   .home-page .segmented button {
@@ -175,8 +177,10 @@
 
   .home-page .segmented button:hover,
   .home-page .unit-toggle button:hover,
+  .day-toggle-btn:hover,
   .home-page .segmented button:active,
-  .home-page .unit-toggle button:active {
+  .home-page .unit-toggle button:active,
+  .day-toggle-btn:active {
     transform: none;
   }
 }
