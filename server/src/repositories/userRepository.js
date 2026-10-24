@@ -3,6 +3,7 @@
  * reports whether it matched a user; a route that answers with the updated data
  * then re-reads the user through findUserWithDashboard for the response body.
  */
+import { DERIVED_CALORIE_SOURCE, lockUserCalorieWrites } from "./mealLogRepository.js";
 import { dateOnlyToDate, toJsonObject } from "./rowValues.js";
 import { getUserPk, userIdWhere } from "./userLookup.js";
 
@@ -91,30 +92,44 @@ export const createUserRepository = ({ prisma }) => {
    * so every call inserts today; the update arm keeps a repeated id from
    * colliding with calorie_entries_user_legacy_idx, as the workout, meal and
    * metric saves do with theirs.
+   *
+   * An entry that is not itself derived from meals also removes the day's
+   * derived entry: a number the user typed outranks it (the rule
+   * mealLogRepository's syncDerivedCalorieEntry follows), and keeping both
+   * would count the day twice. It runs in one transaction under
+   * lockUserCalorieWrites, the lock that sync takes, so a meal saved at the
+   * same moment either sees this entry or has its derived entry removed here.
    */
-  const saveCalorieEntry = async ({ userId, entry = {} }) => {
-    const userPk = await getUserPk(prisma, userId);
-    if (!userPk) return false;
+  const saveCalorieEntry = ({ userId, entry = {} }) =>
+    prisma.$transaction(async (tx) => {
+      const userPk = await getUserPk(tx, userId);
+      if (!userPk) return false;
+      await lockUserCalorieWrites(tx, userPk);
 
-    const existing = entry.id
-      ? await prisma.calorieEntry.findFirst({
-          where: { userId: userPk, legacyId: entry.id },
-          select: { id: true }
-        })
-      : null;
+      const existing = entry.id
+        ? await tx.calorieEntry.findFirst({
+            where: { userId: userPk, legacyId: entry.id },
+            select: { id: true }
+          })
+        : null;
 
-    const data = {
-      userId: userPk,
-      legacyId: entry.id || null,
-      calorieDate: dateOnlyToDate(entry.date),
-      calories: Math.round(Number(entry.calories) || 0),
-      source: entry.source || "manual"
-    };
+      const data = {
+        userId: userPk,
+        legacyId: entry.id || null,
+        calorieDate: dateOnlyToDate(entry.date),
+        calories: Math.round(Number(entry.calories) || 0),
+        source: entry.source || "manual"
+      };
 
-    if (existing) await prisma.calorieEntry.update({ where: { id: existing.id }, data });
-    else await prisma.calorieEntry.create({ data });
-    return true;
-  };
+      if (existing) await tx.calorieEntry.update({ where: { id: existing.id }, data });
+      else await tx.calorieEntry.create({ data });
+      if (data.source !== DERIVED_CALORIE_SOURCE) {
+        await tx.calorieEntry.deleteMany({
+          where: { userId: userPk, calorieDate: data.calorieDate, source: DERIVED_CALORIE_SOURCE }
+        });
+      }
+      return true;
+    });
 
   /**
    * Removes the account row. Every AppUser relation carries onDelete: Cascade
