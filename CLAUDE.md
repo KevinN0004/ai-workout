@@ -107,7 +107,7 @@ AI Workout is a full-stack fitness planning app using **npm workspaces** (`clien
 
 - **Client**: React 19 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
 - **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
-- **Sessions**: in Redis when `REDIS_URL` (or `REDIS_HOST` and `REDIS_PORT`) is set and Redis connects at startup, otherwise in memory. The store is chosen once: while Redis is the store, a failed session command answers 503 and never falls back to memory (`services/auth/sessionService.js`)
+- **Sessions**: in Redis when `REDIS_URL` (or `REDIS_HOST` and `REDIS_PORT`) is set and Redis connects at startup, otherwise in memory. The store is chosen once: while Redis is the store, a failed session command answers 503 and never falls back to memory; a command Redis accepts and never answers fails at a 2 s deadline, the same 503 (`services/auth/sessionService.js`)
 - **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
 - **Tests**: Vitest on both sides
@@ -124,7 +124,7 @@ plans, the user row, and the paginated dashboard collections — plus two shared
   only the legacy id.
 - `rowValues.js` — date and Decimal conversions shared by every mapper.
 
-Two things to know before adding a write:
+Three things to know before adding a write:
 
 - **`upsert` usually is not available.** The uniqueness on these tables comes from
   _partial_ unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
@@ -133,6 +133,11 @@ Two things to know before adding a write:
 - **Collection caps are applied on read, not in storage.** `userReadRepository` limits
   each collection with `take:`; nothing prunes the tables. A "capped list" is a read
   concern here.
+- **A write derived from other rows takes a lock.** `syncDerivedCalorieEntry` sums the
+  day's meals, and two saves in their own transactions each miss the other's uncommitted
+  meal, so it first takes `pg_advisory_xact_lock` keyed on the user. Not `FOR UPDATE` on
+  `app_users`: each meal insert already holds a key-share lock on that row through its
+  foreign key, and two saves asking for `FOR UPDATE` deadlock (measured).
 
 This replaced a MongoDB-shaped compatibility shim (`services/prismaDataModels.js`),
 retired in full — see `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md`. If you
@@ -453,8 +458,12 @@ reads `matchMedia("(prefers-reduced-motion: reduce)")` before it animates
 `*` reset was considered and left out (the Phase 4 plan, Task M2): it cannot stop the
 script, it loses to the `!important` transitions it would need to stop, and it would
 change every element's computed animation and transition, so a screenshot compare could
-not list what it expects. Hover and press feedback still moves under reduced motion,
-which that plan leaves to the owner.
+not list what it expects. Hover and press feedback has blocks of its own beside the white
+buttons (`core/shell.css`) and the mode and unit toggles (`forms-and-motion.css`), which
+stop the lift and the press-in as well as the transition. The home form's training-day
+buttons have none: `.home-stage *` stops their transition, so under reduced motion they
+still lift 1 px on hover and press in to 97%, at once rather than animated (measured in
+Chromium).
 
 **`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
 about it are load-bearing:
@@ -729,10 +738,13 @@ the native instance all along.
       block that builds `previewPersonalTargets`, what the personal chapter types,
       guards those same values again, and none of its fallbacks can fire. The
       invariant that makes them dead is pinned by a test, so if someone removes a
-      guard from `activePreviewProfile` the suite says so. The file's other uncovered
-      arms are `||` and `?:` fallbacks on the derived week and dashboard figures
-      (`todayPlan?.workout || ""` and the like); trace each one's producer before
-      writing a test for it.
+      guard from `activePreviewProfile` the suite says so. Its other uncovered arms
+      were `||`, `?:` and `if` fallbacks on the derived week and dashboard figures,
+      each guarding something the week plan's construction already guarantees (one
+      entry per weekday, every field filled, at least five training days, the goal
+      always met). Each was traced, proved dead by arithmetic and as a deliberate
+      survivor on all seven weekdays, and deleted; the fifteen in the
+      `String(x ?? "")` block are what is left.
       The locale block (`usesImperialUnits`) was the one genuinely reachable part, and it
       is now covered: `navigator.languages`, `navigator.language` and
       `Intl.DateTimeFormat` are all boundaries, stubbed exactly as

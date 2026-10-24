@@ -221,7 +221,9 @@ Generation and external data:
 
 `POST /api/generate` is **open to anonymous callers by design** — the anonymous quota is
 enforced by the rate limiters mounted on the path in `index.js`. A signed-in caller gets
-their plan persisted; an anonymous one gets the plan and nothing is written.
+their plan persisted; an anonymous one gets the plan and nothing is written. A caller
+whose session cookie cannot be read because the session store is down gets a 503, not the
+anonymous quota.
 
 `buildGenerationEquipmentContext` (exported from `routes/generateRoutes.js`) decides what
 the model is told the user can train with, and two of its branches are easy to break:
@@ -257,7 +259,9 @@ command through `runSessionCommand`, which logs the failure and throws
 it into that answer. So a sign-in during an outage gets a 503 and no cookie, rather than a
 session written to memory that the next request, which reads only Redis, could not find.
 `REDIS_COMMAND_TIMEOUT_MS` (1.5 s) bounds how long a command waits to reach the socket, so
-that answer comes quickly.
+that answer comes quickly. Once written, a command is no longer bounded by it, so
+`runSessionCommand` gives each session command a 2 s deadline for its answer
+(`REDIS_SESSION_REPLY_TIMEOUT_MS`).
 
 ## Security Notes
 
