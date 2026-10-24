@@ -215,6 +215,20 @@ describe("createErrorHandler", () => {
       expect(toShortText).toHaveBeenCalledWith("Server error.", 300);
     });
 
+    // A failing weather or air-quality request carries the visitor's
+    // coordinates in its query string. Neither the log line nor the report to
+    // error tracking may keep them.
+    test("records the path without its query string, in the log and the report", () => {
+      handle(errorWith("boom", 500), {
+        req: buildReq({
+          originalUrl: "/api/weather/recommendation?latitude=40.712776&longitude=-74.005974"
+        })
+      });
+
+      expect(logEntry().path).toBe("/api/weather/recommendation");
+      expect(captureException.mock.calls[0][1].path).toBe("/api/weather/recommendation");
+    });
+
     test("prefers originalUrl but falls back to url", () => {
       handle(errorWith("boom", 500), {
         req: { requestId: "r", method: "GET", url: "/fallback" }

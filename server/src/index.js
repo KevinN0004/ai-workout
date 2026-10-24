@@ -36,6 +36,7 @@ import {
   workoutSessionBodySchema
 } from "./services/http/apiSchemaService.js";
 import { setErrorResponseTracker } from "./services/http/errorResponseService.js";
+import { requestLogPath } from "./services/http/requestLogPath.js";
 import { createExternalDataService } from "./services/external/externalDataService.js";
 import { initErrorTracking } from "./services/platform/errorTrackingService.js";
 import {
@@ -295,6 +296,13 @@ const anonGenerateRateLimitWindowMs = toPositiveInt(
   24 * 60 * 60 * 1000
 );
 const anonGenerateRateLimitMax = toPositiveInt(process.env.ANON_GENERATE_RATE_LIMIT_MAX, 3);
+// Bounds the SPA fallback in staticClient.js, which reads index.html from disk
+// on every page request. A browser fetches the shell once per full page load
+// and calls /api on each one, so with this above the /api budget the /api
+// limiter answers a real visitor first; this one only meets a caller that
+// requests pages and nothing else.
+const spaRateLimitWindowMs = toPositiveInt(process.env.SPA_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
+const spaRateLimitMax = toPositiveInt(process.env.SPA_RATE_LIMIT_MAX, 600);
 const dashboardCollectionDefaultLimit = toPositiveInt(
   process.env.DASHBOARD_COLLECTION_DEFAULT_LIMIT,
   50
@@ -516,7 +524,7 @@ const apiLimiter = rateLimit({
         event: "rate_limited",
         scope: "api_global",
         method: req.method,
-        path: req.originalUrl || req.url
+        path: requestLogPath(req)
       },
       "Request rate limited."
     );
@@ -537,7 +545,7 @@ const authLimiter = rateLimit({
         event: "rate_limited",
         scope: "auth",
         method: req.method,
-        path: req.originalUrl || req.url
+        path: requestLogPath(req)
       },
       "Auth request rate limited."
     );
@@ -562,7 +570,7 @@ const credentialLimiter = rateLimit({
         event: "rate_limited",
         scope: "credential",
         method: req.method,
-        path: req.originalUrl || req.url
+        path: requestLogPath(req)
       },
       "Credential verification rate limited."
     );
@@ -583,7 +591,7 @@ const generateLimiter = rateLimit({
         event: "rate_limited",
         scope: "generate",
         method: req.method,
-        path: req.originalUrl || req.url
+        path: requestLogPath(req)
       },
       "Generate request rate limited."
     );
@@ -609,7 +617,7 @@ const anonGenerateLimiter = rateLimit({
         event: "rate_limited",
         scope: "generate_anonymous",
         method: req.method,
-        path: req.originalUrl || req.url
+        path: requestLogPath(req)
       },
       "Anonymous generate quota reached."
     );
@@ -730,7 +738,13 @@ registerClientStatic(app, {
   express,
   existsSync,
   distPath: resolveClientDistPath(process.env.CLIENT_DIST_PATH),
-  logger
+  logger,
+  metrics,
+  shellRateLimit: {
+    windowMs: spaRateLimitWindowMs,
+    limit: spaRateLimitMax,
+    store: rateLimitStore("spa_fallback")
+  }
 });
 
 // The one path to error tracking, for the error middleware and for routes that

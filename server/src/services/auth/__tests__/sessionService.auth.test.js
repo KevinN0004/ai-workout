@@ -458,6 +458,19 @@ describe("requireCsrfToken", () => {
     );
   });
 
+  test("records the refused path without its query string", () => {
+    const service = buildService();
+    const req = buildReq({
+      method: "POST",
+      headers: {},
+      originalUrl: "/api/thing?latitude=40.712776&longitude=-74.005974"
+    });
+
+    service.requireCsrfToken(req, buildRes(), vi.fn());
+
+    expect(req.log.warn.mock.calls[0][0].path).toBe("/api/thing");
+  });
+
   test("survives a request with no logger attached", () => {
     const service = buildService();
     const req = { method: "POST", headers: {} };

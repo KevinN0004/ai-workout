@@ -2,6 +2,7 @@
  * The app's last-resort error middleware, mounted last in index.js. It answers
  * any error a handler throws or passes to `next(err)` instead of answering itself.
  */
+import { requestLogPath } from "../services/http/requestLogPath.js";
 
 /**
  * Builds the error middleware. Every error is logged, and a 5xx is also sent to
@@ -22,7 +23,7 @@ export const createErrorHandler =
         captureException(err, {
           requestId,
           method: req?.method,
-          path: req?.originalUrl || req?.url,
+          path: requestLogPath(req),
           status
         });
       } catch {
@@ -35,7 +36,7 @@ export const createErrorHandler =
         event: "unhandled_error",
         requestId,
         method: req?.method,
-        path: req?.originalUrl || req?.url,
+        path: requestLogPath(req),
         status,
         error: toShortText(message, 300)
       },

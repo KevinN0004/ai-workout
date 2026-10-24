@@ -31,6 +31,8 @@ const NUMERIC_VARS = [
   { name: "GENERATE_RATE_LIMIT_MAX", min: 1 },
   { name: "ANON_GENERATE_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "ANON_GENERATE_RATE_LIMIT_MAX", min: 1 },
+  { name: "SPA_RATE_LIMIT_WINDOW_MS", min: 1000 },
+  { name: "SPA_RATE_LIMIT_MAX", min: 1 },
   { name: "ARGON2_TIME_COST", min: 2 },
   { name: "ARGON2_MEMORY_COST", min: 1024 },
   { name: "ARGON2_PARALLELISM", min: 1 },

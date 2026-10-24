@@ -59,6 +59,21 @@ describe("reporting to error tracking", () => {
     });
   });
 
+  // The weather and air-quality routes answer their own 5xx through here, and
+  // their query string is the visitor's coordinates. The log line and the
+  // report both take the path from the same context, so both must drop it.
+  test("records the path without its query string, in the log and the report", () => {
+    const req = buildReq({
+      method: "GET",
+      originalUrl: "/api/air-quality/current?latitude=40.712776&longitude=-74.005974"
+    });
+
+    sendErrorResponse(req, buildRes(), new Error("upstream broke"), 500);
+
+    expect(capture.mock.calls[0][1].path).toBe("/api/air-quality/current");
+    expect(req.log.error.mock.calls[0][0].path).toBe("/api/air-quality/current");
+  });
+
   test("reports a 503 too", () => {
     sendErrorResponse(buildReq(), buildRes(), new Error("store down"), 503);
 

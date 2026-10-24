@@ -396,6 +396,26 @@ describe("ambient data", () => {
       expect(url).toContain("longitude=-75.2");
     });
 
+    // The coordinates travel in the query string, which ends up in server and
+    // proxy logs. Two decimal places (about 1.1 km) is all the weather grid and
+    // the 25 km air-quality station search need, so nothing finer leaves.
+    test.each([
+      ["loadWeatherRecommendation", "/api/weather/recommendation"],
+      ["loadAirQuality", "/api/air-quality/current"]
+    ])("%s sends the coordinates rounded to two decimal places", async (loader, path) => {
+      stubGeolocation({ position: { coords: { latitude: 40.712776, longitude: -74.005974 } } });
+      const fetchMock = vi.fn(async () => jsonResponse({ summary: {}, recommendation: {} }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { result } = ambient();
+
+      await act(async () => result.current[loader]());
+
+      const url = fetchMock.mock.calls.find(([u]) => String(u).startsWith(path))[0];
+      const query = new URL(url, "http://localhost").searchParams;
+      expect(query.get("latitude")).toBe("40.71");
+      expect(query.get("longitude")).toBe("-74.01");
+    });
+
     // The browser reports why it refused, and each reason means something
     // different to a user: one is fixable in settings, one is not.
     test.each([

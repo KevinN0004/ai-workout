@@ -94,6 +94,18 @@ describe("initErrorTracking with a DSN", () => {
     expect(dataCollection.databaseQueryData).toBe(false);
   });
 
+  // The weather and air-quality routes take the visitor's coordinates as query
+  // parameters, and so does the server's own request to Open-Meteo. With query
+  // collection on, the SDK puts them in the event's request URL and query
+  // string and in each outgoing-request breadcrumb. `false` drops the query
+  // from all of those, as the log lines drop it.
+  test("keeps URL query strings out of events", async () => {
+    vi.stubEnv("SENTRY_DSN", dsn);
+    await initErrorTracking({ logger: createLogger(), toShortText });
+
+    expect(sentry.init.mock.calls[0][0].dataCollection.urlQueryParams).toBe(false);
+  });
+
   test("sends release as undefined rather than an empty string", async () => {
     vi.stubEnv("SENTRY_DSN", dsn);
     vi.stubEnv("SENTRY_RELEASE", "");

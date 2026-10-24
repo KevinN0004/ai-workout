@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 
-// The five limiters are the app's only defence against credential stuffing and
-// against an anonymous caller burning the Gemini quota. index.test.js loops
-// until it sees *a* 429 on /api/generate but never asserts which limiter
-// answered, so this file does: each limiter has a case that expects its own 429
-// body, and one case checks the metrics counter a limited request moves.
+// The five /api limiters are the app's only defence against credential stuffing
+// and against an anonymous caller burning the Gemini quota, and a sixth bounds
+// the SPA shell's file read. index.test.js loops until it sees *a* 429 on
+// /api/generate but never asserts which limiter answered, so this file does:
+// each limiter has a case that expects its own 429 body, and one case checks
+// the metrics counter a limited request moves.
 //
 // Every limit is read from the environment once at import, so each case gets a
 // freshly imported app with the one limit under test set to 1 and the rest set
@@ -21,8 +25,24 @@ const LIMIT_KEYS = [
   "AUTH_RATE_LIMIT_MAX",
   "CREDENTIAL_RATE_LIMIT_MAX",
   "GENERATE_RATE_LIMIT_MAX",
-  "ANON_GENERATE_RATE_LIMIT_MAX"
+  "ANON_GENERATE_RATE_LIMIT_MAX",
+  "SPA_RATE_LIMIT_MAX"
 ];
+
+// The shell's limiter is mounted only when there is a bundle to serve, so every
+// app here is pointed at a real one in a temporary folder. With client/dist
+// built, index.js would otherwise serve that, and without it mount nothing.
+const SHELL = "<!doctype html><html><body><div id=root>SPA_SHELL_MARKER</div></body></html>";
+let distPath;
+
+beforeAll(() => {
+  distPath = fs.mkdtempSync(path.join(os.tmpdir(), "ai-workout-dist-"));
+  fs.writeFileSync(path.join(distPath, "index.html"), SHELL);
+});
+
+afterAll(() => {
+  fs.rmSync(distPath, { recursive: true, force: true });
+});
 
 // Well above any single test's request count, so a limiter that is not under
 // test cannot answer first.
@@ -36,10 +56,12 @@ let running = [];
 // value the test asked for.
 const startApp = async (limited) => {
   vi.resetModules();
-  const previous = LIMIT_KEYS.map((key) => process.env[key]);
+  const keys = [...LIMIT_KEYS, "CLIENT_DIST_PATH"];
+  const previous = keys.map((key) => process.env[key]);
   LIMIT_KEYS.forEach((key) => {
     process.env[key] = key === limited ? "1" : OUT_OF_THE_WAY;
   });
+  process.env.CLIENT_DIST_PATH = distPath;
 
   let app;
   try {
@@ -47,7 +69,7 @@ const startApp = async (limited) => {
   } finally {
     // Assigning undefined to process.env stores the string "undefined", so a
     // variable that was absent has to be deleted rather than assigned back.
-    LIMIT_KEYS.forEach((key, index) => {
+    keys.forEach((key, index) => {
       if (previous[index] === undefined) delete process.env[key];
       else process.env[key] = previous[index];
     });
@@ -194,6 +216,39 @@ describe("rate limiters", () => {
       error: "Free plan limit reached. Sign in to keep generating workout plans.",
       requiresAuth: true
     });
+  });
+
+  // The SPA fallback reads index.html from disk on every page request, so it
+  // has a limiter of its own. This pins that index.js hands it the configured
+  // limit; staticClient.test.js covers what the limiter does.
+  test("the shell's limiter answers page requests with its own message", async () => {
+    const baseUrl = await startApp("SPA_RATE_LIMIT_MAX");
+
+    const first = await fetch(`${baseUrl}/dashboard`);
+    const limited = await fetch(`${baseUrl}/dashboard`);
+
+    expect(first.status).toBe(200);
+    expect(await first.text()).toContain("SPA_SHELL_MARKER");
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({
+      error: "Too many page requests. Please try again shortly."
+    });
+  });
+
+  // One budget per process, separate from the /api one: exhausting the shell's
+  // must leave the API answering.
+  test("a limited page request leaves /api alone and is counted", async () => {
+    const baseUrl = await startApp("SPA_RATE_LIMIT_MAX");
+
+    const before = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    await fetch(`${baseUrl}/`);
+    const limited = await fetch(`${baseUrl}/`);
+    const health = await fetch(`${baseUrl}/api/health`);
+    const after = await (await fetch(`${baseUrl}/api/metrics`)).json();
+
+    expect(limited.status).toBe(429);
+    expect(health.status).toBe(200);
+    expect(after.rateLimited).toBe(before.rateLimited + 1);
   });
 
   test("a limited request is counted in the metrics the operator reads", async () => {

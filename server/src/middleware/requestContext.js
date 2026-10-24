@@ -4,6 +4,7 @@
  * every later middleware and route can use `req.requestId` and `req.log`.
  */
 import crypto from "crypto";
+import { requestLogPath } from "../services/http/requestLogPath.js";
 import { recordLatencyStats } from "../services/platform/metricsService.js";
 
 const UNMATCHED_ROUTE_LABEL = "<unmatched>";
@@ -23,7 +24,8 @@ const sanitizeRoutePath = (req) => {
  * Builds the middleware. It reuses the caller's `X-Request-Id` (cut to 128
  * characters) or mints a UUID, echoes the id on the response, and counts the
  * request in `metrics.requestsTotal`. When the response finishes it records the
- * latency overall and per matched route, and logs one `http_request` line.
+ * latency overall and per matched route, and logs one `http_request` line,
+ * whose path leaves out the query string.
  */
 export const createRequestContextMiddleware =
   ({ metrics, logger, toShortText }) =>
@@ -45,7 +47,7 @@ export const createRequestContextMiddleware =
       req.log.info({
         event: "http_request",
         method: req.method,
-        path: req.originalUrl || req.url,
+        path: requestLogPath(req),
         statusCode: res.statusCode,
         durationMs
       });
