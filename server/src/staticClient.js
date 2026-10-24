@@ -66,9 +66,9 @@ const cacheControlFor = (filePath) => {
  * `express`, `existsSync` and `distPath` are injected so this is testable
  * without a build on disk.
  *
- * @param {object} deps also carries `metrics`, whose `rateLimited` counts a
- *   page request the shell's limiter refuses, and `shellRateLimit`, that
- *   limiter's `{ windowMs, limit, store }` as index.js configures it.
+ * The fallback has a rate limiter of its own. `shellRateLimit` is its
+ * `{ windowMs, limit, store }`, which index.js builds from the SPA_RATE_LIMIT_*
+ * settings, and each request it refuses is counted in `metrics.rateLimited`.
  */
 export const registerClientStatic = (
   app,
