@@ -137,7 +137,11 @@ Three things to know before adding a write:
   day's meals, and two saves in their own transactions each miss the other's uncommitted
   meal, so it first takes `pg_advisory_xact_lock` keyed on the user. Not `FOR UPDATE` on
   `app_users`: each meal insert already holds a key-share lock on that row through its
-  foreign key, and two saves asking for `FOR UPDATE` deadlock (measured).
+  foreign key, and two saves asking for `FOR UPDATE` deadlock (measured). The manual
+  calorie save, `saveCalorieEntry`, takes the same lock (`lockUserCalorieWrites` in
+  `mealLogRepository.js`, the one place the key is written), because it removes the
+  day's derived entry: unlocked, a meal and a manual entry saved at once each miss the
+  other's uncommitted row, and both land.
 
 This replaced a MongoDB-shaped compatibility shim (`services/prismaDataModels.js`),
 retired in full — see `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md`. If you

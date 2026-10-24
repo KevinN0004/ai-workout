@@ -1,14 +1,27 @@
 /**
  * Prisma-native persistence for meal logs: the row mapper the API returns, the
  * save (with the day's calorie entry re-derived in the same transaction), and the
- * calorie entry derived from each day's meals.
+ * calorie entry derived from each day's meals, whose source marker and lock
+ * userRepository's manual calorie save shares.
  */
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
-// Marks a calorie entry as derived from meal logs rather than typed by the user.
-const DERIVED_CALORIE_SOURCE = "meal_logs";
+/**
+ * Marks a calorie entry as derived from meal logs rather than typed by the
+ * user. userRepository's manual save removes the day's entry carrying it.
+ */
+export const DERIVED_CALORIE_SOURCE = "meal_logs";
 const DERIVED_CALORIE_SOURCE_PREFIX = "meal-logs-";
+
+/**
+ * Takes the transaction-level advisory lock that serialises a user's calorie
+ * writes: the derived sync below and userRepository's manual save. It holds
+ * until the caller's transaction ends, so `prisma` must be a transaction
+ * client. `select 1` because $queryRaw cannot deserialize the lock's void.
+ */
+export const lockUserCalorieWrites = (prisma, userPk) =>
+  prisma.$queryRaw`select 1 as locked from pg_advisory_xact_lock(hashtextextended(${`meal-log-day:${userPk}`}, 0))`;
 
 /**
  * Maps a meal_logs row to the meal the API returns. The macro columns are
@@ -110,7 +123,8 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
      * Keeps the calories view in step with the meals logged for one date:
      *
      *   1. if a manual entry exists for the day, change nothing -- a number the
-     *      user typed themselves outranks one derived from meals
+     *      user typed themselves outranks one derived from meals, which is also
+     *      why userRepository's manual save removes the day's derived entry
      *   2. otherwise replace the derived entry with the day's current total
      *   3. if that total is zero, leave no entry rather than a misleading 0
      *
@@ -119,21 +133,23 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
      * Recomputing the whole day rather than adding a delta means this is correct
      * when an existing meal is edited, which the POST route allows by id.
      *
-     * It first takes a transaction-level advisory lock keyed on the user. Inside
-     * saveMealLogWithDailySync's transaction the lock holds until commit, so two
-     * saves for one user take turns here: the second waits, then sums with the
-     * first's meal committed. Without it each would sum only its own meal
-     * (neither sees the other's uncommitted row), and the second write would
-     * either collide with the first's derived entry or overwrite it with a total
-     * missing a meal. Not a lock on the user's row: each save's meal insert
-     * already holds a key-share lock on that row through the foreign key, so two
-     * saves asking for FOR UPDATE deadlock.
+     * It first takes lockUserCalorieWrites, the advisory lock keyed on the user
+     * that the manual save takes too. Inside saveMealLogWithDailySync's
+     * transaction the lock holds until commit, so two saves for one user take
+     * turns here: the second waits, then sums with the first's meal committed.
+     * Without it each would sum only its own meal (neither sees the other's
+     * uncommitted row), and the second write would either collide with the
+     * first's derived entry or overwrite it with a total missing a meal. A
+     * manual save takes its turn the same way, so rule 1 sees its committed
+     * entry, or its removal sees this derived one. Not a lock on the user's row:
+     * each save's meal insert already holds a key-share lock on that row through
+     * the foreign key, so two saves asking for FOR UPDATE deadlock.
      */
     const syncDerivedCalorieEntry = async ({ userId, date }) => {
       const userPk = await getUserPk(prisma, userId);
       const calorieDate = dateOnlyToDate(date);
       if (!userPk || !calorieDate) return null;
-      await prisma.$queryRaw`select 1 as locked from pg_advisory_xact_lock(hashtextextended(${`meal-log-day:${userPk}`}, 0))`;
+      await lockUserCalorieWrites(prisma, userPk);
 
       const manualEntry = await prisma.calorieEntry.findFirst({
         where: { userId: userPk, calorieDate, NOT: { source: DERIVED_CALORIE_SOURCE } },
