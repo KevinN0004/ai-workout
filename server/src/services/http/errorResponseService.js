@@ -3,6 +3,8 @@
  * unmasked message is logged (no stack), a 5xx is reported to error tracking,
  * and the response carries a masked message and the request id.
  */
+import { requestLogPath } from "./requestLogPath.js";
+
 const GENERIC_SERVER_ERROR = "Server error.";
 
 // Replaced once by index.js through setErrorResponseTracker. Until then, as in
@@ -26,8 +28,9 @@ const safeErrorMessage = (err, status = 500) => {
 
 /**
  * Sets the function sendErrorResponse reports a 5xx through, called as
- * `capture(error, { requestId, method, path, status })`. index.js passes the
- * same forwarder it gives the error middleware, so both reach one tracker.
+ * `capture(error, { requestId, method, path, status })`, where `path` has no
+ * query string. index.js passes the same forwarder it gives the error
+ * middleware, so both reach one tracker.
  */
 export const setErrorResponseTracker = (capture) => {
   reportServerError = capture;
@@ -44,7 +47,7 @@ export const sendErrorResponse = (req, res, err, status = 500) => {
   const context = {
     requestId: req?.requestId || "",
     method: req?.method,
-    path: req?.originalUrl || req?.url,
+    path: requestLogPath(req),
     status: resolvedStatus
   };
   req?.log?.error(

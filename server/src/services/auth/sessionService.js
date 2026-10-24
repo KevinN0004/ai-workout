@@ -7,6 +7,7 @@
 import crypto from "crypto";
 import { createClient } from "redis";
 import { sendErrorResponse } from "../http/errorResponseService.js";
+import { requestLogPath } from "../http/requestLogPath.js";
 
 // How long a Redis command may wait to reach the socket, in ms. node-redis
 // queues commands while it reconnects and its own limit is 5 s, so without this
@@ -504,7 +505,7 @@ export const createSessionService = ({
         {
           event: "csrf_check_failed",
           method,
-          path: req.originalUrl || req.url
+          path: requestLogPath(req)
         },
         "CSRF validation failed."
       );

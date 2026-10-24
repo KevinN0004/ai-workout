@@ -32,6 +32,13 @@ const toRate = (value, fallback = 0) => {
 // This is the configuration Sentry's v10-to-v11 migration guide gives for
 // keeping v10's default (`sendDefaultPii: false`), deny list included, plus
 // `queues: false`, which the guide's block leaves out.
+//
+// `urlQueryParams` is stricter than the guide: `false` rather than its deny
+// list. The weather and air-quality routes take the visitor's coordinates as
+// query parameters, and the server's own Open-Meteo request carries them too,
+// so with queries collected they reach the event's request URL and query
+// string and every outgoing-request breadcrumb. `false` drops the query from
+// all three, as the log lines drop it.
 const PII_HEADER_DENY = ["forwarded", "-ip", "remote-", "via", "-user"];
 const DATA_COLLECTION = {
   userInfo: false,
@@ -41,7 +48,7 @@ const DATA_COLLECTION = {
     response: { deny: PII_HEADER_DENY }
   },
   httpBodies: [],
-  urlQueryParams: { deny: PII_HEADER_DENY },
+  urlQueryParams: false,
   genAI: { inputs: false, outputs: false },
   databaseQueryData: false,
   queues: false,

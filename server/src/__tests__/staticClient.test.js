@@ -32,8 +32,20 @@ afterAll(() => {
   fs.rmSync(distPath, { recursive: true, force: true });
 });
 
-const buildApp = () => {
+// Far above any one test's request count, so only the limiter tests below,
+// which pass their own, ever meet the shell's limit.
+const OUT_OF_THE_WAY = 1000;
+
+const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
   const app = express();
+  const metrics = { rateLimited: 0 };
+  const requestLog = { warn: vi.fn() };
+
+  // Stands in for requestContext.js, which attaches the per-request logger.
+  app.use((req, _res, next) => {
+    req.log = requestLog;
+    next();
+  });
 
   // API routes registered first, exactly as index.js does, so the fallback
   // has something real to shadow if it is written wrongly.
@@ -43,10 +55,12 @@ const buildApp = () => {
     express,
     existsSync: fs.existsSync,
     distPath,
-    logger: { warn: vi.fn(), info: vi.fn() }
+    logger: { warn: vi.fn(), info: vi.fn() },
+    metrics,
+    shellRateLimit: { windowMs: 60_000, limit }
   });
 
-  return { app, mounted };
+  return { app, mounted, metrics, requestLog };
 };
 
 // Vite's asset filenames are content-addressed, so they can be cached
@@ -159,6 +173,82 @@ describe("registerClientStatic", () => {
 
     expect(response.status).toBe(404);
     expect(response.text).not.toContain("SPA_SHELL_MARKER");
+  });
+});
+
+// The fallback reads index.html from disk on every request, and nothing else
+// limits it: the five limiters in index.js cover /api only. Each case builds
+// its own app, so each starts with a fresh memory store.
+describe("the shell's rate limit", () => {
+  test("answers 429 once the limit is passed", async () => {
+    const { app } = buildApp({ limit: 2 });
+
+    const first = await request(app).get("/");
+    const second = await request(app).get("/dashboard/settings");
+    const limited = await request(app).get("/dashboard");
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(limited.status).toBe(429);
+    expect(limited.body).toEqual({ error: "Too many page requests. Please try again shortly." });
+    expect(limited.text).not.toContain("SPA_SHELL_MARKER");
+  });
+
+  test("counts a limited request in the metrics the operator reads", async () => {
+    const { app, metrics } = buildApp({ limit: 1 });
+
+    await request(app).get("/");
+    expect(metrics.rateLimited).toBe(0);
+    await request(app).get("/");
+
+    expect(metrics.rateLimited).toBe(1);
+  });
+
+  test("logs a limited request without its query string", async () => {
+    const { app, requestLog } = buildApp({ limit: 1 });
+
+    await request(app).get("/");
+    await request(app).get("/dashboard?latitude=40.712776&longitude=-74.005974");
+
+    expect(requestLog.warn).toHaveBeenCalledTimes(1);
+    expect(requestLog.warn.mock.calls[0][0]).toMatchObject({
+      event: "rate_limited",
+      scope: "spa_fallback",
+      method: "GET",
+      path: "/dashboard"
+    });
+  });
+
+  // Hashed assets are what a page load fetches most, and express.static
+  // answers them before the fallback is reached, so they never count.
+  test("leaves built assets alone", async () => {
+    const { app } = buildApp({ limit: 1 });
+
+    await request(app).get("/");
+    expect((await request(app).get("/")).status).toBe(429);
+    const assets = await Promise.all([1, 2, 3].map(() => request(app).get("/assets/app.js")));
+
+    expect(assets.map((response) => response.status)).toEqual([200, 200, 200]);
+  });
+
+  // An unknown /api path passes through the fallback to its 404. The /api
+  // limiter in index.js has already counted it, so the shell's must not.
+  test("does not count an /api path that passes through", async () => {
+    const { app } = buildApp({ limit: 1 });
+
+    const missing = await Promise.all([1, 2, 3].map(() => request(app).get("/api/nope")));
+    const shell = await request(app).get("/");
+
+    expect(missing.map((response) => response.status)).toEqual([404, 404, 404]);
+    expect(shell.status).toBe(200);
+  });
+
+  test("still serves the shell without caching it while under the limit", async () => {
+    const response = await request(buildApp({ limit: 1 }).app).get("/");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toContain("no-cache");
+    expect(response.headers["ratelimit-limit"]).toBe("1");
   });
 });
 

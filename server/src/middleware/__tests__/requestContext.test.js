@@ -1,3 +1,5 @@
+import express from "express";
+import request from "supertest";
 import { describe, expect, test, vi } from "vitest";
 import { createRequestContextMiddleware } from "../requestContext.js";
 
@@ -146,5 +148,30 @@ describe("requestContext middleware", () => {
     res.finish();
 
     expect(metrics.routeLatencyMs["GET /api/wger/exercises/:id"].count).toBe(1);
+  });
+
+  // The weather and air-quality routes take the visitor's coordinates as query
+  // parameters, and this line is written for every request, so logging the
+  // query would keep a location history per visitor. Driven through real
+  // express so `originalUrl` is the one Express builds, not a hand-made one.
+  test("logs a weather request's path without its query string", async () => {
+    const metrics = { requestsTotal: 0, requestLatencyMs: {}, routeLatencyMs: {} };
+    const requestLogger = { info: vi.fn() };
+    const app = express();
+    app.use(
+      createRequestContextMiddleware({
+        metrics,
+        logger: { child: () => requestLogger },
+        toShortText: () => ""
+      })
+    );
+    app.get("/api/weather/recommendation", (_req, res) => res.json({ ok: true }));
+
+    await request(app).get("/api/weather/recommendation?latitude=40.712776&longitude=-74.005974");
+
+    expect(requestLogger.info).toHaveBeenCalledTimes(1);
+    const entry = requestLogger.info.mock.calls[0][0];
+    expect(entry).toMatchObject({ event: "http_request", path: "/api/weather/recommendation" });
+    expect(JSON.stringify(entry)).not.toMatch(/latitude|longitude|40\.71|74\.00/);
   });
 });

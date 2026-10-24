@@ -200,6 +200,7 @@ Rate limiting. Each bucket is separate; a request can be counted by more than on
 | `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX`             | Limit on signup and login                                                                                                                                                           | `600000` (10m) / `25`  |
 | `CREDENTIAL_RATE_LIMIT_WINDOW_MS` / `CREDENTIAL_RATE_LIMIT_MAX` | Limit on `POST /api/auth/password` and `DELETE /api/auth/me` (a signed-in caller re-verifying their own password); shared between the two, and does not apply to `GET /api/auth/me` | `600000` (10m) / `10`  |
 | `GENERATE_RATE_LIMIT_WINDOW_MS` / `GENERATE_RATE_LIMIT_MAX`     | Limit on `/api/generate` for everyone                                                                                                                                               | `600000` (10m) / `20`  |
+| `SPA_RATE_LIMIT_WINDOW_MS` / `SPA_RATE_LIMIT_MAX`               | Limit on page requests the SPA fallback answers with `index.html`; built assets are not counted. Keep it above the `/api` limit, which every page load also uses                    | `900000` (15m) / `600` |
 
 Password hashing. These are Argon2id cost parameters — raising them makes login slower
 and more expensive to attack.

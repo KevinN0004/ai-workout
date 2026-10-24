@@ -5,8 +5,12 @@
  */
 import path from "path";
 import { fileURLToPath } from "url";
+import rateLimit from "express-rate-limit";
+import { requestLogPath } from "./services/http/requestLogPath.js";
 
 const DEFAULT_CLIENT_DIST = fileURLToPath(new URL("../../client/dist", import.meta.url));
+
+const isApiPath = (req) => req.path === "/api" || req.path.startsWith("/api/");
 
 /**
  * The directory the client bundle is served from: `override` resolved against
@@ -61,10 +65,22 @@ const cacheControlFor = (filePath) => {
  *
  * `express`, `existsSync` and `distPath` are injected so this is testable
  * without a build on disk.
+ *
+ * The fallback has a rate limiter of its own. `shellRateLimit` is its
+ * `{ windowMs, limit, store }`, which index.js builds from the SPA_RATE_LIMIT_*
+ * settings, and each request it refuses is counted in `metrics.rateLimited`.
  */
 export const registerClientStatic = (
   app,
-  { express, existsSync, distPath, logger = null, onMissing = null } = {}
+  {
+    express,
+    existsSync,
+    distPath,
+    logger = null,
+    onMissing = null,
+    metrics,
+    shellRateLimit = {}
+  } = {}
 ) => {
   const indexPath = path.join(distPath, "index.html");
 
@@ -94,23 +110,52 @@ export const registerClientStatic = (
     })
   );
 
+  // The fallback reads index.html from disk on every request, and the /api
+  // limiters in index.js never see it. Built assets are answered by
+  // express.static above and never reach this, so only page requests count.
+  const shellLimiter = rateLimit({
+    windowMs: shellRateLimit.windowMs,
+    limit: shellRateLimit.limit,
+    store: shellRateLimit.store,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      metrics.rateLimited += 1;
+      req.log?.warn(
+        {
+          event: "rate_limited",
+          scope: "spa_fallback",
+          method: req.method,
+          path: requestLogPath(req)
+        },
+        "Page request rate limited."
+      );
+      res.status(429).json({ error: "Too many page requests. Please try again shortly." });
+    }
+  });
+
   // GET/HEAD only -- app.get covers both -- so a POST to an unknown path still
   // falls through to the 404 rather than being handed an HTML page.
   //
   // "/{*splat}", not "*": Express 5's path-to-regexp refuses a bare "*" at
   // registration, and the braces make the wildcard optional so "/" matches too.
-  app.get("/{*splat}", (req, res, next) => {
+  app.get(
+    "/{*splat}",
     // An unmatched /api path is a missing endpoint, not a client route.
     // Without this guard every typo'd API call would answer 200 with the SPA
     // shell, and a fetch would fail on JSON parsing rather than on the status.
-    if (req.path === "/api" || req.path.startsWith("/api/")) return next();
-    // Explicit, not inherited: this path does not go through express.static,
-    // so the policy above never reaches it. Without this the shell is served
-    // with sendFile's default and a visitor can hold a cached page pointing at
-    // a bundle the next deploy has already replaced.
-    res.setHeader("Cache-Control", "no-cache");
-    res.sendFile(indexPath);
-  });
+    // "route" skips the limiter too: the /api limiter has already counted it.
+    (req, _res, next) => (isApiPath(req) ? next("route") : next()),
+    shellLimiter,
+    (_req, res) => {
+      // Explicit, not inherited: this path does not go through express.static,
+      // so the policy above never reaches it. Without this the shell is served
+      // with sendFile's default and a visitor can hold a cached page pointing
+      // at a bundle the next deploy has already replaced.
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(indexPath);
+    }
+  );
 
   logger?.info?.({ event: "client_bundle_mounted", path: distPath }, "Serving the client bundle.");
   return true;

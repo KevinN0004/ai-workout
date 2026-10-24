@@ -7,6 +7,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonCache, writeJsonCache } from "../cache";
 import { fetchWithTimeout } from "../network";
 
+// The coordinates go to the server as query parameters, which request logs and
+// proxies keep, so no more precision leaves the browser than the readings use.
+// Two decimal places is about 1.1 km: Open-Meteo answers the rounded point from
+// the same forecast grid cell, with temperatures moved only by its elevation
+// adjustment (a tenth of a degree), and the shift is a small fraction of the
+// radius the air-quality route searches for a station.
+const roundCoordinate = (value) => Math.round(value * 100) / 100;
+
 const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
   if (!dashboardValue?.goals) return;
   setGoalForm({
@@ -89,7 +97,7 @@ export default function useDashboardData({
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       throw new Error("Unable to determine location coordinates.");
     }
-    return { latitude, longitude };
+    return { latitude: roundCoordinate(latitude), longitude: roundCoordinate(longitude) };
   }, []);
 
   const loadWeatherRecommendation = useCallback(async () => {

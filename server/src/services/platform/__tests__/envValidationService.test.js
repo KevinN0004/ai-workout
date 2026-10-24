@@ -139,6 +139,19 @@ describe("validateEnv", () => {
     expect(errors[0]).toContain(`${name} ${message}`);
   });
 
+  // The SPA shell's limiter is read the same way, so a typo there would quietly
+  // fall back to its default too.
+  test.each([
+    ["SPA_RATE_LIMIT_WINDOW_MS", "fifteen minutes", "must be a number"],
+    ["SPA_RATE_LIMIT_WINDOW_MS", "500", "must be >= 1000"],
+    ["SPA_RATE_LIMIT_MAX", "lots", "must be a number"],
+    ["SPA_RATE_LIMIT_MAX", "0", "must be >= 1"]
+  ])("rejects %s=%s", (name, value, message) => {
+    const errors = validateEnv({ ...validEnv, [name]: value });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain(`${name} ${message}`);
+  });
+
   test("accepts the credential limiter's documented defaults", () => {
     expect(
       validateEnv({
