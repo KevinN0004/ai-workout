@@ -152,6 +152,18 @@ describe("validateEnv", () => {
     expect(errors[0]).toContain(`${name} ${message}`);
   });
 
+  // The daily generate cap bounds the Gemini bill, so a typo that fell back to
+  // the default would leave the operator believing their own figure applied.
+  test.each([
+    ["GENERATE_DAILY_LIMIT", "two hundred", "must be a number"],
+    ["GENERATE_DAILY_LIMIT", "0", "must be >= 1"],
+    ["GENERATE_DAILY_LIMIT", "2.5", "must be a whole number"]
+  ])("rejects %s=%s", (name, value, message) => {
+    const errors = validateEnv({ ...validEnv, [name]: value });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain(`${name} ${message}`);
+  });
+
   test("accepts the credential limiter's documented defaults", () => {
     expect(
       validateEnv({

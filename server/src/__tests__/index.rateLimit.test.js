@@ -1,11 +1,12 @@
 import fs from "fs";
+import http from "http";
 import os from "os";
 import path from "path";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 
-// The five /api limiters are the app's only defence against credential stuffing
-// and against an anonymous caller burning the Gemini quota, and a sixth bounds
-// the SPA shell's file read. index.test.js loops until it sees *a* 429 on
+// The six /api limiters are the app's only defence against credential stuffing
+// and against callers burning the Gemini quota, and a seventh bounds the SPA
+// shell's file read. index.test.js loops until it sees *a* 429 on
 // /api/generate but never asserts which limiter answered, so this file does:
 // each limiter has a case that expects its own 429 body, and one case checks
 // the metrics counter a limited request moves.
@@ -26,6 +27,7 @@ const LIMIT_KEYS = [
   "CREDENTIAL_RATE_LIMIT_MAX",
   "GENERATE_RATE_LIMIT_MAX",
   "ANON_GENERATE_RATE_LIMIT_MAX",
+  "GENERATE_DAILY_LIMIT",
   "SPA_RATE_LIMIT_MAX"
 ];
 
@@ -56,12 +58,16 @@ let running = [];
 // value the test asked for.
 const startApp = async (limited) => {
   vi.resetModules();
-  const keys = [...LIMIT_KEYS, "CLIENT_DIST_PATH"];
+  const keys = [...LIMIT_KEYS, "CLIENT_DIST_PATH", "GEMINI_API_KEY"];
   const previous = keys.map((key) => process.env[key]);
   LIMIT_KEYS.forEach((key) => {
     process.env[key] = key === limited ? "1" : OUT_OF_THE_WAY;
   });
   process.env.CLIENT_DIST_PATH = distPath;
+  // Empty rather than deleted, for the dotenv reason above. With no key at
+  // import the app builds no Gemini client, so a generate request that passes
+  // every limiter answers 500 instead of calling the real API.
+  process.env.GEMINI_API_KEY = "";
 
   let app;
   try {
@@ -89,6 +95,42 @@ const post = (baseUrl, path) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({})
+  });
+
+// A generate request that passes the CSRF check, sent from `localAddress` so a
+// test can play two callers at different IPs. The check only compares the
+// cookie with the header, so any matching pair passes. fetch cannot choose
+// its source address, hence http.request.
+const CSRF = "rate-limit-test-token";
+const postGenerate = (baseUrl, { localAddress = "127.0.0.1", csrf = true } = {}) =>
+  new Promise((resolve, reject) => {
+    const body = JSON.stringify({});
+    const req = http.request(
+      {
+        host: "127.0.0.1",
+        port: new URL(baseUrl).port,
+        path: "/api/generate",
+        method: "POST",
+        localAddress,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          ...(csrf ? { Cookie: `csrfToken=${CSRF}`, "x-csrf-token": CSRF } : {})
+        }
+      },
+      (res) => {
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () =>
+          resolve({ status: res.statusCode, headers: res.headers, body: JSON.parse(data) })
+        );
+      }
+    );
+    req.on("error", reject);
+    req.end(body);
   });
 
 const del = (baseUrl, path) =>
@@ -216,6 +258,47 @@ describe("rate limiters", () => {
       error: "Free plan limit reached. Sign in to keep generating workout plans.",
       requiresAuth: true
     });
+  });
+
+  // The per-IP limits above give every address its own budget, so free sign-ups
+  // from many addresses would multiply them. The daily cap is one budget for all
+  // callers, and so bounds the Gemini bill. The first request here fails (no key
+  // is configured) and still counts: a reply cut off at the token cap is a 502
+  // that has already been paid for.
+  test("the daily generate cap is one budget shared by every caller", async () => {
+    const baseUrl = await startApp("GENERATE_DAILY_LIMIT");
+
+    const first = await postGenerate(baseUrl, { localAddress: "127.0.0.1" });
+    const fromElsewhere = await postGenerate(baseUrl, { localAddress: "127.0.0.2" });
+
+    expect(first.status).toBe(500);
+    expect(fromElsewhere.status).toBe(429);
+    expect(fromElsewhere.body).toEqual({
+      error: "Workout generation has reached today's limit. Please try again later."
+    });
+    // The per-IP limiter's headers, not the cap's: a caller is not told how
+    // much of the shared budget is left.
+    expect(first.headers["ratelimit-limit"]).toBe(OUT_OF_THE_WAY);
+  });
+
+  // Only a request the route will run may spend the shared budget. Otherwise
+  // anyone could exhaust it for everyone with requests that cost nothing: a
+  // POST without a CSRF token, or a GET.
+  test("requests the generate route never runs do not spend the daily cap", async () => {
+    const baseUrl = await startApp("GENERATE_DAILY_LIMIT");
+
+    const rejected = [
+      await postGenerate(baseUrl, { csrf: false }),
+      await postGenerate(baseUrl, { csrf: false }),
+      await fetch(`${baseUrl}/api/generate`),
+      await fetch(`${baseUrl}/api/generate`)
+    ];
+    const allowed = await postGenerate(baseUrl);
+    const limited = await postGenerate(baseUrl);
+
+    expect(rejected.map((res) => res.status)).toEqual([403, 403, 404, 404]);
+    expect(allowed.status).toBe(500);
+    expect(limited.status).toBe(429);
   });
 
   // The SPA fallback reads index.html from disk on every page request, so it

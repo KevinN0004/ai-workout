@@ -296,6 +296,9 @@ const anonGenerateRateLimitWindowMs = toPositiveInt(
   24 * 60 * 60 * 1000
 );
 const anonGenerateRateLimitMax = toPositiveInt(process.env.ANON_GENERATE_RATE_LIMIT_MAX, 3);
+// One budget for every caller together. The per-IP limits above cannot bound
+// the Gemini bill, because free sign-ups from many addresses each get their own.
+const generateDailyLimit = toPositiveInt(process.env.GENERATE_DAILY_LIMIT, 200);
 // Bounds the SPA fallback in staticClient.js, which reads index.html from disk
 // on every page request. A browser fetches the shell once per full page load
 // and calls /api on each one, so with this above the /api budget the /api
@@ -628,6 +631,34 @@ const anonGenerateLimiter = rateLimit({
   }
 });
 
+// The constant key makes this one budget shared by every caller. Every request
+// that reaches it counts, failures included, because a reply cut off at the
+// token cap is a 502 that has already been paid for. Standard headers are off
+// so a caller is not told how much of the shared budget is left.
+const generateDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: generateDailyLimit,
+  store: rateLimitStore("generate_daily"),
+  keyGenerator: () => "all",
+  standardHeaders: false,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log?.warn(
+      {
+        event: "rate_limited",
+        scope: "generate_daily",
+        method: req.method,
+        path: requestLogPath(req)
+      },
+      "Daily generate cap reached."
+    );
+    res.status(429).json({
+      error: "Workout generation has reached today's limit. Please try again later."
+    });
+  }
+});
+
 // ---- Limits and CSRF on /api ------------------------------------------------
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
@@ -637,6 +668,9 @@ app.delete("/api/auth/me", credentialLimiter);
 app.use("/api/generate", attachOptionalUser, anonGenerateLimiter, generateLimiter);
 app.use("/api", ensureCsrfTokenCookie);
 app.use("/api", requireCsrfToken);
+// After the CSRF check and on POST alone, so only a request the route will run
+// can spend the shared budget, and nobody can exhaust it with free ones.
+app.post("/api/generate", generateDailyLimiter);
 
 // ---- API routes -------------------------------------------------------------
 registerApiRoutes(app, {

@@ -31,6 +31,7 @@ const NUMERIC_VARS = [
   { name: "GENERATE_RATE_LIMIT_MAX", min: 1 },
   { name: "ANON_GENERATE_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "ANON_GENERATE_RATE_LIMIT_MAX", min: 1 },
+  { name: "GENERATE_DAILY_LIMIT", min: 1 },
   { name: "SPA_RATE_LIMIT_WINDOW_MS", min: 1000 },
   { name: "SPA_RATE_LIMIT_MAX", min: 1 },
   { name: "ARGON2_TIME_COST", min: 2 },
