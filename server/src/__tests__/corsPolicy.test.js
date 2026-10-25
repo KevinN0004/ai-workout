@@ -27,11 +27,28 @@ const decide = (policy, req) =>
 
 const allowed = { err: null, allowed: true };
 
-describe("createCorsPolicy in production (allowLoopback false)", () => {
-  const policy = createCorsPolicy([], { allowLoopback: false });
+describe("createCorsPolicy in production (development false)", () => {
+  const policy = createCorsPolicy([], { development: false });
 
   test("allows its own origin with no list at all", async () => {
     expect(await decide(policy, fakeRequest("https://api.example.com"))).toEqual(allowed);
+  });
+
+  // In production any own origin counts, loopback or not: the host routes by
+  // Host (Render does), so a request naming another host never reaches us.
+  test("allows a non-loopback own origin", async () => {
+    const req = fakeRequest("https://service.example", { host: "service.example" });
+
+    expect(await decide(policy, req)).toEqual(allowed);
+  });
+
+  // Accepted, and pinned so it stays a decision: in production a non-browser
+  // caller can send a Host to match any Origin. It gains nothing, because CORS
+  // only restrains browsers and such a caller can already send no Origin at all.
+  test("lets through a caller that forges Host to match its Origin", async () => {
+    const req = fakeRequest("https://evil.example", { host: "evil.example" });
+
+    expect(await decide(policy, req)).toEqual(allowed);
   });
 
   test("does not fall back to loopback", async () => {
@@ -47,7 +64,7 @@ describe("createCorsPolicy in production (allowLoopback false)", () => {
   });
 
   test("still allows an origin it lists", async () => {
-    const listed = createCorsPolicy(["https://app.example.com"], { allowLoopback: false });
+    const listed = createCorsPolicy(["https://app.example.com"], { development: false });
 
     expect(await decide(listed, fakeRequest("https://app.example.com"))).toEqual(allowed);
   });
@@ -79,20 +96,38 @@ describe("createCorsPolicy outside production", () => {
     expect(await decide(policy, fakeRequest("http://localhost:5173"))).toEqual(allowed);
   });
 
-  test("allows its own origin there too", async () => {
+  test("allows its own origin there too, when it is loopback", async () => {
     const policy = createCorsPolicy(["https://app.example.com"]);
+    const req = fakeRequest("http://127.0.0.1:5000", { host: "127.0.0.1:5000" }, "http");
 
-    expect(await decide(policy, fakeRequest("https://api.example.com"))).toEqual(allowed);
+    expect(await decide(policy, req)).toEqual(allowed);
+  });
+
+  // DNS rebinding: a page on http://evil.test:5000 points evil.test at
+  // 127.0.0.1, and its writes then reach a developer's server with a Host and an
+  // Origin that agree. That server answers any Host, so a non-loopback own
+  // origin is refused here.
+  test.each([
+    ["a rebound name", "evil.test:5000", "http://evil.test:5000"],
+    ["a public name", "api.example.com", "https://api.example.com"]
+  ])("refuses a non-loopback own origin: %s", async (_label, host, origin) => {
+    const policy = createCorsPolicy(["https://app.example.com"]);
+    const req = fakeRequest(origin, { host }, new URL(origin).protocol.replace(":", ""));
+
+    const { err } = await decide(policy, req);
+
+    expect(err?.status).toBe(403);
   });
 });
 
 // The scheme half of the own origin is req.protocol, which honours
 // X-Forwarded-Proto only when trust proxy is set (index.js sets it in production,
-// where Render terminates TLS). These run the policy through real express.
+// where Render terminates TLS). These run the production policy (development
+// false, so any own origin counts) through real express.
 const appWith = ({ trustProxy }) => {
   const app = express();
   if (trustProxy) app.set("trust proxy", 1);
-  app.use(cors(createCorsPolicy([], { allowLoopback: false }).corsOptionsDelegate));
+  app.use(cors(createCorsPolicy([], { development: false }).corsOptionsDelegate));
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
   app.use((err, _req, res, _next) => res.status(err.status ?? 500).end());
   return app;

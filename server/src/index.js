@@ -121,7 +121,7 @@ const parseCsvEnv = (value) =>
 
 const { corsOptionsDelegate, isEmpty: corsAllowlistIsEmpty } = createCorsPolicy(
   parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS),
-  { allowLoopback: process.env.NODE_ENV !== "production" }
+  { development: process.env.NODE_ENV !== "production" }
 );
 const logLevel = toShortText(process.env.LOG_LEVEL || "info", 20).toLowerCase() || "info";
 const defaultRedactedLogPaths = [
@@ -157,7 +157,7 @@ const logger = pino({
 if (corsAllowlistIsEmpty) {
   logger.info(
     { event: "cors_allowlist_missing" },
-    "CLIENT_ORIGIN is not set. Allowing this server's own origin, and loopback origins outside production."
+    "CLIENT_ORIGIN is not set. Allowing this server's own origin in production, and loopback origins outside it."
   );
 }
 

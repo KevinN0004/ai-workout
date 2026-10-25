@@ -273,14 +273,40 @@ describe("CORS and the server's own origin", () => {
     expect(await getWithoutHost(baseUrl, "https://app.example.com")).toBe(200);
   });
 
-  // Accepted, and pinned so it stays a decision: a non-browser caller can send
-  // a Host to match any Origin. It gains nothing, because CORS only restrains
-  // browsers and such a caller can already send no Origin at all. A browser
-  // cannot set Host, so no page on another site can do this.
-  test("a caller that forges Host to match its Origin is let through", async () => {
+  // Outside production the own origin counts only when it is loopback, because
+  // of DNS rebinding: a page on http://evil.test:<port> points evil.test at
+  // 127.0.0.1, and its browser then sends a Host and an Origin that agree. A
+  // developer's server answers any Host, so this must stay refused.
+  test("in development, a rebound name whose Host and Origin agree is refused", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const { port } = new URL(baseUrl);
+
+    const res = await rawGet(baseUrl, {
+      Origin: `http://evil.test:${port}`,
+      Host: `evil.test:${port}`
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  // The same request a forging non-browser caller sends. In production it is
+  // let through (corsPolicy.test.js pins that); in development it is refused.
+  test("in development, a caller that forges a non-loopback Host to match is refused", async () => {
     const baseUrl = await startApp("https://app.example.com");
 
     const res = await rawGet(baseUrl, { Origin: "http://evil.example", Host: "evil.example" });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test("in development, its own origin under another loopback name is allowed", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const localhostOrigin = baseUrl.replace("127.0.0.1", "localhost");
+
+    const res = await rawGet(baseUrl, {
+      Origin: localhostOrigin,
+      Host: localhostOrigin.replace("http://", "")
+    });
 
     expect(res.statusCode).toBe(200);
   });
