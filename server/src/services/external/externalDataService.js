@@ -455,12 +455,13 @@ export const createExternalDataService = ({
     let newestEndMs = -Infinity;
     for (const item of Array.isArray(hours) ? hours : []) {
       const value = toFiniteNumber(item?.value);
-      const endMs = Date.parse(item?.period?.datetimeTo?.utc ?? "");
+      // Date.parse reads a missing or null end time as NaN.
+      const endMs = Date.parse(item?.period?.datetimeTo?.utc);
       if (value === null || value < 0 || !Number.isFinite(endMs)) continue;
       byHour.set(Math.floor(endMs / HOUR_MS), value);
       newestEndMs = Math.max(newestEndMs, endMs);
     }
-    if (!byHour.size) return null;
+    // Also the guard for no usable hour at all: newestEndMs is still -Infinity.
     if (nowMs - newestEndMs > NOWCAST_MAX_AGE_HOURS * HOUR_MS) return null;
     const newest = Math.floor(newestEndMs / HOUR_MS);
     const series = Array.from({ length: NOWCAST_HOURS }, (_, i) => byHour.get(newest - i) ?? null);
