@@ -1,3 +1,5 @@
+import http from "node:http";
+import net from "node:net";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 // CORS here runs with credentials enabled, which is what makes it worth
@@ -43,6 +45,32 @@ const startApp = async (clientOrigin) => {
 
 const get = (baseUrl, origin) =>
   fetch(`${baseUrl}/api/health`, origin === undefined ? {} : { headers: { Origin: origin } });
+
+// Sends a request with headers fetch will not let a test choose (Host).
+const rawGet = (baseUrl, headers) =>
+  new Promise((resolve, reject) => {
+    const req = http.get(`${baseUrl}/api/health`, { headers }, (res) => {
+      res.resume();
+      resolve(res);
+    });
+    req.on("error", reject);
+  });
+
+// Sends an HTTP/1.0 request with no Host header at all, which node's server
+// accepts only for 1.0, and resolves with the status code.
+const getWithoutHost = (baseUrl, origin) =>
+  new Promise((resolve, reject) => {
+    const { port } = new URL(baseUrl);
+    let response = "";
+    const socket = net.connect(Number(port), "127.0.0.1", () => {
+      socket.write(`GET /api/health HTTP/1.0\r\nOrigin: ${origin}\r\n\r\n`);
+    });
+    socket.on("data", (chunk) => {
+      response += chunk;
+    });
+    socket.on("end", () => resolve(Number(response.split(" ")[1])));
+    socket.on("error", reject);
+  });
 
 afterEach(async () => {
   const servers = running;
@@ -158,5 +186,128 @@ describe("CORS with an allowlist configured", () => {
     const baseUrl = await startApp("https://app.example.com");
 
     expect((await get(baseUrl, undefined)).status).toBe(200);
+  });
+});
+
+// startApp's address is what fetch sends as Host, so baseUrl IS the server's own
+// origin. The list always names another origin here: with an empty list
+// 127.0.0.1 already passes as loopback, and the two rules could not be told
+// apart. This suite imports index.js with NODE_ENV=test, so trust proxy is off.
+describe("CORS and the server's own origin", () => {
+  // The SPA is served from this origin, and a browser still sends Origin on its
+  // writes and on the bundle's crossorigin loads, so its own origin must pass
+  // whatever the list says.
+  test("its own origin is allowed when the list names only others", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    const res = await get(baseUrl, baseUrl);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe(baseUrl);
+    expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+  });
+
+  test.each([
+    ["another port on the same host", (base) => base.replace(/:\d+$/, ":1")],
+    ["the same host with no port", (base) => base.replace(/:\d+$/, "")],
+    ["the same host over https", (base) => base.replace("http://", "https://")],
+    ["the same port on another host", (base) => base.replace("127.0.0.1", "127.0.0.2")],
+    ["the same port under another name", (base) => base.replace("127.0.0.1", "localhost")]
+  ])("%s is not its own origin", async (_label, toOrigin) => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    const res = await get(baseUrl, toOrigin(baseUrl));
+
+    expect(res.status).toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  // The attack the rule must never let through: a page on another site calls
+  // the API. Its browser sets Host to ours and Origin to its own, and no page
+  // can change either, so they differ.
+  test("a browser on another site, whose Host is ours, is still refused", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    const res = await get(baseUrl, "https://evil.example");
+
+    expect(res.status).toBe(403);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("a Host whose port differs from the Origin's is refused", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const { port } = new URL(baseUrl);
+
+    const res = await rawGet(baseUrl, { Origin: baseUrl, Host: `127.0.0.1:${Number(port) + 1}` });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  // Without trust proxy the scheme is the socket's, and a forwarded one is a
+  // header any caller can send, so it must not move the own origin.
+  test("X-Forwarded-Proto is ignored while trust proxy is off", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const httpsOrigin = baseUrl.replace("http://", "https://");
+
+    const forwarded = await rawGet(baseUrl, { Origin: httpsOrigin, "X-Forwarded-Proto": "https" });
+    const socketScheme = await rawGet(baseUrl, { Origin: baseUrl, "X-Forwarded-Proto": "https" });
+
+    expect(forwarded.statusCode).toBe(403);
+    expect(socketScheme.statusCode).toBe(200);
+  });
+
+  // A request with no Host has no own origin, so nothing can equal it: not the
+  // address it reached, and not the "http://undefined" a template would build.
+  test.each([
+    ["the address it reached", (base) => base],
+    ["the origin an unchecked Host would build", () => "http://undefined"]
+  ])("a request with no Host is not its own origin for %s", async (_label, toOrigin) => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    expect(await getWithoutHost(baseUrl, toOrigin(baseUrl))).toBe(403);
+  });
+
+  test("a request with no Host still reaches a listed origin", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    expect(await getWithoutHost(baseUrl, "https://app.example.com")).toBe(200);
+  });
+
+  // Outside production the own origin counts only when it is loopback, because
+  // of DNS rebinding: a page on http://evil.test:<port> points evil.test at
+  // 127.0.0.1, and its browser then sends a Host and an Origin that agree. A
+  // developer's server answers any Host, so this must stay refused.
+  test("in development, a rebound name whose Host and Origin agree is refused", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const { port } = new URL(baseUrl);
+
+    const res = await rawGet(baseUrl, {
+      Origin: `http://evil.test:${port}`,
+      Host: `evil.test:${port}`
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  // The same request a forging non-browser caller sends. In production it is
+  // let through (corsPolicy.test.js pins that); in development it is refused.
+  test("in development, a caller that forges a non-loopback Host to match is refused", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+
+    const res = await rawGet(baseUrl, { Origin: "http://evil.example", Host: "evil.example" });
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test("in development, its own origin under another loopback name is allowed", async () => {
+    const baseUrl = await startApp("https://app.example.com");
+    const localhostOrigin = baseUrl.replace("127.0.0.1", "localhost");
+
+    const res = await rawGet(baseUrl, {
+      Origin: localhostOrigin,
+      Host: localhostOrigin.replace("http://", "")
+    });
+
+    expect(res.statusCode).toBe(200);
   });
 });

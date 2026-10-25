@@ -25,7 +25,7 @@ server/
 |-- prisma/schema.prisma        # Prisma model mapping for Postgres tables
 |-- src/
 |   |-- index.js                # Express app setup, wiring, and server boot
-|   |-- corsPolicy.js           # Allowed-origin rules for CORS
+|   |-- corsPolicy.js           # CORS: the server's own origin, plus CLIENT_ORIGIN
 |   |-- staticClient.js         # Serves client/dist from the same origin as the API
 |   |-- shutdown.js             # Graceful shutdown sequence
 |   |-- db/

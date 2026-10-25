@@ -169,7 +169,7 @@ Common server variables:
 | `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                  | `true` in production, otherwise `false`                     |
 | `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins     | `false`                                                     |
 | `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`              | `true`                                                      |
-| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated                                                    | loopback origins only when unset; set this before deploying |
+| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated, besides the server's own (loopback only in dev)   | own origin in production; loopback origins only, outside it |
 | `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                  | unset                                                       |
 | `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                       | `3`                                                         |
 | `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                | `86400000` (24h)                                            |
@@ -390,12 +390,14 @@ session store and sign every user out.
    the service; Render will prompt for each secret it marks `sync: false`, and a
    comment beside each one in `render.yaml` says what it is for and whether it is
    required.
-   Set `CLIENT_ORIGIN` to the service's own URL once Render assigns it, e.g.
-   `https://ai-workout.onrender.com` — the production preflight refuses to start
-   without it. Serving the page from the same origin does not take CORS out of the
-   path: a browser sends an `Origin` header on every same-origin write, and Chromium
-   on the bundle's `crossorigin` script and stylesheet loads, so a service that does
-   not list its own URL answers those requests 403.
+   `CLIENT_ORIGIN` can stay unset: the server allows its own origin. A browser
+   sends an `Origin` header on every same-origin write, and Chromium on the
+   bundle's `crossorigin` script and stylesheet loads, and the CORS check passes
+   each one whose `Origin` matches the request's own scheme and `Host`. Set it only
+   if something in front of the service rewrites the `Host` header. Any own origin
+   passes in production, where Render routes by `Host`; outside production only a
+   loopback one does, so a page that rebinds its own name to a developer's
+   127.0.0.1 (DNS rebinding) cannot pass as same-origin.
 4. **GitHub** — add three repository secrets: `PRODUCTION_DATABASE_URL` (the same
    Neon URL), `RENDER_DEPLOY_HOOK_URL` (Render → the service → Settings → Deploy
    Hook) and `RENDER_SERVICE_URL`.
@@ -425,7 +427,7 @@ green CI is skipped, and the first deploy is started by hand (see
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV=production`            | Enables the env preflight and the production defaults                                                                                                                                               |
 | `DATABASE_URL`                   | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                                                         |
-| `CLIENT_ORIGIN`                  | Required when `NODE_ENV=production`                                                                                                                                                                 |
+| `CLIENT_ORIGIN`                  | Optional: the server's own origin is always allowed; list others only if a proxy rewrites `Host`                                                                                                    |
 | `REDIS_URL`                      | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window                                   |
 | `GEMINI_API_KEY`                 | Plan generation returns an error without it                                                                                                                                                         |
 | `OPENAQ_API_KEY`                 | Without it air quality always reads as unavailable. The route answers 200 with `fallback: true`, so the browser sees no error; the server logs an `openaq_api_key_missing` warning for each request |

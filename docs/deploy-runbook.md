@@ -118,7 +118,7 @@ six-hour buffer that serves old data when an upstream is down.
    | ----------------- | ------------------------------------ |
    | `DATABASE_URL`    | The Neon string from step 1          |
    | `REDIS_URL`       | The Upstash string from step 2       |
-   | `CLIENT_ORIGIN`   | See below — you may not know it yet  |
+   | `CLIENT_ORIGIN`   | Leave blank (see below)              |
    | `GEMINI_API_KEY`  | Google AI Studio key, or blank       |
    | `SENTRY_DSN`      | See below — strongly recommended     |
    | `VITE_SENTRY_DSN` | See below — optional                 |
@@ -152,17 +152,16 @@ six-hour buffer that serves old data when an upstream is down.
    closes the endpoint in production** rather than publishing it, so blank is
    safe — the choice is between "closed" and "readable by you".
 
-4. **`CLIENT_ORIGIN` is the awkward one.** It must be this service's own public
-   URL, which Render assigns when the service is created. If you can see the
-   assigned URL during setup, use it. If not, put a placeholder, let the service
-   be created, then set it properly under **Environment** and redeploy.
-
-   It looks like `https://ai-workout.onrender.com`, with no trailing slash.
-
-   The server refuses to start in production without it, and it matters after
-   that too: a browser sends an `Origin` header on every same-origin write, and
-   Chromium on the bundle's `crossorigin` script and stylesheet loads, so a
-   service that does not list its own URL answers those requests 403.
+4. **`CLIENT_ORIGIN` is optional; leave it blank.** A browser sends an `Origin`
+   header on every same-origin write, and Chromium on the bundle's `crossorigin`
+   script and stylesheet loads. The server allows each one whose `Origin` matches
+   the request's own scheme (from Render's `X-Forwarded-Proto`) and `Host`, so the
+   service's own URL passes without being listed. Set it only if something in
+   front of the service rewrites the `Host` header: then list the public origin,
+   such as `https://ai-workout.onrender.com`, with no trailing slash. Any own
+   origin passes in production because Render routes by `Host`, so a request
+   naming another host never reaches the service; outside production only a
+   loopback own origin does, which shuts out DNS rebinding against a local server.
 
 5. Create the service. The first Docker build takes several minutes.
 
@@ -321,7 +320,7 @@ rejects anything outside `client_encoding`, `datestyle`, `timezone` and
 `?sslmode=verify-full`.
 
 **The server will not start, complaining about environment.**
-The production preflight requires `DATABASE_URL` and `CLIENT_ORIGIN`, and reports
+The production preflight requires `DATABASE_URL`, and reports
 every problem at once rather than the first. Read the whole message.
 
 **Timestamps look seven hours out.**
@@ -531,6 +530,10 @@ container with a Postgres and Redis URL will work. Keep two properties:
 
 - **Same origin.** The client bundle must be served by the app process. It
   cannot reach a cross-origin API — every call is a relative path and the
-  cookies are `SameSite=Lax`.
+  cookies are `SameSite=Lax`. The CORS check allows the server's own origin by
+  reading `Host` and, through one trusted proxy, `X-Forwarded-Proto`; a host
+  whose proxy rewrites `Host` sets `CLIENT_ORIGIN` to the public origin instead.
+  That own-origin rule assumes `NODE_ENV=production`; outside it only a loopback
+  own origin passes.
 - **Migrate before cutover.** Whatever replaces the workflow must keep that
   order.

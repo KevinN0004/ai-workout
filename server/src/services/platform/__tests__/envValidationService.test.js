@@ -22,15 +22,10 @@ describe("validateEnv", () => {
     expect(validateEnv({ ...validEnv, NODE_ENV: "development" })).toEqual([]);
   });
 
-  test("requires CLIENT_ORIGIN in production", () => {
-    const errors = validateEnv({ ...validEnv, NODE_ENV: "production" });
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain("CLIENT_ORIGIN");
-  });
-
-  test("accepts CLIENT_ORIGINS in production", () => {
-    const env = { ...validEnv, NODE_ENV: "production", CLIENT_ORIGINS: "https://example.com" };
-    expect(validateEnv(env)).toEqual([]);
+  // The server allows its own origin, which is the only one a single-origin
+  // deployment uses, so production no longer needs the list.
+  test("does not require CLIENT_ORIGIN in production", () => {
+    expect(validateEnv({ ...validEnv, NODE_ENV: "production" })).toEqual([]);
   });
 
   test("rejects a non-numeric PORT", () => {
@@ -94,9 +89,7 @@ describe("validateEnv", () => {
   });
 
   test("does not treat GEMINI_API_KEY as required", () => {
-    expect(
-      validateEnv({ ...validEnv, NODE_ENV: "production", CLIENT_ORIGIN: "https://x.com" })
-    ).toEqual([]);
+    expect(validateEnv({ ...validEnv, NODE_ENV: "production" })).toEqual([]);
   });
 
   test("rejects an ARGON2_MEMORY_COST below argon2's own floor", () => {

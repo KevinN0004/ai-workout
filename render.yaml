@@ -56,11 +56,10 @@ services:
       - key: DATABASE_URL
         sync: false
 
-      # Required when NODE_ENV=production, and the preflight refuses to start
-      # without it. Same-origin serving still goes through CORS: a browser sends
-      # an Origin header on same-origin writes, and Chromium on the bundle's
-      # crossorigin script and stylesheet loads, so an unlisted origin gets 403.
-      # Set it to this service's own URL, e.g. https://ai-workout.onrender.com
+      # Optional. The server allows its own origin, which is the only one this
+      # single-origin deployment uses, so leave it blank unless a proxy in front
+      # rewrites Host. Kept here so a Blueprint sync never drops a value an
+      # existing service already has.
       - key: CLIENT_ORIGIN
         sync: false
 
