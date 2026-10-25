@@ -211,6 +211,42 @@ describe("buildContextCategories", () => {
 
     expect(categories).toEqual(uniqueList(categories));
   });
+
+  // Today's plan lines are Gemini's prose, so a keyword inside a longer word
+  // ("ab" in "cable", "run" in "crunches") used to favour the wrong category.
+  // Each row names a track whose own categories lack the one the false match
+  // added, so the row can tell the two behaviours apart.
+  const withLine = (track, line) =>
+    buildContextCategories({ track, goalText: "", todayLines: [line] });
+  const without = (track) => buildContextCategories({ track, goalText: "", todayLines: [] });
+
+  test.each([
+    ["Cable fly", "lean_strength"],
+    ["Crunches", "lean_strength"],
+    ["Warm-up walk", "recovery"],
+    ["Elegant flow", "lean_strength"],
+    ["Scorecard", "lean_strength"]
+  ])("adds nothing for %j", (line, track) => {
+    expect(withLine(track, line)).toEqual(without(track));
+  });
+
+  test.each([
+    ["Ab wheel", "lean_strength", "Abs"],
+    ["Abdominal crunch", "lean_strength", "Abs"],
+    ["Running drills", "lean_strength", "Cardio"],
+    ["Pushups", "recovery", "Chest"],
+    ["Push-ups", "recovery", "Chest"],
+    ["Sled pushing", "recovery", "Chest"],
+    ["Tricep pushdown", "fat_loss", "Chest"],
+    ["Face pulls", "fat_loss", "Arms"],
+    ["Lat pulldown", "fat_loss", "Shoulders"],
+    ["Dumbbell pullover", "fat_loss", "Arms"],
+    ["Forearm curls", "fat_loss", "Arms"],
+    ["Leg day", "lean_strength", "Calves"]
+  ])("still reads %j", (line, track, category) => {
+    expect(without(track)).not.toContain(category);
+    expect(withLine(track, line)).toContain(category);
+  });
 });
 
 describe("buildEquipmentKeywords", () => {
@@ -287,15 +323,70 @@ describe("detectInjuryFlags", () => {
     expect(injuries).toEqual(expect.arrayContaining(["knee", "wrist"]));
   });
 
-  // "back" is a substring of "lower back", so a lower-back note raises both
-  // rules. They carry the same keywords, so the effect is that a conflicting
-  // exercise is penalised twice. Recording it because the doubled penalty is
-  // load-bearing for the ordering, not an obvious reading of the code.
-  test("raises both the back and lower back rules for a lower back note", () => {
-    const injuries = detectInjuryFlags("lower back pain").map((f) => f.injury);
+  // One mention, one flag. "back" is inside "lower back", and the substring
+  // match used to raise both rules, so a lower-back note showed two near-
+  // identical warnings. The doubled penalty that came with it is kept as a
+  // stated number (decision 2 of docs/plans/2026-10-24-parked-items.md).
+  test.each([["Lower back"], ["lower back pain"], ["LOWER BACK"], ["lower backache"]])(
+    "raises the lower back rule alone for %j",
+    (note) => {
+      const flags = detectInjuryFlags(note);
 
-    expect(injuries).toContain("lower back");
-    expect(injuries).toContain("back");
+      expect(flags.map((f) => f.injury)).toEqual(["lower back"]);
+      expect(flags[0].penalty).toBe(14);
+    }
+  );
+
+  // Once the lower back is flagged, a further back mention adds no flag, so a
+  // note naming the back twice still weighs 14, as a single mention does.
+  test.each([
+    ["lower back and upper back"],
+    ["lower back, upper back, neck"],
+    ["upper back pain, then lower back"],
+    ["lower back lower-back"],
+    [buildInjuryText("Lower back", "back pain")]
+  ])("raises no back flag beside the lower back one for %j", (note) => {
+    const flags = detectInjuryFlags(note);
+
+    expect(flags.map((f) => [f.injury, f.penalty])).toEqual([["lower back", 14]]);
+  });
+
+  test("still raises an injury the lower back does not cover", () => {
+    expect(detectInjuryFlags("lower back; knee").map((f) => f.injury)).toEqual([
+      "lower back",
+      "knee"
+    ]);
+  });
+
+  test.each([
+    ["relationship stress"],
+    ["championship prep"],
+    ["worship team"],
+    ["feedback welcome"],
+    ["comeback after a setback"]
+  ])("finds no injury inside a longer word in %j", (note) => {
+    expect(detectInjuryFlags(note)).toEqual([]);
+  });
+
+  // Each spelling a note might use is listed: the plurals, and the compounds
+  // that name the injury. Each of these read as the injury before the fix too.
+  test.each([
+    ["sore knees", "knee"],
+    ["bad kneecap", "knee"],
+    ["kneeling hurts", "knee"],
+    ["my hips ache", "hip"],
+    ["hipbone bruise", "hip"],
+    ["backache", "back"],
+    ["backaches", "back"],
+    ["lowerback pain", "back"],
+    ["shoulders tight", "shoulder"],
+    ["chip on my shoulder", "shoulder"]
+  ])("reads %j as %s", (note, injury) => {
+    expect(detectInjuryFlags(note).map((f) => f.injury)).toEqual([injury]);
+  });
+
+  test("gives every other injury the standard penalty", () => {
+    expect(detectInjuryFlags("Knee").map((f) => f.penalty)).toEqual([7]);
   });
 
   test.each([
@@ -449,6 +540,38 @@ describe("scoreExercise", () => {
       const hipFlag = { injury: "hip", keywords: ["squat", "lunge"] };
 
       expect(scoreOf(squat, { injuryFlags: [kneeFlag, hipFlag] })).toBe(-14);
+    });
+
+    // The ranking a lower-back visitor saw is kept: one flag now, at the 14
+    // the two flags added up to, and one reason instead of two.
+    test("a lower-back conflict costs 14 and gives one reason", () => {
+      const deadlift = exercise({ name: "Romanian Deadlift" });
+      const { score, reasons } = scoreExercise(
+        deadlift,
+        context({ injuryFlags: detectInjuryFlags("Lower back") })
+      );
+
+      expect(score).toBe(-14);
+      expect(reasons.filter((r) => r.startsWith("Potentially high stress"))).toEqual([
+        "Potentially high stress for lower back."
+      ]);
+    });
+
+    // TipsView joins the planner's answer and the profile's notes with
+    // buildInjuryText, so "Lower back" and a note saying "back pain" arrive as
+    // one text that names the back twice. It costs what "Lower back" alone does.
+    test("a lower-back answer and a back note still cost 14 with one reason", () => {
+      const deadlift = exercise({ name: "Romanian Deadlift" });
+      const injuryText = buildInjuryText("Lower back", "back pain");
+      const { score, reasons } = scoreExercise(
+        deadlift,
+        context({ injuryFlags: detectInjuryFlags(injuryText) })
+      );
+
+      expect(score).toBe(-14);
+      expect(reasons.filter((r) => r.startsWith("Potentially high stress"))).toEqual([
+        "Potentially high stress for lower back."
+      ]);
     });
   });
 

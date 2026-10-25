@@ -3,6 +3,7 @@
  * equipment, the weather and an injury note score a wger exercise, and the
  * training-guide cards. Used by TipsView and the tips components.
  */
+import { hasWord } from "../wordMatch";
 
 // wger category names each goal track favours.
 const trackCategoryMap = {
@@ -12,25 +13,43 @@ const trackCategoryMap = {
   recovery: ["Abs", "Back", "Shoulders", "Legs"]
 };
 
-// Words in the goal or today's plan lines that favour more categories.
+// Words in the goal or today's plan lines that favour more categories, matched
+// whole. Each lists its plurals and verb forms, and the exercise names it heads
+// ("pulldown", "pushdown").
 const keywordCategoryMap = [
-  { keyword: "push", categories: ["Chest", "Shoulders", "Arms"] },
-  { keyword: "pull", categories: ["Back", "Arms", "Shoulders"] },
-  { keyword: "chest", categories: ["Chest", "Shoulders"] },
-  { keyword: "back", categories: ["Back"] },
-  { keyword: "shoulder", categories: ["Shoulders"] },
-  { keyword: "arm", categories: ["Arms"] },
-  { keyword: "bicep", categories: ["Arms"] },
-  { keyword: "tricep", categories: ["Arms"] },
-  { keyword: "leg", categories: ["Legs", "Calves"] },
-  { keyword: "quad", categories: ["Legs"] },
-  { keyword: "hamstring", categories: ["Legs"] },
-  { keyword: "glute", categories: ["Legs"] },
-  { keyword: "core", categories: ["Abs"] },
-  { keyword: "ab", categories: ["Abs"] },
-  { keyword: "cardio", categories: ["Cardio"] },
-  { keyword: "conditioning", categories: ["Cardio"] },
-  { keyword: "run", categories: ["Cardio", "Legs"] }
+  {
+    words: ["push", "pushes", "pushing", "pushup", "pushups", "pushdown", "pushdowns"],
+    categories: ["Chest", "Shoulders", "Arms"]
+  },
+  {
+    words: [
+      "pull",
+      "pulls",
+      "pulling",
+      "pullup",
+      "pullups",
+      "pulldown",
+      "pulldowns",
+      "pullover",
+      "pullovers"
+    ],
+    categories: ["Back", "Arms", "Shoulders"]
+  },
+  { words: ["chest"], categories: ["Chest", "Shoulders"] },
+  { words: ["back"], categories: ["Back"] },
+  { words: ["shoulder", "shoulders"], categories: ["Shoulders"] },
+  { words: ["arm", "arms", "forearm", "forearms"], categories: ["Arms"] },
+  { words: ["bicep", "biceps"], categories: ["Arms"] },
+  { words: ["tricep", "triceps"], categories: ["Arms"] },
+  { words: ["leg", "legs"], categories: ["Legs", "Calves"] },
+  { words: ["quad", "quads", "quadriceps"], categories: ["Legs"] },
+  { words: ["hamstring", "hamstrings"], categories: ["Legs"] },
+  { words: ["glute", "glutes"], categories: ["Legs"] },
+  { words: ["core"], categories: ["Abs"] },
+  { words: ["ab", "abs", "abdominal", "abdominals"], categories: ["Abs"] },
+  { words: ["cardio", "cardiovascular"], categories: ["Cardio"] },
+  { words: ["conditioning"], categories: ["Cardio"] },
+  { words: ["run", "runs", "running"], categories: ["Cardio", "Legs"] }
 ];
 
 // The wger equipment-name fragments each planner equipment label stands for,
@@ -72,7 +91,8 @@ const equipmentKeywordMap = {
   "free weights": ["barbell", "dumbbell", "kettlebell"]
 };
 
-// Words in an exercise's name or description that are risky for each injury.
+// Words in an exercise's name or description that are risky for each injury,
+// `lower back` first: detectInjuryFlags tries the names in this order.
 const injuryKeywordRules = {
   "lower back": ["deadlift", "good morning", "hyperextension", "bent-over"],
   back: ["deadlift", "good morning", "hyperextension", "bent-over"],
@@ -82,6 +102,29 @@ const injuryKeywordRules = {
   wrist: ["push-up", "curl", "press", "dip", "extension"],
   elbow: ["curl", "press", "extension", "dip"]
 };
+
+// The words naming each injury, matched whole: the plurals, and the compounds
+// that name it. "lowerback" and "upperback", written as one word, are back.
+const injuryNameForms = {
+  "lower back": ["lower back", "lower backache", "lower backaches"],
+  back: ["back", "backs", "backache", "backaches", "lowerback", "upperback"],
+  knee: ["knee", "knees", "kneecap", "kneecaps", "kneel", "kneeling"],
+  shoulder: ["shoulder", "shoulders"],
+  hip: ["hip", "hips", "hipbone", "hipbones"],
+  wrist: ["wrist", "wrists"],
+  elbow: ["elbow", "elbows"]
+};
+
+// What a conflict costs: more than any single match earns. A lower-back
+// conflict costs double, so a lower-back note weighs as two injuries do
+// (client/README.md, "Exercise Recommendations").
+const INJURY_PENALTY = 7;
+const injuryPenalty = { "lower back": 14 };
+
+// A rule a broader flag already covers: once the lower back is flagged, a
+// further back mention adds no flag, so a note naming the back twice still
+// weighs 14.
+const coveredBy = { back: "lower back" };
 
 /** `value` lower-cased and trimmed, or "" for anything that is not a string. */
 export const normalizeText = (value) =>
@@ -117,13 +160,13 @@ export const getExerciseImage = (exercise) => {
 /**
  * The categories to favour: the track's own (lean_strength's for an unknown
  * track), plus those of each keyword in the goal text or today's plan lines,
- * without repeats. A keyword matches anywhere, inside a longer word included.
+ * without repeats. A keyword matches as a whole word.
  */
 export const buildContextCategories = ({ track, goalText, todayLines }) => {
   const categories = [...(trackCategoryMap[track] || trackCategoryMap.lean_strength)];
   const sourceText = normalizeText(`${goalText} ${todayLines.join(" ")}`);
   for (const rule of keywordCategoryMap) {
-    if (sourceText.includes(rule.keyword)) categories.push(...rule.categories);
+    if (hasWord(sourceText, rule.words)) categories.push(...rule.categories);
   }
   return uniqueList(categories);
 };
@@ -148,15 +191,18 @@ export const buildEquipmentKeywords = ({ form }) => {
 };
 
 /**
- * Each injury whose name appears in the text, with its risky keywords. Names
- * match anywhere, so "lower back" flags both "lower back" and "back", and an
- * exercise conflicting with them is penalised once for each.
+ * Each injury named in the text, with its risky keywords and what a conflict
+ * costs. Names match as whole words, lower back before back, and a back
+ * mention beside a flagged lower back adds no flag (coveredBy), so "lower
+ * back" is one flag, not two.
  */
 export const detectInjuryFlags = (injuryText) => {
   const source = normalizeText(injuryText);
   const active = [];
   for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
-    if (source.includes(injury)) active.push({ injury, keywords });
+    if (!hasWord(source, injuryNameForms[injury])) continue;
+    if (active.some((flag) => flag.injury === coveredBy[injury])) continue;
+    active.push({ injury, keywords, penalty: injuryPenalty[injury] ?? INJURY_PENALTY });
   }
   return active;
 };
@@ -195,7 +241,7 @@ export const buildInjuryText = (injuries, notes) =>
  * and the details modal show. Points come from a favoured category, the weather
  * mode, available equipment (or bodyweight at home), and a word of the goal or
  * of today's lines in the exercise; each injury conflict costs more than any
- * single match earns. A score of 0 or below gets a generic reason. Returns the
+ * single match earns (7, or the flag's own penalty). A score of 0 or below gets a generic reason. Returns the
  * exercise with its score and reasons.
  */
 export const scoreExercise = (exercise, context) => {
@@ -275,7 +321,7 @@ export const scoreExercise = (exercise, context) => {
       (keyword) => nameLower.includes(keyword) || descriptionLower.includes(keyword)
     );
     if (conflict) {
-      score -= 7;
+      score -= flag.penalty ?? INJURY_PENALTY;
       reasons.push(`Potentially high stress for ${flag.injury}.`);
     }
   }

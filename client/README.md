@@ -212,8 +212,8 @@ that is what stops a write queued before a sign-out firing against the next acco
 
 `pages/dashboard/tips/recommendationUtils.js` ranks exercises for the Tips view by
 adding up matches — category focus `+5`, available equipment `+3`, today's planned
-muscles `+2`, and so on — and subtracting `7` for each reported injury the exercise
-conflicts with.
+muscles `+2`, and so on — and subtracting `7` (`14` for a lower back) for each reported
+injury the exercise conflicts with.
 
 **That subtraction is a ranking penalty, not an exclusion.** An exercise matching the
 focus, the equipment, the goal wording and today's muscles banks 12 points, so a single
@@ -223,9 +223,20 @@ Excluding one outright needs a filter, not a bigger penalty.
 
 Two details that are not obvious from reading the file:
 
-- `detectInjuryFlags` matches injury names as substrings, and `back` is inside
-  `lower back`, so a lower-back note raises **both** rules. They carry the same
-  keywords, so a conflicting exercise is penalised twice. The ordering depends on that.
+- Injury names, goal keywords and plan-line keywords match as **whole words**
+  (`pages/dashboard/wordMatch.js`), with the plurals and compounds each rule accepts
+  listed, so "hip" is not found in "relationship" nor "run" in "crunches". `lower back`
+  is tried before `back`, and a flagged lower back covers the back, so a lower-back note
+  is one flag. That flag costs **14**, not 7: when the two rules overlapped, its conflicts were
+  penalised twice, and the rankings a lower-back visitor saw are kept by stating the
+  number instead. Once the lower back is flagged, any further back mention adds no
+  flag, so "lower back and upper back", or the planner's "Lower back" beside a "back
+  pain" note, still costs 14. An injury the lower back does not cover, such as a knee,
+  is still flagged.
+
+  The exercise side is still a substring match on purpose: "squat" must find "Back
+  Squat" and "Squats" in wger's names.
+
 - `getExerciseImage` picks the entry flagged `isMain` that has a url, then falls back to
   `images[0]` — positionally, not to the first entry that has a url. An `images[0]`
   carrying no url yields the placeholder even when a later image would have served.

@@ -3,6 +3,7 @@
  * a day's calorie target on that track, and a week of meals from the track's
  * templates. Used by the meal, plans and tips views and useDashboardMetrics.
  */
+import { hasWord } from "./wordMatch";
 
 // Meal ideas per track, which buildWeeklyMealPlan cycles through by day.
 const WEEKLY_MEAL_TEMPLATES = {
@@ -92,31 +93,38 @@ const WEEKLY_MEAL_TEMPLATES = {
   }
 };
 
+// The words that put a goal on each track, tried in this order. Each is matched
+// as a whole word, with the forms a goal might use listed.
+const TRACK_WORDS = [
+  ["fat_loss", ["fat loss", "cut", "cuts", "cutting", "conditioning"]],
+  [
+    "endurance",
+    [
+      "endurance",
+      "athletic",
+      "athletics",
+      "athleticism",
+      "performance",
+      "cardio",
+      "cardiovascular",
+      "cardiorespiratory"
+    ]
+  ],
+  ["recovery", ["mobility", "recovery", "joint", "joints"]]
+];
+
 /**
  * Maps goal text to a track by keyword, tried in order: fat_loss, endurance,
- * recovery, and lean_strength when none match. A keyword matches anywhere in
- * the text, inside a longer word included. Of goalOptions, only "Build lean
- * strength and energy" has no keyword, and lean_strength is the track it is
- * meant for. The four names also key the meal templates here, the meal
- * suggestions in meal/data and the tips' categories.
+ * recovery, and lean_strength when none match. A keyword matches as a whole
+ * word (TRACK_WORDS), so "cut" is not found in "execute". Of goalOptions, only
+ * "Build lean strength and energy" has no keyword, and lean_strength is the
+ * track it is meant for. The four names also key the meal templates here, the
+ * meal suggestions in meal/data and the tips' categories.
  */
 export const detectTrack = (goalText = "") => {
   const lower = goalText.toLowerCase();
-  if (lower.includes("fat loss") || lower.includes("cut") || lower.includes("conditioning")) {
-    return "fat_loss";
-  }
-  if (
-    lower.includes("endurance") ||
-    lower.includes("athletic") ||
-    lower.includes("performance") ||
-    lower.includes("cardio")
-  ) {
-    return "endurance";
-  }
-  if (lower.includes("mobility") || lower.includes("recovery") || lower.includes("joint")) {
-    return "recovery";
-  }
-  return "lean_strength";
+  const match = TRACK_WORDS.find(([, words]) => hasWord(lower, words));
+  return match ? match[0] : "lean_strength";
 };
 
 /**
