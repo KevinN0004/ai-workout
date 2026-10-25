@@ -103,11 +103,13 @@ export default function DashboardPage({
   weatherData,
   weatherLoading,
   weatherError,
+  weatherErrorKind,
   weatherLastUpdatedAt,
   refreshWeatherRecommendation,
   airQualityData,
   airQualityLoading,
   airQualityError,
+  airQualityErrorKind,
   airQualityLastUpdatedAt,
   refreshAirQuality,
   onSaveExerciseToPlan,
@@ -444,11 +446,13 @@ export default function DashboardPage({
             weatherLoading={weatherLoading}
             weatherRecommendation={weatherRecommendation}
             weatherError={weatherError}
+            weatherErrorKind={weatherErrorKind}
             weatherLastUpdatedAt={weatherLastUpdatedAt}
             refreshWeatherRecommendation={refreshWeatherRecommendation}
             airQualityLoading={airQualityLoading}
             airSummary={airSummary}
             airQualityError={airQualityError}
+            airQualityErrorKind={airQualityErrorKind}
             airQualityLastUpdatedAt={airQualityLastUpdatedAt}
             refreshAirQuality={refreshAirQuality}
             formatRelativeUpdatedAt={formatRelativeUpdatedAt}

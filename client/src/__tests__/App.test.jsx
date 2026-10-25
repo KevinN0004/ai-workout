@@ -643,4 +643,16 @@ describe("App", () => {
       await waitFor(() => expect(dash.props.dashboardPagination).toEqual(pagination));
     });
   });
+
+  describe("the ambient readings", () => {
+    // jsdom has no navigator.geolocation, so the summary view's auto-load
+    // fails before it requests anything: the location kind, for both cards.
+    test("hands the dashboard the kind of each ambient failure", async () => {
+      stubSession(sessionResponse({ user: { email: "ada@example.com" } }));
+      await renderSettled("/dashboard");
+
+      await waitFor(() => expect(dash.props.weatherErrorKind).toBe("location"));
+      expect(dash.props.airQualityErrorKind).toBe("location");
+    });
+  });
 });

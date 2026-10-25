@@ -150,10 +150,12 @@ export default function App() {
     weatherData,
     weatherLoading,
     weatherError,
+    weatherErrorKind,
     weatherLastUpdatedAt,
     airQualityData,
     airQualityLoading,
     airQualityError,
+    airQualityErrorKind,
     airQualityLastUpdatedAt,
     loadWeatherRecommendation,
     loadAirQuality,
@@ -603,11 +605,13 @@ export default function App() {
         weatherData={weatherData}
         weatherLoading={weatherLoading}
         weatherError={weatherError}
+        weatherErrorKind={weatherErrorKind}
         weatherLastUpdatedAt={weatherLastUpdatedAt}
         refreshWeatherRecommendation={loadWeatherRecommendation}
         airQualityData={airQualityData}
         airQualityLoading={airQualityLoading}
         airQualityError={airQualityError}
+        airQualityErrorKind={airQualityErrorKind}
         airQualityLastUpdatedAt={airQualityLastUpdatedAt}
         refreshAirQuality={loadAirQuality}
         onSaveExerciseToPlan={saveExerciseToPlan}

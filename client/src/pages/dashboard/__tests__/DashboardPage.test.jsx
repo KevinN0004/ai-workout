@@ -712,11 +712,13 @@ describe("DashboardPage", () => {
       "weatherLoading",
       "weatherRecommendation",
       "weatherError",
+      "weatherErrorKind",
       "weatherLastUpdatedAt",
       "refreshWeatherRecommendation",
       "airQualityLoading",
       "airSummary",
       "airQualityError",
+      "airQualityErrorKind",
       "airQualityLastUpdatedAt",
       "refreshAirQuality",
       "formatRelativeUpdatedAt",
@@ -790,6 +792,17 @@ describe("DashboardPage", () => {
       expect(props.airQualityLoading).toBe(false);
       expect(props.weatherLastUpdatedAt).toBe(1000);
       expect(props.airQualityLastUpdatedAt).toBe(2000);
+    });
+
+    test("the glance strip gets each card's own error kind", () => {
+      renderPage({
+        dashView: "summary",
+        weatherErrorKind: "location",
+        airQualityErrorKind: "lookup"
+      });
+
+      expect(glance.props.weatherErrorKind).toBe("location");
+      expect(glance.props.airQualityErrorKind).toBe("lookup");
     });
   });
 

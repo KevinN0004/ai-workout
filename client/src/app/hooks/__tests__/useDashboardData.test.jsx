@@ -474,6 +474,76 @@ describe("ambient data", () => {
 
       expect(fetchMock.mock.calls.filter(([u]) => u.includes("/api/weather"))).toHaveLength(0);
     });
+
+    // The card reads the error's kind to tell "Unavailable" (no position, so
+    // nothing was asked of the server) from "Couldn't load" (the request failed).
+    test.each([
+      ["denied", { error: geoError(1) }],
+      ["unavailable", { error: geoError(2) }],
+      ["timed out", { error: geoError(3) }],
+      ["gave without usable coordinates", { position: { coords: { latitude: "north" } } }]
+    ])(
+      "a position the browser %s is a location failure, not a failed lookup",
+      async (_label, geo) => {
+        stubGeolocation(geo);
+        const fetchMock = vi.fn(async () => jsonResponse({}));
+        vi.stubGlobal("fetch", fetchMock);
+        const { result } = ambient();
+
+        await act(async () => result.current.loadWeatherRecommendation());
+
+        await waitFor(() => expect(result.current.weatherErrorKind).toBe("location"));
+        // Nothing was requested, which is what "Unavailable" claims.
+        expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/api/weather"))).toBe(false);
+      }
+    );
+
+    test("no geolocation API at all is a location failure", async () => {
+      vi.stubGlobal("navigator", {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherErrorKind).toBe("location"));
+    });
+
+    test("a request the server refuses is a failed lookup", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ error: "down" }, false))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      await waitFor(() => expect(result.current.weatherErrorKind).toBe("lookup"));
+    });
+
+    test("a new load clears the last error's kind", async () => {
+      stubGeolocation({ error: geoError(1) });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+      await act(async () => result.current.loadWeatherRecommendation());
+      await waitFor(() => expect(result.current.weatherErrorKind).toBe("location"));
+
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ recommendation: {} }))
+      );
+      await act(async () => result.current.loadWeatherRecommendation());
+
+      expect(result.current.weatherData).toEqual({ recommendation: {} });
+      expect(result.current.weatherErrorKind).toBe("");
+    });
   });
 
   describe("loading weather", () => {
@@ -831,6 +901,94 @@ describe("ambient data", () => {
       await waitFor(() =>
         expect(result.current.airQualityError).toMatch(/not available in this browser/i)
       );
+    });
+
+    // The air card reads its own kind, set by its own copy of the catch.
+    test.each([
+      ["denied", { error: geoError(1) }],
+      ["unavailable", { error: geoError(2) }],
+      ["timed out", { error: geoError(3) }],
+      ["gave without usable coordinates", { position: { coords: { latitude: "north" } } }]
+    ])(
+      "a position the browser %s is a location failure, not a failed lookup",
+      async (_label, geo) => {
+        stubGeolocation(geo);
+        const fetchMock = vi.fn(async () => jsonResponse({}));
+        vi.stubGlobal("fetch", fetchMock);
+        const { result } = ambient();
+
+        await act(async () => result.current.loadAirQuality());
+
+        await waitFor(() => expect(result.current.airQualityErrorKind).toBe("location"));
+        expect(fetchMock.mock.calls.some(([u]) => String(u).includes("/api/air-quality"))).toBe(
+          false
+        );
+      }
+    );
+
+    test("no geolocation API at all is a location failure", async () => {
+      vi.stubGlobal("navigator", {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityErrorKind).toBe("location"));
+    });
+
+    test("a request the server refuses is a failed lookup", async () => {
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ error: "down" }, false))
+      );
+      const { result } = ambient();
+
+      await act(async () => result.current.loadAirQuality());
+
+      await waitFor(() => expect(result.current.airQualityErrorKind).toBe("lookup"));
+    });
+
+    test("a new load clears the last error's kind", async () => {
+      stubGeolocation({ error: geoError(1) });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+      await act(async () => result.current.loadAirQuality());
+      await waitFor(() => expect(result.current.airQualityErrorKind).toBe("location"));
+
+      stubGeolocation();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ summary: {} }))
+      );
+      await act(async () => result.current.loadAirQuality());
+
+      expect(result.current.airQualityData).toEqual({ summary: {} });
+      expect(result.current.airQualityErrorKind).toBe("");
+    });
+
+    test("clearDashboardDataState resets both error kinds", async () => {
+      stubGeolocation({ error: geoError(1) });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({}))
+      );
+      const { result } = ambient();
+      await act(async () => result.current.loadWeatherRecommendation());
+      await act(async () => result.current.loadAirQuality());
+      await waitFor(() => expect(result.current.airQualityErrorKind).toBe("location"));
+      expect(result.current.weatherErrorKind).toBe("location");
+
+      act(() => result.current.clearDashboardDataState());
+
+      expect(result.current.weatherErrorKind).toBe("");
+      expect(result.current.airQualityErrorKind).toBe("");
     });
 
     test("and still says so once a reading is already on screen", async () => {
