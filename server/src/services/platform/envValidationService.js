@@ -76,10 +76,6 @@ export const validateEnv = (env = {}) => {
     errors.push("DATABASE_URL (or POSTGRES_URL) is required.");
   }
 
-  if (env.NODE_ENV === "production" && isBlank(env.CLIENT_ORIGIN) && isBlank(env.CLIENT_ORIGINS)) {
-    errors.push("CLIENT_ORIGIN (or CLIENT_ORIGINS) is required when NODE_ENV=production.");
-  }
-
   // Optional settings, checked only when set: numbers against their bounds,
   // then the URLs, then the Sentry sample rate.
   for (const { name, min, max } of NUMERIC_VARS) {

@@ -92,13 +92,14 @@ export default defineConfig({
         // DATABASE_URL, and `npm run -w server` is what puts the CWD in
         // server/ so dotenv finds server/.env.
         PORT: String(SERVER_PORT),
-        // Both origins. The chromium project reaches the API through the
+        // The preview origin. The chromium project reaches the API through the
         // preview proxy, which passes the browser's Origin header through
         // unchanged, so express sees the preview origin on its POSTs and
-        // DELETEs. The deployable project talks to the server directly, from
-        // the server's own origin. The cors policy refuses any Origin not
-        // listed. CORS itself is covered by index.cors.test.js.
-        CLIENT_ORIGIN: `${baseURL},${serverURL}`,
+        // DELETEs. The deployable project talks to the server from the
+        // server's own origin, which corsPolicy.js allows without being
+        // listed: leaving it out here is what proves that. CORS itself is
+        // covered by index.cors.test.js and corsPolicy.test.js.
+        CLIENT_ORIGIN: baseURL,
         LOG_LEVEL: "warn"
       }
     },

@@ -119,8 +119,9 @@ const parseCsvEnv = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const { corsOptions, isEmpty: corsAllowlistIsEmpty } = createCorsPolicy(
-  parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS)
+const { corsOptionsDelegate, isEmpty: corsAllowlistIsEmpty } = createCorsPolicy(
+  parseCsvEnv(process.env.CLIENT_ORIGIN || process.env.CLIENT_ORIGINS),
+  { allowLoopback: process.env.NODE_ENV !== "production" }
 );
 const logLevel = toShortText(process.env.LOG_LEVEL || "info", 20).toLowerCase() || "info";
 const defaultRedactedLogPaths = [
@@ -152,10 +153,11 @@ const logger = pino({
   }
 });
 
+// info, not warn: an unset list is a supported production configuration.
 if (corsAllowlistIsEmpty) {
-  logger.warn(
+  logger.info(
     { event: "cors_allowlist_missing" },
-    "CLIENT_ORIGIN is not set. Allowing loopback origins only; set it before deploying."
+    "CLIENT_ORIGIN is not set. Allowing this server's own origin, and loopback origins outside production."
   );
 }
 
@@ -241,7 +243,7 @@ app.use(
       process.env.NODE_ENV === "production" ? { maxAge: 31536000, includeSubDomains: true } : false
   })
 );
-app.use(cors(corsOptions));
+app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: "1mb" }));
 
 // ---- Configuration ----------------------------------------------------------
