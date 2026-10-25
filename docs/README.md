@@ -27,6 +27,7 @@
 - [2026-10-16 — Readability follow-up, Phase 5](plans/2026-10-16-readability-follow-up-phase-5.md)
 - [2026-10-17 — Readability follow-up, Phase 6](plans/2026-10-17-readability-follow-up-phase-6.md)
 - [2026-10-22 — Readability follow-up, open items](plans/2026-10-22-readability-follow-up-open-items.md)
+- [2026-10-24 — Parked items](plans/2026-10-24-parked-items.md)
 
 ## Specs
 
