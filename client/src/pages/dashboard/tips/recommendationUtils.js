@@ -123,6 +123,11 @@ const injuryNameForms = {
 const INJURY_PENALTY = 7;
 const injuryPenalty = { "lower back": 14 };
 
+// A rule a broader flag already covers: once the lower back is flagged, a
+// further back mention adds no flag, so a note naming the back twice still
+// weighs 14.
+const coveredBy = { back: "lower back" };
+
 /** `value` lower-cased and trimmed, or "" for anything that is not a string. */
 export const normalizeText = (value) =>
   typeof value === "string" ? value.toLowerCase().trim() : "";
@@ -190,7 +195,8 @@ export const buildEquipmentKeywords = ({ form }) => {
 /**
  * Each injury named in the text, with its risky keywords and what a conflict
  * costs. Names match as whole words, longest first, and the words one name
- * matched are not read again, so "lower back" is one flag, not two.
+ * matched are not read again, so "lower back" is one flag, not two. A back
+ * mention beside a flagged lower back adds no flag (coveredBy).
  */
 export const detectInjuryFlags = (injuryText) => {
   let source = normalizeText(injuryText);
@@ -198,8 +204,9 @@ export const detectInjuryFlags = (injuryText) => {
   for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
     const forms = injuryNameForms[injury];
     if (!hasWord(source, forms)) continue;
-    active.push({ injury, keywords, penalty: injuryPenalty[injury] ?? INJURY_PENALTY });
     source = source.replace(wordPattern(forms, "g"), " ");
+    if (active.some((flag) => flag.injury === coveredBy[injury])) continue;
+    active.push({ injury, keywords, penalty: injuryPenalty[injury] ?? INJURY_PENALTY });
   }
   return active;
 };

@@ -337,10 +337,24 @@ describe("detectInjuryFlags", () => {
     }
   );
 
-  test("raises back as well when a second mention names it", () => {
-    expect(detectInjuryFlags("lower back and upper back").map((f) => f.injury)).toEqual([
+  // Once the lower back is flagged, a further back mention adds no flag, so a
+  // note naming the back twice still weighs 14, as a single mention does.
+  test.each([
+    ["lower back and upper back"],
+    ["lower back, upper back, neck"],
+    ["upper back pain, then lower back"],
+    ["lower back lower-back"],
+    [buildInjuryText("Lower back", "back pain")]
+  ])("raises no back flag beside the lower back one for %j", (note) => {
+    const flags = detectInjuryFlags(note);
+
+    expect(flags.map((f) => [f.injury, f.penalty])).toEqual([["lower back", 14]]);
+  });
+
+  test("still raises an injury the lower back does not cover", () => {
+    expect(detectInjuryFlags("lower back; knee").map((f) => f.injury)).toEqual([
       "lower back",
-      "back"
+      "knee"
     ]);
   });
 
@@ -535,6 +549,23 @@ describe("scoreExercise", () => {
       const { score, reasons } = scoreExercise(
         deadlift,
         context({ injuryFlags: detectInjuryFlags("Lower back") })
+      );
+
+      expect(score).toBe(-14);
+      expect(reasons.filter((r) => r.startsWith("Potentially high stress"))).toEqual([
+        "Potentially high stress for lower back."
+      ]);
+    });
+
+    // TipsView joins the planner's answer and the profile's notes with
+    // buildInjuryText, so "Lower back" and a note saying "back pain" arrive as
+    // one text that names the back twice. It costs what "Lower back" alone does.
+    test("a lower-back answer and a back note still cost 14 with one reason", () => {
+      const deadlift = exercise({ name: "Romanian Deadlift" });
+      const injuryText = buildInjuryText("Lower back", "back pain");
+      const { score, reasons } = scoreExercise(
+        deadlift,
+        context({ injuryFlags: detectInjuryFlags(injuryText) })
       );
 
       expect(score).toBe(-14);
