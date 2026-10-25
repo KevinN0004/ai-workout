@@ -26,7 +26,9 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
 
 /**
  * Owns the dashboard, weather and air-quality state, each with its loading flag
- * and error, and `dashboardPagination`, the collection totals the last
+ * and error; the weather and air errors also carry their kind (`"location"`
+ * when the browser gave no position, `"lookup"` when the request failed). Also
+ * `dashboardPagination`, the collection totals the last
  * dashboard load carried (null until one does), for the Logs view. It returns
  * them with `setDashboard` and `setDashError` for the
  * handlers that write, the two location-based loaders, and
@@ -52,10 +54,15 @@ export default function useDashboardData({
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
+  // "location" when the browser gave no position, so nothing was requested;
+  // "lookup" when the request failed. Empty while there is no error.
+  const [weatherErrorKind, setWeatherErrorKind] = useState("");
   const [weatherLastUpdatedAt, setWeatherLastUpdatedAt] = useState(null);
   const [airQualityData, setAirQualityData] = useState(null);
   const [airQualityLoading, setAirQualityLoading] = useState(false);
   const [airQualityError, setAirQualityError] = useState("");
+  // The same two kinds as weatherErrorKind, for the air-quality load.
+  const [airQualityErrorKind, setAirQualityErrorKind] = useState("");
   const [airQualityLastUpdatedAt, setAirQualityLastUpdatedAt] = useState(null);
 
   const weatherDataRef = useRef(null);
@@ -106,10 +113,15 @@ export default function useDashboardData({
     weatherRequestRef.current = requestId;
     setWeatherLoading(true);
     setWeatherError("");
+    setWeatherErrorKind("");
+    // Set once a position is in hand: a failure before it is the browser's,
+    // after it the request's.
+    let located = false;
     try {
       // Locate the visitor, fetch for that spot, and cache the reading with
       // the time it arrived.
       const { latitude, longitude } = await getCurrentCoordinates();
+      located = true;
       const query = new URLSearchParams({
         latitude: String(latitude),
         longitude: String(longitude)
@@ -134,6 +146,7 @@ export default function useDashboardData({
       });
     } catch (err) {
       if (weatherRequestRef.current !== requestId) return;
+      setWeatherErrorKind(located ? "lookup" : "location");
       // A numeric code is a GeolocationPositionError. Every other failure,
       // GEO_NOT_AVAILABLE included (loadAirQuality reports that one by name),
       // says the last reading is still showing, when there is one.
@@ -167,10 +180,14 @@ export default function useDashboardData({
     airRequestRef.current = requestId;
     setAirQualityLoading(true);
     setAirQualityError("");
+    setAirQualityErrorKind("");
+    // Set once a position is in hand, as in the weather loader.
+    let located = false;
     try {
       // Locate the visitor, fetch for that spot, and cache the reading with
       // the time it arrived.
       const { latitude, longitude } = await getCurrentCoordinates();
+      located = true;
       const query = new URLSearchParams({
         latitude: String(latitude),
         longitude: String(longitude)
@@ -195,6 +212,7 @@ export default function useDashboardData({
       });
     } catch (err) {
       if (airRequestRef.current !== requestId) return;
+      setAirQualityErrorKind(located ? "lookup" : "location");
       // A numeric code is a GeolocationPositionError, and GEO_NOT_AVAILABLE is
       // getCurrentCoordinates' own. No failure clears the last reading; only the
       // last branch says it is still showing, when there is one.
@@ -371,10 +389,12 @@ export default function useDashboardData({
     setWeatherData(null);
     setWeatherLoading(false);
     setWeatherError("");
+    setWeatherErrorKind("");
     setWeatherLastUpdatedAt(null);
     setAirQualityData(null);
     setAirQualityLoading(false);
     setAirQualityError("");
+    setAirQualityErrorKind("");
     setAirQualityLastUpdatedAt(null);
   }, []);
 
@@ -388,10 +408,12 @@ export default function useDashboardData({
     weatherData,
     weatherLoading,
     weatherError,
+    weatherErrorKind,
     weatherLastUpdatedAt,
     airQualityData,
     airQualityLoading,
     airQualityError,
+    airQualityErrorKind,
     airQualityLastUpdatedAt,
     loadWeatherRecommendation,
     loadAirQuality,

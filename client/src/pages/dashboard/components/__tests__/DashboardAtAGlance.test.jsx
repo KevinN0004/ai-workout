@@ -16,10 +16,12 @@ const DEFAULTS = {
   weatherLoading: false,
   weatherRecommendation: null,
   weatherError: "",
+  weatherErrorKind: "",
   weatherLastUpdatedAt: null,
   airQualityLoading: false,
   airSummary: null,
   airQualityError: "",
+  airQualityErrorKind: "",
   airQualityLastUpdatedAt: null,
   formatRelativeUpdatedAt: () => "just now",
   onAddWorkout: () => {},
@@ -123,25 +125,6 @@ describe("DashboardAtAGlance", () => {
       expect(headline("weather")).toBe(expected);
     });
 
-    test("a failed lookup reads differently from one that never ran", () => {
-      // These shared the word "Unavailable" until the two states were given
-      // their own wording. The note underneath always differed; the headline,
-      // which is the line a visitor scans, did not.
-      const { container: failed } = renderGlance({ weatherError: "Weather service unavailable" });
-      const { container: neverRan } = renderGlance();
-      const read = (container) => {
-        const weatherCard = container.querySelectorAll("article")[CARDS.weather];
-        return weatherCard.querySelector(".dashboard-glance-value").textContent;
-      };
-
-      expect(read(failed)).toBe("Couldn't check");
-      expect(read(neverRan)).toBe("Not checked yet");
-      expect(read(failed)).not.toBe(read(neverRan));
-      // The note still carries the detail behind each.
-      expect(failed.textContent).toContain("Weather service unavailable");
-      expect(neverRan.textContent).toContain("No weather update yet.");
-    });
-
     test.each([
       [
         "the summary when there is one",
@@ -181,16 +164,6 @@ describe("DashboardAtAGlance", () => {
       expect(headline("air")).toBe(expected);
     });
 
-    test("a failed lookup reads differently from one that never ran", () => {
-      renderGlance({ airQualityError: "Air quality service unavailable" });
-      expect(headline("air")).toBe("Couldn't check");
-
-      renderGlance();
-      expect(screen.getAllByRole("article")[4 + CARDS.air].textContent).toContain(
-        "Not checked yet"
-      );
-    });
-
     test("a reading with no level falls through to the not-checked wording", () => {
       // The server always sets a level, so this is the component's contract
       // rather than a state the app produces.
@@ -215,6 +188,51 @@ describe("DashboardAtAGlance", () => {
       renderGlance(props);
 
       expect(note("air")).toBe(expected);
+    });
+  });
+
+  // Three different reasons for having no reading, and the headline, the line
+  // a visitor scans, names each: our request failed; the browser gave no
+  // position, so nothing was requested; or the summary view has not loaded
+  // yet. The note underneath carries the detail in every case.
+  describe.each([
+    ["weather", "weatherError", "weatherErrorKind"],
+    ["air", "airQualityError", "airQualityErrorKind"]
+  ])("the %s card without a reading", (name, errorProp, kindProp) => {
+    test.each([
+      [
+        "a request that failed",
+        { [errorProp]: "Lookup failed", [kindProp]: "lookup" },
+        "Couldn't load"
+      ],
+      [
+        "no position from the browser",
+        { [errorProp]: "Location permission was denied.", [kindProp]: "location" },
+        "Unavailable"
+      ],
+      ["an error of no stated kind", { [errorProp]: "Lookup failed" }, "Couldn't load"],
+      ["a load that has not run", {}, "Not checked yet"]
+    ])("reads %s as expected", (_label, props, expected) => {
+      renderGlance(props);
+
+      expect(headline(name)).toBe(expected);
+    });
+
+    test("keeps the error text in the note", () => {
+      renderGlance({ [errorProp]: "Location permission was denied.", [kindProp]: "location" });
+
+      expect(note(name)).toBe("Location permission was denied.");
+    });
+
+    test("still offers Retry when the location was refused", () => {
+      const handlers = { refreshWeatherRecommendation: vi.fn(), refreshAirQuality: vi.fn() };
+      renderGlance({
+        [errorProp]: "Location request timed out.",
+        [kindProp]: "location",
+        ...handlers
+      });
+
+      expect(within(card(name)).getByRole("button", { name: /^Retry/ })).toBeInTheDocument();
     });
   });
 

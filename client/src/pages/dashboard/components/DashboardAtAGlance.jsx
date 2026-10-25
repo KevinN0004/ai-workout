@@ -10,7 +10,11 @@
  * "Upcoming" or "Latest", `caloriesGap` is the goal minus `avgCalories`
  * (positive means under target), and `formatRelativeUpdatedAt` words the update
  * times. The weather and air cards offer Retry while their last load has an
- * error; a reading already on screen stays in place of the error text.
+ * error; a reading already on screen stays in place of the error text. With no
+ * reading, their headline says why: "Couldn't load" when the request failed,
+ * "Unavailable" when the browser gave no position (`*ErrorKind` is
+ * "location"), so nothing was requested, and "Not checked yet" before the
+ * summary view's first load.
  */
 export default function DashboardAtAGlance({
   nextWorkout,
@@ -20,11 +24,13 @@ export default function DashboardAtAGlance({
   weatherLoading,
   weatherRecommendation,
   weatherError,
+  weatherErrorKind,
   weatherLastUpdatedAt,
   refreshWeatherRecommendation,
   airQualityLoading,
   airSummary,
   airQualityError,
+  airQualityErrorKind,
   airQualityLastUpdatedAt,
   refreshAirQuality,
   formatRelativeUpdatedAt,
@@ -91,7 +97,9 @@ export default function DashboardAtAGlance({
                   : weatherRecommendation?.workoutType === "indoor"
                     ? "Indoor suggested"
                     : weatherError
-                      ? "Couldn't check"
+                      ? weatherErrorKind === "location"
+                        ? "Unavailable"
+                        : "Couldn't load"
                       : "Not checked yet"}
             </p>
             <p className="muted">
@@ -124,7 +132,12 @@ export default function DashboardAtAGlance({
                 ? airSummary
                   ? "Refreshing..."
                   : "Checking..."
-                : airSummary?.level || (airQualityError ? "Couldn't check" : "Not checked yet")}
+                : airSummary?.level ||
+                  (airQualityError
+                    ? airQualityErrorKind === "location"
+                      ? "Unavailable"
+                      : "Couldn't load"
+                    : "Not checked yet")}
             </p>
             <p className="muted">
               {airSummary?.guidance || airQualityError || "No air quality guidance available."}
