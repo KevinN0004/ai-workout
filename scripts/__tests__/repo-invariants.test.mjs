@@ -464,6 +464,13 @@ describe("the secret scan", () => {
     expect(existsSync(path.join(repoRoot, "security", "gitleaks.toml"))).toBe(true);
   });
 
+  // A config file replaces gitleaks' rules rather than adding to them, so one
+  // without this block has no rules at all and the scan passes anything.
+  test("the config extends gitleaks' default rules", () => {
+    const config = readFileSync(path.join(repoRoot, "security", "gitleaks.toml"), "utf8");
+    expect(config).toMatch(/^\[extend\]\r?\nuseDefault = true\r?$/m);
+  });
+
   // gitleaks reads history, and a shallow checkout gives it one commit.
   test("checks out the full history for it", () => {
     expect(job).toContain("name: Secret scan");
