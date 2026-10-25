@@ -229,8 +229,10 @@ Two details that are not obvious from reading the file:
   is tried before `back`, and its words are not read again, so a lower-back note is one
   flag. That flag costs **14**, not 7: when the two rules overlapped, its conflicts were
   penalised twice, and the rankings a lower-back visitor saw are kept by stating the
-  number instead. A note that also names the back separately ("lower back and upper
-  back") raises both flags.
+  number instead. Once the lower back is flagged, any further back mention adds no
+  flag, so "lower back and upper back", or the planner's "Lower back" beside a "back
+  pain" note, still costs 14. An injury the lower back does not cover, such as a knee,
+  is still flagged.
 
   The exercise side is still a substring match on purpose: "squat" must find "Back
   Squat" and "Squats" in wger's names.
