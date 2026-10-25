@@ -28,6 +28,24 @@ describe("planUtils", () => {
     expect(detectTrack(goal)).toBe(INTENDED_TRACKS[goal]);
   });
 
+  // A keyword is a whole word. As a substring, "cut" was found in "execute"
+  // and "joint" in "disjointed", which put those goals on the wrong track.
+  test.each([
+    ["Execute a strength block", "lean_strength"],
+    ["Acute knee rehab, then strength", "lean_strength"],
+    ["Uppercut power for boxing", "lean_strength"],
+    ["Shortcut to strength", "lean_strength"],
+    ["Disjointed schedule, build muscle", "lean_strength"],
+    ["Cutting phase", "fat_loss"],
+    ["Cardiovascular health", "endurance"],
+    ["Improve cardiorespiratory fitness", "endurance"],
+    ["Athleticism", "endurance"],
+    ["Athletics season", "endurance"],
+    ["Joint health", "recovery"]
+  ])("detectTrack reads %j as %s", (goal, track) => {
+    expect(detectTrack(goal)).toBe(track);
+  });
+
   test("getDailyCalories applies track rules and minimum floors", () => {
     expect(getDailyCalories("fat_loss", 2000, true)).toBe(2000);
     expect(getDailyCalories("fat_loss", 1600, false)).toBe(1400);
