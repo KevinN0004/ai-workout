@@ -37,6 +37,7 @@ describe("planUtils", () => {
     ["Shortcut to strength", "lean_strength"],
     ["Disjointed schedule, build muscle", "lean_strength"],
     ["Cutting phase", "fat_loss"],
+    ["Cardio-focused cut", "fat_loss"],
     ["Cardiovascular health", "endurance"],
     ["Improve cardiorespiratory fitness", "endurance"],
     ["Athleticism", "endurance"],
