@@ -295,6 +295,19 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   Redis and survives a restart, which is what keeps the six-hour stale window through a
   spin-down. Without Redis, or while Redis is unreachable, it is a per-process map: each
   replica keeps its own and multiplies upstream load.
+- **The air-quality AQI is the EPA NowCast, not the latest reading.**
+  `GET /api/air-quality/current` makes three OpenAQ calls per uncached lookup: the nearest
+  station, its latest readings, then its PM2.5 sensor's hourly means
+  (`sensors/<id>/hours`, from fifteen hours before the current hour). `summary.aqiUs`
+  scores `summary.pm25NowCast`, the EPA NowCast of the last twelve of those hours
+  (`pm25NowCast` in `externalDataService.js`); `summary.pm25` is still the latest single
+  reading. Hour 0 is the newest hour the station reported, used only if it ended within
+  three hours, and two of the three newest hours must be present. Otherwise, or when the
+  hourly call fails, `aqiUs` is `null` and the level "Unknown", and the rest of the answer
+  still arrives: that one call degrades the score, not the route. The hourly call is
+  cached under `OPENAQ_CACHE_TTL_SEC` like the other two, keyed by sensor and clock hour,
+  so lookups near one station in the same hour share an entry; the three-hour limit is
+  checked against the clock on every lookup, so a stale copy cannot outlive it.
 - **Every external route answers `200` on an upstream outage, not an error.** Air quality,
   both weather routes, all three wger routes and the mealdb search each return
   `fallback: true` with empty or null readings, so the panel degrades instead of failing.

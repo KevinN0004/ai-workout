@@ -180,9 +180,21 @@ This is not hypothetical. Three shipped bugs came from it, all in health advice:
   the raw value rather than from the guarded number
 
 The whole external-data path has since been swept for it. `pm25ToUsAqi`, `aqiBand`,
-`toFiniteNumber`, `weatherCodeToText` and `toNumberOrNull` all guard; `isSevereWeatherCode`
-is safe because `0` is not a severe code; the wger and mealdb routes only use `cleanText`,
-which tests `typeof value === "string"`.
+`toFiniteNumber`, `weatherCodeToText`, `toNumberOrNull`, and `pm25NowCast`, which reads an
+absent hour as a missing hour, all guard; `isSevereWeatherCode` is safe because `0` is not
+a severe code; the wger and mealdb routes only use `cleanText`, which tests
+`typeof value === "string"`.
+
+**The US AQI is the EPA NowCast of the station's PM2.5 hourly means, not its latest
+reading.** The air-quality route makes a third OpenAQ call, `sensors/<id>/hours`, and
+`pm25NowCast` in `externalDataService.js` scores the last twelve hours to the EPA's method
+(weight min / max floored at 0.5, two of the three newest hours present, truncated to
+0.1 ug/m3), checked against AirNow's and the EPA sample's worked examples. Hour 0 is the
+newest hour the station reported, used only if it ended within three hours. An hour whose
+value is `null`, `""`, missing, non-numeric or negative is a **missing** hour: it neither
+counts towards two of three nor pulls the mean towards 0. Too few hours, a stale station
+or a failed hourly call gives `aqiUs: null` and "Unknown", as no PM2.5 sensor does;
+`summary.pm25` is still the latest reading and `summary.pm25NowCast` the scored one.
 
 `undefined` already behaved correctly, so an omitted key and an explicit `null` gave
 opposite answers for the same missing data — which is what made it hard to see.
@@ -214,6 +226,9 @@ Two things the contract deliberately does not flatten:
   `null` has to stay `null` for `z.null()` to match — collapsing them would lose the
   difference between a field omitted and a field explicitly cleared. It still honours the
   part that matters: an empty field becomes `null`, never `0`.
+- **`pm25NowCast` takes a list of hours, not one value**, so its row feeds it three steady
+  hours of the value under test. Reading an hour with `Number()` instead of
+  `toFiniteNumber` fails that row for `null`, `""`, `undefined` and a non-numeric string.
 
 Mutation-tested rather than trusted, since a contract test over correct code passes on the
 first run either way. Removing the guard from `toNumberOrNull`, `toNullableNumber`,
