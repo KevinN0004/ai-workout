@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { hasWord, wordPattern } from "../wordMatch";
+import { hasWord } from "../wordMatch";
 
 describe("hasWord", () => {
   test.each([
@@ -15,13 +15,5 @@ describe("hasWord", () => {
     ["knees", ["knee", "knees"], true]
   ])("%j against %j is %s", (text, forms, expected) => {
     expect(hasWord(text, forms)).toBe(expected);
-  });
-});
-
-describe("wordPattern", () => {
-  test("with the g flag, replaces every whole-word match and nothing inside a word", () => {
-    expect("back pain, backpack, back".replace(wordPattern(["back"], "g"), "_")).toBe(
-      "_ pain, backpack, _"
-    );
   });
 });

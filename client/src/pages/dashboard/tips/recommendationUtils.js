@@ -3,7 +3,7 @@
  * equipment, the weather and an injury note score a wger exercise, and the
  * training-guide cards. Used by TipsView and the tips components.
  */
-import { hasWord, wordPattern } from "../wordMatch";
+import { hasWord } from "../wordMatch";
 
 // wger category names each goal track favours.
 const trackCategoryMap = {
@@ -104,9 +104,7 @@ const injuryKeywordRules = {
 };
 
 // The words naming each injury, matched whole: the plurals, and the compounds
-// that name it. Each set is removed from the note once matched, so "lower back"
-// is one flag and its "back" is not a second. "lowerback" and "upperback",
-// written as one word, are back.
+// that name it. "lowerback" and "upperback", written as one word, are back.
 const injuryNameForms = {
   "lower back": ["lower back", "lower backache", "lower backaches"],
   back: ["back", "backs", "backache", "backaches", "lowerback", "upperback"],
@@ -194,17 +192,15 @@ export const buildEquipmentKeywords = ({ form }) => {
 
 /**
  * Each injury named in the text, with its risky keywords and what a conflict
- * costs. Names match as whole words, longest first, and the words one name
- * matched are not read again, so "lower back" is one flag, not two. A back
- * mention beside a flagged lower back adds no flag (coveredBy).
+ * costs. Names match as whole words, lower back before back, and a back
+ * mention beside a flagged lower back adds no flag (coveredBy), so "lower
+ * back" is one flag, not two.
  */
 export const detectInjuryFlags = (injuryText) => {
-  let source = normalizeText(injuryText);
+  const source = normalizeText(injuryText);
   const active = [];
   for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
-    const forms = injuryNameForms[injury];
-    if (!hasWord(source, forms)) continue;
-    source = source.replace(wordPattern(forms, "g"), " ");
+    if (!hasWord(source, injuryNameForms[injury])) continue;
     if (active.some((flag) => flag.injury === coveredBy[injury])) continue;
     active.push({ injury, keywords, penalty: injuryPenalty[injury] ?? INJURY_PENALTY });
   }

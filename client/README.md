@@ -226,8 +226,8 @@ Two details that are not obvious from reading the file:
 - Injury names, goal keywords and plan-line keywords match as **whole words**
   (`pages/dashboard/wordMatch.js`), with the plurals and compounds each rule accepts
   listed, so "hip" is not found in "relationship" nor "run" in "crunches". `lower back`
-  is tried before `back`, and its words are not read again, so a lower-back note is one
-  flag. That flag costs **14**, not 7: when the two rules overlapped, its conflicts were
+  is tried before `back`, and a flagged lower back covers the back, so a lower-back note
+  is one flag. That flag costs **14**, not 7: when the two rules overlapped, its conflicts were
   penalised twice, and the rankings a lower-back visitor saw are kept by stating the
   number instead. Once the lower back is flagged, any further back mention adds no
   flag, so "lower back and upper back", or the planner's "Lower back" beside a "back
