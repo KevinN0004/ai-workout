@@ -205,8 +205,9 @@ describe("pm25NowCast", () => {
     expect(pm25NowCast([endingAt("2026-03-02T09:09:59Z", 12), ...older])).toBeNull();
   });
 
+  // A thirteenth hour of 5, if read, would set w = 5 / 10 = 0.5 and give 9.9.
   test("reads only the twelve hours up to the newest", () => {
-    expect(pm25NowCast([...series(Array(12).fill(10)), hour(12, 500)])).toBe(10);
+    expect(pm25NowCast([...series(Array(12).fill(10)), hour(12, 5)])).toBe(10);
   });
 
   test("gives the same answer for hours in any order", () => {
