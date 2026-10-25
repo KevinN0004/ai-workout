@@ -97,7 +97,8 @@ export default defineConfig({
         // unchanged, so express sees the preview origin on its POSTs and
         // DELETEs. The deployable project talks to the server from the
         // server's own origin, which corsPolicy.js allows without being
-        // listed: leaving it out here is what proves that. CORS itself is
+        // listed (outside production, because localhost is loopback): leaving
+        // it out here is what proves that. CORS itself is
         // covered by index.cors.test.js and corsPolicy.test.js.
         CLIENT_ORIGIN: baseURL,
         LOG_LEVEL: "warn"

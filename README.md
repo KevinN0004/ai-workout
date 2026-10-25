@@ -169,7 +169,7 @@ Common server variables:
 | `POSTGRES_STARTUP_REQUIRED`                                                 | Fail startup if Postgres is unavailable                                                  | `true` in production, otherwise `false`                     |
 | `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins     | `false`                                                     |
 | `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`              | `true`                                                      |
-| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated, besides the server's own, which is always allowed | own origin always; loopback origins too, outside production |
+| `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated, besides the server's own (loopback only in dev)   | own origin in production; loopback origins only, outside it |
 | `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                  | unset                                                       |
 | `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                       | `3`                                                         |
 | `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                | `86400000` (24h)                                            |
@@ -394,7 +394,10 @@ session store and sign every user out.
    sends an `Origin` header on every same-origin write, and Chromium on the
    bundle's `crossorigin` script and stylesheet loads, and the CORS check passes
    each one whose `Origin` matches the request's own scheme and `Host`. Set it only
-   if something in front of the service rewrites the `Host` header.
+   if something in front of the service rewrites the `Host` header. Any own origin
+   passes in production, where Render routes by `Host`; outside production only a
+   loopback one does, so a page that rebinds its own name to a developer's
+   127.0.0.1 (DNS rebinding) cannot pass as same-origin.
 4. **GitHub** — add three repository secrets: `PRODUCTION_DATABASE_URL` (the same
    Neon URL), `RENDER_DEPLOY_HOOK_URL` (Render → the service → Settings → Deploy
    Hook) and `RENDER_SERVICE_URL`.

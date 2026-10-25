@@ -371,7 +371,9 @@ survived. Five things are worth knowing before touching it:
   `chromium` against the preview origin. The server's `CLIENT_ORIGIN` names only
   the preview origin, so the `deployable` project also proves that `corsPolicy.js`
   allows the server's own origin without it being listed. Adding 5000 back to that
-  list would pass every test and remove the proof.
+  list would pass every test and remove the proof. Its server is not production,
+  so the own origin counts only because `localhost:5000` is loopback: outside
+  production a non-loopback own origin is refused, which shuts out DNS rebinding.
 
   This exists because its absence shipped a blank page. `default-src 'none'`
   was correct while the process served JSON only; once `staticClient.js` began

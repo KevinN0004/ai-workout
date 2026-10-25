@@ -158,7 +158,10 @@ six-hour buffer that serves old data when an upstream is down.
    the request's own scheme (from Render's `X-Forwarded-Proto`) and `Host`, so the
    service's own URL passes without being listed. Set it only if something in
    front of the service rewrites the `Host` header: then list the public origin,
-   such as `https://ai-workout.onrender.com`, with no trailing slash.
+   such as `https://ai-workout.onrender.com`, with no trailing slash. Any own
+   origin passes in production because Render routes by `Host`, so a request
+   naming another host never reaches the service; outside production only a
+   loopback own origin does, which shuts out DNS rebinding against a local server.
 
 5. Create the service. The first Docker build takes several minutes.
 
@@ -530,5 +533,7 @@ container with a Postgres and Redis URL will work. Keep two properties:
   cookies are `SameSite=Lax`. The CORS check allows the server's own origin by
   reading `Host` and, through one trusted proxy, `X-Forwarded-Proto`; a host
   whose proxy rewrites `Host` sets `CLIENT_ORIGIN` to the public origin instead.
+  That own-origin rule assumes `NODE_ENV=production`; outside it only a loopback
+  own origin passes.
 - **Migrate before cutover.** Whatever replaces the workflow must keep that
   order.
