@@ -942,15 +942,13 @@ the native instance all along.
     outright was added to the mutation list _expecting_ it to survive, and it did: nothing
     observable depends on either test. That is a mechanical proof rather than a reading of
     the code, and it costs one run. Reach for it whenever two arms look alike.
-    Both conditions have since been collapsed to the single string they always
-    produced, so the mutations that proved them dead no longer have anything to
-    target; they were replaced with ones that protect the wording itself. The
-    wording is unchanged and the note under each card still carries the error
-    text, so a visitor sees exactly what they saw before. **Whether a failed
-    lookup should read differently from one that has not happened is a copy
-    decision, and it is still open** — collapsing the condition removed a
-    branch that could not make that distinction, not the question of whether to
-    make it.
+    Both conditions were later collapsed to the single string they always produced, which
+    removed the mutations' target. The question they could not answer, whether a failed
+    lookup should read differently from one that never ran, was then decided: the headline
+    reads "Couldn't load" when our request failed, "Unavailable" when the browser gave no
+    position so nothing was requested (the hook's `*ErrorKind`), and "Not checked yet"
+    before the summary view's first load. The note under each card still carries the error
+    text.
   - **A regex for "both arms are the same" needs care.** Sweeping the tree for
     this pattern turned up a third hit in
     `server/src/services/dashboard/dashboardDataBuildersService.js`, which was a false
