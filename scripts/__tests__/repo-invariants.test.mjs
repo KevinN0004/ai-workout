@@ -450,6 +450,34 @@ describe("the Deploy workflow deploys only this repository's own pushes", () => 
   });
 });
 
+describe("the secret scan", () => {
+  const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+  const job = ci.slice(ci.indexOf("  secrets:"), ci.indexOf("  test:"));
+
+  // The scan reads its config from security/. A moved or renamed file fails
+  // the job (gitleaks exits 1 on a config path it cannot open), and the quick
+  // "fix" of dropping GITLEAKS_CONFIG silently discards any allowlist in it.
+  test("runs gitleaks with the config in security/", () => {
+    expect(job).toContain("name: Secret scan");
+    expect(job).toMatch(/uses: gitleaks\/gitleaks-action@v\d+/);
+    expect(job).toMatch(/GITLEAKS_CONFIG: security\/gitleaks\.toml/);
+    expect(existsSync(path.join(repoRoot, "security", "gitleaks.toml"))).toBe(true);
+  });
+
+  // A config file replaces gitleaks' rules rather than adding to them, so one
+  // without this block has no rules at all and the scan passes anything.
+  test("the config extends gitleaks' default rules", () => {
+    const config = readFileSync(path.join(repoRoot, "security", "gitleaks.toml"), "utf8");
+    expect(config).toMatch(/^\[extend\]\r?\nuseDefault = true\r?$/m);
+  });
+
+  // gitleaks reads history, and a shallow checkout gives it one commit.
+  test("checks out the full history for it", () => {
+    expect(job).toContain("name: Secret scan");
+    expect(job).toMatch(/fetch-depth: 0/);
+  });
+});
+
 describe("every source file opens with a header comment", () => {
   // docs/code-readability-sop.md asks every non-test source file to open with a
   // comment of one to four lines saying what it is for. This checks that the
