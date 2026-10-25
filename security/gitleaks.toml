@@ -1,0 +1,15 @@
+# The secret scan's configuration: gitleaks' default rules, plus an allowlist
+# of fixture values when one is needed. Read by CI's secrets job.
+
+[extend]
+useDefault = true
+
+# No allowlist: the full-history scan with gitleaks 8.30.1's default rules finds
+# nothing, fixtures included. When a fixture trips a rule, add an
+# [[allowlists]] block that names its value, never its path, so a real key
+# pasted into a test is still caught:
+#
+#   [[allowlists]]
+#   description = "What the fixture is and which suite uses it"
+#   regexTarget = "match"
+#   regexes = ['''the-fixture-value''']

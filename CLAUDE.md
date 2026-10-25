@@ -96,8 +96,9 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 - `docs/plans` — implementation plans, one file per effort, named `YYYY-MM-DD-name.md`
 - `docs/specs` — design specs, named to match the plan they belong to
 - `scripts/` — repo-level tooling (Claude Code hook targets live here)
-- `security/` — the audit-ci allowlist (`audit-ci.json`) and the advisory reviews it is
-  checked against
+- `security/` — the audit-ci allowlist (`audit-ci.json`), the advisory reviews it is
+  checked against, and the gitleaks config (`gitleaks.toml`), whose allowlist names
+  fixture values, never paths
 - The root holds only what a tool requires there. `CODEOWNERS` is in `.github/`, and
   `.vscode/settings.json` hides generated output from the file tree
 
@@ -1110,6 +1111,9 @@ catches that, and any hook that calls `.claude/` directly instead of through the
 - NEVER hardcode API keys, secrets, or credentials in source files
 - NEVER commit `.env` files or any file containing secrets — `server/.env` holds the
   Gemini key and the Postgres connection string
+- **A secret scan runs on every PR and every push to `main`** (CI's secrets job, gitleaks,
+  `security/gitleaks.toml`). A test fixture that trips it is allowlisted by its value,
+  never by its path.
 - Always validate user input at system boundaries
 - Always sanitize file paths to prevent directory traversal
 - **Never route around a permission rule.** If a deny rule blocks a path, stop and say so.

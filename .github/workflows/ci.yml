@@ -6,6 +6,7 @@ on:
       - main
       - master
   pull_request:
+  workflow_dispatch:
 
 # Supersede in-flight runs on the same ref rather than paying for both, except on
 # main -- an intermediate commit there should keep its own CI signal.
@@ -58,6 +59,36 @@ jobs:
 
       - name: Dependency Audit
         run: npx --yes audit-ci@7.1.0 --config security/audit-ci.json
+
+  # gitleaks over the commits each push or PR adds (a manual run reads the whole
+  # history). GitHub's own secret scanning blocks provider tokens; this catches
+  # the generic ones, against the config in security/gitleaks.toml.
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The action lists a PR's commits through the API; with comments off it
+    # writes nothing.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Pinned to the gitleaks release the local full-history baseline used, so
+      # CI and that baseline apply the same rules. No artifact: on a public
+      # repository a report artifact is downloadable by anyone.
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: security/gitleaks.toml
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
 
   test:
     name: Tests (Node ${{ matrix.node }})
