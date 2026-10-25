@@ -368,7 +368,10 @@ survived. Five things are worth knowing before touching it:
   response header express sets is visible through it, and it proxies only
   `/api`. So the `deployable` project points a browser at the express origin
   (5000) instead, which is what actually deploys; everything else runs under
-  `chromium` against the preview origin.
+  `chromium` against the preview origin. The server's `CLIENT_ORIGIN` names only
+  the preview origin, so the `deployable` project also proves that `corsPolicy.js`
+  allows the server's own origin without it being listed. Adding 5000 back to that
+  list would pass every test and remove the proof.
 
   This exists because its absence shipped a blank page. `default-src 'none'`
   was correct while the process served JSON only; once `staticClient.js` began
@@ -623,10 +626,11 @@ the native instance all along.
     `requestContext.js` from 84% to 79% branches while its statements went to
     100%. Server totals rose across both moves. Judge this file by what is left
     uncovered, not by its percentage.
-    Its CORS layer is now covered end to end, and so is every rate limiter
-    — see `index.rateLimit.test.js`, which sets the limit under test to 1 and
-    the others far out of the way, because the limiters are layered and the
-    global `/api` one would otherwise answer first. `postgres.js` was the worst
+    Its CORS layer is now covered end to end (the own-origin rule with trust
+    proxy on, and the production fallback, in `corsPolicy.test.js`), and so is
+    every rate limiter — see `index.rateLimit.test.js`, which sets the limit
+    under test to 1 and the others far out of the way, because the limiters are
+    layered and the global `/api` one would otherwise answer first. `postgres.js` was the worst
     at 53% and is now at 100% on every metric; its redaction of the database
     password is the part that mattered, and the fallback for a URL too malformed
     to parse had never been exercised.
