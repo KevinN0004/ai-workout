@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 
 // Air-quality maths from externalDataService. These decide whether a user is
@@ -12,6 +12,8 @@ import { createExternalDataService } from "../externalDataService.js";
 // functions under test are pure and touch none of them.
 const {
   pm25ToUsAqi,
+  pm25NowCast,
+  nowCastHoursQuery,
   aqiBand,
   isSevereWeatherCode,
   isOutdoorFriendlyNow,
@@ -100,6 +102,181 @@ describe("pm25ToUsAqi", () => {
       if (index === 0) return;
       expect(value).toBeGreaterThanOrEqual(values[index - 1]);
     });
+  });
+});
+
+// The NowCast reads the clock, so it is pinned. Only Date is faked: nothing
+// here waits on a timer.
+const NOW = new Date("2026-03-02T12:10:00Z");
+
+// One OpenAQ hourly mean, ending `hoursAgo` whole hours before 12:00Z.
+const hour = (hoursAgo, value) => ({
+  value,
+  period: { datetimeTo: { utc: new Date(Date.UTC(2026, 2, 2, 12 - hoursAgo)).toISOString() } }
+});
+
+// Twelve hourly means, newest first; a null is an hour with no value.
+const series = (values) => values.map((value, hoursAgo) => hour(hoursAgo, value));
+
+describe("pm25NowCast", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("of a steady twelve hours is that level", () => {
+    expect(pm25NowCast(series(Array(12).fill(20)))).toBe(20);
+  });
+
+  // The EPA's published examples, so the method is checked against the EPA's
+  // answers rather than only against this file's arithmetic.
+  //
+  // AirNow's worked example ("The NowCast for PM2.5 and PM10", AirNow-Tech
+  // forum, 2016): hour 1 is missing, so it is left out of both sums. The
+  // weight is 21 / 69.2 = 0.30, floored to 0.5. NowCast 28.409801, truncated
+  // to 28.4 ug/m3; the forum converts that to AQI 87.
+  test("gives AirNow's worked example, with a missing hour", () => {
+    const hours = series([21, null, 35, 49.2, 48.6, 53.7, 66.2, 69.2, 64.9, 50, 43, 34.9]);
+
+    expect(pm25NowCast(hours)).toBe(28.4);
+    expect(pm25ToUsAqi(pm25NowCast(hours))).toBe(87);
+  });
+
+  // "Computing the NowCast" (Minnesota Pollution Control Agency, after the
+  // EPA's Nowcast-formula sample): 50 80 75 90 82 53 64 74 21 10 16 13, oldest
+  // first. The weight is 1 - 80 / 90 = 0.11, floored to 0.5; NowCast 17.4.
+  test("gives the EPA sample's 17.4 for falling air", () => {
+    const oldestFirst = [50, 80, 75, 90, 82, 53, 64, 74, 21, 10, 16, 13];
+
+    expect(pm25NowCast(series(oldestFirst.toReversed()))).toBe(17.4);
+  });
+
+  // Rising air, weight floored at 0.5, so the newest hours dominate. With
+  // c = 40, 20 and ten hours of 10, the weight is max(10 / 40, 0.5) = 0.5.
+  test("leans on the newest hours when the air is changing", () => {
+    const values = [40, 20, ...Array(10).fill(10)];
+    const weights = Array.from({ length: 12 }, (_, i) => 0.5 ** i);
+    const expected =
+      values.reduce((s, v, i) => s + v * weights[i], 0) / weights.reduce((a, b) => a + b);
+
+    expect(pm25NowCast(series(values))).toBe(Math.floor(expected * 10) / 10);
+  });
+
+  test("uses the range ratio as the weight when it is above one half", () => {
+    // min 30, max 40: w = 0.75, and the mean is 36.756..., so 36.7.
+    const w = 0.75;
+    const expected = (40 + 30 * w + 40 * w * w) / (1 + w + w * w);
+
+    expect(pm25NowCast(series([40, 30, 40]))).toBe(Math.floor(expected * 10) / 10);
+    expect(pm25NowCast(series([40, 30, 40]))).toBe(36.7);
+  });
+
+  // The EPA truncates to one decimal: 12.19 is 12.1, never 12.2.
+  test("truncates to one decimal rather than rounding", () => {
+    expect(pm25NowCast(series(Array(12).fill(12.19)))).toBe(12.1);
+  });
+
+  // Twelve 12.1s average to 12.099999999999996 in floating point, which a bare
+  // floor would truncate to 12.0, AQI 50 instead of 51.
+  test.each([0.1, 0.3, 1.1, 12.1])("of a steady %s is that level, not a tenth less", (level) => {
+    expect(pm25NowCast(series(Array(12).fill(level)))).toBe(level);
+  });
+
+  test("needs two of the three newest hours", () => {
+    expect(pm25NowCast([hour(0, 12), hour(3, 12), hour(4, 12)])).toBeNull();
+    expect(pm25NowCast([hour(0, 12), hour(2, 12)])).toBe(12);
+    expect(pm25NowCast([hour(1, 12), hour(2, 12)])).toBe(12);
+  });
+
+  test("is null for a station that stopped reporting", () => {
+    expect(pm25NowCast([hour(4, 12), hour(5, 12), hour(6, 12)])).toBeNull();
+  });
+
+  // The newest hour counts while it ended within the last three hours: the
+  // clock reads 12:10, so an hour ending at 09:10 is just in, 09:09:59 just out.
+  test("takes a newest hour that ended exactly three hours ago, and no older", () => {
+    const endingAt = (utc, value) => ({ value, period: { datetimeTo: { utc } } });
+    const older = [hour(4, 12), hour(5, 12)];
+
+    expect(pm25NowCast([endingAt("2026-03-02T09:10:00Z", 12), ...older])).toBe(12);
+    expect(pm25NowCast([endingAt("2026-03-02T09:09:59Z", 12), ...older])).toBeNull();
+  });
+
+  test("reads only the twelve hours up to the newest", () => {
+    expect(pm25NowCast([...series(Array(12).fill(10)), hour(12, 500)])).toBe(10);
+  });
+
+  test("gives the same answer for hours in any order", () => {
+    const hours = series([21, null, 35, 49.2, 48.6, 53.7, 66.2, 69.2, 64.9, 50, 43, 34.9]);
+
+    expect(pm25NowCast(hours.toReversed())).toBe(28.4);
+    expect(pm25NowCast([...hours.slice(6), ...hours.slice(0, 6)])).toBe(28.4);
+  });
+
+  // Absent is not zero: a null, an empty string or a missing value is a missing
+  // hour, which neither counts towards two of three nor pulls the mean to 0.
+  test.each([[null], [""], [undefined], ["n/a"]])(
+    "reads a %j hour as missing, not as 0",
+    (absent) => {
+      expect(pm25NowCast([hour(0, 30), hour(1, absent), hour(2, 30)])).toBe(30);
+      expect(pm25NowCast([hour(0, 30), hour(1, absent), hour(2, absent)])).toBeNull();
+    }
+  );
+
+  test("reads an hour with no end time as missing", () => {
+    const noEnd = [
+      { value: 90 },
+      { value: 90, period: null },
+      { value: 90, period: {} },
+      { value: 90, period: { datetimeTo: { utc: null } } },
+      { value: 90, period: { datetimeTo: { utc: "yesterday-ish" } } }
+    ];
+
+    expect(pm25NowCast([hour(0, 30), ...noEnd, hour(2, 30)])).toBe(30);
+    expect(pm25NowCast([hour(0, 30), ...noEnd])).toBeNull();
+  });
+
+  test("keeps a measured zero", () => {
+    expect(pm25NowCast([hour(0, 0), hour(1, 0), hour(2, 0)])).toBe(0);
+    expect(pm25ToUsAqi(pm25NowCast([hour(0, 0), hour(1, 0), hour(2, 0)]))).toBe(0);
+  });
+
+  test("reads a negative hour as a sensor fault, missing", () => {
+    expect(pm25NowCast([hour(0, 30), hour(1, -5), hour(2, 30)])).toBe(30);
+  });
+
+  test.each([[undefined], [null], ["not a list"], [[]], [[{ value: 10 }]], [[null]]])(
+    "is null for %j",
+    (hours) => {
+      expect(pm25NowCast(hours)).toBeNull();
+    }
+  );
+});
+
+describe("nowCastHoursQuery", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Twelve hours behind a newest hour that may be three hours old, floored to
+  // the hour, so every lookup within one hour asks the same thing and hits the
+  // same cache entry.
+  test("asks from fifteen hours before the current hour", () => {
+    expect(nowCastHoursQuery()).toEqual({ datetime_from: "2026-03-01T21:00:00.000Z", limit: 24 });
+  });
+
+  test("asks the same thing all hour", () => {
+    const at = (utc) => nowCastHoursQuery(Date.parse(utc));
+
+    expect(at("2026-03-02T12:00:00Z")).toEqual(at("2026-03-02T12:59:59Z"));
+    expect(at("2026-03-02T13:00:00Z")).not.toEqual(at("2026-03-02T12:59:59Z"));
   });
 });
 

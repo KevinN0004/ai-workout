@@ -428,6 +428,67 @@ export const createExternalDataService = ({
     return interpolate(band || points[points.length - 1]);
   };
 
+  const HOUR_MS = 60 * 60 * 1000;
+  const NOWCAST_HOURS = 12;
+  // How old the newest hour may be. OpenAQ's hourly means arrive late, so the
+  // newest hour the station reported stands in for the current one, as long as
+  // it ended within this window.
+  const NOWCAST_MAX_AGE_HOURS = 3;
+  // Absorbs float error in the weighted mean before truncating: twelve hours of
+  // 12.1 average to 12.099999999999996, which a bare floor would make 12.0.
+  const TRUNCATE_EPSILON = 1e-9;
+
+  // The EPA's NowCast for PM2.5, as AirNow publishes it ("PM NowCast" fact
+  // sheet, EPA/AirNow, STI-6079, Dec. 2014; "The NowCast for PM2.5 and PM10",
+  // AirNow-Tech forum, 2016). Over the last twelve hourly means, newest first,
+  // the weight is min / max of the hours present (1 minus the range scaled by
+  // the max), floored at 0.5; the NowCast is sum(c_i * w^i) / sum(w^i) over the
+  // hours present, i the hours before the newest, truncated to 0.1 ug/m3. It is
+  // valid only when two of the three newest hours are present. One deviation:
+  // hour 0 is the newest hour the station reported, not the clock hour, and it
+  // must have ended within NOWCAST_MAX_AGE_HOURS. An hour whose value is
+  // absent (null, "", missing), non-numeric or negative, or that has no
+  // readable end time, is a missing hour, never a zero one; a measured 0 is
+  // clean air. Returns null when the NowCast is not valid.
+  const pm25NowCast = (hours, nowMs = Date.now()) => {
+    const byHour = new Map();
+    let newestEndMs = -Infinity;
+    for (const item of Array.isArray(hours) ? hours : []) {
+      const value = toFiniteNumber(item?.value);
+      const endMs = Date.parse(item?.period?.datetimeTo?.utc ?? "");
+      if (value === null || value < 0 || !Number.isFinite(endMs)) continue;
+      byHour.set(Math.floor(endMs / HOUR_MS), value);
+      newestEndMs = Math.max(newestEndMs, endMs);
+    }
+    if (!byHour.size) return null;
+    if (nowMs - newestEndMs > NOWCAST_MAX_AGE_HOURS * HOUR_MS) return null;
+    const newest = Math.floor(newestEndMs / HOUR_MS);
+    const series = Array.from({ length: NOWCAST_HOURS }, (_, i) => byHour.get(newest - i) ?? null);
+    if (series.slice(0, 3).filter((value) => value !== null).length < 2) return null;
+    const present = series.filter((value) => value !== null);
+    const max = Math.max(...present);
+    // Every hour measured 0 is steady air: w = 1, not 0 / 0.
+    const weight = max > 0 ? Math.max(Math.min(...present) / max, 0.5) : 1;
+    let weighted = 0;
+    let total = 0;
+    series.forEach((value, i) => {
+      if (value === null) return;
+      weighted += value * weight ** i;
+      total += weight ** i;
+    });
+    return Math.floor((weighted / total) * 10 + TRUNCATE_EPSILON) / 10;
+  };
+
+  // The hours pm25NowCast reads: twelve behind a newest hour that may be
+  // NOWCAST_MAX_AGE_HOURS old, from the start of the current hour, so every
+  // lookup within one hour asks the same thing and shares one cache entry.
+  const nowCastHoursQuery = (nowMs = Date.now()) => ({
+    datetime_from: new Date(
+      (Math.floor(nowMs / HOUR_MS) - NOWCAST_HOURS - NOWCAST_MAX_AGE_HOURS) * HOUR_MS
+    ).toISOString(),
+    limit: 24
+  });
+
   const aqiBand = (aqi) => {
     // No reading, or an unreadable one: the advice errs indoors.
     if (aqi === null || aqi === undefined || aqi === "") {
@@ -767,6 +828,8 @@ export const createExternalDataService = ({
     openAqParameterLabel,
     extractOpenAqMeasurement,
     pm25ToUsAqi,
+    pm25NowCast,
+    nowCastHoursQuery,
     aqiBand,
     normalizePlainText,
     parseMultiNumberQuery,

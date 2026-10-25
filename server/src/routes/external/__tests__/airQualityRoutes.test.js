@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
 import { registerAirQualityRoutes } from "../registerAirQualityRoutes.js";
@@ -12,8 +12,9 @@ import {
 
 // GET /api/air-quality/current had no test, while its sibling
 // /api/weather/current did. The AQI maths are covered in airQuality.test.js;
-// this covers the route around them -- validation, the two upstream calls, how
-// readings are joined to sensors, and what a user gets when OpenAQ is down.
+// this covers the route around them -- validation, the three upstream calls,
+// how readings are joined to sensors, which hours the NowCast is scored from,
+// and what a user gets when OpenAQ is down.
 //
 // Only openAqRequest is stubbed. It is the network boundary; every other
 // dependency is the real function the server injects, so the parsing and AQI
@@ -25,17 +26,24 @@ const stubbed = {
   toShortText: (value) => String(value ?? "")
 };
 
-const { extractOpenAqMeasurement, pm25ToUsAqi, aqiBand, openAqParameterLabel, toFiniteNumber } =
-  createExternalDataService({
-    ...stubbed,
-    cleanText,
-    toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-    readThroughExternalCache: async () => ({}),
-    buildExternalCacheKey: () => "",
-    recordExternalApiLatency: () => {},
-    externalApiRetries: 0,
-    externalApiRetryBaseDelayMs: 0
-  });
+const {
+  extractOpenAqMeasurement,
+  pm25ToUsAqi,
+  pm25NowCast,
+  nowCastHoursQuery,
+  aqiBand,
+  openAqParameterLabel,
+  toFiniteNumber
+} = createExternalDataService({
+  ...stubbed,
+  cleanText,
+  toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+  readThroughExternalCache: async () => ({}),
+  buildExternalCacheKey: () => "",
+  recordExternalApiLatency: () => {},
+  externalApiRetries: 0,
+  externalApiRetryBaseDelayMs: 0
+});
 
 const { mergeCacheStatuses } = createHttpCacheService({
   ...stubbed,
@@ -57,6 +65,8 @@ const buildApp = (openAqRequest, { requestId } = {}) => {
     cleanText,
     extractOpenAqMeasurement,
     pm25ToUsAqi,
+    pm25NowCast,
+    nowCastHoursQuery,
     aqiBand,
     mergeCacheStatuses,
     openAqParameterLabel,
@@ -89,13 +99,31 @@ const station = (overrides = {}) => ({
   ...overrides
 });
 
-// Two upstream calls in order: the location lookup, then that location's latest
-// readings.
-const upstream = ({ locations, latest, locationsCache = "miss", latestCache = "miss" }) =>
+// One OpenAQ hourly mean, ending `hoursAgo` whole hours before 12:00Z. The
+// clock is pinned at 12:10Z below, so hour 0 is ten minutes old.
+const hour = (hoursAgo, value) => ({
+  value,
+  period: { datetimeTo: { utc: new Date(Date.UTC(2026, 2, 2, 12 - hoursAgo)).toISOString() } }
+});
+
+// Three steady hours of `value`: the fewest a NowCast of that value needs.
+const steadyHours = (value) => [hour(0, value), hour(1, value), hour(2, value)];
+
+// Three upstream calls in order: the location lookup, that location's latest
+// readings, then the PM2.5 sensor's hourly means.
+const upstream = ({
+  locations,
+  latest,
+  hours = [],
+  locationsCache = "miss",
+  latestCache = "miss",
+  hoursCache = "miss"
+}) =>
   vi
     .fn()
     .mockResolvedValueOnce({ data: { results: locations }, cache: locationsCache })
-    .mockResolvedValueOnce({ data: { results: latest }, cache: latestCache });
+    .mockResolvedValueOnce({ data: { results: latest }, cache: latestCache })
+    .mockResolvedValueOnce({ data: { results: hours }, cache: hoursCache });
 
 const get = (app, query = "latitude=40.1&longitude=-75.2") => {
   const path = query ? `/api/air-quality/current?${query}` : "/api/air-quality/current";
@@ -103,6 +131,16 @@ const get = (app, query = "latitude=40.1&longitude=-75.2") => {
 };
 
 describe("GET /api/air-quality/current", () => {
+  // The NowCast reads the clock. Only Date is faked, because supertest and
+  // express rely on real timers.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-02T12:10:00Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("request validation", () => {
     test("rejects a request with no coordinates", async () => {
       const openAqRequest = vi.fn();
@@ -278,12 +316,17 @@ describe("GET /api/air-quality/current", () => {
   });
 
   describe("summary", () => {
-    test("reports the AQI the EPA table gives for the measured pm2.5", async () => {
-      const openAqRequest = upstream({ locations: [station()], latest: [reading(1, 12)] });
+    test("reports the AQI the EPA table gives for the pm2.5 NowCast", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 12)],
+        hours: steadyHours(12)
+      });
 
       const response = await get(buildApp(openAqRequest));
 
       expect(response.body.summary.pm25).toBe(12);
+      expect(response.body.summary.pm25NowCast).toBe(12);
       expect(response.body.summary.aqiUs).toBe(pm25ToUsAqi(12));
       expect(response.body.summary.level).toBe(aqiBand(pm25ToUsAqi(12)).level);
       expect(response.body.summary.primaryPollutant).toBe("PM2.5");
@@ -294,13 +337,166 @@ describe("GET /api/air-quality/current", () => {
     test.each(["pm25", "pm2.5", "pm2_5", "pm2p5"])("recognises %s as pm2.5", async (code) => {
       const openAqRequest = upstream({
         locations: [station({ sensors: [sensor(1, code)] })],
-        latest: [reading(1, 35)]
+        latest: [reading(1, 35)],
+        hours: steadyHours(35)
       });
 
       const response = await get(buildApp(openAqRequest));
 
+      expect(openAqRequest).toHaveBeenNthCalledWith(3, "sensors/1/hours", nowCastHoursQuery());
       expect(response.body.summary.pm25).toBe(35);
+      expect(response.body.summary.pm25NowCast).toBe(35);
       expect(response.body.summary.aqiUs).toBe(pm25ToUsAqi(35));
+    });
+
+    test("asks for the PM2.5 sensor's hourly means", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ sensors: [sensor(2, "o3", "ppm"), sensor(7, "pm25")] })],
+        latest: [reading(2, 0.03), reading(7, 12)]
+      });
+
+      await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenCalledTimes(3);
+      expect(openAqRequest).toHaveBeenNthCalledWith(3, "sensors/7/hours", {
+        datetime_from: "2026-03-01T21:00:00.000Z",
+        limit: 24
+      });
+    });
+
+    test("scores the NowCast, not the latest reading", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 5)],
+        hours: steadyHours(60)
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(body.summary.pm25).toBe(5);
+      expect(body.summary.pm25NowCast).toBe(60);
+      expect(body.summary.aqiUs).toBe(pm25ToUsAqi(60));
+      expect(body.summary.level).toBe(aqiBand(pm25ToUsAqi(60)).level);
+    });
+
+    // Decision 5: a NowCast the method says is not valid reads Unknown, as a
+    // station with no PM2.5 does, rather than falling back to the instant value.
+    test("reads Unknown when there are too few recent hours", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 5)],
+        hours: [hour(0, 60)]
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(body.summary.pm25).toBe(5);
+      expect(body.summary.pm25NowCast).toBeNull();
+      expect(body.summary.aqiUs).toBeNull();
+      expect(body.summary.level).toBe("Unknown");
+      expect(body.summary.workoutType).toBe("indoor");
+    });
+
+    // Absent is not zero, through the route: three hours with no value are
+    // three missing hours, not three hours of clean air.
+    test.each([[null], [""], [undefined]])(
+      "reads Unknown, not AQI 0, for hours of %j",
+      async (absent) => {
+        const openAqRequest = upstream({
+          locations: [station()],
+          latest: [reading(1, 5)],
+          hours: steadyHours(absent)
+        });
+
+        const { body } = await get(buildApp(openAqRequest));
+
+        expect(body.summary.pm25NowCast).toBeNull();
+        expect(body.summary.aqiUs).toBeNull();
+        expect(body.summary.level).toBe("Unknown");
+      }
+    );
+
+    test.each([
+      ["no results list", { data: {}, cache: "miss" }],
+      ["no data", { cache: "miss" }],
+      ["nothing at all", undefined]
+    ])("reads Unknown when the hourly answer has %s", async (_name, answer) => {
+      const openAqRequest = vi
+        .fn()
+        .mockResolvedValueOnce({ data: { results: [station()] }, cache: "miss" })
+        .mockResolvedValueOnce({ data: { results: [reading(1, 5)] }, cache: "miss" })
+        .mockResolvedValueOnce(answer);
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.status).toBe(200);
+      expect(response.body.summary.aqiUs).toBeNull();
+      expect(response.body.summary.level).toBe("Unknown");
+      expect(response.body.summary.pm25).toBe(5);
+    });
+
+    // The station and its other readings did arrive, so a failed hourly
+    // request degrades this one number rather than the whole answer.
+    test("reads Unknown, and still answers, when the hourly request fails", async () => {
+      const openAqRequest = vi
+        .fn()
+        .mockResolvedValueOnce({ data: { results: [station()] }, cache: "miss" })
+        .mockResolvedValueOnce({
+          data: { results: [reading(1, 5), reading(2, 0.03)] },
+          cache: "miss"
+        })
+        .mockRejectedValueOnce(Object.assign(new Error("openaq exploded"), { status: 502 }));
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.status).toBe(200);
+      expect(response.body.fallback).toBeUndefined();
+      expect(response.body.summary.level).toBe("Unknown");
+      expect(response.body.summary.aqiUs).toBeNull();
+      expect(response.body.summary.pm25).toBe(5);
+      expect(response.body.pollutants).toHaveLength(2);
+      expect(response.body.cache.hours).toBeNull();
+    });
+
+    test("asks for no hours when the station has no PM2.5 sensor", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        latest: [reading(2, 0.03)]
+      });
+
+      await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenCalledTimes(2);
+    });
+
+    // A reading can carry its sensor inline rather than by id. Then it says it
+    // is PM2.5 but not which sensor, so there is nothing to ask hours of.
+    test("asks for no hours when the PM2.5 reading names no sensor id", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ sensors: [] })],
+        latest: [{ value: 12, sensor: sensor(undefined, "pm25"), datetime: { utc: "x" } }]
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenCalledTimes(2);
+      expect(body.summary.pm25).toBe(12);
+      expect(body.summary.aqiUs).toBeNull();
+      expect(body.summary.level).toBe("Unknown");
+    });
+
+    test("does not list the sensor id among the pollutants", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 12)],
+        hours: steadyHours(12)
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(Object.keys(body.pollutants[0]).sort()).toEqual(
+        ["code", "label", "measuredAt", "unit", "value"].sort()
+      );
     });
 
     test("leaves the AQI null when the station reports no pm2.5 at all", async () => {
@@ -333,17 +529,21 @@ describe("GET /api/air-quality/current", () => {
       expect(response.body.summary.aqiUs).not.toBe(0);
     });
 
-    // A measured zero is a real reading and must survive the guard above.
+    // A measured zero is a real reading and must survive the guard above, in
+    // the latest reading and in the hours the NowCast is scored from.
     test("keeps a genuine zero reading", async () => {
       const openAqRequest = upstream({
         locations: [station({ sensors: [sensor(1, "pm25")] })],
-        latest: [reading(1, 0)]
+        latest: [reading(1, 0)],
+        hours: steadyHours(0)
       });
 
       const response = await get(buildApp(openAqRequest));
 
       expect(response.body.summary.pm25).toBe(0);
+      expect(response.body.summary.pm25NowCast).toBe(0);
       expect(response.body.summary.aqiUs).toBe(0);
+      expect(response.body.summary.level).toBe("Good");
     });
 
     // firstFinite exists to try several payload shapes. A null in the first
@@ -387,18 +587,61 @@ describe("GET /api/air-quality/current", () => {
       });
     });
 
-    test("merges the cache status of both upstream calls", async () => {
+    test("merges the cache status of all three upstream calls", async () => {
       const openAqRequest = upstream({
         locations: [station()],
         latest: [reading(1, 12)],
         locationsCache: "hit",
-        latestCache: "stale"
+        latestCache: "stale",
+        hoursCache: "hit"
       });
 
       const response = await get(buildApp(openAqRequest));
 
       // Stale anywhere makes the whole answer stale.
-      expect(response.body.cache).toEqual({ status: "stale", locations: "hit", latest: "stale" });
+      expect(response.body.cache).toEqual({
+        status: "stale",
+        locations: "hit",
+        latest: "stale",
+        hours: "hit"
+      });
+    });
+
+    test("counts a stale hourly answer in the merged status", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 12)],
+        locationsCache: "hit",
+        latestCache: "hit",
+        hoursCache: "stale"
+      });
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.body.cache).toEqual({
+        status: "stale",
+        locations: "hit",
+        latest: "hit",
+        hours: "stale"
+      });
+    });
+
+    test("reports no hourly cache status when no hours were asked for", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        latest: [reading(2, 0.03)],
+        locationsCache: "hit",
+        latestCache: "hit"
+      });
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.body.cache).toEqual({
+        status: "hit",
+        locations: "hit",
+        latest: "hit",
+        hours: null
+      });
     });
   });
 
@@ -430,6 +673,7 @@ describe("GET /api/air-quality/current", () => {
       expect(response.body.summary.workoutType).toBe("indoor");
       expect(response.body.summary.aqiUs).toBeNull();
       expect(response.body.summary.pm25).toBeNull();
+      expect(response.body.summary).toHaveProperty("pm25NowCast", null);
       expect(response.body.summary.level).toBe("Unknown");
       expect(response.body.pollutants).toEqual([]);
     });

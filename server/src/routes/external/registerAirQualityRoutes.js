@@ -1,15 +1,15 @@
 /**
- * GET /api/air-quality/current: an OpenAQ station's latest readings near the
- * given coordinates, scored as a US AQI with a training recommendation.
- * Registered by externalRoutes.js.
+ * GET /api/air-quality/current: an OpenAQ station near the given coordinates, its
+ * latest readings, and the EPA NowCast of its PM2.5 hourly means scored as a US AQI
+ * with a training recommendation. Registered by externalRoutes.js.
  */
 import { airQualityQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 /**
  * Registers the air-quality route. `deps` supplies the OpenAQ client
- * (`openAqRequest`) and its parsing and scoring helpers from
- * externalDataService.js.
+ * (`openAqRequest`) and its parsing and scoring helpers, the NowCast among them,
+ * from externalDataService.js.
  */
 export const registerAirQualityRoutes = (app, deps) => {
   const {
@@ -19,6 +19,8 @@ export const registerAirQualityRoutes = (app, deps) => {
     cleanText,
     extractOpenAqMeasurement,
     pm25ToUsAqi,
+    pm25NowCast,
+    nowCastHoursQuery,
     aqiBand,
     mergeCacheStatuses,
     openAqParameterLabel,
@@ -56,7 +58,8 @@ export const registerAirQualityRoutes = (app, deps) => {
       // Load its latest readings. A reading names its sensor by id, and the
       // station's sensor list says what that sensor measures, so the two are
       // joined. Readings with no pollutant or no value are dropped, and the
-      // first reading for each pollutant wins.
+      // first reading for each pollutant wins, keeping its sensor id for the
+      // hourly request below.
       const latestResponse = await openAqRequest(`locations/${Math.trunc(locationId)}/latest`);
       const latestData = latestResponse.data;
       const rawReadings = Array.isArray(latestData?.results) ? latestData.results : [];
@@ -74,23 +77,40 @@ export const registerAirQualityRoutes = (app, deps) => {
           sensor: linkedSensor || entry?.sensor
         });
         if (!parsed.code || parsed.value === null) continue;
-        if (!byCode.has(parsed.code)) byCode.set(parsed.code, parsed);
+        if (!byCode.has(parsed.code)) {
+          byCode.set(parsed.code, { ...parsed, sensorsId: entry?.sensorsId });
+        }
       }
       const pollutants = Array.from(byCode.values()).slice(0, 12);
 
-      // Score from PM2.5 alone. A station with no PM2.5 reading scores null and
-      // the "Unknown" band, never AQI 0.
+      // Score PM2.5's NowCast over its sensor's hourly means. No PM2.5 sensor,
+      // too few recent hours, or a failed hourly request each score null and the
+      // "Unknown" band, never AQI 0; the latest reading is still reported.
       const pm25Reading =
         pollutants.find((item) => ["pm25", "pm2.5", "pm2_5", "pm2p5"].includes(item.code)) || null;
       const pm25 = pm25Reading?.value ?? null;
-      const aqiUs = pm25ToUsAqi(pm25);
+      const pm25SensorId = toNullableNumber(pm25Reading?.sensorsId, 1, 1000000000);
+      const hoursResponse =
+        pm25SensorId === null
+          ? null
+          : await openAqRequest(
+              `sensors/${Math.trunc(pm25SensorId)}/hours`,
+              nowCastHoursQuery()
+            ).catch(() => null);
+      const pm25NowCastValue = pm25NowCast(hoursResponse?.data?.results);
+      const aqiUs = pm25ToUsAqi(pm25NowCastValue);
       const recommendation = aqiBand(aqiUs);
 
       res.json({
         cache: {
-          status: mergeCacheStatuses(locationResponse.cache, latestResponse.cache),
+          status: mergeCacheStatuses(
+            locationResponse.cache,
+            latestResponse.cache,
+            hoursResponse?.cache
+          ),
           locations: locationResponse.cache,
-          latest: latestResponse.cache
+          latest: latestResponse.cache,
+          hours: hoursResponse?.cache ?? null
         },
         location: {
           id: toFiniteNumber(location?.id),
@@ -111,6 +131,7 @@ export const registerAirQualityRoutes = (app, deps) => {
             openAqParameterLabel(pollutants[0]?.code) ||
             "Unknown",
           pm25,
+          pm25NowCast: pm25NowCastValue,
           aqiUs
         },
         pollutants: pollutants.map((item) => ({
@@ -142,6 +163,7 @@ export const registerAirQualityRoutes = (app, deps) => {
           summary: {
             aqiUs: null,
             pm25: null,
+            pm25NowCast: null,
             level: "Unknown",
             workoutType: "indoor",
             guidance: "Air quality data is unavailable. Prefer indoor training."
