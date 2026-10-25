@@ -6,11 +6,12 @@ import request from "supertest";
 import { describe, expect, test } from "vitest";
 import { createCorsPolicy } from "../corsPolicy.js";
 
-// What the cors middleware hands the delegate, reduced to what it reads.
-const fakeRequest = (origin, host = "api.example.com", protocol = "https") => ({
-  headers: { origin },
+// What the cors middleware hands the delegate, reduced to what it reads. The
+// Host goes in a headers object, so a test can leave it out entirely.
+const fakeRequest = (origin, headers = { host: "api.example.com" }, protocol = "https") => ({
+  headers: { ...headers, origin },
   protocol,
-  get: (name) => (name.toLowerCase() === "host" ? host : undefined)
+  get: (name) => headers[name.toLowerCase()]
 });
 
 // Runs the delegate and then the origin check it returns, as cors does.
@@ -62,10 +63,10 @@ describe("createCorsPolicy in production (allowLoopback false)", () => {
   // A missing or empty Host leaves the request with no own origin: it must not
   // turn into one a caller can name, such as "https://undefined" or "https://".
   test.each([
-    ["no Host", undefined, "https://undefined"],
-    ["an empty Host", "", "https://"]
-  ])("%s never matches", async (_label, host, origin) => {
-    const { err } = await decide(policy, fakeRequest(origin, host));
+    ["no Host", {}, "https://undefined"],
+    ["an empty Host", { host: "" }, "https://"]
+  ])("%s never matches", async (_label, headers, origin) => {
+    const { err } = await decide(policy, fakeRequest(origin, headers));
 
     expect(err?.status).toBe(403);
   });
