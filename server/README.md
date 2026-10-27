@@ -296,10 +296,10 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   spin-down. Without Redis, or while Redis is unreachable, it is a per-process map: each
   replica keeps its own and multiplies upstream load.
 - **The air-quality AQI is the EPA NowCast, not the latest reading.**
-  `GET /api/air-quality/current` makes three OpenAQ calls per uncached lookup: up to 100
-  stations within the radius, the chosen station's latest readings, then its PM2.5
-  sensor's hourly means (`sensors/<id>/hours`, from sixteen hours before the current
-  hour). `summary.aqiUs` scores `summary.pm25NowCast`, the EPA NowCast of the last twelve
+  `GET /api/air-quality/current` makes at most five OpenAQ calls per uncached lookup: the
+  PM2.5 stations within the radius, up to three stations' latest readings, then the
+  chosen station's PM2.5 hourly means (`sensors/<id>/hours`, from sixteen hours before the
+  current hour). `summary.aqiUs` scores `summary.pm25NowCast`, the EPA NowCast of the last twelve
   of those hours (`pm25NowCast` in `externalDataService.js`); `summary.pm25` is still the
   latest single reading. Hour 0 is the newest hour the station reported, used only if it
   ended within four hours, and two of the three newest hours must be present. Otherwise,
@@ -310,14 +310,22 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   four-hour limit is checked against the clock on every lookup, so a stale copy cannot
   outlive it.
 - **The station is chosen, not taken first.** OpenAQ lists stations in id order and keeps
-  ones that stopped reporting years ago, so `nearestFreshPm25Station` picks the nearest
-  station with a PM2.5 sensor whose `datetimeLast` ended within the same four hours. A
-  missing or unparseable `datetimeLast` is stale. Distance is OpenAQ's `distance`, else
-  haversine from the station's coordinates; a station with no position sorts last, and
-  equal distances go to the more recent report. With stations listed but none fresh, the
-  route answers 200 "Unknown" without calling `/latest` or the hours, and its `location`
-  names no station (`id: null`, `name: ""`) and echoes the coordinates asked for. An
-  empty list is still the 404 "No nearby air quality station found."
+  ones that stopped reporting years ago. The route asks for PM2.5 stations only
+  (`parameters_id: 2`) in one page of 1,000, OpenAQ's page maximum, and logs an
+  `openaq_locations_truncated` warning, once per list fetched rather than per cached
+  read, when `meta.found` says even that was cut short. `rankFreshPm25Stations` keeps the
+  stations with a PM2.5 sensor whose `datetimeLast` is fresh and ranks them nearest first
+  (OpenAQ's `distance`, else haversine; no position sorts last; ties go to the more
+  recent report).
+- **The PM2.5 reading must be fresh too, not just the station.** A station's
+  `datetimeLast` covers all its sensors, so the route walks the ranked stations, asks
+  `/latest` of at most three (five OpenAQ calls a lookup at most, inside the 60 a minute
+  limit), and reads the first whose PM2.5 reading's own `datetime.utc` is within the four
+  hours. A missing or unparseable time is stale. A failed `/latest` is a miss; if every
+  one asked failed, the route answers as for an outage. With no fresh reading it answers
+  200 "Unknown" without asking the hours, and its `location` names no station
+  (`id: null`, `name: ""`) and echoes the coordinates asked for. An empty station list is
+  still the 404 "No nearby air quality station found."
 - **Every external route answers `200` on an upstream outage, not an error.** Air quality,
   both weather routes, all three wger routes and the mealdb search each return
   `fallback: true` with empty or null readings, so the panel degrades instead of failing.

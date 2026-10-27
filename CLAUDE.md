@@ -200,14 +200,25 @@ or a failed hourly call gives `aqiUs: null` and "Unknown", as no PM2.5 sensor do
 stations in id order (`order_by` accepts only `id`) and keeps ones that stopped reporting
 years ago: on 2026-10-27 its first PM2.5 station was 23.5 hours stale in New York, last
 heard in 2017 in Los Angeles and in 2023 in London, beside stations reporting within
-hours. So the route asks for a page of 100 and `nearestFreshPm25Station` chooses the
-nearest station with a PM2.5 sensor whose `datetimeLast` ended within the same four
-hours (`NOWCAST_MAX_AGE_HOURS`, shared with hour 0 so the two agree). Absent is stale: a
-missing, `null` or unparseable `datetimeLast` never counts as fresh. Distance is OpenAQ's
-`distance` when it is a number of 0 or more, else haversine from the station's
-`coordinates`, and a `null` distance or position is unknown, never 0 metres; a station
-with no position sorts last. With no fresh PM2.5 station the answer is "Unknown" with no
-`/latest` or hours call, and no station named.
+hours. The list was also cut short: `meta.found` read `">100"` for Los Angeles and London
+at a limit of 100. So the route asks for PM2.5 stations only (`parameters_id: 2`, the id
+seen live in all three cities) in one page of 1,000, the most OpenAQ's pagination docs
+allow, and logs `openaq_locations_truncated` when `openAqResultsTruncated` says even that
+was cut short. `rankFreshPm25Stations` keeps the stations with a PM2.5 sensor whose
+`datetimeLast` is fresh and ranks them nearest first: OpenAQ's `distance` (metres, filled
+in live) when it is a number of 0 or more, else haversine from `coordinates`; a `null`
+distance or position is unknown, never 0 metres, and sorts last.
+
+**A fresh station is not a fresh PM2.5 reading.** `datetimeLast` covers every sensor: live,
+London's nearest fresh station (154 Marylebone Road, 2.2 h) had a PM2.5 reading dated
+2026-09-10, so the hours came back empty. The route therefore walks the ranked list, asks
+`/latest` of at most three, and reads the first whose PM2.5 reading's own `datetime.utc` is
+fresh. Both checks go through `isFreshReading`, within the same four hours
+(`NOWCAST_MAX_AGE_HOURS`, shared with hour 0), and **absent is stale**: a missing, `null`
+or unparseable time never counts as fresh. A failed `/latest` is a miss and the walk goes
+on; if every one asked failed, nothing said the stations were stale, so the outage
+handling answers as before. Otherwise no fresh reading means "Unknown" with no hours call
+and no station named. Three keeps a lookup to five calls, inside OpenAQ's 60 a minute.
 
 `undefined` already behaved correctly, so an omitted key and an explicit `null` gave
 opposite answers for the same missing data — which is what made it hard to see.

@@ -224,7 +224,7 @@ Dashboard pagination and external-API behaviour.
 | `EXTERNAL_CACHE_MAX_ENTRIES`         | Entries held in the in-memory fallback cache; with `REDIS_URL` set the cache is bounded by TTL instead | `500`        |
 | `EXTERNAL_CACHE_STALE_TTL_SEC`       | How long a stale entry may still be served                                                             | `21600` (6h) |
 | `OPEN_METEO_CACHE_TTL_SEC`           | Fresh-cache window for weather                                                                         | `300`        |
-| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality, for each of its three OpenAQ calls                                 | `180`        |
+| `OPENAQ_CACHE_TTL_SEC`               | Fresh-cache window for air quality, for each of its OpenAQ calls                                       | `180`        |
 | `WGER_CACHE_TTL_SEC`                 | Fresh-cache window for exercise data                                                                   | `900`        |
 | `MEALDB_CACHE_TTL_SEC`               | Fresh-cache window for meal search                                                                     | `900`        |
 

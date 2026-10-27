@@ -524,7 +524,9 @@ export const createExternalDataService = ({
   // Whether a UTC time ended within NOWCAST_MAX_AGE_HOURS of `nowMs`: the one
   // freshness rule, for a station's datetimeLast and for a reading's own
   // datetime. A missing, null or unparseable time is stale, never fresh
-  // (Date.parse reads it as NaN).
+  // (Date.parse reads it as NaN). The isFinite check states that outright
+  // rather than leaving it to NaN comparing false, which a rewrite as
+  // !(age > window) would silently invert.
   const isFreshReading = (utc, nowMs = Date.now()) => {
     const ms = Date.parse(utc);
     return Number.isFinite(ms) && nowMs - ms <= NOWCAST_MAX_AGE_HOURS * HOUR_MS;
@@ -532,7 +534,8 @@ export const createExternalDataService = ({
 
   // Whether OpenAQ says it holds more results than it sent: `meta.found` is a
   // count, or a string such as ">100" when it stopped counting at the limit. An
-  // absent or unreadable count says nothing either way, so it reads as false.
+  // absent or unreadable count says nothing either way, so it reads as false;
+  // the null check keeps that from resting on returnedCount being 0 or more.
   const openAqResultsTruncated = (meta, returnedCount) => {
     const found = meta?.found;
     if (typeof found === "string" && /^>\s*\d+$/.test(found.trim())) return true;
