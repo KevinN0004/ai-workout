@@ -190,11 +190,24 @@ reading.** The air-quality route makes a third OpenAQ call, `sensors/<id>/hours`
 `pm25NowCast` in `externalDataService.js` scores the last twelve hours to the EPA's method
 (weight min / max floored at 0.5, two of the three newest hours present, truncated to
 0.1 ug/m3), checked against AirNow's and the EPA sample's worked examples. Hour 0 is the
-newest hour the station reported, used only if it ended within three hours. An hour whose
+newest hour the station reported, used only if it ended within four hours. An hour whose
 value is `null`, `""`, missing, non-numeric or negative is a **missing** hour: it neither
 counts towards two of three nor pulls the mean towards 0. Too few hours, a stale station
 or a failed hourly call gives `aqiUs: null` and "Unknown", as no PM2.5 sensor does;
 `summary.pm25` is still the latest reading and `summary.pm25NowCast` the scored one.
+
+**OpenAQ's first station is not the nearest, and is often dead.** `/v3/locations` lists
+stations in id order (`order_by` accepts only `id`) and keeps ones that stopped reporting
+years ago: on 2026-10-27 its first PM2.5 station was 23.5 hours stale in New York, last
+heard in 2017 in Los Angeles and in 2023 in London, beside stations reporting within
+hours. So the route asks for a page of 100 and `nearestFreshPm25Station` chooses the
+nearest station with a PM2.5 sensor whose `datetimeLast` ended within the same four
+hours (`NOWCAST_MAX_AGE_HOURS`, shared with hour 0 so the two agree). Absent is stale: a
+missing, `null` or unparseable `datetimeLast` never counts as fresh. Distance is OpenAQ's
+`distance` when it is a number of 0 or more, else haversine from the station's
+`coordinates`, and a `null` distance or position is unknown, never 0 metres; a station
+with no position sorts last. With no fresh PM2.5 station the answer is "Unknown" with no
+`/latest` or hours call, and no station named.
 
 `undefined` already behaved correctly, so an omitted key and an explicit `null` gave
 opposite answers for the same missing data — which is what made it hard to see.

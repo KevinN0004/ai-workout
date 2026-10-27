@@ -296,18 +296,28 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   spin-down. Without Redis, or while Redis is unreachable, it is a per-process map: each
   replica keeps its own and multiplies upstream load.
 - **The air-quality AQI is the EPA NowCast, not the latest reading.**
-  `GET /api/air-quality/current` makes three OpenAQ calls per uncached lookup: the nearest
-  station, its latest readings, then its PM2.5 sensor's hourly means
-  (`sensors/<id>/hours`, from fifteen hours before the current hour). `summary.aqiUs`
-  scores `summary.pm25NowCast`, the EPA NowCast of the last twelve of those hours
-  (`pm25NowCast` in `externalDataService.js`); `summary.pm25` is still the latest single
-  reading. Hour 0 is the newest hour the station reported, used only if it ended within
-  three hours, and two of the three newest hours must be present. Otherwise, or when the
-  hourly call fails, `aqiUs` is `null` and the level "Unknown", and the rest of the answer
-  still arrives: that one call degrades the score, not the route. The hourly call is
-  cached under `OPENAQ_CACHE_TTL_SEC` like the other two, keyed by sensor and clock hour,
-  so lookups near one station in the same hour share an entry; the three-hour limit is
-  checked against the clock on every lookup, so a stale copy cannot outlive it.
+  `GET /api/air-quality/current` makes three OpenAQ calls per uncached lookup: up to 100
+  stations within the radius, the chosen station's latest readings, then its PM2.5
+  sensor's hourly means (`sensors/<id>/hours`, from sixteen hours before the current
+  hour). `summary.aqiUs` scores `summary.pm25NowCast`, the EPA NowCast of the last twelve
+  of those hours (`pm25NowCast` in `externalDataService.js`); `summary.pm25` is still the
+  latest single reading. Hour 0 is the newest hour the station reported, used only if it
+  ended within four hours, and two of the three newest hours must be present. Otherwise,
+  or when the hourly call fails, `aqiUs` is `null` and the level "Unknown", and the rest
+  of the answer still arrives: that one call degrades the score, not the route. The
+  hourly call is cached under `OPENAQ_CACHE_TTL_SEC` like the other two, keyed by sensor
+  and clock hour, so lookups near one station in the same hour share an entry; the
+  four-hour limit is checked against the clock on every lookup, so a stale copy cannot
+  outlive it.
+- **The station is chosen, not taken first.** OpenAQ lists stations in id order and keeps
+  ones that stopped reporting years ago, so `nearestFreshPm25Station` picks the nearest
+  station with a PM2.5 sensor whose `datetimeLast` ended within the same four hours. A
+  missing or unparseable `datetimeLast` is stale. Distance is OpenAQ's `distance`, else
+  haversine from the station's coordinates; a station with no position sorts last, and
+  equal distances go to the more recent report. With stations listed but none fresh, the
+  route answers 200 "Unknown" without calling `/latest` or the hours, and its `location`
+  names no station (`id: null`, `name: ""`) and echoes the coordinates asked for. An
+  empty list is still the 404 "No nearby air quality station found."
 - **Every external route answers `200` on an upstream outage, not an error.** Air quality,
   both weather routes, all three wger routes and the mealdb search each return
   `fallback: true` with empty or null readings, so the panel degrades instead of failing.
