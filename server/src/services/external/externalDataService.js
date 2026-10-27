@@ -430,10 +430,11 @@ export const createExternalDataService = ({
 
   const HOUR_MS = 60 * 60 * 1000;
   const NOWCAST_HOURS = 12;
-  // How old the newest hour may be. OpenAQ's hourly means arrive late, so the
-  // newest hour the station reported stands in for the current one, as long as
-  // it ended within this window.
-  const NOWCAST_MAX_AGE_HOURS = 3;
+  // How old a station's newest report may be: the window both for choosing a
+  // station (nearestFreshPm25Station) and for the NowCast's hour 0. OpenAQ's
+  // hourly means arrive late, so the newest hour the station reported stands in
+  // for the current one, as long as it ended within this window.
+  const NOWCAST_MAX_AGE_HOURS = 4;
   // Absorbs float error in the weighted mean before truncating: twelve hours of
   // 12.1 average to 12.099999999999996, which a bare floor would make 12.0.
   const TRUNCATE_EPSILON = 1e-9;
@@ -489,6 +490,68 @@ export const createExternalDataService = ({
     ).toISOString(),
     limit: 24
   });
+
+  // OpenAQ spells the PM2.5 parameter several ways; each is PM2.5.
+  const PM25_CODES = ["pm25", "pm2.5", "pm2_5", "pm2p5"];
+  const isPm25Code = (code) => PM25_CODES.includes(cleanText(code, 40).toLowerCase());
+
+  const EARTH_MEAN_RADIUS_M = 6371008.8;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+
+  // A point's latitude and longitude, or null when either is absent, not a
+  // number, or off the globe: a null must not read as 0, a real position.
+  const toPosition = (point) => {
+    const latitude = toFiniteNumber(point?.latitude);
+    const longitude = toFiniteNumber(point?.longitude);
+    if (latitude === null || longitude === null) return null;
+    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+  };
+
+  // The great-circle (haversine) distance between two positions, in metres.
+  const haversineM = (from, to) => {
+    const dLat = toRadians(to.latitude - from.latitude);
+    const dLon = toRadians(to.longitude - from.longitude);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRadians(from.latitude)) *
+        Math.cos(toRadians(to.latitude)) *
+        Math.sin(dLon / 2) ** 2;
+    return 2 * EARTH_MEAN_RADIUS_M * Math.asin(Math.sqrt(h));
+  };
+
+  // Chooses, from OpenAQ's /locations answer, the station to read: the nearest
+  // one with a PM2.5 sensor whose datetimeLast ended within
+  // NOWCAST_MAX_AGE_HOURS. OpenAQ lists stations in id order, not by distance,
+  // and keeps ones that stopped years ago, so its first result is no answer. A
+  // missing, null or unparseable datetimeLast is stale, never fresh. Distance is
+  // OpenAQ's `distance` when it gives a number of 0 or more, else the haversine
+  // distance from `origin` to the station's coordinates; a station with neither
+  // sorts after every station with one. Equal distances go to the more recent
+  // report, then to list order. Returns { station, distanceM } (distanceM null
+  // when unknown), or null when no station qualifies.
+  const nearestFreshPm25Station = (locations, origin, nowMs = Date.now()) => {
+    const from = toPosition(origin);
+    const fresh = [];
+    for (const station of Array.isArray(locations) ? locations : []) {
+      const sensors = Array.isArray(station?.sensors) ? station.sensors : [];
+      if (!sensors.some((sensor) => isPm25Code(sensor?.parameter?.name))) continue;
+      // Date.parse reads a missing or null time as NaN.
+      const lastMs = Date.parse(station?.datetimeLast?.utc);
+      if (!Number.isFinite(lastMs) || nowMs - lastMs > NOWCAST_MAX_AGE_HOURS * HOUR_MS) continue;
+      const given = toFiniteNumber(station?.distance);
+      const at = toPosition(station?.coordinates);
+      let distanceM = null;
+      if (given !== null && given >= 0) distanceM = given;
+      else if (from && at) distanceM = Math.round(haversineM(from, at));
+      fresh.push({ station, distanceM, lastMs });
+    }
+    // Array.prototype.sort is stable, so full ties keep OpenAQ's order.
+    fresh.sort(
+      (a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity) || b.lastMs - a.lastMs
+    );
+    return fresh.length ? { station: fresh[0].station, distanceM: fresh[0].distanceM } : null;
+  };
 
   const aqiBand = (aqi) => {
     // No reading, or an unreadable one: the advice errs indoors.
@@ -831,6 +894,8 @@ export const createExternalDataService = ({
     pm25ToUsAqi,
     pm25NowCast,
     nowCastHoursQuery,
+    nearestFreshPm25Station,
+    isPm25Code,
     aqiBand,
     normalizePlainText,
     parseMultiNumberQuery,

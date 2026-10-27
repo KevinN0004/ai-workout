@@ -1,5 +1,5 @@
 /**
- * GET /api/air-quality/current: an OpenAQ station near the given coordinates, its
+ * GET /api/air-quality/current: the nearest OpenAQ PM2.5 station still reporting, its
  * latest readings, and the EPA NowCast of its PM2.5 hourly means scored as a US AQI
  * with a training recommendation. Registered by externalRoutes.js.
  */
@@ -8,8 +8,8 @@ import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 /**
  * Registers the air-quality route. `deps` supplies the OpenAQ client
- * (`openAqRequest`) and its parsing and scoring helpers, the NowCast among them,
- * from externalDataService.js.
+ * (`openAqRequest`) and its parsing, station-choosing and scoring helpers, the
+ * NowCast among them, from externalDataService.js.
  */
 export const registerAirQualityRoutes = (app, deps) => {
   const {
@@ -21,6 +21,8 @@ export const registerAirQualityRoutes = (app, deps) => {
     pm25ToUsAqi,
     pm25NowCast,
     nowCastHoursQuery,
+    nearestFreshPm25Station,
+    isPm25Code,
     aqiBand,
     mergeCacheStatuses,
     openAqParameterLabel,
@@ -36,17 +38,56 @@ export const registerAirQualityRoutes = (app, deps) => {
       if (!query) return;
       const { latitude, longitude, radiusKm = 25 } = query;
 
-      // Load the first station OpenAQ lists within the radius.
+      // Load the stations within the radius and choose one. OpenAQ lists them in
+      // id order (order_by accepts only id) and keeps stations that stopped
+      // reporting years ago, so the route asks for one page of 100, OpenAQ's own
+      // default page size, and picks the nearest PM2.5 station still reporting.
       const locationResponse = await openAqRequest("locations", {
         coordinates: `${latitude},${longitude}`,
         radius: Math.round(radiusKm * 1000),
-        limit: 1
+        limit: 100
       });
       const locationData = locationResponse.data;
-      const location = Array.isArray(locationData?.results) ? locationData.results[0] : null;
-      if (!location) {
+      const candidates = Array.isArray(locationData?.results) ? locationData.results : [];
+      if (!candidates.length) {
         return res.status(404).json({ error: "No nearby air quality station found." });
       }
+
+      // Stations are listed but none is a PM2.5 station reporting now: Unknown,
+      // with nothing more asked of OpenAQ. No station is named, so the location
+      // echoes the coordinates asked for, as the outage fallback's does.
+      const chosen = nearestFreshPm25Station(candidates, { latitude, longitude });
+      if (!chosen) {
+        const recommendation = aqiBand(null);
+        return res.json({
+          cache: {
+            status: mergeCacheStatuses(locationResponse.cache),
+            locations: locationResponse.cache,
+            latest: null,
+            hours: null
+          },
+          location: {
+            id: null,
+            name: "",
+            city: "",
+            country: "",
+            latitude,
+            longitude,
+            distanceM: null
+          },
+          summary: {
+            level: recommendation.level,
+            workoutType: recommendation.workoutType,
+            guidance: recommendation.guidance,
+            primaryPollutant: "Unknown",
+            pm25: null,
+            pm25NowCast: null,
+            aqiUs: null
+          },
+          pollutants: []
+        });
+      }
+      const location = chosen.station;
 
       const locationId = toNullableNumber(location?.id, 1, 1000000000);
       if (locationId === null) {
@@ -86,8 +127,7 @@ export const registerAirQualityRoutes = (app, deps) => {
       // Score PM2.5's NowCast over its sensor's hourly means. No PM2.5 sensor,
       // too few recent hours, or a failed hourly request each score null and the
       // "Unknown" band, never AQI 0; the latest reading is still reported.
-      const pm25Reading =
-        pollutants.find((item) => ["pm25", "pm2.5", "pm2_5", "pm2p5"].includes(item.code)) || null;
+      const pm25Reading = pollutants.find((item) => isPm25Code(item.code)) || null;
       const pm25 = pm25Reading?.value ?? null;
       const pm25SensorId = toNullableNumber(pm25Reading?.sensorsId, 1, 1000000000);
       const hoursResponse =
@@ -119,7 +159,7 @@ export const registerAirQualityRoutes = (app, deps) => {
           country: cleanText(location?.country?.name || location?.country?.code || "", 80),
           latitude: toFiniteNumber(location?.coordinates?.latitude),
           longitude: toFiniteNumber(location?.coordinates?.longitude),
-          distanceM: toFiniteNumber(location?.distance)
+          distanceM: chosen.distanceM
         },
         summary: {
           level: recommendation.level,

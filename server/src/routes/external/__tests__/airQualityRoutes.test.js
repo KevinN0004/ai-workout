@@ -31,6 +31,8 @@ const {
   pm25ToUsAqi,
   pm25NowCast,
   nowCastHoursQuery,
+  nearestFreshPm25Station,
+  isPm25Code,
   aqiBand,
   openAqParameterLabel,
   toFiniteNumber
@@ -67,6 +69,8 @@ const buildApp = (openAqRequest, { requestId } = {}) => {
     pm25ToUsAqi,
     pm25NowCast,
     nowCastHoursQuery,
+    nearestFreshPm25Station,
+    isPm25Code,
     aqiBand,
     mergeCacheStatuses,
     openAqParameterLabel,
@@ -95,8 +99,15 @@ const station = (overrides = {}) => ({
   country: { name: "United States" },
   coordinates: { latitude: 40.1, longitude: -75.2 },
   distance: 1200,
+  // Ten minutes before the pinned clock: a station reporting now.
+  datetimeLast: { utc: "2026-03-02T12:00:00Z", local: "2026-03-02T07:00:00-05:00" },
   sensors: [sensor(1, "pm25"), sensor(2, "o3", "ppm")],
   ...overrides
+});
+
+// A station that last reported `hoursAgo` hours before the pinned 12:10Z.
+const reportedAgo = (hoursAgo) => ({
+  utc: new Date(Date.parse("2026-03-02T12:10:00Z") - hoursAgo * 3600000).toISOString()
 });
 
 // One OpenAQ hourly mean, ending `hoursAgo` whole hours before 12:00Z. The
@@ -176,7 +187,9 @@ describe("GET /api/air-quality/current", () => {
   });
 
   describe("station lookup", () => {
-    test("asks for one station within the requested radius, in metres", async () => {
+    // OpenAQ lists stations in id order and cannot sort them by distance, so
+    // the route asks for a page of candidates and chooses among them itself.
+    test("asks for a page of stations within the requested radius, in metres", async () => {
       const openAqRequest = upstream({ locations: [station()], latest: [reading(1, 12)] });
 
       await get(buildApp(openAqRequest), "latitude=40.1&longitude=-75.2&radiusKm=10");
@@ -184,7 +197,7 @@ describe("GET /api/air-quality/current", () => {
       expect(openAqRequest).toHaveBeenNthCalledWith(1, "locations", {
         coordinates: "40.1,-75.2",
         radius: 10000,
-        limit: 1
+        limit: 100
       });
     });
 
@@ -235,6 +248,131 @@ describe("GET /api/air-quality/current", () => {
 
       expect(response.status).toBe(502);
       expect(response.body.requestId).toBe("req-aq-1");
+    });
+  });
+
+  // Shapes from the live answers for three cities on 2026-10-27: OpenAQ's list
+  // is in id order and keeps stations that stopped reporting long ago.
+  describe("station choice", () => {
+    test("reads from the nearest PM2.5 station still reporting (New York)", async () => {
+      const nyc = [
+        station({ id: 384, name: "CCNY", distance: 600, datetimeLast: reportedAgo(23.5) }),
+        station({ id: 625, name: "Queens", distance: 15700, datetimeLast: reportedAgo(1.5) }),
+        station({ id: 626, name: "Midtown", distance: 3300, datetimeLast: reportedAgo(1.5) }),
+        station({ id: 628, name: "Brooklyn", distance: 8200, datetimeLast: reportedAgo(1.5) })
+      ];
+      const openAqRequest = upstream({
+        locations: nyc,
+        latest: [reading(1, 12)],
+        hours: steadyHours(12)
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenNthCalledWith(2, "locations/626/latest");
+      expect(body.location).toMatchObject({ id: 626, name: "Midtown", distanceM: 3300 });
+      expect(body.summary.aqiUs).toBe(pm25ToUsAqi(12));
+    });
+
+    test("takes the live station after a dead one (London)", async () => {
+      const london = [
+        station({
+          id: 137,
+          name: "Harrow",
+          distance: 16300,
+          datetimeLast: { utc: "2023-08-01T00:00:00Z" }
+        }),
+        station({ id: 151, name: "Tower Hamlets", distance: 6150, datetimeLast: reportedAgo(3.5) })
+      ];
+      const openAqRequest = upstream({ locations: london, latest: [reading(1, 30)] });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenNthCalledWith(2, "locations/151/latest");
+      expect(body.location.name).toBe("Tower Hamlets");
+    });
+
+    test("reports the distance it worked out when OpenAQ gives none", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ distance: null, coordinates: { latitude: 41.1, longitude: -75.2 } })],
+        latest: [reading(1, 12)]
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      // One degree of latitude north of the requested 40.1, -75.2.
+      expect(body.location.distanceM).toBe(111195);
+    });
+
+    // Los Angeles: every station listed stopped years ago. Nothing is read, and
+    // the answer is Unknown, never a number from a dead sensor.
+    test("reads Unknown, asking nothing more, when no station is reporting (Los Angeles)", async () => {
+      const la = [
+        station({ id: 1575, datetimeLast: { utc: "2017-06-15T10:00:00Z" } }),
+        station({
+          id: 1576,
+          sensors: [sensor(2, "o3", "ppm")],
+          datetimeLast: { utc: "2016-01-01T00:00:00Z" }
+        })
+      ];
+      const openAqRequest = upstream({
+        locations: la,
+        latest: [reading(1, 12)],
+        locationsCache: "hit"
+      });
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.status).toBe(200);
+      expect(openAqRequest).toHaveBeenCalledTimes(1);
+      expect(response.body).toEqual({
+        cache: { status: "hit", locations: "hit", latest: null, hours: null },
+        location: {
+          id: null,
+          name: "",
+          city: "",
+          country: "",
+          latitude: 40.1,
+          longitude: -75.2,
+          distanceM: null
+        },
+        summary: {
+          level: "Unknown",
+          workoutType: "indoor",
+          guidance: aqiBand(null).guidance,
+          primaryPollutant: "Unknown",
+          pm25: null,
+          pm25NowCast: null,
+          aqiUs: null
+        },
+        pollutants: []
+      });
+    });
+
+    test("reads Unknown when the only fresh station measures no PM2.5", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        latest: [reading(2, 0.031)]
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenCalledTimes(1);
+      expect(body.summary.level).toBe("Unknown");
+      expect(body.pollutants).toEqual([]);
+    });
+
+    test("reads a station that does not say when it last reported as stale", async () => {
+      const openAqRequest = upstream({
+        locations: [station({ datetimeLast: null })],
+        latest: [reading(1, 12)]
+      });
+
+      const { body } = await get(buildApp(openAqRequest));
+
+      expect(openAqRequest).toHaveBeenCalledTimes(1);
+      expect(body.summary.aqiUs).toBeNull();
+      expect(body.location.id).toBeNull();
     });
   });
 
@@ -303,7 +441,9 @@ describe("GET /api/air-quality/current", () => {
     });
 
     test("caps the pollutant list at twelve", async () => {
-      const sensors = Array.from({ length: 20 }, (_, index) => sensor(index + 1, `p${index + 1}`));
+      const sensors = Array.from({ length: 20 }, (_, index) =>
+        sensor(index + 1, index === 0 ? "pm25" : `p${index + 1}`)
+      );
       const openAqRequest = upstream({
         locations: [station({ sensors })],
         latest: sensors.map((item, index) => reading(item.id, index + 1))
@@ -359,7 +499,7 @@ describe("GET /api/air-quality/current", () => {
 
       expect(openAqRequest).toHaveBeenCalledTimes(3);
       expect(openAqRequest).toHaveBeenNthCalledWith(3, "sensors/7/hours", {
-        datetime_from: "2026-03-01T21:00:00.000Z",
+        datetime_from: "2026-03-01T20:00:00.000Z",
         limit: 24
       });
     });
@@ -458,9 +598,11 @@ describe("GET /api/air-quality/current", () => {
       expect(response.body.cache.hours).toBeNull();
     });
 
-    test("asks for no hours when the station has no PM2.5 sensor", async () => {
+    // A station is chosen for its PM2.5 sensor, but its latest readings can
+    // still lack one; then there is no sensor to ask hours of.
+    test("asks for no hours when the latest readings carry no PM2.5", async () => {
       const openAqRequest = upstream({
-        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        locations: [station()],
         latest: [reading(2, 0.03)]
       });
 
@@ -473,7 +615,7 @@ describe("GET /api/air-quality/current", () => {
     // is PM2.5 but not which sensor, so there is nothing to ask hours of.
     test("asks for no hours when the PM2.5 reading names no sensor id", async () => {
       const openAqRequest = upstream({
-        locations: [station({ sensors: [] })],
+        locations: [station()],
         latest: [{ value: 12, sensor: sensor(undefined, "pm25"), datetime: { utc: "x" } }]
       });
 
@@ -499,9 +641,9 @@ describe("GET /api/air-quality/current", () => {
       );
     });
 
-    test("leaves the AQI null when the station reports no pm2.5 at all", async () => {
+    test("leaves the AQI null when the latest readings carry no pm2.5", async () => {
       const openAqRequest = upstream({
-        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        locations: [station()],
         latest: [reading(2, 0.031)]
       });
 
@@ -628,7 +770,7 @@ describe("GET /api/air-quality/current", () => {
 
     test("reports no hourly cache status when no hours were asked for", async () => {
       const openAqRequest = upstream({
-        locations: [station({ sensors: [sensor(2, "o3", "ppm")] })],
+        locations: [station()],
         latest: [reading(2, 0.03)],
         locationsCache: "hit",
         latestCache: "hit"
