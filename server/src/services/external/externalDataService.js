@@ -227,7 +227,10 @@ export const createExternalDataService = ({
     });
   };
 
-  const openAqRequest = async (endpoint, query = {}) => {
+  // `project`, when given, maps the parsed body before it is returned and
+  // cached, so a large answer can be cached trimmed to the fields its caller
+  // reads. The cache key is unchanged, so an entry cached whole still answers.
+  const openAqRequest = async (endpoint, query = {}, { project } = {}) => {
     const cacheKey = buildExternalCacheKey("openAq", {
       baseUrl: openAqBaseUrl,
       endpoint,
@@ -248,7 +251,7 @@ export const createExternalDataService = ({
           err.status = 503;
           throw err;
         }
-        return runExternalRequestWithRetry("openAq", async () => {
+        const data = await runExternalRequestWithRetry("openAq", async () => {
           if (typeof fetch !== "function") {
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
@@ -317,6 +320,7 @@ export const createExternalDataService = ({
             clearTimeout(timeout);
           }
         });
+        return project ? project(data) : data;
       }
     });
   };
@@ -542,6 +546,53 @@ export const createExternalDataService = ({
     const count = toFiniteNumber(found);
     return count !== null && count > returnedCount;
   };
+
+  const isPlainObject = (value) =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+  // A copy of `source` holding only those of `fields` it actually has. A field
+  // given as [name, project] has its value projected too. Values are copied,
+  // never coerced: a missing field stays missing and a null stays null, never 0
+  // or "". Anything that is not a plain object is returned as it came.
+  const pickFields = (source, fields) => {
+    if (!isPlainObject(source)) return source;
+    const picked = {};
+    for (const field of fields) {
+      const [key, project] = Array.isArray(field) ? field : [field];
+      if (!Object.hasOwn(source, key)) continue;
+      picked[key] = project ? project(source[key]) : source[key];
+    }
+    return picked;
+  };
+
+  const projectParameter = (parameter) =>
+    pickFields(parameter, ["name", "units", "unit", "displayName", "display_name"]);
+  const projectSensor = (sensor) => pickFields(sensor, ["id", ["parameter", projectParameter]]);
+  const projectStation = (station) =>
+    pickFields(station, [
+      "id",
+      "name",
+      "city",
+      "locality",
+      ["country", (country) => pickFields(country, ["name", "code"])],
+      ["coordinates", (coordinates) => pickFields(coordinates, ["latitude", "longitude"])],
+      "distance",
+      ["datetimeLast", (datetimeLast) => pickFields(datetimeLast, ["utc"])],
+      ["sensors", (sensors) => (Array.isArray(sensors) ? sensors.map(projectSensor) : sensors)]
+    ]);
+
+  // Trims OpenAQ's /locations answer to what rankFreshPm25Stations, the
+  // air-quality route and its answer read, before it is cached: per station its
+  // id, name, city or locality, country name and code, coordinates, distance,
+  // datetimeLast.utc and each sensor's id and parameter name, unit and label,
+  // plus meta.found. The cache is keyed per requested point and the untrimmed
+  // page of up to 1,000 stations ran to 383,705 bytes for Los Angeles live.
+  // Values are copied, never coerced, so absent stays absent.
+  const projectOpenAqStations = (data) =>
+    pickFields(data, [
+      ["meta", (meta) => pickFields(meta, ["found"])],
+      ["results", (results) => (Array.isArray(results) ? results.map(projectStation) : results)]
+    ]);
 
   // Ranks, from OpenAQ's /locations answer, the stations worth reading: those
   // with a PM2.5 sensor whose datetimeLast is fresh (isFreshReading), nearest
@@ -919,6 +970,7 @@ export const createExternalDataService = ({
     rankFreshPm25Stations,
     isFreshReading,
     openAqResultsTruncated,
+    projectOpenAqStations,
     isPm25Code,
     aqiBand,
     normalizePlainText,

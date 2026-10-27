@@ -431,6 +431,7 @@ const {
   rankFreshPm25Stations,
   isFreshReading,
   openAqResultsTruncated,
+  projectOpenAqStations,
   isPm25Code,
   aqiBand,
   normalizePlainText,
@@ -710,6 +711,7 @@ registerApiRoutes(app, {
   rankFreshPm25Stations,
   isFreshReading,
   openAqResultsTruncated,
+  projectOpenAqStations,
   // The air-quality route warns when OpenAQ's station list arrives cut short.
   logger,
   isPm25Code,

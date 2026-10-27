@@ -17,6 +17,7 @@ const {
   rankFreshPm25Stations,
   isFreshReading,
   openAqResultsTruncated,
+  projectOpenAqStations,
   aqiBand,
   isSevereWeatherCode,
   isOutdoorFriendlyNow,
@@ -355,6 +356,135 @@ describe("openAqResultsTruncated", () => {
 
   test.each([[undefined], [null], ["meta"]])("is false for a meta of %j", (meta) => {
     expect(openAqResultsTruncated(meta, 5)).toBe(false);
+  });
+});
+
+// One station as OpenAQ's /v3/locations returns it: every field of the
+// documented location record, most of which nothing here reads.
+const liveStation = (id) => ({
+  id,
+  name: `Station ${id}`,
+  locality: "Los Angeles",
+  timezone: "America/Los_Angeles",
+  country: { id: 155, code: "US", name: "United States" },
+  owner: { id: 4, name: "Unknown Governmental Organization" },
+  provider: { id: 119, name: "AirNow" },
+  isMobile: false,
+  isMonitor: true,
+  instruments: [{ id: 2, name: "Government Monitor" }],
+  sensors: [
+    {
+      id: id * 10,
+      name: "pm25 µg/m³",
+      parameter: { id: 2, name: "pm25", units: "µg/m³", displayName: "PM2.5" }
+    },
+    {
+      id: id * 10 + 1,
+      name: "o3 ppm",
+      parameter: { id: 10, name: "o3", units: "ppm", displayName: "O₃" }
+    }
+  ],
+  coordinates: { latitude: 34.06659, longitude: -118.22688 },
+  licenses: [
+    {
+      id: 33,
+      name: "US Public Domain",
+      attribution: { name: "Unknown Governmental Organization", url: null },
+      dateFrom: "2016-01-30",
+      dateTo: null
+    }
+  ],
+  bounds: [-118.22688, 34.06659, -118.22688, 34.06659],
+  distance: 2222.24721458,
+  datetimeFirst: { utc: "2016-03-06T20:00:00Z", local: "2016-03-06T12:00:00-08:00" },
+  datetimeLast: { utc: "2026-10-27T02:00:00Z", local: "2026-10-26T19:00:00-07:00" }
+});
+
+// The station list is cached for every requested point, and with
+// parameters_id=2&limit=1000 it ran to 383,705 bytes for Los Angeles live. Only
+// the fields the route and its answer read are kept.
+describe("projectOpenAqStations", () => {
+  test("keeps only what the station choice and the answer read", () => {
+    const projected = projectOpenAqStations({
+      meta: { name: "openaq-api", website: "/", page: 1, limit: 1000, found: 287 },
+      results: [liveStation(7936)]
+    });
+
+    expect(projected).toEqual({
+      meta: { found: 287 },
+      results: [
+        {
+          id: 7936,
+          name: "Station 7936",
+          locality: "Los Angeles",
+          country: { code: "US", name: "United States" },
+          coordinates: { latitude: 34.06659, longitude: -118.22688 },
+          distance: 2222.24721458,
+          datetimeLast: { utc: "2026-10-27T02:00:00Z" },
+          sensors: [
+            { id: 79360, parameter: { name: "pm25", units: "µg/m³", displayName: "PM2.5" } },
+            { id: 79361, parameter: { name: "o3", units: "ppm", displayName: "O₃" } }
+          ]
+        }
+      ]
+    });
+  });
+
+  // Absent is not zero: the projection copies what is there and nothing else,
+  // so a missing field stays missing and a null stays null, never 0 or "".
+  test("leaves an absent field absent and a null null", () => {
+    const sparse = {
+      id: 1,
+      distance: null,
+      coordinates: { latitude: null },
+      datetimeLast: null,
+      country: null,
+      sensors: [{ id: 2, parameter: { name: "pm25" } }, { parameter: null }, null]
+    };
+
+    const [station] = projectOpenAqStations({ results: [sparse] }).results;
+
+    expect(station).toEqual(sparse);
+    expect(station).not.toHaveProperty("name");
+    expect(station).not.toHaveProperty("locality");
+    expect(station.coordinates).not.toHaveProperty("longitude");
+    expect(station.sensors[0].parameter).not.toHaveProperty("units");
+    expect(projectOpenAqStations({ results: [] })).toEqual({ results: [] });
+    expect(projectOpenAqStations({ results: [{ id: 3, sensors: null }, null] })).toEqual({
+      results: [{ id: 3, sensors: null }, null]
+    });
+    expect(projectOpenAqStations({ meta: { page: 1 } })).toEqual({ meta: {} });
+  });
+
+  test("keeps the other spellings of a parameter's unit and label", () => {
+    const station = {
+      id: 1,
+      city: "Springfield",
+      sensors: [{ id: 2, parameter: { name: "pm25", unit: "ug/m3", display_name: "PM2.5" } }]
+    };
+
+    expect(projectOpenAqStations({ results: [station] }).results[0]).toEqual(station);
+  });
+
+  test.each([[undefined], [null], ["not json"], [[]], [{ results: "nope", meta: 3 }]])(
+    "passes %j through as it came",
+    (data) => {
+      expect(projectOpenAqStations(data)).toEqual(data);
+    }
+  );
+
+  // The ranking reads the same answer from the projection as from the full list.
+  test("ranks the projected list exactly as the full one", () => {
+    const full = [liveStation(1), liveStation(2), liveStation(3)];
+    full[1].distance = 900;
+    full[2].datetimeLast = { utc: "2025-01-01T00:00:00Z", local: "x" };
+    const at = Date.parse("2026-10-27T02:49:00Z");
+    const origin = { latitude: 34.0522, longitude: -118.2437 };
+    const ids = (ranked) => ranked.map(({ station, distanceM }) => [station.id, distanceM]);
+
+    expect(
+      ids(rankFreshPm25Stations(projectOpenAqStations({ results: full }).results, origin, at))
+    ).toEqual(ids(rankFreshPm25Stations(full, origin, at)));
   });
 });
 

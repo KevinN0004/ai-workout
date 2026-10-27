@@ -36,6 +36,7 @@ export const registerAirQualityRoutes = (app, deps) => {
     rankFreshPm25Stations,
     isFreshReading,
     openAqResultsTruncated,
+    projectOpenAqStations,
     isPm25Code,
     aqiBand,
     mergeCacheStatuses,
@@ -90,12 +91,19 @@ export const registerAirQualityRoutes = (app, deps) => {
       // reporting years ago, so the route asks for one full page and ranks them
       // itself. A list still cut short could miss the nearest station, so it is
       // logged, once per answer fetched from OpenAQ rather than per cached read.
-      const locationResponse = await openAqRequest("locations", {
-        coordinates: `${latitude},${longitude}`,
-        radius: Math.round(radiusKm * 1000),
-        parameters_id: PM25_PARAMETER_ID,
-        limit: STATION_PAGE_LIMIT
-      });
+      // The page is cached per requested point, so it is cached trimmed to the
+      // fields read below (projectOpenAqStations); a list cached whole before
+      // the trim holds the same fields and still answers.
+      const locationResponse = await openAqRequest(
+        "locations",
+        {
+          coordinates: `${latitude},${longitude}`,
+          radius: Math.round(radiusKm * 1000),
+          parameters_id: PM25_PARAMETER_ID,
+          limit: STATION_PAGE_LIMIT
+        },
+        { project: projectOpenAqStations }
+      );
       const locationData = locationResponse.data;
       const candidates = Array.isArray(locationData?.results) ? locationData.results : [];
       if (!candidates.length) {

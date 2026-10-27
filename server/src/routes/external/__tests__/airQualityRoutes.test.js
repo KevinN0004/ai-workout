@@ -34,6 +34,7 @@ const {
   rankFreshPm25Stations,
   isFreshReading,
   openAqResultsTruncated,
+  projectOpenAqStations,
   isPm25Code,
   aqiBand,
   openAqParameterLabel,
@@ -75,6 +76,7 @@ const buildApp = (openAqRequest, { requestId, logger = stubbed.logger } = {}) =>
     rankFreshPm25Stations,
     isFreshReading,
     openAqResultsTruncated,
+    projectOpenAqStations,
     isPm25Code,
     aqiBand,
     mergeCacheStatuses,
@@ -200,12 +202,88 @@ describe("GET /api/air-quality/current", () => {
 
       await get(buildApp(openAqRequest), "latitude=40.1&longitude=-75.2&radiusKm=10");
 
-      expect(openAqRequest).toHaveBeenNthCalledWith(1, "locations", {
-        coordinates: "40.1,-75.2",
-        radius: 10000,
-        parameters_id: 2,
-        limit: 1000
+      expect(openAqRequest).toHaveBeenNthCalledWith(
+        1,
+        "locations",
+        { coordinates: "40.1,-75.2", radius: 10000, parameters_id: 2, limit: 1000 },
+        { project: projectOpenAqStations }
+      );
+    });
+
+    // That page is cached for every point asked about (383,705 bytes live for
+    // Los Angeles), so the station list is cached trimmed to the fields read;
+    // /latest and the hours are small and cached whole.
+    test("caches the station list trimmed, and the other calls whole", async () => {
+      const openAqRequest = upstream({
+        locations: [station()],
+        latest: [reading(1, 12)],
+        hours: steadyHours(12)
       });
+
+      await get(buildApp(openAqRequest));
+
+      expect(openAqRequest.mock.calls[0][2]).toEqual({ project: projectOpenAqStations });
+      expect(openAqRequest.mock.calls[1]).toHaveLength(1);
+      expect(openAqRequest.mock.calls[2]).toHaveLength(2);
+    });
+
+    // A list cached before the trim holds every field; one cached after holds
+    // only the projection. Both must give the same answer.
+    test("answers the same from a trimmed station list as from a full one", async () => {
+      const full = [
+        station({
+          id: 154,
+          distance: 2509,
+          timezone: "Europe/London",
+          provider: { id: 1, name: "AirNow" },
+          owner: { id: 2, name: "Defra" },
+          licenses: [{ id: 3, name: "OGL" }],
+          bounds: [0, 0, 0, 0],
+          datetimeFirst: { utc: "2016-01-01T00:00:00Z" },
+          sensors: [
+            { id: 246, name: "pm25 µg/m³", parameter: { id: 2, name: "pm25", units: "ug/m3" } }
+          ]
+        }),
+        station({
+          id: 151,
+          name: "Tower Hamlets",
+          distance: 6150,
+          country: { id: 79, code: "GB", name: "United Kingdom" },
+          sensors: [
+            { id: 1510, parameter: { id: 2, name: "pm25", units: "ug/m3", displayName: "PM2.5" } },
+            { id: 1511, parameter: { id: 10, name: "o3", units: "ppm", displayName: "Ozone" } }
+          ]
+        })
+      ];
+      const answerFrom = async (locations) => {
+        const openAqRequest = vi
+          .fn()
+          .mockResolvedValueOnce({ data: { meta: { found: 2 }, results: locations }, cache: "hit" })
+          .mockResolvedValueOnce({
+            data: { results: [reading(246, 10, "2026-01-10T08:00:00Z")] },
+            cache: "miss"
+          })
+          .mockResolvedValueOnce({
+            data: { results: [reading(1510, 12), reading(1511, 0.03)] },
+            cache: "miss"
+          })
+          .mockResolvedValueOnce({ data: { results: steadyHours(12) }, cache: "miss" });
+        return (await get(buildApp(openAqRequest))).body;
+      };
+
+      const fromFull = await answerFrom(full);
+      const fromTrimmed = await answerFrom(projectOpenAqStations({ results: full }).results);
+
+      expect(fromTrimmed).toEqual(fromFull);
+      expect(fromFull.location).toMatchObject({
+        id: 151,
+        name: "Tower Hamlets",
+        country: "United Kingdom"
+      });
+      expect(fromFull.pollutants.map((item) => [item.label, item.unit])).toEqual([
+        ["PM2.5", "ug/m3"],
+        ["Ozone", "ppm"]
+      ]);
     });
 
     test("defaults to a 25km radius when none is given", async () => {

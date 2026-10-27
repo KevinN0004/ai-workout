@@ -348,6 +348,51 @@ const rawText = (status, body) => ({
 });
 
 describe("openAqRequest", () => {
+  // What the cache stores is whatever requestFn returns, so a cache that keeps
+  // that value shows what a lookup would leave in memory or Redis.
+  const keepingCache = () => {
+    const stored = [];
+    const readThroughExternalCache = async ({ requestFn }) => {
+      const data = await requestFn();
+      stored.push(data);
+      return { data, cache: "miss" };
+    };
+    return { stored, readThroughExternalCache };
+  };
+
+  test("caches the projection of the body when one is given, not the body", async () => {
+    const body = { meta: { found: 1, page: 1 }, results: [{ id: 7, provider: { id: 1 } }] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => rawText(200, JSON.stringify(body)))
+    );
+    const { stored, readThroughExternalCache } = keepingCache();
+    const project = vi.fn(() => ({ results: [{ id: 7 }] }));
+
+    const { data } = await buildRequesters({ readThroughExternalCache }).openAqRequest(
+      "locations",
+      {},
+      { project }
+    );
+
+    expect(project).toHaveBeenCalledWith(body);
+    expect(stored).toEqual([{ results: [{ id: 7 }] }]);
+    expect(data).toEqual({ results: [{ id: 7 }] });
+  });
+
+  test("caches the body whole when no projection is given", async () => {
+    const body = { results: [{ sensorsId: 1, value: 12, coordinates: { latitude: 1 } }] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => rawText(200, JSON.stringify(body)))
+    );
+    const { stored, readThroughExternalCache } = keepingCache();
+
+    await buildRequesters({ readThroughExternalCache }).openAqRequest("locations/1/latest");
+
+    expect(stored).toEqual([body]);
+  });
+
   test("joins the base url and endpoint without doubling the slash", async () => {
     const fetchMock = vi.fn(async () => rawText(200, JSON.stringify({ results: [] })));
     vi.stubGlobal("fetch", fetchMock);
