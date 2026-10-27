@@ -442,6 +442,7 @@ describe("nearestFreshPm25Station", () => {
     const placed = candidate({ id: 2, last: hoursBefore(1), latitude: 0.2, longitude: 0.05 });
 
     expect(pick([lost, placed], origin)).toEqual({ station: placed, distanceM: 16679 });
+    expect(pick([placed, lost], origin)).toEqual({ station: placed, distanceM: 16679 });
     // Alone, it is still a fresh PM2.5 station, with no distance to report.
     expect(pick([lost], origin)).toEqual({ station: lost, distanceM: null });
   });
