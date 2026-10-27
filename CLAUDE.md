@@ -207,7 +207,11 @@ allow, and logs `openaq_locations_truncated` when `openAqResultsTruncated` says 
 was cut short. `rankFreshPm25Stations` keeps the stations with a PM2.5 sensor whose
 `datetimeLast` is fresh and ranks them nearest first: OpenAQ's `distance` (metres, filled
 in live) when it is a number of 0 or more, else haversine from `coordinates`; a `null`
-distance or position is unknown, never 0 metres, and sorts last.
+distance or position is unknown, never 0 metres, and sorts last. **That page is cached
+trimmed** (`projectOpenAqStations`, passed to `openAqRequest` as `project`): untrimmed it
+ran to 383,705 bytes for Los Angeles, cached per requested point for up to 500 entries,
+enough to exhaust a 512 MB instance. Only the fields the route and its answer read are
+kept, copied as they came, so absent stays absent; an entry cached whole still answers.
 
 **A fresh station is not a fresh PM2.5 reading.** `datetimeLast` covers every sensor: live,
 London's nearest fresh station (154 Marylebone Road, 2.2 h) had a PM2.5 reading dated
