@@ -358,6 +358,8 @@ describe("GET /api/air-quality/current", () => {
       const { body } = await get(buildApp(openAqRequest));
 
       expect(openAqRequest).toHaveBeenCalledTimes(1);
+      // A deliberate answer, not the outage fallback.
+      expect(body.fallback).toBeUndefined();
       expect(body.summary.level).toBe("Unknown");
       expect(body.pollutants).toEqual([]);
     });
@@ -371,6 +373,7 @@ describe("GET /api/air-quality/current", () => {
       const { body } = await get(buildApp(openAqRequest));
 
       expect(openAqRequest).toHaveBeenCalledTimes(1);
+      expect(body.fallback).toBeUndefined();
       expect(body.summary.aqiUs).toBeNull();
       expect(body.location.id).toBeNull();
     });
