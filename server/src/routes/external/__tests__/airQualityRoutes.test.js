@@ -35,6 +35,7 @@ const {
   isFreshReading,
   openAqResultsTruncated,
   projectOpenAqStations,
+  openAqReturnedCount,
   isPm25Code,
   aqiBand,
   openAqParameterLabel,
@@ -77,6 +78,7 @@ const buildApp = (openAqRequest, { requestId, logger = stubbed.logger } = {}) =>
     isFreshReading,
     openAqResultsTruncated,
     projectOpenAqStations,
+    openAqReturnedCount,
     isPm25Code,
     aqiBand,
     mergeCacheStatuses,
@@ -255,10 +257,10 @@ describe("GET /api/air-quality/current", () => {
           ]
         })
       ];
-      const answerFrom = async (locations) => {
+      const answerFrom = async (locationData) => {
         const openAqRequest = vi
           .fn()
-          .mockResolvedValueOnce({ data: { meta: { found: 2 }, results: locations }, cache: "hit" })
+          .mockResolvedValueOnce({ data: locationData, cache: "hit" })
           .mockResolvedValueOnce({
             data: { results: [reading(246, 10, "2026-01-10T08:00:00Z")] },
             cache: "miss"
@@ -271,8 +273,13 @@ describe("GET /api/air-quality/current", () => {
         return (await get(buildApp(openAqRequest))).body;
       };
 
-      const fromFull = await answerFrom(full);
-      const fromTrimmed = await answerFrom(projectOpenAqStations({ results: full }).results);
+      // A third station, stale: dropped by the projection, passed over by the
+      // ranking of the full list.
+      full.push(station({ id: 9, distance: 10, datetimeLast: { utc: "2017-06-15T10:00:00Z" } }));
+      const upstreamAnswer = { meta: { found: 3 }, results: full };
+
+      const fromFull = await answerFrom(upstreamAnswer);
+      const fromTrimmed = await answerFrom(projectOpenAqStations(upstreamAnswer));
 
       expect(fromTrimmed).toEqual(fromFull);
       expect(fromFull.location).toMatchObject({
@@ -556,10 +563,30 @@ describe("GET /api/air-quality/current", () => {
       );
     });
 
+    // The cached list has its stale stations dropped, so its length is not what
+    // OpenAQ sent; the count the projection recorded is.
+    test("judges the list by the count OpenAQ sent, not by the stations kept", async () => {
+      const logger = { info() {}, warn: vi.fn(), error() {} };
+      const openAqRequest = walk({
+        locations: [pm25Station(1, 100, 11)],
+        meta: { found: ">1000", returned: 1000 },
+        latests: [[reading(11, 12)]],
+        hours: steadyHours(12)
+      });
+
+      await get(buildApp(openAqRequest, { logger }));
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ found: ">1000", returned: 1000 })
+      );
+    });
+
     test.each([
       ["a cached list", { found: ">1000" }, "hit"],
       ["a complete list", { found: 1 }, "miss"],
-      ["no count", undefined, "miss"]
+      ["no count", undefined, "miss"],
+      // 287 sent, 286 of them stale and dropped: complete, though only one is kept.
+      ["a complete list with stale stations dropped", { found: 287, returned: 287 }, "miss"]
     ])("does not warn for %s", async (_label, meta, locationsCache) => {
       const logger = { info() {}, warn: vi.fn(), error() {} };
       const openAqRequest = walk({
@@ -672,6 +699,51 @@ describe("GET /api/air-quality/current", () => {
         },
         pollutants: []
       });
+    });
+
+    // The station list is cached with its stale stations already dropped, so
+    // Los Angeles' list comes back from the cache empty but counted. That is
+    // still "stations listed, none reporting": the same 200 Unknown, byte for
+    // byte, as the full list cached before the drop, and never the 404.
+    test("answers an all-stale list the same whether cached whole or filtered", async () => {
+      const la = {
+        meta: { found: 2 },
+        results: [
+          station({ id: 1575, datetimeLast: { utc: "2017-06-15T10:00:00Z" } }),
+          station({ id: 1576, datetimeLast: { utc: "2016-01-01T00:00:00Z" } })
+        ]
+      };
+      const answerFrom = async (data) => {
+        const openAqRequest = vi.fn().mockResolvedValueOnce({ data, cache: "hit" });
+        const response = await get(buildApp(openAqRequest));
+        expect(openAqRequest).toHaveBeenCalledTimes(1);
+        return response;
+      };
+      const filtered = projectOpenAqStations(la);
+
+      expect(filtered).toEqual({ meta: { found: 2, returned: 2 }, results: [] });
+      const fromWhole = await answerFrom(la);
+      const fromFiltered = await answerFrom(filtered);
+
+      expect(fromFiltered.status).toBe(200);
+      expect(fromFiltered.status).toBe(fromWhole.status);
+      expect(fromFiltered.text).toBe(fromWhole.text);
+      expect(fromFiltered.body.summary.level).toBe("Unknown");
+    });
+
+    test("still answers 404 when OpenAQ listed no station at all", async () => {
+      const openAqRequest = vi
+        .fn()
+        .mockResolvedValueOnce({
+          data: { meta: { found: 0, returned: 0 }, results: [] },
+          cache: "miss"
+        });
+
+      const response = await get(buildApp(openAqRequest));
+
+      expect(response.status).toBe(404);
+      expect(String(response.body?.error)).toMatch(/no nearby air quality station/i);
+      expect(openAqRequest).toHaveBeenCalledTimes(1);
     });
 
     test("reads Unknown when the only fresh station measures no PM2.5", async () => {

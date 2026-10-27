@@ -37,6 +37,7 @@ export const registerAirQualityRoutes = (app, deps) => {
     isFreshReading,
     openAqResultsTruncated,
     projectOpenAqStations,
+    openAqReturnedCount,
     isPm25Code,
     aqiBand,
     mergeCacheStatuses,
@@ -106,17 +107,22 @@ export const registerAirQualityRoutes = (app, deps) => {
       );
       const locationData = locationResponse.data;
       const candidates = Array.isArray(locationData?.results) ? locationData.results : [];
-      if (!candidates.length) {
+      // The cached list has the stations the route could not read already
+      // dropped, so the 404 and the truncation check go by how many OpenAQ
+      // sent (openAqReturnedCount), not by how many were kept. A list with
+      // stations sent but none kept takes the no-fresh-station answer below.
+      const returnedCount = openAqReturnedCount(locationData);
+      if (returnedCount === 0) {
         return res.status(404).json({ error: "No nearby air quality station found." });
       }
       if (
         locationResponse.cache === "miss" &&
-        openAqResultsTruncated(locationData?.meta, candidates.length)
+        openAqResultsTruncated(locationData?.meta, returnedCount)
       ) {
         logger.warn({
           event: "openaq_locations_truncated",
           found: locationData.meta.found,
-          returned: candidates.length,
+          returned: returnedCount,
           message: "OpenAQ holds more PM2.5 stations within the radius than one page returned."
         });
       }

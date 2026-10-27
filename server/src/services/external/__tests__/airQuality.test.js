@@ -18,6 +18,7 @@ const {
   isFreshReading,
   openAqResultsTruncated,
   projectOpenAqStations,
+  openAqReturnedCount,
   aqiBand,
   isSevereWeatherCode,
   isOutdoorFriendlyNow,
@@ -402,16 +403,23 @@ const liveStation = (id) => ({
 
 // The station list is cached for every requested point, and with
 // parameters_id=2&limit=1000 it ran to 383,705 bytes for Los Angeles live. Only
-// the fields the route and its answer read are kept.
+// the stations the route could read, and only the fields it reads, are kept.
+// The clock is passed in: the fixtures carry real dates.
+const LIVE_AT = Date.parse("2026-10-27T02:49:00Z");
+const freshUtc = "2026-10-27T02:00:00Z";
+
 describe("projectOpenAqStations", () => {
   test("keeps only what the station choice and the answer read", () => {
-    const projected = projectOpenAqStations({
-      meta: { name: "openaq-api", website: "/", page: 1, limit: 1000, found: 287 },
-      results: [liveStation(7936)]
-    });
+    const projected = projectOpenAqStations(
+      {
+        meta: { name: "openaq-api", website: "/", page: 1, limit: 1000, found: 287 },
+        results: [liveStation(7936)]
+      },
+      LIVE_AT
+    );
 
     expect(projected).toEqual({
-      meta: { found: 287 },
+      meta: { found: 287, returned: 1 },
       results: [
         {
           id: 7936,
@@ -420,13 +428,66 @@ describe("projectOpenAqStations", () => {
           country: { code: "US", name: "United States" },
           coordinates: { latitude: 34.06659, longitude: -118.22688 },
           distance: 2222.24721458,
-          datetimeLast: { utc: "2026-10-27T02:00:00Z" },
+          datetimeLast: { utc: freshUtc },
           sensors: [
             { id: 79360, parameter: { name: "pm25", units: "µg/m³", displayName: "PM2.5" } },
             { id: 79361, parameter: { name: "o3", units: "ppm", displayName: "O₃" } }
           ]
         }
       ]
+    });
+  });
+
+  // Live, Los Angeles listed 287 PM2.5 stations and 61 had reported within four
+  // hours. A station stale when the list is fetched only grows staler in the
+  // cached copy, so the route could never read it: it is dropped before caching,
+  // by the same rule the route applies (isFreshReading, absent is stale).
+  test("drops the stations the route could never read, and counts what came", () => {
+    const stale = liveStation(1);
+    stale.datetimeLast = { utc: "2023-08-01T00:00:00Z", local: "x" };
+    const undated = liveStation(2);
+    delete undated.datetimeLast;
+    const unparseable = liveStation(3);
+    unparseable.datetimeLast = { utc: "recently" };
+    const noPm25 = liveStation(4);
+    noPm25.sensors = noPm25.sensors.slice(1);
+    const noSensorList = liveStation(6);
+    noSensorList.sensors = null;
+    const fresh = liveStation(5);
+
+    const projected = projectOpenAqStations(
+      { meta: { found: 6 }, results: [stale, undated, unparseable, noPm25, noSensorList, fresh] },
+      LIVE_AT
+    );
+
+    expect(projected.meta).toEqual({ found: 6, returned: 6 });
+    expect(projected.results.map((station) => station.id)).toEqual([5]);
+  });
+
+  // The same four hours as the route: at 02:49, 22:49 the evening before is just
+  // fresh and 22:48:59 just stale.
+  test("keeps a station that reported exactly four hours ago, and no older", () => {
+    const at = (utc) => {
+      const station = liveStation(1);
+      station.datetimeLast = { utc };
+      return projectOpenAqStations({ results: [station] }, LIVE_AT).results.length;
+    };
+
+    expect(at("2026-10-26T22:49:00Z")).toBe(1);
+    expect(at("2026-10-26T22:48:59Z")).toBe(0);
+  });
+
+  test("records the raw count even when no station survives, and with no meta", () => {
+    const stale = liveStation(1);
+    stale.datetimeLast = { utc: "2017-06-15T10:00:00Z" };
+
+    expect(projectOpenAqStations({ results: [stale, null] }, LIVE_AT)).toEqual({
+      meta: { returned: 2 },
+      results: []
+    });
+    expect(projectOpenAqStations({ results: [] }, LIVE_AT)).toEqual({
+      meta: { returned: 0 },
+      results: []
     });
   });
 
@@ -437,54 +498,103 @@ describe("projectOpenAqStations", () => {
       id: 1,
       distance: null,
       coordinates: { latitude: null },
-      datetimeLast: null,
+      datetimeLast: { utc: freshUtc },
       country: null,
       sensors: [{ id: 2, parameter: { name: "pm25" } }, { parameter: null }, null]
     };
 
-    const [station] = projectOpenAqStations({ results: [sparse] }).results;
+    const [station] = projectOpenAqStations({ results: [sparse] }, LIVE_AT).results;
 
     expect(station).toEqual(sparse);
     expect(station).not.toHaveProperty("name");
     expect(station).not.toHaveProperty("locality");
     expect(station.coordinates).not.toHaveProperty("longitude");
     expect(station.sensors[0].parameter).not.toHaveProperty("units");
-    expect(projectOpenAqStations({ results: [] })).toEqual({ results: [] });
-    expect(projectOpenAqStations({ results: [{ id: 3, sensors: null }, null] })).toEqual({
-      results: [{ id: 3, sensors: null }, null]
+    expect(projectOpenAqStations({ meta: { page: 1 } }, LIVE_AT)).toEqual({ meta: {} });
+    expect(projectOpenAqStations({ meta: null, results: "nope" }, LIVE_AT)).toEqual({
+      meta: null,
+      results: "nope"
     });
-    expect(projectOpenAqStations({ meta: { page: 1 } })).toEqual({ meta: {} });
   });
 
   test("keeps the other spellings of a parameter's unit and label", () => {
     const station = {
       id: 1,
       city: "Springfield",
-      sensors: [{ id: 2, parameter: { name: "pm25", unit: "ug/m3", display_name: "PM2.5" } }]
+      datetimeLast: { utc: freshUtc },
+      sensors: [{ id: 2, parameter: { name: "pm2.5", unit: "ug/m3", display_name: "PM2.5" } }]
     };
 
-    expect(projectOpenAqStations({ results: [station] }).results[0]).toEqual(station);
+    expect(projectOpenAqStations({ results: [station] }, LIVE_AT).results[0]).toEqual(station);
   });
 
   test.each([[undefined], [null], ["not json"], [[]], [{ results: "nope", meta: 3 }]])(
     "passes %j through as it came",
     (data) => {
-      expect(projectOpenAqStations(data)).toEqual(data);
+      expect(projectOpenAqStations(data, LIVE_AT)).toEqual(data);
     }
   );
 
-  // The ranking reads the same answer from the projection as from the full list.
+  // The route ranks at read time, so the projection may only drop what the
+  // ranking would drop anyway: both lists must rank the same.
   test("ranks the projected list exactly as the full one", () => {
-    const full = [liveStation(1), liveStation(2), liveStation(3)];
+    const full = [liveStation(1), liveStation(2), liveStation(3), liveStation(4)];
     full[1].distance = 900;
     full[2].datetimeLast = { utc: "2025-01-01T00:00:00Z", local: "x" };
-    const at = Date.parse("2026-10-27T02:49:00Z");
+    full[3].sensors = [];
     const origin = { latitude: 34.0522, longitude: -118.2437 };
     const ids = (ranked) => ranked.map(({ station, distanceM }) => [station.id, distanceM]);
 
     expect(
-      ids(rankFreshPm25Stations(projectOpenAqStations({ results: full }).results, origin, at))
-    ).toEqual(ids(rankFreshPm25Stations(full, origin, at)));
+      ids(
+        rankFreshPm25Stations(
+          projectOpenAqStations({ results: full }, LIVE_AT).results,
+          origin,
+          LIVE_AT
+        )
+      )
+    ).toEqual(ids(rankFreshPm25Stations(full, origin, LIVE_AT)));
+  });
+
+  test("reads the clock when no time is given", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(LIVE_AT);
+    try {
+      expect(projectOpenAqStations({ results: [liveStation(1)] }).results).toHaveLength(1);
+      vi.setSystemTime(LIVE_AT + 5 * 3600000);
+      expect(projectOpenAqStations({ results: [liveStation(1)] }).results).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// How many stations OpenAQ sent, before projectOpenAqStations dropped the stale
+// ones: what the 404 and the truncation check are about. A list cached before
+// the projection counted has no meta.returned, so its own length is the count.
+describe("openAqReturnedCount", () => {
+  test("is the count the projection recorded", () => {
+    expect(openAqReturnedCount({ meta: { found: 287, returned: 287 }, results: [{ id: 1 }] })).toBe(
+      287
+    );
+    expect(openAqReturnedCount({ meta: { returned: 0 }, results: [] })).toBe(0);
+  });
+
+  test("is the list's own length for a list cached before the count was kept", () => {
+    expect(openAqReturnedCount({ meta: { found: 2 }, results: [{ id: 1 }, { id: 2 }] })).toBe(2);
+    expect(openAqReturnedCount({ results: [] })).toBe(0);
+  });
+
+  // Absent is not zero: an unreadable count is no count, so the length decides.
+  test.each([[null], [""], ["5"], [-1], [1.5], [undefined]])(
+    "falls back to the length for a returned of %j",
+    (returned) => {
+      expect(openAqReturnedCount({ meta: { returned }, results: [{ id: 1 }] })).toBe(1);
+    }
+  );
+
+  test.each([[undefined], [null], [{}], [{ results: "nope" }]])("is 0 for %j", (data) => {
+    expect(openAqReturnedCount(data)).toBe(0);
   });
 });
 
