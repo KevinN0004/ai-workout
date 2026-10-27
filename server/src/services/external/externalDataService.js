@@ -430,10 +430,11 @@ export const createExternalDataService = ({
 
   const HOUR_MS = 60 * 60 * 1000;
   const NOWCAST_HOURS = 12;
-  // How old a station's newest report may be: the window both for choosing a
-  // station (nearestFreshPm25Station) and for the NowCast's hour 0. OpenAQ's
-  // hourly means arrive late, so the newest hour the station reported stands in
-  // for the current one, as long as it ended within this window.
+  // How old a report may be: the window for a station's datetimeLast, for its
+  // PM2.5 reading's own time (both through isFreshReading) and for the
+  // NowCast's hour 0. OpenAQ's hourly means arrive late, so the newest hour the
+  // station reported stands in for the current one, as long as it ended within
+  // this window.
   const NOWCAST_MAX_AGE_HOURS = 4;
   // Absorbs float error in the weighted mean before truncating: twelve hours of
   // 12.1 average to 12.099999999999996, which a bare floor would make 12.0.
@@ -520,25 +521,43 @@ export const createExternalDataService = ({
     return 2 * EARTH_MEAN_RADIUS_M * Math.asin(Math.sqrt(h));
   };
 
-  // Chooses, from OpenAQ's /locations answer, the station to read: the nearest
-  // one with a PM2.5 sensor whose datetimeLast ended within
-  // NOWCAST_MAX_AGE_HOURS. OpenAQ lists stations in id order, not by distance,
-  // and keeps ones that stopped years ago, so its first result is no answer. A
-  // missing, null or unparseable datetimeLast is stale, never fresh. Distance is
+  // Whether a UTC time ended within NOWCAST_MAX_AGE_HOURS of `nowMs`: the one
+  // freshness rule, for a station's datetimeLast and for a reading's own
+  // datetime. A missing, null or unparseable time is stale, never fresh
+  // (Date.parse reads it as NaN).
+  const isFreshReading = (utc, nowMs = Date.now()) => {
+    const ms = Date.parse(utc);
+    return Number.isFinite(ms) && nowMs - ms <= NOWCAST_MAX_AGE_HOURS * HOUR_MS;
+  };
+
+  // Whether OpenAQ says it holds more results than it sent: `meta.found` is a
+  // count, or a string such as ">100" when it stopped counting at the limit. An
+  // absent or unreadable count says nothing either way, so it reads as false.
+  const openAqResultsTruncated = (meta, returnedCount) => {
+    const found = meta?.found;
+    if (typeof found === "string" && /^>\s*\d+$/.test(found.trim())) return true;
+    const count = toFiniteNumber(found);
+    return count !== null && count > returnedCount;
+  };
+
+  // Ranks, from OpenAQ's /locations answer, the stations worth reading: those
+  // with a PM2.5 sensor whose datetimeLast is fresh (isFreshReading), nearest
+  // first. OpenAQ lists stations in id order, not by distance, and keeps ones
+  // that stopped years ago, so its first result is no answer. Distance is
   // OpenAQ's `distance` when it gives a number of 0 or more, else the haversine
   // distance from `origin` to the station's coordinates; a station with neither
   // sorts after every station with one. Equal distances go to the more recent
-  // report, then to list order. Returns { station, distanceM } (distanceM null
-  // when unknown), or null when no station qualifies.
-  const nearestFreshPm25Station = (locations, origin, nowMs = Date.now()) => {
+  // report, then to list order. A station's datetimeLast covers all its sensors,
+  // so its PM2.5 reading's own time is still to be checked; the route does that.
+  // Returns [{ station, distanceM }] (distanceM null when unknown), maybe empty.
+  const rankFreshPm25Stations = (locations, origin, nowMs = Date.now()) => {
     const from = toPosition(origin);
     const fresh = [];
     for (const station of Array.isArray(locations) ? locations : []) {
       const sensors = Array.isArray(station?.sensors) ? station.sensors : [];
       if (!sensors.some((sensor) => isPm25Code(sensor?.parameter?.name))) continue;
-      // Date.parse reads a missing or null time as NaN.
-      const lastMs = Date.parse(station?.datetimeLast?.utc);
-      if (!Number.isFinite(lastMs) || nowMs - lastMs > NOWCAST_MAX_AGE_HOURS * HOUR_MS) continue;
+      if (!isFreshReading(station?.datetimeLast?.utc, nowMs)) continue;
+      const lastMs = Date.parse(station.datetimeLast.utc);
       const given = toFiniteNumber(station?.distance);
       const at = toPosition(station?.coordinates);
       let distanceM = null;
@@ -550,7 +569,7 @@ export const createExternalDataService = ({
     fresh.sort(
       (a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity) || b.lastMs - a.lastMs
     );
-    return fresh.length ? { station: fresh[0].station, distanceM: fresh[0].distanceM } : null;
+    return fresh.map(({ station, distanceM }) => ({ station, distanceM }));
   };
 
   const aqiBand = (aqi) => {
@@ -894,7 +913,9 @@ export const createExternalDataService = ({
     pm25ToUsAqi,
     pm25NowCast,
     nowCastHoursQuery,
-    nearestFreshPm25Station,
+    rankFreshPm25Stations,
+    isFreshReading,
+    openAqResultsTruncated,
     isPm25Code,
     aqiBand,
     normalizePlainText,

@@ -14,7 +14,9 @@ const {
   pm25ToUsAqi,
   pm25NowCast,
   nowCastHoursQuery,
-  nearestFreshPm25Station,
+  rankFreshPm25Stations,
+  isFreshReading,
+  openAqResultsTruncated,
   aqiBand,
   isSevereWeatherCode,
   isOutdoorFriendlyNow,
@@ -297,12 +299,86 @@ const candidate = ({ id, sensors = ["pm25"], last, latitude, longitude, distance
   sensors: sensors.map((name, i) => ({ id: id * 10 + i, parameter: { name, units: "ug/m3" } }))
 });
 
-describe("nearestFreshPm25Station", () => {
+describe("isFreshReading", () => {
+  // The one freshness rule, for a station's datetimeLast and for a reading's
+  // own datetime: ended within four hours of the clock. At 12:10, 08:10 is
+  // just fresh and 08:09:59 just stale.
+  test("is fresh up to exactly four hours old, and no older", () => {
+    expect(isFreshReading("2026-03-02T12:00:00Z", AT)).toBe(true);
+    expect(isFreshReading("2026-03-02T08:10:00Z", AT)).toBe(true);
+    expect(isFreshReading("2026-03-02T08:09:59Z", AT)).toBe(false);
+    expect(isFreshReading("2026-09-10T08:00:00Z", Date.parse("2026-10-27T02:09:00Z"))).toBe(false);
+  });
+
+  // Absent is stale, never fresh.
+  test.each([[undefined], [null], [""], ["recently"], [{}], [12]])("is stale for %j", (utc) => {
+    expect(isFreshReading(utc, AT)).toBe(false);
+  });
+
+  test("reads the clock when no time is given", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(AT);
+    try {
+      expect(isFreshReading("2026-03-02T12:00:00Z")).toBe(true);
+      expect(isFreshReading("2026-03-02T08:00:00Z")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("openAqResultsTruncated", () => {
+  // Live on 2026-10-27, Los Angeles and London answered meta.found ">100" to
+  // a limit of 100: more stations than the page held.
+  test.each([
+    [">100", 100],
+    [">1000", 1000],
+    [1200, 1000],
+    ["1200", 1000]
+  ])("is true for meta.found %j with %i returned", (found, returned) => {
+    expect(openAqResultsTruncated({ found }, returned)).toBe(true);
+  });
+
+  // An absent or unreadable count says nothing either way, so no warning.
+  test.each([
+    [76, 76],
+    ["76", 76],
+    [0, 0],
+    [null, 5],
+    ["", 5],
+    [undefined, 5],
+    ["lots", 5],
+    [">", 5]
+  ])("is false for meta.found %j with %i returned", (found, returned) => {
+    expect(openAqResultsTruncated({ found }, returned)).toBe(false);
+  });
+
+  test.each([[undefined], [null], ["meta"]])("is false for a meta of %j", (meta) => {
+    expect(openAqResultsTruncated(meta, 5)).toBe(false);
+  });
+});
+
+describe("rankFreshPm25Stations", () => {
   const NYC = { latitude: 40.7128, longitude: -74.006 };
   const LA = { latitude: 34.0522, longitude: -118.2437 };
   const LONDON = { latitude: 51.5074, longitude: -0.1278 };
   const pick = (locations, origin = NYC, nowMs = AT) =>
-    nearestFreshPm25Station(locations, origin, nowMs);
+    rankFreshPm25Stations(locations, origin, nowMs)[0] ?? null;
+
+  test("lists every fresh PM2.5 station, nearest first, and no stale one", () => {
+    const nyc = [
+      candidate({ id: 384, last: hoursBefore(23.5), latitude: 40.715, longitude: -74.0 }),
+      candidate({ id: 625, last: hoursBefore(1.5), latitude: 40.736, longitude: -73.822 }),
+      candidate({ id: 626, last: hoursBefore(1.5), latitude: 40.74, longitude: -73.99 }),
+      candidate({ id: 628, last: hoursBefore(1.5), latitude: 40.64, longitude: -74.02 })
+    ];
+
+    expect(rankFreshPm25Stations(nyc, NYC, AT)).toEqual([
+      { station: nyc[2], distanceM: 3311 },
+      { station: nyc[3], distanceM: 8181 },
+      { station: nyc[1], distanceM: 15719 }
+    ]);
+  });
 
   // New York: the first PM2.5 station OpenAQ lists, and the nearest, stopped
   // 23.5 hours ago; three others reported 1.5 hours ago.
@@ -471,7 +547,7 @@ describe("nearestFreshPm25Station", () => {
   test.each([[undefined], [null], ["not a list"], [[]], [[null]], [[{}]]])(
     "is null for %j",
     (locations) => {
-      expect(pick(locations)).toBeNull();
+      expect(rankFreshPm25Stations(locations, NYC, AT)).toEqual([]);
     }
   );
 
@@ -481,7 +557,7 @@ describe("nearestFreshPm25Station", () => {
     try {
       const station = candidate({ id: 1, last: hoursBefore(1), distance: 100 });
 
-      expect(nearestFreshPm25Station([station], NYC)?.station).toBe(station);
+      expect(rankFreshPm25Stations([station], NYC)[0]?.station).toBe(station);
     } finally {
       vi.useRealTimers();
     }
