@@ -59,6 +59,12 @@ describe("HomeWorkoutStage", () => {
     expect(backButton()).toHaveAttribute("aria-label", "Back");
   });
 
+  test("gives the back control no inline style, so styles/base.css's .back-btn styles it", () => {
+    renderStage();
+    expect(backButton()).toHaveClass("back-btn");
+    expect(backButton()).not.toHaveAttribute("style");
+  });
+
   test("allows going back when no transition is running", () => {
     renderStage();
     expect(backButton()).toBeEnabled();

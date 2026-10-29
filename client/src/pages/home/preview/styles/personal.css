@@ -125,12 +125,10 @@
 }
 
 /* ---- Form and its fade --------------------------------------------------- */
-/* Its gap and top margin never apply: styles/base.css's .form ties this rule and loads
-   later. */
+/* Its gap and top margin are styles/base.css's .form's. */
 .preview-personal-form {
   position: relative;
   z-index: 1;
-  gap: 8px;
   transition:
     transform var(--personal-morph-duration) var(--personal-morph-ease),
     opacity var(--personal-morph-duration) var(--personal-morph-ease),
@@ -138,7 +136,8 @@
   transform-origin: 50% 6%;
   width: min(920px, 100%);
   justify-self: center;
-  margin: 0 auto;
+  margin-inline: auto;
+  margin-bottom: 0;
 }
 
 /* ---- Collapsed form ------------------------------------------------------ */

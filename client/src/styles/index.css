@@ -1,5 +1,5 @@
-﻿/* The global stylesheet, imported by main.jsx: base.css, the app's base layer. main.jsx
-   imports it after App, so it lands after every page's stylesheet in the main CSS chunk;
-   each lazily loaded dashboard view's stylesheet is a separate file that lands after it. */
+﻿/* The global stylesheet, imported by main.jsx: base.css, the app's base layer, in the
+   `base` cascade layer. Every page, planner and view rule is unlayered, so each beats it
+   at any specificity; main.jsx imports this after App, but the order no longer matters. */
 
-@import "./base.css";
+@import "./base.css" layer(base);

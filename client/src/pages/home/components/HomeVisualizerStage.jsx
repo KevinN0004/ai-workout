@@ -18,7 +18,6 @@ export default function HomeVisualizerStage({
   visualLabel,
   silhouetteRenderSignature,
   silhouetteShape,
-  backBtnStyle,
   onBack,
   onContinue,
   isIntroTransitioning,
@@ -62,7 +61,6 @@ export default function HomeVisualizerStage({
           <button
             type="button"
             className="back-btn"
-            style={backBtnStyle}
             onClick={onBack}
             disabled={isIntroTransitioning || isStageTransitioning}
           >

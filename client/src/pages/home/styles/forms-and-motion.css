@@ -231,15 +231,16 @@
 }
 
 /* ---- Workout sample panel and profile hint ------------------------------- */
-/* Neither rule fully applies. core/shell.css's .home-page .panel:not(.home-intro-panel) sets
-   the panel's background, and styles/base.css's .muted, which ties .personal-hint and loads
-   later, gives the hint its top margin. */
+/* The panel's background does not apply: core/shell.css's
+   .home-page .panel:not(.home-intro-panel) sets it. The hint's top margin is styles/base.css's
+   .muted's. */
 .muted-panel {
   background: rgba(255, 255, 255, 0.04);
 }
 
 .personal-hint {
-  margin: 0;
+  margin-inline: 0;
+  margin-bottom: 0;
   text-align: left;
 }
 
@@ -258,6 +259,15 @@
   grid-template-rows: auto auto auto auto;
   width: 100%;
   min-height: 0;
+}
+
+/* The panel is also .center-panel and .stage-panel. Its gap and centring are
+   styles/base.css's .center-panel's, which won the tie with core/shell.css's .stage-panel only
+   by loading last; base.css is now the lower base layer, so both classes are named here to
+   outrank .stage-panel. */
+.stage-panel.workout-stage-panel {
+  gap: 16px;
+  text-align: center;
 }
 
 .workout-header {

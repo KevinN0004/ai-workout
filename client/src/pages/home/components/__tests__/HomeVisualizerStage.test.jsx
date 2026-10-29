@@ -143,10 +143,11 @@ describe("HomeVisualizerStage", () => {
     expect(continueButton()).toBeDisabled();
   });
 
-  test("applies the caller's style to the back control", () => {
-    renderStage({ backBtnStyle: { opacity: 0.5 } });
+  test("gives the back control no inline style, so styles/base.css's .back-btn styles it", () => {
+    renderStage();
 
-    expect(backButton()).toHaveStyle({ opacity: "0.5" });
+    expect(backButton()).toHaveClass("back-btn");
+    expect(backButton()).not.toHaveAttribute("style");
   });
 
   test("forwards the panel ref the stage animation measures", () => {

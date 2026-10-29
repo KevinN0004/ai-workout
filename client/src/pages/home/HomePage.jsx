@@ -27,14 +27,6 @@ import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
 const SILHOUETTE_VIEW_HEIGHT = 430;
 const SILHOUETTE_FLOOR_INSET = 18;
 
-// The white Back control of the personal, physique and workout stages.
-const BACK_BUTTON_STYLE = {
-  background: "#fff",
-  border: "1px solid rgba(255, 255, 255, 0.92)",
-  color: "#000",
-  boxShadow: "0 0 12px rgba(255, 255, 255, 0.56), 0 0 24px rgba(255, 255, 255, 0.28)"
-};
-
 // The physique stage's accessible name for the silhouette.
 const VISUAL_LABEL =
   "Adaptive full-body silhouette generated from your profile measurements with proportional shoulder, torso, arm, and leg morphing.";
@@ -211,7 +203,6 @@ export default function HomePage({
                 trainingDayOptions={TRAINING_DAY_OPTIONS}
                 toggleTrainingDay={toggleTrainingDay}
                 isPersonalComplete={isPersonalComplete}
-                backBtnStyle={BACK_BUTTON_STYLE}
                 goToStage={goToStage}
                 isIntroTransitioning={isIntroTransitioning}
                 isStageTransitioning={isStageTransitioning}
@@ -224,7 +215,6 @@ export default function HomePage({
                 visualLabel={VISUAL_LABEL}
                 silhouetteRenderSignature={silhouetteRenderSignature}
                 silhouetteShape={silhouetteShape}
-                backBtnStyle={BACK_BUTTON_STYLE}
                 onBack={() => goToStage("personal")}
                 onContinue={() => transitionToStageFromTrigger("workout")}
                 isIntroTransitioning={isIntroTransitioning}
@@ -236,7 +226,6 @@ export default function HomePage({
               <HomeWorkoutStage
                 workoutShellRef={workoutShellRef}
                 workoutPanelRef={workoutPanelRef}
-                backBtnStyle={BACK_BUTTON_STYLE}
                 onBack={() => goToStage("visualizer")}
                 isIntroTransitioning={isIntroTransitioning}
                 isStageTransitioning={isStageTransitioning}
