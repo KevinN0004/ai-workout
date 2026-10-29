@@ -579,44 +579,58 @@ export const createExternalDataService = ({
       "distance",
       ["datetimeLast", (datetimeLast) => pickFields(datetimeLast, ["utc"])],
       // Always a list here: projectOpenAqStations keeps only stations
-      // isReadableStation passed, which needs a PM2.5 sensor in one.
+      // rankFreshPm25Stations kept, whose isReadableStation needs a PM2.5
+      // sensor in one.
       ["sensors", (sensors) => sensors.map(projectSensor)]
     ]);
 
   // Whether the route could read a station at `nowMs`: it has a PM2.5 sensor and
   // its datetimeLast is fresh (isFreshReading; absent or unparseable is stale).
-  // The one rule for both rankFreshPm25Stations and projectOpenAqStations.
+  // The rule rankFreshPm25Stations applies, and so projectOpenAqStations, which
+  // ranks through it.
   const isReadableStation = (station, nowMs) =>
     isFreshReading(station?.datetimeLast?.utc, nowMs) &&
     (Array.isArray(station?.sensors) ? station.sensors : []).some((sensor) =>
       isPm25Code(sensor?.parameter?.name)
     );
 
-  // Trims OpenAQ's /locations answer before it is cached, to the stations the
-  // route could read (isReadableStation at `nowMs`) and the fields it reads: per
-  // station its id, name, city or locality, country name and code, coordinates,
-  // distance, datetimeLast.utc and each sensor's id and parameter name, unit and
-  // label, plus meta.found, and meta.returned, the number of stations OpenAQ
-  // sent before any was dropped. The cache is keyed per requested point, and
-  // untrimmed the page ran to 383,705 bytes for Los Angeles live, where 61 of
-  // its 287 stations had reported within four hours.
+  // How many stations a cached /locations list keeps. The route asks /latest of
+  // at most three (MAX_LATEST_ATTEMPTS in registerAirQualityRoutes.js); the
+  // other seven cover stations going stale while a stale copy is served, for up
+  // to EXTERNAL_CACHE_STALE_TTL_SEC (6 h by default) during an OpenAQ failure,
+  // when /latest is failing too anyway.
+  const CACHED_STATION_LIMIT = 10;
+
+  // Trims OpenAQ's /locations answer before it is cached, to the nearest
+  // CACHED_STATION_LIMIT stations the route could read, ranked from `origin` at
+  // `nowMs` by rankFreshPm25Stations itself so the two cannot disagree, and to
+  // the fields the route reads: per station its id, name, city or locality,
+  // country name and code, coordinates, distance, datetimeLast.utc and each
+  // sensor's id and parameter name, unit and label, plus meta.found, and
+  // meta.returned, the number of stations OpenAQ sent before any was dropped.
+  // `origin` is the point the list was asked for, which is part of its cache
+  // key. The cache is keyed per requested point: untrimmed the page ran to
+  // 383,705 bytes for Los Angeles live, and filtered but uncapped to 139,519,
+  // with 206 of its 287 stations fresh that hour.
   //
-  // Dropping stale stations is safe because the route ranks the cached list
-  // again at read time, re-checking freshness, so a cached station that has
-  // since gone stale is still passed over. A station that was stale when
-  // fetched and revives is missed until the entry is refetched: within
-  // OPENAQ_CACHE_TTL_SEC (180 s by default), or, while OpenAQ is failing and the
-  // stale copy is served (up to EXTERNAL_CACHE_STALE_TTL_SEC, 6 h by default),
-  // for as long as that lasts; the copy can lack a revived station but never
-  // offer a dead one. Values are copied, never coerced, so absent stays absent.
-  const projectOpenAqStations = (data, nowMs = Date.now()) => {
+  // Dropping stations is safe because the route ranks the cached list again at
+  // read time, re-checking freshness, so a cached station that has since gone
+  // stale is still passed over. A station that was stale when fetched and
+  // revives is missed until the entry is refetched: within OPENAQ_CACHE_TTL_SEC
+  // (180 s by default), or, while OpenAQ is failing and the stale copy is served
+  // (up to EXTERNAL_CACHE_STALE_TTL_SEC, 6 h by default), for as long as that
+  // lasts; the copy can lack a revived station but never offer a dead one.
+  // Values are copied, never coerced, so absent stays absent.
+  const projectOpenAqStations = (data, origin, nowMs = Date.now()) => {
     const projected = pickFields(data, [
       ["meta", (meta) => pickFields(meta, ["found"])],
       [
         "results",
         (results) =>
           Array.isArray(results)
-            ? results.filter((station) => isReadableStation(station, nowMs)).map(projectStation)
+            ? rankFreshPm25Stations(results, origin, nowMs)
+                .slice(0, CACHED_STATION_LIMIT)
+                .map(({ station }) => projectStation(station))
             : results
       ]
     ]);

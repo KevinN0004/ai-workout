@@ -407,6 +407,8 @@ const liveStation = (id) => ({
 // The clock is passed in: the fixtures carry real dates.
 const LIVE_AT = Date.parse("2026-10-27T02:49:00Z");
 const freshUtc = "2026-10-27T02:00:00Z";
+// The point a list was asked for: the projection ranks by distance from it.
+const LA_POINT = { latitude: 34.0522, longitude: -118.2437 };
 
 describe("projectOpenAqStations", () => {
   test("keeps only what the station choice and the answer read", () => {
@@ -415,6 +417,7 @@ describe("projectOpenAqStations", () => {
         meta: { name: "openaq-api", website: "/", page: 1, limit: 1000, found: 287 },
         results: [liveStation(7936)]
       },
+      LA_POINT,
       LIVE_AT
     );
 
@@ -457,11 +460,94 @@ describe("projectOpenAqStations", () => {
 
     const projected = projectOpenAqStations(
       { meta: { found: 6 }, results: [stale, undated, unparseable, noPm25, noSensorList, fresh] },
+      LA_POINT,
       LIVE_AT
     );
 
     expect(projected.meta).toEqual({ found: 6, returned: 6 });
     expect(projected.results.map((station) => station.id)).toEqual([5]);
+  });
+
+  // Freshness varies by the hour: live on 2026-10-29 Los Angeles had 206 of 287
+  // stations fresh, 139,519 bytes cached. The route asks /latest of at most
+  // three, so only the nearest ten are cached, ranked exactly as the route
+  // ranks them; meta.returned is still everything OpenAQ sent.
+  test("keeps only the ten nearest readable stations, nearest first", () => {
+    // Twenty fresh stations listed farthest first, three nearer stale ones, and
+    // one near station with no PM2.5 sensor.
+    const fresh = Array.from({ length: 20 }, (_, i) => {
+      const station = liveStation(100 + i);
+      station.distance = 20000 - i * 900;
+      return station;
+    });
+    const staleNear = [1, 2, 3].map((id) => {
+      const station = liveStation(id);
+      station.distance = id;
+      station.datetimeLast = { utc: "2019-01-01T00:00:00Z" };
+      return station;
+    });
+    const ozoneOnly = liveStation(4);
+    ozoneOnly.distance = 5;
+    ozoneOnly.sensors = ozoneOnly.sensors.slice(1);
+    const list = [...staleNear, ozoneOnly, ...fresh];
+
+    const projected = projectOpenAqStations(
+      { meta: { found: 24 }, results: list },
+      LA_POINT,
+      LIVE_AT
+    );
+
+    expect(projected.meta).toEqual({ found: 24, returned: 24 });
+    expect(projected.results.map((station) => station.id)).toEqual([
+      119, 118, 117, 116, 115, 114, 113, 112, 111, 110
+    ]);
+    expect(projected.results.map((station) => station.id)).toEqual(
+      rankFreshPm25Stations(list, LA_POINT, LIVE_AT)
+        .slice(0, 10)
+        .map(({ station }) => station.id)
+    );
+  });
+
+  test("keeps every readable station of a list of fewer than ten, nearest first", () => {
+    const list = [3, 1, 2].map((id) => {
+      const station = liveStation(id);
+      station.distance = id * 1000;
+      return station;
+    });
+
+    const projected = projectOpenAqStations({ results: list }, LA_POINT, LIVE_AT);
+
+    expect(projected.results.map((station) => station.id)).toEqual([1, 2, 3]);
+    expect(projected.meta).toEqual({ returned: 3 });
+  });
+
+  // A direct call can pass a point with no position, and stations can lack one:
+  // their distance is unknown and sorts after every known one, as in the
+  // ranking, and the ten are taken in that order.
+  test("ranks unknown distances last when choosing the ten, as the route does", () => {
+    const known = Array.from({ length: 8 }, (_, i) => {
+      const station = liveStation(10 + i);
+      station.distance = 8000 - i * 1000;
+      return station;
+    });
+    const unknown = Array.from({ length: 4 }, (_, i) => {
+      const station = liveStation(50 + i);
+      station.distance = null;
+      return station;
+    });
+    const list = [...unknown, ...known];
+    const nowhere = { latitude: null, longitude: null };
+
+    const ids = projectOpenAqStations({ results: list }, nowhere, LIVE_AT).results.map(
+      (station) => station.id
+    );
+
+    expect(ids).toEqual([17, 16, 15, 14, 13, 12, 11, 10, 50, 51]);
+    expect(ids).toEqual(
+      rankFreshPm25Stations(list, nowhere, LIVE_AT)
+        .slice(0, 10)
+        .map(({ station }) => station.id)
+    );
   });
 
   // The same four hours as the route: at 02:49, 22:49 the evening before is just
@@ -470,7 +556,7 @@ describe("projectOpenAqStations", () => {
     const at = (utc) => {
       const station = liveStation(1);
       station.datetimeLast = { utc };
-      return projectOpenAqStations({ results: [station] }, LIVE_AT).results.length;
+      return projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results.length;
     };
 
     expect(at("2026-10-26T22:49:00Z")).toBe(1);
@@ -481,11 +567,11 @@ describe("projectOpenAqStations", () => {
     const stale = liveStation(1);
     stale.datetimeLast = { utc: "2017-06-15T10:00:00Z" };
 
-    expect(projectOpenAqStations({ results: [stale, null] }, LIVE_AT)).toEqual({
+    expect(projectOpenAqStations({ results: [stale, null] }, LA_POINT, LIVE_AT)).toEqual({
       meta: { returned: 2 },
       results: []
     });
-    expect(projectOpenAqStations({ results: [] }, LIVE_AT)).toEqual({
+    expect(projectOpenAqStations({ results: [] }, LA_POINT, LIVE_AT)).toEqual({
       meta: { returned: 0 },
       results: []
     });
@@ -503,15 +589,15 @@ describe("projectOpenAqStations", () => {
       sensors: [{ id: 2, parameter: { name: "pm25" } }, { parameter: null }, null]
     };
 
-    const [station] = projectOpenAqStations({ results: [sparse] }, LIVE_AT).results;
+    const [station] = projectOpenAqStations({ results: [sparse] }, LA_POINT, LIVE_AT).results;
 
     expect(station).toEqual(sparse);
     expect(station).not.toHaveProperty("name");
     expect(station).not.toHaveProperty("locality");
     expect(station.coordinates).not.toHaveProperty("longitude");
     expect(station.sensors[0].parameter).not.toHaveProperty("units");
-    expect(projectOpenAqStations({ meta: { page: 1 } }, LIVE_AT)).toEqual({ meta: {} });
-    expect(projectOpenAqStations({ meta: null, results: "nope" }, LIVE_AT)).toEqual({
+    expect(projectOpenAqStations({ meta: { page: 1 } }, LA_POINT, LIVE_AT)).toEqual({ meta: {} });
+    expect(projectOpenAqStations({ meta: null, results: "nope" }, LA_POINT, LIVE_AT)).toEqual({
       meta: null,
       results: "nope"
     });
@@ -525,13 +611,15 @@ describe("projectOpenAqStations", () => {
       sensors: [{ id: 2, parameter: { name: "pm2.5", unit: "ug/m3", display_name: "PM2.5" } }]
     };
 
-    expect(projectOpenAqStations({ results: [station] }, LIVE_AT).results[0]).toEqual(station);
+    expect(projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results[0]).toEqual(
+      station
+    );
   });
 
   test.each([[undefined], [null], ["not json"], [[]], [{ results: "nope", meta: 3 }]])(
     "passes %j through as it came",
     (data) => {
-      expect(projectOpenAqStations(data, LIVE_AT)).toEqual(data);
+      expect(projectOpenAqStations(data, LA_POINT, LIVE_AT)).toEqual(data);
     }
   );
 
@@ -548,7 +636,7 @@ describe("projectOpenAqStations", () => {
     expect(
       ids(
         rankFreshPm25Stations(
-          projectOpenAqStations({ results: full }, LIVE_AT).results,
+          projectOpenAqStations({ results: full }, LA_POINT, LIVE_AT).results,
           origin,
           LIVE_AT
         )

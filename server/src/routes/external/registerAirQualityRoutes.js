@@ -92,9 +92,12 @@ export const registerAirQualityRoutes = (app, deps) => {
       // reporting years ago, so the route asks for one full page and ranks them
       // itself. A list still cut short could miss the nearest station, so it is
       // logged, once per answer fetched from OpenAQ rather than per cached read.
-      // The page is cached per requested point, so it is cached trimmed to the
-      // fields read below (projectOpenAqStations); a list cached whole before
-      // the trim holds the same fields and still answers.
+      // The page is cached per requested point, so it is cached trimmed
+      // (projectOpenAqStations) to the nearest ten stations the route could
+      // read from that point and the fields read below. The route ranks again
+      // here, so a list cached whole, or uncapped, before the trim answers the
+      // same.
+      const origin = { latitude, longitude };
       const locationResponse = await openAqRequest(
         "locations",
         {
@@ -103,7 +106,7 @@ export const registerAirQualityRoutes = (app, deps) => {
           parameters_id: PM25_PARAMETER_ID,
           limit: STATION_PAGE_LIMIT
         },
-        { project: projectOpenAqStations }
+        { project: (data) => projectOpenAqStations(data, origin) }
       );
       const locationData = locationResponse.data;
       const candidates = Array.isArray(locationData?.results) ? locationData.results : [];
@@ -133,7 +136,7 @@ export const registerAirQualityRoutes = (app, deps) => {
       // station with no usable id costs no call and is passed over; a failed
       // /latest, or one with no fresh PM2.5 reading, is a miss. At most
       // MAX_LATEST_ATTEMPTS are asked.
-      const ranked = rankFreshPm25Stations(candidates, { latitude, longitude });
+      const ranked = rankFreshPm25Stations(candidates, origin);
       let chosen = null;
       let attempts = 0;
       let answered = 0;

@@ -208,7 +208,7 @@ describe("GET /api/air-quality/current", () => {
         1,
         "locations",
         { coordinates: "40.1,-75.2", radius: 10000, parameters_id: 2, limit: 1000 },
-        { project: projectOpenAqStations }
+        { project: expect.any(Function) }
       );
     });
 
@@ -224,9 +224,69 @@ describe("GET /api/air-quality/current", () => {
 
       await get(buildApp(openAqRequest));
 
-      expect(openAqRequest.mock.calls[0][2]).toEqual({ project: projectOpenAqStations });
+      // The projection the route passes is projectOpenAqStations ranking from
+      // the point asked about, which is part of the cache key.
+      const { project } = openAqRequest.mock.calls[0][2];
+      const twelve = Array.from({ length: 12 }, (_, i) =>
+        station({
+          id: 100 + i,
+          distance: null,
+          coordinates: { latitude: 40.1 + i / 100, longitude: -75.2 }
+        })
+      );
+      const answer = { meta: { found: 12 }, results: twelve.toReversed() };
+      expect(project(answer)).toEqual(
+        projectOpenAqStations(answer, { latitude: 40.1, longitude: -75.2 })
+      );
+      expect(project(answer).results.map((item) => item.id)).toEqual([
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 109
+      ]);
+      expect(project(answer).meta).toEqual({ found: 12, returned: 12 });
       expect(openAqRequest.mock.calls[1]).toHaveLength(1);
       expect(openAqRequest.mock.calls[2]).toHaveLength(2);
+    });
+
+    // Only the nearest ten fresh stations are cached; a list cached before the
+    // cap, whole or filtered with more than ten, must give the same answer.
+    test("answers the same from a capped list as from a longer one cached before", async () => {
+      const point = { latitude: 40.1, longitude: -75.2 };
+      // Fourteen fresh PM2.5 stations; the nearest (id 1, 300 m) reads a stale
+      // PM2.5 value, so the walk goes on to the second (id 2).
+      const fourteen = Array.from({ length: 14 }, (_, i) =>
+        station({
+          id: i + 1,
+          name: `Station ${i + 1}`,
+          distance: 300 + i * 500,
+          sensors: [sensor((i + 1) * 10, "pm25"), sensor((i + 1) * 10 + 1, "o3", "ppm")]
+        })
+      );
+      const whole = { meta: { found: 14 }, results: fourteen.toReversed() };
+      const filteredUncapped = { meta: { found: 14, returned: 14 }, results: fourteen };
+      const capped = projectOpenAqStations(whole, point);
+      expect(capped.results).toHaveLength(10);
+
+      const answerFrom = async (data) => {
+        const openAqRequest = vi
+          .fn()
+          .mockResolvedValueOnce({ data, cache: "hit" })
+          .mockResolvedValueOnce({
+            data: { results: [reading(10, 9, "2026-01-10T08:00:00Z")] },
+            cache: "miss"
+          })
+          .mockResolvedValueOnce({
+            data: { results: [reading(20, 12), reading(21, 0.03)] },
+            cache: "miss"
+          })
+          .mockResolvedValueOnce({ data: { results: steadyHours(12) }, cache: "miss" });
+        const response = await get(buildApp(openAqRequest));
+        expect(openAqRequest).toHaveBeenNthCalledWith(3, "locations/2/latest");
+        return response.text;
+      };
+
+      const fromWhole = await answerFrom(whole);
+      expect(await answerFrom(filteredUncapped)).toBe(fromWhole);
+      expect(await answerFrom(capped)).toBe(fromWhole);
+      expect(JSON.parse(fromWhole).location).toMatchObject({ id: 2, distanceM: 800 });
     });
 
     // A list cached before the trim holds every field; one cached after holds
@@ -279,7 +339,9 @@ describe("GET /api/air-quality/current", () => {
       const upstreamAnswer = { meta: { found: 3 }, results: full };
 
       const fromFull = await answerFrom(upstreamAnswer);
-      const fromTrimmed = await answerFrom(projectOpenAqStations(upstreamAnswer));
+      const fromTrimmed = await answerFrom(
+        projectOpenAqStations(upstreamAnswer, { latitude: 40.1, longitude: -75.2 })
+      );
 
       expect(fromTrimmed).toEqual(fromFull);
       expect(fromFull.location).toMatchObject({
@@ -719,7 +781,7 @@ describe("GET /api/air-quality/current", () => {
         expect(openAqRequest).toHaveBeenCalledTimes(1);
         return response;
       };
-      const filtered = projectOpenAqStations(la);
+      const filtered = projectOpenAqStations(la, { latitude: 40.1, longitude: -75.2 });
 
       expect(filtered).toEqual({ meta: { found: 2, returned: 2 }, results: [] });
       const fromWhole = await answerFrom(la);
