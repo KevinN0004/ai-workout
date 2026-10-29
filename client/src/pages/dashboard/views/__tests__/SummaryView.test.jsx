@@ -362,6 +362,123 @@ describe("SummaryView", () => {
     });
   });
 
+  // The route's answers, in the shapes registerAirQualityRoutes.js builds:
+  // `aqiUs` scores `pm25NowCast`, and a payload cached before the NowCast has
+  // no `pm25NowCast` at all, so its AQI is the latest reading's.
+  describe("the air card's AQI line", () => {
+    const station = {
+      id: 8118,
+      name: "Bay Station",
+      city: "Oakland",
+      country: "US",
+      latitude: 37.8,
+      longitude: -122.27,
+      distanceM: 1200
+    };
+    const reading = (summary) => ({
+      location: station,
+      summary: {
+        level: "Moderate",
+        workoutType: "outdoor",
+        guidance: "Guidance text.",
+        primaryPollutant: "PM2.5",
+        pm25: 12,
+        ...summary
+      },
+      pollutants: []
+    });
+    // The line under the guidance: pollutant, reading and any AQI.
+    const aqiLine = (container) =>
+      Array.from(container.querySelectorAll("p")).find((p) => p.textContent.includes("ug/m3"))
+        ?.textContent;
+
+    test.each([
+      [
+        "a NowCast",
+        { pm25: 64.1, pm25NowCast: 60, aqiUs: 151 },
+        "PM2.5: 64.1 ug/m3 | US AQI 151 (NowCast, last 12 hours)"
+      ],
+      // A measured 0 is clean air, not a missing NowCast.
+      [
+        "a NowCast of 0",
+        { pm25: 0, pm25NowCast: 0, aqiUs: 0 },
+        "PM2.5: 0 ug/m3 | US AQI 0 (NowCast, last 12 hours)"
+      ],
+      [
+        "a payload cached before the NowCast",
+        { pm25: 14, aqiUs: 54 },
+        "PM2.5: 14 ug/m3 | US AQI 54 from the latest reading"
+      ],
+      // Too few recent hours: the latest reading is shown with no AQI.
+      [
+        "a NowCast that could not be computed",
+        { level: "Unknown", pm25: 12, pm25NowCast: null, aqiUs: null },
+        "PM2.5: 12 ug/m3"
+      ]
+    ])("%s", (_label, summary, expected) => {
+      const { container } = renderView({ airQualityData: reading(summary) });
+      expect(aqiLine(container)).toBe(expected);
+      expect(container.textContent).toContain("Station: Bay Station (Oakland)");
+    });
+
+    test("no fresh station names no station and shows no AQI", () => {
+      const { container } = renderView({
+        airQualityData: {
+          cache: { status: "miss", locations: "miss", latest: null, hours: null },
+          location: { ...station, id: null, name: "", city: "", country: "", distanceM: null },
+          summary: {
+            level: "Unknown",
+            workoutType: "indoor",
+            guidance: "Air quality data is limited. Prefer flexible indoor options.",
+            primaryPollutant: "Unknown",
+            pm25: null,
+            pm25NowCast: null,
+            aqiUs: null
+          },
+          pollutants: []
+        }
+      });
+
+      expect(aqiLine(container)).toBe("Unknown: -- ug/m3");
+      expect(container.textContent).not.toContain("Station:");
+      expect(container.textContent).not.toContain("US AQI");
+    });
+
+    test("the outage fallback shows no AQI and no station", () => {
+      const { container } = renderView({
+        airQualityData: {
+          fallback: true,
+          service: "openaq",
+          error: "Air quality service unavailable.",
+          location: { id: null, name: "", city: "", country: "", latitude: 1, longitude: 2 },
+          summary: {
+            aqiUs: null,
+            pm25: null,
+            pm25NowCast: null,
+            level: "Unknown",
+            workoutType: "indoor",
+            guidance: "Air quality data is unavailable. Prefer indoor training."
+          },
+          pollutants: []
+        }
+      });
+
+      expect(aqiLine(container)).toBe("PM2.5: -- ug/m3");
+      expect(container.textContent).toContain(
+        "Air quality data is unavailable. Prefer indoor training."
+      );
+      expect(container.textContent).not.toContain("Station:");
+      expect(container.textContent).not.toContain("US AQI");
+    });
+
+    test("the first load shows no AQI line until a reading arrives", () => {
+      const { container } = renderView({ airQualityLoading: true, airQualityData: null });
+
+      expect(container.textContent).toContain("Checking local air quality...");
+      expect(aqiLine(container)).toBeUndefined();
+    });
+  });
+
   describe("the weekly trend figures", () => {
     test("shows the latest logged weight when there is one", () => {
       renderView({ weeklyTrends: { latestWeight: 181.4, weightDelta: -1.2 } });
