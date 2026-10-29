@@ -227,7 +227,10 @@ export const createExternalDataService = ({
     });
   };
 
-  const openAqRequest = async (endpoint, query = {}) => {
+  // `project`, when given, maps the parsed body before it is returned and
+  // cached, so a large answer can be cached trimmed to the fields its caller
+  // reads. The cache key is unchanged, so an entry cached whole still answers.
+  const openAqRequest = async (endpoint, query = {}, { project } = {}) => {
     const cacheKey = buildExternalCacheKey("openAq", {
       baseUrl: openAqBaseUrl,
       endpoint,
@@ -248,7 +251,7 @@ export const createExternalDataService = ({
           err.status = 503;
           throw err;
         }
-        return runExternalRequestWithRetry("openAq", async () => {
+        const data = await runExternalRequestWithRetry("openAq", async () => {
           if (typeof fetch !== "function") {
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
@@ -317,6 +320,7 @@ export const createExternalDataService = ({
             clearTimeout(timeout);
           }
         });
+        return project ? project(data) : data;
       }
     });
   };
@@ -426,6 +430,257 @@ export const createExternalDataService = ({
       Math.round(iLow + ((truncated - cLow) / (cHigh - cLow)) * (iHigh - iLow));
     const band = points.find((point) => truncated <= point.cHigh);
     return interpolate(band || points[points.length - 1]);
+  };
+
+  const HOUR_MS = 60 * 60 * 1000;
+  const NOWCAST_HOURS = 12;
+  // How old a report may be: the window for a station's datetimeLast, for its
+  // PM2.5 reading's own time (both through isFreshReading) and for the
+  // NowCast's hour 0. OpenAQ's hourly means arrive late, so the newest hour the
+  // station reported stands in for the current one, as long as it ended within
+  // this window.
+  const NOWCAST_MAX_AGE_HOURS = 4;
+  // Absorbs float error in the weighted mean before truncating: twelve hours of
+  // 12.1 average to 12.099999999999996, which a bare floor would make 12.0.
+  const TRUNCATE_EPSILON = 1e-9;
+
+  // The EPA's NowCast for PM2.5, as AirNow publishes it ("PM NowCast" fact
+  // sheet, EPA/AirNow, STI-6079, Dec. 2014; "The NowCast for PM2.5 and PM10",
+  // AirNow-Tech forum, 2016). Over the last twelve hourly means, newest first,
+  // the weight is min / max of the hours present (1 minus the range scaled by
+  // the max), floored at 0.5; the NowCast is sum(c_i * w^i) / sum(w^i) over the
+  // hours present, i the hours before the newest, truncated to 0.1 ug/m3. It is
+  // valid only when two of the three newest hours are present. One deviation:
+  // hour 0 is the newest hour the station reported, not the clock hour, and it
+  // must have ended within NOWCAST_MAX_AGE_HOURS. An hour whose value is
+  // absent (null, "", missing), non-numeric or negative, or that has no
+  // readable end time, is a missing hour, never a zero one; a measured 0 is
+  // clean air. Returns null when the NowCast is not valid.
+  const pm25NowCast = (hours, nowMs = Date.now()) => {
+    const byHour = new Map();
+    let newestEndMs = -Infinity;
+    for (const item of Array.isArray(hours) ? hours : []) {
+      const value = toFiniteNumber(item?.value);
+      // Date.parse reads a missing or null end time as NaN.
+      const endMs = Date.parse(item?.period?.datetimeTo?.utc);
+      if (value === null || value < 0 || !Number.isFinite(endMs)) continue;
+      byHour.set(Math.floor(endMs / HOUR_MS), value);
+      newestEndMs = Math.max(newestEndMs, endMs);
+    }
+    // Also the guard for no usable hour at all: newestEndMs is still -Infinity.
+    if (nowMs - newestEndMs > NOWCAST_MAX_AGE_HOURS * HOUR_MS) return null;
+    const newest = Math.floor(newestEndMs / HOUR_MS);
+    const series = Array.from({ length: NOWCAST_HOURS }, (_, i) => byHour.get(newest - i) ?? null);
+    if (series.slice(0, 3).filter((value) => value !== null).length < 2) return null;
+    const present = series.filter((value) => value !== null);
+    const max = Math.max(...present);
+    // Every hour measured 0 is steady air: w = 1, not 0 / 0.
+    const weight = max > 0 ? Math.max(Math.min(...present) / max, 0.5) : 1;
+    let weighted = 0;
+    let total = 0;
+    series.forEach((value, i) => {
+      if (value === null) return;
+      weighted += value * weight ** i;
+      total += weight ** i;
+    });
+    return Math.floor((weighted / total) * 10 + TRUNCATE_EPSILON) / 10;
+  };
+
+  // The hours pm25NowCast reads: twelve behind a newest hour that may be
+  // NOWCAST_MAX_AGE_HOURS old, from the start of the current hour, so every
+  // lookup within one hour asks the same thing and shares one cache entry.
+  const nowCastHoursQuery = (nowMs = Date.now()) => ({
+    datetime_from: new Date(
+      (Math.floor(nowMs / HOUR_MS) - NOWCAST_HOURS - NOWCAST_MAX_AGE_HOURS) * HOUR_MS
+    ).toISOString(),
+    limit: 24
+  });
+
+  // OpenAQ spells the PM2.5 parameter several ways; each is PM2.5.
+  const PM25_CODES = ["pm25", "pm2.5", "pm2_5", "pm2p5"];
+  const isPm25Code = (code) => PM25_CODES.includes(cleanText(code, 40).toLowerCase());
+
+  const EARTH_MEAN_RADIUS_M = 6371008.8;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+
+  // A point's latitude and longitude, or null when either is absent, not a
+  // number, or off the globe: a null must not read as 0, a real position.
+  const toPosition = (point) => {
+    const latitude = toFiniteNumber(point?.latitude);
+    const longitude = toFiniteNumber(point?.longitude);
+    if (latitude === null || longitude === null) return null;
+    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+  };
+
+  // The great-circle (haversine) distance between two positions, in metres.
+  const haversineM = (from, to) => {
+    const dLat = toRadians(to.latitude - from.latitude);
+    const dLon = toRadians(to.longitude - from.longitude);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRadians(from.latitude)) *
+        Math.cos(toRadians(to.latitude)) *
+        Math.sin(dLon / 2) ** 2;
+    return 2 * EARTH_MEAN_RADIUS_M * Math.asin(Math.sqrt(h));
+  };
+
+  // Whether a UTC time ended within NOWCAST_MAX_AGE_HOURS of `nowMs`: the one
+  // freshness rule, for a station's datetimeLast and for a reading's own
+  // datetime. A missing, null or unparseable time is stale, never fresh
+  // (Date.parse reads it as NaN). The isFinite check states that outright
+  // rather than leaving it to NaN comparing false, which a rewrite as
+  // !(age > window) would silently invert.
+  const isFreshReading = (utc, nowMs = Date.now()) => {
+    const ms = Date.parse(utc);
+    return Number.isFinite(ms) && nowMs - ms <= NOWCAST_MAX_AGE_HOURS * HOUR_MS;
+  };
+
+  // Whether OpenAQ says it holds more results than it sent: `meta.found` is a
+  // count, or a string such as ">100" when it stopped counting at the limit. An
+  // absent or unreadable count says nothing either way, so it reads as false;
+  // the null check keeps that from resting on returnedCount being 0 or more.
+  const openAqResultsTruncated = (meta, returnedCount) => {
+    const found = meta?.found;
+    if (typeof found === "string" && /^>\s*\d+$/.test(found.trim())) return true;
+    const count = toFiniteNumber(found);
+    return count !== null && count > returnedCount;
+  };
+
+  const isPlainObject = (value) =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+  // A copy of `source` holding only those of `fields` it actually has. A field
+  // given as [name, project] has its value projected too. Values are copied,
+  // never coerced: a missing field stays missing and a null stays null, never 0
+  // or "". Anything that is not a plain object is returned as it came.
+  const pickFields = (source, fields) => {
+    if (!isPlainObject(source)) return source;
+    const picked = {};
+    for (const field of fields) {
+      const [key, project] = Array.isArray(field) ? field : [field];
+      if (!Object.hasOwn(source, key)) continue;
+      picked[key] = project ? project(source[key]) : source[key];
+    }
+    return picked;
+  };
+
+  const projectParameter = (parameter) =>
+    pickFields(parameter, ["name", "units", "unit", "displayName", "display_name"]);
+  const projectSensor = (sensor) => pickFields(sensor, ["id", ["parameter", projectParameter]]);
+  const projectStation = (station) =>
+    pickFields(station, [
+      "id",
+      "name",
+      "city",
+      "locality",
+      ["country", (country) => pickFields(country, ["name", "code"])],
+      ["coordinates", (coordinates) => pickFields(coordinates, ["latitude", "longitude"])],
+      "distance",
+      ["datetimeLast", (datetimeLast) => pickFields(datetimeLast, ["utc"])],
+      // Always a list here: projectOpenAqStations keeps only stations
+      // rankFreshPm25Stations kept, whose isReadableStation needs a PM2.5
+      // sensor in one.
+      ["sensors", (sensors) => sensors.map(projectSensor)]
+    ]);
+
+  // Whether the route could read a station at `nowMs`: it has a PM2.5 sensor and
+  // its datetimeLast is fresh (isFreshReading; absent or unparseable is stale).
+  // The rule rankFreshPm25Stations applies, and so projectOpenAqStations, which
+  // ranks through it.
+  const isReadableStation = (station, nowMs) =>
+    isFreshReading(station?.datetimeLast?.utc, nowMs) &&
+    (Array.isArray(station?.sensors) ? station.sensors : []).some((sensor) =>
+      isPm25Code(sensor?.parameter?.name)
+    );
+
+  // How many stations a cached /locations list keeps. The route asks /latest of
+  // at most three (MAX_LATEST_ATTEMPTS in registerAirQualityRoutes.js); the
+  // other seven cover stations going stale while a stale copy is served, for up
+  // to EXTERNAL_CACHE_STALE_TTL_SEC (6 h by default) during an OpenAQ failure,
+  // when /latest is failing too anyway.
+  const CACHED_STATION_LIMIT = 10;
+
+  // Trims OpenAQ's /locations answer before it is cached, to the nearest
+  // CACHED_STATION_LIMIT stations the route could read, ranked from `origin` at
+  // `nowMs` by rankFreshPm25Stations itself so the two cannot disagree, and to
+  // the fields the route reads: per station its id, name, city or locality,
+  // country name and code, coordinates, distance, datetimeLast.utc and each
+  // sensor's id and parameter name, unit and label, plus meta.found, and
+  // meta.returned, the number of stations OpenAQ sent before any was dropped.
+  // `origin` is the point the list was asked for, which is part of its cache
+  // key. The cache is keyed per requested point: untrimmed the page ran to
+  // 383,705 bytes for Los Angeles live, and filtered but uncapped to 139,519,
+  // with 206 of its 287 stations fresh that hour.
+  //
+  // Dropping stations is safe because the route ranks the cached list again at
+  // read time, re-checking freshness, so a cached station that has since gone
+  // stale is still passed over. A station that was stale when fetched and
+  // revives is missed until the entry is refetched: within OPENAQ_CACHE_TTL_SEC
+  // (180 s by default), or, while OpenAQ is failing and the stale copy is served
+  // (up to EXTERNAL_CACHE_STALE_TTL_SEC, 6 h by default), for as long as that
+  // lasts; the copy can lack a revived station but never offer a dead one.
+  // Values are copied, never coerced, so absent stays absent.
+  const projectOpenAqStations = (data, origin, nowMs = Date.now()) => {
+    const projected = pickFields(data, [
+      ["meta", (meta) => pickFields(meta, ["found"])],
+      [
+        "results",
+        (results) =>
+          Array.isArray(results)
+            ? rankFreshPm25Stations(results, origin, nowMs)
+                .slice(0, CACHED_STATION_LIMIT)
+                .map(({ station }) => projectStation(station))
+            : results
+      ]
+    ]);
+    if (Array.isArray(data?.results)) {
+      const meta = isPlainObject(projected.meta) ? projected.meta : {};
+      projected.meta = { ...meta, returned: data.results.length };
+    }
+    return projected;
+  };
+
+  // How many stations OpenAQ sent for a /locations answer, before
+  // projectOpenAqStations dropped the ones the route could not read: what the
+  // 404 ("no station at all") and the truncation check are about. A list cached
+  // before the projection counted carries no meta.returned, so its own length
+  // is the count; an unreadable count (absent, null, not a whole number of 0 or
+  // more) is no count, never 0.
+  const openAqReturnedCount = (data) => {
+    const recorded = data?.meta?.returned;
+    if (Number.isInteger(recorded) && recorded >= 0) return recorded;
+    return Array.isArray(data?.results) ? data.results.length : 0;
+  };
+
+  // Ranks, from OpenAQ's /locations answer, the stations worth reading: those
+  // with a PM2.5 sensor whose datetimeLast is fresh (isFreshReading), nearest
+  // first. OpenAQ lists stations in id order, not by distance, and keeps ones
+  // that stopped years ago, so its first result is no answer. Distance is
+  // OpenAQ's `distance` when it gives a number of 0 or more, else the haversine
+  // distance from `origin` to the station's coordinates; a station with neither
+  // sorts after every station with one. Equal distances go to the more recent
+  // report, then to list order. A station's datetimeLast covers all its sensors,
+  // so its PM2.5 reading's own time is still to be checked; the route does that.
+  // Returns [{ station, distanceM }] (distanceM null when unknown), maybe empty.
+  const rankFreshPm25Stations = (locations, origin, nowMs = Date.now()) => {
+    const from = toPosition(origin);
+    const fresh = [];
+    for (const station of Array.isArray(locations) ? locations : []) {
+      if (!isReadableStation(station, nowMs)) continue;
+      const lastMs = Date.parse(station.datetimeLast.utc);
+      const given = toFiniteNumber(station?.distance);
+      const at = toPosition(station?.coordinates);
+      let distanceM = null;
+      if (given !== null && given >= 0) distanceM = given;
+      else if (from && at) distanceM = Math.round(haversineM(from, at));
+      fresh.push({ station, distanceM, lastMs });
+    }
+    // Array.prototype.sort is stable, so full ties keep OpenAQ's order.
+    fresh.sort(
+      (a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity) || b.lastMs - a.lastMs
+    );
+    return fresh.map(({ station, distanceM }) => ({ station, distanceM }));
   };
 
   const aqiBand = (aqi) => {
@@ -767,6 +1022,14 @@ export const createExternalDataService = ({
     openAqParameterLabel,
     extractOpenAqMeasurement,
     pm25ToUsAqi,
+    pm25NowCast,
+    nowCastHoursQuery,
+    rankFreshPm25Stations,
+    isFreshReading,
+    openAqResultsTruncated,
+    projectOpenAqStations,
+    openAqReturnedCount,
+    isPm25Code,
     aqiBand,
     normalizePlainText,
     parseMultiNumberQuery,

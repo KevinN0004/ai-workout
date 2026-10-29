@@ -6,6 +6,31 @@ import { __testables as errorTracking } from "../services/platform/errorTracking
 import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
 import { __testables as indexTestables } from "../index.js";
 import { validateEnv } from "../services/platform/envValidationService.js";
+import { createExternalDataService } from "../services/external/externalDataService.js";
+
+// The NowCast is pure, so it is built through the factory with stub
+// dependencies rather than widening index.js's __testables for it.
+const { pm25NowCast } = createExternalDataService({
+  cleanText: (value) => (typeof value === "string" ? value : ""),
+  toNullableNumber,
+  readThroughExternalCache: async () => ({}),
+  buildExternalCacheKey: () => "",
+  metrics: { externalApiFailures: {}, externalApiRetries: {} },
+  logger: { info() {}, warn() {}, error() {} },
+  toShortText: (value) => String(value ?? ""),
+  recordExternalApiLatency: () => {},
+  externalApiRetries: 0,
+  externalApiRetryBaseDelayMs: 0
+});
+
+// Three hourly means of one value, ending in the three hours before `NOW`: the
+// fewest a NowCast needs, so the NowCast of a steady value is that value.
+const NOW = Date.parse("2026-03-02T12:10:00Z");
+const threeHoursOf = (value) =>
+  [0, 1, 2].map((hoursAgo) => ({
+    value,
+    period: { datetimeTo: { utc: new Date(NOW - 10 * 60000 - hoursAgo * 3600000).toISOString() } }
+  }));
 
 // The invariant this file exists to hold:
 //
@@ -92,6 +117,15 @@ const helpers = [
     call: (value) => parseRedisPort(value),
     absent: null,
     zeroIsValid: false
+  },
+  // Takes a list of hours rather than one value, so the row feeds it three
+  // steady hours of the value under test: absent hours are missing hours, and
+  // three missing hours are no NowCast at all, never a NowCast of 0.
+  {
+    name: "pm25NowCast (each hour's value)",
+    call: (value) => pm25NowCast(threeHoursOf(value), NOW),
+    absent: null,
+    zeroIsValid: true
   }
 ];
 
