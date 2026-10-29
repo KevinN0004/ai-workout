@@ -316,9 +316,12 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   read, when `meta.found` says even that was cut short. `rankFreshPm25Stations` keeps the
   stations with a PM2.5 sensor whose `datetimeLast` is fresh and ranks them nearest first
   (OpenAQ's `distance`, else haversine; no position sorts last; ties go to the more
-  recent report). The list is cached trimmed to the fields read (`projectOpenAqStations`),
-  because it is cached per requested point and ran to 383,705 bytes for Los Angeles
-  whole; `/latest` and the hours, about 1 KB and 12 KB, are cached whole.
+  recent report). The list is cached trimmed (`projectOpenAqStations`) to the stations
+  the route could read and the fields it reads, because it is cached per requested point
+  and ran to 383,705 bytes for Los Angeles whole (about 192 MB at the 500-entry cap;
+  trimmed, about 10% of that). Its `meta.returned` keeps the raw count, so the 404 still
+  means OpenAQ sent no station, and a list sent with none fresh is the 200 "Unknown".
+  `/latest` and the hours, about 1 KB and 12 KB, are cached whole.
 - **The PM2.5 reading must be fresh too, not just the station.** A station's
   `datetimeLast` covers all its sensors, so the route walks the ranked stations, asks
   `/latest` of at most three (five OpenAQ calls a lookup at most, inside the 60 a minute
