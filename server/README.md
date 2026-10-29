@@ -316,12 +316,15 @@ that answer comes quickly. Once written, a command is no longer bounded by it, s
   read, when `meta.found` says even that was cut short. `rankFreshPm25Stations` keeps the
   stations with a PM2.5 sensor whose `datetimeLast` is fresh and ranks them nearest first
   (OpenAQ's `distance`, else haversine; no position sorts last; ties go to the more
-  recent report). The list is cached trimmed (`projectOpenAqStations`) to the stations
-  the route could read and the fields it reads, because it is cached per requested point
-  and ran to 383,705 bytes for Los Angeles whole (about 192 MB at the 500-entry cap;
-  trimmed, about 10% of that). Its `meta.returned` keeps the raw count, so the 404 still
-  means OpenAQ sent no station, and a list sent with none fresh is the 200 "Unknown".
-  `/latest` and the hours, about 1 KB and 12 KB, are cached whole.
+  recent report). The list is cached trimmed (`projectOpenAqStations`) to the nearest ten
+  stations the route could read from the point asked for, and the fields it reads,
+  because it is cached per requested point and ran to 383,705 bytes for Los Angeles whole
+  (about 192 MB at the 500-entry cap). Filtering alone was not enough: with 206 of LA's
+  287 stations fresh it still cached 139,519 bytes, about 70 MB at the cap, where an
+  earlier estimate from 61 fresh had said 19.5 MB. Capped, an entry is about 6 KB
+  whatever the hour, about 3 MB at the cap. Its `meta.returned` keeps the raw count, so
+  the 404 still means OpenAQ sent no station, and a list sent with none fresh is the 200
+  "Unknown". `/latest` and the hours, about 1 KB and 12 KB, are cached whole.
 - **The PM2.5 reading must be fresh too, not just the station.** A station's
   `datetimeLast` covers all its sensors, so the route walks the ranked stations, asks
   `/latest` of at most three (five OpenAQ calls a lookup at most, inside the 60 a minute

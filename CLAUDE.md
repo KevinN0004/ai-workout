@@ -210,12 +210,18 @@ in live) when it is a number of 0 or more, else haversine from `coordinates`; a 
 distance or position is unknown, never 0 metres, and sorts last. **That page is cached
 trimmed** (`projectOpenAqStations`, passed to `openAqRequest` as `project`): untrimmed it
 ran to 383,705 bytes for Los Angeles, cached per requested point for up to 500 entries,
-about 192 MB, enough to exhaust a 512 MB instance. It keeps only the stations the route
-could read (`isReadableStation`, the ranking's own rule; live LA had 61 fresh of 287) and
-only the fields read, copied as they came, so absent stays absent: about 10% of the bytes,
-some 20 MB at that worst case. `meta.returned` keeps OpenAQ's raw count, which the 404 and
-the truncation check read through `openAqReturnedCount`; an entry cached before has none,
-and its length stands in. The route re-ranks at read time, so the cached copy can miss a
+about 192 MB, enough to exhaust a 512 MB instance. It keeps only the **nearest ten**
+stations the route could read (`CACHED_STATION_LIMIT`), ranked from the point asked for by
+`rankFreshPm25Stations` itself, and only the fields read, copied as they came, so absent
+stays absent. **Filtering alone was not a bound, and the first estimate was wrong:** 19.5
+MB assumed LA's 61 fresh of 287 (2026-10-27), but freshness varies by the hour, and on
+2026-10-29 206 were fresh, 139,519 bytes cached, about 70 MB at 500 entries. Capped, an
+entry is about 6 KB however many are fresh (5,951 B measured for an LA-like list with 206
+fresh), about 3 MB at 500. The route walks at most three; the other seven cover stations
+going stale while a stale copy is served in an outage. `meta.returned` keeps OpenAQ's raw
+count, which the 404 and the truncation check read through `openAqReturnedCount`; an
+entry cached before has none, and its length stands in. The route re-ranks at read time,
+so a cached copy, capped or a longer one from before, answers the same, and it can miss a
 station that revived since the fetch (within the TTL, or while a stale copy is served in
 an outage) but never offers a dead one.
 
