@@ -732,12 +732,10 @@ describe("GET /api/air-quality/current", () => {
     });
 
     test("still answers 404 when OpenAQ listed no station at all", async () => {
-      const openAqRequest = vi
-        .fn()
-        .mockResolvedValueOnce({
-          data: { meta: { found: 0, returned: 0 }, results: [] },
-          cache: "miss"
-        });
+      const openAqRequest = vi.fn().mockResolvedValueOnce({
+        data: { meta: { found: 0, returned: 0 }, results: [] },
+        cache: "miss"
+      });
 
       const response = await get(buildApp(openAqRequest));
 
