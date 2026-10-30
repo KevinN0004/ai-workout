@@ -136,7 +136,6 @@
 /* ---- Setup modal header -------------------------------------------------- */
 .planner-close-icon {
   font-size: 1.2rem;
-  line-height: 1;
 }
 
 .planner-setup-modal .modal-header {
@@ -175,9 +174,8 @@
 }
 
 /* ---- Training form (step 2) ---------------------------------------------- */
+/* Its gap and top margin are styles/base.css's .form's. */
 .planner-step-two-form {
-  margin-top: 8px;
-  gap: 18px;
   text-align: left !important;
   justify-items: stretch;
   align-items: start;

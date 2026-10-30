@@ -2,12 +2,6 @@
    animations, hover and press feedback, and the header's back arrow. Imported second of the
    four planner sheets by styles/app.css; the keyframes it names are in motion.css. */
 
-/* ---- Muted text ---------------------------------------------------------- */
-/* styles/base.css's .modal .muted ties this and comes later, so it does not apply. */
-.planner-setup-modal .muted {
-  color: #ececec;
-}
-
 /* ---- Environment toggle (step 1) ----------------------------------------- */
 /* ::before is the pill behind the two buttons. PlannerSetupModal sets pos-1 when the
    environment is Commercial, which slides it under the second button. */

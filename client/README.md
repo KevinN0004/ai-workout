@@ -26,7 +26,8 @@ client/
 |   |-- components/             # Shared UI components
 |   |-- hooks/                  # Shared hooks
 |   |-- pages/                  # One folder per route, with its own parts
-|   |-- styles/                 # Global CSS
+|   |-- styles/                 # Global CSS: base.css, in the lowest cascade layer,
+|   |                           #   so every page's rules beat it
 |   `-- test/                   # Vitest setup
 `-- package.json
 ```
