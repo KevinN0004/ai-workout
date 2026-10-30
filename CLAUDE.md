@@ -1091,6 +1091,14 @@ the native instance all along.
   `grid-template-columns:44px 1fr 44px;align-items:center;display:grid`), adds prefixes
   (`-webkit-backdrop-filter`), shortens colours (`rgba(12, 16, 30, 0.85)` becomes
   `#0c101ed9`) and rewrites selectors (`*::before` becomes ` :before`).
+- **`styles/base.css` is the `base` cascade layer** (`styles/index.css` imports it with
+  `layer(base)`), and nothing else is layered. So any page, planner or view rule beats it at
+  any specificity: never raise a selector or add `!important` to beat it. **Never add
+  `!important` to `base.css`**: a layered `!important` beats every unlayered one, which is
+  the reverse of what it looks like. Moving any other sheet into a layer is a decision, not
+  a cleanup (`docs/plans/2026-10-24-parked-items.md`, Task L1, says why it was not done).
+  The build keeps the layer: Vite hoists the Google Fonts `@import` to the first rule, as
+  `@import "…" layer(base)`, so the fonts still load.
 - Server needs `server/.env` (`PORT`, `DATABASE_URL`, `CLIENT_ORIGIN`, `GEMINI_API_KEY`)
 - Server tests need Postgres: `npm run postgres:local:start -w server` first, or every
   test that reaches the database fails with `Can't reach database server`, which is
