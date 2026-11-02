@@ -308,423 +308,60 @@ expected symptom of switching sides, not a broken container
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
-- **Coverage is measured, not estimated.** `npm run test:coverage`. The current figures
-  are in the comment above `thresholds` in each side's config, `client/vite.config.js`
-  and `server/vitest.config.js`
-  (`Measured <date> (statements / branches / functions / lines)`), and each floor is its
-  figure truncated to one decimal;
-  `scripts/__tests__/repo-invariants.test.mjs` fails when a floor and its note disagree.
-  For exact counts, add `--coverage.reporter=json-summary` and read
-  `<side>/coverage/coverage-summary.json`: the text table's two decimals are too coarse
-  when a metric sits a fraction above its floor, and a metric passes exactly when
-  `covered >= floor / 100 × total`.
-  **Floors are raised once per phase of work, by one floor PR per side.** A fix PR keeps
-  coverage at or above the floors and leaves the floor lines alone. The floor PR
-  re-measures `main`, raises each floor whose truncated measurement went up, and updates
-  the note beside it; a floor is never lowered
-  (`docs/specs/2026-10-10-readability-follow-up-design.md`, rule 3).
-  **Two things move a measurement with no code changing.** Server branches read higher
-  in CI than locally, so the server floor follows the local figure. And with
-  `client/dist` present, `index.js` serves the bundle, so `staticClient.js`'s no-bundle
-  arm goes unreached and server branches read one lower; the gates build before they
-  measure, so measure a server floor with a build on disk. The server config's note
-  records both.
-  On 2026-09-22 the client's branch figure read 93.62%, **down** 0.02 from the reading
-  before it, and the ratchet correctly did not trip, which is the floor doing its job
-  rather than failing at it: it sits one decimal below the measurement, so a
-  rounding-scale movement is tolerated while a real regression is not. Do not "fix" a
-  small dip by raising the floor to meet it. That dip was never explained, though, and
-  it was measured on a Tuesday (`a4097dd`), when the weekday-dependent branch in the
-  entry below went uncovered. One arm is about 0.03 points, which the truncated report
-  can show as 0.02, so it may have been that rather than rounding. Nobody re-measured it.
-  How much a floor tolerates is whatever truncation leaves, and that can be nothing:
-  when the slack, `covered - floor / 100 × total`, is under one, a single new uncovered
-  statement, branch or function can fail CI.
-  Both configs measure all of `src/**` and exclude only the tests themselves, because a
-  narrower `include` reports a better number rather than a truer one.
-  **Both sides carry a ratchet**, floored one decimal below the measured value — the
-  client's in `client/vite.config.js`, the server's in `server/vitest.config.js`. Raise
-  them when coverage rises; never lower them to make a build pass. Whole-percent floors
-  were tried first and let a sub-point gain evaporate without tripping anything.
-  **This entry used to name only the client's**, and the omission cost a CI cycle: a
-  change was verified with `npm test`, which runs no coverage at all, while CI runs
-  `test:coverage` and tripped the server floor on lines, functions and statements. Run
-  `npm run test:coverage`, not `npm test`, before claiming a change is ready.
-  - **A coverage figure that changes between runs of identical code is a test bug.**
-    Until #178 the client's did, from two sources. The next-session walk in
-    `usePreviewDerivedData.js` reached its rest-day arm only when the real tomorrow was
-    a rest day, which never happened on a Tuesday or a Sunday. The dashboard loader's
-    superseded-failure guards (two arms) were reached only when timing lined up, in
-    roughly one full run in six. It took both misses at once to fail: 3171 of 3388
-    branches is 93.59%, under the 93.6% floor, which is what CI hit on a Tuesday.
-    Either one alone stayed above it. Both now have tests, and a sweep of nine dates and
-    times measures identical coverage, which is what the tight floors in
-    `client/vite.config.js` rely on. A `TZ` set in the shell does not reach Node here
-    (see the `TZ` entry below), but the date can be moved: a `NODE_OPTIONS=--import`
-    preload that shifts `Date` reaches Vitest's workers, and diffing the per-arm JSON
-    across such a sweep is what found both. Pin the clock in any test whose branches
-    follow `new Date()`; stage a race
-    with deferred promises.
-  - Do not infer coverage from whether a file has a neighbouring `*.test.js`. The
-    repositories have few tests of their own (three files for ten modules) and are well
-    covered anyway, because the dashboard integration suites drive them.
-  - **A function being stubbed is not a function being tested.** `openAqRequest`
-    was 79 lines that never executed once — 53 uncovered branches, the largest
-    single gap on the server — because `airQualityRoutes.test.js` stubs it as its
-    network boundary. Stubbing it at every call site is what made it invisible:
-    the routes above it were at 100%, so nothing in the coverage table pointed
-    here. It is the request layer for the surface where the null-pm2.5-as-AQI-0
-    bug shipped. It is now covered in `externalRequests.test.js`, alongside the wger
-    and MealDB wrappers.
-    When a test stubs a named function of this repo's own, check whether anything
-    else exercises it.
-  - Thin areas, worst first by uncovered statements: `index.js` (app bootstrap and
-    wiring) and `httpCacheService.js`. Nearly all of
-    what is still uncovered in `index.js` is the bootstrap the suite deliberately does
-    not run: the env preflight sits behind `NODE_ENV !== "test" && !VITEST`, so
-    it is verified by booting the server rather than by the unit suite, and
-    `startServer` is verified the same way.
-    **Its percentage went down when it got better**, which is worth knowing
-    before reading it as a regression: extracting `metricsService.js` and
-    `corsPolicy.js` removed covered statements, so the untestable bootstrap is
-    now a larger share of a smaller file. The same denominator effect took
-    `requestContext.js` from 84% to 79% branches while its statements went to
-    100%. Server totals rose across both moves. Judge this file by what is left
-    uncovered, not by its percentage.
-    Its CORS layer is now covered end to end (the own-origin rule with trust
-    proxy on, and the production fallback, in `corsPolicy.test.js`), and so is
-    every rate limiter — see `index.rateLimit.test.js`, which sets the limit
-    under test to 1 and the others far out of the way, because the limiters are
-    layered and the global `/api` one would otherwise answer first. `postgres.js` was the worst
-    at 53% and is now at 100% on every metric; its redaction of the database
-    password is the part that mattered, and the fallback for a URL too malformed
-    to parse had never been exercised.
-    For today's per-file figures, read `server/coverage/coverage-summary.json` after a
-    run with `--coverage.reporter=json-summary`; a figure written here goes stale with
-    the next merge.
-  - **Re-importing a server module does not give you a clean environment.**
-    `index.js` and `prisma.js` both call `dotenv.config()` at module scope, and
-    dotenv fills in any key that is _absent_ from `process.env`. So
-    `delete process.env.CLIENT_ORIGIN` followed by `vi.resetModules()` and a
-    re-import hands the app whatever the environment file says, not the empty
-    value the test asked for. This is silent: the CORS suite's "no allowlist
-    configured" cases were really testing the file's allowlist, and only looked
-    wrong because `http://localhost:5173` happened to be in it while
-    `http://127.0.0.1:4173` was not. **Set the variable to an empty string
-    instead of deleting it** — a present-but-empty key is one dotenv leaves
-    alone. Restoring afterwards has the mirror-image trap: assigning `undefined`
-    back to `process.env` stores the string `"undefined"`, so a key that was
-    absent has to be deleted rather than assigned.
-    Re-importing is otherwise safe here: `index.js` exports `startServer` rather
-    than calling it, and `prisma.js` caches its client on `globalThis` outside
-    production, so no second database client is created.
-    On the client, rank by **uncovered branches** rather than by percentage —
-    that is what says where the untested behaviour actually is. Compute the ranking
-    from `client/coverage/coverage-summary.json` (`branches.total - branches.covered`
-    per file) rather than keeping one here: it changes with every merge.
-    **The two geometry files near the top of it, `outlineGeometry.js` and
-    `templateOutline.js`, are the same dead-defensive pattern**:
-    `outlineGeometry.js`'s uncovered arms are the `top || bottom || null`
-    fallbacks in `chooseYUpper`/`chooseXOuter` and friends, reachable only with
-    asymmetric anchor data that `geometry.js` never produces. They are
-    closure-scoped, so reaching them means driving the outer function with
-    hand-built anchor sets. Left alone deliberately: unlike the duplicated
-    profile guards, these are cheap insurance in rendering code where the worst
-    case is a slightly wrong silhouette, and deleting them would make the file
-    more fragile to change rather than less.
-    **This entry previously claimed "nothing is left above ten uncovered
-    branches" and listed `usePreviewDerivedData.js` among the files that were
-    done. Both were wrong** — it was the largest client gap at the time, and the
-    claim would have stopped the next reader looking. Re-measure before trusting
-    a ranking here; it goes stale every time anything lands.
-    `PreviewStage.jsx` (31), `PreviewDashboardChapter.jsx` (28),
-    `HomePage.jsx` (25), `DashboardPage.jsx` (23), `App.jsx` (20),
-    `CaloriesView.jsx` (16) and `AuthPage.jsx` (15) all used to head this
-    list and are done. `GeneratedPlanModal.jsx` (14) was there too, and was
-    deleted rather than tested, because nothing could open it.
-    **Much of what is left is not a missing test.** `usePreviewDerivedData.js`
-    went 46 → 34 by deleting branches rather than covering them: seven guards
-    re-applied `activePreviewProfile.X || JOHN_DOE_PREVIEW_PROFILE.X` to a value
-    that had already been through that exact guard 100 lines earlier, where the
-    profile is built. The else arms could not fire. Check whether an uncovered
-    arm is reachable at all before writing a test to reach it — and see the
-    note below on two guards testing the same thing, for how to tell.
-    **`CaloriesView.jsx`'s two guards on `progressMetrics` used to disagree, and
-    the fix is worth copying.** The rows were guarded with `Array.isArray`, the
-    empty state beneath them with `?.length` — which a string satisfies — so a
-    non-array produced no rows _and_ suppressed the "No progress metrics logged
-    yet." line, leaving a blank panel with nothing to explain it. A third list
-    in the same file, `calories`, had no guard at all. Each list is now narrowed
-    once at the top of the component and both uses read that, so the two cannot
-    drift apart again; four mutation cases exist specifically to catch them
-    drifting back.
-    **A correction to how that was first reported.** PR #111 called the blank
-    panel "reachable only from a malformed cached dashboard". It is not
-    reachable at all: `useDashboardMetrics` narrows both lists with
-    `Array.isArray` before handing them over, and `buildDedupedList` narrows
-    again and returns an array it builds by pushing — so the props are
-    guaranteed arrays three times over, and `CaloriesView` has exactly one
-    caller. The inconsistency was real and worth removing; the user-visible
-    failure it implied was not. **Trace the producer before calling a guard's
-    disagreement reachable** — the guard may be the fourth in a chain.
-    `PreviewDashboardChapter.jsx` and `HomePage.jsx` reached 100% on every metric.
-    `DashboardPage.jsx`'s one remaining uncovered branch is unreachable, and so
-    is the `return null` under it: `activeDashView` is constrained to the eight
-    names in `DASH_VIEW_ORDER` by the line that computes it, and the router below
-    handles all eight, so it never falls past the last `if`.
-    **`App.jsx` carries a redundant pair worth knowing about.** The `useState`
-    initializers for `heightUnit` and `weightUnit` derive the visitor's units
-    from their locale, and `resetPersonalFlow` derives exactly the same thing
-    again from the same source. An effect calls `resetPersonalFlow()` whenever
-    the route is `/`, and `/` is the only route where those units are read at
-    all — they are passed to `HomePage` and nowhere else. So the initializers
-    are overwritten before anything observable, and inverting them changes no
-    test and no pixel. Verified by inverting the ternary by hand: the suite
-    stays green. If the two copies ever disagree, the effect's copy silently
-    wins. **Deliberately left alone.** Removing the initializers would leave
-    `heightUnit` and `weightUnit` undefined on the first render, before the
-    effect runs, and `HomePage` receives them on that render. The redundancy is
-    harmless; the alternative is a regression.
-    **Three files are off this list for good, and none of them is worth
-    revisiting.** Each was ranked high by uncovered branches and each turned out
-    to be unreachable rather than untested:
-    - `usePreviewDerivedData.js` (46) — double-guarded fallbacks, below.
-    - `outlineGeometry.js` (28) — its uncovered branches are null-guards inside
-      module-private helpers (`toPoint`, `appendPoint`, and the four
-      `chooseY`/`chooseX` pickers). Nothing exports them, and the anchor sets the
-      one caller builds always supply the points they guard against.
-    - `templateOutline.js` (26) — one export, `buildTemplateOutline`, and
-      everything else private. The remaining branches are
-      `!Array.isArray(points) || points.length < 3` guards on private helpers,
-      and the template is a **fixed SVG asset** with hundreds of points, so the
-      single entry point cannot drive any of them.
-      It used to contain genuinely dead code, now removed: `pointsToPath` was
-      called from exactly one place, `buildCurvedPath`, whose guard was
-      `if (!Array.isArray(points) || points.length < 3) return pointsToPath(points)`
-      — character for character the same condition `pointsToPath` itself returned
-      `""` for on its first line. It could only ever return `""`, so its
-      path-building body and the `round3` helper that served it went with it; the
-      guard now returns `""` directly.
-      **`usePreviewDerivedData.js`'s largest group of uncovered branches cannot
-      fire.** `activePreviewProfile` spreads `JOHN_DOE_PREVIEW_PROFILE` and then
-      overrides every field with `personal.x || JOHN_DOE_PREVIEW_PROFILE.x`, so every
-      field is non-empty for any input — including all-null. The `String(x ?? "")`
-      block that builds `previewPersonalTargets`, what the personal chapter types,
-      guards those same values again, and none of its fallbacks can fire. The
-      invariant that makes them dead is pinned by a test, so if someone removes a
-      guard from `activePreviewProfile` the suite says so. Its other uncovered arms
-      were `||`, `?:` and `if` fallbacks on the derived week and dashboard figures,
-      each guarding something the week plan's construction already guarantees (one
-      entry per weekday, every field filled, at least five training days, the goal
-      always met). Each was traced, proved dead by arithmetic and as a deliberate
-      survivor on all seven weekdays, and deleted; the fifteen in the
-      `String(x ?? "")` block are what is left.
-      The locale block (`usesImperialUnits`) was the one genuinely reachable part, and it
-      is now covered: `navigator.languages`, `navigator.language` and
-      `Intl.DateTimeFormat` are all boundaries, stubbed exactly as
-      `SettingsView.test.jsx` stubs them. It decides whether the whole walkthrough
-      is shown in pounds and feet or kilograms and centimetres. Two notes from
-      doing it, both of which cost a run:
-    - **`new Intl.DateTimeFormat()` needs a constructible stub.** An arrow
-      function in `mockImplementation` throws when called with `new`, which
-      lands silently in the surrounding `catch` — so every test passes, but via
-      the error path rather than the branch it names. Use `function stubbed() {}`.
-    - **Every fallback in that chain ends at `"US"`.** A test whose locale
-      resolves to US therefore cannot tell one fallback from the next, and six
-      mutants survived because of it. Pin `navigator.languages[0]` and
-      `navigator.language` to _different_ regions, and stub the ambient format
-      to a metric one, so each step is distinguishable from the step after it.
-      Done, and worth copying from: `SettingsView.jsx`, `WorkoutResultPage.jsx`,
-      `MealView.jsx` (which took the five `meal/*` panels with it),
-      `useHomeStageFlow.js`, `usePreviewChapterFlow.js`,
-      `usePreviewWeekParticleAnimation.js`, `usePreviewDerivedData.js`,
-      `WorkoutsView.jsx`, `TipsView.jsx`, `SummaryView.jsx`, `PlansView.jsx`,
-      `useDashboardMetrics.js`, both preview chapter components, `App.jsx`,
-      `DashboardPage.jsx`, `usePreviewWeekOutline.js`, `PlannerSetupModal.jsx`,
-      `HomePersonalStage.jsx`, `useDashboardData.js`, `events.js`, `useBodyModel.js`,
-      `DashboardAtAGlance.jsx`, `PreviewStage.jsx`, `PreviewDashboardChapter.jsx`,
-      `HomePage.jsx`, `CaloriesView.jsx` and `AuthPage.jsx`.
-      `PreviewStage.jsx` (then `PreviewPage.jsx`) had a chapter-body router whose final `else` arm no
-      chapter id could reach: `usePreviewDerivedData` builds exactly
-      `personal-info`, `generate`, `workout-week` and `dashboard-preview`, and
-      the four arms above it handle all of them. That arm rendered a generic grid
-      of textareas from `chapter.fields`, which is the only reason those arrays
-      existed — every chapter built one and nothing read it. The arm, the arrays
-      and the `getPreviewFieldRows` helper that sized their rows are all gone,
-      which took the file from 94% / 65% to 97% / 87% by deletion rather than by
-      testing. Its remaining uncovered branches are the `: null` the router now
-      ends in, and two defensive guards that cannot fire
-      (`!previewStageRef.current`, `!document.documentElement`).
-      Removing them turned up something worth remembering. A test had been written
-      asserting that the visitor's locale "reaches the fields the visitor actually
-      reads", against `previewChapters[0].fields` — data nothing rendered.
-      **Dead data invites tests that assert on it**, and such a test looks exactly
-      like coverage of a real behaviour. That assertion now reads
-      `previewFillOrder`, which is the sequence the typing animation walks.
-      **There are no animation write-offs left.** All three hooks that were listed
-      as untestable are now covered.
-  - **Check before calling something untestable.** This entry said for months
-    that the animation hooks were limited because they measure real element
-    rects, which jsdom does not provide. Every part of that turned out wrong,
-    and it cost four files their coverage:
-    - `useMealDbSearch.js` sat at 0% described that way on nothing but proximity
-      to them. It is a data-fetching hook and went to 97% with no layout at all.
-    - `usePreviewChapterFlow.js` sat at 0% on the same list and **measures
-      nothing** — it is a timed state machine over `setTimeout`, `setInterval`
-      and `Date.now`, and fake timers drive all of it. 0% → 100%/100%.
-    - `useHomeStageFlow.js` and `usePreviewWeekParticleAnimation.js` really do
-      measure rects, and went to 94% and 96% branches anyway.
-
-    The technique, in order of what to reach for:
-    - **Layout is a boundary.** `getBoundingClientRect` is a function on the
-      element you hand the hook, so a test stubs it exactly as it stubs `fetch`.
-      The arithmetic on top of the fake numbers is the arithmetic that ships.
-    - **Randomness is a boundary.** `vi.spyOn(Math, "random").mockReturnValue(0.5)`
-      makes `randomBetween` land on its midpoint, so a cell's area maps to an
-      exact particle count. Vary the draw to reach both sides of a coin flip.
-    - **Where the output is a library call rather than DOM, record the call.**
-      Wrapping `createTimeline` from animejs turns "it did not throw" into an
-      assertion that a 600×320 panel morphs to 900×600 and translates by
-      (-30, -60), and gives you the `onComplete` to invoke directly.
-
-    Reach for those before writing anything off.
-
+- **Coverage is measured, not estimated.** Run `npm run test:coverage`, not `npm test`,
+  before claiming a change is ready: CI runs `test:coverage`, and `npm test` runs no
+  coverage at all. Each side's floors are in `client/vite.config.js` and
+  `server/vitest.config.js`, beside a
+  `Measured <date> (statements / branches / functions / lines)` note; each floor is its
+  figure truncated to one decimal, and `scripts/__tests__/repo-invariants.test.mjs` fails
+  when a floor and its note disagree. For exact counts, add `--coverage.reporter=json-summary` and read
+  `<side>/coverage/coverage-summary.json`: a metric passes exactly when
+  `covered >= floor / 100 × total`, and when the slack, `covered - floor / 100 × total`, is
+  under one, a single new uncovered statement, branch or function fails CI.
+  **Floors are raised once per phase, by one floor PR per side, and never lowered**; a fix
+  PR leaves the floor lines alone (`docs/specs/2026-10-10-readability-follow-up-design.md`,
+  rule 3). Server branches read higher in CI than locally, and one lower with
+  `client/dist` present, so measure a server floor locally with a build on disk. Both
+  configs measure all of `src/**`, because a narrower `include` reports a better number
+  rather than a truer one ([0010](docs/adr/0010-coverage-floors.md)).
+  - **A coverage figure that changes between runs of identical code is a test bug.** Pin
+    the clock in any test whose branches follow `new Date()`; stage a race with deferred
+    promises.
   - **A `TZ` set in the shell does not reach Node on this machine; one set inside the
-    process does.** `TZ=Asia/Tokyo node -e 'console.log(process.env.TZ)'` prints
-    `undefined` here, inline or exported, and the process keeps the system
-    zone. A suite re-run under several shell `TZ` values therefore proves nothing —
-    it is the same zone every time, and the passes are not independent. This
-    has already produced a false claim in a merged PR description.
-    Assigning `process.env.TZ` inside the test does work, at once: the hour of
-    `new Date(0)` reads 9 under `Asia/Tokyo` and 0 under `UTC`. `DashboardPage.test.jsx`
-    and `MealView.test.jsx` pin a calendar-date test to a zone that way. **Restore it by
-    assigning the zone captured at load**,
-    `Intl.DateTimeFormat().resolvedOptions().timeZone`, **not with `delete`**: deleting
-    it leaves Node on UTC, not on the system zone — the opposite of the dotenv entry
-    above, where an absent key is deleted.
-    Beyond that: the system zone (UTC-7) locally and **UTC in
-    CI** sit on opposite sides of the boundary that matters, so a test
-    that passes in both is genuinely exercised either side of midnight.
-    Beyond that, reason arithmetically rather than by running: `new Date("Y-M-D")`
-    is UTC midnight and `new Date(y, m, d)` is local midnight, and the signed
-    difference between them **is** the offset — which settles which side of a
-    comparison every zone falls on without needing to be in one.
-
-  - **jsdom's CSSOM is not a faithful mirror, and guessing at it wastes a run.**
-    `rgba(14, 14, 14, 1)` reads back as `rgb(14, 14, 14)`, and an unstyled
-    element's computed `color` is `rgb(0, 0, 0)` rather than empty, so a
-    `style.color || fallback` branch can never take its fallback here. Check
-    what it stores before asserting on it. **It changed under jsdom 29**, which
-    rewrote the CSSOM: `border: none` used to read back as `""` and now reads
-    `"none"`, as Chromium does, and the computed `color` above used to be
-    `canvastext`. A test that pinned the old answer failed on the upgrade.
-  - **Prefer logic to markup — but a `*View.jsx` is not automatically markup.**
-    `units.js`, `app/plans.js`, `tips/recommendationUtils.js`, `useOptimisticLogs.js`,
-    `useApiClient.js` and `app/events.js` are all well covered — pure functions,
-    state machines, the request layer and every user action. That part holds.
-    What did **not** hold is the corollary this file used to draw, that a view
-    component is therefore more lines for less risk. Five of them were tested in
-    2026-09 and each carried real derivation the rest of the tree does not:
-    `SettingsView` infers the measurement system from the visitor's locale (0% → 89%),
-    `WorkoutResultPage` transposes the plan table and derives every row label from the
-    line text (0% → 100% statements, 97% branches), `MealView` picks the recommendation
-    track from the goal text and the portion note from the calorie band, and took its
-    five `meal/*` panels with it (0% → 100%), `TipsView` owns two fetches and a
-    debounced search (0% → 44% branches), `PlansView` owns the saved-exercise paging
-    (0% → 42%). Judge a component by whether it _computes_ anything, not by its suffix.
-    A genuinely presentational view really is low value; these five were not.
-  - **The auth path and the external routes are now covered**, and are the worked
-    examples to copy: `authUserService.js`, `authRoutes.js` and `errorHandler.js`, and
-    the weather and air-quality routes end to end.
-    Both suites stub only the boundary — the database, session store and cookie
-    writers for auth; `fetchOpenMeteo` and `openAqRequest` for the external routes —
-    and use the real injected function everywhere else, so password hashing is real
-    argon2 and the AQI maths under test are the ones that ship.
-  - **Pick by risk, not by size.** `middleware/errorHandler.js` was 33 lines at 15% with
-    0% branch, and it is what masks 5xx detail before it reaches a client.
-    `registerWgerRoutes.js` is five times the size and a read-only proxy of public
-    exercise data — it is bottom of this list for a reason.
+    process does.** Assign `process.env.TZ` inside the test, and restore it by assigning
+    the zone captured at load, `Intl.DateTimeFormat().resolvedOptions().timeZone`, **not
+    with `delete`**, which leaves Node on UTC.
+  - **Re-importing a server module does not give you a clean environment.** `index.js` and
+    `prisma.js` call `dotenv.config()` at module scope, which fills in any key that is
+    _absent_ from `process.env`. **Set the variable to an empty string instead of deleting
+    it**, and restore a key that was absent by deleting it: assigning `undefined` stores
+    the string `"undefined"`. [0011](docs/adr/0011-tests-control-their-environment.md)
+    covers all three.
+  - **Check whether an uncovered arm is reachable at all before writing a test to reach
+    it.** On the client, rank files by uncovered branches, from
+    `client/coverage/coverage-summary.json`, rather than by percentage; much of what is
+    left there cannot fire. The uncovered arms left in `outlineGeometry.js`,
+    `templateOutline.js` and `usePreviewDerivedData.js` stay on purpose, and so do
+    `App.jsx`'s redundant unit initializers, because `HomePage` reads the units on the
+    first render, before the effect that resets them runs
+    ([0012](docs/adr/0012-coverage-gaps.md) maps it all).
+  - **Check before calling something untestable.** Layout (`getBoundingClientRect`),
+    randomness (`Math.random`) and library calls are boundaries a test stubs, and
+    `new Intl.DateTimeFormat()` needs a constructible stub. jsdom's CSSOM is not a
+    faithful mirror, so check what it stores before asserting on it
+    ([0013](docs/adr/0013-test-boundaries.md)).
+  - **A function being stubbed is not a function being tested.** When a test stubs a named
+    function of this repo's own, check whether anything else exercises it. Stub only the
+    boundary, judge a component by whether it _computes_ anything rather than by its
+    suffix, and pick by risk, not by size ([0014](docs/adr/0014-what-to-test.md)).
   - **When mutation-testing, confirm the mutation applied.** An unapplied mutation and an
-    uncaught one both read as "tests passed". Check the file changed, not just the exit
-    code. Five things have silently prevented a match so far: shell escaping eating a
-    backslash, indentation not matching, an apostrophe in the pattern, **CRLF line
-    endings**, and a **heredoc collapsing `\\n` to `\n`** even with a quoted delimiter.
-    Three of those five are the shell, so **write mutation scripts with the Write tool
-    rather than a heredoc**, and use `String.raw` for any pattern containing a
-    backslash. The prompt in `generateRoutes.js` is the awkward case: its newlines are
-    the two characters backslash-n inside a template literal.
-    **On CRLF:** no committed file is, or ever was, CRLF — no blob in the history
-    holds a carriage return (checked on 2026-10-17 over every blob
-    `git rev-list --objects --all` reaches), and `.gitattributes` stores text as LF (`.bat`
-    and `.cmd` excepted; none are tracked). A working copy can still be CRLF, and git
-    hides one of the two ways it gets there. A CRLF rewrite that has not been staged
-    shows as modified, with an empty `git diff`. A file committed while CRLF is stored as LF
-    but stays CRLF on disk, `git status` calls it clean, and `git checkout -- <file>`
-    and `git reset --hard` both leave it CRLF, because git skips a file whose stat
-    still matches the index; delete it and check it out again. So match on `\r?\n`
-    anyway, and check a file with `git ls-files --eol` (`w/crlf`) or count with
-    `tr -cd '\r' < file | wc -c`. Not with `grep -c $'\r'`, which is wrong here both
-    ways: this grep strips carriage returns before matching unless given `-U`, so it
-    reads 0 on a CRLF file, and inside a `$(…)` this bash drops the carriage return
-    from `$'\r'`, leaving an empty pattern that matches every line, so it reads the
-    line count. The second is what put a false CRLF claim in #177's description.
-    Not every survivor is a weak test either: removing the `!user?.hash` guard in
-    `verifyPassword` is an equivalent mutant, because `argon2.verify` then throws and the
-    existing catch returns the same `false`.
-    Dropping the `ageValue !== null` guard on `useBodyModel`'s age adjustment is another,
-    and the arithmetic is the proof rather than a run: the guard's else-branch is `0`, and
-    `clamp((null - 40) / 45, 0, 0.22)` is `clamp(-0.889, 0, 0.22)`, which is also `0`.
-    A mutant whose two sides you can evaluate on paper does not need a test written for it.
-  - **A score that survives every mutation may be scoring the wrong string.** Five fields in
-    `useBodyModel` are looked up in lower-case maps, and every value `HomePersonalStage`
-    stores is the option label verbatim — `"Moderate"`, `"HIIT"`, `"High-protein"`. A single
-    `toLowerText` joins them, so deleting it would drop all five to their defaults at once,
-    invisibly. The test suite missed it because the fixtures were written in lower case;
-    **build fixtures from what the form actually stores**, not from what the lookup expects.
-  - **An unexpected survivor can mean two guards are testing the same thing, not
-    that the test is weak.** `GeneratedPlanModal.jsx` (since deleted) opened with
-    `if (!planModalOpen || !result) return null` and then passed
-    `open={Boolean(planModalOpen && result)}` to `ModalPortal`. Mutating the
-    early return survived, because with no result the portal rendered nothing
-    anyway — the two guards are the same condition, so **no test could tell them
-    apart, which is a proof of duplication rather than a gap**. The fix was to
-    collapse it: the early return became the only guard and the portal just got
-    `open`, and the same mutation was then caught. When a survivor looks like a test
-    gap, check first whether something else is already enforcing the condition.
-    `ExerciseDetailsModal.jsx` carried the identical pair and got the identical
-    fix, so **if you add a modal, give it one guard, not two** — the second one
-    does nothing except make the first untestable.
-  - **Guard a value once, where it is summed.** `useDashboardMetrics.js` had the
-    same reading coerced two ways: the accumulation loops guarded with
-    `Number.isNaN` before adding to `caloriesByDate`, while `avgCalories` folded
-    `Number(item?.calories || 0)` with no guard at all. One unparseable row is
-    enough — `sum + NaN` stays NaN for the rest of the fold — and `avgCalories`
-    is rendered directly and drives a progress-bar width, so the card would read
-    "NaN" and the bar would get `width: NaN%`. Latent rather than shipped: the
-    calorie input is `type="number"` and the column is an Int, so nothing
-    currently feeds it a non-number. Both sites now share `toMetricNumber`,
-    which is the structural fix — two call sites that must agree will eventually
-    stop agreeing.
-  - **A deliberate survivor is how you prove a branch is dead.** `DashboardAtAGlance.jsx`
-    had two conditions whose arms were the same string — `weatherError ? "Unavailable" :
-"Unavailable"`, and the identical thing again for air quality. Deleting each condition
-    outright was added to the mutation list _expecting_ it to survive, and it did: nothing
-    observable depends on either test. That is a mechanical proof rather than a reading of
-    the code, and it costs one run. Reach for it whenever two arms look alike.
-    Both conditions were later collapsed to the single string they always produced, which
-    removed the mutations' target. The question they could not answer, whether a failed
-    lookup should read differently from one that never ran, was then decided: the headline
-    reads "Couldn't load" when our request failed, "Unavailable" when the browser gave no
-    position so nothing was requested (the hook's `*ErrorKind`), and "Not checked yet"
-    before the summary view's first load. The note under each card still carries the error
-    text.
-  - **A regex for "both arms are the same" needs care.** Sweeping the tree for
-    this pattern turned up a third hit in
-    `server/src/services/dashboard/dashboardDataBuildersService.js`, which was a false
-    positive: the code is
-    `typeof item === "string" ? item : item?.name`, and a naive arm pattern
-    stops at the `?.` and reads both arms as `item`. Those two were the only
-    real instances in the repository.
+    uncaught one both read as "tests passed". Write mutation scripts with the Write tool
+    rather than a heredoc, use `String.raw` for any pattern containing a backslash, match
+    on `\r?\n`, and check line endings with `git ls-files --eol`, never `grep -c $'\r'`.
+    Before writing a test for a survivor, check whether it is an equivalent mutant or a
+    second guard on the same condition (**if you add a modal, give it one guard, not
+    two**); build fixtures from what the form actually stores; and use a deliberate
+    survivor to prove a branch dead ([0015](docs/adr/0015-mutation-testing.md)).
 - **ESLint is scoped to defect classes, not style** — unused/undeclared identifiers,
   unreachable code, React Hook contract violations, import cycles and unresolved
   specifiers, `no-console`, `react/jsx-key`, and `react/no-unstable-nested-components`.
@@ -745,29 +382,11 @@ expected symptom of switching sides, not a broken container
   `no-unexpected-multiline`, which is an ASI-hazard defect rule rather than a style rule.
   The repo-wide reformat is commit `86621a3` (173 files, ~7,200 lines), recorded in
   `.git-blame-ignore-revs`.
-  - **Nothing is excluded from Prettier any more, and the way that was noticed is the
-    point.** `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md` used to be:
-    Prettier **3.9.6 never converged** on it, indenting the continuation paragraphs under
-    its nested `- [x]` task-list items four spaces deeper on every `--write` and growing
-    the file 280 bytes per run with no fixed point. **3.9.8 fixed it** — measured over five
-    consecutive passes, it reformats once (15,691 → 16,547 bytes) and is then byte-identical.
-    The exclusion and the file are both gone from `.prettierignore`.
-
-    An exclusion like that should not outlive its upstream bug, and nothing routine would
-    have prompted anyone to revisit it: a Dependabot Prettier bump shows only a lockfile
-    diff, and `prettier --check` stays green precisely because the file is ignored. So
-    `scripts/__tests__/repo-invariants.test.mjs` carried a test asserting the exclusion still
-    **earned its place** — that the file still failed to converge — designed to fail the
-    moment it stopped. It did exactly that on the 3.9.6 → 3.9.8 bump, which is how this
-    entry came to be rewritten. That test is now deleted too; it had no remaining subject.
-    **If you ever exclude a file from a formatter here, write the guard that retires the
-    exclusion for you.**
-
-    Not every slow-converging file was that file. `docs/plans/2026-09-06-foundation-hardening.md`
-    needed **two** `--write` passes to settle (70,068 then 70,066 bytes, stable after) and
-    was never excluded, because it had a fixed point. The pathological case grows without
-    bound; a file that stops changing is merely awkward. Measure before excluding one, and
-    check byte-stability across ~3 consecutive passes rather than a single clean `--check`.
+  - **Nothing is excluded from Prettier.** If you ever exclude a file from a formatter
+    here, write the guard that retires the exclusion for you. Before excluding one, check
+    byte-stability across about three consecutive `--write` passes: a file that stops
+    changing is merely awkward, and only one that grows without bound earns an exclusion
+    ([0016](docs/adr/0016-formatter-exclusions.md)).
 
   - **Prettier rewrites number literals, not comments.** In JS, `93.80` becomes `93.8`
     and `5.` becomes `5`, but `99.0` stays `99.0`; in CSS, `99.0%` becomes `99%`
