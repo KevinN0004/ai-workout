@@ -3,12 +3,246 @@
  * one cached, retrying request, plus the helpers that turn their payloads into
  * this API's readings and advice. Built once in index.js.
  */
+// @ts-check
+
+/**
+ * One request through readThroughExternalCache, as this service makes it.
+ * @typedef {object} CachedRequest
+ * @property {string} serviceName
+ * @property {string} cacheKey
+ * @property {number} ttlSec
+ * @property {() => Promise<unknown>} requestFn
+ */
+
+/**
+ * What readThroughExternalCache resolves with: the payload, and whether it came
+ * fresh from the cache, from the upstream, or stale after the upstream failed.
+ * @typedef {object} CachedRead
+ * @property {unknown} data
+ * @property {"hit" | "miss" | "stale"} cache
+ */
+
+/**
+ * The counters this service adds to, per upstream, in metricsService's metrics.
+ * @typedef {object} ExternalApiCounters
+ * @property {Record<string, number>} externalApiRetries
+ * @property {Record<string, number>} externalApiFailures
+ */
+
+/**
+ * What createExternalDataService is given. Its summary says what the settings
+ * mean and where the cache and latency helpers come from.
+ * @typedef {object} ExternalDataDeps
+ * @property {(value: unknown, maxLen?: number) => string} cleanText
+ * @property {(value: unknown, min: number, max: number) => number | null} toNullableNumber
+ * @property {(request: CachedRequest) => Promise<CachedRead>} readThroughExternalCache
+ * @property {(serviceName: string, parts?: object) => string} buildExternalCacheKey
+ * @property {ExternalApiCounters} metrics
+ * @property {{ warn: (entry: object) => void }} logger
+ * @property {(value: unknown, maxLen?: number) => string} toShortText
+ * @property {(serviceName: string, durationMs: number) => void} recordExternalApiLatency
+ * @property {number} externalApiRetries
+ * @property {number} externalApiRetryBaseDelayMs
+ * @property {string} openMeteoBaseUrl
+ * @property {number} openMeteoTimeoutMs
+ * @property {number} openMeteoCacheTtlSec
+ * @property {string} openAqBaseUrl
+ * @property {string} openAqApiKey
+ * @property {number} openAqTimeoutMs
+ * @property {number} openAqCacheTtlSec
+ * @property {string} wgerBaseUrl
+ * @property {string} wgerApiToken
+ * @property {number} wgerDefaultLanguage
+ * @property {number} wgerTimeoutMs
+ * @property {number} wgerCacheTtlSec
+ * @property {string} mealDbBaseUrl
+ * @property {number} mealDbTimeoutMs
+ * @property {number} mealDbCacheTtlSec
+ */
+
+/**
+ * An Error carrying the HTTP status a route answers with.
+ * @typedef {Error & { status?: number }} StatusError
+ */
+
+/**
+ * Whatever a request threw: a StatusError from this file, fetch's TypeError, or
+ * the AbortError a timeout raises. Any field may be absent.
+ * @typedef {{ name?: unknown, message?: unknown, status?: unknown } | null | undefined} Thrown
+ */
+
+// Upstream answers are typed as objects whose fields may each be absent and are
+// `unknown`, so the checker refuses a reading used directly as a number or a
+// string: it goes through toFiniteNumber, cleanText or a typeof check first.
+// Number() accepts anything, so it is no such check. Where an answer gives a
+// bare value (a code, an id) in place of an object, reading a field from it
+// finds nothing, as from an object without that field.
+
+/**
+ * An upstream answer, as far as this file reads one: the fields an error is
+ * explained in.
+ * @typedef {object} UpstreamBody
+ * @property {unknown} [reason]
+ * @property {unknown} [message]
+ * @property {unknown} [detail]
+ * @property {unknown} [error]
+ */
+
+/**
+ * Open-Meteo's `current` block, in its default units: degrees C, km/h and mm.
+ * @typedef {object} OpenMeteoCurrent
+ * @property {unknown} [temperature_2m]
+ * @property {unknown} [wind_speed_10m]
+ * @property {unknown} [precipitation]
+ * @property {unknown} [weather_code]
+ */
+
+/**
+ * A point as given: either part may be absent or not a number.
+ * @typedef {object} LatLon
+ * @property {unknown} [latitude]
+ * @property {unknown} [longitude]
+ */
+
+/**
+ * A point on the globe, as toPosition returns one.
+ * @typedef {{ latitude: number, longitude: number }} Position
+ */
+
+/**
+ * An OpenAQ parameter: the pollutant a sensor measures.
+ * @typedef {object} OpenAqParameter
+ * @property {unknown} [name]
+ * @property {unknown} [units]
+ * @property {unknown} [unit]
+ * @property {unknown} [displayName]
+ * @property {unknown} [display_name]
+ */
+
+/**
+ * A time as OpenAQ writes one, in UTC and local.
+ * @typedef {object} OpenAqTime
+ * @property {unknown} [utc]
+ * @property {unknown} [local]
+ */
+
+/**
+ * An OpenAQ sensor, as a station lists it.
+ * @typedef {object} OpenAqSensor
+ * @property {OpenAqParameter} [parameter]
+ */
+
+/**
+ * A value OpenAQ nests under `summary`, `latest`, `measurement` or `measurements`.
+ * @typedef {object} OpenAqValue
+ * @property {unknown} [value]
+ * @property {unknown} [unit]
+ * @property {OpenAqParameter} [parameter]
+ * @property {OpenAqTime} [datetime]
+ */
+
+/**
+ * One reading, as extractOpenAqMeasurement is given it. `parameter` may be an
+ * object or a bare code such as "pm25".
+ * @typedef {object} OpenAqItem
+ * @property {OpenAqParameter} [parameter]
+ * @property {OpenAqSensor} [sensor]
+ * @property {OpenAqSensor[]} [sensors]
+ * @property {OpenAqValue} [measurement]
+ * @property {OpenAqValue[]} [measurements]
+ * @property {OpenAqValue} [summary]
+ * @property {OpenAqValue} [latest]
+ * @property {unknown} [name]
+ * @property {unknown} [sensorName]
+ * @property {unknown} [value]
+ * @property {unknown} [unit]
+ * @property {OpenAqTime} [datetime]
+ * @property {OpenAqTime} [date]
+ */
+
+/**
+ * A station from OpenAQ's /locations answer, as the ranking reads it.
+ * @typedef {object} OpenAqStation
+ * @property {OpenAqTime} [datetimeLast]
+ * @property {OpenAqSensor[]} [sensors]
+ * @property {unknown} [distance]
+ * @property {LatLon} [coordinates]
+ */
+
+/**
+ * The `meta` block of an OpenAQ answer: `found` is OpenAQ's count, `returned`
+ * this service's own, which projectOpenAqStations adds.
+ * @typedef {object} OpenAqMeta
+ * @property {unknown} [found]
+ * @property {unknown} [returned]
+ */
+
+/**
+ * OpenAQ's /locations answer, and the copy of it projectOpenAqStations caches.
+ * @typedef {object} OpenAqLocations
+ * @property {OpenAqMeta} [meta]
+ * @property {unknown} [results]
+ */
+
+/**
+ * One of a wger exercise's translations.
+ * @typedef {object} WgerTranslation
+ * @property {unknown} [language]
+ * @property {unknown} [name]
+ * @property {unknown} [description]
+ */
+
+/**
+ * A wger category, muscle or piece of equipment, which an answer may give as a
+ * bare id instead.
+ * @typedef {object} WgerRef
+ * @property {unknown} [id]
+ * @property {unknown} [name]
+ * @property {unknown} [name_en]
+ */
+
+/**
+ * A wger exercise image or video.
+ * @typedef {object} WgerMedia
+ * @property {unknown} [id]
+ * @property {unknown} [image]
+ * @property {unknown} [video]
+ * @property {unknown} [url]
+ * @property {unknown} [is_main]
+ * @property {unknown} [isMain]
+ */
+
+/**
+ * A wger exercise, as an exerciseinfo answer gives one.
+ * @typedef {object} WgerExercise
+ * @property {unknown} [id]
+ * @property {unknown} [uuid]
+ * @property {WgerTranslation[]} [translations]
+ * @property {WgerMedia[]} [images]
+ * @property {WgerMedia[]} [videos]
+ * @property {WgerRef} [category]
+ * @property {WgerRef[]} [muscles]
+ * @property {WgerRef[]} [muscles_secondary]
+ * @property {WgerRef[]} [equipment]
+ */
+
+/**
+ * A TheMealDB meal. Its ingredients and measures are numbered fields,
+ * strIngredient1 to strIngredient20 and strMeasure1 to strMeasure20.
+ * @typedef {Record<string, unknown>} MealDbMeal
+ */
+
+/**
+ * A field pickFields copies: its name, or its name and a function its value is
+ * projected through.
+ * @typedef {string | [string, (value: unknown) => unknown]} PickField
+ */
 
 /**
  * Builds the service and returns its requests and helpers, which index.js hands
  * to the external routes.
  *
- * @param deps `readThroughExternalCache` and `buildExternalCacheKey` come from
+ * @param {ExternalDataDeps} deps `readThroughExternalCache` and `buildExternalCacheKey` come from
  *   httpCacheService, and `recordExternalApiLatency` from metricsService. Each
  *   upstream takes a base URL, a timeout in ms and a cache TTL in seconds.
  *   `openAqApiKey` is required for OpenAQ, `wgerApiToken` is optional, and
@@ -51,6 +285,7 @@ export const createExternalDataService = ({
   // absent value to 0 would make those guards unreachable for the input they
   // are written for: a null weather code would read as code 0, "Clear sky", and
   // a null temperature as 0C, too cold to train outdoors.
+  /** @param {unknown} value */
   const toFiniteNumber = (value) => {
     if (value === null || value === undefined || value === "") return null;
     const num = Number(value);
@@ -63,6 +298,7 @@ export const createExternalDataService = ({
   // upstream value here for weatherText, so without this guard a response could
   // carry weatherCode null beside weatherText "Clear sky" -- and the text is the
   // half a user reads. A real code 0 is still a clear sky.
+  /** @param {unknown} code */
   const weatherCodeToText = (code) => {
     if (code === null || code === undefined || code === "") return "Unknown";
     const value = Number(code);
@@ -76,10 +312,12 @@ export const createExternalDataService = ({
     return "Unknown";
   };
 
+  /** @param {unknown} code */
   const isSevereWeatherCode = (code) => [95, 96, 99].includes(Number(code));
 
   // The thresholds here and in buildWorkoutRecommendation are in Open-Meteo's
   // default units, which the requests keep: degrees C, km/h and mm.
+  /** @param {OpenMeteoCurrent} [current] */
   const isOutdoorFriendlyNow = (current = {}) => {
     const temperature = toFiniteNumber(current.temperature_2m);
     const wind = toFiniteNumber(current.wind_speed_10m);
@@ -93,6 +331,7 @@ export const createExternalDataService = ({
     return true;
   };
 
+  /** @param {OpenMeteoCurrent} [current] */
   const buildWorkoutRecommendation = (current = {}) => {
     const reasons = [];
     const weatherCode = toFiniteNumber(current.weather_code);
@@ -128,11 +367,13 @@ export const createExternalDataService = ({
     };
   };
 
+  /** @param {number} ms */
   const delayMs = (ms) =>
     new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
 
+  /** @param {Thrown} err */
   const isRetriableExternalError = (err) => {
     const status = Number(err?.status);
     if (err?.name === "AbortError") return true;
@@ -140,6 +381,10 @@ export const createExternalDataService = ({
     return status >= 500;
   };
 
+  /**
+   * @param {string} serviceName
+   * @param {() => Promise<unknown>} requestFn
+   */
   const runExternalRequestWithRetry = async (serviceName, requestFn) => {
     let attempt = 0;
     let lastError = null;
@@ -152,7 +397,8 @@ export const createExternalDataService = ({
       } catch (err) {
         recordExternalApiLatency(serviceName, Date.now() - startedAt);
         lastError = err;
-        const canRetry = attempt < externalApiRetries && isRetriableExternalError(err);
+        const canRetry =
+          attempt < externalApiRetries && isRetriableExternalError(/** @type {Thrown} */ (err));
         if (!canRetry) break;
         metrics.externalApiRetries[serviceName] =
           (metrics.externalApiRetries[serviceName] || 0) + 1;
@@ -162,8 +408,10 @@ export const createExternalDataService = ({
           service: serviceName,
           attempt: attempt + 1,
           waitTimeMs: waitTime,
-          status: Number.isInteger(err?.status) ? err.status : null,
-          message: toShortText(err?.message, 220)
+          status: Number.isInteger(/** @type {Thrown} */ (err)?.status)
+            ? /** @type {StatusError} */ (err).status
+            : null,
+          message: toShortText(/** @type {Thrown} */ (err)?.message, 220)
         });
         await delayMs(waitTime);
         attempt += 1;
@@ -173,6 +421,7 @@ export const createExternalDataService = ({
     throw lastError || new Error("External request failed.");
   };
 
+  /** @param {Record<string, unknown>} [query] */
   const fetchOpenMeteo = async (query) => {
     const cacheKey = buildExternalCacheKey("openMeteo", {
       baseUrl: openMeteoBaseUrl,
@@ -185,6 +434,7 @@ export const createExternalDataService = ({
       requestFn: async () =>
         runExternalRequestWithRetry("openMeteo", async () => {
           if (typeof fetch !== "function") {
+            /** @type {StatusError} */
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
             throw err;
@@ -206,15 +456,17 @@ export const createExternalDataService = ({
           const timeout = setTimeout(() => controller.abort(), openMeteoTimeoutMs);
           try {
             const response = await fetch(url, { signal: controller.signal });
-            const data = await response.json().catch(() => ({}));
+            const data = /** @type {UpstreamBody} */ (await response.json().catch(() => ({})));
             if (!response.ok) {
+              /** @type {StatusError} */
               const err = new Error(cleanText(data?.reason || "Open-Meteo request failed.", 200));
               err.status = response.status >= 500 ? 502 : response.status;
               throw err;
             }
             return data;
           } catch (err) {
-            if (err?.name === "AbortError") {
+            if (/** @type {Thrown} */ (err)?.name === "AbortError") {
+              /** @type {StatusError} */
               const timeoutErr = new Error("Open-Meteo request timed out.");
               timeoutErr.status = 504;
               throw timeoutErr;
@@ -230,6 +482,11 @@ export const createExternalDataService = ({
   // `project`, when given, maps the parsed body before it is returned and
   // cached, so a large answer can be cached trimmed to the fields its caller
   // reads. The cache key is unchanged, so an entry cached whole still answers.
+  /**
+   * @param {string} endpoint
+   * @param {Record<string, unknown>} [query]
+   * @param {{ project?: (data: unknown) => unknown }} [options]
+   */
   const openAqRequest = async (endpoint, query = {}, { project } = {}) => {
     const cacheKey = buildExternalCacheKey("openAq", {
       baseUrl: openAqBaseUrl,
@@ -247,12 +504,14 @@ export const createExternalDataService = ({
         if (!openAqApiKey) {
           const message = "OpenAQ API key is not configured. Set OPENAQ_API_KEY.";
           logger.warn({ event: "openaq_api_key_missing", message });
+          /** @type {StatusError} */
           const err = new Error(message);
           err.status = 503;
           throw err;
         }
         const data = await runExternalRequestWithRetry("openAq", async () => {
           if (typeof fetch !== "function") {
+            /** @type {StatusError} */
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
             throw err;
@@ -282,6 +541,7 @@ export const createExternalDataService = ({
               signal: controller.signal
             });
             const rawBody = await response.text();
+            /** @type {UpstreamBody | string} */
             let data = {};
             try {
               data = rawBody ? JSON.parse(rawBody) : {};
@@ -294,6 +554,7 @@ export const createExternalDataService = ({
                 Array.isArray(data) && data.length
                   ? cleanText(data[0]?.msg || data[0]?.message || data[0]?.detail, 220)
                   : "";
+              /** @type {StatusError} */
               const err = new Error(
                 cleanText(
                   firstError ||
@@ -310,7 +571,8 @@ export const createExternalDataService = ({
             }
             return data;
           } catch (err) {
-            if (err?.name === "AbortError") {
+            if (/** @type {Thrown} */ (err)?.name === "AbortError") {
+              /** @type {StatusError} */
               const timeoutErr = new Error("OpenAQ request timed out.");
               timeoutErr.status = 504;
               throw timeoutErr;
@@ -325,8 +587,10 @@ export const createExternalDataService = ({
     });
   };
 
+  /** @param {unknown} [code] */
   const openAqParameterLabel = (code = "") => {
     const key = cleanText(code, 40).toLowerCase();
+    /** @type {Record<string, string>} */
     const labels = {
       pm25: "PM2.5",
       "pm2.5": "PM2.5",
@@ -343,6 +607,7 @@ export const createExternalDataService = ({
   // depends on toFiniteNumber rejecting absent input: if it converted null to
   // 0, a null first candidate would end the search at 0 and the later shapes
   // would never be tried. A real 0 is still a measurement.
+  /** @param {unknown[]} values */
   const firstFinite = (values) => {
     for (const value of values) {
       const num = toFiniteNumber(value);
@@ -351,6 +616,7 @@ export const createExternalDataService = ({
     return null;
   };
 
+  /** @param {unknown[]} values */
   const firstClean = (values, maxLen = 80) => {
     for (const value of values) {
       const text = cleanText(value, maxLen);
@@ -359,6 +625,7 @@ export const createExternalDataService = ({
     return "";
   };
 
+  /** @param {OpenAqItem | null} [item] */
   const extractOpenAqMeasurement = (item = {}) => {
     // The parameter, value, unit and time can each sit in several places in an
     // OpenAQ item, so each is taken from the first candidate that carries one.
@@ -407,6 +674,7 @@ export const createExternalDataService = ({
     return { code, label, value, unit, measuredAt };
   };
 
+  /** @param {unknown} pm25 */
   const pm25ToUsAqi = (pm25) => {
     if (pm25 === null || pm25 === undefined || pm25 === "") return null;
     const value = Number(pm25);
@@ -426,6 +694,7 @@ export const createExternalDataService = ({
       { cLow: 125.5, cHigh: 225.4, iLow: 201, iHigh: 300 },
       { cLow: 225.5, cHigh: 325.4, iLow: 301, iHigh: 500 }
     ];
+    /** @param {{ cLow: number, cHigh: number, iLow: number, iHigh: number }} band */
     const interpolate = ({ cLow, cHigh, iLow, iHigh }) =>
       Math.round(iLow + ((truncated - cLow) / (cHigh - cLow)) * (iHigh - iLow));
     const band = points.find((point) => truncated <= point.cHigh);
@@ -456,6 +725,7 @@ export const createExternalDataService = ({
   // absent (null, "", missing), non-numeric or negative, or that has no
   // readable end time, is a missing hour, never a zero one; a measured 0 is
   // clean air. Returns null when the NowCast is not valid.
+  /** @param {unknown} hours */
   const pm25NowCast = (hours, nowMs = Date.now()) => {
     const byHour = new Map();
     let newestEndMs = -Infinity;
@@ -498,13 +768,16 @@ export const createExternalDataService = ({
 
   // OpenAQ spells the PM2.5 parameter several ways; each is PM2.5.
   const PM25_CODES = ["pm25", "pm2.5", "pm2_5", "pm2p5"];
+  /** @param {unknown} code */
   const isPm25Code = (code) => PM25_CODES.includes(cleanText(code, 40).toLowerCase());
 
   const EARTH_MEAN_RADIUS_M = 6371008.8;
+  /** @param {number} degrees */
   const toRadians = (degrees) => (degrees * Math.PI) / 180;
 
   // A point's latitude and longitude, or null when either is absent, not a
   // number, or off the globe: a null must not read as 0, a real position.
+  /** @param {LatLon | null | undefined} point */
   const toPosition = (point) => {
     const latitude = toFiniteNumber(point?.latitude);
     const longitude = toFiniteNumber(point?.longitude);
@@ -514,6 +787,10 @@ export const createExternalDataService = ({
   };
 
   // The great-circle (haversine) distance between two positions, in metres.
+  /**
+   * @param {Position} from
+   * @param {Position} to
+   */
   const haversineM = (from, to) => {
     const dLat = toRadians(to.latitude - from.latitude);
     const dLon = toRadians(to.longitude - from.longitude);
@@ -531,8 +808,9 @@ export const createExternalDataService = ({
   // (Date.parse reads it as NaN). The isFinite check states that outright
   // rather than leaving it to NaN comparing false, which a rewrite as
   // !(age > window) would silently invert.
+  /** @param {unknown} utc */
   const isFreshReading = (utc, nowMs = Date.now()) => {
-    const ms = Date.parse(utc);
+    const ms = Date.parse(/** @type {string} */ (utc));
     return Number.isFinite(ms) && nowMs - ms <= NOWCAST_MAX_AGE_HOURS * HOUR_MS;
   };
 
@@ -540,6 +818,10 @@ export const createExternalDataService = ({
   // count, or a string such as ">100" when it stopped counting at the limit. An
   // absent or unreadable count says nothing either way, so it reads as false;
   // the null check keeps that from resting on returnedCount being 0 or more.
+  /**
+   * @param {OpenAqMeta | null | undefined} meta
+   * @param {number} returnedCount
+   */
   const openAqResultsTruncated = (meta, returnedCount) => {
     const found = meta?.found;
     if (typeof found === "string" && /^>\s*\d+$/.test(found.trim())) return true;
@@ -547,6 +829,10 @@ export const createExternalDataService = ({
     return count !== null && count > returnedCount;
   };
 
+  /**
+   * @param {unknown} value
+   * @returns {value is Record<string, unknown>}
+   */
   const isPlainObject = (value) =>
     Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -554,8 +840,14 @@ export const createExternalDataService = ({
   // given as [name, project] has its value projected too. Values are copied,
   // never coerced: a missing field stays missing and a null stays null, never 0
   // or "". Anything that is not a plain object is returned as it came.
+  /**
+   * @template T
+   * @param {T} source
+   * @param {PickField[]} fields
+   */
   const pickFields = (source, fields) => {
     if (!isPlainObject(source)) return source;
+    /** @type {Record<string, unknown>} */
     const picked = {};
     for (const field of fields) {
       const [key, project] = Array.isArray(field) ? field : [field];
@@ -565,9 +857,12 @@ export const createExternalDataService = ({
     return picked;
   };
 
+  /** @param {unknown} parameter */
   const projectParameter = (parameter) =>
     pickFields(parameter, ["name", "units", "unit", "displayName", "display_name"]);
+  /** @param {unknown} sensor */
   const projectSensor = (sensor) => pickFields(sensor, ["id", ["parameter", projectParameter]]);
+  /** @param {unknown} station */
   const projectStation = (station) =>
     pickFields(station, [
       "id",
@@ -581,13 +876,18 @@ export const createExternalDataService = ({
       // Always a list here: projectOpenAqStations keeps only stations
       // rankFreshPm25Stations kept, whose isReadableStation needs a PM2.5
       // sensor in one.
-      ["sensors", (sensors) => sensors.map(projectSensor)]
+      ["sensors", (sensors) => /** @type {unknown[]} */ (sensors).map(projectSensor)]
     ]);
 
   // Whether the route could read a station at `nowMs`: it has a PM2.5 sensor and
   // its datetimeLast is fresh (isFreshReading; absent or unparseable is stale).
   // The rule rankFreshPm25Stations applies, and so projectOpenAqStations, which
   // ranks through it.
+  /**
+   * @param {OpenAqStation} station
+   * @param {number} nowMs
+   * @returns {station is OpenAqStation & { datetimeLast: OpenAqTime }}
+   */
   const isReadableStation = (station, nowMs) =>
     isFreshReading(station?.datetimeLast?.utc, nowMs) &&
     (Array.isArray(station?.sensors) ? station.sensors : []).some((sensor) =>
@@ -621,6 +921,10 @@ export const createExternalDataService = ({
   // (up to EXTERNAL_CACHE_STALE_TTL_SEC, 6 h by default), for as long as that
   // lasts; the copy can lack a revived station but never offer a dead one.
   // Values are copied, never coerced, so absent stays absent.
+  /**
+   * @param {OpenAqLocations} data
+   * @param {LatLon} [origin]
+   */
   const projectOpenAqStations = (data, origin, nowMs = Date.now()) => {
     const projected = pickFields(data, [
       ["meta", (meta) => pickFields(meta, ["found"])],
@@ -647,9 +951,11 @@ export const createExternalDataService = ({
   // before the projection counted carries no meta.returned, so its own length
   // is the count; an unreadable count (absent, null, not a whole number of 0 or
   // more) is no count, never 0.
+  /** @param {OpenAqLocations | null | undefined} data */
   const openAqReturnedCount = (data) => {
     const recorded = data?.meta?.returned;
-    if (Number.isInteger(recorded) && recorded >= 0) return recorded;
+    if (Number.isInteger(recorded) && /** @type {number} */ (recorded) >= 0)
+      return /** @type {number} */ (recorded);
     return Array.isArray(data?.results) ? data.results.length : 0;
   };
 
@@ -663,12 +969,16 @@ export const createExternalDataService = ({
   // report, then to list order. A station's datetimeLast covers all its sensors,
   // so its PM2.5 reading's own time is still to be checked; the route does that.
   // Returns [{ station, distanceM }] (distanceM null when unknown), maybe empty.
+  /**
+   * @param {unknown} locations
+   * @param {LatLon} [origin]
+   */
   const rankFreshPm25Stations = (locations, origin, nowMs = Date.now()) => {
     const from = toPosition(origin);
     const fresh = [];
     for (const station of Array.isArray(locations) ? locations : []) {
       if (!isReadableStation(station, nowMs)) continue;
-      const lastMs = Date.parse(station.datetimeLast.utc);
+      const lastMs = Date.parse(/** @type {string} */ (station.datetimeLast.utc));
       const given = toFiniteNumber(station?.distance);
       const at = toPosition(station?.coordinates);
       let distanceM = null;
@@ -683,6 +993,7 @@ export const createExternalDataService = ({
     return fresh.map(({ station, distanceM }) => ({ station, distanceM }));
   };
 
+  /** @param {unknown} aqi */
   const aqiBand = (aqi) => {
     // No reading, or an unreadable one: the advice errs indoors.
     if (aqi === null || aqi === undefined || aqi === "") {
@@ -743,6 +1054,7 @@ export const createExternalDataService = ({
     };
   };
 
+  /** @param {unknown} value */
   const normalizePlainText = (value, maxLen = 500) => {
     if (typeof value !== "string") return "";
     const stripped = value
@@ -752,6 +1064,11 @@ export const createExternalDataService = ({
     return stripped.slice(0, maxLen);
   };
 
+  /**
+   * @param {unknown} input
+   * @param {number} min
+   * @param {number} max
+   */
   const parseMultiNumberQuery = (input, min, max, maxItems = 8) => {
     if (input === undefined || input === null || input === "") return [];
     const list = Array.isArray(input) ? input : String(input).split(",");
@@ -765,6 +1082,10 @@ export const createExternalDataService = ({
     return values;
   };
 
+  /**
+   * @param {string} endpoint
+   * @param {{ query?: Record<string, unknown> }} [options]
+   */
   const wgerRequest = async (endpoint, options = {}) => {
     const query = options?.query || {};
     const cacheKey = buildExternalCacheKey("wger", {
@@ -779,6 +1100,7 @@ export const createExternalDataService = ({
       requestFn: async () =>
         runExternalRequestWithRetry("wger", async () => {
           if (typeof fetch !== "function") {
+            /** @type {StatusError} */
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
             throw err;
@@ -812,19 +1134,21 @@ export const createExternalDataService = ({
               headers: wgerApiToken ? { Authorization: `Token ${wgerApiToken}` } : undefined,
               signal: controller.signal
             });
-            const data = await response.json().catch(() => ({}));
+            const data = /** @type {UpstreamBody} */ (await response.json().catch(() => ({})));
             if (!response.ok) {
               const message = cleanText(
                 data?.detail || data?.reason || data?.message || "Wger request failed.",
                 220
               );
+              /** @type {StatusError} */
               const err = new Error(message);
               err.status = response.status >= 500 ? 502 : response.status;
               throw err;
             }
             return data;
           } catch (err) {
-            if (err?.name === "AbortError") {
+            if (/** @type {Thrown} */ (err)?.name === "AbortError") {
+              /** @type {StatusError} */
               const timeoutErr = new Error("Wger request timed out.");
               timeoutErr.status = 504;
               throw timeoutErr;
@@ -837,6 +1161,10 @@ export const createExternalDataService = ({
     });
   };
 
+  /**
+   * @param {string} endpoint
+   * @param {Record<string, unknown>} [query]
+   */
   const mealDbRequest = async (endpoint, query = {}) => {
     const cacheKey = buildExternalCacheKey("mealDb", {
       baseUrl: mealDbBaseUrl,
@@ -850,6 +1178,7 @@ export const createExternalDataService = ({
       requestFn: async () =>
         runExternalRequestWithRetry("mealDb", async () => {
           if (typeof fetch !== "function") {
+            /** @type {StatusError} */
             const err = new Error("This Node runtime does not support fetch.");
             err.status = 500;
             throw err;
@@ -871,6 +1200,7 @@ export const createExternalDataService = ({
           try {
             const response = await fetch(url, { signal: controller.signal });
             const rawBody = await response.text();
+            /** @type {UpstreamBody} */
             let data = {};
             try {
               data = rawBody ? JSON.parse(rawBody) : {};
@@ -879,6 +1209,7 @@ export const createExternalDataService = ({
             }
 
             if (!response.ok) {
+              /** @type {StatusError} */
               const err = new Error(
                 cleanText(
                   data?.message || data?.detail || data?.error || "MealDB request failed.",
@@ -891,7 +1222,8 @@ export const createExternalDataService = ({
 
             return data;
           } catch (err) {
-            if (err?.name === "AbortError") {
+            if (/** @type {Thrown} */ (err)?.name === "AbortError") {
+              /** @type {StatusError} */
               const timeoutErr = new Error("MealDB request timed out.");
               timeoutErr.status = 504;
               throw timeoutErr;
@@ -904,6 +1236,7 @@ export const createExternalDataService = ({
     });
   };
 
+  /** @param {MealDbMeal | null} [meal] */
   const mapMealDbIngredients = (meal = {}) => {
     const ingredients = [];
     for (let i = 1; i <= 20; i += 1) {
@@ -915,6 +1248,7 @@ export const createExternalDataService = ({
     return ingredients;
   };
 
+  /** @param {MealDbMeal | null} [meal] */
   const mapMealDbMeal = (meal = {}) => {
     const source = cleanText(meal?.strSource, 320);
     const youtube = cleanText(meal?.strYoutube, 320);
@@ -946,6 +1280,10 @@ export const createExternalDataService = ({
     };
   };
 
+  /**
+   * @param {WgerTranslation[] | undefined} translations
+   * @param {number} preferredLanguage
+   */
   const pickWgerTranslation = (translations, preferredLanguage) => {
     const list = Array.isArray(translations) ? translations : [];
     if (!list.length) return null;
@@ -961,6 +1299,7 @@ export const createExternalDataService = ({
     return list.find((item) => cleanText(item?.name, 200)) || list[0] || null;
   };
 
+  /** @param {WgerExercise | null | undefined} exercise */
   const mapWgerExercise = (exercise, preferredLanguage = wgerDefaultLanguage) => {
     // The name and description come from one translation: the requested
     // language, else English, else the first with a name, else the first.
