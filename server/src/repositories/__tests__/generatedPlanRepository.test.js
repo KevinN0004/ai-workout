@@ -1,13 +1,29 @@
+import { readFileSync } from "node:fs";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
-import { createGeneratedPlanRepository, GENERATED_PLAN_LIMIT } from "../generatedPlanRepository.js";
+import { buildPlanPayload } from "../../services/dashboard/planPayloadService.js";
+import {
+  createGeneratedPlanRepository,
+  GENERATED_PLAN_LIMIT,
+  mapGeneratedPlan
+} from "../generatedPlanRepository.js";
 import { createUserReadRepository } from "../userReadRepository.js";
 
-// Pins the plan prune against real Postgres. Which plans it keeps is decided by
-// the order the dashboard reads them in, so the tests compare against that
-// read rather than restating the order.
+// Pins the plan writes against real Postgres: the structure each plan is saved
+// with, and the prune. Which plans the prune keeps is decided by the order the
+// dashboard reads them in, so the tests compare against that read rather than
+// restating the order.
 
-const { pruneGeneratedPlans } = createGeneratedPlanRepository({ prisma });
+const { saveGeneratedPlan, pruneGeneratedPlans } = createGeneratedPlanRepository({ prisma });
+
+// One of the real answers planPayloadService's tests are built on.
+const realAnswer = readFileSync(
+  new URL(
+    "../../services/dashboard/__tests__/fixtures/plans/01-home-bodyweight-3d.txt",
+    import.meta.url
+  ),
+  "utf8"
+);
 const { findUserWithDashboard } = createUserReadRepository({ prisma });
 
 const createUser = (email, legacyUserId) =>
@@ -39,6 +55,48 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await prisma.appUser.deleteMany({});
+});
+
+describe("the plan's structure", () => {
+  const storedPayloadOf = async (userId) =>
+    (await prisma.generatedPlan.findFirst({ where: { userId }, select: { planPayload: true } }))
+      .planPayload;
+
+  test("is stored with the plan and returned as its payload", async () => {
+    const user = await createUser("payload-saved@example.com");
+    const payload = buildPlanPayload(realAnswer);
+
+    const saved = await saveGeneratedPlan({
+      userId: user.id,
+      entry: { plan: realAnswer, payload }
+    });
+
+    expect(saved.payload).toEqual(payload);
+    expect(await storedPayloadOf(user.id)).toEqual(payload);
+  });
+
+  // `{}` is the one way a row says "no structure", as every older plan's does.
+  test.each([
+    ["no structure", {}],
+    ["a malformed structure", { payload: { version: 2, days: [], notes: [] } }]
+  ])("stores {} for an entry with %s, and returns null", async (_label, extra) => {
+    const user = await createUser(`payload-none-${extra.payload ? "bad" : "absent"}@example.com`);
+
+    const saved = await saveGeneratedPlan({ userId: user.id, entry: { plan: "x", ...extra } });
+
+    expect(saved.payload).toBeNull();
+    expect(await storedPayloadOf(user.id)).toEqual({});
+  });
+
+  test("reads a valid stored structure back, and anything else as null", () => {
+    const payload = buildPlanPayload(realAnswer);
+
+    expect(mapGeneratedPlan({ planPayload: payload }).payload).toEqual(payload);
+    expect(mapGeneratedPlan({ planPayload: {} }).payload).toBeNull();
+    expect(
+      mapGeneratedPlan({ planPayload: { version: 1, days: "x", notes: [] } }).payload
+    ).toBeNull();
+  });
 });
 
 describe("pruneGeneratedPlans", () => {

@@ -4,6 +4,7 @@
  * the dashboard reads (userReadRepository.js). A foreign key to a plan must be
  * ON DELETE SET NULL, so a prune never deletes or blocks the row that holds it.
  */
+import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
@@ -18,7 +19,8 @@ export const GENERATED_PLAN_ORDER = [{ createdAt: "desc" }, { id: "desc" }];
 
 /**
  * Maps a generated_plans row to the plan the API returns. `id` is the legacy id
- * when the row has one, and the JSON list columns always read as arrays.
+ * when the row has one, the JSON list columns always read as arrays, and
+ * `payload` is the plan's stored structure, or null for a row that has none.
  */
 export const mapGeneratedPlan = (row = {}) => ({
   id: row.legacyId || row.id,
@@ -31,7 +33,8 @@ export const mapGeneratedPlan = (row = {}) => ({
   days: row.days ?? null,
   environment: row.environment || "",
   focuses: toJsonArray(row.focuses),
-  plan: row.planText || ""
+  plan: row.planText || "",
+  payload: toPlanPayload(row.planPayload)
 });
 
 /**
@@ -58,7 +61,8 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
         environment: entry.environment || "",
         focuses: toJsonArray(entry.focuses),
         planText: entry.plan || "",
-        planPayload: {}
+        // `{}` is how a row says it has no structure, as every older plan's does.
+        planPayload: toPlanPayload(entry.payload) ?? {}
       }
     });
 

@@ -1,11 +1,12 @@
 /**
  * POST /api/generate: asks Gemini for a weekly workout plan built from the
- * planner form, and saves it for a signed-in caller. Registered by
- * registerApiRoutes.
+ * planner form, parses it into days and notes, and saves both for a signed-in
+ * caller. Registered by registerApiRoutes.
  */
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { collapseWhitespace } from "../services/dashboard/dashboardDataBuildersService.js";
+import { buildPlanPayload } from "../services/dashboard/planPayloadService.js";
 
 // Defaults for the generation guardrails, used when GEMINI_MAX_OUTPUT_TOKENS
 // (tokens), GEMINI_TIMEOUT_MS (milliseconds) or GEMINI_MAX_PLAN_CHARS
@@ -15,15 +16,9 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_PLAN_CHARS = 20000;
 
-// client/src/app/plans.js opens a day on a line that starts with a weekday
-// name, so a plan naming no weekday cannot be split into days. Such a plan is
-// still served, and logged. This test is looser than plans.js: a weekday named
-// mid-line passes it.
-const WEEKDAY_HEADING = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
-
 // Sent as the system instruction, apart from the client data in the user
 // message. The weekday headings and "Coach Notes:" it asks for are what
-// client/src/app/plans.js parses, so that wording is a contract.
+// planPayloadService parses, so that wording is a contract.
 const SYSTEM_INSTRUCTION = [
   "You are an expert fitness coach. Create a weekly workout plan.",
   "",
@@ -299,7 +294,7 @@ export const registerGenerateRoutes = (app, deps) => {
 
       // Check the answer. A plan the model stopped at the token cap, an empty or
       // whitespace-only plan, or one longer than GEMINI_MAX_PLAN_CHARS, is a 502
-      // and is not saved. One naming no weekday is logged and still served.
+      // and is not saved. One with no weekday heading is logged and still served.
       // "MAX_TOKENS" is @google/genai's FinishReason.MAX_TOKENS; a cut-off plan
       // still has text, often every weekday heading, so only this tells it apart.
       if (result?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
@@ -330,7 +325,10 @@ export const registerGenerateRoutes = (app, deps) => {
         });
       }
 
-      if (!WEEKDAY_HEADING.test(plan)) {
+      // Parse the answer once, into the days and notes every reader uses. With
+      // no weekday heading, the whole plan is one "Your plan" day.
+      const payload = buildPlanPayload(plan);
+      if (!payload.days.some((day) => day.weekday !== null)) {
         req.log?.warn({ event: "generate_no_weekday" }, "Generated plan has no weekday heading.");
       }
 
@@ -350,7 +348,8 @@ export const registerGenerateRoutes = (app, deps) => {
           days,
           environment,
           focuses,
-          plan
+          plan,
+          payload
         };
 
         // Always an insert: the dashboard orders plans newest first and caps how
@@ -375,7 +374,7 @@ export const registerGenerateRoutes = (app, deps) => {
         }
       }
 
-      res.json({ plan, savedPlan });
+      res.json({ plan, payload, savedPlan });
     } catch (err) {
       sendErrorResponse(req, res, err, 500);
     }
