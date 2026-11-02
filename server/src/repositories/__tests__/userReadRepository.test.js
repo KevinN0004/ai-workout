@@ -165,11 +165,10 @@ describe("userReadRepository", () => {
     expect(after.dashboard.plans[0].goal).toBe("Second");
   });
 
-  // The route asks for $position: 0 and $slice: 200, but neither operator does
-  // anything: rows are always inserted, ordering comes from `createdAt desc`,
-  // and the 200 limit is applied when reading. Pinned because it means there is
-  // no storage-side cap to preserve -- the table grows without bound by design.
-  test("the 200 plan limit is applied on read, not on write", async () => {
+  // The read caps plans by itself. Only the generate route prunes, after a save
+  // (generatedPlanRepository.test.js), so rows put in directly, as here, stay,
+  // and the read still returns just the newest 200.
+  test("the 200 plan limit is applied on read, whatever is stored", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
     const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;

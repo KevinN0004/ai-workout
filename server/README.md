@@ -63,7 +63,8 @@ Two conventions worth knowing before adding a write:
   (`where legacy_id is not null`), which `schema.prisma` cannot express, so Prisma has no
   constraint to target. The repositories do an explicit read-then-write.
 - **Collection caps are applied on read.** `userReadRepository` limits each collection
-  with `take:`; nothing prunes the tables.
+  with `take:`. Only generated plans are also pruned, to the newest 200 after each save;
+  the paginated routes reach the other collections past their caps.
 
 This replaced a MongoDB-shaped compatibility shim, retired in full — see
 `docs/plans/2026-09-04-retiring-the-mongo-compat-shim.md`.

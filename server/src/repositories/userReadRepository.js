@@ -2,7 +2,7 @@
  * Loads users for the API: the user row alone, which every signed-in request
  * and sign-in reads (findUserRow, findUserRowByEmail), or the row with every
  * dashboard collection, each capped on read by COLLECTION_LIMITS
- * (findUserWithDashboard). Nothing prunes the tables.
+ * (findUserWithDashboard). Only generated plans are pruned, after each save.
  */
 import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
@@ -10,7 +10,11 @@ import { mapProgressMetric } from "./progressMetricRepository.js";
 import { mapWorkoutSession } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";
 import { mapSavedExercise } from "./savedExerciseRepository.js";
-import { mapGeneratedPlan } from "./generatedPlanRepository.js";
+import {
+  GENERATED_PLAN_LIMIT,
+  GENERATED_PLAN_ORDER,
+  mapGeneratedPlan
+} from "./generatedPlanRepository.js";
 
 const lower = (value) =>
   String(value || "")
@@ -26,15 +30,17 @@ const mapCalorieEntry = (row = {}) => ({
 });
 
 /**
- * The caps the API enforces on each collection. They are applied here, on
- * read, rather than in storage, so nothing prunes these tables.
+ * The caps the API enforces on each collection, applied here, on read. Only
+ * generated plans are also pruned to their cap, after each save
+ * (generatedPlanRepository.js). The paginated routes reach sessions, meals and
+ * metrics past their caps, so pruning those would delete visible history.
  */
 const COLLECTION_LIMITS = {
   workoutSessions: 500,
   calorieEntries: 1000,
   mealLogs: 800,
   progressMetrics: 400,
-  generatedPlans: 200,
+  generatedPlans: GENERATED_PLAN_LIMIT,
   savedExercises: 200
 };
 
@@ -128,7 +134,7 @@ export const createUserReadRepository = ({ prisma }) => {
       }),
       prisma.generatedPlan.findMany({
         where: { userId: userPk },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy: GENERATED_PLAN_ORDER,
         take: COLLECTION_LIMITS.generatedPlans
       }),
       prisma.savedExercise.findMany({

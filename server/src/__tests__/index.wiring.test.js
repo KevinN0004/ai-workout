@@ -14,6 +14,7 @@ vi.mock("@google/genai", () => ({
 }));
 import { app } from "../index.js";
 import { prisma } from "../db/prisma.js";
+import { GENERATED_PLAN_LIMIT } from "../repositories/generatedPlanRepository.js";
 
 // authRoutes.test.js and generateRoutes.equipment.test.js build their routes
 // from dependencies passed by hand, which proves nothing about the real app:
@@ -50,7 +51,8 @@ let baseUrl = "";
 const WIRING_TEST_EMAILS = [
   "wiring-password-change@example.test",
   "wiring-account-delete@example.test",
-  "wiring-other-sessions@example.test"
+  "wiring-other-sessions@example.test",
+  "wiring-plan-prune@example.test"
 ];
 
 const extractCookieFromHeader = (headerValue, cookieName) => {
@@ -278,5 +280,31 @@ describe("plan generation is wired into the real app", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  // The prune runs in a try that only logs a failure, so a missing
+  // pruneGeneratedPlans would show nowhere a response can see: the plan still
+  // comes back, and the account keeps one more row per save. Only a count does.
+  test("POST /api/generate prunes the signed-in user's plans to the read cap", async () => {
+    const email = "wiring-plan-prune@example.test";
+    const sidCookie = await signUp(email, "PrunePlans123!");
+    const owner = await prisma.appUser.findFirst({ where: { email } });
+    await prisma.generatedPlan.createMany({
+      data: Array.from({ length: GENERATED_PLAN_LIMIT }, (_, index) => ({
+        userId: owner.id,
+        planText: `old ${index}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index))
+      }))
+    });
+
+    const response = await withCsrf("/api/generate", "POST", {
+      sidCookie,
+      body: { goal: "Build strength", days: 3 }
+    });
+
+    expect(response.status).toBe(200);
+    const plans = { userId: owner.id };
+    expect(await prisma.generatedPlan.count({ where: plans })).toBe(GENERATED_PLAN_LIMIT);
+    expect(await prisma.generatedPlan.count({ where: { ...plans, planText: "old 0" } })).toBe(0);
   });
 });

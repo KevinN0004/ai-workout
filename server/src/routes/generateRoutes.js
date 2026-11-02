@@ -189,7 +189,8 @@ export const registerGenerateRoutes = (app, deps) => {
     toCleanArray,
     toNullableNumber,
     toPositiveInt,
-    saveGeneratedPlan
+    saveGeneratedPlan,
+    pruneGeneratedPlans
   } = deps;
 
   // Open to anonymous callers by design; the anonymous quota is enforced by the
@@ -357,6 +358,21 @@ export const registerGenerateRoutes = (app, deps) => {
         // instead when the user cannot be resolved.
         savedPlan =
           (await saveGeneratedPlan({ userId: sessionUser.id, entry: planEntry })) || planEntry;
+
+        // Then drop the plans past that cap, which no route can read. The plan
+        // is saved by now, so a failed prune is only logged: answering 500
+        // would cost the caller this plan, and the next save prunes again.
+        try {
+          await pruneGeneratedPlans({ userId: sessionUser.id });
+        } catch (pruneErr) {
+          req.log?.warn(
+            {
+              event: "generated_plan_prune_failed",
+              error: cleanText(pruneErr?.message || String(pruneErr), 240)
+            },
+            "Pruning older generated plans failed."
+          );
+        }
       }
 
       res.json({ plan, savedPlan });

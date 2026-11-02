@@ -131,9 +131,12 @@ Three things to know before adding a write:
   _partial_ unique indexes (`where legacy_id is not null`), which `schema.prisma` cannot
   express, so Prisma has no constraint to target. The repositories do an explicit
   read-then-write instead. This is deliberate, not an oversight.
-- **Collection caps are applied on read, not in storage.** `userReadRepository` limits
-  each collection with `take:`; nothing prunes the tables. A "capped list" is a read
-  concern here.
+- **Collection caps are applied on read, and only plans are pruned.** `userReadRepository`
+  limits each collection with `take:`. After each save, the generate route deletes the
+  user's plans past the same 200 (`pruneGeneratedPlans`, in the read's own order), which no
+  route can read. Nothing prunes the rest: the paginated routes reach sessions, meals and
+  metrics past their caps, so pruning those would delete visible history. A foreign key to
+  a plan must be `ON DELETE SET NULL`.
 - **A write derived from other rows takes a lock.** `syncDerivedCalorieEntry` sums the
   day's meals, and two saves in their own transactions each miss the other's uncommitted
   meal, so it first takes `pg_advisory_xact_lock` keyed on the user. Not `FOR UPDATE` on
