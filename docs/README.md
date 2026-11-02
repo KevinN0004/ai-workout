@@ -31,6 +31,7 @@
 - [2026-10-24 — Parked items](plans/2026-10-24-parked-items.md)
 - [2026-11-02 — Production data growth](plans/2026-11-02-production-data-growth.md)
 - [2026-11-02 — Decision records](plans/2026-11-02-decision-records.md)
+- [2026-11-02 — Type checking through JSDoc, phase 1](plans/2026-11-02-jsdoc-type-checking.md)
 
 ## Specs
 
@@ -42,3 +43,4 @@
 - [2026-10-10 — Readability follow-up](specs/2026-10-10-readability-follow-up-design.md)
 - [2026-11-02 — Production data growth](specs/2026-11-02-production-data-growth-design.md)
 - [2026-11-02 — Decision records](specs/2026-11-02-decision-records-design.md)
+- [2026-11-02 — Type checking through JSDoc](specs/2026-11-02-jsdoc-type-checking-design.md)
