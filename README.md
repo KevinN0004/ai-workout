@@ -44,7 +44,7 @@ AI Workout is a full-stack fitness planning app. The client guides a user throug
 |-- e2e/                      # Playwright suites: smoke, a11y, deployable
 |-- scripts/                  # repo tooling and Claude Code hook targets
 |-- security/                 # audit-ci allowlist and advisory reviews
-|-- docs/                     # deploy runbook, implementation plans, design specs
+|-- docs/                     # deploy runbook, decision records, plans, specs
 |-- .github/                  # CI and deploy workflows, Dependabot, PR template, CODEOWNERS
 |-- .vscode/                  # hides generated output from the file tree
 |-- .claude/settings.json     # Claude Code hook wiring and permission allowlist
@@ -450,6 +450,6 @@ on.
 - [E2E README](e2e/README.md) — the browser suites, and how to run them
 - [Scripts README](scripts/README.md) — repo tooling and Claude Code hook targets
 - [Security README](security/README.md) — how audit findings are accepted and expire
-- [Docs index](docs/README.md) — the runbook, plans and specs
-- [`CLAUDE.md`](CLAUDE.md) — working notes and the reasoning behind the non-obvious
-  decisions
+- [Docs index](docs/README.md) — the runbook, decision records, plans and specs
+- [`CLAUDE.md`](CLAUDE.md) — the rules Claude Code sessions work by; the reasoning
+  behind the non-obvious ones is in the [decision records](docs/adr/README.md)

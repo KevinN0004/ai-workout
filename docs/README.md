@@ -4,10 +4,11 @@
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | [`deploy-runbook.md`](deploy-runbook.md)             | Step-by-step first deployment to Render + Neon + Upstash, and what to check when it goes wrong    |
 | [`code-readability-sop.md`](code-readability-sop.md) | How source files are commented and ordered, and how to prove a readability change altered nothing |
+| [`adr/`](adr/README.md)                              | Decision records: why a rule in `CLAUDE.md` exists, one record per decision, kept current         |
 | `plans/`                                             | Implementation plans, one file per effort, named `YYYY-MM-DD-name.md`                             |
 | `specs/`                                             | Design specs, named to match the plan they belong to                                              |
 
-**Plans and specs are dated records.** Each describes the codebase as it was when it was written and is not updated afterwards, so a name or figure in one may since have changed. For how things are now, read the code, the READMEs and `CLAUDE.md`. For why something is the way it is, read the plan or spec for that effort.
+**Plans and specs are dated records.** Each describes the codebase as it was when it was written and is not updated afterwards, so a name or figure in one may since have changed. For how things are now, read the code, the READMEs and `CLAUDE.md`. For why something is the way it is, read its decision record in `adr/`, which is kept current, or the plan or spec for that effort.
 
 ## Plans
 

@@ -756,3 +756,88 @@ describe("the coverage floors agree with their measurement notes", () => {
     for (const file of CONFIGS) expect(claude).toContain(`\`${file}\``);
   });
 });
+
+describe("the decision records", () => {
+  // CLAUDE.md keeps each rule in a few lines and points at a record in docs/adr/
+  // for the reasoning behind it. A pointer to a record that is not there loses
+  // that reasoning without a sound, and a record left out of the index is one
+  // nobody finds. The ceiling stops CLAUDE.md, which every agent session loads
+  // whole, growing back: lower it freely, and raise it only in a PR that says why.
+  const CLAUDE_MD_MAX_BYTES = 76_000;
+
+  const adrDir = path.join(repoRoot, "docs", "adr");
+  const RECORD = /^\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
+  const entries = existsSync(adrDir)
+    ? readdirSync(adrDir)
+        .filter((name) => name !== "README.md")
+        .sort()
+    : [];
+  const records = entries.filter((name) => RECORD.test(name));
+  const indexPath = path.join(adrDir, "README.md");
+  const index = existsSync(indexPath) ? readFileSync(indexPath, "utf8") : "";
+  // One table row per record, its first cell a link to the file.
+  const listed = [...index.matchAll(/^\| \[\d{4}\]\((\d{4}-[a-z0-9-]+\.md)\) +\|/gm)].map(
+    (match) => match[1]
+  );
+
+  test("docs/adr holds records, each named NNNN-kebab-name.md", () => {
+    expect(records.length, "docs/adr holds no records").toBeGreaterThan(0);
+    expect(
+      entries.filter((name) => !RECORD.test(name)),
+      "docs/adr holds only README.md and records named NNNN-kebab-name.md"
+    ).toEqual([]);
+  });
+
+  test("the records are numbered from 0001 without a gap or a repeat", () => {
+    expect(records.map((name) => Number(name.slice(0, 4)))).toEqual(records.map((_, i) => i + 1));
+  });
+
+  test("the index lists every record once, in number order", () => {
+    expect(listed, "give each record one row in docs/adr/README.md, in order").toEqual(records);
+  });
+
+  test("every record path named in the repository exists", () => {
+    // Plans and specs are dated records, so a path in one may name what has
+    // since changed; everywhere else a pointer has to resolve.
+    const TEXT = /\.(md|js|jsx|mjs|cjs|json|jsonc|ya?ml|css|html)$/;
+    const scanned = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
+      .split("\0")
+      .filter(
+        (file) =>
+          TEXT.test(file) &&
+          file !== "package-lock.json" &&
+          !/^docs\/(plans|specs)\//.test(file) &&
+          existsSync(path.join(repoRoot, file))
+      );
+    const named = [];
+    for (const file of scanned) {
+      const text = readFileSync(path.join(repoRoot, file), "utf8");
+      for (const match of text.matchAll(/\badr\/(\d{4}-[a-z0-9-]+\.md)/g)) {
+        named.push({ file, record: match[1] });
+      }
+      // Inside docs/adr, records link to one another by bare file name.
+      if (file.startsWith("docs/adr/")) {
+        for (const match of text.matchAll(/\]\((\d{4}-[a-z0-9-]+\.md)\)/g)) {
+          named.push({ file, record: match[1] });
+        }
+      }
+    }
+    // CLAUDE.md names records, so finding none means the sweep has drifted.
+    expect(
+      named.some(({ file }) => file === "CLAUDE.md"),
+      "no record path found in CLAUDE.md"
+    ).toBe(true);
+    const missing = named
+      .filter(({ record }) => !records.includes(record))
+      .map(({ file, record }) => `${file} -> ${record}`);
+    expect(missing, "each of these names a record that docs/adr does not hold").toEqual([]);
+  });
+
+  test("CLAUDE.md is at most CLAUDE_MD_MAX_BYTES", () => {
+    const text = readFileSync(path.join(repoRoot, "CLAUDE.md"), "utf8").replace(/\r\n/g, "\n");
+    expect(
+      Buffer.byteLength(text, "utf8"),
+      "keep the rule in CLAUDE.md and move the story behind it to a record in docs/adr/"
+    ).toBeLessThanOrEqual(CLAUDE_MD_MAX_BYTES);
+  });
+});

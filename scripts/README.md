@@ -29,7 +29,10 @@ The four hook scripts are wired in `.claude/settings.json`, which knip cannot se
 - every source file opens with a header of at most four lines of text
   ([`docs/code-readability-sop.md`](../docs/code-readability-sop.md), rule 1);
 - each coverage floor is its config's measurement note truncated to one decimal, and
-  `CLAUDE.md` points at both configs for them.
+  `CLAUDE.md` points at both configs for them;
+- every decision-record path named outside the dated plans and specs exists,
+  `docs/adr/README.md` lists each record once and in order, and `CLAUDE.md` stays at or
+  under `CLAUDE_MD_MAX_BYTES`.
 
 ```bash
 npm run test:scripts

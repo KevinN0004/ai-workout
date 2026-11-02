@@ -95,6 +95,11 @@ Before responding, check if the prompt matches any of these patterns and invoke 
   a test-only folder
 - `docs/plans` — implementation plans, one file per effort, named `YYYY-MM-DD-name.md`
 - `docs/specs` — design specs, named to match the plan they belong to
+- `docs/adr` — decision records, one file per decision, named `NNNN-name.md` and listed in
+  `docs/adr/README.md`. A record holds why a rule in this file exists: the rule stays here
+  in a few lines and points at its record, and the story, the measurements and the history
+  go in the record. `scripts/__tests__/repo-invariants.test.mjs` checks that every record
+  path named in the repository exists, and holds this file under `CLAUDE_MD_MAX_BYTES`
 - `scripts/` — repo-level tooling (Claude Code hook targets live here)
 - `security/` — the audit-ci allowlist (`audit-ci.json`), the advisory reviews it is
   checked against, and the gitleaks config (`gitleaks.toml`), whose allowlist names
@@ -163,208 +168,35 @@ before testing turns missing data into a real-looking measurement.
 `repositories/rowValues.js`, all do this; copy that shape rather than writing a fresh
 coercion. On the client, `toNumberOrNull` in `app/units.js` is that shape: import it.
 
-**Guarding the converter does not protect a caller that bypasses it.** This class has
-recurred three times, and the third was in code I had already declared fixed:
-`weatherCodeToText` kept its own `Number(code)`, and the weather routes called it with
-the raw upstream value while building the neighbouring numeric field through
-`toFiniteNumber`. One response carried `weatherCode: null` beside
-`weatherText: "Clear sky"`. When you fix one of these, grep for every caller of the
-helper and check what each passes in.
-
-This is not hypothetical. Three shipped bugs came from it, all in health advice:
-
-- a pm2.5 sensor reporting `null` was published as `0 ug/m3`, which scores **AQI 0** and
-  told the user the air was clean
-- a `null` weather code is code `0`, **"Clear sky"**, and a `null` temperature is `0 °C`,
-  so a payload carrying no weather at all was reported as clear _and_ too cold to train
-  outdoors
-- the same `null` weather code went on reporting **"Clear sky"** from both weather routes
-  and every day of the forecast after that fix, because those build `weatherText` from
-  the raw value rather than from the guarded number
-
-The whole external-data path has since been swept for it. `pm25ToUsAqi`, `aqiBand`,
-`toFiniteNumber`, `weatherCodeToText`, `toNumberOrNull`, and `pm25NowCast`, which reads an
-absent hour as a missing hour, all guard; `isSevereWeatherCode` is safe because `0` is not
-a severe code; the wger and mealdb routes only use `cleanText`, which tests
-`typeof value === "string"`.
-
-**The US AQI is the EPA NowCast of the station's PM2.5 hourly means, not its latest
-reading.** The air-quality route makes a third OpenAQ call, `sensors/<id>/hours`, and
-`pm25NowCast` in `externalDataService.js` scores the last twelve hours to the EPA's method
-(weight min / max floored at 0.5, two of the three newest hours present, truncated to
-0.1 ug/m3), checked against AirNow's and the EPA sample's worked examples. Hour 0 is the
-newest hour the station reported, used only if it ended within four hours. An hour whose
-value is `null`, `""`, missing, non-numeric or negative is a **missing** hour: it neither
-counts towards two of three nor pulls the mean towards 0. Too few hours, a stale station
-or a failed hourly call gives `aqiUs: null` and "Unknown", as no PM2.5 sensor does;
-`summary.pm25` is still the latest reading and `summary.pm25NowCast` the scored one.
-
-**OpenAQ's first station is not the nearest, and is often dead.** `/v3/locations` lists
-stations in id order (`order_by` accepts only `id`) and keeps ones that stopped reporting
-years ago: on 2026-10-27 its first PM2.5 station was 23.5 hours stale in New York, last
-heard in 2017 in Los Angeles and in 2023 in London, beside stations reporting within
-hours. The list was also cut short: `meta.found` read `">100"` for Los Angeles and London
-at a limit of 100. So the route asks for PM2.5 stations only (`parameters_id: 2`, the id
-seen live in all three cities) in one page of 1,000, the most OpenAQ's pagination docs
-allow, and logs `openaq_locations_truncated` when `openAqResultsTruncated` says even that
-was cut short. `rankFreshPm25Stations` keeps the stations with a PM2.5 sensor whose
-`datetimeLast` is fresh and ranks them nearest first: OpenAQ's `distance` (metres, filled
-in live) when it is a number of 0 or more, else haversine from `coordinates`; a `null`
-distance or position is unknown, never 0 metres, and sorts last. **That page is cached
-trimmed** (`projectOpenAqStations`, passed to `openAqRequest` as `project`): untrimmed it
-ran to 383,705 bytes for Los Angeles, cached per requested point for up to 500 entries,
-about 192 MB, enough to exhaust a 512 MB instance. It keeps only the **nearest ten**
-stations the route could read (`CACHED_STATION_LIMIT`), ranked from the point asked for by
-`rankFreshPm25Stations` itself, and only the fields read, copied as they came, so absent
-stays absent. **Filtering alone was not a bound, and the first estimate was wrong:** 19.5
-MB assumed LA's 61 fresh of 287 (2026-10-27), but freshness varies by the hour, and on
-2026-10-29 206 were fresh, 139,519 bytes cached, about 70 MB at 500 entries. Capped, an
-entry is about 6 KB however many are fresh (5,951 B measured for an LA-like list with 206
-fresh), about 3 MB at 500. The route walks at most three; the other seven cover stations
-going stale while a stale copy is served in an outage. `meta.returned` keeps OpenAQ's raw
-count, which the 404 and the truncation check read through `openAqReturnedCount`; an
-entry cached before has none, and its length stands in. The route re-ranks at read time,
-so a cached copy, capped or a longer one from before, answers the same, and it can miss a
-station that revived since the fetch (within the TTL, or while a stale copy is served in
-an outage) but never offers a dead one.
-
-**A fresh station is not a fresh PM2.5 reading.** `datetimeLast` covers every sensor: live,
-London's nearest fresh station (154 Marylebone Road, 2.2 h) had a PM2.5 reading dated
-2026-09-10, so the hours came back empty. The route therefore walks the ranked list, asks
-`/latest` of at most three, and reads the first whose PM2.5 reading's own `datetime.utc` is
-fresh. Both checks go through `isFreshReading`, within the same four hours
-(`NOWCAST_MAX_AGE_HOURS`, shared with hour 0), and **absent is stale**: a missing, `null`
-or unparseable time never counts as fresh. A failed `/latest` is a miss and the walk goes
-on; if every one asked failed, nothing said the stations were stale, so the outage
-handling answers as before. Otherwise no fresh reading means "Unknown" with no hours call
-and no station named. Three keeps a lookup to five calls, inside OpenAQ's 60 a minute.
-
-`undefined` already behaved correctly, so an omitted key and an explicit `null` gave
-opposite answers for the same missing data — which is what made it hard to see.
+**Guarding the converter does not protect a caller that bypasses it.** When you fix one of
+these, grep for every caller of the helper and check what each passes in.
 
 **Do not "fix" this with `!value`.** That swallows a genuine zero, and a measured zero is
-a measurement: 0 °C really is below the cold gate. Range checks used to mask the bug too:
-`toPositiveInt` and `parseRedisPort` were safe only because `> 0` and a port range reject
-the accidental `0`, and `toRate` was safe only because its one caller passes `0` as the
-fallback, so the accidental zero and the intended default happened to coincide. All three
-now guard before they coerce, so the safety is intrinsic rather than a side effect of the
-range. `toRate` was the one that mattered: `0` is a valid sample rate, so nothing else was
-going to catch it if the default ever changed.
+a measurement: 0 °C really is below the cold gate.
 
-**The invariant is now asserted, not just described here.**
-`server/src/__tests__/numericCoercion.contract.test.js` and its client counterpart enumerate every
-numeric helper and pin three things: that `null`, `""` and `undefined` all agree, that a
-non-numeric string is absent, and that a measured `0` survives. **Add a row when you add a
-helper** — that is the whole mechanism, and it is why `toNumberOrNull`, the shape this
-section tells you to copy, is now tested directly rather than only incidentally through
-the dashboard integration suites.
+**The invariant is asserted, not just described.**
+`server/src/__tests__/numericCoercion.contract.test.js` and its client counterpart
+enumerate every numeric helper and pin three things: that `null`, `""` and `undefined` all
+agree, that a non-numeric string is absent, and that a measured `0` survives. **Add a row
+when you add a helper.** Each row declares whether zero is meaningful for its helper, and
+`toNumberInput` keeps `undefined` and `null` apart on purpose, because it feeds
+`z.preprocess`.
 
-Two things the contract deliberately does not flatten:
+Three shipped bugs in health advice came from this class, among them a `null` PM2.5
+reading published as AQI 0, and it has been found five times;
+[0001](docs/adr/0001-absent-is-not-zero.md) records each instance and what let it survive.
+Before changing the air-quality route, read [0002](docs/adr/0002-us-aqi-from-the-nowcast.md),
+on scoring the US AQI as the EPA NowCast of hourly PM2.5, and
+[0003](docs/adr/0003-picking-the-openaq-station.md), on picking the station and bounding
+the cache.
 
-- **`toPositiveInt` and `parseRedisPort` exclude `0` from their domain**, so for them a
-  measured `0` correctly reads as absent. Asserting otherwise would be wrong, so each row
-  declares whether zero is meaningful for that helper.
-- **`toNumberInput` does not make the three absent forms agree**, and must not. It feeds
-  `z.preprocess`, where `undefined` has to stay `undefined` for `.optional()` to fire and
-  `null` has to stay `null` for `z.null()` to match — collapsing them would lose the
-  difference between a field omitted and a field explicitly cleared. It still honours the
-  part that matters: an empty field becomes `null`, never `0`.
-- **`pm25NowCast` takes a list of hours, not one value**, so its row feeds it three steady
-  hours of the value under test. Reading an hour with `Number()` instead of
-  `toFiniteNumber` fails that row for `null`, `""`, `undefined` and a non-numeric string.
+### Conventions
 
-Mutation-tested rather than trusted, since a contract test over correct code passes on the
-first run either way. Removing the guard from `toNumberOrNull`, `toNullableNumber`,
-`toFiniteNumber` (both copies) or `toRate` is caught; so is switching any of them to
-`!value`. Removing it from `toPositiveInt` or `parseRedisPort` **survives, as predicted** —
-those two are equivalent mutants, which is the mechanical proof that reshaping them changed
-no answer.
-
-**The class was not confined to the server, and the fourth instance is fixed.**
-`useBodyModel.js` carried its own `toFiniteNumber` written the wrong way round —
-`Number()` first, `Number.isFinite` after — while `defaultPersonalForm.bodyFat`
-is `""`. So an unentered body fat resolved to `0`, `clamp(0, 3, 60)` lifted it
-to `3`, and `explicitBodyFat ?? estimatedBodyFat` accepted that 3 as a real
-answer. Anyone who filled in height and weight but not body fat was modelled at
-**3% body fat**, leaner than an elite athlete, and the BMI-derived
-`estimatedBodyFat` sitting beside it was unreachable from the app. It also
-floored the silhouette's whole adiposity channel: `fatScore` clamped to `0` for
-an ordinary BMI-25.8 profile.
-
-The guard now runs before the coercion: `useBodyModel.js` reads through the client's
-`toNumberOrNull` (`app/units.js`), the same shape as `repositories/rowValues.js`'s.
-Two things follow from that, and both are worth knowing:
-
-- **An unentered body fat now reaches the BMI estimate**, and `""`, `null` and
-  an absent key all agree. An entered `"0"` is still a measurement and still
-  clamps to the 3% floor — blank and zero are different answers.
-- **The cross-unit height fallback came back to life.** Both `??` in that pick
-  were dead for the same reason: the left operand was `0`, never `null`. A
-  profile carrying a height in only one of the two fields used to resolve to no
-  height at all; it now falls back to the other unit, which is what the
-  expression was written to do.
-
-Only `""` and `null` changed behaviour — `undefined` already returned null, and
-weight was unaffected because `toKg` returns `""` for a falsy value and the
-`> 0` check downstream rejected the `0` either way.
-
-**A fifth instance sat in `pages/home/components/physique/math.js`, and it is fixed too.**
-That file carried a _third_ `toFiniteNumber`, the only one taking an explicit
-`fallback` argument, written the wrong way round like the others. It is the copy
-the silhouette runs on: dozens of calls across `geometry.js`,
-`templateOutline.js`, `outlineUtils.js` and `palette.js`.
-
-It was never reachable from the app — `useBodyModel`'s `silhouetteShape` puts
-every field through `clamp()` of a numeric expression, so the model it hands
-`PhysiqueSilhouette2D` carries only finite numbers. It was a trap for the next
-caller rather than a shipped bug. Two things let it survive the earlier sweep,
-and both are worth recognising elsewhere:
-
-- **Its test pinned the wrong behaviour with a comment that only explained the
-  mechanism.** `expect(toFiniteNumber(null, 7)).toBe(0)` was annotated
-  `// Number(null) is 0, which is finite` — true, and not a reason. Compare the
-  `is_day` test in `weatherRoutes.test.js`, which argues that anything other
-  than the flag "must not read as daytime". A comment that restates what the
-  code does cannot tell you whether it should.
-- **`geometry.test.js` already passed a `null` in and could not see it.** Its
-  non-numeric case includes `waistHalf: null`, but asserts only that the path
-  holds no `NaN` — true whichever way the null resolves. Exercising a value is
-  not the same as discriminating on it.
-
-The regression test now pins absent and zero apart at both levels. Note what the
-geometry-level one had to assert: a zeroed dimension does **not** simply clamp to
-its minimum bound, because `buildTemplateSizing` in `templateOutline.js` derives
-its width scale from the **raw** model value rather than from geometry's clamped
-local. Those unclamped scales are worth remembering before assuming the clamps in
-`buildPhysiqueSilhouetteGeometry` bound everything downstream of them.
-
-Conventions:
-
-- **File length is a smell, not a limit.** This file used to say "keep files under
-  500 lines". That rule arrived with the initial Claude config in `eb165c7`, whose
-  message says the setup was ported from another repo — it was never a decision
-  about this codebase. Nine files broke it, nothing enforced it, and adding
-  `max-lines` would contradict the ESLint policy below, which is deliberately
-  scoped to defect classes rather than style.
-
-  What matters is how many _things_ a file is, not how long it is. Eight of those
-  nine are one exported thing plus its private helpers: `templateOutline.js` has a
-  single export, `buildTemplateOutline`, and `externalDataService.js` and `events.js` are
-  closure factories. Splitting those means exporting internals to satisfy a line
-  count, which trades real encapsulation for a number. **Leave them.**
-
-  `index.js` was the exception — genuinely several things — and it was split for
-  that reason rather than for its length, which is why the pieces that came out
-  (`services/platform/metricsService.js`, `corsPolicy.js`) are cohesive rather than
-  arbitrary. It is still the largest server file and still over 500 lines. That is
-  fine; it is the app bootstrap, and the remainder is wiring that belongs together.
-
-  Reach for a split when a file grows a second unrelated reason to change, or when
-  something worth testing can only be reached by booting the whole app. Both were
-  true of the metrics helpers: they were the last uncovered statements in
-  `index.js` precisely because they were module-scope privates, and the identical
-  `recordLatency` in `middleware/requestContext.js` was a second copy of one of
-  them. Extracting fixed the coverage and the duplication together.
+- **File length is a smell, not a limit.** What matters is how many _things_ a file is,
+  not how long it is. Reach for a split when a file grows a second unrelated reason to
+  change, or when something worth testing can only be reached by booting the whole app,
+  and leave a long file that is one exported thing plus its private helpers
+  ([0004](docs/adr/0004-file-length-is-a-smell.md)).
 
 - **Comments and in-file order follow `docs/code-readability-sop.md`**: a header first in
   every source file, a prose `/** */` summary on every export, one line on every effect,
