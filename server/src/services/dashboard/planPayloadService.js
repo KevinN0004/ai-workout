@@ -65,7 +65,7 @@ const findNotesStart = (lines) => {
  * @returns {PlanPayload}
  */
 export const buildPlanPayload = (text) => {
-  const rawLines = String(text ?? "")
+  const rawLines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
