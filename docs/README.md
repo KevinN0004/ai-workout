@@ -29,6 +29,7 @@
 - [2026-10-22 — Readability follow-up, open items](plans/2026-10-22-readability-follow-up-open-items.md)
 - [2026-10-24 — Parked items](plans/2026-10-24-parked-items.md)
 - [2026-11-02 — Production data growth](plans/2026-11-02-production-data-growth.md)
+- [2026-11-02 — Decision records](plans/2026-11-02-decision-records.md)
 
 ## Specs
 
@@ -39,3 +40,4 @@
 - [2026-09-29 — Code readability](specs/2026-09-29-code-readability-design.md)
 - [2026-10-10 — Readability follow-up](specs/2026-10-10-readability-follow-up-design.md)
 - [2026-11-02 — Production data growth](specs/2026-11-02-production-data-growth-design.md)
+- [2026-11-02 — Decision records](specs/2026-11-02-decision-records-design.md)
