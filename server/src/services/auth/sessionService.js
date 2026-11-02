@@ -125,7 +125,8 @@ const tokensMatch = (a, b) => {
  * connects Redis when it is configured and falls back to memory when it is not
  * or cannot connect.
  *
- * @param deps `findUserById` (from authUserService) loads a session's user.
+ * @param deps `findUserById` (from authUserService) loads a session's user, the
+ *   user row alone.
  *   `cookieSecure` is "; Secure" or "", appended to every cookie.
  *   `csrfUnsafeMethods` is the set of methods `requireCsrfToken` checks, and
  *   `redisSessionKeyPrefix` namespaces the session keys in Redis.
@@ -411,8 +412,8 @@ export const createSessionService = ({
       // above and the passwordChangedAt branch below, which both delete.
       //
       // Safe because null here means "no row": findUserById resolves through
-      // loadWithCollections, which returns null only when findFirst matches
-      // nothing. A database failure throws instead and never reaches this
+      // findUserRow, whose one findFirst returns null only when nothing
+      // matches. A database failure throws instead and never reaches this
       // line, so a transient outage cannot cost a valid session its token.
       await deleteSession(token);
       return null;

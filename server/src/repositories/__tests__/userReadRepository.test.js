@@ -9,7 +9,7 @@ import { createGeneratedPlanRepository } from "../generatedPlanRepository.js";
 import { createWorkoutSessionRepository } from "../workoutSessionRepository.js";
 import { createMealLogRepository } from "../mealLogRepository.js";
 
-const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
+const { findUserWithDashboard, findUserRow, findUserRowByEmail, createUserWithDashboard } =
   createUserReadRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLog, sumCaloriesForDate } = createMealLogRepository({ prisma });
@@ -57,7 +57,7 @@ describe("userReadRepository", () => {
     const doc = baseUserDoc({ email: "Mixed.Case@Example.com" });
     await createUserWithDashboard(doc);
 
-    const found = await findUserWithDashboardByEmail("mixed.case@example.com");
+    const found = await findUserRowByEmail("mixed.case@example.com");
     expect(found).not.toBeNull();
     expect(found.email).toBe("mixed.case@example.com");
   });
@@ -65,6 +65,42 @@ describe("userReadRepository", () => {
   test("findOne returns null for unknown user and empty query", async () => {
     expect(await findUserWithDashboard(crypto.randomUUID())).toBeNull();
     expect(await findUserWithDashboard("")).toBeNull();
+    expect(await findUserRow(crypto.randomUUID())).toBeNull();
+    expect(await findUserRow("")).toBeNull();
+    expect(await findUserRowByEmail("nobody@example.com")).toBeNull();
+    expect(await findUserRowByEmail("")).toBeNull();
+  });
+
+  // The row lookups serve every signed-in request, so they read the user row
+  // and nothing else: no dashboard key at all, which an empty one would hide.
+  // Both id forms must resolve, because a session holds whichever one the
+  // account had when it signed in (commit 19cc8ac).
+  test("findUserRow resolves the UUID and the legacy id without the collections", async () => {
+    const doc = baseUserDoc({ profile: { firstName: "Ada" } });
+    await createUserWithDashboard(doc);
+    await saveGeneratedPlan({ userId: doc.userId, entry: { goal: "Strength", plan: "squat" } });
+    const pk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
+
+    for (const id of [doc.userId, pk]) {
+      const found = await findUserRow(id);
+      expect(found.userId).toBe(doc.userId);
+      expect(found.hash).toBe(doc.hash);
+      expect(found.profile).toEqual({ firstName: "Ada" });
+      expect(found).not.toHaveProperty("dashboard");
+    }
+    expect(await findUserRowByEmail(doc.email)).not.toHaveProperty("dashboard");
+  });
+
+  test("findUserRow reads passwordChangedAt exactly as the full load does", async () => {
+    const doc = baseUserDoc();
+    await createUserWithDashboard(doc);
+    expect((await findUserRow(doc.userId)).passwordChangedAt).toBeNull();
+
+    await updatePasswordHash({ userId: doc.userId, hash: "h2", stampPasswordChange: true });
+
+    const changed = (await findUserRow(doc.userId)).passwordChangedAt;
+    expect(Number.isFinite(Date.parse(changed))).toBe(true);
+    expect(changed).toBe((await findUserWithDashboard(doc.userId)).passwordChangedAt);
   });
 
   // Goals live in one JSON column, so a partial write must patch rather than
