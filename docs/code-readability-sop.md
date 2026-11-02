@@ -39,9 +39,15 @@ that constant, which review should refuse.
 Every exported function, component and hook has a `/** */` comment directly above it, in
 prose: what it is for, what it returns, and anything it assumes.
 
-- Use `@param` only for a shape the reader cannot guess — a factory's dependency object, an
-  options bag. Do not restate a parameter the name already explains.
-- No `@returns {string}`-style types. Nothing checks them, so they drift.
+- In a file without `// @ts-check`, use `@param` only for a shape the reader cannot guess —
+  a factory's dependency object, an options bag — and do not restate a parameter the name
+  already explains. Write no `@returns {string}`-style types there: nothing checks them, so
+  they drift.
+- In a file with `// @ts-check`, `npm run typecheck` checks every JSDoc type, so they cannot
+  drift. Give each parameter the checker cannot infer a `@param {Type} name` line below the
+  prose, and add a `@returns {Type}` only where the inferred return is wider than the truth.
+  The pragma goes on its own line below the header, before the first statement
+  ([decision record 0017](adr/0017-type-checking-through-jsdoc.md)).
 - An export may go without one only when its name and signature already say all of that.
   If you leave one bare, say which in the PR.
 

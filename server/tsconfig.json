@@ -1,0 +1,19 @@
+{
+  // Type-checks the server's JavaScript (roadmap lane D1, decision record 0017).
+  // A file is checked when `// @ts-check` sits below its header; every other
+  // file is read for its types and reports nothing. Node runs the sources as
+  // they are, so nothing is built from this file. `lib` leaves out the DOM.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["esnext"],
+    "types": []
+  },
+  "include": ["src"]
+}

@@ -54,6 +54,11 @@ jobs:
       - name: Knip
         run: npm run knip
 
+      # Checks each workspace's `// @ts-check` files; every other file reports
+      # nothing until roadmap milestone M4 turns checkJs on (decision record 0017).
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Script Tests
         run: npm run test:scripts
 

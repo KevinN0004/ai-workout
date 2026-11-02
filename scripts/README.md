@@ -32,7 +32,10 @@ The four hook scripts are wired in `.claude/settings.json`, which knip cannot se
   `CLAUDE.md` points at both configs for them;
 - every decision-record path named outside the dated plans and specs exists,
   `docs/adr/README.md` lists each record once and in order, and `CLAUDE.md` stays at or
-  under `CLAUDE_MD_MAX_BYTES`.
+  under `CLAUDE_MD_MAX_BYTES`;
+- every `// @ts-check` sits before its file's first statement, where TypeScript reads it,
+  `TYPE_CHECKED_FILES` matches the files that carry one, both tsconfigs keep `strict` on and
+  `checkJs` off, and CI runs `npm run typecheck`.
 
 ```bash
 npm run test:scripts
