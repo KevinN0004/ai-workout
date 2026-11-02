@@ -236,7 +236,8 @@ the model is told the user can train with, and two of its branches are easy to b
 
 The prompt asks for weekday headings and a `"Coach Notes:"` section by name because
 `services/dashboard/planPayloadService.js` parses exactly those when a plan is saved, and
-`client/src/app/plans.js` parses the text again by the same rules. **Nothing checks the
+`client/src/app/plans.js` parses an older plan's text by the same rules, which
+`client/src/app/__tests__/planPayload.contract.test.js` holds equal. **Nothing checks the
 prompt against them:** the parser's tests run on answers captured from this prompt, so
 changing its wording means capturing new answers and running them through those tests
 (`docs/specs/2026-11-02-structured-plans-design.md`, "What forces a re-check").

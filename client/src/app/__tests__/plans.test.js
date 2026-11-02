@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { extractLatestPlanByWeekday, parsePlanSections } from "../plans";
+import {
+  PLAN_PAYLOAD_VERSION,
+  extractLatestPlanByWeekday,
+  parsePlanSections,
+  planByWeekday,
+  readPlan
+} from "../plans";
 
 // The two parsers that turn a generated plan -- free text from Gemini -- into
 // the day sections the Plans view renders and the weekday lookup the dashboard
@@ -67,7 +73,21 @@ describe("parsePlanSections", () => {
     test("keeps a day with no lines under it", () => {
       const { days } = parsePlanSections(weekPlan);
 
-      expect(days[2]).toEqual({ title: "Wednesday - Rest", lines: [] });
+      expect(days[2]).toEqual({
+        index: 2,
+        weekday: "Wednesday",
+        title: "Wednesday - Rest",
+        lines: []
+      });
+    });
+
+    test("names each day's weekday in one spelling, beside its position", () => {
+      const { days } = parsePlanSections(plan("MONDAY - Push", "Bench", "monday", "Squat"));
+
+      expect(days.map(({ index, weekday }) => ({ index, weekday }))).toEqual([
+        { index: 0, weekday: "Monday" },
+        { index: 1, weekday: "Monday" }
+      ]);
     });
 
     test("matches a weekday heading regardless of case", () => {
@@ -95,7 +115,9 @@ describe("parsePlanSections", () => {
     test("falls back to a single section when no weekday is found", () => {
       const { days } = parsePlanSections(plan("Do 20 push-ups", "Then a 2km run"));
 
-      expect(days).toEqual([{ title: "Your plan", lines: ["Do 20 push-ups", "Then a 2km run"] }]);
+      expect(days).toEqual([
+        { index: 0, weekday: null, title: "Your plan", lines: ["Do 20 push-ups", "Then a 2km run"] }
+      ]);
     });
 
     // startsWith, not a contains, so a line only counts as a heading when the
@@ -163,7 +185,7 @@ describe("parsePlanSections", () => {
     test("still reads the week when a notes heading comes first", () => {
       const { days, notes } = parsePlanSections(plan("Notes: warm up first", "Monday", "Bench"));
 
-      expect(days).toEqual([{ title: "Monday", lines: ["Bench"] }]);
+      expect(days).toEqual([{ index: 0, weekday: "Monday", title: "Monday", lines: ["Bench"] }]);
       expect(notes).toEqual([]);
     });
 
@@ -184,8 +206,8 @@ describe("parsePlanSections", () => {
         );
 
         expect(days).toEqual([
-          { title: "Monday - Push", lines: ["Bench press 4x6", line] },
-          { title: "Tuesday - Pull", lines: ["Barbell row 4x6"] }
+          { index: 0, weekday: "Monday", title: "Monday - Push", lines: ["Bench press 4x6", line] },
+          { index: 1, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["Barbell row 4x6"] }
         ]);
         expect(notes).toEqual(["sleep well"]);
       }
@@ -199,8 +221,8 @@ describe("parsePlanSections", () => {
       );
 
       expect(days).toEqual([
-        { title: "Monday", lines: ["Bench", "Tip: brace hard"] },
-        { title: "Tuesday", lines: ["Rows"] }
+        { index: 0, weekday: "Monday", title: "Monday", lines: ["Bench", "Tip: brace hard"] },
+        { index: 1, weekday: "Tuesday", title: "Tuesday", lines: ["Rows"] }
       ]);
       expect(notes).toEqual(["hydrate"]);
     });
@@ -209,8 +231,8 @@ describe("parsePlanSections", () => {
       const { days, notes } = parsePlanSections(coachNotesNamingADay);
 
       expect(days).toEqual([
-        { title: "Monday - Push", lines: ["Bench 4x6"] },
-        { title: "Tuesday - Pull", lines: ["Rows 4x8"] }
+        { index: 0, weekday: "Monday", title: "Monday - Push", lines: ["Bench 4x6"] },
+        { index: 1, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["Rows 4x8"] }
       ]);
       expect(notes).toEqual(["Saturday: light walk", "Sleep 8 hours"]);
     });
@@ -335,5 +357,84 @@ describe("extractLatestPlanByWeekday", () => {
 
     expect(week.Monday).toEqual(days[0].lines);
     expect(week.Tuesday).toEqual(days[1].lines);
+  });
+
+  // A plan saved with its structure is read from that, not from its text.
+  test("reads the newest plan's saved structure when it has one", () => {
+    const week = extractLatestPlanByWeekday({
+      plans: [{ plan: plan("Monday", "From the text"), payload: savedPayload() }]
+    });
+
+    expect(week).toEqual({ Tuesday: ["From the payload"] });
+  });
+});
+
+// A structure the server would save: deliberately unlike any text it is paired
+// with below, so a test can tell which of the two was read.
+const savedPayload = (overrides = {}) => ({
+  version: PLAN_PAYLOAD_VERSION,
+  days: [{ index: 0, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["From the payload"] }],
+  notes: ["Saved note"],
+  ...overrides
+});
+
+describe("readPlan", () => {
+  const text = plan("Monday", "From the text", "Coach Notes: text note");
+
+  test("reads a valid saved structure, not the text", () => {
+    expect(readPlan({ payload: savedPayload(), text })).toEqual({
+      days: savedPayload().days,
+      notes: ["Saved note"]
+    });
+  });
+
+  test.each([
+    ["no structure", undefined],
+    ["a null one", null]
+  ])("parses the text when there is %s", (_label, payload) => {
+    expect(readPlan({ payload, text })).toEqual(parsePlanSections(text));
+  });
+
+  // Anything the server would not have saved is read as no structure at all.
+  const withDay = (change) => savedPayload({ days: [{ ...savedPayload().days[0], ...change }] });
+
+  test.each([
+    ["the {} an older plan holds", {}],
+    ["another version", savedPayload({ version: 2 })],
+    ["days that are not a list", savedPayload({ days: "Tuesday" })],
+    ["a day that is not an object", savedPayload({ days: ["Tuesday"] })],
+    ["an index that is not the day's position", withDay({ index: 1 })],
+    ["a weekday in another spelling", withDay({ weekday: "tuesday" })],
+    ["a title that is not text", withDay({ title: 5 })],
+    ["lines that are not all text", withDay({ lines: ["Rows", 5] })],
+    ["notes that are not a list of text", savedPayload({ notes: "Saved note" })]
+  ])("parses the text when the structure has %s", (_label, payload) => {
+    expect(readPlan({ payload, text })).toEqual(parsePlanSections(text));
+  });
+
+  test("is empty with neither a structure nor text", () => {
+    expect(readPlan({})).toEqual({ days: [], notes: [] });
+  });
+});
+
+describe("planByWeekday", () => {
+  const day = (index, weekday, lines) => ({ index, weekday, title: weekday || "Your plan", lines });
+
+  test("maps each weekday to its lines, merging a repeated weekday in order", () => {
+    const week = planByWeekday({
+      days: [day(0, "Monday", ["Bench"]), day(1, "Tuesday", ["Rows"]), day(2, "Monday", ["Squat"])],
+      notes: []
+    });
+
+    expect(week).toEqual({ Monday: ["Bench", "Squat"], Tuesday: ["Rows"] });
+  });
+
+  test("gives no key to a day with no weekday or no lines", () => {
+    const week = planByWeekday({
+      days: [day(0, null, ["Do 20 push-ups"]), day(1, "Wednesday", [])],
+      notes: []
+    });
+
+    expect(week).toEqual({});
   });
 });

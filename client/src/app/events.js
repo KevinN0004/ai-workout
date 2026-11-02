@@ -85,6 +85,7 @@ export const createAppEventHandlers = ({
   setLoading,
   setError,
   setResult,
+  setResultPayload,
   setDashboard,
   closePlanner,
   isDashboardRoute,
@@ -139,11 +140,14 @@ export const createAppEventHandlers = ({
     setLoading(true);
     setError("");
     setResult("");
+    setResultPayload(null);
     const isSameAccount = captureAccount();
 
     try {
-      // Generate. For a signed-in visitor the server also saves the plan and
-      // returns it as savedPlan, which goes to the head of the dashboard's list.
+      // Generate. The answer carries the plan's text and the structure the
+      // server parsed from it. For a signed-in visitor the server also saves the
+      // plan and returns it as savedPlan, which goes to the head of the
+      // dashboard's list.
       const res = await apiFetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,6 +166,7 @@ export const createAppEventHandlers = ({
       // and no trip to /plan.
       if (!isSameAccount()) return;
       setResult(data.plan);
+      setResultPayload(data.payload ?? null);
       if (data.savedPlan) {
         setDashboard((prev) =>
           prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev

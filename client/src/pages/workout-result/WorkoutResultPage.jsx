@@ -32,8 +32,8 @@ export default function WorkoutResultPage({
   // ---- The plan's shape -----------------------------------------------------
   // Memoized so that the `: []` fallback, for planSections without a days
   // array, is not a fresh array each render, which would make the two useMemo
-  // hooks below recompute every time. App's parsePlanSections always supplies
-  // the array, so the fallback is defensive.
+  // hooks below recompute every time. App's readPlan always supplies the array,
+  // so the fallback is defensive.
   const days = useMemo(
     () => (Array.isArray(planSections?.days) ? planSections.days : []),
     [planSections]

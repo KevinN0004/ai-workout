@@ -34,8 +34,12 @@ vi.mock("../pages/dashboard/DashboardPage", () => ({
   }
 }));
 
+const resultPage = vi.hoisted(() => ({ props: null }));
 vi.mock("../pages/workout-result/WorkoutResultPage", () => ({
-  default: () => <div data-testid="workout-result-page">Workout result page</div>
+  default: (props) => {
+    resultPage.props = props;
+    return <div data-testid="workout-result-page">Workout result page</div>;
+  }
 }));
 
 import App from "../App";
@@ -641,6 +645,72 @@ describe("App", () => {
       await renderSettled("/dashboard");
 
       await waitFor(() => expect(dash.props.dashboardPagination).toEqual(pagination));
+    });
+  });
+
+  describe("a generated plan", () => {
+    // The answer's structure, not its text, becomes the result page's plan: the
+    // text names a different day, so the two cannot be confused.
+    test("reaches the result page from the structure the server parsed", async () => {
+      const payload = {
+        version: 1,
+        days: [
+          { index: 0, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["From the payload"] }
+        ],
+        notes: ["Sleep well"]
+      };
+      stubSession(async (url) => {
+        const path = String(url);
+        if (path === "/api/generate") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ plan: "Monday\nFrom the text", payload, savedPlan: null })
+          };
+        }
+        if (path === "/api/csrf-token") {
+          return { ok: true, status: 200, json: async () => ({ csrfToken: "t" }) };
+        }
+        return { ok: false, status: 401, json: async () => ({}) };
+      });
+      await renderSettled("/");
+
+      act(() => home.props.openPlannerFromProfile());
+      await act(async () => planner.props.onSubmit({ preventDefault() {} }));
+
+      await waitFor(() =>
+        expect(resultPage.props?.planSections).toEqual({
+          days: payload.days,
+          notes: ["Sleep well"]
+        })
+      );
+    });
+  });
+
+  describe("the newest plan's week", () => {
+    // A plan saved with its structure is read from that structure, not its
+    // text, which here names a different day so the two cannot be confused.
+    test("is handed to the dashboard from the plan's saved structure", async () => {
+      const payload = {
+        version: 1,
+        days: [
+          { index: 0, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["From the payload"] }
+        ],
+        notes: []
+      };
+      stubSession(async (url) => ({
+        ok: true,
+        json: async () =>
+          String(url).startsWith("/api/dashboard")
+            ? { dashboard: { plans: [{ plan: "Monday\nFrom the text", payload }] } }
+            : { user: { email: "ada@example.com" } }
+      }));
+
+      await renderSettled("/dashboard");
+
+      await waitFor(() =>
+        expect(dash.props.latestPlanByWeekday).toEqual({ Tuesday: ["From the payload"] })
+      );
     });
   });
 
