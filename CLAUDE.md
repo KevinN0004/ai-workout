@@ -204,6 +204,12 @@ the cache.
   fails on a source file without a header unless `file-header-allowlist.json` lists it,
   and on any header over four lines of text. That list is empty and only shrinks, and
   `ALLOWLIST_SIZE` in the test pins its length — never add to it.
+- **Type checking is per file, through JSDoc**
+  ([0017](docs/adr/0017-type-checking-through-jsdoc.md)). A file is checked when
+  `// @ts-check` is on its own line below its header, before the first statement:
+  TypeScript ignores it anywhere else, silently. Checking a file raises
+  `TYPE_CHECKED_FILES` in `repo-invariants.test.mjs`, and in a checked file every parameter
+  the checker cannot infer gets a `@param {Type}` (`docs/code-readability-sop.md`, rule 2).
 - Validate user input at system boundaries
 - Sanitize file paths to prevent directory traversal
 - Server config is env-driven — see the Environment Variables table in `README.md`
@@ -225,6 +231,7 @@ npm run test:coverage    # the same suites with a v8 coverage report
 npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
 npm run test:e2e:ui      # the same suite in Playwright's UI mode
 npm run knip             # unused files, exports and dependencies (exit 0 = clean)
+npm run typecheck        # tsc, strict, over each workspace's `// @ts-check` files
 npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
@@ -306,7 +313,7 @@ Do not drop the prefix.
 expected symptom of switching sides, not a broken container
 ([0009](docs/adr/0009-compose-on-loopback.md)).
 
-- ALWAYS run `npm test` and `npm run lint` after making code changes
+- ALWAYS run `npm test`, `npm run lint` and `npm run typecheck` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
 - **Coverage is measured, not estimated.** Run `npm run test:coverage`, not `npm test`,
   before claiming a change is ready: CI runs `test:coverage`, and `npm test` runs no

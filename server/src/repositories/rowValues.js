@@ -4,15 +4,22 @@
  * values and relation lists to arrays and objects. An absent date or number
  * reads as "" or null, never as 0, and an absent list or object as empty.
  */
+// @ts-check
 
-/** A timestamp as an ISO string, or "" when there is none. */
+/**
+ * A timestamp as an ISO string, or "" when there is none.
+ * @param {unknown} value
+ */
 export const toIso = (value) => {
   if (!value) return "";
   if (value instanceof Date) return value.toISOString();
   return String(value);
 };
 
-/** The `YYYY-MM-DD` key of a date column (read in UTC), or "" when there is none. */
+/**
+ * The `YYYY-MM-DD` key of a date column (read in UTC), or "" when there is none.
+ * @param {unknown} value
+ */
 export const toDateOnly = (value) => {
   if (!value) return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -23,6 +30,7 @@ export const toDateOnly = (value) => {
  * The Date to write to a `@db.Date` column: the first ten characters of a
  * `YYYY-MM-DD` string, as UTC midnight. Null when there is no string or it is
  * blank. It does not validate, so a malformed string becomes an Invalid Date.
+ * @param {unknown} value
  */
 export const dateOnlyToDate = (value) => {
   const raw = typeof value === "string" ? value.trim().slice(0, 10) : "";
@@ -32,6 +40,7 @@ export const dateOnlyToDate = (value) => {
 /**
  * Prisma returns Decimal columns as objects, so numeric fields are normalized
  * on the way out. Empty string and null both mean "absent" rather than zero.
+ * @param {unknown} value
  */
 export const toNumberOrNull = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -42,9 +51,13 @@ export const toNumberOrNull = (value) => {
 /**
  * Any value as an array: one that is not an array reads as empty. Used on JSON
  * list columns both ways, and by userReadRepository on loaded relation lists.
+ * @param {unknown} value
  */
 export const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 
-/** A JSON column read as an object: arrays, null and scalars read as empty. */
+/**
+ * A JSON column read as an object: arrays, null and scalars read as empty.
+ * @param {unknown} value
+ */
 export const toJsonObject = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};

@@ -34,3 +34,4 @@ wording. Only references to other places in `CLAUDE.md`, and one miscount, were 
 | [0014](0014-what-to-test.md)                    | Choose what to test by what it computes and what it risks                              |
 | [0015](0015-mutation-testing.md)                | Confirm every mutation applied, and read a survivor before testing it                  |
 | [0016](0016-formatter-exclusions.md)            | Retire a formatter exclusion with a guard                                              |
+| [0017](0017-type-checking-through-jsdoc.md)     | Type-check JavaScript through JSDoc, one file at a time                                |

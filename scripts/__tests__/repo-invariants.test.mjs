@@ -841,3 +841,72 @@ describe("the decision records", () => {
     ).toBeLessThanOrEqual(CLAUDE_MD_MAX_BYTES);
   });
 });
+
+describe("type-checked files", () => {
+  // Lane D1 checks JavaScript one file at a time: a file is checked when a line
+  // reading `// @ts-check` comes before its first statement. TypeScript ignores
+  // the pragma anywhere else without a word, below the first import or inside
+  // the header's own block comment, so a misplaced one leaves a file unchecked
+  // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
+  // raise it with each file you check, and lower it only in a PR that says why.
+  const TYPE_CHECKED_FILES = 2;
+  const WORKSPACES = ["client", "server"];
+  const PRAGMA = "// @ts-check";
+
+  const sources = execFileSync("git", ["ls-files", "-z", "--", "client/src", "server/src"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  })
+    .split("\0")
+    .filter((file) => /\.(js|jsx|mjs|cjs)$/.test(file) && existsSync(path.join(repoRoot, file)))
+    .map((file) => ({
+      file,
+      lines: readFileSync(path.join(repoRoot, file), "utf8").split(/\r?\n/)
+    }));
+  const checked = sources.filter(({ lines }) => lines.some((line) => line.trim() === PRAGMA));
+  const withoutComments = (text) =>
+    text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+  test("every // @ts-check comes before its file's first statement", () => {
+    const misplaced = checked
+      .filter(({ lines }) => {
+        const before = lines.slice(
+          0,
+          lines.findIndex((line) => line.trim() === PRAGMA)
+        );
+        return withoutComments(before.join("\n")).trim() !== "";
+      })
+      .map(({ file }) => file);
+    expect(
+      misplaced,
+      "move // @ts-check up to directly below the header: TypeScript ignores it after the first statement"
+    ).toEqual([]);
+    const inBlock = sources
+      .filter(({ lines }) => lines.some((line) => /^\s*\*\s*@ts-check\b/.test(line)))
+      .map(({ file }) => file);
+    expect(
+      inBlock,
+      "write @ts-check as its own // line below the header: TypeScript ignores it inside a block comment"
+    ).toEqual([]);
+  });
+
+  test("TYPE_CHECKED_FILES matches the files that are checked", () => {
+    expect(
+      checked.length,
+      "raise TYPE_CHECKED_FILES with each file you check; lower it only in a PR that says why"
+    ).toBe(TYPE_CHECKED_FILES);
+  });
+
+  test.each(WORKSPACES)("%s/tsconfig.json keeps strict on and checkJs off", (workspace) => {
+    const file = path.join(repoRoot, workspace, "tsconfig.json");
+    expect(existsSync(file), `${workspace}/tsconfig.json is missing`).toBe(true);
+    const { compilerOptions = {} } = JSON.parse(stripJsonComments(readFileSync(file, "utf8")));
+    expect(compilerOptions.strict, "strict is what makes the check worth having").toBe(true);
+    expect(compilerOptions.checkJs, "files opt in one at a time until milestone M4").toBe(false);
+  });
+
+  test("CI runs npm run typecheck", () => {
+    const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+    expect(ci).toMatch(/^\s*run: npm run typecheck\s*$/m);
+  });
+});

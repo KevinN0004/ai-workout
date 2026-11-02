@@ -4,6 +4,7 @@
  * measurement system, today's local date key, height and weight conversion, and
  * reading a value that may be absent as a number or null.
  */
+// @ts-check
 
 /**
  * The regions that measure height in feet and inches and weight in pounds.
@@ -16,6 +17,7 @@ export const IMPERIAL_REGION_CODES = new Set(["US", "LR", "MM"]);
  * Splits a full name at whitespace: the first word is the first name and the
  * rest, rejoined with single spaces, the last name. Blank input gives two
  * empty strings.
+ * @param {unknown} nameValue
  */
 export const splitFullName = (nameValue) => {
   const nameParts = String(nameValue || "")
@@ -36,6 +38,7 @@ export const splitFullName = (nameValue) => {
  * or "" when there is none. Intl.Locale reads the tag, so a script subtag is not
  * taken for the region ("zh-Hant-TW" gives "TW"). A tag it cannot parse falls
  * back to its second subtag.
+ * @param {unknown} locale
  */
 export const getRegionFromLocale = (locale) => {
   if (!locale || typeof locale !== "string") return "";
@@ -87,6 +90,7 @@ export const getLocalDateKey = () => {
  * `Number("")` are both 0: testing afterwards would turn a missing reading into
  * a measured zero, while a measured 0 stays 0. Same shape as toNumberOrNull in
  * the server's repositories/rowValues.js.
+ * @param {unknown} value
  */
 export const toNumberOrNull = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -97,6 +101,8 @@ export const toNumberOrNull = (value) => {
 /**
  * Feet and inches, as form values, to whole centimetres as a string. A blank or
  * non-numeric part counts as zero, and a zero total gives "" rather than "0".
+ * @param {unknown} feetValue
+ * @param {unknown} inchesValue
  */
 export const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feetNum = Number(feetValue);
@@ -112,6 +118,7 @@ export const toCmFromFeetInches = (feetValue, inchesValue) => {
  * Centimetres to `{ feet, inches }` as strings, with the inches rounded and 12
  * of them carried into a foot. A blank, zero or non-numeric value gives two
  * empty strings.
+ * @param {unknown} cmValue
  */
 export const toFeetInchesFromCm = (cmValue) => {
   const cmNum = Number(cmValue);
@@ -131,6 +138,8 @@ export const toFeetInchesFromCm = (cmValue) => {
  * rounds to a whole kilogram, and any other unit passes the number through. A
  * falsy value (the number 0 included) gives "", and a non-numeric one comes back
  * unchanged.
+ * @param {string | number | null | undefined} value
+ * @param {string} fromUnit
  */
 export const toKg = (value, fromUnit) => {
   if (!value) return "";
@@ -142,6 +151,8 @@ export const toKg = (value, fromUnit) => {
 /**
  * toKg's mirror: to whole pounds from "kg", with falsy and non-numeric input
  * handled the same way.
+ * @param {string | number | null | undefined} value
+ * @param {string} fromUnit
  */
 export const toLb = (value, fromUnit) => {
   if (!value) return "";
