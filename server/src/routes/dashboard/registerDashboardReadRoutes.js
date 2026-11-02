@@ -7,17 +7,29 @@ import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 /**
  * Registers GET /api/dashboard and the workout-session, meal-log and
- * progress-metric collection routes, all behind `requireAuth`. The other three
- * members it takes from `deps` come from the dashboard collection service built
- * in index.js.
+ * progress-metric collection routes, all behind `requireAuth`. From `deps`,
+ * `findUserWithDashboard` and `mapDbDocToUser` load the whole user as the write
+ * routes do, and the other three come from the dashboard collection service
+ * built in index.js.
  */
 export const registerDashboardReadRoutes = (app, deps) => {
-  const { requireAuth, buildDashboardResponse, parseDashboardPagination, getDashboardCollection } =
-    deps;
+  const {
+    requireAuth,
+    findUserWithDashboard,
+    mapDbDocToUser,
+    buildDashboardResponse,
+    parseDashboardPagination,
+    getDashboardCollection
+  } = deps;
 
+  // req.user is the user row alone, so this route loads the collections itself.
+  // It must not hand req.user to buildDashboardResponse: buildDashboard turns a
+  // missing dashboard into an empty one, and answers 200 with nothing in it.
   app.get("/api/dashboard", requireAuth, async (req, res) => {
     try {
-      const response = await buildDashboardResponse(req.user);
+      const userDoc = await findUserWithDashboard(req.user.id);
+      if (!userDoc) return res.status(404).json({ error: "User not found." });
+      const response = await buildDashboardResponse(mapDbDocToUser(userDoc));
       return res.json(response);
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);

@@ -200,4 +200,51 @@ describe("dashboard collection reads", () => {
     expect(seen).toHaveLength(6);
     expect(new Set(seen).size).toBe(6);
   });
+
+  // GET /api/dashboard takes plans, calorie entries, saved exercises and goals
+  // from the fully loaded user, not from the paginated reads above, and
+  // buildDashboard turns a user loaded without them into an empty dashboard
+  // rather than an error. The goal values differ from the defaults, so a
+  // fallback cannot pass for the real thing.
+  test("GET /api/dashboard returns the account's plans, calories, saved exercises and goals", async () => {
+    const goals = await agent
+      .post("/api/dashboard/goals")
+      .set("X-CSRF-Token", csrfToken)
+      .send({ targetWeight: 165, targetCalories: 2400, weeklyWorkouts: 4 });
+    expect(goals.status).toBe(200);
+    const calories = await agent
+      .post("/api/dashboard/calories")
+      .set("X-CSRF-Token", csrfToken)
+      .send({ date: "2026-07-02", calories: 2100 });
+    expect(calories.status).toBe(200);
+    const saved = await agent
+      .post("/api/dashboard/saved-exercises")
+      .set("X-CSRF-Token", csrfToken)
+      .send({ exerciseId: 192, name: "Barbell bench press", category: "Chest" });
+    expect(saved.status).toBe(200);
+    // No route saves a plan without a live Gemini call, so the row goes in directly.
+    const owner = await prisma.appUser.findFirst({
+      where: { email: "collection-reads@example.com" }
+    });
+    await prisma.generatedPlan.create({
+      data: { userId: owner.id, goal: "Build muscle", planText: "Monday: bench press 4x8" }
+    });
+
+    const response = await agent.get("/api/dashboard");
+
+    expect(response.status).toBe(200);
+    const { dashboard } = response.body;
+    expect(dashboard.plans.map((plan) => plan.plan)).toEqual(["Monday: bench press 4x8"]);
+    expect(dashboard.calories).toEqual([
+      expect.objectContaining({ date: "2026-07-02", calories: 2100 })
+    ]);
+    expect(dashboard.savedExercises.map((exercise) => exercise.name)).toEqual([
+      "Barbell bench press"
+    ]);
+    expect(dashboard.goals).toMatchObject({
+      targetWeight: 165,
+      targetCalories: 2400,
+      weeklyWorkouts: 4
+    });
+  });
 });

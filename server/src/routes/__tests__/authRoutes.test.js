@@ -44,9 +44,11 @@ let cookieCalls;
 let deps;
 let logError;
 
+// The in-memory rows stand in for both reads: the user row the auth lookups
+// take, and the full load the profile route re-reads after a write.
 const findUserWithDashboard = async (userId) => rows.find((row) => row.userId === userId) || null;
-const findUserWithDashboardByEmail = async (email) =>
-  rows.find((row) => row.email === email) || null;
+const findUserRow = findUserWithDashboard;
+const findUserRowByEmail = async (email) => rows.find((row) => row.email === email) || null;
 const createUserWithDashboard = async (doc) => {
   rows.push(doc);
   return doc;
@@ -125,8 +127,8 @@ beforeEach(() => {
       const row = rows.find((item) => item.userId === userId);
       if (row) Object.assign(row, { salt, hash, passwordAlgo });
     }),
-    findUserWithDashboard,
-    findUserWithDashboardByEmail,
+    findUserRow,
+    findUserRowByEmail,
     createUserWithDashboard
   });
 
@@ -665,8 +667,8 @@ describe("POST /api/auth/login", () => {
         updates.push(args);
         return true;
       },
-      findUserWithDashboard,
-      findUserWithDashboardByEmail,
+      findUserRow,
+      findUserRowByEmail,
       createUserWithDashboard
     }).upgradeUserPasswordToArgon2id;
 

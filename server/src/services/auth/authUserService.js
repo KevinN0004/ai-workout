@@ -15,17 +15,17 @@ const pbkdf2Async = promisify(crypto.pbkdf2);
  * re-read after a write, and the hashing, verification and legacy-hash upgrade
  * the auth routes call.
  *
- * @param deps The three user readers come from userReadRepository and
- *   `updatePasswordHash` from userRepository. `argon2Options` carries the
- *   argon2id costs index.js reads from the environment; any it leaves out
- *   takes the default below.
+ * @param deps The two row lookups and `createUserWithDashboard` come from
+ *   userReadRepository, and `updatePasswordHash` from userRepository.
+ *   `argon2Options` carries the argon2id costs index.js reads from the
+ *   environment; any it leaves out takes the default below.
  */
 export const createAuthUserService = ({
   cleanText,
   argon2Options,
   updatePasswordHash,
-  findUserWithDashboard,
-  findUserWithDashboardByEmail,
+  findUserRow,
+  findUserRowByEmail,
   createUserWithDashboard
 }) => {
   const {
@@ -37,7 +37,8 @@ export const createAuthUserService = ({
 
   // Maps a user as userReadRepository returns it to the shape the routes use:
   // `userId` becomes `id`, and a missing passwordAlgo, which only a hand-built
-  // source can have, is inferred from the hash.
+  // source can have, is inferred from the hash. A user read by its row alone
+  // has no dashboard, and gets no `dashboard` key rather than an empty one.
   const mapDbDocToUser = (source) => {
     if (!source) return null;
     const inferredAlgo =
@@ -56,7 +57,7 @@ export const createAuthUserService = ({
       // of the null the rest of the app expects.
       passwordChangedAt: source.passwordChangedAt ?? null,
       profile: source.profile,
-      dashboard: source.dashboard
+      ...(source.dashboard !== undefined && { dashboard: source.dashboard })
     };
   };
 
@@ -77,10 +78,12 @@ export const createAuthUserService = ({
     return doc;
   };
 
-  const findUserById = async (userId) => mapDbDocToUser(await findUserWithDashboard(userId));
+  // The user row alone. Every signed-in request resolves its user here, and
+  // only GET /api/dashboard and a write's response load the collections.
+  const findUserById = async (userId) => mapDbDocToUser(await findUserRow(userId));
 
   const findUserByEmail = async (email) =>
-    mapDbDocToUser(await findUserWithDashboardByEmail(cleanText(email, 254).toLowerCase()));
+    mapDbDocToUser(await findUserRowByEmail(cleanText(email, 254).toLowerCase()));
 
   const createUser = async (user) =>
     mapDbDocToUser(await createUserWithDashboard(mapUserToDbDoc(user)));

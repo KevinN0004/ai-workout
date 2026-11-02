@@ -20,8 +20,8 @@ const pbkdf2Async = promisify(crypto.pbkdf2);
 const argon2Options = { timeCost: 2, memoryCost: 8192, parallelism: 1, hashLength: 32 };
 
 let updatePasswordHash;
-let findUserWithDashboard;
-let findUserWithDashboardByEmail;
+let findUserRow;
+let findUserRowByEmail;
 let createUserWithDashboard;
 
 const build = (overrides = {}) =>
@@ -29,8 +29,8 @@ const build = (overrides = {}) =>
     cleanText,
     argon2Options,
     updatePasswordHash,
-    findUserWithDashboard,
-    findUserWithDashboardByEmail,
+    findUserRow,
+    findUserRowByEmail,
     createUserWithDashboard,
     ...overrides
   });
@@ -44,8 +44,8 @@ const legacyPbkdf2User = async (password) => {
 
 beforeEach(() => {
   updatePasswordHash = vi.fn(async () => {});
-  findUserWithDashboard = vi.fn(async () => null);
-  findUserWithDashboardByEmail = vi.fn(async () => null);
+  findUserRow = vi.fn(async () => null);
+  findUserRowByEmail = vi.fn(async () => null);
   createUserWithDashboard = vi.fn(async (doc) => doc);
 });
 
@@ -295,6 +295,16 @@ describe("mapDbDocToUser", () => {
     });
   });
 
+  // A user read by its row alone has no collections. No key, not an empty
+  // dashboard, which buildDashboard would serve as a real account's.
+  test("keeps the dashboard it is given, and adds none to a row read alone", () => {
+    const full = build().mapDbDocToUser({ userId: "u-1", dashboard: { plans: [] } });
+    const row = build().mapDbDocToUser({ userId: "u-1" });
+
+    expect(full.dashboard).toEqual({ plans: [] });
+    expect(row).not.toHaveProperty("dashboard");
+  });
+
   test("infers argon2id from the hash when the column is empty", () => {
     const user = build().mapDbDocToUser({ userId: "u-1", hash: "$argon2id$v=19$..." });
 
@@ -329,12 +339,30 @@ describe("mapDbDocToUser", () => {
 
 describe("lookups", () => {
   test("findUserById maps the row it gets back", async () => {
-    findUserWithDashboard = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
+    findUserRow = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
 
     const user = await build().findUserById("u-1");
 
-    expect(findUserWithDashboard).toHaveBeenCalledWith("u-1");
+    expect(findUserRow).toHaveBeenCalledWith("u-1");
     expect(user.id).toBe("u-1");
+  });
+
+  // Every signed-in request resolves its user through these two, so they read
+  // the user row alone. A dashboard loader handed in by mistake must stay unused.
+  test("neither lookup loads the dashboard collections", async () => {
+    const loader = vi.fn(async () => {
+      throw new Error("a lookup loaded the dashboard collections");
+    });
+    findUserRow = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
+    findUserRowByEmail = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
+    const service = build({
+      findUserWithDashboard: loader,
+      findUserWithDashboardByEmail: loader
+    });
+
+    expect((await service.findUserById("u-1")).id).toBe("u-1");
+    expect((await service.findUserByEmail("person@example.com")).id).toBe("u-1");
+    expect(loader).not.toHaveBeenCalled();
   });
 
   test("findUserById returns null when there is no row", async () => {
@@ -344,11 +372,11 @@ describe("lookups", () => {
   // Email is the login identifier, so it has to match regardless of how the
   // user typed it.
   test("findUserByEmail lowercases and trims before looking up", async () => {
-    findUserWithDashboardByEmail = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
+    findUserRowByEmail = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
 
     await build().findUserByEmail("  Person@Example.COM  ");
 
-    expect(findUserWithDashboardByEmail).toHaveBeenCalledWith("person@example.com");
+    expect(findUserRowByEmail).toHaveBeenCalledWith("person@example.com");
   });
 
   test("findUserByEmail returns null when there is no row", async () => {
@@ -444,8 +472,8 @@ describe("argon2 options", () => {
     await createAuthUserService({
       cleanText,
       updatePasswordHash,
-      findUserWithDashboard,
-      findUserWithDashboardByEmail,
+      findUserRow,
+      findUserRowByEmail,
       createUserWithDashboard
     }).hashPassword("StrongPass123!");
 

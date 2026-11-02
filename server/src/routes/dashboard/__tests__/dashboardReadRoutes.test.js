@@ -15,6 +15,7 @@ import {
 // routes against Postgres.
 
 let loadCollectionPage;
+let findUserWithDashboard;
 
 const paginatedPaths = [
   "/api/dashboard/workout-sessions",
@@ -22,7 +23,9 @@ const paginatedPaths = [
   "/api/dashboard/progress-metrics"
 ];
 
-const buildApp = ({ user = { id: "u-1", dashboard: {} } } = {}) => {
+// requireAuth hands the routes the user row alone, as the real one does; the
+// full user comes from findUserWithDashboard.
+const buildApp = ({ user = { id: "u-1" } } = {}) => {
   const service = createDashboardCollectionService({
     cleanText,
     toNullableNumber,
@@ -34,6 +37,8 @@ const buildApp = ({ user = { id: "u-1", dashboard: {} } } = {}) => {
   const app = express();
   registerDashboardReadRoutes(app, {
     ...service,
+    findUserWithDashboard,
+    mapDbDocToUser: (doc) => ({ id: doc.userId, dashboard: doc.dashboard }),
     requireAuth: (req, _res, next) => {
       req.user = user;
       next();
@@ -47,6 +52,7 @@ beforeEach(() => {
     items: [{ id: `${collection}-1` }],
     total: 1
   }));
+  findUserWithDashboard = vi.fn(async (userId) => ({ userId, dashboard: {} }));
 });
 
 describe("the paginated routes", () => {
@@ -115,7 +121,9 @@ describe("GET /api/dashboard", () => {
   });
 
   test("answers empty collections, without a query, for a user with no id", async () => {
-    const response = await request(buildApp({ user: {} })).get("/api/dashboard");
+    findUserWithDashboard = vi.fn(async () => ({ dashboard: {} }));
+
+    const response = await request(buildApp()).get("/api/dashboard");
 
     expect(response.body.dashboard.workoutSessions).toEqual([]);
     expect(response.body.pagination.mealLogs).toEqual({
@@ -124,6 +132,29 @@ describe("GET /api/dashboard", () => {
       offset: 0,
       source: "collection"
     });
+    expect(loadCollectionPage).not.toHaveBeenCalled();
+  });
+
+  // req.user has no dashboard, and buildDashboard would turn that into an
+  // empty one without complaint, so the plans must come from the full load.
+  test("takes the dashboard from the full load of the signed-in user", async () => {
+    const plan = { id: "p-1", plan: "Monday: squat 5x5" };
+    findUserWithDashboard = vi.fn(async (userId) => ({ userId, dashboard: { plans: [plan] } }));
+
+    const response = await request(buildApp()).get("/api/dashboard");
+
+    expect(response.status).toBe(200);
+    expect(findUserWithDashboard).toHaveBeenCalledWith("u-1");
+    expect(response.body.dashboard.plans).toEqual([plan]);
+  });
+
+  test("answers 404 when the account is gone by the time it is loaded", async () => {
+    findUserWithDashboard = vi.fn(async () => null);
+
+    const response = await request(buildApp()).get("/api/dashboard");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "User not found." });
     expect(loadCollectionPage).not.toHaveBeenCalled();
   });
 });

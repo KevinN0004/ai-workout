@@ -354,7 +354,7 @@ const mealDbBaseUrl = cleanText(
 const mealDbTimeoutMs = 12000;
 
 // ---- Repositories -----------------------------------------------------------
-const { findUserWithDashboard, findUserWithDashboardByEmail, createUserWithDashboard } =
+const { findUserWithDashboard, findUserRow, findUserRowByEmail, createUserWithDashboard } =
   createUserReadRepository({ prisma });
 const { saveProgressMetric } = createProgressMetricRepository({ prisma });
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
@@ -444,8 +444,8 @@ const {
 } = externalDataService;
 
 const authUserService = createAuthUserService({
-  findUserWithDashboard,
-  findUserWithDashboardByEmail,
+  findUserRow,
+  findUserRowByEmail,
   createUserWithDashboard,
   cleanText,
   argon2Options: {

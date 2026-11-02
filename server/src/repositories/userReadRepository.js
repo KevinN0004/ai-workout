@@ -1,8 +1,8 @@
 /**
- * Loads a user together with the dashboard collections the API returns: the
- * user row, then every collection at once, in the response shape the routes
- * depend on. Each collection is capped here, on read (COLLECTION_LIMITS);
- * nothing prunes the tables.
+ * Loads users for the API: the user row alone, which every signed-in request
+ * and sign-in reads (findUserRow, findUserRowByEmail), or the row with every
+ * dashboard collection, each capped on read by COLLECTION_LIMITS
+ * (findUserWithDashboard). Nothing prunes the tables.
  */
 import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
@@ -38,15 +38,11 @@ const COLLECTION_LIMITS = {
   savedExercises: 200
 };
 
-/**
- * Maps a user row and its loaded collections to the user document that
- * authUserService.mapDbDocToUser reads, or null when there is no row. It
- * carries the password hash and salt, which authUserService verifies against.
- */
-export const mapUser = (row, related = {}) => {
+// The user row's own fields, as both mapUser and the row lookups return them.
+// There is no `dashboard` key at all, because buildDashboard turns a missing
+// dashboard into an empty one, and an empty one would pass for a real account.
+const mapUserRow = (row) => {
   if (!row) return null;
-  const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
-
   return {
     userId: row.legacyUserId || row.id,
     email: row.email,
@@ -58,7 +54,21 @@ export const mapUser = (row, related = {}) => {
     // absent/zero rule applies to timestamps too, so this is guarded before
     // toIso rather than trusting its return value.
     passwordChangedAt: row.passwordChangedAt ? toIso(row.passwordChangedAt) : null,
-    profile: toJsonObject(row.profile),
+    profile: toJsonObject(row.profile)
+  };
+};
+
+/**
+ * Maps a user row and its loaded collections to the user document that
+ * authUserService.mapDbDocToUser reads, or null when there is no row. It
+ * carries the password hash and salt, which authUserService verifies against.
+ */
+export const mapUser = (row, related = {}) => {
+  if (!row) return null;
+  const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
+
+  return {
+    ...mapUserRow(row),
     dashboard: {
       workouts: workoutSessions.slice(0, COLLECTION_LIMITS.workoutSessions),
       workoutSessions,
@@ -73,9 +83,10 @@ export const mapUser = (row, related = {}) => {
 };
 
 /**
- * Builds the user reads over `prisma`: find by id (either form) and by email
- * ignoring case, each returning the mapped user or null, and create, which
- * returns the new user loaded the same way.
+ * Builds the user reads over `prisma`: the user row alone by id (either form)
+ * or by email ignoring case, the user with every collection by id, each
+ * returning the mapped user or null, and create, which returns the new user
+ * with its collections.
  */
 export const createUserReadRepository = ({ prisma }) => {
   /** One user and every collection, or null only when no user row matches. */
@@ -141,12 +152,20 @@ export const createUserReadRepository = ({ prisma }) => {
   const findUserWithDashboard = (userId) =>
     userId ? loadWithCollections(userId) : Promise.resolve(null);
 
-  const findUserWithDashboardByEmail = async (email) => {
+  /**
+   * The user row alone, or null when no row matches. One query, whatever the
+   * account holds. Accepts either the UUID primary key or the legacy id.
+   */
+  const findUserRow = async (userId) =>
+    userId ? mapUserRow(await prisma.appUser.findFirst({ where: userIdWhere(userId) })) : null;
+
+  /** The user row alone for an email, matched ignoring case, or null. */
+  const findUserRowByEmail = async (email) => {
     if (!email) return null;
     const row = await prisma.appUser.findFirst({
       where: { email: { equals: lower(email), mode: "insensitive" } }
     });
-    return row ? loadWithCollections(row.legacyUserId || row.id) : null;
+    return mapUserRow(row);
   };
 
   const createUserWithDashboard = async (doc = {}) => {
@@ -166,7 +185,8 @@ export const createUserReadRepository = ({ prisma }) => {
 
   return {
     findUserWithDashboard,
-    findUserWithDashboardByEmail,
+    findUserRow,
+    findUserRowByEmail,
     createUserWithDashboard
   };
 };
