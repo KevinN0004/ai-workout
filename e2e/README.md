@@ -31,4 +31,4 @@ npm run test:e2e        # or npm run test:e2e:ui for Playwright's UI mode
 - **Geolocation stays denied**, so the dashboard never calls the live weather and air-quality APIs. Plan generation is out of scope, because it needs a real Gemini key.
 - **The server reads `server/.env`, including `REDIS_URL`.** To keep a shared Redis untouched, run with `REDIS_URL=` set in the shell. dotenv leaves a variable that is present but empty alone, so sessions stay in memory.
 
-CI runs these suites in their own `E2E smoke` job, so a flaky browser run cannot muddy the unit signal. `CLAUDE.md` records how each suite was verified by mutation.
+CI runs these suites in their own `E2E smoke` job, so a flaky browser run cannot muddy the unit signal. Decision records [0005](../docs/adr/0005-testing-across-the-wire.md) and [0006](../docs/adr/0006-accessibility-by-axe.md) record how each suite was verified by mutation.

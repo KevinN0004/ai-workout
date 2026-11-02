@@ -763,7 +763,7 @@ describe("the decision records", () => {
   // that reasoning without a sound, and a record left out of the index is one
   // nobody finds. The ceiling stops CLAUDE.md, which every agent session loads
   // whole, growing back: lower it freely, and raise it only in a PR that says why.
-  const CLAUDE_MD_MAX_BYTES = 76_000;
+  const CLAUDE_MD_MAX_BYTES = 67_000;
 
   const adrDir = path.join(repoRoot, "docs", "adr");
   const RECORD = /^\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;

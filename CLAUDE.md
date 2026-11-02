@@ -229,168 +229,54 @@ npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```
 
-**A client test can import server modules directly, and the contract tests do.** The
-running app cannot reach across the wire, but Vitest can resolve a relative
-`server/src/...` path from a client test, so a contract between the two sides can be
-asserted without a browser or a database. `app/__tests__/constants.test.js` pins the
-option lists against the server's `allowed*Values`, and
-`app/__tests__/profileContract.test.js` walks a form draft through
-`personalToProfile` → `profileBodySchema` → `buildProfile` → `profileToPersonal`
-and back. Both were verified to catch divergence the owning side's own suite
-misses: narrowing the server's height range to 100-170 makes a 178cm profile
-store `null`, and the server's tests never try 178. A third,
-`__tests__/serverBounds.contract.test.jsx`, renders every form that posts a number and
-holds each input's range to the schema the server validates it with. Keep such imports
-to test files — confirmed they do not reach the bundle.
+**A client test can import server modules directly, and the contract tests do.** Vitest
+resolves a relative `server/src/...` path from a client test, so a contract between the two
+sides is asserted without a browser or a database: `app/__tests__/constants.test.js`,
+`app/__tests__/profileContract.test.js` and `__tests__/serverBounds.contract.test.jsx`.
+Keep such imports to test files.
 
-**Otherwise the E2E suite is the only thing that runs both halves together.**
-Everything else tests one side of the wire — the client suite mocks `fetch`, the
-server suite drives express with supertest — so a defect in the wiring between
-them passes both. It is deliberately tiny: sign up, log a workout, reload, confirm it
-survived. Five things are worth knowing before touching it:
+**Otherwise the E2E suite is the only thing that runs both halves together**, and it is
+deliberately tiny: sign up, log a workout, reload, confirm it survived. Five things to know
+before touching it ([0005](docs/adr/0005-testing-across-the-wire.md) has the history):
 
-- **It runs against the built bundle** via `vite preview` on 4173, not the dev
-  server, so `npm -w client run build` has to happen first. `vite preview` does
-  not inherit `server.proxy`, which is why `client/vite.config.js` carries a
-  separate `preview.proxy`.
-- **There are two projects, and the split is load-bearing.** `vite preview` is
-  the shipped _bundle_ but not the shipped _server_: it has no helmet, so no
-  response header express sets is visible through it, and it proxies only
-  `/api`. So the `deployable` project points a browser at the express origin
-  (5000) instead, which is what actually deploys; everything else runs under
-  `chromium` against the preview origin. The server's `CLIENT_ORIGIN` names only
-  the preview origin, so the `deployable` project also proves that `corsPolicy.js`
-  allows the server's own origin without it being listed. Adding 5000 back to that
-  list would pass every test and remove the proof. Its server is not production,
-  so the own origin counts only because `localhost:5000` is loopback: outside
-  production a non-loopback own origin is refused, which shuts out DNS rebinding.
+- **It runs against the built bundle** via `vite preview` on 4173, so
+  `npm -w client run build` comes first, and `client/vite.config.js` carries a separate
+  `preview.proxy`.
+- **There are two projects, and the split is load-bearing.** `deployable` points a browser
+  at the express origin (5000), which is what deploys and the only origin where the headers
+  express sets, the CSP among them, are visible; `chromium` runs the rest against the
+  preview origin. `CLIENT_ORIGIN` names only the preview origin, so the `deployable`
+  project also proves that `corsPolicy.js` allows the server's own origin unlisted. Adding
+  5000 back to that list would pass every test and remove the proof.
+- **Do not set `NODE_ENV=test` for the server it starts.** The process then loads,
+  exports, and exits 0 with no output at all — which reads exactly like a crash.
+- **Geolocation is left denied**, so the dashboard never reaches the live weather and
+  air-quality upstreams, and plan generation is out of scope, because it needs a real
+  Gemini key.
+- **Each run creates an account and deletes it** before the file ends. A run that fails
+  before that step leaves the row behind in a local database.
 
-  This exists because its absence shipped a blank page. `default-src 'none'`
-  was correct while the process served JSON only; once `staticClient.js` began
-  serving the SPA, the CSP blocked the bundle's own script and stylesheet.
-  **Every check passed** — `/api/ready` answered 200, and the CI container job
-  smoke-tests the deployable with `curl | grep 'id="root"'`, which cannot
-  enforce CSP. Only a browser on that origin can see it.
+**Accessibility is checked by axe against rendered pages, not by the linter.**
+`e2e/a11y.spec.js` asserts zero violations on the forms, the dashboard, an open modal and
+the account panel's states, and checks that a modal can be dismissed from the keyboard
+alone. **When a linter and the accessibility engine disagree about rendered output, the
+engine wins.** Three jsx-a11y interaction rules are off as one recorded decision: keyboard
+dismissal lives in `useCloseOnEscape` (`ModalPortal` calls it for every modal,
+`DashboardDrawer` directly), where the rules cannot see it, and the axe scan is what
+catches a real keyboard trap ([0006](docs/adr/0006-accessibility-by-axe.md)).
 
-  Mutation-tested rather than trusted: reverting `script-src` is caught by
-  three of its five tests, dropping `font-src` by exactly one, and each caching
-  mutation by exactly one. `server/src/__tests__/index.securityHeaders.test.js` is the
-  cheap companion guard, but a well-formed header can still be wrong — the
-  browser project is the one that proves the page runs.
+**Reduced motion is handled where each motion is, not by a global reset.** Script reads
+`matchMedia("(prefers-reduced-motion: reduce)")` before it animates, and each stylesheet
+carries its own `@media (prefers-reduced-motion: reduce)` block beside the rules it stops
+([0007](docs/adr/0007-reduced-motion-where-it-moves.md)).
 
-- **Do not set `NODE_ENV=test` for the server it starts.** `index.js` guards its
-  `startServer()` call with `NODE_ENV !== "test" && !VITEST` so the unit suite
-  can import `app` without binding a port. Set it and the process loads, exports,
-  and exits 0 with no output at all — which reads exactly like a crash.
-- **Geolocation is left denied**, so the dashboard takes its own "location
-  unavailable" path instead of reaching the live weather and air-quality
-  upstreams. Plan generation is out of scope for the same reason: it needs a
-  real Gemini key.
-- **Each run creates an account** (`e2e-<timestamp>@example.test`) and now
-  deletes it before the file ends. `smoke.spec.js` deletes it as its last
-  test, the thing under test; `a11y.spec.js` deletes its own account
-  (`a11y-<timestamp>@example.test`) in `afterAll` instead, because its two
-  account scans stop at the delete confirmation reveal so axe can see that
-  state, rather than submitting it. A run that fails before reaching that
-  step still leaves the row behind — harmless in CI, but it accumulates in a
-  local database.
-
-It has its own CI job rather than living in `test`, so a flaky browser run
-cannot muddy the unit signal. It was verified by mutation rather than trusted:
-removing the client's CSRF header, and making the workout route answer 200
-without writing, are both caught — and both pass every other suite in the repo.
-
-**Accessibility is checked by axe against rendered pages, not by the linter, and
-that order is deliberate.** `e2e/a11y.spec.js` scans the login and signup forms, the
-dashboard, an open modal, the settings forms and the account panel's states, asserts
-zero violations, and checks that a modal can be dismissed from the keyboard alone. It
-rides the same Playwright job, so it is already in CI.
-
-The linter is the junior authority here, and the numbers say why. jsx-a11y's
-recommended set reported **153 findings; 128 were false positives** from
-`label-has-for` and `control-has-associated-label`, both firing on
-`<label>Name <input /></label>` — the shape every form in this app uses. Nesting
-alone is a valid association, which is why `label-has-for` is deprecated
-upstream. axe reports zero violations on those same forms. **When a linter and
-the accessibility engine disagree about rendered output, the engine wins.**
-
-What axe actually found, and what was fixed:
-
-- **`aria-dialog-name` (serious).** Four of six modals had `role="dialog"` with
-  no accessible name, so a screen reader announced "dialog" and nothing else.
-  `MealDetailsModal` and `PlansView` already set `aria-label`; the rest did not.
-  The four are now named by `aria-labelledby` pointing at their own visible
-  heading, so the name cannot drift from what is on screen. (One of the four,
-  `GeneratedPlanModal`, has since been deleted.)
-- **`region` (moderate).** The header note and the at-a-glance cards sat between
-  `<header>` and `<main>` as bare children of the page. Wrapped in a named
-  `<section>`. Safe because `.dashboard-page` is plain block flow and the only
-  direct-child selector is `.dashboard-page > .title`, which still matches —
-  verified with a full-page screenshot before and after, **byte-identical**.
-
-**Three jsx-a11y interaction rules are off, and the reason is a real trade.**
-`click-events-have-key-events`, `no-static-element-interactions` and
-`no-noninteractive-element-interactions` produced 20 findings, all one pattern:
-an overlay backdrop whose `onClick` dismisses it. Keyboard dismissal is now
-handled by `useCloseOnEscape` — `ModalPortal` calls it for every modal,
-`DashboardDrawer` calls it directly because it is the one overlay not portalled
-— so the backdrop click is a redundant mouse affordance. The rules cannot see
-that, because it lives in a hook rather than on the element. They are off as one
-recorded decision rather than twenty inline disables, and **the axe scan is the
-thing that should catch a real keyboard trap instead.**
-
-Before that hook existed, **no overlay in the app closed on Escape at all**: a
-mouse user could click the backdrop, a keyboard user had to find the Close
-button. Three role bugs were fixed alongside it — two `<aside role="tablist">`
-(a landmark given an interactive role) and a `<button role="listitem">` (which
-strips the button semantics a screen reader needs).
-
-Mutation-tested rather than trusted, because an axe assertion that passes may be
-asserting nothing: removing a modal's `aria-labelledby`, removing the landmark
-wrapper, and disabling the Escape handler are all caught, and all three pass
-every unit suite.
-
-**Reduced motion is handled where each motion is, not by a global reset.** Script
-reads `matchMedia("(prefers-reduced-motion: reduce)")` before it animates
-(`useHomeStageFlow.js`, `usePreviewChapterFlow.js`,
-`usePreviewWeekParticleAnimation.js`), and the stylesheets carry their own
-`@media (prefers-reduced-motion: reduce)` blocks beside the rules they stop. A global
-`*` reset was considered and left out (the Phase 4 plan, Task M2): it cannot stop the
-script, it loses to the `!important` transitions it would need to stop, and it would
-change every element's computed animation and transition, so a screenshot compare could
-not list what it expects. Hover and press feedback has blocks of its own beside the white
-buttons (`core/shell.css`) and the mode and unit toggles (`forms-and-motion.css`), which
-stop the lift and the press-in as well as the transition. The home form's training-day
-buttons are stopped in the same `forms-and-motion.css` block: `.home-stage *` stops their
-transition and that block their transform, so under reduced motion they neither lift on
-hover nor press in (measured in Chromium against the built bundle: `none` both ways).
-
-**`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** Two things
-about it are load-bearing:
-
-- **It must declare the hook scripts as entry points.** `codex-handoff.mjs`,
-  `run-claude-helper.cjs`, `scrub-junk-files.cjs` and `skill-router.mjs` are invoked
-  from `.claude/settings.json`, which knip cannot see — so without the config it
-  reports every one of them as an unused file, then cascades and reports
-  `codex-handoff/*.mjs` too, because their only importer looks dead. **That is a
-  false positive for every hook file, inviting you to delete the whole hook wiring.**
-  They are live; see the Fresh Clone Setup checklist that runs them.
-- **"Unused export" usually means the export, not the value.** Of the 17 knip
-  originally reported, 12 were constants used inside their own module to derive
-  others that _are_ consumed — `PREVIEW_WEEK_LINE_DRAW_MS` feeds
-  `PREVIEW_WEEK_OUTLINE_DRAW_MS`, and so on. Those were narrowed to
-  module-private rather than deleted. Only `goalOptions` and the two meal
-  libraries were genuinely dead, and `goalOptions` has since come back (`a498ff2`):
-  Settings offers it as the goal select, and `createDefaultPlannerForm` falls back to
-  its first entry.
-
-**Deleting dead source does not necessarily shrink the bundle**, and assuming it
-does is how you overstate a cleanup. `MEAL_LIBRARY` and `EXTRA_MEAL_LIBRARY` were
-736 lines reachable only through a re-export nothing imported; removing them
-changed the built bundle by **zero bytes and not even the content hash**, because
-rollup was already tree-shaking them. Verified by grepping `client/dist` for a
-string from the file before and after. They were worth removing for the reading,
-not for the shipping. Measure the bundle rather than claiming it.
+**`npm run knip` is clean, and `knip.jsonc` is what keeps it that way.** It must declare
+the hook scripts as entry points: `.claude/settings.json` invokes them where knip cannot
+see, and without the config it reports every hook file as unused — a false positive
+inviting you to delete the whole hook wiring. "Unused export" usually means the export,
+not the value: narrow it to module-private before deleting anything. Deleting dead source
+does not necessarily shrink the bundle, so measure the bundle rather than claiming it
+([0008](docs/adr/0008-knip-and-dead-code.md)).
 
 Server-only helpers (run from `server/`):
 
@@ -407,31 +293,18 @@ Postgres and Redis in containers while the app itself stays native. Both it and
 Compose starts an empty database, so `npm -w server run migrate:postgres` is required
 before the server or its test suite will work against it.
 
-**Both published ports bind `127.0.0.1` on purpose, and the prefix is load-bearing.**
-Docker's default is `0.0.0.0`, and `start-local-postgres.ps1` binds `127.0.0.1` — and on
-Windows those two do **not** collide. Before this was fixed, `docker compose up -d`
-succeeded while every `localhost` connection kept reaching the native instance: compose
-looked healthy, `migrate:postgres` printed `skipped 001_foundation.sql` because the
-_native_ database already had it, and the container sat at zero tables with no error
-anywhere. Measured both ways on 2026-09-12, holding `127.0.0.1:55432` with a dummy
-listener:
+**Both published ports bind `127.0.0.1` on purpose, and the prefix is load-bearing.** On
+Windows, Docker's default `0.0.0.0` and the PowerShell helper's `127.0.0.1` do not collide,
+so without the prefix compose starts beside the native instance while every `localhost`
+connection keeps reaching the native one; with it, picking the wrong one fails at once.
+Do not drop the prefix.
 
-- publishing `0.0.0.0:55432` — container starts, shadowing the native instance
-- publishing `127.0.0.1:55432` — `Error response from daemon: ports are not available`
-
-So the collision the comment in `docker-compose.yml` always claimed is now real, and
-picking the wrong one fails immediately instead of silently. Do not drop the prefix. It
-also stops publishing a development database on every interface; nothing needs that,
-because the app runs natively and connects over loopback.
-
-**The two instances do not share a password.** Compose uses `POSTGRES_PASSWORD`
-(default `ai_workout_dev`), which is what `env.example` already spells out:
-`postgresql://postgres:ai_workout_dev@127.0.0.1:55432/ai_workout`. The PowerShell helper
-generates its own instead, so a `server/.env` written for one will fail against the other
-with `password authentication failed for user "postgres"` (SQLSTATE 28P01). That is the
-expected symptom of switching sides, not a broken container — and it was invisible until
-the port binding was fixed, because the shadowed connection was authenticating against
-the native instance all along.
+**The two instances do not share a password.** Compose uses `POSTGRES_PASSWORD` (default
+`ai_workout_dev`, as `env.example` spells out) and the helper generates its own, so a
+`server/.env` written for one fails against the other with
+`password authentication failed for user "postgres"` (SQLSTATE 28P01). That is the
+expected symptom of switching sides, not a broken container
+([0009](docs/adr/0009-compose-on-loopback.md)).
 
 - ALWAYS run `npm test` and `npm run lint` after making code changes
 - ALWAYS verify `npm run build` succeeds before committing
