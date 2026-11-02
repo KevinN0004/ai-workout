@@ -22,6 +22,7 @@ const generateContent = vi.fn(async () => ({ text: "Monday - Push\nBench press" 
 const gemini = { models: { generateContent } };
 
 let saveGeneratedPlan;
+let pruneGeneratedPlans;
 
 const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
   const app = express();
@@ -41,6 +42,7 @@ const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
     toNullableNumber,
     toPositiveInt: indexTestables.toPositiveInt,
     saveGeneratedPlan,
+    pruneGeneratedPlans,
     ...overrides
   });
   return app;
@@ -58,6 +60,7 @@ beforeEach(() => {
   generateContent.mockClear();
   generateContent.mockResolvedValue({ text: "Monday - Push\nBench press" });
   saveGeneratedPlan = vi.fn(async () => null);
+  pruneGeneratedPlans = vi.fn(async () => 0);
 });
 
 afterEach(() => {
@@ -561,8 +564,43 @@ describe("POST /api/generate", () => {
       const response = await post(buildApp());
 
       expect(saveGeneratedPlan).not.toHaveBeenCalled();
+      expect(pruneGeneratedPlans).not.toHaveBeenCalled();
       expect(response.body.savedPlan).toBeNull();
       expect(response.body.plan).toBeTruthy();
+    });
+
+    // The dashboard reads only the newest plans, so each save trims the rest.
+    test("prunes the caller's older plans once the new one is saved", async () => {
+      const app = buildApp({}, { user: { id: "u-1" } });
+
+      await post(app);
+
+      expect(pruneGeneratedPlans).toHaveBeenCalledWith({ userId: "u-1" });
+      expect(pruneGeneratedPlans.mock.invocationCallOrder[0]).toBeGreaterThan(
+        saveGeneratedPlan.mock.invocationCallOrder[0]
+      );
+    });
+
+    // The plan is saved by the time the prune runs, so a failed prune must not
+    // cost the caller the plan Gemini just made. The next save tries again.
+    test("still answers with the plan when the prune fails, and logs it", async () => {
+      pruneGeneratedPlans = vi.fn(async () => {
+        throw new Error("deadlock detected");
+      });
+      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const app = buildApp({}, { user: { id: "u-1" }, log });
+
+      const response = await post(app);
+
+      expect(response.status).toBe(200);
+      expect(response.body.savedPlan.plan).toBe("Monday - Push\nBench press");
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "generated_plan_prune_failed",
+          error: "deadlock detected"
+        }),
+        expect.any(String)
+      );
     });
 
     test("returns the stored row when the repository sends one back", async () => {
