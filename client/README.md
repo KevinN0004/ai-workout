@@ -198,16 +198,22 @@ that is what stops a write queued before a sign-out firing against the next acco
 
 ## Generated Plan Parsing
 
-`app/plans.js` parses the plan text Gemini returns. Two things to know:
+`app/plans.js` reads a generated plan through `readPlan`: from the structure the server
+saved with it (`payload`), or, for a plan saved without one, from its text. The text parse
+follows the server's rules (`planPayloadService.js`), and
+`app/__tests__/planPayload.contract.test.js` holds the two to identical output on real
+captured answers. Three things to know:
 
 - **Weekday headings are matched with `startsWith`**, so markdown emphasis defeats them.
   `**Monday - Push**`, `## Monday` and `- Monday` are all invisible, and the week
   collapses into a single "Your plan" section instead of failing visibly.
-- **The two parsers disagree about a plan with no weekday headings.**
-  `parsePlanSections` falls back to one "Your plan" section, so the Plans view still
-  renders; `extractLatestPlanByWeekday` has no fallback and returns `{}`, so the
-  dashboard's today panel is empty for the same plan. A test asserts both halves
-  together so the asymmetry cannot be half-fixed.
+- **A plan with no weekday headings reads differently in the two views.** `readPlan`
+  gives one "Your plan" day, so the Plans view still renders; `extractLatestPlanByWeekday`
+  maps days by weekday and that day has none, so it returns `{}` and the dashboard's
+  today panel is empty for the same plan. A test asserts both halves together so the
+  asymmetry cannot be half-fixed.
+- **Every day the plan lists has lines, rest days included,** so the weekday map counts a
+  rest day as a training day (`planUtils.js`). Detecting rest days is roadmap Phase 6's.
 
 ## Exercise Recommendations
 

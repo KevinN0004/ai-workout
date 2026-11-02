@@ -239,8 +239,8 @@ npm run lint:fix         # eslint . --fix
 **A client test can import server modules directly, and the contract tests do.** Vitest
 resolves a relative `server/src/...` path from a client test, so a contract between the two
 sides is asserted without a browser or a database: `app/__tests__/constants.test.js`,
-`app/__tests__/profileContract.test.js` and `__tests__/serverBounds.contract.test.jsx`.
-Keep such imports to test files.
+`app/__tests__/profileContract.test.js`, `app/__tests__/planPayload.contract.test.js` and
+`__tests__/serverBounds.contract.test.jsx`. Keep such imports to test files.
 
 **Otherwise the E2E suite is the only thing that runs both halves together**, and it is
 deliberately tiny: sign up, log a workout, reload, confirm it survived. Five things to know

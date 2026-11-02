@@ -27,7 +27,7 @@ import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
 import { fetchWithTimeout } from "./app/network";
-import { parsePlanSections, extractLatestPlanByWeekday } from "./app/plans";
+import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
 import {
@@ -122,6 +122,8 @@ export default function App() {
   const [personal, setPersonal] = useState({ ...defaultPersonalForm });
   const [form, setForm] = useState(() => createDefaultPlannerForm());
   const [result, setResult] = useState("");
+  // The server's parse of `result`, read in its place when it is valid.
+  const [resultPayload, setResultPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -349,6 +351,7 @@ export default function App() {
     setLoading,
     setError,
     setResult,
+    setResultPayload,
     setDashboard,
     closePlanner,
     isDashboardRoute,
@@ -416,7 +419,10 @@ export default function App() {
     />
   );
 
-  const planSections = useMemo(() => parsePlanSections(result), [result]);
+  const planSections = useMemo(
+    () => readPlan({ payload: resultPayload, text: result }),
+    [resultPayload, result]
+  );
 
   const latestPlanByWeekday = useMemo(() => extractLatestPlanByWeekday(dashboard), [dashboard]);
 

@@ -47,6 +47,7 @@ beforeEach(() => {
     setLoading: vi.fn(),
     setError: vi.fn(),
     setResult: vi.fn(),
+    setResultPayload: vi.fn(),
     setDashboard: vi.fn(),
     closePlanner: vi.fn(),
     isDashboardRoute: false,
@@ -965,6 +966,7 @@ describe("an answer that arrives after the account signed out", () => {
     ).onSubmit(submitEvent());
 
     expect(deps.setResult).not.toHaveBeenCalledWith("Monday - Push");
+    expect(deps.setResultPayload).not.toHaveBeenCalledWith(expect.anything());
     expect(deps.setDashboard).not.toHaveBeenCalled();
     expect(deps.go).not.toHaveBeenCalled();
     expect(deps.setLoading).toHaveBeenLastCalledWith(false);
@@ -1007,6 +1009,7 @@ describe("onSubmit", () => {
 
     expect(deps.setError).toHaveBeenNthCalledWith(1, "");
     expect(deps.setResult).toHaveBeenNthCalledWith(1, "");
+    expect(deps.setResultPayload).toHaveBeenNthCalledWith(1, null);
   });
 
   test("stores the generated plan", async () => {
@@ -1015,6 +1018,24 @@ describe("onSubmit", () => {
     await build().onSubmit(submitEvent());
 
     expect(deps.setResult).toHaveBeenLastCalledWith("Monday - Push\nBench press");
+  });
+
+  test("stores the structure the server parsed from it", async () => {
+    const payload = { version: 1, days: [], notes: ["Sleep well"] };
+    deps.apiFetch.mockResolvedValue(generated({ payload }));
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.setResultPayload).toHaveBeenLastCalledWith(payload);
+  });
+
+  // An answer that carries no structure is read from its text instead.
+  test("stores no structure when the answer has none", async () => {
+    deps.apiFetch.mockResolvedValue(generated());
+
+    await build().onSubmit(submitEvent());
+
+    expect(deps.setResultPayload).toHaveBeenLastCalledWith(null);
   });
 
   // Generation takes long enough that the spinner is the only thing telling a
