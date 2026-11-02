@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
 import { buildGenerationEquipmentContext, registerGenerateRoutes } from "../generateRoutes.js";
+import { buildPlanPayload } from "../../services/dashboard/planPayloadService.js";
 import { generatePlanBodySchema, validateBody } from "../../services/http/apiSchemaService.js";
 import {
   cleanText,
@@ -19,6 +21,15 @@ import { __testables as indexTestables } from "../../index.js";
 // function, so the prompt under test is the one that would be sent.
 
 const generateContent = vi.fn(async () => ({ text: "Monday - Push\nBench press" }));
+
+// One of the real answers planPayloadService's tests are built on.
+const realAnswer = readFileSync(
+  new URL(
+    "../../services/dashboard/__tests__/fixtures/plans/01-home-bodyweight-3d.txt",
+    import.meta.url
+  ),
+  "utf8"
+);
 const gemini = { models: { generateContent } };
 
 let saveGeneratedPlan;
@@ -458,6 +469,33 @@ describe("POST /api/generate", () => {
       expect(configSent().abortSignal.aborted).toBe(false);
     });
 
+    // The warning means "no day could be read", so it follows the parse: a
+    // weekday named mid-line, or under markdown, opens no day either.
+    test.each([
+      ["only mid-line", "Rest on Monday\nSquats and lunges"],
+      ["only under markdown", "**Monday - Push**\nBench press"]
+    ])("warns when the weekday is %s", async (_label, text) => {
+      generateContent.mockResolvedValue({ text });
+      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+
+      const response = await post(buildApp({}, { log }));
+
+      expect(response.status).toBe(200);
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: "generate_no_weekday" }),
+        expect.any(String)
+      );
+    });
+
+    test("does not warn for a real answer", async () => {
+      generateContent.mockResolvedValue({ text: realAnswer });
+      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+
+      await post(buildApp({}, { log }));
+
+      expect(log.warn).not.toHaveBeenCalled();
+    });
+
     test("warns, but still serves, a plan with no weekday heading", async () => {
       generateContent.mockResolvedValue({ text: "Squats and lunges" });
       const warn = vi.fn();
@@ -619,6 +657,29 @@ describe("POST /api/generate", () => {
       const response = await post(app);
 
       expect(response.body.savedPlan.plan).toBe("Monday - Push\nBench press");
+    });
+
+    // The answer is parsed once, here, so the repository stores the structure
+    // and every reader gets it without parsing text again.
+    test("builds the plan's structure once, saves it and answers it", async () => {
+      generateContent.mockResolvedValue({ text: realAnswer });
+      const app = buildApp({}, { user: { id: "u-1" } });
+
+      const response = await post(app);
+
+      const expected = buildPlanPayload(realAnswer);
+      expect(saveGeneratedPlan.mock.calls[0][0].entry.payload).toEqual(expected);
+      expect(response.body.payload).toEqual(expected);
+      expect(response.body.savedPlan.payload).toEqual(expected);
+    });
+
+    test("answers the structure to an anonymous caller too", async () => {
+      generateContent.mockResolvedValue({ text: realAnswer });
+
+      const response = await post(buildApp());
+
+      expect(response.body.payload).toEqual(buildPlanPayload(realAnswer));
+      expect(response.body.savedPlan).toBeNull();
     });
   });
 

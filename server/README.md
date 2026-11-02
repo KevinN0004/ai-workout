@@ -235,9 +235,11 @@ the model is told the user can train with, and two of its branches are easy to b
   the environment silently changes which equipment vocabulary is used.
 
 The prompt asks for weekday headings and a `"Coach Notes:"` section by name because
-`client/src/app/plans.js` parses exactly those. **That contract crosses the client/server
-boundary with nothing type-checking it** — changing the wording here breaks plan parsing
-there, and only the generate-route tests will say so.
+`services/dashboard/planPayloadService.js` parses exactly those when a plan is saved, and
+`client/src/app/plans.js` parses the text again by the same rules. **Nothing checks the
+prompt against them:** the parser's tests run on answers captured from this prompt, so
+changing its wording means capturing new answers and running them through those tests
+(`docs/specs/2026-11-02-structured-plans-design.md`, "What forces a re-check").
 
 ## Sessions
 

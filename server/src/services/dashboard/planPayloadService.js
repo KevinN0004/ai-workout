@@ -1,7 +1,7 @@
 /**
- * A generated plan's structure, its days and notes, parsed from the text Gemini
- * returns, and the check a stored or received structure must pass. The rules
- * are those of client/src/app/plans.js, which parses the same text.
+ * A generated plan's structure, its days and notes: built from Gemini's text by
+ * the generate route when it saves a plan, and checked by the plan repository
+ * whenever it stores or reads one. The rules are those of client/src/app/plans.js.
  */
 // @ts-check
 
