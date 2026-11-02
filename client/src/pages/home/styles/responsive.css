@@ -1,6 +1,6 @@
 /* The home page's narrower-screen rules, and the workout stage's sample plan cards.
    Imported last by HomePage.css, so these override core.css and forms-and-motion.css at the
-   same specificity. styles/base.css lands after every home sheet and still wins its ties. */
+   same specificity. styles/base.css is the lower base layer, so every home sheet beats it. */
 
 /* ---- Medium screens ------------------------------------------------------ */
 @media (max-width: 1180px) {
@@ -53,8 +53,8 @@
 /* ---- Narrow screens ------------------------------------------------------ */
 /* The personal stage's form, and the walkthrough's copy of it, go to one column in both
    modes. Each selector names an ancestor, the stage's wrapper or the walkthrough's panel, to
-   outrank styles/base.css's .form (which ties .personal-form and loads later) and
-   forms-and-motion.css's two-column advanced-mode rule. */
+   outrank forms-and-motion.css's two-column advanced-mode rule (styles/base.css's .form is
+   in the lower base layer, so it needs no outranking). */
 @media (max-width: 720px) {
   .home-page {
     width: 100%;
@@ -181,8 +181,6 @@
 }
 
 /* ---- Smallest screens ---------------------------------------------------- */
-/* The Preview button's padding-inline loses to styles/base.css's .ghost padding, which ties
-   it and loads later. */
 @media (max-width: 560px) {
   .home-sticky-nav {
     grid-template-columns: 1fr auto;
@@ -197,7 +195,6 @@
   .home-preview-btn {
     min-width: 0;
     width: auto;
-    padding-inline: 12px;
   }
 
   .stage-actions .cta,

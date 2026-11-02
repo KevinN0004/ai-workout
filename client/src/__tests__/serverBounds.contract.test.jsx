@@ -120,7 +120,6 @@ const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
       trainingDayOptions={[]}
       toggleTrainingDay={noop}
       isPersonalComplete={false}
-      backBtnStyle={{}}
       goToStage={noop}
       isIntroTransitioning={false}
       isStageTransitioning={false}

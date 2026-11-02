@@ -12,7 +12,6 @@
 export default function HomeWorkoutStage({
   workoutShellRef,
   workoutPanelRef,
-  backBtnStyle,
   onBack,
   isIntroTransitioning,
   isStageTransitioning,
@@ -28,7 +27,6 @@ export default function HomeWorkoutStage({
           <button
             type="button"
             className="back-btn workout-back-arrow"
-            style={backBtnStyle}
             aria-label="Back"
             onClick={onBack}
             disabled={isIntroTransitioning || isStageTransitioning}

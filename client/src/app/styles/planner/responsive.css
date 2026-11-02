@@ -1,13 +1,5 @@
-﻿/* The planner modal on smaller screens: the training form in one column and smaller
-   controls. Imported third by styles/app.css, after the planner rules it overrides at the
-   same specificity. */
-
-/* ---- Training form in one column ----------------------------------------- */
-@media (max-width: 860px) {
-  .planner-step-two-form {
-    grid-template-columns: 1fr;
-  }
-}
+﻿/* The planner modal on smaller screens: smaller controls. Imported third by styles/app.css,
+   after the planner rules it overrides at the same specificity. */
 
 /* ---- Narrow screens ------------------------------------------------------ */
 @media (max-width: 720px) {
@@ -47,9 +39,5 @@
 @media (max-width: 520px) {
   .option-grid {
     grid-template-columns: 1fr;
-  }
-
-  .planner-step-two-form {
-    gap: 14px;
   }
 }

@@ -35,7 +35,6 @@ export default function HomePersonalStage({
   trainingDayOptions,
   toggleTrainingDay,
   isPersonalComplete,
-  backBtnStyle,
   goToStage,
   isIntroTransitioning,
   isStageTransitioning
@@ -356,7 +355,6 @@ export default function HomePersonalStage({
             <button
               type="button"
               className="back-btn"
-              style={backBtnStyle}
               onClick={() => goToStage("intro")}
               disabled={isIntroTransitioning || isStageTransitioning}
             >

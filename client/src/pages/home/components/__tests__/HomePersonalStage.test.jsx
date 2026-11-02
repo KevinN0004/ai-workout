@@ -56,7 +56,6 @@ const renderStage = (props = {}) => {
       toKg={toKg}
       trainingDayOptions={TRAINING_DAYS}
       isPersonalComplete={false}
-      backBtnStyle={{}}
       isIntroTransitioning={false}
       isStageTransitioning={false}
       {...handlers}
@@ -333,6 +332,13 @@ describe("HomePersonalStage", () => {
       fireEvent.click(button("Back"));
 
       expect(goToStage).toHaveBeenCalledWith("intro");
+    });
+
+    test("Back has no inline style, so styles/base.css's .back-btn styles it", () => {
+      renderStage();
+
+      expect(button("Back")).toHaveClass("back-btn");
+      expect(button("Back")).not.toHaveAttribute("style");
     });
   });
 

@@ -1,7 +1,7 @@
 /* The app's base layer: the Google Fonts import, the type scale on :root, the reset, and
-   the page, panel, form, button and modal classes the pages share. Imported by index.css,
-   which main.jsx loads after App, so it follows every stylesheet in the main CSS chunk and
-   wins ties against them; a lazy dashboard view's stylesheet loads after it and wins ties. */
+   the page, panel, form, button and modal classes the pages share. Imported by index.css
+   into the `base` cascade layer, so any page, planner or view rule beats it whatever its
+   specificity or order. Nothing here is !important: a layered one would beat every page's. */
 
 /* ---- Fonts and type scale ------------------------------------------------ */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
@@ -345,29 +345,28 @@ select:focus {
   -webkit-appearance: none;
   border-radius: 999px;
   padding: 10px 16px;
-  border: 1px solid rgba(255, 106, 88, 0.94) !important;
+  border: 1px solid rgba(255, 106, 88, 0.94);
   cursor: pointer;
   font-family: inherit;
   font-weight: 600;
-  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
-  color: #fff !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58);
+  color: #fff;
   box-shadow:
     0 0 12px rgba(255, 61, 88, 0.56),
-    0 0 28px rgba(255, 135, 58, 0.38) !important;
+    0 0 28px rgba(255, 135, 58, 0.38);
 }
 
 .back-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #ff873a, #ff3d58) !important;
-  border-color: rgba(255, 106, 88, 0.94) !important;
-  color: #fff !important;
+  background: linear-gradient(120deg, #ff873a, #ff3d58);
+  border-color: rgba(255, 106, 88, 0.94);
+  color: #fff;
   box-shadow:
     0 0 16px rgba(255, 61, 88, 0.68),
-    0 0 34px rgba(255, 135, 58, 0.46) !important;
+    0 0 34px rgba(255, 135, 58, 0.46);
 }
 
 .back-btn:disabled {
   opacity: 1;
-  box-shadow: none;
   cursor: not-allowed;
 }
 

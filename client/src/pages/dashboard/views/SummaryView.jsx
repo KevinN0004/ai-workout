@@ -40,7 +40,8 @@ function TrendChart({
  * the weather and air-quality figures are useDashboardData's readings. App's
  * `dashView` being "summary", not this view rendering, is what starts their
  * one-time load. The two cards' refresh buttons are always there, and each card
- * shows its error alongside any reading it still has.
+ * shows its error alongside any reading it still has. The air card labels its
+ * US AQI a NowCast when the payload carries one, and the latest reading's when not.
  */
 export default function SummaryView({
   form,
@@ -364,8 +365,14 @@ export default function SummaryView({
                     <p>{airSummary.guidance}</p>
                     <p className="muted">
                       {airSummary.primaryPollutant || "PM2.5"}: {airSummary.pm25 ?? "--"} ug/m3
+                      {/* The basis follows the payload: one cached before the NowCast
+                          has no pm25NowCast, and its AQI is the latest reading's. */}
                       {airSummary.aqiUs !== null && airSummary.aqiUs !== undefined
-                        ? ` | US AQI ${airSummary.aqiUs} from the latest reading`
+                        ? ` | US AQI ${airSummary.aqiUs} ${
+                            Number.isFinite(airSummary.pm25NowCast)
+                              ? "(NowCast, last 12 hours)"
+                              : "from the latest reading"
+                          }`
                         : ""}
                     </p>
                     {airLocation?.name ? (

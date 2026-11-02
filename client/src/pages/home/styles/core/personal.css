@@ -21,15 +21,11 @@
   min-height: 0;
 }
 
-/* The form also carries .form, and styles/base.css's .form ties this rule and loads later,
-   so .form's grid-template-columns, gap and margin-top are the ones that apply. The
-   advanced-mode columns below are more specific and do apply. */
+/* The form also carries .form, whose grid-template-columns, gap and margin-top it keeps.
+   The advanced-mode columns below are more specific. */
 .personal-form {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   align-items: start;
-  margin-top: 0;
   align-content: start;
-  gap: 18px;
   width: min(920px, 100%);
   justify-self: center;
   grid-auto-flow: row dense;
