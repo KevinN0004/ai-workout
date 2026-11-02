@@ -315,4 +315,5 @@ Recorded so nobody mistakes it for an oversight:
 - Some files carry a byte-order mark and the rest do not.
 - `.height-split`, `.height-field`, `.height-field input` and `.height-unit` are styled by
   both `AuthPage.css` and `home/styles/forms-and-motion.css`.
-- Large files are not split. `CLAUDE.md` explains why length alone is not a reason.
+- Large files are not split. [`adr/0004`](adr/0004-file-length-is-a-smell.md) explains why
+  length alone is not a reason.
