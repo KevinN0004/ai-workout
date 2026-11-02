@@ -138,8 +138,8 @@ Coverage is `npm run test:coverage -w client`, measured against a ratchet in
 `vite.config.js` whose floors sit just below the last measurement. Raise them when
 coverage rises; never lower them. Judge where a test is worth writing by whether the
 code _computes_ anything, not by its file suffix: several `*View.jsx` components carry
-real derivation, and `CLAUDE.md` records which files' remaining uncovered branches are
-unreachable rather than untested.
+real derivation, and decision record [0012](../docs/adr/0012-coverage-gaps.md) records
+which files' remaining uncovered branches are unreachable rather than untested.
 
 ## Requests and Sign-out
 
