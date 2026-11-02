@@ -69,14 +69,15 @@ Considered and not chosen:
 
 ### PR 1: lean reads
 
-- `userReadRepository` gains `findUser(userId)` and `findUserByEmail(email)`. Each runs one
+- `userReadRepository` gains `findUserRow(userId)` and `findUserRowByEmail(email)`. Each runs one
   `appUser` query: ids through `userIdWhere`, so both the UUID and the legacy id resolve, and
   email case-insensitively as today. Both map through a new `mapUserRow`, the user fields of
   `mapUser` without `dashboard`, and `mapUser` is rebuilt on top of it so the two cannot drift.
   `passwordChangedAt` keeps its guard (absent is `null`, never `""`).
-- `authUserService.findUserById` and `findUserByEmail` use those lookups. Their callers keep
-  their names and their wiring: `getSessionUser` (so `requireAuth`, `attachOptionalUser` and
-  `GET /api/auth/me`), signup's existence check and login.
+- `authUserService.findUserById` and `findUserByEmail` use those lookups, which `index.js`
+  passes it in place of the two dashboard loaders. Their callers keep their names and their
+  wiring: `getSessionUser` (so `requireAuth`, `attachOptionalUser` and `GET /api/auth/me`),
+  signup's existence check and login.
 - `GET /api/dashboard` loads the full user itself, as the write routes already do:
   `findUserWithDashboard(req.user.id)`, `mapDbDocToUser`, a 404 "User not found." when the row
   has gone, then `buildDashboardResponse` as today. The response does not change.
@@ -126,8 +127,8 @@ Re-measure `main` once both PRs are in, and raise each floor whose truncated fig
 - **PR 1**
   - `authUserService`: `findUserById` and `findUserByEmail` call the row lookups and never the
     dashboard loaders (injected fakes). Fails on `main`.
-  - `userReadRepository`, real database: `findUser` by UUID and by legacy id,
-    `findUserByEmail` with different case, the result has no `dashboard` key, and
+  - `userReadRepository`, real database: `findUserRow` by UUID and by legacy id,
+    `findUserRowByEmail` with different case, the result has no `dashboard` key, and
     `passwordChangedAt` reads as `mapUser` reads it.
   - **The real app:** sign up, log data into the collections `buildDashboard` reads (a plan, a
     calorie entry, a saved exercise, goals), then `GET /api/dashboard` returns all of it.

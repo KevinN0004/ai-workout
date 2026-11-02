@@ -54,9 +54,11 @@ logs that the new instance reported ready.
 
 **Files:**
 
-- Modify: `server/src/repositories/userReadRepository.js` (`mapUserRow`, `findUser`,
-  `findUserByEmail`; remove `findUserWithDashboardByEmail`)
+- Modify: `server/src/repositories/userReadRepository.js` (`mapUserRow`, `findUserRow`,
+  `findUserRowByEmail`; remove `findUserWithDashboardByEmail`)
 - Modify: `server/src/services/auth/authUserService.js` (`findUserById`, `findUserByEmail`)
+- Modify: `server/src/index.js` (`createAuthUserService` gets the two row lookups in place of
+  the dashboard loaders)
 - Modify: `server/src/routes/dashboard/registerDashboardReadRoutes.js` (`GET /api/dashboard`
   loads the full user)
 - No wiring change: `dashboardRoutes.js` hands the read routes the same `deps` object as the
@@ -76,21 +78,22 @@ logs that the new instance reported ready.
       is the guard for Step 5.
 - [ ] **Step 2: failing unit tests.**
   - `authUserService.test.js`: built with fakes, `findUserById` and `findUserByEmail` call
-    `findUser` and `findUserByEmail` from the read repository and never `findUserWithDashboard`.
+    `findUserRow` and `findUserRowByEmail` and never a dashboard loader.
   - `userReadRepository.test.js`, real database:
-    - `findUser` resolves the UUID and the legacy id;
-    - `findUserByEmail` ignores case;
+    - `findUserRow` resolves the UUID and the legacy id;
+    - `findUserRowByEmail` ignores case;
     - the result has no `dashboard` key;
     - `passwordChangedAt` is `null` when unset and the ISO string when set, as `mapUser` gives
       it.
 
   Run them and see each fail for its reason: missing functions, or the full loader called.
 
-- [ ] **Step 3: implement.** Add `mapUserRow` and rebuild `mapUser` on it. Add `findUser` and
-      `findUserByEmail`: one `prisma.appUser.findFirst` each, through `userIdWhere`, and
-      `mode: "insensitive"` on the email. Point the two `authUserService` lookups at them.
+- [ ] **Step 3: implement.** Add `mapUserRow` and rebuild `mapUser` on it. Add `findUserRow`
+      and `findUserRowByEmail`: one `prisma.appUser.findFirst` each, through `userIdWhere`,
+      and `mode: "insensitive"` on the email. Point the two `authUserService` lookups at them,
+      and pass them to `createAuthUserService` in `index.js`.
 - [ ] **Step 4: remove `findUserWithDashboardByEmail`.** It has no caller left. Grep every
-      caller and its tests first, and move any test that used it to `findUserByEmail`.
+      caller and its tests first, and move any test that used it to `findUserRowByEmail`.
 - [ ] **Step 5: `GET /api/dashboard` loads the full user.** Use `findUserWithDashboard(req.user.id)`
       and `mapDbDocToUser`, answer 404 "User not found." when it returns `null`, then call
       `buildDashboardResponse` as today. Destructure the two from the route's `deps`, and
@@ -102,7 +105,7 @@ logs that the new instance reported ready.
   1. `buildDashboardResponse(req.user)` back in the route (Step 1's test).
   2. `findUserById` back on `findUserWithDashboard` (Step 2).
   3. The 404 guard removed (Step 5).
-  4. `findUser` without `userIdWhere`, matching `id` only (the legacy-id case).
+  4. `findUserRow` without `userIdWhere`, matching `id` only (the legacy-id case).
 - [ ] **Step 8: gates and an exact-count floor check** (Conventions).
 - [ ] **Step 9: PR, CI, merge, deploy.** Title: `perf(auth): read only the user row`. The
       description quotes the spec's measurement and lists the mutations. Merge only when
