@@ -3,10 +3,14 @@
  * clamping, mirroring across the centre line, absent-safe coercion and
  * interpolation between width bands.
  */
+// @ts-check
 
 /**
  * `value` bounded to [min, max]. A NaN stays NaN, which is why the geometry
  * reads its inputs through toFiniteNumber before clamping them.
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
  */
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -14,6 +18,8 @@ export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
  * `x` reflected across the vertical line at `centerX`. geometry.js and
  * outlineGeometry.js build each left-side point from its right-side twin with
  * it.
+ * @param {number} x
+ * @param {number} centerX
  */
 export const mirrorX = (x, centerX) => centerX - (x - centerX);
 
@@ -30,6 +36,8 @@ export const mirrorX = (x, centerX) => centerX - (x - centerX);
  * A measured zero is still a measurement and is deliberately kept: `sideFat: 0`
  * means no adiposity, not "unspecified". That is why this tests for absence
  * rather than falsiness.
+ * @param {unknown} value
+ * @param {number} fallback
  */
 export const toFiniteNumber = (value, fallback) => {
   if (value === null || value === undefined || value === "") return fallback;
@@ -42,6 +50,8 @@ export const toFiniteNumber = (value, fallback) => {
  * `bands` (`{ y, w }`) either side of it and held at the first or last band's
  * width beyond them. Assumes the bands ascend in y; with none it is 0.
  * geometry.js's `widthAt` is this, over the body's width bands.
+ * @param {{ y: number, w: number }[]} bands
+ * @param {number} yValue
  */
 export const interpolateBandWidth = (bands, yValue) => {
   if (!Array.isArray(bands) || !bands.length) return 0;
