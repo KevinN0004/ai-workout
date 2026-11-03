@@ -19,7 +19,12 @@ import {
 // and env.example document the same defaults.
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_TIMEOUT_MS = 30000;
-const DEFAULT_MAX_PLAN_CHARS = 20000;
+
+/**
+ * The longest plan served, in characters, when GEMINI_MAX_PLAN_CHARS is unset.
+ * The plan-quality evals (scripts/evals/) hold a plan to the same cap.
+ */
+export const DEFAULT_MAX_PLAN_CHARS = 20000;
 
 // Thrown only by the route's own deadline, so the handler can tell a timeout
 // (504) from a failure of the Gemini call itself (500).

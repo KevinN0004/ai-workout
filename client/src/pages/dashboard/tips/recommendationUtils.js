@@ -3,7 +3,7 @@
  * equipment, the weather and an injury note score a wger exercise, and the
  * training-guide cards. Used by TipsView and the tips components.
  */
-import { hasWord } from "../wordMatch";
+import { hasWord } from "../wordMatch.js";
 
 // wger category names each goal track favours.
 const trackCategoryMap = {
