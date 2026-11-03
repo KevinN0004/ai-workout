@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   PLAN_PAYLOAD_VERSION,
   extractLatestPlanByWeekday,
+  isRestDay,
   parsePlanSections,
   planByWeekday,
   readPlan,
@@ -457,6 +458,74 @@ describe("savedPlanDays", () => {
     ["another version", { plan: "Monday\nText", payload: savedPayload({ version: 2 }) }]
   ])("is null for %s, whatever its text says", (_label, plan) => {
     expect(savedPlanDays(plan)).toBeNull();
+  });
+});
+
+// Every day of a real plan has lines, rest days included, so a day's having
+// lines says nothing about whether it trains. Its opening main entry does.
+describe("isRestDay", () => {
+  // Loaded by Vite as text, as in planPayload.contract.test.js. Each file's
+  // name holds the number of training days its profile asked for.
+  const fixtures = Object.entries(
+    import.meta.glob("../../../../server/src/services/dashboard/__tests__/fixtures/plans/*.txt", {
+      query: "?raw",
+      import: "default",
+      eager: true
+    })
+  ).map(([path, text]) => [path.split("/").pop(), text]);
+
+  test("reads the eight fixtures", () => {
+    expect(fixtures).toHaveLength(8);
+  });
+
+  test.each(fixtures)("%s trains on as many days as its profile asked for", (name, text) => {
+    const asked = Number(/-(\d)d[-.]/.exec(name)[1]);
+    const { days } = parsePlanSections(text);
+
+    expect(days).toHaveLength(7);
+    expect(days.filter((day) => !isRestDay(day.lines))).toHaveLength(asked);
+  });
+
+  test("is a day with no lines", () => {
+    expect(isRestDay([])).toBe(true);
+  });
+
+  // The ways the eight real answers write a rest day.
+  test.each([
+    ["Rest or 20-minute light walk."],
+    ["Rest / Active Recovery", "(Light walking or gentle stretching permitted)"],
+    ["Rest Day - Active recovery (light stretching or 20-minute walk recommended)."],
+    ["Rest and Recovery"],
+    ["Full Rest."],
+    ["Active Recovery: 15-20 minutes of full-body mobility or yoga-style stretching."],
+    ["Warmup: None.", "Main lifts: Full Rest.", "Accessories: Optional 20-minute walk outdoors."],
+    ["Warmup: 5 min light walk.", "Main lifts: Active Recovery Day."],
+    ["Warmup: None.", "Main lifts:", "- Full Rest Day.", "Accessories:", "- Foam rolling"],
+    ["Warmup: 5 mins foam rolling.", "Main lifts:", "- Active Recovery: 20 mins Lap Swimming"],
+    ["Warmup: 5 mins - Dynamic stretching.", "Main lifts:", "- Optional: Light outdoor activity"]
+  ])("is a day opening its main block with rest: %s", (...lines) => {
+    expect(isRestDay(lines)).toBe(true);
+  });
+
+  // Training days mention rest too, between sets and inside prescriptions.
+  test.each([
+    [
+      "Warmup:",
+      "- Cat-Cow: 2 sets x 10 reps",
+      "- Rest: 30 seconds",
+      "Main lifts:",
+      "- Band Rows: 3 x 12"
+    ],
+    ["Main lifts:", "- Back Squats: 3 x 5 (Rest: 3 mins)"],
+    ["Warmup: 5 minutes of dynamic movement.", "Main lifts:", "- Bodyweight Squats: 3 x 12"],
+    ["Bench press 4x6", "Rest 90s between sets"],
+    ["Warmup:", "- Treadmill Walk: 5 minutes"]
+  ])("is false for a training day whose lines mention rest: %s", (...lines) => {
+    expect(isRestDay(lines)).toBe(false);
+  });
+
+  test("is false when the Main lifts heading is the day's last line", () => {
+    expect(isRestDay(["Warmup: 5 mins", "Main lifts:"])).toBe(false);
   });
 });
 

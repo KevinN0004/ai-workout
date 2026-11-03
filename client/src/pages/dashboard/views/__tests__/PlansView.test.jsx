@@ -482,4 +482,38 @@ describe("logging a plan day", () => {
 
     expect(within(card("Mon")).queryByText("Logged")).toBeNull();
   });
+
+  // A rest day is not a planned session, so nothing is logged against it.
+  describe("a rest day", () => {
+    test("is labelled on its card", () => {
+      renderWithPlan();
+
+      expect(within(card("Tue")).getByText("Rest day")).toBeInTheDocument();
+      expect(within(card("Mon")).queryByText("Rest day")).toBeNull();
+    });
+
+    test("offers no log", () => {
+      renderWithPlan();
+      openDay("Tue");
+
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Log this workout" })).toBeNull();
+    });
+
+    test("is not marked by a session linked to it before rest days were told apart", () => {
+      renderWithPlan({ workoutSessions: [{ id: "w1", planId: "plan-1", planDayIndex: 1 }] });
+
+      expect(within(card("Tue")).queryByText("Logged")).toBeNull();
+    });
+  });
+
+  test("labels no rest day for a weekday the plan has no lines for", () => {
+    renderView({
+      weekDays: [...WEEK, { key: "Wednesday", label: "Wed" }],
+      latestPlanByWeekday: { Monday: mondayDay.lines },
+      dashboard: { plans: [savedPlan()], goals: {}, savedExercises: [], workoutSessions: [] }
+    });
+
+    expect(within(card("Wed")).queryByText("Rest day")).toBeNull();
+  });
 });

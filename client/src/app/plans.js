@@ -1,8 +1,8 @@
 /**
  * Reads a generated plan, whose prompt asks for weekday headings and a closing
- * "Coach Notes:" section: from its saved structure, or from its text by the
- * server's rules (planPayloadService). Used by App and the dashboard for the
- * plan views, and for the workout form's link to a plan day.
+ * "Coach Notes:" section, from its saved structure or its text by the server's
+ * rules (planPayloadService), and tells its rest days apart. Used by App and the
+ * dashboard for the plan views, the meal plan and the link to a plan day.
  */
 // @ts-check
 
@@ -173,6 +173,29 @@ export const savedPlanDays = (plan) => (isPlanPayload(plan?.payload) ? plan.payl
  */
 export const readPlan = ({ payload, text }) =>
   isPlanPayload(payload) ? { days: payload.days, notes: payload.notes } : parsePlanSections(text);
+
+// A day's opening main entry: what follows its "Main lifts:" heading, on the
+// heading's line or the line below it, or its first line when it has none.
+const MAIN_LIFTS_HEADING = /^main\s+lifts?\s*:?\s*/i;
+const OPENS_WITH_REST = /^(?:-\s*)?(?:full\s+)?(?:rest|active\s+recovery|optional)\b/i;
+
+/**
+ * Whether a day's lines make it a rest day: it has none, or its opening main
+ * entry starts with "Rest", "Full Rest", "Active Recovery" or "Optional". Real
+ * plans give rest days lines, and training days mention rest between sets, so
+ * neither having lines nor naming rest decides it. Takes a day's lines, so it
+ * reads a saved day and planByWeekday's merged lines alike.
+ * @param {string[]} lines
+ */
+export const isRestDay = (lines) => {
+  if (!lines.length) return true;
+  const heading = lines.findIndex((line) => MAIN_LIFTS_HEADING.test(line));
+  const opening =
+    heading < 0
+      ? lines[0]
+      : lines[heading].replace(MAIN_LIFTS_HEADING, "") || lines[heading + 1] || "";
+  return OPENS_WITH_REST.test(opening);
+};
 
 /**
  * A plan's days as a map from weekday name to their lines, in order, so a
