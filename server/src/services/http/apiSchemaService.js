@@ -130,7 +130,11 @@ export const workoutSessionBodySchema = z
     reps: optionalNullableNumberField(1, 120),
     intensityRpe: optionalNullableNumberField(1, 10),
     rpe: optionalNullableNumberField(1, 10),
-    notes: optionalStringField(500)
+    notes: optionalStringField(500),
+    // The plan day the workout was logged against: the plan's id as the client
+    // knows it, and the day's index in the plan's saved structure.
+    planId: optionalStringField(64),
+    planDayIndex: optionalNullableNumberField(0, 31)
   })
   .passthrough();
 

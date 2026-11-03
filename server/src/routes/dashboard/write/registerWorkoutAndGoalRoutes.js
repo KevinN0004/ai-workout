@@ -43,7 +43,16 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
           return res.status(400).json({ error: "Date and duration are required." });
         }
 
-        await saveWorkoutSession({ userId: req.user.id, session });
+        // The repository keeps a plan-day link only when the plan is the user's
+        // and has that day. A dropped link still saves the workout, which the
+        // undo window has already shown as logged, and is logged here.
+        const saved = await saveWorkoutSession({ userId: req.user.id, session });
+        if (session.planId && !saved?.planId) {
+          req.log?.warn(
+            { event: "workout_plan_link_dropped", planDayIndex: session.planDayIndex },
+            "A workout's plan-day link did not match a day of the user's plans."
+          );
+        }
 
         // Re-read rather than answer from req.user, which was loaded before this
         // write: dashboard.workouts in the response has to include the session.
@@ -54,7 +63,7 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         const response = await buildDashboardResponse(updated);
         return res.json({
           ...response,
-          workoutSession: session
+          workoutSession: saved || session
         });
       } catch (err) {
         return sendErrorResponse(req, res, err, 500);

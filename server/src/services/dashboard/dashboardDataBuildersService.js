@@ -191,20 +191,26 @@ export const buildDashboard = (input = {}) => {
  * The workout session the workout route saves, built from a validated body.
  * Each field is cleaned or range-checked, `rpe` is accepted for
  * `intensityRpe`, an id is minted when the body has none, and `createdAt` is
- * now.
+ * now. `planId` and `planDayIndex` name the plan day it was logged against, or
+ * are null; the index is a whole number, and 0, the first day, is kept.
  */
-export const buildWorkoutSessionEntry = (input = {}) => ({
-  id: cleanText(input.id, 64) || crypto.randomUUID(),
-  date: cleanText(input.date, 20),
-  focus: cleanText(input.focus, 80) || "General",
-  duration: toNullableNumber(input.duration, 5, 360),
-  exercises: toCleanArray(input.exercises, 18, 140),
-  sets: toNullableNumber(input.sets, 1, 80),
-  reps: toNullableNumber(input.reps, 1, 120),
-  intensityRpe: toNullableNumber(input.intensityRpe ?? input.rpe, 1, 10),
-  notes: cleanText(input.notes, 500),
-  createdAt: new Date().toISOString()
-});
+export const buildWorkoutSessionEntry = (input = {}) => {
+  const planDayIndex = toNullableNumber(input.planDayIndex, 0, 31);
+  return {
+    id: cleanText(input.id, 64) || crypto.randomUUID(),
+    date: cleanText(input.date, 20),
+    focus: cleanText(input.focus, 80) || "General",
+    duration: toNullableNumber(input.duration, 5, 360),
+    exercises: toCleanArray(input.exercises, 18, 140),
+    sets: toNullableNumber(input.sets, 1, 80),
+    reps: toNullableNumber(input.reps, 1, 120),
+    intensityRpe: toNullableNumber(input.intensityRpe ?? input.rpe, 1, 10),
+    notes: cleanText(input.notes, 500),
+    planId: cleanText(input.planId, 64) || null,
+    planDayIndex: Number.isInteger(planDayIndex) ? planDayIndex : null,
+    createdAt: new Date().toISOString()
+  };
+};
 
 /**
  * The meal the meal-log route saves, built from a validated body. An unknown

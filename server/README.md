@@ -48,13 +48,13 @@ these; nothing else touches `prisma.*` directly.
 | ---------------------------------- | ------------------------------------------------------------ |
 | `userReadRepository.js`            | Loads a user with all dashboard collections                  |
 | `userRepository.js`                | Profile, goals, password hash, calorie entries               |
-| `workoutSessionRepository.js`      | Workout session writes                                       |
+| `workoutSessionRepository.js`      | Workout session writes, and links to a plan day              |
 | `mealLogRepository.js`             | Meal log writes, day calorie totals, derived calorie entries |
 | `progressMetricRepository.js`      | Progress metric writes                                       |
 | `savedExerciseRepository.js`       | Saved exercise add/remove, with dedup                        |
 | `generatedPlanRepository.js`       | Generated plan inserts                                       |
 | `dashboardCollectionRepository.js` | Paginated reads for all three collections                    |
-| `userLookup.js`                    | UUID-or-legacy user id resolution — load-bearing             |
+| `userLookup.js`                    | UUID-or-legacy id resolution, for users — load-bearing       |
 | `rowValues.js`                     | Shared date, Decimal and JSON conversions                    |
 
 Two conventions worth knowing before adding a write:
