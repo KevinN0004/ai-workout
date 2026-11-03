@@ -41,13 +41,17 @@ model WorkoutSession {
   reps            Int?
   intensityRpe    Decimal?  @map("intensity_rpe") @db.Decimal(4, 1)
   notes           String    @default("")
+  generatedPlanId String?   @map("generated_plan_id") @db.Uuid
+  planDayIndex    Int?      @map("plan_day_index") @db.SmallInt
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          AppUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generatedPlan GeneratedPlan? @relation(fields: [generatedPlanId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)], map: "workout_sessions_user_created_idx")
   @@index([userId, workoutDate(sort: Desc)], map: "workout_sessions_user_date_idx")
+  @@index([generatedPlanId, planDayIndex], map: "workout_sessions_plan_day_idx")
   @@map("workout_sessions")
 }
 
@@ -126,7 +130,8 @@ model GeneratedPlan {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            AppUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutSessions WorkoutSession[]
 
   @@index([userId, createdAt(sort: Desc)], map: "generated_plans_user_created_idx")
   @@map("generated_plans")
