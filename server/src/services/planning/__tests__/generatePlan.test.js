@@ -422,6 +422,8 @@ describe("step 6: the prescription", () => {
   const main = (overrides) =>
     dayLines(generatePlan(input(overrides)).text, overrides.weekday ?? "Monday");
   const lineAfter = (lines, heading) => lines[lines.indexOf(heading) + 1];
+  // The dose a line prescribes: everything after its exercise name.
+  const doseOf = (line) => line.slice(line.indexOf(": ") + 2);
 
   test.each([
     [{}, "3 x 8-10 (Rest 90s, stop 2 reps short of failure)"],
@@ -455,9 +457,7 @@ describe("step 6: the prescription", () => {
       "3 x 8-10 (Rest 90s, stop 3 reps short of failure)"
     ]
   ])("%j writes the first main lift as %s", (overrides, prescription) => {
-    expect(lineAfter(main(overrides), "Main lifts:")).toMatch(
-      new RegExp(`: ${prescription.replace(/[()]/g, "\\$&")}$`)
-    );
+    expect(doseOf(lineAfter(main(overrides), "Main lifts:"))).toBe(prescription);
   });
 
   test.each([
@@ -470,9 +470,7 @@ describe("step 6: the prescription", () => {
     ],
     [{ goal: "Cardio" }, "2 x 10-12 (Rest 60s, stop 2 reps short of failure)"]
   ])("%j writes the first accessory as %s", (overrides, prescription) => {
-    expect(lineAfter(main(overrides), "Accessories:")).toMatch(
-      new RegExp(`: ${prescription.replace(/[()]/g, "\\$&")}$`)
-    );
+    expect(doseOf(lineAfter(main(overrides), "Accessories:"))).toBe(prescription);
   });
 
   test("a regressed main lift takes the accessory prescription, with its cue", () => {
