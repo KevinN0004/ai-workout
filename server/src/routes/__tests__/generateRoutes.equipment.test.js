@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
-import { buildGenerationEquipmentContext, registerGenerateRoutes } from "../generateRoutes.js";
+import { registerGenerateRoutes } from "../generateRoutes.js";
 import { buildPlanPayload } from "../../services/dashboard/planPayloadService.js";
 import { generatePlanBodySchema, validateBody } from "../../services/http/apiSchemaService.js";
 import {
@@ -12,10 +12,9 @@ import {
 } from "../../services/dashboard/dashboardDataBuildersService.js";
 import { __testables as indexTestables } from "../../index.js";
 
-// The plan generator. Two things live here: the equipment context that
-// decides what the model is told the user can train with, and the route that
-// defaults the rest of the form, holds the call to its guardrails, and
-// persists the result.
+// The plan generator's route: it defaults the form, sends the prompt, holds the
+// call to its guardrails, and persists the result. The prompt's own text,
+// equipment lines included, is pinned in planPromptService.test.js.
 //
 // Only the Gemini client is stubbed. Everything else is the real injected
 // function, so the prompt under test is the one that would be sent.
@@ -76,142 +75,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
-});
-
-describe("buildGenerationEquipmentContext", () => {
-  describe("a home setup", () => {
-    test("turns the selected kit into capabilities the model can use", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Home",
-        equipment: ["Dumbbells", "Pull-up bar"]
-      });
-
-      expect(context.capabilityLine).toContain("dumbbells");
-      expect(context.capabilityLine).toContain("pull-up bar");
-      expect(context.profileLine).toBe("Dumbbells, Pull-up bar");
-    });
-
-    // The labels come back as the user wrote them; only the lookup is
-    // lowercased.
-    test("matches the kit regardless of case", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "home",
-        equipment: ["  DUMBBELLS  "]
-      });
-
-      expect(context.capabilityLine).toContain("dumbbells");
-    });
-
-    test("assumes bodyweight when nothing was selected", () => {
-      const context = buildGenerationEquipmentContext({ environment: "Home", equipment: [] });
-
-      expect(context.profileLine).toBe("Bodyweight only");
-      expect(context.capabilityLine).toContain("bodyweight training");
-    });
-
-    test("ignores kit it does not recognise", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Home",
-        equipment: ["Moon boots"]
-      });
-
-      // Still named in the profile, but contributes no capabilities.
-      expect(context.profileLine).toBe("Moon boots");
-      expect(context.capabilityLine).toContain("bodyweight training");
-    });
-
-    test("does not repeat a capability two items share", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Home",
-        equipment: ["Dumbbells", "Dumbbells"]
-      });
-
-      const hints = context.capabilityLine.split(", ");
-      expect(new Set(hints).size).toBe(hints.length);
-    });
-
-    test.each([
-      ["equipment is missing", { environment: "Home" }],
-      ["equipment is not a list", { environment: "Home", equipment: "Dumbbells" }],
-      ["nothing is given", {}]
-    ])("still produces a usable context when %s", (_label, input) => {
-      const context = buildGenerationEquipmentContext(input);
-
-      expect(context.profileLine).toBeTruthy();
-      expect(context.capabilityLine).toBeTruthy();
-      expect(context.planningGuidance).toBeTruthy();
-    });
-  });
-
-  describe("a commercial gym", () => {
-    test("programs only the rooms that were listed", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commercial",
-        equipment: ["Cardio deck"]
-      });
-
-      expect(context.capabilityLine).toContain("treadmills");
-      expect(context.capabilityLine).not.toContain("barbells and racks");
-      expect(context.planningGuidance).toMatch(/only with the listed/i);
-    });
-
-    // "Full gym access" is a shorthand for every room, so the model is told
-    // about all of them rather than the single label.
-    test("expands full gym access to every room", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commercial",
-        equipment: ["Full gym access"]
-      });
-
-      expect(context.capabilityLine).toContain("barbells and racks");
-      expect(context.capabilityLine).toContain("treadmills");
-      expect(context.capabilityLine).toContain("lap swimming");
-      expect(context.planningGuidance).toMatch(/full gym access/i);
-    });
-
-    test("keeps the other rooms when full access is listed alongside them", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commercial",
-        equipment: ["Full gym access", "Strength floor"]
-      });
-
-      expect(context.capabilityLine).toContain("barbells and racks");
-      const hints = context.capabilityLine.split(", ");
-      expect(new Set(hints).size).toBe(hints.length);
-    });
-
-    test("still recognises the older room labels", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commercial",
-        equipment: ["Barbell + plates", "Smith machine"]
-      });
-
-      expect(context.capabilityLine).toContain("barbells and racks");
-      expect(context.capabilityLine).toContain("smith machine variations");
-    });
-
-    test("falls back to standard gym capabilities when nothing was listed", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commercial",
-        equipment: []
-      });
-
-      expect(context.profileLine).toMatch(/unspecified/i);
-      expect(context.capabilityLine).toMatch(/standard strength and cardio/i);
-    });
-
-    // Anything that is not "commercial" is treated as a home setup, so a typo
-    // in the environment quietly changes which map is used.
-    test("treats an unrecognised environment as a home setup", () => {
-      const context = buildGenerationEquipmentContext({
-        environment: "Commerical",
-        equipment: ["Cardio deck"]
-      });
-
-      expect(context.capabilityLine).not.toContain("treadmills");
-      expect(context.planningGuidance).toMatch(/home setup/i);
-    });
-  });
 });
 
 describe("POST /api/generate", () => {
