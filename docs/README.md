@@ -54,3 +54,4 @@
 - [2026-11-02 — Planned versus done](specs/2026-11-02-planned-versus-done-design.md)
 - [2026-11-03 — Plan-quality evals](specs/2026-11-03-plan-quality-evals-design.md)
 - [2026-11-03 — Rule-based plans](specs/2026-11-03-rule-based-plans-design.md)
+- [2026-11-03 — Rule-based plans, evidence review](specs/2026-11-03-rule-based-plans-evidence.md)
