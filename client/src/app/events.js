@@ -11,6 +11,7 @@ import {
   defaultAuthForm,
   defaultSignupProfileForm
 } from "./constants";
+import { NO_PLAN_LINK } from "./plans";
 import { personalToProfile } from "./profileMapping";
 import { getLocalDateKey, splitFullName } from "./units";
 
@@ -377,10 +378,12 @@ export const createAppEventHandlers = ({
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-    const payload = {
-      ...workoutForm,
-      exercises: normalizedExercises
-    };
+    // A workout logged from a plan day carries its link. An ordinary one leaves
+    // the link out: the server takes an absent planId, never a null one. The
+    // label only names the day in the modal and is never sent.
+    const { planId, planDayIndex, planDayLabel: _label, ...formFields } = workoutForm;
+    const link = planId ? { planId, planDayIndex } : null;
+    const payload = { ...formFields, exercises: normalizedExercises, ...link };
 
     // The entry shows at once and is sent only when the undo window closes,
     // unless it is undone first (useOptimisticLogs).
@@ -395,6 +398,8 @@ export const createAppEventHandlers = ({
       reps: workoutForm.reps ? Number(workoutForm.reps) : null,
       intensityRpe: workoutForm.intensityRpe ? Number(workoutForm.intensityRpe) : null,
       notes: workoutForm.notes || "",
+      planId: link?.planId ?? null,
+      planDayIndex: link?.planDayIndex ?? null,
       createdAt: new Date().toISOString()
     };
 
@@ -427,7 +432,8 @@ export const createAppEventHandlers = ({
       sets: "",
       reps: "",
       intensityRpe: "",
-      notes: ""
+      notes: "",
+      ...NO_PLAN_LINK
     });
     setWorkoutModalOpen(false);
   };

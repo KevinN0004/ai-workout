@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import WorkoutsView from "../WorkoutsView";
+import { NO_PLAN_LINK } from "../../../../app/plans";
 
 // Four log lists over one shared paging state. Prop-driven, but not markup:
 // it sorts every list by date with its own guard against unparseable ones,
@@ -184,7 +185,8 @@ describe("WorkoutsView", () => {
 
       expect(setWorkoutForm.mock.calls.at(-1)[0]({ focus: "Legs" })).toEqual({
         focus: "Legs",
-        date: "2026-09-11"
+        date: "2026-09-11",
+        ...NO_PLAN_LINK
       });
       expect(setWorkoutModalOpen).toHaveBeenCalledWith(true);
     });
@@ -196,7 +198,25 @@ describe("WorkoutsView", () => {
       const { setWorkoutForm } = renderView();
       fireEvent.click(screen.getByText("Add workout now"));
 
-      expect(setWorkoutForm.mock.calls.at(-1)[0]({})).toEqual({ date: "2026-09-11" });
+      expect(setWorkoutForm.mock.calls.at(-1)[0]({})).toEqual({
+        date: "2026-09-11",
+        ...NO_PLAN_LINK
+      });
+    });
+
+    // A plan-day log closed without saving leaves its link in the form. An
+    // ordinary workout must not inherit it.
+    test.each(["Add workout", "Add workout now"])("%s clears a leftover plan-day link", (label) => {
+      const { setWorkoutForm } = renderView();
+      fireEvent.click(screen.getByText(label));
+
+      const next = setWorkoutForm.mock.calls.at(-1)[0]({
+        focus: "Monday",
+        planId: "plan-1",
+        planDayIndex: 0,
+        planDayLabel: "Monday"
+      });
+      expect(next).toMatchObject({ focus: "Monday", ...NO_PLAN_LINK });
     });
 
     test("the date is local, not UTC", () => {

@@ -215,6 +215,14 @@ captured answers. Three things to know:
 - **Every day the plan lists has lines, rest days included,** so the weekday map counts a
   rest day as a training day (`planUtils.js`). Detecting rest days is roadmap Phase 6's.
 
+**Logging a workout against a plan day** works only for the newest plan, and only when it
+was saved with its structure (`savedPlanDays`): a session's `planDayIndex` points into
+those days, never into a text parse. The Plans view's day details fill the Log workout
+form with `buildPlanDayPrefill` (`planUtils.js`) and the link (`planId`, `planDayIndex`).
+Every other way of opening that form spreads `NO_PLAN_LINK` into it, so a link left by an
+unsent plan-day log never reaches an ordinary workout. An ordinary workout leaves the link
+out of its body altogether: the server accepts an absent `planId` and refuses a null one.
+
 ## Exercise Recommendations
 
 `pages/dashboard/tips/recommendationUtils.js` ranks exercises for the Tips view by

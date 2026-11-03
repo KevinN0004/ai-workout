@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
+import { NO_PLAN_LINK } from "../plans";
 import { defaultAuthForm, defaultSignupProfileForm } from "../constants";
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg } from "../units";
 
@@ -618,6 +619,51 @@ describe("optimistic submissions", () => {
       expect(deps.setWorkoutForm).toHaveBeenCalledWith(
         expect.objectContaining({ focus: "", exercises: "", duration: "" })
       );
+    });
+
+    // A workout logged from a plan day carries the link, so the plan hub can
+    // mark the day logged while the entry is still inside its undo window.
+    describe("against a plan day", () => {
+      const linked = () =>
+        workoutForm({ planId: "plan-1", planDayIndex: 0, planDayLabel: "Monday" });
+
+      test("puts the link on the entry shown at once", async () => {
+        await build({ workoutForm: linked() }).submitWorkout(submitEvent());
+
+        expect(queued().item).toMatchObject({ planId: "plan-1", planDayIndex: 0 });
+      });
+
+      test("sends the link, and not the label, which is only for display", async () => {
+        await build({ workoutForm: linked() }).submitWorkout(submitEvent());
+        deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard: {} }));
+
+        await queued().request();
+
+        const sent = JSON.parse(deps.apiFetch.mock.calls[0][1].body);
+        expect(sent).toMatchObject({ planId: "plan-1", planDayIndex: 0 });
+        expect("planDayLabel" in sent).toBe(false);
+      });
+
+      test("clears the link with the rest of the form", async () => {
+        await build({ workoutForm: linked() }).submitWorkout(submitEvent());
+
+        expect(deps.setWorkoutForm).toHaveBeenCalledWith(
+          expect.objectContaining({ planId: null, planDayIndex: null, planDayLabel: "" })
+        );
+      });
+
+      // The server accepts an absent planId but refuses a null one, so an
+      // ordinary workout leaves the link out of the body altogether.
+      test("leaves the link out of an ordinary workout", async () => {
+        await build({ workoutForm: workoutForm({ ...NO_PLAN_LINK }) }).submitWorkout(submitEvent());
+        deps.apiFetch.mockResolvedValue(jsonResponse({ dashboard: {} }));
+
+        await queued().request();
+
+        const sent = JSON.parse(deps.apiFetch.mock.calls[0][1].body);
+        expect("planId" in sent || "planDayIndex" in sent || "planDayLabel" in sent).toBe(false);
+        expect(queued().item).toMatchObject({ planId: null, planDayIndex: null });
+      });
     });
 
     describe("the queued request", () => {

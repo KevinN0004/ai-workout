@@ -83,6 +83,7 @@ vi.mock("../views/DashboardHomeView", () => ({
 }));
 
 import DashboardPage from "../DashboardPage";
+import { NO_PLAN_LINK } from "../../../app/plans";
 
 // The zone the run started in, restored after each test that pins its own.
 const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -455,9 +456,25 @@ describe("DashboardPage", () => {
 
       expect(setWorkoutForm.mock.calls.at(-1)[0]({ focus: "Legs" })).toEqual({
         focus: "Legs",
-        date: "2026-09-11"
+        date: "2026-09-11",
+        ...NO_PLAN_LINK
       });
       expect(setWorkoutModalOpen).toHaveBeenCalledWith(true);
+    });
+
+    // A plan-day log closed without saving leaves its link in the form.
+    test("clears a leftover plan-day link", () => {
+      const { setWorkoutForm } = renderPage();
+
+      act(() => glance.props.onAddWorkout());
+
+      expect(
+        setWorkoutForm.mock.calls.at(-1)[0]({
+          planId: "plan-1",
+          planDayIndex: 0,
+          planDayLabel: "Monday"
+        })
+      ).toMatchObject(NO_PLAN_LINK);
     });
   });
 
@@ -872,6 +889,15 @@ describe("DashboardPage", () => {
       act(() => plansView.props.onOpenGuides());
 
       expect(go).toHaveBeenCalledWith("/dashboard/tips");
+    });
+
+    // The plans view logs a plan day through the same form and modal.
+    test("the plans view is handed the workout form and modal", async () => {
+      const { setWorkoutForm, setWorkoutModalOpen } = renderPage({ dashView: "plans" });
+      await screen.findByTestId("plans-view");
+
+      expect(plansView.props.setWorkoutForm).toBe(setWorkoutForm);
+      expect(plansView.props.setWorkoutModalOpen).toBe(setWorkoutModalOpen);
     });
 
     test("the drawer can close itself without navigating", () => {

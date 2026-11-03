@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlansView from "../PlansView";
+import { buildPlanDayPrefill } from "../../planUtils";
 
 // Prop-driven throughout -- no fetching -- so this drives the parts a visitor
 // actually operates: the two empty states, the three callbacks the dashboard
@@ -379,5 +380,106 @@ describe("PlansView", () => {
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
+  });
+});
+
+// A day of the newest plan, saved with its structure, can be logged against:
+// the day details pre-fill the Log workout form and link it to that day, and
+// the week marks a day once a session links to it.
+describe("logging a plan day", () => {
+  const WEEK = [
+    { key: "Monday", label: "Mon" },
+    { key: "Tuesday", label: "Tue" }
+  ];
+  const mondayDay = {
+    index: 0,
+    weekday: "Monday",
+    title: "Monday",
+    lines: ["Main lifts:", "- Back Squats: 3 x 5 (Rest: 3 mins)", "- Plank: 3 x 30s"]
+  };
+  const tuesdayDay = { index: 1, weekday: "Tuesday", title: "Tuesday", lines: ["Rest Day"] };
+  const savedPlan = (overrides = {}) => ({
+    id: "plan-1",
+    goal: "Build lean strength and energy",
+    plan: "Monday\nMain lifts:",
+    payload: { version: 1, days: [mondayDay, tuesdayDay], notes: [] },
+    ...overrides
+  });
+
+  const renderWithPlan = ({ plan = savedPlan(), workoutSessions = [] } = {}) => {
+    const setWorkoutForm = vi.fn();
+    const setWorkoutModalOpen = vi.fn();
+    const utils = renderView({
+      weekDays: WEEK,
+      latestPlanByWeekday: { Monday: mondayDay.lines, Tuesday: tuesdayDay.lines },
+      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions },
+      setWorkoutForm,
+      setWorkoutModalOpen
+    });
+    return { ...utils, setWorkoutForm, setWorkoutModalOpen };
+  };
+  // The workout week's cards: the meals week has a card per day as well.
+  const workoutWeek = () =>
+    within(screen.getByRole("heading", { name: "Workout week" }).closest("section"));
+  const card = (label) => workoutWeek().getByRole("button", { name: new RegExp(`^${label}`) });
+  const openDay = (label) => fireEvent.click(card(label));
+
+  test("fills the Log workout form from the day, links it, and opens it", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 11, 9, 0, 0));
+    const { setWorkoutForm, setWorkoutModalOpen } = renderWithPlan();
+    openDay("Mon");
+
+    fireEvent.click(screen.getByRole("button", { name: "Log this workout" }));
+
+    expect(setWorkoutForm).toHaveBeenCalledWith({
+      date: "2026-09-11",
+      duration: "",
+      sets: "",
+      reps: "",
+      intensityRpe: "",
+      ...buildPlanDayPrefill(mondayDay),
+      planId: "plan-1",
+      planDayIndex: 0,
+      planDayLabel: "Monday"
+    });
+    expect(setWorkoutModalOpen).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  test.each([
+    ["the plan was saved without a structure", savedPlan({ payload: null })],
+    ["the plan's structure is not one this version reads", savedPlan({ payload: {} })]
+  ])("offers no log when %s", (_label, plan) => {
+    renderWithPlan({ plan });
+    openDay("Mon");
+
+    expect(screen.queryByRole("button", { name: "Log this workout" })).toBeNull();
+  });
+
+  test("offers no log for a weekday the saved plan does not have", () => {
+    renderWithPlan({
+      plan: savedPlan({ payload: { version: 1, days: [mondayDay], notes: [] } })
+    });
+    openDay("Tue");
+
+    expect(screen.queryByRole("button", { name: "Log this workout" })).toBeNull();
+  });
+
+  test("marks a day once a session links to it", () => {
+    renderWithPlan({ workoutSessions: [{ id: "w1", planId: "plan-1", planDayIndex: 0 }] });
+
+    expect(within(card("Mon")).getByText("Logged")).toBeInTheDocument();
+    expect(within(card("Tue")).queryByText("Logged")).toBeNull();
+  });
+
+  test.each([
+    ["another plan's day", { id: "w1", planId: "plan-0", planDayIndex: 0 }],
+    ["an off-plan session", { id: "w1", planId: null, planDayIndex: null }]
+  ])("does not mark a day for %s", (_label, session) => {
+    renderWithPlan({ workoutSessions: [session] });
+
+    expect(within(card("Mon")).queryByText("Logged")).toBeNull();
   });
 });
