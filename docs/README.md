@@ -36,6 +36,7 @@
 - [2026-11-02 — Logging a workout against a plan day](plans/2026-11-02-plan-day-logging.md)
 - [2026-11-02 — Planned versus done](plans/2026-11-02-planned-versus-done.md)
 - [2026-11-03 — Plan-quality evals](plans/2026-11-03-plan-quality-evals.md)
+- [2026-11-03 — Rule-based plans](plans/2026-11-03-rule-based-plans.md)
 
 ## Specs
 
@@ -52,3 +53,5 @@
 - [2026-11-02 — Logging a workout against a plan day](specs/2026-11-02-plan-day-logging-design.md)
 - [2026-11-02 — Planned versus done](specs/2026-11-02-planned-versus-done-design.md)
 - [2026-11-03 — Plan-quality evals](specs/2026-11-03-plan-quality-evals-design.md)
+- [2026-11-03 — Rule-based plans](specs/2026-11-03-rule-based-plans-design.md)
+- [2026-11-03 — Rule-based plans, evidence review](specs/2026-11-03-rule-based-plans-evidence.md)
