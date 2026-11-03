@@ -80,8 +80,8 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 - `server/src` — Express 5 API, services, routes. Only the app bootstrap
   (`index.js`, `corsPolicy.js`, `shutdown.js`, `staticClient.js`) stays at this level
 - `server/src/services/<domain>` — `auth/`, `dashboard/`, `external/`, `http/`
-  (request validation, API schemas, error responses) and `platform/` (metrics, error
-  tracking, health, env validation)
+  (request validation, API schemas, error responses), `planning/` (the rule-based plan
+  generator) and `platform/` (metrics, error tracking, health, env validation)
 - `server/src/db` — the Postgres pool, the Prisma client and the migration runner
 - `server/src/repositories` — **all Prisma data access lives here.** Routes and services
   call these; nothing else should touch `prisma.*` directly
