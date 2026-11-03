@@ -12,12 +12,13 @@ npm run prisma:generate -w server
 
 ## The migrations
 
-| File                          | What it does                                                                                                                                                                                               |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `001_foundation.sql`          | The seven tables, their indexes and `updated_at` triggers                                                                                                                                                  |
-| `002_password_changed_at.sql` | Adds `app_users.password_changed_at`, set only when a user deliberately changes their password, so sessions issued before it can be rejected. The silent pbkdf2 → argon2id rehash on login does not set it |
-| `003_utc_timezone.sql`        | Makes UTC the database's timezone. It used to be set per connection with `options=-c timezone=UTC`, which the pooled (PgBouncer) endpoint refuses                                                          |
-| `004_workout_plan_day.sql`    | Links a workout session to a day of a generated plan (`generated_plan_id`, `plan_day_index`). Deleting a plan clears only the reference, so a session survives the prune with its index left behind        |
+| File                                  | What it does                                                                                                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_foundation.sql`                  | The seven tables, their indexes and `updated_at` triggers                                                                                                                                                  |
+| `002_password_changed_at.sql`         | Adds `app_users.password_changed_at`, set only when a user deliberately changes their password, so sessions issued before it can be rejected. The silent pbkdf2 → argon2id rehash on login does not set it |
+| `003_utc_timezone.sql`                | Makes UTC the database's timezone. It used to be set per connection with `options=-c timezone=UTC`, which the pooled (PgBouncer) endpoint refuses                                                          |
+| `004_workout_plan_day.sql`            | Links a workout session to a day of a generated plan (`generated_plan_id`, `plan_day_index`). Deleting a plan clears only the reference, so a session survives the prune with its index left behind        |
+| `005_clear_default_target_weight.sql` | Removes the 160 lb target weight sign-up stored, from accounts whose goals are still exactly the sign-up defaults. A target is absent until the user saves one                                             |
 
 **The server reads `password_changed_at` on every user read**, so migrations must run
 before new code starts; a server started against an unmigrated database fails every

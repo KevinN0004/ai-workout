@@ -6,9 +6,52 @@ import {
   allowedNutritionValues,
   allowedSleepValues,
   allowedTrainingDayValues,
+  buildDashboard,
   buildProfile,
+  defaultDashboard,
+  defaultGoals,
   defaultProfile
 } from "../dashboardDataBuildersService";
+
+// A target weight is the user's own choice, so it is absent until they save
+// one: a default would be progress measured toward a number nobody picked.
+describe("the target weight", () => {
+  test("is not among the goals a new dashboard starts with", () => {
+    expect(defaultGoals()).toEqual({ targetCalories: 2200, weeklyWorkouts: 3 });
+    expect(defaultDashboard().goals).toEqual({ targetCalories: 2200, weeklyWorkouts: 3 });
+  });
+
+  test.each([
+    ["absent", {}],
+    ["null", { targetWeight: null }],
+    ["an empty string", { targetWeight: "" }],
+    ["not a number", { targetWeight: "heavy" }],
+    ["below the range", { targetWeight: 79 }],
+    ["above the range", { targetWeight: 401 }]
+  ])("is null when the stored one is %s", (_label, goals) => {
+    expect(buildDashboard({ goals }).goals).toEqual({
+      targetWeight: null,
+      targetCalories: 2200,
+      weeklyWorkouts: 3
+    });
+  });
+
+  test.each([
+    [80, 80],
+    ["172.5", 172.5],
+    [400, 400]
+  ])("is the stored one when it is in range (%s)", (stored, expected) => {
+    expect(buildDashboard({ goals: { targetWeight: stored } }).goals.targetWeight).toBe(expected);
+  });
+
+  test("leaves the other goals' defaults in place", () => {
+    expect(buildDashboard({ goals: { targetCalories: 50, weeklyWorkouts: 9 } }).goals).toEqual({
+      targetWeight: null,
+      targetCalories: 2200,
+      weeklyWorkouts: 3
+    });
+  });
+});
 
 // buildProfile is a whitelist, not a merge: a field missing from its returned
 // object literal is dropped however permissive the Zod schema is. These seven
