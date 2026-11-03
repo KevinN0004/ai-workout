@@ -195,6 +195,16 @@ describe("CaloriesView", () => {
       expect(screen.getByText("Target weight: 165 lb")).toBeInTheDocument();
     });
 
+    // A target is absent until the user saves one. 160 is only a suggestion.
+    test("says the target is not set, and suggests one, when it is blank", () => {
+      renderView({ goalForm: { targetWeight: "", targetCalories: "2000", weeklyWorkouts: "3" } });
+
+      expect(screen.getByText("Target weight: not set")).toBeInTheDocument();
+      const input = screen.getByLabelText("Target weight (lb)");
+      expect(input).toHaveValue(null);
+      expect(input).toHaveAttribute("placeholder", "160");
+    });
+
     test("shows the pace line it was given", () => {
       renderView({ goalPaceText: "Log a workout to start your pace estimate." });
 

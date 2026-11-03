@@ -126,7 +126,6 @@ export default function DashboardPage({
     calories,
     mealLogs,
     progressMetrics,
-    goals,
     buildLinePath,
     last7Workouts,
     avgCalories,
@@ -142,7 +141,9 @@ export default function DashboardPage({
     goalPaceText,
     calorieDelta,
     todayRecommendation,
-    weeklyTrends
+    weeklyTrends,
+    weightProgress,
+    planWeek
   } = useDashboardMetrics({
     dashboard,
     goalForm,
@@ -262,14 +263,15 @@ export default function DashboardPage({
           openPlannerFromProfile={openPlannerFromProfile}
           last7Workouts={last7Workouts}
           avgCalories={avgCalories}
-          goals={goals}
-          goalForm={goalForm}
           weeklyGoal={weeklyGoal}
           workoutProgress={workoutProgress}
           calorieGoal={calorieGoal}
           calorieProgress={calorieProgress}
           workouts={recentWorkouts}
           weeklyTrends={weeklyTrends}
+          planWeek={planWeek}
+          weightProgress={weightProgress}
+          onOpenGoals={() => navigateDashView("calories")}
           buildLinePath={buildLinePath}
           trendRanges={trendRanges}
           todayRecommendation={todayRecommendation}

@@ -13,9 +13,9 @@ const emptyDashboard = () => ({
 });
 
 describe("defaultDashboardData", () => {
-  test("carries the goal defaults the UI falls back to", () => {
+  // The server's defaults: a target weight is absent until the user saves one.
+  test("carries the goal defaults the UI falls back to, and no target weight", () => {
     expect(defaultDashboardData().goals).toEqual({
-      targetWeight: 160,
       targetCalories: 2200,
       weeklyWorkouts: 3
     });

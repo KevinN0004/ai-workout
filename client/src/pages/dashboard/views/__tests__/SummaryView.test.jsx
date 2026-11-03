@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SummaryView from "../SummaryView";
 
@@ -15,8 +15,6 @@ const baseProps = {
   openPlannerFromProfile: noop,
   last7Workouts: [],
   avgCalories: 0,
-  goals: {},
-  goalForm: {},
   weeklyGoal: 3,
   workoutProgress: 0,
   calorieGoal: 2200,
@@ -38,6 +36,8 @@ const baseProps = {
 };
 
 const renderView = (overrides = {}) => render(<SummaryView {...baseProps} {...overrides} />);
+
+const latestWeightStat = () => screen.getByText("Latest weight").parentElement;
 
 describe("SummaryView", () => {
   describe("robustness", () => {
@@ -485,18 +485,129 @@ describe("SummaryView", () => {
       expect(screen.getByText(/181/)).toBeInTheDocument();
     });
 
-    test("a zero weight is shown rather than replaced by the target", () => {
-      // `??` again: a logged 0 is wrong data, but hiding it behind the target
-      // makes it look like a legitimate goal instead of a bad row.
-      const { container } = renderView({ weeklyTrends: { latestWeight: 0 } });
+    test("a zero weight is shown as logged", () => {
+      // `??` again: a logged 0 is wrong data, but hiding it makes it look like
+      // no reading instead of a bad row.
+      renderView({ weeklyTrends: { latestWeight: 0 } });
 
-      expect(container.textContent).toContain("0 lb");
-      expect(container.textContent).not.toContain("Target weight");
+      expect(latestWeightStat()).toHaveTextContent("0 lb");
     });
 
-    test("falls back to the target label with no logged weight", () => {
-      renderView({ weeklyTrends: {} });
-      expect(screen.getByText("Target weight")).toBeInTheDocument();
+    // It used to show the target in its place, and "0 lb" with neither.
+    test("shows no weight, rather than the target or 0 lb, with none logged", () => {
+      renderView({ weeklyTrends: {}, weightProgress: { state: "progress", target: 175 } });
+
+      expect(latestWeightStat()).toHaveTextContent("--");
+      expect(latestWeightStat()).not.toHaveTextContent("lb");
+    });
+  });
+
+  describe("this week's plan", () => {
+    const day = (key, label, state) => ({ key, label, date: "", state });
+    const planWeek = {
+      planned: 3,
+      done: 1,
+      missed: 1,
+      days: [
+        day("Monday", "Mon", "done"),
+        day("Tuesday", "Tue", "rest"),
+        day("Wednesday", "Wed", "missed"),
+        day("Thursday", "Thu", "today"),
+        day("Friday", "Fri", "unplanned"),
+        day("Saturday", "Sat", "upcoming"),
+        day("Sunday", "Sun", "rest")
+      ]
+    };
+    const planBlock = () => screen.getByText(/planned days done/).closest(".progress-block");
+
+    test("counts the planned days done and missed", () => {
+      renderView({ planWeek });
+
+      expect(planBlock()).toHaveTextContent("1 of 3 planned days done, 1 missed");
+    });
+
+    test("lists each planned day with its state in words", () => {
+      renderView({ planWeek });
+
+      const rows = within(planBlock())
+        .getAllByRole("listitem")
+        .map((row) => row.textContent);
+      expect(rows).toEqual(["MonDone", "WedMissed", "ThuToday", "SatUpcoming"]);
+    });
+
+    test("marks done and missed days apart", () => {
+      renderView({ planWeek });
+
+      expect(within(planBlock()).getByText("Done")).toHaveClass("trend-badge", "trend-up");
+      expect(within(planBlock()).getByText("Missed")).toHaveClass("trend-badge", "trend-down");
+      expect(within(planBlock()).getByText("Today")).toHaveClass("trend-badge");
+    });
+
+    test("leaves out a missed count of zero", () => {
+      renderView({ planWeek: { ...planWeek, missed: 0 } });
+
+      expect(planBlock()).toHaveTextContent("1 of 3 planned days done");
+      expect(planBlock()).not.toHaveTextContent("missed");
+    });
+
+    test("says so when the week has no planned days", () => {
+      renderView({ planWeek: { planned: 0, done: 0, missed: 0, days: [] } });
+
+      expect(screen.getByText("This week's plan: no training days planned.")).toBeInTheDocument();
+    });
+
+    test("is not shown without a plan", () => {
+      const { container } = renderView({ planWeek: null });
+
+      expect(container.textContent).not.toContain("This week's plan");
+    });
+  });
+
+  describe("the target weight", () => {
+    const targetBlock = () => screen.getByText(/^Target weight/).closest(".progress-block");
+    const bar = () => targetBlock().querySelector(".progress-bar span");
+
+    test("asks for one when none is saved, and opens the goals view", () => {
+      const onOpenGoals = vi.fn();
+      renderView({ weightProgress: { state: "no-target", target: null }, onOpenGoals });
+
+      expect(targetBlock()).toHaveTextContent("Target weight: not set");
+      expect(bar()).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Set a target weight" }));
+      expect(onOpenGoals).toHaveBeenCalledTimes(1);
+    });
+
+    test("asks for a weight when none is logged", () => {
+      renderView({ weightProgress: { state: "no-weight", target: 175 } });
+
+      expect(targetBlock()).toHaveTextContent(
+        "Target weight: 175 lb. Log a weight to see progress."
+      );
+      expect(bar()).toBeNull();
+    });
+
+    test("shows what is left and how far along it is", () => {
+      renderView({
+        weightProgress: { state: "progress", target: 175, latest: 182, remaining: 7, percent: 53 }
+      });
+
+      expect(targetBlock()).toHaveTextContent("Target weight: 175 lb, 7 lb to go");
+      expect(bar()).toHaveStyle({ width: "53%" });
+    });
+
+    test("says when it is reached", () => {
+      renderView({
+        weightProgress: { state: "reached", target: 175, latest: 174, remaining: 1, percent: 100 }
+      });
+
+      expect(targetBlock()).toHaveTextContent("Target weight: 175 lb. Target reached.");
+      expect(bar()).toHaveStyle({ width: "100%" });
+    });
+
+    test("is not shown before the dashboard has worked it out", () => {
+      const { container } = renderView({ weightProgress: undefined });
+
+      expect(container.textContent).not.toContain("Target weight");
     });
   });
 

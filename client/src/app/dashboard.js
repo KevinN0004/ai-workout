@@ -4,7 +4,8 @@
  */
 
 /**
- * A fresh empty dashboard, every list empty and the goals at their defaults.
+ * A fresh empty dashboard, every list empty and the goals at the server's
+ * defaults, which hold no target weight until the user saves one.
  * mergeOptimisticDashboard builds on it when an entry is logged before the
  * dashboard has loaded.
  */
@@ -17,7 +18,6 @@ export const defaultDashboardData = () => ({
   plans: [],
   savedExercises: [],
   goals: {
-    targetWeight: 160,
     targetCalories: 2200,
     weeklyWorkouts: 3
   }
