@@ -1,7 +1,7 @@
 /**
- * The dashboard's goal tracks and weekly meal plan: the track a goal belongs to,
- * a day's calorie target on that track, and a week of meals from the track's
- * templates. Used by the meal, plans and tips views and useDashboardMetrics.
+ * The dashboard's plan helpers: a goal's track, a day's calorie target and a
+ * week of meals (meal, plans and tips views, useDashboardMetrics), and the
+ * workout form's pre-fill from a plan day (plans view).
  */
 import { hasWord } from "./wordMatch";
 
@@ -181,3 +181,40 @@ export const buildWeeklyMealPlan = ({
     })
   };
 };
+
+// The workout form's limits, which the server enforces on save:
+// buildWorkoutSessionEntry keeps 18 exercises of 140 characters and 500
+// characters of notes.
+const PREFILL_MAX_EXERCISES = 18;
+const PREFILL_MAX_EXERCISE_LENGTH = 140;
+const PREFILL_MAX_NOTES = 500;
+
+// An exercise name from a "- Name: prescription" bullet, without its bracketed
+// asides, or "" for a rest line or a name the form cannot hold: the exercises
+// field is split on commas, and an aside is where real plans put theirs.
+const exerciseNameOf = (line) => {
+  if (!line.startsWith("- ")) return "";
+  const name = line
+    .slice(2)
+    .split(":")[0]
+    .replace(/\s*\([^)]*\)/g, "")
+    .trim();
+  if (/^rest\b/i.test(name) || name.includes(",")) return "";
+  return name.length <= PREFILL_MAX_EXERCISE_LENGTH ? name : "";
+};
+
+/**
+ * The Log workout form's fields for a day of a saved plan: the day's title as
+ * the focus, the names its bullets prescribe as the comma-separated exercises
+ * (at most 18), and the day's lines as the notes, cut at 500 characters. Sets,
+ * reps and RPE are left to the person logging.
+ */
+export const buildPlanDayPrefill = (day) => ({
+  focus: day.title,
+  exercises: day.lines
+    .map(exerciseNameOf)
+    .filter(Boolean)
+    .slice(0, PREFILL_MAX_EXERCISES)
+    .join(", "),
+  notes: day.lines.join("\n").slice(0, PREFILL_MAX_NOTES)
+});

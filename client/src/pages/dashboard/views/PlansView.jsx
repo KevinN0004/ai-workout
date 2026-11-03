@@ -4,7 +4,9 @@
  * which loads it lazily.
  */
 import { useEffect, useMemo, useState } from "react";
-import { buildWeeklyMealPlan } from "../planUtils";
+import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
+import { savedPlanDays } from "../../../app/plans";
+import { getLocalDateKey } from "../../../app/units";
 import ModalPortal from "../../../components/ModalPortal";
 import "./PlansView.css";
 
@@ -18,7 +20,10 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * saved entry's `id`, not its wger `exerciseId`. The meals week follows the
  * latest plan's goal, else the planner form's (`fallbackPlan`); the
  * `goals.goalType` step between them never applies, because the server's goals
- * carry none.
+ * carry none. A weekday the newest plan saved a structure for can be logged
+ * against: its details fill App's workout form through `setWorkoutForm` and open
+ * the modal with `setWorkoutModalOpen`, and its card says once a session links
+ * to it.
  */
 export default function PlansView({
   weekDays,
@@ -27,7 +32,9 @@ export default function PlansView({
   dashboard,
   fallbackPlan,
   onRemoveSavedExercise,
-  onOpenGuides
+  onOpenGuides,
+  setWorkoutForm,
+  setWorkoutModalOpen
 }) {
   // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -57,6 +64,41 @@ export default function PlansView({
       workoutLines: latestPlanByWeekday[selectedDetail.dayKey] || []
     };
   }, [selectedDetail, weeklyMealPlan.days, latestPlanByWeekday]);
+
+  // ---- Logging a plan day ---------------------------------------------------
+  // Only the newest plan, and only when it was saved with its structure: a
+  // session's planDayIndex points into those days, never into a text parse.
+  const latestPlan = dashboard?.plans?.[0];
+  const savedDays = useMemo(() => savedPlanDays(latestPlan), [latestPlan]);
+  const savedDayFor = (weekday) => savedDays?.find((day) => day.weekday === weekday) ?? null;
+
+  // The newest plan's days a workout session links to, pending ones included,
+  // since the dashboard lists an entry still inside its undo window.
+  const loggedDayIndexes = useMemo(() => {
+    const sessions = Array.isArray(dashboard?.workoutSessions) ? dashboard.workoutSessions : [];
+    return new Set(
+      sessions
+        .filter((session) => latestPlan && session.planId === latestPlan.id)
+        .map((session) => session.planDayIndex)
+    );
+  }, [dashboard, latestPlan]);
+
+  const logPlanDay = (day) => {
+    setWorkoutForm({
+      date: getLocalDateKey(),
+      duration: "",
+      sets: "",
+      reps: "",
+      intensityRpe: "",
+      ...buildPlanDayPrefill(day),
+      planId: latestPlan.id,
+      planDayIndex: day.index,
+      planDayLabel: day.weekday
+    });
+    setSelectedDetail(null);
+    setWorkoutModalOpen(true);
+  };
+  const selectedSavedDay = selectedDay ? savedDayFor(selectedDay.key) : null;
 
   // Escape closes the day details while they are open. ModalPortal's own
   // Escape handling already does the same, so this listener is a second copy.
@@ -241,6 +283,9 @@ export default function PlansView({
                   )}
                 </div>
                 <div className="card-section-foot">
+                  {loggedDayIndexes.has(savedDayFor(key)?.index) ? (
+                    <p className="hub-card-hint">Logged</p>
+                  ) : null}
                   <p className="hub-card-hint">View day details</p>
                 </div>
               </button>
@@ -482,6 +527,15 @@ export default function PlansView({
                     ) : (
                       <p className="muted">Recovery or rest day. No workout block assigned.</p>
                     )}
+                    {selectedSavedDay ? (
+                      <button
+                        type="button"
+                        className="cta"
+                        onClick={() => logPlanDay(selectedSavedDay)}
+                      >
+                        Log this workout
+                      </button>
+                    ) : null}
                   </section>
                 ) : (
                   <section className="plan-day-detail-col">

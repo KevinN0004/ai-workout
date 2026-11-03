@@ -146,4 +146,22 @@ describe("DashboardWorkoutModal", () => {
 
     expect(onSubmit).toHaveBeenCalled();
   });
+
+  // A form filled from a plan day says which day it is logging, so a person
+  // can tell it from an ordinary workout before saving.
+  describe("the plan day it is logging", () => {
+    test("names the day when the form carries a link", () => {
+      renderModal({
+        workoutForm: { ...workoutForm, planId: "plan-1", planDayIndex: 0, planDayLabel: "Monday" }
+      });
+
+      expect(screen.getByText("Logging Monday of your plan.")).toBeInTheDocument();
+    });
+
+    test("says nothing for an ordinary workout", () => {
+      renderModal();
+
+      expect(screen.queryByText(/of your plan/)).toBeNull();
+    });
+  });
 });

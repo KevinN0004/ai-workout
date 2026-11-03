@@ -27,7 +27,7 @@ import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
 import { fetchWithTimeout } from "./app/network";
-import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
+import { readPlan, extractLatestPlanByWeekday, NO_PLAN_LINK } from "./app/plans";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
 import {
@@ -86,7 +86,8 @@ export default function App() {
     sets: "",
     reps: "",
     intensityRpe: "",
-    notes: ""
+    notes: "",
+    ...NO_PLAN_LINK
   });
   const [calorieForm, setCalorieForm] = useState({
     calories: ""

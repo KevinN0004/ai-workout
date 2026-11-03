@@ -1,8 +1,8 @@
 /**
  * Reads a generated plan, whose prompt asks for weekday headings and a closing
- * "Coach Notes:" section: from the structure the server saved with it, or from
- * its text by the server's rules (planPayloadService). Used by App for the plan
- * views and for the dashboard's copy of the newest plan.
+ * "Coach Notes:" section: from its saved structure, or from its text by the
+ * server's rules (planPayloadService). Used by App and the dashboard for the
+ * plan views, and for the workout form's link to a plan day.
  */
 // @ts-check
 
@@ -26,6 +26,14 @@
 
 /** The version of the server's saved structure this file reads. */
 export const PLAN_PAYLOAD_VERSION = 1;
+
+/**
+ * The workout form's link fields with no plan day: the form's initial value,
+ * its reset, and what every ordinary way of opening the Log workout modal
+ * spreads into it, so a link left by an unsent plan-day log never reaches the
+ * next workout. `planDayLabel` names the day for display and is never sent.
+ */
+export const NO_PLAN_LINK = Object.freeze({ planId: null, planDayIndex: null, planDayLabel: "" });
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -146,6 +154,15 @@ const isPlanPayload = (value) =>
   Array.isArray(value.days) &&
   value.days.every(isPlanDay) &&
   isStringList(value.notes);
+
+/**
+ * A plan's saved days when the structure the server saved with it is valid,
+ * and otherwise null. Only those days can be logged against: a workout
+ * session's `planDayIndex` points into them, never into a text parse.
+ * @param {{ payload?: unknown } | null | undefined} plan
+ * @returns {PlanDay[] | null}
+ */
+export const savedPlanDays = (plan) => (isPlanPayload(plan?.payload) ? plan.payload.days : null);
 
 /**
  * A plan's days and notes: from the structure the server saved with it when

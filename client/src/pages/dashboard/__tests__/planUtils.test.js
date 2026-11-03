@@ -1,6 +1,102 @@
 import { describe, expect, test } from "vitest";
-import { buildWeeklyMealPlan, detectTrack, getDailyCalories } from "../planUtils";
+import {
+  buildPlanDayPrefill,
+  buildWeeklyMealPlan,
+  detectTrack,
+  getDailyCalories
+} from "../planUtils";
 import { goalOptions } from "../../../app/constants";
+import { parsePlanSections } from "../../../app/plans";
+
+// The eight real Gemini answers the server's plan tests are built on, loaded by
+// Vite as text: under jsdom, node:fs cannot find them from import.meta.url.
+const realDays = Object.entries(
+  import.meta.glob("../../../../../server/src/services/dashboard/__tests__/fixtures/plans/*.txt", {
+    query: "?raw",
+    import: "default",
+    eager: true
+  })
+).flatMap(([path, text]) =>
+  parsePlanSections(text).days.map((day) => [`${path.split("/").pop()} ${day.title}`, day])
+);
+const realDay = (fixture, weekday) =>
+  realDays.find(([label]) => label === `${fixture} ${weekday}`)[1];
+
+describe("buildPlanDayPrefill", () => {
+  test("reads all 56 real days", () => {
+    expect(realDays).toHaveLength(56);
+  });
+
+  // The exercises field is split on commas, so a name holding one would log
+  // as two exercises; the server keeps 18 names of 140 characters.
+  test.each(realDays)("%s fits the form", (_label, day) => {
+    const { focus, exercises, notes } = buildPlanDayPrefill(day);
+    const names = exercises ? exercises.split(", ") : [];
+
+    expect(focus).toBe(day.title);
+    expect(names.length).toBeLessThanOrEqual(18);
+    for (const name of names) {
+      expect(name).not.toMatch(/,/);
+      expect(name).not.toMatch(/^rest\b/i);
+      expect(name).not.toMatch(/[()]/);
+      expect(name.length).toBeGreaterThan(0);
+      expect(name.length).toBeLessThanOrEqual(140);
+    }
+    expect(notes.length).toBeLessThanOrEqual(500);
+    expect(notes).toBe(day.lines.join("\n").slice(0, 500));
+  });
+
+  test("names each exercise a day's bullets prescribe, in order", () => {
+    expect(buildPlanDayPrefill(realDay("02-commercial-full-5d.txt", "Monday")).exercises).toBe(
+      "Back Squats, Conventional Deadlifts, Leg Press, Seated Calf Raises, Wall Sits"
+    );
+  });
+
+  test("drops a bracketed aside, and the comma in it", () => {
+    const day = {
+      title: "Tuesday",
+      lines: ["- Cable Rows (Close grip, focus on upright posture): 3 x 10"]
+    };
+
+    expect(buildPlanDayPrefill(day).exercises).toBe("Cable Rows");
+  });
+
+  test("leaves out a rest line, and a name that still holds a comma", () => {
+    const day = {
+      title: "Monday",
+      lines: ["- Rest: 30 seconds", "- Squats, then lunges: 3 x 10", "- Plank: 3 x 30s"]
+    };
+
+    expect(buildPlanDayPrefill(day).exercises).toBe("Plank");
+  });
+
+  // The server keeps an exercise of at most 140 characters, so a longer name
+  // is left out rather than cut into a different name.
+  test("leaves out a name longer than the 140 characters an exercise can hold", () => {
+    const day = {
+      title: "Monday",
+      lines: [`- ${"x".repeat(141)}: 3 x 10`, `- ${"y".repeat(140)}: 3 x 10`]
+    };
+
+    expect(buildPlanDayPrefill(day).exercises).toBe("y".repeat(140));
+  });
+
+  test("keeps the whole day as notes, cut at 500 characters", () => {
+    const day = { title: "Monday", lines: ["Warmup:", "x".repeat(600)] };
+
+    expect(buildPlanDayPrefill(day).notes).toBe(`Warmup:\n${"x".repeat(492)}`);
+  });
+
+  test("gives a rest day its text and no exercises", () => {
+    const day = realDay("05-home-bands-2d-shoulder.txt", "Monday");
+
+    expect(buildPlanDayPrefill(day)).toEqual({
+      focus: "Monday",
+      exercises: "",
+      notes: "Rest / Active Recovery\n(Light walking or gentle stretching permitted)"
+    });
+  });
+});
 
 describe("planUtils", () => {
   test("detectTrack maps goal text to expected tracks", () => {

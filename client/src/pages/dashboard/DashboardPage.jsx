@@ -12,6 +12,7 @@ import DashboardAtAGlance from "./components/DashboardAtAGlance";
 import DashboardWorkoutModal from "./components/DashboardWorkoutModal";
 import useDashboardMetrics, { parseDateValue } from "./hooks/useDashboardMetrics";
 import { getLocalDateKey } from "../../app/units";
+import { NO_PLAN_LINK } from "../../app/plans";
 import "./DashboardPage.css";
 
 const WorkoutsView = lazy(() => import("./views/WorkoutsView"));
@@ -345,6 +346,8 @@ export default function DashboardPage({
             fallbackPlan={form}
             onRemoveSavedExercise={onRemoveSavedExercise}
             onOpenGuides={() => navigateDashView("tips")}
+            setWorkoutForm={setWorkoutForm}
+            setWorkoutModalOpen={setWorkoutModalOpen}
           />
         </Suspense>
       );
@@ -457,7 +460,7 @@ export default function DashboardPage({
             refreshAirQuality={refreshAirQuality}
             formatRelativeUpdatedAt={formatRelativeUpdatedAt}
             onAddWorkout={() => {
-              setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey() }));
+              setWorkoutForm((prev) => ({ ...prev, date: getLocalDateKey(), ...NO_PLAN_LINK }));
               setWorkoutModalOpen(true);
             }}
             onOpenMeal={() => navigateDashView("meal")}

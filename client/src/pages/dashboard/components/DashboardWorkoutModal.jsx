@@ -1,14 +1,16 @@
 /**
  * The Log workout modal: session details, exercise details and notes. Rendered
  * by DashboardPage, and opened by the glance panel's and WorkoutsView's Add
- * workout buttons, each of which sets the form's date to today first.
+ * workout buttons, which date the form today and clear any plan-day link, and
+ * by PlansView's Log this workout, which fills it from a plan day.
  */
 import ModalPortal from "../../../components/ModalPortal";
 
 /**
  * A controlled form over App's `workoutForm`. `onSubmit` is submitWorkout in
  * events.js, which queues the entry behind the undo window, then resets the
- * form and closes the modal without waiting for the save.
+ * form and closes the modal without waiting for the save. A form filled from a
+ * plan day (PlansView) carries `planId` and says which day it is logging.
  */
 export default function DashboardWorkoutModal({
   open,
@@ -37,6 +39,9 @@ export default function DashboardWorkoutModal({
             <div className="dashboard-workout-heading">
               <h2 id="workout-modal-title">Log workout</h2>
               <p className="muted">Save your session details and notes.</p>
+              {workoutForm.planId ? (
+                <p className="muted">Logging {workoutForm.planDayLabel} of your plan.</p>
+              ) : null}
             </div>
             <button
               type="button"

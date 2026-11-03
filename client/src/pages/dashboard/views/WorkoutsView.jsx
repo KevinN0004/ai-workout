@@ -4,6 +4,7 @@
  */
 import { useMemo, useState } from "react";
 import { getLocalDateKey } from "../../../app/units";
+import { NO_PLAN_LINK } from "../../../app/plans";
 import useOlderLogPages from "../hooks/useOlderLogPages";
 import "./WorkoutsView.css";
 
@@ -142,7 +143,8 @@ export default function WorkoutsView({
           onClick={() => {
             setWorkoutForm((prev) => ({
               ...prev,
-              date: getLocalDateKey()
+              date: getLocalDateKey(),
+              ...NO_PLAN_LINK
             }));
             setWorkoutModalOpen(true);
           }}
@@ -191,7 +193,8 @@ export default function WorkoutsView({
                   onClick={() => {
                     setWorkoutForm((prev) => ({
                       ...prev,
-                      date: getLocalDateKey()
+                      date: getLocalDateKey(),
+                      ...NO_PLAN_LINK
                     }));
                     setWorkoutModalOpen(true);
                   }}

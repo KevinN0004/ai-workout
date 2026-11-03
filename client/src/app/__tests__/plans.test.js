@@ -4,7 +4,9 @@ import {
   extractLatestPlanByWeekday,
   parsePlanSections,
   planByWeekday,
-  readPlan
+  readPlan,
+  savedPlanDays,
+  NO_PLAN_LINK
 } from "../plans";
 
 // The two parsers that turn a generated plan -- free text from Gemini -- into
@@ -437,4 +439,30 @@ describe("planByWeekday", () => {
 
     expect(week).toEqual({});
   });
+});
+
+// Only a plan saved with its structure can be logged against: its days are
+// what a session's planDayIndex points into.
+describe("savedPlanDays", () => {
+  test("is a plan's saved days when its structure is valid", () => {
+    expect(savedPlanDays({ plan: "Monday\nText", payload: savedPayload() })).toEqual(
+      savedPayload().days
+    );
+  });
+
+  test.each([
+    ["no plan", undefined],
+    ["a plan saved without a structure", { plan: "Monday\nText", payload: null }],
+    ["the {} an older plan holds", { plan: "Monday\nText", payload: {} }],
+    ["another version", { plan: "Monday\nText", payload: savedPayload({ version: 2 }) }]
+  ])("is null for %s, whatever its text says", (_label, plan) => {
+    expect(savedPlanDays(plan)).toBeNull();
+  });
+});
+
+// What every ordinary way of opening the Log workout modal spreads into the
+// workout form, so it carries no plan day.
+test("NO_PLAN_LINK is a workout form with no plan day", () => {
+  expect(NO_PLAN_LINK).toEqual({ planId: null, planDayIndex: null, planDayLabel: "" });
+  expect(Object.isFrozen(NO_PLAN_LINK)).toBe(true);
 });
