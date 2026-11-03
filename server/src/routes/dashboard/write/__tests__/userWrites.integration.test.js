@@ -98,6 +98,38 @@ describe("remaining user write paths", () => {
     });
   });
 
+  // Sign-up used to store a 160 lb target in every account, which made a chosen
+  // 160 and the default indistinguishable.
+  describe("a new account's target weight", () => {
+    test("is not stored, and the dashboard answers null", async () => {
+      const row = await prisma.appUser.findFirst();
+      expect(row.goals).toEqual({ targetCalories: 2200, weeklyWorkouts: 3 });
+
+      const response = await agent.get("/api/dashboard");
+      expect(response.status).toBe(200);
+      expect(response.body.dashboard.goals).toEqual({
+        targetWeight: null,
+        targetCalories: 2200,
+        weeklyWorkouts: 3
+      });
+    });
+
+    // The goals form sends a blank target for one that is not set.
+    test("stays unset when the goals form saves it blank", async () => {
+      const response = await agent
+        .post("/api/dashboard/goals")
+        .set("X-CSRF-Token", csrfToken)
+        .send({ targetWeight: "", targetCalories: "2300", weeklyWorkouts: "4" });
+
+      expect(response.status).toBe(200);
+      expect(response.body.dashboard.goals).toEqual({
+        targetWeight: null,
+        targetCalories: 2300,
+        weeklyWorkouts: 4
+      });
+    });
+  });
+
   describe("POST /api/dashboard/goals", () => {
     test("stores the supplied goals", async () => {
       const response = await agent

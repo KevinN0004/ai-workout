@@ -136,10 +136,10 @@ export const defaultProfile = () => ({
 
 /**
  * The goals a new dashboard starts with, and the fallback buildDashboard uses
- * for any goal that is absent or out of range.
+ * for any goal that is absent or out of range. There is no target weight: it is
+ * the user's own choice, so it stays absent until they save one.
  */
 export const defaultGoals = () => ({
-  targetWeight: 160,
   targetCalories: 2200,
   weeklyWorkouts: 3
 });
@@ -159,7 +159,7 @@ export const defaultDashboard = () => ({
 /**
  * Normalises a stored dashboard for a response: each list becomes an array,
  * most of them capped, and each goal falls back to its default when absent or
- * out of range.
+ * out of range. The target weight has no default, so it is null then.
  */
 export const buildDashboard = (input = {}) => {
   const base = defaultDashboard();
@@ -178,8 +178,7 @@ export const buildDashboard = (input = {}) => {
     plans: Array.isArray(input.plans) ? input.plans : [],
     savedExercises: Array.isArray(input.savedExercises) ? input.savedExercises.slice(0, 200) : [],
     goals: {
-      ...base.goals,
-      targetWeight: toNullableNumber(goals.targetWeight, 80, 400) ?? base.goals.targetWeight,
+      targetWeight: toNullableNumber(goals.targetWeight, 80, 400),
       targetCalories:
         toNullableNumber(goals.targetCalories, 1200, 4500) ?? base.goals.targetCalories,
       weeklyWorkouts: toNullableNumber(goals.weeklyWorkouts, 1, 7) ?? base.goals.weeklyWorkouts
