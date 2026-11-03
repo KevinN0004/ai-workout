@@ -849,7 +849,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 8;
+  const TYPE_CHECKED_FILES = 9;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 

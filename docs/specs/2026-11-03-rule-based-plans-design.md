@@ -107,7 +107,7 @@ Settled in this spec:
 
 ### The exercise library
 
-`server/src/services/planning/exerciseLibrary.js`, about 120 entries. Each entry has:
+`server/src/services/planning/exerciseLibrary.js`, about 150 entries. Each entry has:
 
 - `id`, kebab-case and unique, and `name`, as the plan shows it;
 - `pattern`, one of `squat`, `hinge`, `horizontal-push`, `vertical-push`, `horizontal-pull`,
@@ -120,7 +120,9 @@ Settled in this spec:
 - `regressions`, for each area it marks `modify`: the `id` of the easier entry to use instead,
   and a short `cue`, for example `{ knee: { id: "box-squat", cue: "sit back to a box at a
 height that stays comfortable" } }`;
-- `impact`, `high` or `low`, for conditioning entries.
+- `supine`, whether it is done lying on the back, which pregnancy avoids;
+- `impact`, `high` or `low`, for conditioning entries. High-impact entries are `avoid` for the
+  knee, the hip and pregnancy.
 
 The order within a pattern is its priority: the first eligible entry is the default choice.
 
@@ -629,7 +631,10 @@ until then (finding 7).
     capability the original does not;
   - the `ok` bodyweight beginner entry is there for every area in `squat`, `hinge`,
     `single-leg` and `core`;
-  - every entry the avoid table names is `avoid` for that area.
+  - every entry the avoid table names is `avoid` for that area, every `supine` entry is `avoid`
+    in pregnancy, and every high-impact entry is `avoid` for the knee, the hip and pregnancy;
+  - a bodyweight, beginner, low-impact conditioning entry is `ok` for every area;
+  - the old keyword false positives (finding 6) carry no flag for the area they do not load.
 - **The injury rules:** whole-word matching, including the false positives of finding 6; the
   moved tests; the client contract test.
 - **The generator,** with the tables above as cases:
