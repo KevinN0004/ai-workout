@@ -182,8 +182,14 @@ scorers' fixtures.
   prompt version, every plan's text and scores, and the summary. `out/` is git-ignored.
 - **It prints** a Markdown table of the summary, which the workflow appends to the job
   summary, and the comparison with the reference. It exits 1 when the comparison fails.
-- **The prompt version** is the first 8 hex characters of the sha256 of `SYSTEM_INSTRUCTION`,
-  a newline, and `buildPlanPrompt` for a fixed reference profile with the fence `"0"`.
+- **The prompt version** is the first 8 hex characters of the sha256 of `SYSTEM_INSTRUCTION`
+  and `buildPlanPrompt` for four fixed setups with the fence `"0"`, joined by newlines. One
+  profile would hash only the capability lines it selects, so a change to another label's
+  capabilities would keep the version. The four between them hold every capability line: a
+  home with each label, a home with none, full gym access, and one commercial area.
+- **The run's limits are the route's own,** `DEFAULT_MAX_OUTPUT_TOKENS`, `DEFAULT_TIMEOUT_MS`
+  and `DEFAULT_MAX_PLAN_CHARS`, which `generateRoutes.js` exports for the evals rather than
+  have them copied.
 - **The root workspace declares `@google/genai`** as a devDependency at the server's range, so
   knip sees it listed and npm keeps the one copy.
 
