@@ -157,9 +157,13 @@ Steps:
   `@google/genai` in `devDependencies` at the server's range; `package-lock.json` by
   `npm install`.
 - Modify: `.gitignore`: `scripts/evals/out/`.
-- Modify: `scripts/README.md`, `README.md` (the environment table gains
-  `GEMINI_EVAL_API_KEY` and `EVAL_MODEL`, as eval-only), and `CLAUDE.md`'s Build & Test list
-  (`npm run eval:plans`, needs the key, never in `npm test`).
+- Modify: `scripts/README.md`, whose table documents `GEMINI_EVAL_API_KEY` and `EVAL_MODEL`
+  beside the script, and `CLAUDE.md`'s Build & Test list (`npm run eval:plans`, needs the
+  key). Not `README.md`'s environment table, nor `env.example`: both list the server's
+  variables, and `repo-invariants.test.mjs` fails on an `env.example` key the server does not
+  read.
+- Modify: `server/src/routes/generateRoutes.js`, which exports its three guardrail defaults
+  so the run uses them rather than copies.
 
 Steps:
 

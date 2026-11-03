@@ -230,6 +230,7 @@ npm run test:scripts     # the scripts/ tests only: repo invariants, the header 
 npm run test:coverage    # the same suites with a v8 coverage report
 npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
 npm run test:e2e:ui      # the same suite in Playwright's UI mode
+npm run eval:plans       # plan-quality evals: live Gemini calls, needs GEMINI_EVAL_API_KEY
 npm run knip             # unused files, exports and dependencies (exit 0 = clean)
 npm run typecheck        # tsc, strict, over each workspace's `// @ts-check` files
 npm run lint             # eslint . across both workspaces

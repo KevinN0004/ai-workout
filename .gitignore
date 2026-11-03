@@ -12,6 +12,10 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# Scores from `npm run eval:plans`. A run adopted as the reference is copied
+# into scripts/evals/results/, which is tracked.
+scripts/evals/out/
+
 # ---- Secrets ----------------------------------------------------------------
 # server/.env holds the Gemini key and the Postgres connection string. The
 # committed template is env.example. Variants such as .env.local and
