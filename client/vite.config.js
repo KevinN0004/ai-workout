@@ -67,11 +67,11 @@ export default defineConfig({
       // uncovered statement anywhere in src fails CI. Cover it; do not lower
       // the floor.
       //
-      // Measured 2026-11-02 (99.02 / 94.68 / 99.22 / 99.58), the same locally
+      // Measured 2026-11-02 (99.03 / 94.79 / 99.24 / 99.58), the same locally
       // and in CI.
       thresholds: {
         statements: 99,
-        branches: 94.6,
+        branches: 94.7,
         functions: 99.2,
         lines: 99.5
       }
