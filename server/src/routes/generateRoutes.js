@@ -16,14 +16,9 @@ import {
 // Defaults for the generation guardrails, used when GEMINI_MAX_OUTPUT_TOKENS
 // (tokens), GEMINI_TIMEOUT_MS (milliseconds) or GEMINI_MAX_PLAN_CHARS
 // (characters) is unset or not a positive integer. README's environment table
-// and env.example document the same defaults. The plan-quality evals
-// (scripts/evals/) generate and score under the same three.
-
-/** The output-token cap a plan is generated under when GEMINI_MAX_OUTPUT_TOKENS is unset. */
-export const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
-
-/** The milliseconds a plan may take when GEMINI_TIMEOUT_MS is unset; past it, a 504. */
-export const DEFAULT_TIMEOUT_MS = 30000;
+// and env.example document the same defaults.
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_TIMEOUT_MS = 30000;
 
 /** The longest plan served, in characters, when GEMINI_MAX_PLAN_CHARS is unset. */
 export const DEFAULT_MAX_PLAN_CHARS = 20000;
