@@ -20,7 +20,7 @@ const baseDashboard = {
   }
 };
 
-function DashboardHarness() {
+function DashboardHarness({ dashboard = baseDashboard }) {
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
@@ -66,7 +66,7 @@ function DashboardHarness() {
       personal={{}}
       go={noop}
       onLogout={noop}
-      dashboard={baseDashboard}
+      dashboard={dashboard}
       goalForm={goalForm}
       setGoalForm={setGoalForm}
       dashView={dashView}
@@ -193,5 +193,39 @@ describe("Dashboard integration flows", () => {
     expect(screen.getByText(/workout saved\./i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /dismiss message/i }));
     expect(screen.queryByText(/workout saved\./i)).not.toBeInTheDocument();
+  });
+
+  // A target weight is absent until the user saves one, and the summary sends
+  // them to the goals view to set it.
+  test("opens the goals view from the summary to set a target weight", async () => {
+    const user = userEvent.setup();
+    const { targetWeight: _target, ...goals } = baseDashboard.goals;
+    render(<DashboardHarness dashboard={{ ...baseDashboard, goals }} />);
+
+    await user.click(screen.getByRole("button", { name: "Set a target weight" }));
+
+    expect(await screen.findByRole("heading", { name: "Overall goal" })).toBeInTheDocument();
+  });
+
+  test("shows the newest plan's week on the summary", () => {
+    const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const plan = {
+      id: "plan-1",
+      createdAt: "2026-01-01T12:00:00.000Z",
+      plan: "Monday",
+      payload: {
+        version: 1,
+        days: weekdays.map((weekday, index) => ({
+          index,
+          weekday,
+          title: weekday,
+          lines: ["Squat 5x5"]
+        })),
+        notes: []
+      }
+    };
+    render(<DashboardHarness dashboard={{ ...baseDashboard, plans: [plan] }} />);
+
+    expect(screen.getByText(/of 7 planned days done/)).toBeInTheDocument();
   });
 });

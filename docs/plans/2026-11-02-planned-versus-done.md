@@ -57,8 +57,14 @@ functions 0.30. So every new function and branch ships with its test.
 
 **Merging:** only when GitHub reports the PR `CLEAN`, with a standalone
 `gh pr merge <n> --merge`. Then watch `main`'s CI and Deploy runs to green before the next
-merge. The Deploy workflow migrates before it deploys, so PR 3's migration reaches
-production with that PR.
+merge. The Deploy workflow migrates before it deploys, so Task 3's migration reaches
+production with its PR.
+
+**Task 4 ships before Task 3.** Found while doing Task 3: against the new server, the
+client then live shows "0 lb" for an unset target with no weight logged, and its goals
+form fills an absent target with 160, so saving only the calories would save 160 again.
+Task 4's client reads a null target and a stored 160 alike, so it goes first, as PR 3,
+and Task 3 follows as PR 4.
 
 ## Task 1: the spec and this plan (PR 1)
 
@@ -94,7 +100,7 @@ Steps:
 - [ ] **Step 4:** run the gates and coverage.
 - [ ] **Step 5:** open the PR, wait for `CLEAN`, merge, and watch CI and Deploy.
 
-## Task 3: the target weight on the server (PR 3)
+## Task 3: the target weight on the server (PR 4, after Task 4)
 
 **Files:**
 
@@ -130,7 +136,7 @@ Steps:
 - [ ] **Step 5:** open the PR, wait for `CLEAN`, merge, and watch CI and Deploy. Confirm that
       the Deploy log's migrate step applied `005_clear_default_target_weight.sql`.
 
-## Task 4: planned versus done and the weight block (PR 4)
+## Task 4: planned versus done and the weight block (PR 3)
 
 **Files:**
 

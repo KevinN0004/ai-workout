@@ -1,10 +1,11 @@
 /**
  * The dashboard's derived numbers: the deduplicated logs, the seven-day
- * averages and goal progress, the week and month trend series, and today's
- * planned workout and meals. Called by DashboardPage.
+ * averages and goal progress, the week and month trend series, today's planned
+ * workout and meals, and this week of the plan. Called by DashboardPage.
  */
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
+import { buildPlanWeek } from "../planWeek";
 import { buildLinePath } from "../../../app/linePath";
 import { toNumberOrNull } from "../../../app/units";
 
@@ -346,6 +347,31 @@ export default function useDashboardMetrics({
         ? Number((latestWeight - previousWeight).toFixed(1))
         : null;
 
+    // Progress toward the target weight, from the first weight logged to the
+    // latest, for losing or gaining. The target is absent until the user saves
+    // one, and toNumberOrNull keeps an absent one from reading as 0 lb.
+    const targetWeight = toNumberOrNull(goals?.targetWeight);
+    const firstWeight =
+      weightTrendCandidates.length > 0 ? Number(weightTrendCandidates.at(-1).weightLb) : null;
+    const weightProgress = (() => {
+      if (targetWeight === null) return { state: "no-target", target: null };
+      if (latestWeight === null) return { state: "no-weight", target: targetWeight };
+      const remaining = Number(Math.abs(targetWeight - latestWeight).toFixed(1));
+      const known = { target: targetWeight, latest: latestWeight, remaining };
+      const reached = { state: "reached", ...known, percent: 100 };
+      // Starting at the target leaves no distance to measure along.
+      if (firstWeight === targetWeight) {
+        return remaining === 0 ? reached : { state: "progress", ...known, percent: 0 };
+      }
+      const losing = targetWeight < firstWeight;
+      if (losing ? latestWeight <= targetWeight : latestWeight >= targetWeight) return reached;
+      const share = (firstWeight - latestWeight) / (firstWeight - targetWeight);
+      return { state: "progress", ...known, percent: clamp(Math.round(share * 100), 0, 100) };
+    })();
+
+    // This week of the newest plan against the workouts logged.
+    const planWeek = buildPlanWeek({ plan: plans[0], workouts, today: todayDate });
+
     // Today's lines from the latest plan, and today's meals from the meal plan
     // built for that plan's training days.
     const latestPlan = plans[0];
@@ -387,7 +413,9 @@ export default function useDashboardMetrics({
       goalPaceText,
       calorieDelta,
       todayRecommendation,
-      weeklyTrends
+      weeklyTrends,
+      weightProgress,
+      planWeek
     };
   }, [calories, workouts, goals, plans, progressMetrics, formGoal, weekDays, latestPlanByWeekday]);
 

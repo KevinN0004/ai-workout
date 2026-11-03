@@ -742,4 +742,135 @@ describe("useDashboardMetrics", () => {
       expect(metrics.avgCalories).toBe(1000);
     });
   });
+
+  // planWeek.test.js pins the week itself; this is that the summary gets the
+  // newest plan's week, against the deduplicated workouts.
+  describe("the plan's week", () => {
+    const newestPlan = {
+      id: "plan-2",
+      createdAt: "2026-02-20T12:00:00.000Z",
+      plan: "Monday",
+      payload: {
+        version: 1,
+        days: [{ index: 0, weekday: "Monday", title: "Monday", lines: ["Squat 5x5"] }],
+        notes: []
+      }
+    };
+
+    test("is the newest plan's week", () => {
+      const metrics = render({
+        dashboard: {
+          plans: [newestPlan, { ...newestPlan, id: "plan-1" }],
+          workoutSessions: [{ id: "w1", date: "2026-03-02", planId: "plan-2", planDayIndex: 0 }],
+          workouts: [{ id: "w1", date: "2026-03-02", planId: "plan-2", planDayIndex: 0 }]
+        }
+      });
+
+      expect(metrics.planWeek).toMatchObject({ planned: 1, done: 1, missed: 0 });
+      expect(metrics.planWeek.days[0]).toMatchObject({ key: "Monday", state: "done" });
+    });
+
+    test("is null with no plan", () => {
+      expect(render().planWeek).toBeNull();
+    });
+  });
+
+  // The target weight is absent until the user saves one, and absent must
+  // never read as a target of 0 lb.
+  describe("progress toward the target weight", () => {
+    const weights = (...entries) =>
+      entries.map(([date, weightLb], index) => ({ id: `p${index}`, date, weightLb }));
+    const progressFor = (targetWeight, progressMetrics = []) =>
+      render({ dashboard: { goals: { targetWeight }, progressMetrics } }).weightProgress;
+
+    test.each([
+      ["null", null],
+      ["an empty string", ""],
+      ["undefined", undefined],
+      ["not a number", "heavy"]
+    ])("has no target when it is %s", (_label, target) => {
+      expect(progressFor(target, weights(["2026-03-01", 180]))).toEqual({
+        state: "no-target",
+        target: null
+      });
+    });
+
+    test("has no target when the goals form, standing in, holds none", () => {
+      const metrics = render({ dashboard: { goals: null }, goalForm: { targetWeight: "" } });
+
+      expect(metrics.weightProgress.state).toBe("no-target");
+    });
+
+    test("asks for a weight when none is logged", () => {
+      expect(progressFor("175", weights(["2026-03-01", null], ["2026-03-02", ""]))).toEqual({
+        state: "no-weight",
+        target: 175
+      });
+    });
+
+    test("measures losing from the first weight logged to the latest", () => {
+      const progress = progressFor(
+        175,
+        weights(["2026-03-01", 182], ["2026-02-01", 190], ["2026-02-15", 186])
+      );
+
+      expect(progress).toEqual({
+        state: "progress",
+        target: 175,
+        latest: 182,
+        remaining: 7,
+        percent: 53
+      });
+    });
+
+    test("measures gaining the same way", () => {
+      expect(progressFor(160, weights(["2026-02-01", 150], ["2026-03-01", 156]))).toEqual({
+        state: "progress",
+        target: 160,
+        latest: 156,
+        remaining: 4,
+        percent: 60
+      });
+    });
+
+    test("rounds what is left to a tenth of a pound", () => {
+      const progress = progressFor(175, weights(["2026-02-01", 190], ["2026-03-01", 182.37]));
+
+      expect(progress.remaining).toBe(7.4);
+    });
+
+    test("is 0% with one weight logged, or after moving away from the target", () => {
+      expect(progressFor(175, weights(["2026-03-01", 182])).percent).toBe(0);
+      expect(progressFor(175, weights(["2026-02-01", 180], ["2026-03-01", 185]))).toMatchObject({
+        state: "progress",
+        remaining: 10,
+        percent: 0
+      });
+    });
+
+    test.each([
+      ["losing, at the target", 175, 190, 175],
+      ["losing, past it", 175, 190, 172],
+      ["gaining, past it", 160, 150, 161],
+      ["having started at it", 175, 175, 175]
+    ])("is reached %s", (_label, target, first, latest) => {
+      expect(
+        progressFor(target, weights(["2026-02-01", first], ["2026-03-01", latest]))
+      ).toMatchObject({ state: "reached", percent: 100 });
+    });
+
+    test("is not reached after starting at the target and leaving it", () => {
+      expect(progressFor(175, weights(["2026-02-01", 175], ["2026-03-01", 178]))).toMatchObject({
+        state: "progress",
+        remaining: 3,
+        percent: 0
+      });
+    });
+
+    // The counterpart: a measured zero is a value, not an absence. The server
+    // refuses a target outside 80 to 400 lb, so this guards the reading only.
+    test("reads a target of 0 as a target", () => {
+      expect(progressFor(0, weights(["2026-03-01", 10])).state).toBe("progress");
+    });
+  });
 });

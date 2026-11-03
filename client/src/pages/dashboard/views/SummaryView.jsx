@@ -7,6 +7,23 @@
 import { useState } from "react";
 import "./SummaryView.css";
 
+// How each planned day of the week reads, in words and the trend badge's tone.
+// A rest day, or a training day before the plan was saved, is not listed.
+const PLAN_DAY_STATES = {
+  done: { text: "Done", tone: "trend-up" },
+  missed: { text: "Missed", tone: "trend-down" },
+  today: { text: "Today", tone: "trend-flat" },
+  upcoming: { text: "Upcoming", tone: "trend-flat" }
+};
+
+// The target-weight line for each of useDashboardMetrics' weightProgress states.
+const targetWeightLabel = ({ state, target, remaining }) => {
+  if (state === "no-target") return "Target weight: not set";
+  if (state === "no-weight") return `Target weight: ${target} lb. Log a weight to see progress.`;
+  if (state === "reached") return `Target weight: ${target} lb. Target reached.`;
+  return `Target weight: ${target} lb, ${remaining} lb to go`;
+};
+
 function TrendChart({
   title,
   subtitle,
@@ -42,14 +59,14 @@ function TrendChart({
  * one-time load. The two cards' refresh buttons are always there, and each card
  * shows its error alongside any reading it still has. The air card labels its
  * US AQI a NowCast when the payload carries one, and the latest reading's when not.
+ * The weekly card lists `planWeek`'s planned days, and shows `weightProgress`,
+ * whose "Set a target weight" button calls `onOpenGoals`.
  */
 export default function SummaryView({
   form,
   openPlannerFromProfile,
   last7Workouts,
   avgCalories,
-  goals,
-  goalForm,
   weeklyGoal,
   workoutProgress,
   calorieGoal,
@@ -59,6 +76,9 @@ export default function SummaryView({
   trendRanges,
   todayRecommendation,
   weeklyTrends,
+  planWeek,
+  weightProgress,
+  onOpenGoals,
   weatherData,
   weatherLoading,
   weatherError,
@@ -424,17 +444,12 @@ export default function SummaryView({
               </div>
             </div>
             <div>
-              <p className="muted">
-                {weeklyTrends?.latestWeight !== null && weeklyTrends?.latestWeight !== undefined
-                  ? "Latest weight"
-                  : "Target weight"}
-              </p>
+              <p className="muted">Latest weight</p>
               <div className="summary-stat-main">
                 <h3>
-                  {(weeklyTrends?.latestWeight ??
-                    Number(goals.targetWeight || goalForm.targetWeight)) ||
-                    0}{" "}
-                  lb
+                  {weeklyTrends?.latestWeight !== null && weeklyTrends?.latestWeight !== undefined
+                    ? `${weeklyTrends.latestWeight} lb`
+                    : "--"}
                 </h3>
                 {renderTrendBadge(weeklyTrends?.weightDelta, {
                   suffix: "vs last log",
@@ -444,6 +459,29 @@ export default function SummaryView({
               </div>
             </div>
           </div>
+          {planWeek ? (
+            <div className="progress-block">
+              <div className="progress-label">
+                {planWeek.planned
+                  ? `This week's plan: ${planWeek.done} of ${planWeek.planned} planned days done${
+                      planWeek.missed ? `, ${planWeek.missed} missed` : ""
+                    }.`
+                  : "This week's plan: no training days planned."}
+              </div>
+              <div className="summary-list" role="list">
+                {planWeek.days
+                  .filter((day) => PLAN_DAY_STATES[day.state])
+                  .map((day) => (
+                    <div key={day.key} className="summary-list-row" role="listitem">
+                      <strong>{day.label}</strong>
+                      <span className={`trend-badge ${PLAN_DAY_STATES[day.state].tone}`}>
+                        {PLAN_DAY_STATES[day.state].text}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
           <div className="progress-block">
             <div className="progress-label">
               Workouts ({last7Workouts.length}/{weeklyGoal})
@@ -460,6 +498,21 @@ export default function SummaryView({
               <span style={{ width: `${calorieProgress}%` }} />
             </div>
           </div>
+          {weightProgress ? (
+            <div className="progress-block">
+              <div className="progress-label">{targetWeightLabel(weightProgress)}</div>
+              {weightProgress.state === "no-target" ? (
+                <button type="button" className="ghost" onClick={onOpenGoals}>
+                  Set a target weight
+                </button>
+              ) : null}
+              {weightProgress.state === "progress" || weightProgress.state === "reached" ? (
+                <div className="progress-bar">
+                  <span style={{ width: `${weightProgress.percent}%` }} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         {/* ---- Recent workouts ---- */}

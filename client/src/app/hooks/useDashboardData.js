@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonCache, writeJsonCache } from "../cache";
 import { fetchWithTimeout } from "../network";
+import { toNumberOrNull } from "../units";
 
 // The coordinates go to the server as query parameters, which request logs and
 // proxies keep, so no more precision leaves the browser than the readings use.
@@ -15,10 +16,14 @@ import { fetchWithTimeout } from "../network";
 // radius the air-quality route searches for a station.
 const roundCoordinate = (value) => Math.round(value * 100) / 100;
 
+// A target weight the user never saved fills the form blank, not with a
+// default: the server leaves a blank target unset, so saving only the calories
+// cannot save a target with them.
 const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
   if (!dashboardValue?.goals) return;
+  const targetWeight = toNumberOrNull(dashboardValue.goals.targetWeight);
   setGoalForm({
-    targetWeight: String(dashboardValue.goals.targetWeight || 160),
+    targetWeight: targetWeight === null ? "" : String(targetWeight),
     targetCalories: String(dashboardValue.goals.targetCalories || 2200),
     weeklyWorkouts: String(dashboardValue.goals.weeklyWorkouts || 3)
   });

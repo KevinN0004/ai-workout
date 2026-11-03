@@ -88,6 +88,42 @@ describe("useDashboardData", () => {
     expect(result.current.dashError).toBe("");
   });
 
+  // The goals form is filled from the loaded goals. A target the user never
+  // saved stays blank, so saving only the calories cannot save a default target
+  // with them: the server leaves a blank target as it was.
+  describe("filling the goals form", () => {
+    const loadGoals = async (goals) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse({ dashboard: { goals } }))
+      );
+      const fillGoalForm = vi.fn();
+      render({ setGoalForm: fillGoalForm });
+      await waitFor(() => expect(fillGoalForm).toHaveBeenCalled());
+      return fillGoalForm.mock.calls.at(-1)[0];
+    };
+
+    test("leaves the target blank when none is saved", async () => {
+      expect(
+        await loadGoals({ targetWeight: null, targetCalories: 2300, weeklyWorkouts: 4 })
+      ).toEqual({ targetWeight: "", targetCalories: "2300", weeklyWorkouts: "4" });
+    });
+
+    test("fills a saved target", async () => {
+      expect(
+        await loadGoals({ targetWeight: 172.5, targetCalories: 2300, weeklyWorkouts: 4 })
+      ).toEqual({ targetWeight: "172.5", targetCalories: "2300", weeklyWorkouts: "4" });
+    });
+
+    test("still fills the other goals' defaults", async () => {
+      expect(await loadGoals({})).toEqual({
+        targetWeight: "",
+        targetCalories: "2200",
+        weeklyWorkouts: "3"
+      });
+    });
+  });
+
   test("does not fetch without a signed-in user", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
     vi.stubGlobal("fetch", fetchMock);

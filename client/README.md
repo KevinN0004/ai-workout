@@ -229,6 +229,17 @@ Every other way of opening that form spreads `NO_PLAN_LINK` into it, so a link l
 unsent plan-day log never reaches an ordinary workout. An ordinary workout leaves the link
 out of its body altogether: the server accepts an absent `planId` and refuses a null one.
 
+**Planned versus done** is `buildPlanWeek` (`pages/dashboard/planWeek.js`): this week,
+Monday to Sunday, of the newest plan's training days. A day is done when a workout linked
+to it is dated this week, or when a workout with no link is dated on it; a workout linked
+to an older plan completes nothing. Training days before the plan was saved are
+`unplanned`, so a plan saved on Thursday never shows Monday as missed. The summary lists
+the planned days with their states.
+
+**A target weight is absent until the user saves one.** The goals form is filled with a
+blank target, not 160, because the server leaves a blank target unset: filled with a
+default, saving only the calories would save the default as the target too.
+
 ## Exercise Recommendations
 
 `pages/dashboard/tips/recommendationUtils.js` ranks exercises for the Tips view by

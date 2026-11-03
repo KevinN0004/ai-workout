@@ -111,7 +111,7 @@ export default function App() {
     notes: ""
   });
   const [goalForm, setGoalForm] = useState({
-    targetWeight: "160",
+    targetWeight: "",
     targetCalories: "2200",
     weeklyWorkouts: "3"
   });

@@ -101,7 +101,9 @@ three counts. It lives in `pages/dashboard/planWeek.js`, and `useDashboardMetric
   - A weekday before the local date the plan was saved on is not planned: a plan saved on
     Thursday never shows Monday as missed.
 - **Each day's state:**
-  - `rest` when it is not planned;
+  - `rest` when the plan does not train that weekday;
+  - `unplanned` for a training day before the date the plan was saved on, so a training
+    day is never called a rest day;
   - `done` when it is planned and has a workout, by the decided rule:
     - one linked to a day of this plan with that weekday, dated in this week;
     - or one with no link, dated on that day.
@@ -113,9 +115,10 @@ three counts. It lives in `pages/dashboard/planWeek.js`, and `useDashboardMetric
   - `upcoming` when it is planned and after today.
 - **The counts:** planned, done and missed. With no plan, the function returns null and the
   summary shows nothing new.
-- **The summary's weekly card** shows "3 of 4 planned days done · 1 missed" and a row of
-  seven day labels, each with its state as text, not colour alone. Existing classes are used
-  where they fit; a new rule needs the screenshot proof `CLAUDE.md` requires.
+- **The summary's weekly card** shows "This week's plan: 3 of 4 planned days done, 1
+  missed." and lists the planned days, each with its state as text, not colour alone: a
+  `trend-up` badge for done and `trend-down` for missed. Rest days and unplanned days are
+  not listed. Only existing classes are used, so no stylesheet changes.
 
 ### Target weight
 
@@ -124,8 +127,8 @@ three counts. It lives in `pages/dashboard/planWeek.js`, and `useDashboardMetric
   - `buildDashboard` answers `targetWeight: null` for an absent or out-of-range target. The
     other two goals keep their defaults;
   - migration `005_clear_default_target_weight.sql` removes `targetWeight` from every
-    account's goals that equal `{"targetWeight": 160, "targetCalories": 2200,
-"weeklyWorkouts": 3}` exactly. Equality on `jsonb` ignores key order.
+    account's goals that equal the sign-up defaults exactly (160 lb, 2,200 kcal and 3
+    workouts). Equality on `jsonb` ignores key order.
 - **Deploy order:** the Deploy workflow migrates before it deploys. Until the new code
   starts, the old `buildDashboard` reads an absent target as 160, as it does today. An
   account created in that window keeps 160 stored.
@@ -148,10 +151,14 @@ three counts. It lives in `pages/dashboard/planWeek.js`, and `useDashboardMetric
 
 1. The spec and plan.
 2. Rest days: `isRestDay`, the meal plan and the plan hub.
-3. The target weight on the server, with migration 005.
-4. Planned versus done and the weight block on the summary, and the client's handling of an
+3. Planned versus done and the weight block on the summary, and the client's handling of an
    absent target.
+4. The target weight on the server, with migration 005.
 5. A floor PR per side, only if a truncated figure rose.
+
+The client ships before the server. It reads a null target and a stored 160 alike, while
+the old client with the new server would show "0 lb" for an unset target and would put
+160 back whenever the goals form saved only the calories.
 
 ## Testing
 

@@ -44,7 +44,9 @@ export default function CaloriesView({
       <header className="panel-header">
         <div>
           <h2>Overall goal</h2>
-          <p className="muted">Target weight: {goalForm.targetWeight} lb</p>
+          <p className="muted">
+            Target weight: {goalForm.targetWeight ? `${goalForm.targetWeight} lb` : "not set"}
+          </p>
         </div>
         <button className="cta" type="submit" form="goals-form">
           Save goals
@@ -152,6 +154,7 @@ export default function CaloriesView({
                   type="number"
                   min="80"
                   max="400"
+                  placeholder="160"
                   value={goalForm.targetWeight}
                   onChange={(e) =>
                     setGoalForm((prev) => ({
