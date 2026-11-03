@@ -7,7 +7,7 @@
 import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
-import { mapWorkoutSession } from "./workoutSessionRepository.js";
+import { mapWorkoutSession, WORKOUT_SESSION_INCLUDE } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";
 import { mapSavedExercise } from "./savedExerciseRepository.js";
 import {
@@ -115,7 +115,8 @@ export const createUserReadRepository = ({ prisma }) => {
       prisma.workoutSession.findMany({
         where: { userId: userPk },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: COLLECTION_LIMITS.workoutSessions
+        take: COLLECTION_LIMITS.workoutSessions,
+        include: WORKOUT_SESSION_INCLUDE
       }),
       prisma.calorieEntry.findMany({
         where: { userId: userPk },

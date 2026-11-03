@@ -4,14 +4,16 @@
  * because dashboardCollectionService drives them through a single code path.
  */
 import { userIdWhere } from "./userLookup.js";
-import { mapWorkoutSession } from "./workoutSessionRepository.js";
+import { mapWorkoutSession, WORKOUT_SESSION_INCLUDE } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
 
+// `include` is what a collection's mapRow needs loaded with each row.
 const COLLECTIONS = {
   workoutSessions: {
     delegate: "workoutSession",
     mapRow: mapWorkoutSession,
+    include: WORKOUT_SESSION_INCLUDE,
     sortFields: { createdAt: "createdAt", date: "workoutDate" }
   },
   mealLogs: {
@@ -47,7 +49,13 @@ export const createDashboardCollectionRepository = ({ prisma }) => {
     const orderBy = [{ [spec.sortFields[sortField] || sortField]: "desc" }, { id: "desc" }];
 
     const [rows, total] = await Promise.all([
-      prisma[spec.delegate].findMany({ where, orderBy, skip: offset, take: limit }),
+      prisma[spec.delegate].findMany({
+        where,
+        orderBy,
+        skip: offset,
+        take: limit,
+        ...(spec.include ? { include: spec.include } : {})
+      }),
       prisma[spec.delegate].count({ where })
     ]);
 
