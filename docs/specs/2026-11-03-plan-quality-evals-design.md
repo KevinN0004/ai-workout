@@ -1,7 +1,10 @@
 # Plan-quality evals (roadmap B3), design
 
-Status: **decided 2026-11-03**, nothing applied. The plan is
-`docs/plans/2026-11-03-plan-quality-evals.md`.
+Status: **decided 2026-11-03; PRs 2 to 4 applied (#326 to #328), then superseded in part the
+same day** by `docs/specs/2026-11-03-rule-based-plans-design.md`. Plans are now built by rules
+and only their notes come from Gemini, so the scorers below gate the generator in `npm test`,
+and the live run, its workflow and the first reference (PR 5) are retired or cancelled. The
+plan is `docs/plans/2026-11-03-plan-quality-evals.md`.
 
 The roadmap's B3 asks for a fixed set of profiles (injuries, home and commercial gyms, 2 to 6
 days) run through generation from a manual GitHub Actions workflow, with the key as a secret.

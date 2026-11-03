@@ -12,7 +12,9 @@ hits on the saved plans and the decisions are not repeated here.
 
 **Tech Stack:** Express 5, `@google/genai` 2.31, Vitest 5, Node 24, GitHub Actions, gh CLI.
 
-**Status: a plan.** Every file and line below was read on `7acfa8e`.
+**Status: Tasks 1 to 4 done (#325 to #328); Task 5 cancelled and Task 6 replaced** by
+`docs/plans/2026-11-03-rule-based-plans.md`, after the owner moved plan generation off Gemini on
+2026-11-03. Every file and line below was read on `7acfa8e`.
 
 ---
 
