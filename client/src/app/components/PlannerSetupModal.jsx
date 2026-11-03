@@ -1,7 +1,7 @@
 /**
- * The three-step planner that collects a plan request: environment and
- * equipment; schedule, level and injuries; then focus. App builds it; HomePage
- * and DashboardPage render it.
+ * The four-step planner that collects a plan request: environment and
+ * equipment; schedule, level and injuries; focus; then a short health check.
+ * App builds it; HomePage and DashboardPage render it.
  */
 import ModalPortal from "../../components/ModalPortal";
 import { equipmentOptionsByEnv, injuryOptions, quickFocuses } from "../constants";
@@ -24,8 +24,30 @@ import thumbCommercialRecovery from "../assets/planner-thumbs/commercial-recover
 const plannerHeaderTitleByStep = {
   1: "Environment",
   2: "Schedule",
-  3: "Focus"
+  3: "Focus",
+  4: "Health check"
 };
+
+const LAST_STEP = 4;
+
+// The health check's questions, in the app's own words (the PAR-Q+ licence
+// permits no edits), after ACSM's 2015 screening and the pregnancy guidelines
+// (docs/specs/2026-11-03-rule-based-plans-design.md, "The health screen").
+const HEALTH_QUESTIONS = [
+  [
+    "condition",
+    "Has a doctor told you that you have a heart condition, high blood pressure, diabetes, or a lung, kidney or liver condition?"
+  ],
+  [
+    "symptoms",
+    "Do you get chest pain or pressure, faint or feel dizzy, or become unusually short of breath, during activity or at rest?"
+  ],
+  [
+    "supervised",
+    "Has a health professional told you to exercise only under supervision, or to limit physical activity?"
+  ],
+  ["pregnant", "Are you pregnant, or have you given birth in the last six months?"]
+];
 
 const equipmentThumbByLabel = {
   "bodyweight only": { image: thumbHomeBodyweight, tone: "tone-mobility" },
@@ -65,7 +87,7 @@ const resolveEquipmentThumb = (label) => {
 };
 
 /**
- * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 3). Every
+ * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 4). Every
  * choice it shows is App's `form`, changed through the handlers passed in; the
  * last step's button calls `onSubmit`, which generates the plan.
  */
@@ -79,6 +101,7 @@ export default function PlannerSetupModal({
   toggleEquipment,
   onChange,
   toggleFocus,
+  setHealthAnswer,
   loading,
   onSubmit
 }) {
@@ -259,15 +282,50 @@ export default function PlannerSetupModal({
                 </div>
               </div>
             )}
+            {/* ---- Step 4: the health check ---- */}
+            {plannerStep === 4 && (
+              <div className="step-panel planner-step-panel">
+                <p className="muted planner-step-copy">
+                  Answer yes to any that apply. A yes keeps every session at a pace where you can
+                  talk, and it never stops you getting a plan.
+                </p>
+                <form className="form planner-step-two-form">
+                  {HEALTH_QUESTIONS.map(([name, question]) => (
+                    <label key={name}>
+                      {question}
+                      <select
+                        name={name}
+                        value={form.health?.[name] ? "yes" : "no"}
+                        onChange={(event) => setHealthAnswer(name, event.target.value === "yes")}
+                      >
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                      </select>
+                    </label>
+                  ))}
+                </form>
+                <p className="muted planner-step-copy">
+                  For a fuller self-check, see the{" "}
+                  <a href="https://eparmedx.com/" target="_blank" rel="noopener noreferrer">
+                    PAR-Q+
+                  </a>
+                  .
+                </p>
+              </div>
+            )}
           </div>
           {/* ---- Footer: next, or generate on the last step ---- */}
-          <div className={`modal-footer ${plannerStep === 3 ? "planner-footer-center" : ""}`}>
-            <div className={`modal-actions ${plannerStep === 3 ? "planner-actions-center" : ""}`}>
-              {plannerStep < 3 ? (
+          <div
+            className={`modal-footer ${plannerStep === LAST_STEP ? "planner-footer-center" : ""}`}
+          >
+            <div
+              className={`modal-actions ${plannerStep === LAST_STEP ? "planner-actions-center" : ""}`}
+            >
+              {plannerStep < LAST_STEP ? (
                 <button
                   type="button"
                   className="cta"
-                  onClick={() => setPlannerStep((prev) => Math.min(3, prev + 1))}
+                  onClick={() => setPlannerStep((prev) => Math.min(LAST_STEP, prev + 1))}
                 >
                   Next
                 </button>

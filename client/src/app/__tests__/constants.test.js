@@ -69,8 +69,16 @@ describe("goalOptions", () => {
       injuries: "None",
       days: "3",
       focuses: [],
-      environment: "Home"
+      environment: "Home",
+      health: { condition: false, symptoms: false, supervised: false, pregnant: false }
     });
+  });
+
+  test("gives each planner a fresh set of health answers", () => {
+    const first = createDefaultPlannerForm();
+    first.health.pregnant = true;
+
+    expect(createDefaultPlannerForm().health.pregnant).toBe(false);
   });
 });
 

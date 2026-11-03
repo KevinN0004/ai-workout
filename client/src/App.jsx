@@ -320,6 +320,11 @@ export default function App() {
     });
   };
 
+  // One answer of the planner's health check, yes or no; the others stay.
+  const setHealthAnswer = (question, yes) => {
+    setForm((prev) => ({ ...prev, health: { ...prev.health, [question]: yes } }));
+  };
+
   const openPlannerFromProfile = () => {
     resetPlannerFlow();
     setPlannerOpen(true);
@@ -415,6 +420,7 @@ export default function App() {
       toggleEquipment={toggleEquipment}
       onChange={onChange}
       toggleFocus={toggleFocus}
+      setHealthAnswer={setHealthAnswer}
       loading={loading}
       onSubmit={onSubmit}
     />

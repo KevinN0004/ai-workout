@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import PlannerSetupModal from "../PlannerSetupModal";
 import { equipmentOptionsByEnv, quickFocuses } from "../../constants";
 
-// The three-step planner a visitor actually fills in. The equipment logic
+// The four-step planner a visitor actually fills in. The equipment logic
 // behind it is covered in App.planner.test.jsx, through the very handlers this
 // component calls; what is untested is the surface that calls them -- which
 // step shows what, which tile reads as selected, and that every option gets a
@@ -17,6 +17,7 @@ const renderModal = (props = {}) => {
     toggleEquipment: vi.fn(),
     onChange: vi.fn(),
     toggleFocus: vi.fn(),
+    setHealthAnswer: vi.fn(),
     onSubmit: vi.fn()
   };
   const utils = render(
@@ -30,7 +31,8 @@ const renderModal = (props = {}) => {
         days: "3",
         duration: "45",
         goal: "",
-        injuries: ""
+        injuries: "",
+        health: {}
       }}
       loading={false}
       {...handlers}
@@ -73,7 +75,8 @@ describe("PlannerSetupModal", () => {
     test.each([
       [1, "Environment"],
       [2, "Schedule"],
-      [3, "Focus"]
+      [3, "Focus"],
+      [4, "Health check"]
     ])("step %i is titled %s", (plannerStep, title) => {
       renderModal({ plannerStep });
       expect(within(dialog()).getByText(title)).toBeInTheDocument();
@@ -91,7 +94,7 @@ describe("PlannerSetupModal", () => {
       expect(within(dialog()).queryByLabelText("Back")).toBeNull();
     });
 
-    test.each([[2], [3]])("step %i offers a way back", (plannerStep) => {
+    test.each([[2], [3], [4]])("step %i offers a way back", (plannerStep) => {
       renderModal({ plannerStep });
       expect(within(dialog()).getByLabelText("Back")).toBeInTheDocument();
     });
@@ -299,8 +302,82 @@ describe("PlannerSetupModal", () => {
     });
   });
 
+  describe("step four: the health check", () => {
+    const QUESTIONS = [
+      [
+        "condition",
+        "Has a doctor told you that you have a heart condition, high blood pressure, diabetes, or a lung, kidney or liver condition?"
+      ],
+      [
+        "symptoms",
+        "Do you get chest pain or pressure, faint or feel dizzy, or become unusually short of breath, during activity or at rest?"
+      ],
+      [
+        "supervised",
+        "Has a health professional told you to exercise only under supervision, or to limit physical activity?"
+      ],
+      ["pregnant", "Are you pregnant, or have you given birth in the last six months?"]
+    ];
+
+    test.each(QUESTIONS)("asks %s as a yes or no, answered no until changed", (_name, question) => {
+      renderModal({ plannerStep: 4 });
+
+      const select = within(dialog()).getByLabelText(question);
+      expect(select).toHaveValue("no");
+      expect(select).not.toBeRequired();
+      expect(
+        within(select)
+          .getAllByRole("option")
+          .map((option) => option.textContent)
+      ).toEqual(["No", "Yes"]);
+    });
+
+    test.each(QUESTIONS)("shows a yes to %s as yes", (name, question) => {
+      renderModal({ plannerStep: 4, form: formWith({ health: { [name]: true } }) });
+
+      expect(within(dialog()).getByLabelText(question)).toHaveValue("yes");
+    });
+
+    test.each(QUESTIONS)("sends each answer to %s on", (name, question) => {
+      const { setHealthAnswer } = renderModal({ plannerStep: 4 });
+      const select = within(dialog()).getByLabelText(question);
+
+      fireEvent.change(select, { target: { value: "yes" } });
+      fireEvent.change(select, { target: { value: "no" } });
+
+      expect(setHealthAnswer.mock.calls).toEqual([
+        [name, true],
+        [name, false]
+      ]);
+    });
+
+    test("says a yes never stops the plan, and links to the full PAR-Q+", () => {
+      renderModal({ plannerStep: 4 });
+
+      expect(within(dialog()).getByText(/never stops you getting a plan/i)).toBeInTheDocument();
+      const link = within(dialog()).getByRole("link", { name: "PAR-Q+" });
+      expect(link).toHaveAttribute("href", "https://eparmedx.com/");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+    });
+
+    test("reads a form with no health answers as all no", () => {
+      renderModal({ plannerStep: 4, form: formWith({ health: undefined }) });
+
+      for (const [, question] of QUESTIONS) {
+        expect(within(dialog()).getByLabelText(question)).toHaveValue("no");
+      }
+    });
+
+    test("is not shown on the other steps", () => {
+      renderModal({ plannerStep: 3 });
+
+      expect(within(dialog()).queryByText(/never stops you getting a plan/i)).toBeNull();
+    });
+  });
+
   describe("the footer", () => {
-    test.each([[1], [2]])("step %i offers to continue rather than submit", (plannerStep) => {
+    test.each([[1], [2], [3]])("step %i offers to continue rather than submit", (plannerStep) => {
       const { setPlannerStep, onSubmit } = renderModal({ plannerStep });
 
       const next = within(dialog())
@@ -324,11 +401,12 @@ describe("PlannerSetupModal", () => {
 
       const updater = setPlannerStep.mock.calls.at(-1)[0];
       expect(updater(1)).toBe(2);
-      expect(updater(3)).toBe(3);
+      expect(updater(3)).toBe(4);
+      expect(updater(4)).toBe(4);
     });
 
     test("the last step submits instead", () => {
-      const { onSubmit } = renderModal({ plannerStep: 3 });
+      const { onSubmit } = renderModal({ plannerStep: 4 });
 
       const submit = within(dialog())
         .getAllByRole("button")
@@ -342,7 +420,7 @@ describe("PlannerSetupModal", () => {
     test("the submit button is disabled while a plan is generating", () => {
       // Generating takes several seconds; a second submit costs another call
       // to the model.
-      renderModal({ plannerStep: 3, loading: true });
+      renderModal({ plannerStep: 4, loading: true });
 
       const submit = within(dialog())
         .getAllByRole("button")
@@ -352,7 +430,7 @@ describe("PlannerSetupModal", () => {
     });
 
     test("and enabled when it is not", () => {
-      renderModal({ plannerStep: 3, loading: false });
+      renderModal({ plannerStep: 4, loading: false });
 
       const submit = within(dialog())
         .getAllByRole("button")
@@ -372,6 +450,7 @@ function formWith(overrides) {
     duration: "45",
     goal: "",
     injuries: "",
+    health: {},
     ...overrides
   };
 }
