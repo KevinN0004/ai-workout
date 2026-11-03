@@ -28,7 +28,7 @@ npm run test:e2e        # or npm run test:e2e:ui for Playwright's UI mode
 
 - **Postgres must be running.** Each run creates its own accounts (`e2e-<timestamp>@example.test`, `a11y-<timestamp>@example.test`) and deletes them at the end. A run that fails midway leaves its account behind.
 - **Do not set `NODE_ENV=test`** for the server it starts. The server then loads and exits with no output, which looks exactly like a crash.
-- **Geolocation stays denied**, so the dashboard never calls the live weather and air-quality APIs. Plan generation is out of scope, because it needs a real Gemini key.
+- **Geolocation stays denied**, so the dashboard never calls the live weather and air-quality APIs. Plan generation is not covered yet. It no longer needs a key, since the rules build the plan and write its notes without Gemini.
 - **The server reads `server/.env`, including `REDIS_URL`.** To keep a shared Redis untouched, run with `REDIS_URL=` set in the shell. dotenv leaves a variable that is present but empty alone, so sessions stay in memory.
 
 CI runs these suites in their own `E2E smoke` job, so a flaky browser run cannot muddy the unit signal. Decision records [0005](../docs/adr/0005-testing-across-the-wire.md) and [0006](../docs/adr/0006-accessibility-by-axe.md) record how each suite was verified by mutation.

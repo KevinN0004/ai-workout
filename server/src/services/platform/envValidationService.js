@@ -51,8 +51,7 @@ const NUMERIC_VARS = [
   { name: "WGER_DEFAULT_LANGUAGE", min: 1, max: 100 },
   { name: "SENTRY_SHUTDOWN_TIMEOUT_MS", min: 1 },
   { name: "GEMINI_MAX_OUTPUT_TOKENS", min: 1 },
-  { name: "GEMINI_TIMEOUT_MS", min: 1 },
-  { name: "GEMINI_MAX_PLAN_CHARS", min: 1 }
+  { name: "GEMINI_TIMEOUT_MS", min: 1 }
 ];
 
 // Only HTTP endpoints are parsed. Postgres and Redis connection strings are

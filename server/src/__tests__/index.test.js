@@ -261,12 +261,13 @@ describe("server routes", () => {
       });
 
     try {
-      // No session: the request still reaches the handler, which fails fast on the
-      // missing key rather than rejecting the caller as unauthenticated.
+      // No session and no key: the request still reaches the handler, which
+      // builds the plan by rule rather than rejecting the caller as unauthenticated.
       const firstResponse = await callGenerate();
       const firstBody = await firstResponse.json();
-      expect(firstResponse.status).toBe(500);
-      expect(firstBody.error).toMatch(/missing gemini_api_key/i);
+      expect(firstResponse.status).toBe(200);
+      expect(firstBody.plan).toMatch(/^Monday - /);
+      expect(firstBody.savedPlan).toBeNull();
 
       let quotaResponse = null;
       for (let attempt = 0; attempt < 10 && !quotaResponse; attempt += 1) {

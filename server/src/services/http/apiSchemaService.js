@@ -214,7 +214,17 @@ export const generatePlanBodySchema = z
     injuries: optionalStringField(140),
     days: optionalNullableNumberField(1, 7),
     environment: optionalStringField(40),
-    focuses: optionalStringArrayField(8, 60)
+    focuses: optionalStringArrayField(8, 60),
+    // The planner's health screen. Each answer is optional, and an unanswered
+    // one counts as no; the answers shape the plan and are not saved.
+    health: z
+      .object({
+        condition: optionalBooleanField,
+        symptoms: optionalBooleanField,
+        supervised: optionalBooleanField,
+        pregnant: optionalBooleanField
+      })
+      .optional()
   })
   .passthrough();
 

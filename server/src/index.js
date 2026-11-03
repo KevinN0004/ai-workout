@@ -249,7 +249,7 @@ app.use(express.json({ limit: "1mb" }));
 // ---- Configuration ----------------------------------------------------------
 // Built only when a key is configured. The key is optional by design, and the
 // SDK console.warns on every keyless construction, bypassing pino. With no
-// client, /api/generate answers its own "Missing GEMINI_API_KEY." 500.
+// client, /api/generate still builds the plan and writes its notes by rule.
 const gemini = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   : null;
