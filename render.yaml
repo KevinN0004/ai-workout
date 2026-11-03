@@ -74,7 +74,7 @@ services:
       - key: REDIS_URL
         sync: false
 
-      # Plan generation returns an error without it; everything else works.
+      # Optional: Gemini writes the plans' coach notes; without it the rules do.
       - key: GEMINI_API_KEY
         sync: false
 

@@ -114,7 +114,7 @@ AI Workout is a full-stack fitness planning app using **npm workspaces** (`clien
 - **Client**: React 19 + Vite, dev server on `http://localhost:5173`, proxies `/api` to the server
 - **Server**: Express 5 on `http://localhost:5000`, Postgres via Prisma Client
 - **Sessions**: in Redis when `REDIS_URL` (or `REDIS_HOST` and `REDIS_PORT`) is set and Redis connects at startup, otherwise in memory. The store is chosen once: while Redis is the store, a failed session command answers 503 and never falls back to memory; a command Redis accepts and never answers fails at a 2 s deadline, the same 503 (`services/auth/sessionService.js`)
-- **AI**: Google Gemini (`GEMINI_API_KEY`) for weekly workout plan generation
+- **Plans**: built by rules (`services/planning/`); Gemini (`GEMINI_API_KEY`, optional) writes the coach notes
 - **Integrations**: cached fitness, meal, weather, and air-quality APIs
 - **Tests**: Vitest on both sides
 

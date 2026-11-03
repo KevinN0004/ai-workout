@@ -49,7 +49,7 @@ describe("validateEnv", () => {
   });
 
   // generateRoutes.js reads these three per request through toPositiveInt.
-  test.each(["GEMINI_MAX_OUTPUT_TOKENS", "GEMINI_TIMEOUT_MS", "GEMINI_MAX_PLAN_CHARS"])(
+  test.each(["GEMINI_MAX_OUTPUT_TOKENS", "GEMINI_TIMEOUT_MS"])(
     "checks %s like every other limit",
     (name) => {
       expect(validateEnv({ ...validEnv, [name]: "0" })).toEqual([

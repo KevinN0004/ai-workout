@@ -4,7 +4,6 @@
  * avoid (docs/specs/2026-11-03-rule-based-plans-design.md, "The quality gate").
  */
 import { buildPlanPayload } from "../../server/src/services/dashboard/planPayloadService.js";
-import { DEFAULT_MAX_PLAN_CHARS } from "../../server/src/routes/generateRoutes.js";
 import { isRestDay } from "../../client/src/app/plans.js";
 import {
   buildInjuryText,
@@ -37,6 +36,10 @@ const AVOID_PHRASES = {
 const avoidPattern = (phrases) => new RegExp(String.raw`\b(?:${phrases.join("|")})\b`, "i");
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+// The longest plan text the scorer accepts, in characters: the cap the route held
+// Gemini's plans to before the rule-based generator, which writes far shorter ones.
+const MAX_PLAN_CHARS = 20000;
 
 // Labels as the planner offers them, lower-cased.
 const FULL = "full gym access";
@@ -98,7 +101,7 @@ const outcomeBreak = (outcome) => {
   if (outcome.finishReason === "MAX_TOKENS") return "truncated";
   const text = typeof outcome.text === "string" ? outcome.text : "";
   if (!text.trim()) return "empty";
-  if (text.length > DEFAULT_MAX_PLAN_CHARS) return "oversized";
+  if (text.length > MAX_PLAN_CHARS) return "oversized";
   return null;
 };
 

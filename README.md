@@ -103,8 +103,8 @@ There are two ways to run Postgres locally. Both bind **55432**, so use one or t
 - **`docker compose up -d`** starts Postgres 18 in a container. The `DATABASE_URL` in
   `env.example` already matches it.
 
-Plan generation needs a `GEMINI_API_KEY` in `server/.env`; everything else works without
-one.
+Plans are built by the app's own rules, so everything works without a `GEMINI_API_KEY`; with
+one in `server/.env`, Gemini writes each plan's coach notes.
 
 The client runs on `http://localhost:5173` and proxies `/api` requests to the server on `http://localhost:5000`.
 
@@ -170,13 +170,12 @@ Common server variables:
 | `POSTGRES_SSL`                                                              | Enable TLS — **only when `DATABASE_URL` carries no `sslmode`**, which otherwise wins     | `false`                                                     |
 | `POSTGRES_SSL_REJECT_UNAUTHORIZED`                                          | Reject untrusted TLS certificates; same precedence caveat as `POSTGRES_SSL`              | `true`                                                      |
 | `CLIENT_ORIGIN` / `CLIENT_ORIGINS`                                          | Allowed CORS origins, comma-separated, besides the server's own (loopback only in dev)   | own origin in production; loopback origins only, outside it |
-| `GEMINI_API_KEY`                                                            | Enables `/api/generate`                                                                  | unset                                                       |
+| `GEMINI_API_KEY`                                                            | Lets Gemini write the coach notes; without it the rules write them                       | unset                                                       |
 | `ANON_GENERATE_RATE_LIMIT_MAX`                                              | Plan generations allowed per IP without signing in                                       | `3`                                                         |
 | `ANON_GENERATE_RATE_LIMIT_WINDOW_MS`                                        | Window for the anonymous generation quota                                                | `86400000` (24h)                                            |
-| `GEMINI_MODEL`                                                              | Gemini model for workout generation                                                      | `gemini-3.5-flash-lite`                                     |
-| `GEMINI_MAX_OUTPUT_TOKENS`                                                  | Token cap on the generated plan                                                          | `8192`                                                      |
-| `GEMINI_TIMEOUT_MS`                                                         | Hard deadline for one generation; answers 504 when exceeded                              | `30000`                                                     |
-| `GEMINI_MAX_PLAN_CHARS`                                                     | Longest plan returned or saved; longer output answers 502                                | `20000`                                                     |
+| `GEMINI_MODEL`                                                              | Gemini model for the coach notes                                                         | `gemini-3.5-flash-lite`                                     |
+| `GEMINI_MAX_OUTPUT_TOKENS`                                                  | Token cap on the notes Gemini writes                                                     | `1024`                                                      |
+| `GEMINI_TIMEOUT_MS`                                                         | Deadline for the notes call; past it the rule-written notes stand in                     | `8000`                                                      |
 | `REDIS_URL`                                                                 | Redis URL backing sessions, rate limit counters and the external cache                   | unset                                                       |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_TLS` | Socket-style Redis config (takes precedence over `REDIS_URL`)                            | unset                                                       |
 | `REDIS_CONNECT_TIMEOUT_MS`                                                  | How long startup waits for Redis before falling back to memory                           | `10000`                                                     |
@@ -429,7 +428,7 @@ green CI is skipped, and the first deploy is started by hand (see
 | `DATABASE_URL`                   | Required. Add `?sslmode=verify-full` for TLS — the Prisma adapter takes no separate `ssl` option, so it has to ride the URL                                                                         |
 | `CLIENT_ORIGIN`                  | Optional: the server's own origin is always allowed; list others only if a proxy rewrites `Host`                                                                                                    |
 | `REDIS_URL`                      | Without it sessions, rate limit counters and the external cache are in-memory: a restart signs everyone out, resets every quota, and drops the cache stale window                                   |
-| `GEMINI_API_KEY`                 | Plan generation returns an error without it                                                                                                                                                         |
+| `GEMINI_API_KEY`                 | Without it the rules write every plan's coach notes, and plans are built as usual                                                                                                                   |
 | `OPENAQ_API_KEY`                 | Without it air quality always reads as unavailable. The route answers 200 with `fallback: true`, so the browser sees no error; the server logs an `openaq_api_key_missing` warning for each request |
 | `SENTRY_DSN` / `VITE_SENTRY_DSN` | Server and browser error reporting. Unset, production errors reach only the host's logs                                                                                                             |
 | `METRICS_TOKEN`                  | Opens `/api/metrics` to callers who send it; unset, the endpoint stays closed in production                                                                                                         |

@@ -262,16 +262,15 @@ describe("rate limiters", () => {
 
   // The per-IP limits above give every address its own budget, so free sign-ups
   // from many addresses would multiply them. The daily cap is one budget for all
-  // callers, and so bounds the Gemini bill. The first request here fails (no key
-  // is configured) and still counts: a reply cut off at the token cap is a 502
-  // that has already been paid for.
+  // callers, and so bounds the Gemini bill. With no key configured the route
+  // still builds the plan by rule, and the request counts like any other.
   test("the daily generate cap is one budget shared by every caller", async () => {
     const baseUrl = await startApp("GENERATE_DAILY_LIMIT");
 
     const first = await postGenerate(baseUrl, { localAddress: "127.0.0.1" });
     const fromElsewhere = await postGenerate(baseUrl, { localAddress: "127.0.0.2" });
 
-    expect(first.status).toBe(500);
+    expect(first.status).toBe(200);
     expect(fromElsewhere.status).toBe(429);
     expect(fromElsewhere.body).toEqual({
       error: "Workout generation has reached today's limit. Please try again later."
@@ -297,7 +296,7 @@ describe("rate limiters", () => {
     const limited = await postGenerate(baseUrl);
 
     expect(rejected.map((res) => res.status)).toEqual([403, 403, 404, 404]);
-    expect(allowed.status).toBe(500);
+    expect(allowed.status).toBe(200);
     expect(limited.status).toBe(429);
   });
 
