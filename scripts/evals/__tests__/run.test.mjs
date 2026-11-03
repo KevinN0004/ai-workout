@@ -115,7 +115,7 @@ describe("runEval", () => {
 
     expect(client.models.generateContent).toHaveBeenCalledTimes(2);
     expect(plans[0]).toMatchObject({ attempts: 2, structure: [], text: hipPlan });
-    expect(plans[0].injuryHits).toHaveLength(1);
+    expect(plans[0].injuryHits).toHaveLength(0);
   });
 
   test("a call that fails twice is a failed plan, with its error", async () => {
@@ -280,8 +280,8 @@ describe("main", () => {
     const scores = JSON.parse(readFileSync(path.join(dir, "out", file), "utf8"));
     expect(scores).toMatchObject({ model: "m-2", promptVersion: promptVersion() });
     expect(scores.plans).toHaveLength(3);
-    expect(scores.summary.totals).toMatchObject({ plans: 3, structureBreaks: 0, injuryHits: 3 });
-    expect(logs.join("\n")).toMatch(/\| 08-commercial-recovery-1d-hip \| 3 \| 0 \| 0 \| 3 \| 0 \|/);
+    expect(scores.summary.totals).toMatchObject({ plans: 3, structureBreaks: 0, injuryHits: 0 });
+    expect(logs.join("\n")).toMatch(/\| 08-commercial-recovery-1d-hip \| 3 \| 0 \| 0 \| 0 \| 0 \|/);
     expect(logs.join("\n")).toMatch(/No reference yet/);
   });
 
@@ -316,13 +316,13 @@ describe("main", () => {
     const reference = { summary: { totals: { injuryHits: 0, equipmentHits: 0 } } };
     writeFileSync(path.join(dir, "results", "ref.json"), JSON.stringify(reference));
     writeFileSync(path.join(dir, "reference.json"), JSON.stringify({ results: "ref.json" }));
-    const plan = hipPlan.replace("Monday\n", "Monday\n- Squat\n- Lunge\n- Deadlift\n");
+    const plan = hipPlan.replace("Monday\n", "Monday\n- Pistol squat\n- Sumo squat\n");
 
     const code = await run({ GEMINI_EVAL_API_KEY: "k" }, stubClient([answer(plan)]));
 
     expect(code).toBe(1);
     expect(logs.join("\n")).toMatch(/Compared with ref\.json/);
-    expect(logs.join("\n")).toMatch(/injury hits rose from 0 to 12, past the margin of 3/);
+    expect(logs.join("\n")).toMatch(/injury hits rose from 0 to 6, past the margin of 3/);
   });
 
   test("reads a reference file name only from results/", async () => {

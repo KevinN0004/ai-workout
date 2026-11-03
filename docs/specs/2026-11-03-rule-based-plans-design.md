@@ -306,17 +306,20 @@ the days asked:
 
 The full-body order puts a leg, a push and a pull in the first four slots, multi-joint before
 single-joint (guideline, ACSM 2009; a review, Iversen 2021, sets one leg, one push and one
-pull as the minimum). An **older adult** also gets a `balance` slot after `core` on FB and L
-days (guideline, WHO 2020: balance and strength on 3 or more days for people 65 and over).
+pull as the minimum). An **older adult** always gets a balance exercise on FB, L and LG days,
+added after the budgeted slots so the time budget cannot crowd it out (guideline, WHO 2020:
+balance and strength on 3 or more days for people 65 and over).
 
 **How many slots fill** follows a time budget (derived; every constant here is this spec's
 own estimate):
 
 - **The warm-up is 3 minutes** for a session of 20 minutes or less, 5 minutes under 45, and 8
-  from 45 up. Ramp-up sets of the first main lift are counted at one minute each (step 7).
+  from 45 up. Ramp-up sets of the first main lift are counted at one minute each (step 8), and
+  only when that lift is loaded.
 - **The finisher is 0** at 20 minutes or less. Otherwise it is 5 minutes for lean strength, the
   strength focus, mobility and recovery, and 10 for fat loss. A cardio-track strength day opens
-  with a 20-minute cardio block (15 for beginners) instead.
+  with a 20-minute cardio block (15 for beginners) instead, capped at half the session after the
+  warm-up and rounded down to 5 minutes, so a 15-minute session's block is 5.
 - **The exercise count** is
   `clamp(floor((minutes - warmup - rampUp - finisher) / perExercise), floor, 8)`:
   - `perExercise` is 7 minutes for lean strength, 10 for the strength focus, 5 for fat loss,
@@ -344,8 +347,10 @@ Choose the first library entry of the slot's pattern that:
 **The library guarantees** an `ok` bodyweight beginner entry for every area in `squat`,
 `hinge`, `single-leg` and `core`: a wall sit, a glute bridge, a supported split squat, a dead
 bug. So no combination of areas empties a lower day. A slot nothing fits is still left out,
-and it is never filled with an entry that breaks a rule. An area of `knee`, `hip` or
-`pregnancy` takes only `low`-impact conditioning.
+and it is never filled with an entry that breaks a rule: the day records the pattern it
+skipped, and the next slot in the list takes its place, so the count holds. An entry is
+reused only when nothing else fits. An area of `knee`, `hip` or `pregnancy` takes only
+`low`-impact conditioning.
 
 #### Step 6: the prescription
 
@@ -380,6 +385,8 @@ beginners misjudge how close they are, so beginners keep 3 in reserve throughout
 - **A one-day plan** does one set more on the main lifts, at least 3.
 - **Core:** holds of 3 x 10 seconds for beginners, 2-3 x 20-30 seconds otherwise, and rep
   entries at 2-3 x 8-12 a side (convention).
+- **A wall sit** is a hold, at the scheme's sets of 30-45 seconds with 60 seconds of rest
+  (convention).
 - **An older adult** holds stretches 2 x 45 seconds, and does balance work at 2-3 x 20-30
   seconds a side.
 - **Light-to-moderate mode** keeps 3 in reserve on every line and uses lean strength's main
@@ -397,9 +404,14 @@ beginners misjudge how close they are, so beginners keep 3 in reserve throughout
   | Advanced     | 4 x 4 minutes hard, 3 minutes easy                                  |
 
 - **The hard-session cap.** At most 2 hard sessions a week for beginners, and 3 for anyone
-  else, never on consecutive days (convention). A C day or an interval finisher is hard. Once
-  the cap is reached, the rest of the week's conditioning is steady, at a pace where the user
-  can talk (guideline, the talk test).
+  else, never on consecutive days, the week wrapping round (convention). A C day or an interval
+  finisher is hard. C days are placed first, then fat-loss finishers in turn, every other one
+  asking for intervals. Once the cap is reached, the rest of the week's conditioning is steady,
+  at a pace where the user can talk (guideline, the talk test). Under the tables above, the
+  no-consecutive rule never lets the count pass the cap; the cap and the gate stay, so a change
+  to the tables that would pass it fails.
+- **Which conditioning:** steady work tries walking, cycling and other low-impact options
+  first, and intervals try the bikes and rowers first, before the library's order.
 - **Steady blocks:** 20-30 minutes on a C day, 15-20 for beginners. An LC day is 45-60
   minutes, 30-40 for beginners. An E day is 20-40 minutes of easy cardio at a pace where the
   user can talk, followed by mobility.
@@ -421,7 +433,8 @@ Finisher/conditioning:
 - <finisher>
 ```
 
-- **The warm-up** is general, then specific: ramp-up sets of the first main lift.
+- **The warm-up** is general, then specific: ramp-up sets of the first main lift, when it is
+  loaded. A bodyweight first lift has none.
   - **How many:** 3 for the strength focus (at about 50%, 70% and 85-90% of working weight), 2
     for lean strength, 1 for fat loss, and none for cardio and mobility.
   - **Sources:** trial (Ribeiro 2021: sets near the working load help; light ones do not) and
@@ -493,8 +506,8 @@ count a rest day as planned.
     comes from a moderate calorie deficit and your total weekly activity; lifting keeps your
     muscle." (Guideline: ACSM 2009.)
 - **The rules always append**, after Gemini's or the fallback notes:
-  - **One injury line per area:**
-    - **Text:** "Exercises that commonly bother your [area] are swapped for easier versions or
+  - **One injury line, naming every area found:**
+    - **Text:** "Exercises that commonly bother your [areas] are swapped for easier versions or
       left out. This is not a rehab programme. Mild discomfort that stays at about 3 out of 10
       or less, settles within a day and does not build from week to week is usually fine. Stop
       an exercise if the pain is sharp, keeps building, changes how you move, or is worse the
@@ -565,6 +578,9 @@ Every plan must pass all of these:
   - hip: pistol, sumo squat;
   - pregnancy: jump, burpee, sprint.
 
+  Each phrase also lists its word forms, such as jumps and jumping, because whole-word
+  matching would not otherwise catch them.
+
   So the library's names and tags are checked against an independent list;
 
 - **two days or more of lower-body, push and pull work,** for every plan with two or more
@@ -575,8 +591,9 @@ Every plan must pass all of these:
 - **the hard-session cap,** with no hard sessions on consecutive days, and none in
   light-to-moderate mode;
 - **the weekly aerobic target met,** unless every rest day's walk is already at 60 minutes;
-- **squat, hinge, single-leg and core filled** on every FB and L day, whatever the areas;
-- **balance work for older adults** on FB, L and M days.
+- **no slot of squat, hinge, single-leg or core skipped** on any FB, L or LG day, whatever the
+  areas;
+- **balance work for older adults** on FB, L, LG and M days.
 
 The scorers' table and the library's tags are kept apart on purpose, so the gate catches a
 library entry whose name names equipment its tags do not need, or an avoid lift its tags
