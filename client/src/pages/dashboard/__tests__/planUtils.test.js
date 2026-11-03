@@ -189,4 +189,24 @@ describe("planUtils", () => {
     expect(fallback.track).toBe("lean_strength");
     expect(fallback.targetCalories).toBe(2200);
   });
+
+  // Every day of a real plan has lines, so lines alone cannot mark a training
+  // day: a rest day's lines are prose about resting.
+  test("buildWeeklyMealPlan gives a rest day with lines the rest-day calories", () => {
+    const plan = buildWeeklyMealPlan({
+      weekDays: [
+        { label: "Mon", key: "Monday" },
+        { label: "Tue", key: "Tuesday" }
+      ],
+      latestPlanByWeekday: {
+        Monday: ["Main lifts:", "- Back Squats: 3 x 5 (Rest: 3 mins)"],
+        Tuesday: ["Rest or 20-minute light walk."]
+      },
+      goalText: "Fat loss + conditioning",
+      targetCalories: "2100"
+    });
+
+    expect(plan.days.map((day) => day.trainingDay)).toEqual([true, false]);
+    expect(plan.days.map((day) => day.calories)).toEqual([2100, 1850]);
+  });
 });

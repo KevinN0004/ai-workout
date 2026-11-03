@@ -3,6 +3,7 @@
  * week of meals (meal, plans and tips views, useDashboardMetrics), and the
  * workout form's pre-fill from a plan day (plans view).
  */
+import { isRestDay } from "../../app/plans";
 import { hasWord } from "./wordMatch";
 
 // Meal ideas per track, which buildWeeklyMealPlan cycles through by day.
@@ -146,8 +147,9 @@ export const getDailyCalories = (track, baseCalories, trainingDay) => {
  * A week of meals for a goal: one entry per `weekDays` day, cycling through the
  * track's template meals and prep notes, with that day's calorie target. A day
  * is a training day when `latestPlanByWeekday`, the newest saved plan by
- * weekday, has lines for it. Returns the goal text and target it used, after
- * their defaults, with the track and the days.
+ * weekday, has lines for it that are not a rest day's (isRestDay). Returns the
+ * goal text and target it used, after their defaults, with the track and the
+ * days.
  */
 export const buildWeeklyMealPlan = ({
   weekDays,
@@ -165,7 +167,7 @@ export const buildWeeklyMealPlan = ({
     targetCalories: safeCalories,
     track,
     days: weekDays.map(({ label, key }, index) => {
-      const trainingDay = Boolean(latestPlanByWeekday?.[key]?.length);
+      const trainingDay = !isRestDay(latestPlanByWeekday?.[key] || []);
       return {
         label,
         key,

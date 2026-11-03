@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
-import { savedPlanDays } from "../../../app/plans";
+import { isRestDay, savedPlanDays } from "../../../app/plans";
 import { getLocalDateKey } from "../../../app/units";
 import ModalPortal from "../../../components/ModalPortal";
 import "./PlansView.css";
@@ -20,10 +20,10 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * saved entry's `id`, not its wger `exerciseId`. The meals week follows the
  * latest plan's goal, else the planner form's (`fallbackPlan`); the
  * `goals.goalType` step between them never applies, because the server's goals
- * carry none. A weekday the newest plan saved a structure for can be logged
+ * carry none. A training day the newest plan saved a structure for can be logged
  * against: its details fill App's workout form through `setWorkoutForm` and open
  * the modal with `setWorkoutModalOpen`, and its card says once a session links
- * to it.
+ * to it. A rest day's card says so, and offers no log.
  */
 export default function PlansView({
   weekDays,
@@ -68,9 +68,11 @@ export default function PlansView({
   // ---- Logging a plan day ---------------------------------------------------
   // Only the newest plan, and only when it was saved with its structure: a
   // session's planDayIndex points into those days, never into a text parse.
+  // Only a training day: a rest day is not a planned session.
   const latestPlan = dashboard?.plans?.[0];
   const savedDays = useMemo(() => savedPlanDays(latestPlan), [latestPlan]);
-  const savedDayFor = (weekday) => savedDays?.find((day) => day.weekday === weekday) ?? null;
+  const savedDayFor = (weekday) =>
+    savedDays?.find((day) => day.weekday === weekday && !isRestDay(day.lines)) ?? null;
 
   // The newest plan's days a workout session links to, pending ones included,
   // since the dashboard lists an entry still inside its undo window.
@@ -283,6 +285,9 @@ export default function PlansView({
                   )}
                 </div>
                 <div className="card-section-foot">
+                  {latestPlanByWeekday[key]?.length > 0 && isRestDay(latestPlanByWeekday[key]) ? (
+                    <p className="hub-card-hint">Rest day</p>
+                  ) : null}
                   {loggedDayIndexes.has(savedDayFor(key)?.index) ? (
                     <p className="hub-card-hint">Logged</p>
                   ) : null}

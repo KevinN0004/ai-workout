@@ -212,12 +212,18 @@ captured answers. Three things to know:
   maps days by weekday and that day has none, so it returns `{}` and the dashboard's
   today panel is empty for the same plan. A test asserts both halves together so the
   asymmetry cannot be half-fixed.
-- **Every day the plan lists has lines, rest days included,** so the weekday map counts a
-  rest day as a training day (`planUtils.js`). Detecting rest days is roadmap Phase 6's.
+- **Every day the plan lists has lines, rest days included,** so having lines does not
+  make a day a training day. `isRestDay` reads a day's opening main entry instead: the
+  text after its "Main lifts:" heading, or its first line without one. It is a rest day
+  when that starts with "Rest", "Full Rest", "Active Recovery" or "Optional", or when the
+  day has no lines. A search of the whole day for "rest" would fail, because training days
+  rest between sets. On the eight captured answers this gives each plan exactly the
+  training days its profile asked for, which the tests check. The meal plan and the Plans
+  view both use it.
 
-**Logging a workout against a plan day** works only for the newest plan, and only when it
-was saved with its structure (`savedPlanDays`): a session's `planDayIndex` points into
-those days, never into a text parse. The Plans view's day details fill the Log workout
+**Logging a workout against a plan day** works only for the newest plan, only for a
+training day, and only when the plan was saved with its structure (`savedPlanDays`): a
+session's `planDayIndex` points into those days, never into a text parse. The Plans view's day details fill the Log workout
 form with `buildPlanDayPrefill` (`planUtils.js`) and the link (`planId`, `planDayIndex`).
 Every other way of opening that form spreads `NO_PLAN_LINK` into it, so a link left by an
 unsent plan-day log never reaches an ordinary workout. An ordinary workout leaves the link
