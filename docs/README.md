@@ -33,6 +33,7 @@
 - [2026-11-02 — Decision records](plans/2026-11-02-decision-records.md)
 - [2026-11-02 — Type checking through JSDoc, phase 1](plans/2026-11-02-jsdoc-type-checking.md)
 - [2026-11-02 — Structured plans](plans/2026-11-02-structured-plans.md)
+- [2026-11-02 — Logging a workout against a plan day](plans/2026-11-02-plan-day-logging.md)
 
 ## Specs
 
@@ -46,3 +47,4 @@
 - [2026-11-02 — Decision records](specs/2026-11-02-decision-records-design.md)
 - [2026-11-02 — Type checking through JSDoc](specs/2026-11-02-jsdoc-type-checking-design.md)
 - [2026-11-02 — Structured plans](specs/2026-11-02-structured-plans-design.md)
+- [2026-11-02 — Logging a workout against a plan day](specs/2026-11-02-plan-day-logging-design.md)
