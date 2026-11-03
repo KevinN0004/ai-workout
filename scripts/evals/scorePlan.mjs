@@ -1,7 +1,7 @@
 /**
- * Scores one generated plan for the plan-quality evals: its structure breaks,
- * the lines naming equipment its profile lacks, and the lines risky for an
- * injury it names (docs/specs/2026-11-03-plan-quality-evals-design.md).
+ * Scores one generated plan: its structure breaks, the lines naming equipment
+ * its profile lacks, and the lines naming an exercise its injuries or pregnancy
+ * avoid (docs/specs/2026-11-03-rule-based-plans-design.md, "The quality gate").
  */
 import { buildPlanPayload } from "../../server/src/services/dashboard/planPayloadService.js";
 import { DEFAULT_MAX_PLAN_CHARS } from "../../server/src/routes/generateRoutes.js";
@@ -10,6 +10,31 @@ import {
   buildInjuryText,
   detectInjuryFlags
 } from "../../client/src/pages/dashboard/tips/recommendationUtils.js";
+
+// The spec's avoid table as name phrases, each with its word forms, matched
+// whole and ignoring case. Kept apart from the exercise library's own tags on
+// purpose, so the gate checks the library against an independent list.
+const AVOID_PHRASES = {
+  knee: ["jump", "jumps", "jumping", "pistol", "pistols"],
+  "lower back": ["barbell deadlift", "barbell deadlifts", "good morning", "good mornings"],
+  back: ["barbell deadlift", "barbell deadlifts", "good morning", "good mornings"],
+  shoulder: [
+    "upright row",
+    "upright rows",
+    "behind-the-neck",
+    "dip",
+    "dips",
+    "snatch",
+    "snatches",
+    "jerk",
+    "jerks"
+  ],
+  wrist: ["dip", "dips", "skull crusher", "skull crushers"],
+  elbow: ["dip", "dips", "skull crusher", "skull crushers"],
+  hip: ["pistol", "pistols", "sumo squat", "sumo squats"],
+  pregnancy: ["jump", "jumps", "jumping", "burpee", "burpees", "sprint", "sprints"]
+};
+const avoidPattern = (phrases) => new RegExp(String.raw`\b(?:${phrases.join("|")})\b`, "i");
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -81,10 +106,10 @@ const outcomeBreak = (outcome) => {
  * Scores one plan for `profile`. `outcome` is a call's result, `{ text,
  * finishReason }`, or `{ error }` for a call that failed twice. Returns the
  * structure breaks, in the spec's order, and each injury and equipment hit with
- * the weekday and line it is on: an injury hit is a line and a flagged injury
- * with a keyword in it, counted by substring as the Guides view counts a
- * conflict, and an equipment hit a line and a word no label of the profile
- * supplies. Every day's lines are read, rest days included.
+ * the weekday and line it is on: an injury hit is a line and an area the
+ * profile names (its injuries, or pregnancy from `profile.health`) with one of
+ * that area's avoid phrases in it, and an equipment hit a line and a word no
+ * label of the profile supplies. Every day's lines are read, rest days included.
  */
 export const scorePlan = (profile, outcome) => {
   const early = outcomeBreak(outcome);
@@ -98,7 +123,10 @@ export const scorePlan = (profile, outcome) => {
   const trainingDays = payload.days.filter((day) => !isRestDay(day.lines)).length;
   if (trainingDays !== profile.days) structure.push("training-days");
 
-  const flags = detectInjuryFlags(buildInjuryText(profile.injuries, ""));
+  const areas = [
+    ...detectInjuryFlags(buildInjuryText(profile.injuries, "")).map((flag) => flag.injury),
+    ...(profile.health?.pregnant ? ["pregnancy"] : [])
+  ].map((area) => [area, avoidPattern(AVOID_PHRASES[area])]);
   const labels = profile.equipment.map((label) => label.toLowerCase());
   const missing = EQUIPMENT_WORDS.filter(
     ({ suppliers }) => !suppliers.some((supplier) => labels.includes(supplier))
@@ -108,11 +136,8 @@ export const scorePlan = (profile, outcome) => {
   const equipmentHits = [];
   for (const day of payload.days) {
     for (const line of day.lines) {
-      const lower = line.toLowerCase();
-      for (const flag of flags) {
-        if (flag.keywords.some((keyword) => lower.includes(keyword))) {
-          injuryHits.push({ weekday: day.weekday, line, injury: flag.injury });
-        }
+      for (const [area, pattern] of areas) {
+        if (pattern.test(line)) injuryHits.push({ weekday: day.weekday, line, injury: area });
       }
       for (const { word, pattern } of missing) {
         if (pattern.test(line)) equipmentHits.push({ weekday: day.weekday, line, word });

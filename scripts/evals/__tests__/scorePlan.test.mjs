@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import { PROFILES } from "../profiles.mjs";
 import { scorePlan } from "../scorePlan.mjs";
 
-// The plan-quality scorer. The eight saved plans are real /api/generate answers
-// for the first eight profiles (docs/specs/2026-11-03-plan-quality-evals-design.md,
+// The plan scorer the quality gate runs. The eight saved plans are real Gemini
+// answers for the first eight profiles (docs/specs/2026-11-03-plan-quality-evals-design.md,
 // "What was found"); the rest are plans built to have one property each.
 
 const fixtureDir = new URL(
@@ -67,12 +67,12 @@ describe("scorePlan on the saved plans", () => {
   test.each([
     ["01-home-bodyweight-3d", 0, 0],
     ["02-commercial-full-5d", 0, 0],
-    ["03-home-dumbbells-4d-knee", 5, 0],
-    ["04-commercial-strength-6d-lowerback", 1, 2],
+    ["03-home-dumbbells-4d-knee", 1, 0],
+    ["04-commercial-strength-6d-lowerback", 0, 2],
     ["05-home-bands-2d-shoulder", 0, 0],
     ["06-commercial-cardio-3d", 0, 0],
-    ["07-home-kettlebell-7d-wrist", 6, 0],
-    ["08-commercial-recovery-1d-hip", 1, 0]
+    ["07-home-kettlebell-7d-wrist", 0, 0],
+    ["08-commercial-recovery-1d-hip", 0, 0]
   ])("%s: no break, %i injury hits, %i equipment hits", (name, injury, equipment) => {
     const score = scorePlan(profileNamed(name), ok(readFixture(name)));
 
@@ -293,26 +293,55 @@ describe("scorePlan's equipment hits", () => {
 });
 
 describe("scorePlan's injury hits", () => {
-  const hitsFor = (lines, injuries) =>
+  // A hit is a line naming an exercise the spec's avoid table rules out for an
+  // area the profile names, matched as whole words.
+  const hitsFor = (lines, injuries, health) =>
     scorePlan(
-      homeProfile({ injuries }),
+      homeProfile({ injuries, ...(health ? { health } : {}) }),
       ok(buildPlan({ training: ["Monday"], extra: lines }))
     ).injuryHits.map((hit) => hit.injury);
 
-  test("a line with two keywords of one injury is one hit", () => {
-    expect(hitsFor(["- Squat to reverse lunge: 3 x 8"], "Knee")).toEqual(["knee"]);
+  test("a line with two avoid phrases of one area is one hit", () => {
+    expect(hitsFor(["- Jump to a pistol: 3 x 5"], "Knee")).toEqual(["knee"]);
   });
 
-  test("a line risky for two flagged injuries is a hit for each", () => {
-    expect(hitsFor(["- DB curl to press: 3 x 10"], "Wrist/Elbow")).toEqual(["wrist", "elbow"]);
+  test("a line avoided for two flagged areas is a hit for each", () => {
+    expect(hitsFor(["- Bench dips: 3 x 10"], "Wrist/Elbow")).toEqual(["wrist", "elbow"]);
   });
 
   test("each line counts on its own", () => {
-    expect(hitsFor(["- Lunges: 3 x 10", "- Jump squats: 3 x 8"], "Knee")).toEqual(["knee", "knee"]);
+    expect(hitsFor(["- Box jumps: 3 x 5", "- Pistol squat: 3 x 5"], "Knee")).toEqual([
+      "knee",
+      "knee"
+    ]);
   });
 
-  test("a keyword inside a longer word counts, as the Guides view counts it", () => {
-    expect(hitsFor(["- Overhead pressing: 3 x 8"], "Shoulder")).toEqual(["shoulder"]);
+  test.each([
+    ["- Jumping jacks: 3 x 30 seconds", "Knee", ["knee"]],
+    ["- Upright rows: 3 x 10", "Shoulder", ["shoulder"]],
+    ["- Barbell deadlifts: 3 x 5", "Lower back", ["lower back"]],
+    ["- Barbell skull crushers: 3 x 10", "Wrist/Elbow", ["wrist", "elbow"]],
+    ["- Dumbbell sumo squat: 3 x 10", "Hip", ["hip"]]
+  ])("%s is a hit for %s", (line, injuries, areas) => {
+    expect(hitsFor([line], injuries)).toEqual(areas);
+  });
+
+  // The Guides view's substring keywords counted these; the avoid table does not.
+  test.each([
+    ["- Overhead pressing: 3 x 8", "Shoulder"],
+    ["- Leg press: 3 x 10", "Shoulder"],
+    ["- Standing calf raise: 3 x 15", "Shoulder"],
+    ["- Leg curl: 3 x 12", "Wrist/Elbow"],
+    ["- Goblet squat: 3 x 10", "Knee"],
+    ["- Dumbbell Romanian deadlift: 3 x 10", "Lower back"],
+    ["- Dipping sauce: never", "Shoulder"]
+  ])("%s is no hit for %s", (line, injuries) => {
+    expect(hitsFor([line], injuries)).toEqual([]);
+  });
+
+  test("pregnancy, from the health answers, has its own avoid phrases", () => {
+    expect(hitsFor(["- Burpees: 3 x 10"], "None", { pregnant: true })).toEqual(["pregnancy"]);
+    expect(hitsFor(["- Burpees: 3 x 10"], "None")).toEqual([]);
   });
 
   test("no injury means no hits", () => {
