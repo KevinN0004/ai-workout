@@ -34,6 +34,7 @@
 - [2026-11-02 — Type checking through JSDoc, phase 1](plans/2026-11-02-jsdoc-type-checking.md)
 - [2026-11-02 — Structured plans](plans/2026-11-02-structured-plans.md)
 - [2026-11-02 — Logging a workout against a plan day](plans/2026-11-02-plan-day-logging.md)
+- [2026-11-02 — Planned versus done](plans/2026-11-02-planned-versus-done.md)
 
 ## Specs
 
@@ -48,3 +49,4 @@
 - [2026-11-02 — Type checking through JSDoc](specs/2026-11-02-jsdoc-type-checking-design.md)
 - [2026-11-02 — Structured plans](specs/2026-11-02-structured-plans-design.md)
 - [2026-11-02 — Logging a workout against a plan day](specs/2026-11-02-plan-day-logging-design.md)
+- [2026-11-02 — Planned versus done](specs/2026-11-02-planned-versus-done-design.md)
