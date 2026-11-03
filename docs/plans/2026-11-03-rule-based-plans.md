@@ -17,7 +17,9 @@ are not repeated here.
 **Tech Stack:** Express 5, React 19, `@google/genai` 2.31, Vitest 5 with v8 coverage,
 supertest, Testing Library, Node 24, GitHub Actions, gh CLI.
 
-**Status: a plan.** Every file and line below was read on `ef481e8`.
+**Status: in progress.** Tasks 1 to 4 are done (#329 to #332). Task 7 ships before Task 5,
+because Task 5 rewrites the prompt module that the runner Task 7 deletes still imports.
+Every file and line below was read on `ef481e8`.
 
 ---
 
@@ -264,11 +266,13 @@ Steps:
       the old timeout.
 - [ ] Gates and coverage.
 
-## Task 7: retire the live eval run (PR 7)
+## Task 7: retire the live eval run (PR 5, shipped before Task 5)
 
 - [ ] Delete `scripts/evals/run.mjs` and its tests, `scripts/evals/reference.json`,
       `.github/workflows/plan-evals.yml`, the `eval:plans` script, the root `@google/genai`
       devDependency, and the `scripts/evals/out/` ignore line.
+- [ ] Delete `scripts/evals/summarize.mjs` and its tests too: its run summary and reference
+      comparison have no caller once the runner is gone.
 - [ ] Update `scripts/README.md` and `CLAUDE.md`'s Build & Test list.
 - [ ] Make `DEFAULT_MAX_OUTPUT_TOKENS` and `DEFAULT_TIMEOUT_MS` module-private again once
       `run.mjs` is gone, since nothing else imports them. `npm run knip` confirms.
