@@ -159,7 +159,10 @@ The variants are convention.
 ### The injury rules, shared
 
 `server/src/services/planning/injuryRules.js` holds the area names and their name forms,
-`coveredBy`, `detectInjuryFlags` and `buildInjuryText`, moved from `recommendationUtils.js`.
+`coveredBy`, `buildInjuryText`, and `detectInjuryAreas`, the server's form of
+`detectInjuryFlags` that returns the areas alone, copied from `recommendationUtils.js`. The
+exercise keywords and penalties stay on the client, since only the Guides view's scoring reads
+them.
 On the server they do one job: **map the injuries answer, a planner option or free text, to
 areas.** They match whole words, not substrings. Library entries are judged by their `flags`,
 never by name keywords. Free text that maps to no area is kept, and the notes say the plan
