@@ -107,6 +107,32 @@ test.describe.serial("accessibility", () => {
     await expect(page.getByRole("dialog", { name: "Log workout" })).toBeHidden();
   });
 
+  // Tab must not leave an open modal for the page behind it. Focus moves in
+  // when the modal opens, Tab and Shift+Tab go round inside it, and closing it
+  // hands focus back to the button that opened it.
+  test("an open modal holds keyboard focus, and returns it on close", async () => {
+    const opener = page.getByRole("button", { name: "Add workout" }).first();
+    await opener.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Log workout" });
+    await expect(dialog).toBeVisible();
+
+    const focusIsInside = () =>
+      page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+    expect(await focusIsInside()).toBe(true);
+    // More presses than the modal has controls, both ways round.
+    for (const key of ["Tab", "Shift+Tab"]) {
+      for (let press = 0; press < 25; press += 1) {
+        await page.keyboard.press(key);
+        expect(await focusIsInside(), `${key} press ${press + 1}`).toBe(true);
+      }
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
+  });
+
   // The planner is four steps in one dialog, and each step renders its own
   // controls. Its steps fade in, and axe scanning mid-fade measures colours
   // half drawn, so this runs with reduced motion, which the app honours.

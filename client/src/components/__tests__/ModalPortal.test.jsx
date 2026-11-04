@@ -103,4 +103,47 @@ describe("ModalPortal", () => {
       expect(() => fireEvent.keyDown(document, { key: "Escape" })).not.toThrow();
     });
   });
+
+  // Every modal goes through here, so holding focus here covers them all:
+  // focus moves into the modal, cannot Tab out to the page behind, and goes
+  // back to the opener on close. useFocusTrap's own tests cover the edges.
+  describe("holding focus", () => {
+    const Page = ({ open }) => (
+      <>
+        <button type="button">Opener</button>
+        <ModalPortal open={open}>
+          <div role="dialog" aria-label="Example">
+            <button type="button">Close</button>
+            <button type="button">Save</button>
+          </div>
+        </ModalPortal>
+        <button type="button">Behind</button>
+      </>
+    );
+
+    test("moves focus into the modal, keeps it there, and returns it on close", () => {
+      const view = render(<Page open={false} />);
+      screen.getByRole("button", { name: "Opener" }).focus();
+
+      view.rerender(<Page open />);
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
+
+      fireEvent.keyDown(document.activeElement, { key: "Tab" });
+      screen.getByRole("button", { name: "Behind" }).focus();
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
+
+      view.rerender(<Page open={false} />);
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Opener" }));
+    });
+
+    // The wrapper that carries the trap's ref must not change the layout:
+    // every backdrop is position: fixed against the viewport.
+    test("wraps the modal in an element that draws no box", () => {
+      render(<Page open />);
+
+      const wrapper = screen.getByRole("dialog").parentElement;
+      expect(wrapper.parentElement).toBe(document.body);
+      expect(wrapper.style.display).toBe("contents");
+    });
+  });
 });
