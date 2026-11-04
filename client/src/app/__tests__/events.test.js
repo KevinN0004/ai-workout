@@ -1038,14 +1038,14 @@ describe("onSubmit", () => {
     expect(JSON.parse(options.body)).toEqual({ goal: "build muscle", days: 4 });
   });
 
-  // The server gives Gemini 30 s by default (GEMINI_TIMEOUT_MS), so the
-  // client's 15 s default would give up on every slow plan the server serves.
-  test("waits longer than the server's own generation deadline", async () => {
+  // The server gives Gemini's notes 8 s by default (GEMINI_TIMEOUT_MS) and then
+  // writes them by rule, so 20 s covers that deadline, the save and the network.
+  test("waits longer than the server's own notes deadline", async () => {
     deps.apiFetch.mockResolvedValue(generated());
 
     await build().onSubmit(submitEvent());
 
-    expect(deps.apiFetch.mock.calls[0][1].timeoutMs).toBe(40000);
+    expect(deps.apiFetch.mock.calls[0][1].timeoutMs).toBe(20000);
   });
 
   test("clears the previous result and error before starting", async () => {

@@ -7,7 +7,10 @@ The client is a React 19 + Vite application for the AI Workout user experience. 
 - Multi-step home flow for profile capture, body visualization, workout setup, and preview
 - Authentication screens for login and signup
 - Dashboard routes for summary, workout logs, goals, weekly plans, meal prep, exercise guides, and settings
-- The planner setup modal, and the generated plan's page (`/plan`) with PDF export
+- The planner setup modal, and the generated plan's page (`/plan`) with PDF export. The
+  planner's last step is a four-question health check: a yes keeps the plan at a pace where
+  you can talk and adds a note to check with a health professional, and the answers are sent
+  with the request but never saved
 - CSRF-aware API helper for authenticated writes
 - Local caching for dashboard, weather, and air-quality data
 

@@ -20,10 +20,11 @@ import { getLocalDateKey, splitFullName } from "./units";
 const LOGOUT_FLUSH_CAP_MS = 5000;
 
 // How long plan generation may take before the client gives up, in
-// milliseconds: the server's own deadline (GEMINI_TIMEOUT_MS, 30 s unless set)
-// plus room for the save and the network. A deployment that raises that
-// setting past about 35 s has to raise this with it.
-const GENERATE_TIMEOUT_MS = 40000;
+// milliseconds: the server's deadline for the coach notes (GEMINI_TIMEOUT_MS,
+// 8 s unless set), after which it writes them by rule, plus room for the save
+// and the network. A deployment that raises that setting past about 15 s has to
+// raise this with it.
+const GENERATE_TIMEOUT_MS = 20000;
 
 // Settles when `promise` does or after `ms`, whichever comes first, and clears
 // its timer either way, so a quick promise leaves no timer behind.

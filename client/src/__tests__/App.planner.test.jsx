@@ -256,6 +256,33 @@ describe("the planner's equipment picker", () => {
       expect(equipment()).toEqual([]);
     });
 
+    test("a health answer sets one question and leaves the rest", () => {
+      expect(planner.props.form.health).toEqual({
+        condition: false,
+        symptoms: false,
+        supervised: false,
+        pregnant: false
+      });
+
+      act(() => planner.props.setHealthAnswer("symptoms", true));
+      expect(planner.props.form.health).toEqual({
+        condition: false,
+        symptoms: true,
+        supervised: false,
+        pregnant: false
+      });
+
+      act(() => planner.props.setHealthAnswer("symptoms", false));
+      expect(planner.props.form.health.symptoms).toBe(false);
+    });
+
+    test("closing the planner clears the health answers too", () => {
+      act(() => planner.props.setHealthAnswer("pregnant", true));
+      act(() => planner.props.closePlanner());
+
+      expect(planner.props.form.health.pregnant).toBe(false);
+    });
+
     test("a focus toggle adds and removes", () => {
       const focus = "Strength";
 
