@@ -243,7 +243,8 @@ sides is asserted without a browser or a database: `app/__tests__/constants.test
 `__tests__/serverBounds.contract.test.jsx`. Keep such imports to test files.
 
 **Otherwise the E2E suite is the only thing that runs both halves together**, and it is
-deliberately tiny: sign up, log a workout, reload, confirm it survived. Five things to know
+deliberately tiny: sign up, log a workout, reload, confirm it survived, and generate a plan
+and log a day of it. Five things to know
 before touching it ([0005](docs/adr/0005-testing-across-the-wire.md) has the history):
 
 - **It runs against the built bundle** via `vite preview` on 4173, so
@@ -258,8 +259,8 @@ before touching it ([0005](docs/adr/0005-testing-across-the-wire.md) has the his
 - **Do not set `NODE_ENV=test` for the server it starts.** The process then loads,
   exports, and exits 0 with no output at all — which reads exactly like a crash.
 - **Geolocation is left denied**, so the dashboard never reaches the live weather and
-  air-quality upstreams. Plan generation is not covered yet, though it no longer needs a
-  key: the rules build the plan and write its notes without Gemini.
+  air-quality upstreams. Plan generation needs no key, and the config sets
+  `GEMINI_API_KEY` empty so the notes are always the rule-written ones.
 - **Each run creates an account and deletes it** before the file ends. A run that fails
   before that step leaves the row behind in a local database.
 
