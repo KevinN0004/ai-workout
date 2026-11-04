@@ -101,7 +101,11 @@ export default defineConfig({
         // it out here is what proves that. CORS itself is
         // covered by index.cors.test.js and corsPolicy.test.js.
         CLIENT_ORIGIN: baseURL,
-        LOG_LEVEL: "warn"
+        LOG_LEVEL: "warn",
+        // Empty, not absent: dotenv fills only absent keys, so this keeps a
+        // key in server/.env from reaching Gemini. Plans are built by rule and
+        // their notes written by rule, so plan.spec.js is deterministic.
+        GEMINI_API_KEY: ""
       }
     },
     {

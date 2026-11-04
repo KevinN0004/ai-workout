@@ -66,8 +66,11 @@ survived. Five things are worth knowing before touching it:
   and exits 0 with no output at all — which reads exactly like a crash.
 - **Geolocation is left denied**, so the dashboard takes its own "location
   unavailable" path instead of reaching the live weather and air-quality
-  upstreams. Plan generation is out of scope for the same reason: it needs a
-  real Gemini key.
+  upstreams. Plan generation was out of scope while it needed a real Gemini
+  key. Since rule-based plans (#329 to #336) it needs none, and `plan.spec.js`
+  covers it: `playwright.config.js` sets `GEMINI_API_KEY` empty, so a key in
+  `server/.env` never reaches Gemini and the notes are the rule-written ones.
+  Its account is `plan-<timestamp>@example.test`, deleted in `afterAll`.
 - **Each run creates an account** (`e2e-<timestamp>@example.test`) and now
   deletes it before the file ends. `smoke.spec.js` deletes it as its last
   test, the thing under test; `a11y.spec.js` deletes its own account

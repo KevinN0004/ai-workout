@@ -8,8 +8,8 @@ import { expect, test } from "@playwright/test";
 // never sees the browser half. A defect in the wiring between them -- a cookie
 // flag, a missing header, a proxy path -- passes both suites and breaks the app.
 //
-// Deliberately not covered here: plan generation, which calls Gemini and cannot
-// run without a live key, and weather/air quality, which need geolocation.
+// Deliberately not covered here: plan generation, which plan.spec.js covers,
+// and weather/air quality, which need geolocation.
 // Geolocation is left denied in playwright.config.js, so the dashboard takes its
 // own "location unavailable" path instead of reaching two live upstreams.
 
