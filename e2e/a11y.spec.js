@@ -107,6 +107,47 @@ test.describe.serial("accessibility", () => {
     await expect(page.getByRole("dialog", { name: "Log workout" })).toBeHidden();
   });
 
+  // The planner is four steps in one dialog, and each step renders its own
+  // controls. Its steps fade in, and axe scanning mid-fade measures colours
+  // half drawn, so this runs with reduced motion, which the app honours.
+  test("each step of the planner has no violations", async () => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/dashboard/plans");
+    await page.getByRole("button", { name: "Create weekly plan" }).first().click();
+    const planner = page.getByRole("dialog");
+
+    for (const step of ["Environment", "Schedule", "Focus", "Health check"]) {
+      await expect(planner.getByRole("heading", { name: step })).toBeVisible();
+      expectNoViolations(await analyze(page));
+      if (step !== "Health check") await planner.getByRole("button", { name: "Next" }).click();
+    }
+
+    // The health check's PAR-Q+ link is the only link in the planner. axe
+    // cannot settle the background behind it and files it as incomplete, not
+    // as a violation, so its contrast is measured here: WCAG's ratio of the
+    // link's colour against the modal's, at least 4.5 for body-size text.
+    const ratio = await planner.getByRole("link", { name: "PAR-Q+" }).evaluate((link) => {
+      const luminance = (css) => {
+        const [r, g, b] = css
+          .match(/[\d.]+/g)
+          .slice(0, 3)
+          .map((value) => {
+            const channel = Number(value) / 255;
+            return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const fore = luminance(getComputedStyle(link).color);
+      const back = luminance(getComputedStyle(link.closest(".modal")).backgroundColor);
+      return (Math.max(fore, back) + 0.05) / (Math.min(fore, back) + 0.05);
+    });
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+
+    await page.keyboard.press("Escape");
+    await expect(planner).toBeHidden();
+    await page.emulateMedia({ reducedMotion: null });
+  });
+
   // The profile edit form is the newest form in the app and carries markup
   // nothing else here does: two number inputs that together mean one height,
   // and an inline error beside the controls rather than in a dialog. It is

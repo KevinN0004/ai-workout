@@ -1,6 +1,6 @@
-﻿/* PlannerSetupModal, the planner modal App builds for HomePage and DashboardPage: its three
-   steps, its header and its training form. Imported first of the four planner sheets by
-   styles/app.css. */
+﻿/* PlannerSetupModal, the planner modal App builds for HomePage and DashboardPage: its four
+   steps, its header, its training form and the health check's link. Imported first of the
+   four planner sheets by styles/app.css. */
 
 /* ---- Setup modal steps --------------------------------------------------- */
 .step-panel {
@@ -197,4 +197,16 @@
 .planner-step-two-form label input {
   width: 100%;
   min-height: 44px;
+}
+
+/* ---- Health check (step 4) ----------------------------------------------- */
+/* The PAR-Q+ link. The modal is near black, where the browser's own link blue reads at
+   about 2:1, so it takes the dashboard modals' link colours instead. */
+.planner-setup-modal a {
+  color: #f5f5f5;
+  text-underline-offset: 2px;
+}
+
+.planner-setup-modal a:hover {
+  color: #ffffff;
 }
