@@ -83,7 +83,9 @@ describe("DashboardDrawer", () => {
       const onClose = vi.fn();
       renderDrawer(true, onClose);
 
-      await user.keyboard("{Enter}a");
+      // Not Enter or Space: the drawer focuses its Close button when it opens,
+      // and those would press it.
+      await user.keyboard("a{ArrowDown}");
 
       expect(onClose).not.toHaveBeenCalled();
     });
@@ -109,5 +111,42 @@ describe("DashboardDrawer", () => {
 
       expect(onClose).not.toHaveBeenCalled();
     });
+  });
+
+  // The drawer is not portalled through ModalPortal, so it holds focus with
+  // the same hook directly: focus moves in, Tab goes round inside the panel,
+  // and closing hands focus back to the menu button.
+  test("holds keyboard focus while open and returns it on close", async () => {
+    const user = userEvent.setup();
+    const Page = ({ open }) => (
+      <>
+        <button type="button">Open dashboard menu</button>
+        <DashboardDrawer
+          open={open}
+          dashView="summary"
+          items={items}
+          onClose={vi.fn()}
+          onNavigate={vi.fn()}
+        />
+        <button type="button">Behind</button>
+      </>
+    );
+    const view = render(<Page open={false} />);
+    const menuButton = screen.getByRole("button", { name: "Open dashboard menu" });
+    menuButton.focus();
+
+    view.rerender(<Page open />);
+    expect(screen.getByRole("button", { name: "Close dashboard menu" })).toHaveFocus();
+
+    // Close, Home, Logs, Settings: four Tabs come back round to Close.
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Close dashboard menu" })).toHaveFocus();
+
+    view.rerender(<Page open={false} />);
+    expect(menuButton).toHaveFocus();
   });
 });
