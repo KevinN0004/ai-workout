@@ -175,6 +175,13 @@ test.describe.serial("accessibility", () => {
     expect(await tappable(planner.getByRole("button", { name: "Next" }))).toBe("tappable");
     await page.keyboard.press("Escape");
 
+    // The drawer fills a phone's width and keeps Settings at its foot, where
+    // the bar is.
+    await page.getByRole("button", { name: "Open dashboard menu" }).click();
+    const drawer = page.locator("aside.drawer");
+    expect(await tappable(drawer.getByRole("button", { name: "Settings" }))).toBe("tappable");
+    await page.keyboard.press("Escape");
+
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.emulateMedia({ reducedMotion: null });
   });
