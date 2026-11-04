@@ -60,3 +60,15 @@ Mutation-tested rather than trusted, because an axe assertion that passes may be
 asserting nothing: removing a modal's `aria-labelledby`, removing the landmark
 wrapper, and disabling the Escape handler are all caught, and all three pass
 every unit suite.
+
+**Focus is held inside an open modal, by a trap rather than by `inert`** (added
+2026-11-04). A browser walkthrough found that Tab walked out of every modal into
+the page behind. `useFocusTrap`, called by `ModalPortal`, moves focus to the
+modal's first control on open, wraps Tab and Shift+Tab at its edges, pulls back
+focus that lands outside, and returns focus to the opener on close. Marking the
+page `inert` would do the same for the keyboard, but it also takes the
+dashboard's toast, a `role="status"` live region inside `#root`, out of the
+accessibility tree, and the exercise modal raises a toast while it stays open.
+The modals already carry `aria-modal="true"`. `e2e/a11y.spec.js` presses Tab and
+Shift+Tab 25 times each in the Log workout modal and checks that focus never
+leaves it. The axe scan passed throughout, so it was not the guard on this.
