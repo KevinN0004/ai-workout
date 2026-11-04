@@ -148,6 +148,44 @@ test.describe.serial("accessibility", () => {
     await page.emulateMedia({ reducedMotion: null });
   });
 
+  // On a phone the dashboard shows a fixed bottom bar. Every modal must sit
+  // above it, or the bar takes the tap meant for the modal's own buttons:
+  // each button here is scrolled into view and must be what the centre of
+  // its own box hits.
+  test("on a phone, the bottom bar never covers a modal's buttons", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const tappable = (button) =>
+      button.evaluate((element) => {
+        element.scrollIntoView({ block: "end" });
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return element.contains(hit) ? "tappable" : `covered by ${hit?.textContent?.trim()}`;
+      });
+
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: "Add workout" }).first().click();
+    const workout = page.getByRole("dialog", { name: "Log workout" });
+    expect(await tappable(workout.getByRole("button", { name: "Save workout" }))).toBe("tappable");
+    await page.keyboard.press("Escape");
+
+    await page.goto("/dashboard/plans");
+    await page.getByRole("button", { name: "Create weekly plan" }).first().click();
+    const planner = page.getByRole("dialog");
+    expect(await tappable(planner.getByRole("button", { name: "Next" }))).toBe("tappable");
+    await page.keyboard.press("Escape");
+
+    // The drawer fills a phone's width and keeps Settings at its foot, where
+    // the bar is.
+    await page.getByRole("button", { name: "Open dashboard menu" }).click();
+    const drawer = page.locator("aside.drawer");
+    expect(await tappable(drawer.getByRole("button", { name: "Settings" }))).toBe("tappable");
+    await page.keyboard.press("Escape");
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.emulateMedia({ reducedMotion: null });
+  });
+
   // The profile edit form is the newest form in the app and carries markup
   // nothing else here does: two number inputs that together mean one height,
   // and an inline error beside the controls rather than in a dialog. It is
