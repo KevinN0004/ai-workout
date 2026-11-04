@@ -173,13 +173,16 @@
 
 /* ---- Bottom navigation --------------------------------------------------- */
 /* Hidden until responsive.css shows it on narrow screens. DashboardPage renders the bar
-   beside .dashboard-page, so theme.css sets the --dash-* tokens on the bar itself. */
+   beside .dashboard-page, so theme.css sets the --dash-* tokens on the bar itself. Its
+   z-index sits above the sticky title (24) and the profile menu (30) and below every
+   modal backdrop (50) and the drawer (60), which would otherwise lose their bottom
+   edge, and their buttons, under it. */
 .dashboard-bottom-nav {
   position: fixed;
   left: 12px;
   right: 12px;
   bottom: 10px;
-  z-index: 70;
+  z-index: 40;
   display: none;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
