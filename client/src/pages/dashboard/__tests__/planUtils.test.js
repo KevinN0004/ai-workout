@@ -5,8 +5,10 @@ import {
   detectTrack,
   getDailyCalories
 } from "../planUtils";
-import { goalOptions } from "../../../app/constants";
+import { equipmentOptionsByEnv, experienceOptions, goalOptions } from "../../../app/constants";
 import { parsePlanSections } from "../../../app/plans";
+import { generatePlan } from "../../../../../server/src/services/planning/generatePlan.js";
+import { EXERCISES } from "../../../../../server/src/services/planning/exerciseLibrary.js";
 
 // The eight real Gemini answers the server's plan tests are built on, loaded by
 // Vite as text: under jsdom, node:fs cannot find them from import.meta.url.
@@ -95,6 +97,52 @@ describe("buildPlanDayPrefill", () => {
       exercises: "",
       notes: "Rest / Active Recovery\n(Light walking or gentle stretching permitted)"
     });
+  });
+
+  // Plans are built by rules now, and their bullets are not all exercises: a
+  // ramp-up line names its lift after a "Ramp-up:" label, a superset prefixes
+  // its pair with "A1." and "A2.", and a cool-down is "Easy breathing". A
+  // sample of real rule-built weeks must pre-fill only names from the library.
+  test("pre-fills only library exercises from rule-built plans", () => {
+    const names = new Set(EXERCISES.map((exercise) => exercise.name));
+    const setups = [
+      { environment: "Home", equipment: ["Bodyweight only"] },
+      { environment: "Home", equipment: ["Dumbbells", "Adjustable bench"] },
+      { environment: "Commercial", equipment: equipmentOptionsByEnv.Commercial }
+    ];
+    const texts = [];
+    const strays = new Set();
+    for (const setup of setups)
+      for (const level of experienceOptions)
+        for (const duration of [20, 30, 45, 60, 90])
+          for (const focuses of [[], ["Mobility"], ["Cardio"]])
+            for (const injuries of ["None", "Knee"])
+              for (const days of [3, 5]) {
+                const { text } = generatePlan({
+                  ...setup,
+                  goal: goalOptions[0],
+                  level,
+                  days,
+                  duration,
+                  injuries,
+                  focuses,
+                  health: {},
+                  age: null
+                });
+                texts.push(text);
+                for (const day of parsePlanSections(text).days) {
+                  const { exercises } = buildPlanDayPrefill(day);
+                  for (const name of exercises ? exercises.split(", ") : [])
+                    if (!names.has(name)) strays.add(name);
+                }
+              }
+
+    // The sample holds every kind of bullet that is not an exercise.
+    const all = texts.join("\n");
+    expect(all).toMatch(/^- Ramp-up: /m);
+    expect(all).toMatch(/^- A1\. /m);
+    expect(all).toMatch(/^- Easy breathing: /m);
+    expect([...strays]).toEqual([]);
   });
 });
 
