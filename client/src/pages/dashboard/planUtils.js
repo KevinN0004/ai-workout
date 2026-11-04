@@ -192,16 +192,20 @@ const PREFILL_MAX_EXERCISE_LENGTH = 140;
 const PREFILL_MAX_NOTES = 500;
 
 // An exercise name from a "- Name: prescription" bullet, without its bracketed
-// asides, or "" for a rest line or a name the form cannot hold: the exercises
-// field is split on commas, and an aside is where real plans put theirs.
+// asides or a superset's "A1." label, or "" for a line that names no exercise
+// (a rest, a ramp-up of the lift after it, a cool-down) or a name the form
+// cannot hold: the exercises field is split on commas, and an aside is where
+// real plans put theirs.
+const NOT_AN_EXERCISE = /^(rest|ramp-up|easy breathing|easy cooldown)\b/i;
 const exerciseNameOf = (line) => {
   if (!line.startsWith("- ")) return "";
   const name = line
     .slice(2)
     .split(":")[0]
     .replace(/\s*\([^)]*\)/g, "")
+    .replace(/^[A-Z]\d\.\s+/, "")
     .trim();
-  if (/^rest\b/i.test(name) || name.includes(",")) return "";
+  if (NOT_AN_EXERCISE.test(name) || name.includes(",")) return "";
   return name.length <= PREFILL_MAX_EXERCISE_LENGTH ? name : "";
 };
 
