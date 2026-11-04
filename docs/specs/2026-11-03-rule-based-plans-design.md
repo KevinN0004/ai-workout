@@ -1,7 +1,8 @@
 # Rule-based plans, design
 
 Status: **decided 2026-11-03, revised the same day against the evidence review**
-(`docs/specs/2026-11-03-rule-based-plans-evidence.md`); nothing applied. The plan is
+(`docs/specs/2026-11-03-rule-based-plans-evidence.md`); **applied 2026-11-04** in #330 to
+#336, all live. The plan is
 `docs/plans/2026-11-03-rule-based-plans.md`. This replaces the rest of roadmap B3 as
 `docs/specs/2026-11-03-plan-quality-evals-design.md` planned it: its scorers stay, as the
 gate below, and its live eval run goes.

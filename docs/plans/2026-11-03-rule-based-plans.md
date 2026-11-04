@@ -17,9 +17,10 @@ are not repeated here.
 **Tech Stack:** Express 5, React 19, `@google/genai` 2.31, Vitest 5 with v8 coverage,
 supertest, Testing Library, Node 24, GitHub Actions, gh CLI.
 
-**Status: in progress.** Tasks 1 to 4 are done (#329 to #332). Task 7 ships before Task 5,
-because Task 5 rewrites the prompt module that the runner Task 7 deletes still imports.
-Every file and line below was read on `ef481e8`.
+**Status: done 2026-11-04** (#329 to #336, all live; main `a829396`). Task 7 shipped before
+Task 5 (#333, then #334), because Task 5 rewrote the prompt module that the runner Task 7
+deleted still imported. Task 9 raised the server floors only (#336); the client figures
+equalled its floors. Every file and line below was read on `ef481e8`.
 
 ---
 

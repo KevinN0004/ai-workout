@@ -258,8 +258,8 @@ before touching it ([0005](docs/adr/0005-testing-across-the-wire.md) has the his
 - **Do not set `NODE_ENV=test` for the server it starts.** The process then loads,
   exports, and exits 0 with no output at all — which reads exactly like a crash.
 - **Geolocation is left denied**, so the dashboard never reaches the live weather and
-  air-quality upstreams, and plan generation is out of scope, because it needs a real
-  Gemini key.
+  air-quality upstreams. Plan generation is not covered yet, though it no longer needs a
+  key: the rules build the plan and write its notes without Gemini.
 - **Each run creates an account and deletes it** before the file ends. A run that fails
   before that step leaves the row behind in a local database.
 
