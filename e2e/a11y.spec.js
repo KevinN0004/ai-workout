@@ -133,6 +133,29 @@ test.describe.serial("accessibility", () => {
     await expect(opener).toBeFocused();
   });
 
+  // The menu drawer is the one overlay not portalled through ModalPortal, so
+  // it holds focus on its own, and is checked on its own.
+  test("the menu drawer holds keyboard focus, and returns it on close", async () => {
+    const menuButton = page.getByRole("button", { name: "Open dashboard menu" });
+    await menuButton.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { name: "Dashboard menu" })).toBeVisible();
+
+    const focusIsInside = () =>
+      page.evaluate(() => Boolean(document.activeElement?.closest("aside.drawer")));
+    expect(await focusIsInside()).toBe(true);
+    for (const key of ["Tab", "Shift+Tab"]) {
+      for (let press = 0; press < 15; press += 1) {
+        await page.keyboard.press(key);
+        expect(await focusIsInside(), `${key} press ${press + 1}`).toBe(true);
+      }
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("heading", { name: "Dashboard menu" })).toBeHidden();
+    await expect(menuButton).toBeFocused();
+  });
+
   // The planner is four steps in one dialog, and each step renders its own
   // controls. Its steps fade in, and axe scanning mid-fade measures colours
   // half drawn, so this runs with reduced motion, which the app honours.
