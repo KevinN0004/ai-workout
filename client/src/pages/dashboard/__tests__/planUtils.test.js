@@ -8,6 +8,10 @@ import {
 import { equipmentOptionsByEnv, experienceOptions, goalOptions } from "../../../app/constants";
 import { parsePlanSections } from "../../../app/plans";
 import { generatePlan } from "../../../../../server/src/services/planning/generatePlan.js";
+import {
+  buildPlanPayload,
+  withPrescriptions
+} from "../../../../../server/src/services/dashboard/planPayloadService.js";
 import { EXERCISES } from "../../../../../server/src/services/planning/exerciseLibrary.js";
 
 // The eight real Gemini answers the server's plan tests are built on, loaded by
@@ -132,13 +136,16 @@ describe("buildPlanDayPrefill", () => {
     ];
     const texts = [];
     const strays = new Set();
+    // The same weeks as a rule-built plan saves them, prescriptions and all.
+    const prescribedStrays = new Set();
+    let prescribedCards = 0;
     for (const setup of setups)
       for (const level of experienceOptions)
         for (const duration of [20, 30, 45, 60, 90])
           for (const focuses of [[], ["Mobility"], ["Cardio"]])
             for (const injuries of ["None", "Knee"])
               for (const days of [3, 5]) {
-                const { text } = generatePlan({
+                const { text, week } = generatePlan({
                   ...setup,
                   goal: goalOptions[0],
                   level,
@@ -154,6 +161,12 @@ describe("buildPlanDayPrefill", () => {
                   for (const name of namesOf(buildPlanDayPrefill(day)))
                     if (!names.has(name)) strays.add(name);
                 }
+                for (const day of withPrescriptions(buildPlanPayload(text), week).days) {
+                  const cards = buildPlanDayPrefill(day).exerciseSets;
+                  prescribedCards += cards.length;
+                  for (const card of cards)
+                    if (!names.has(card.name)) prescribedStrays.add(card.name);
+                }
               }
 
     // The sample holds every kind of bullet that is not an exercise.
@@ -162,6 +175,85 @@ describe("buildPlanDayPrefill", () => {
     expect(all).toMatch(/^- A1\. /m);
     expect(all).toMatch(/^- Easy breathing: /m);
     expect([...strays]).toEqual([]);
+    expect(prescribedCards).toBeGreaterThan(0);
+    expect([...prescribedStrays]).toEqual([]);
+  });
+
+  // Roadmap B1: a rule-built day carries its prescriptions, so its cards open
+  // with the prescribed rows, counted the prescribed way, and the targets as
+  // placeholders. A target is a placeholder, never a value: every row opens
+  // empty.
+  describe("from a rule-built day's prescriptions", () => {
+    const prescription = (fields) => ({
+      name: "Dumbbell bench press",
+      sets: 3,
+      reps: { min: 8, max: 10 },
+      seconds: null,
+      perSide: false,
+      targetRpe: { min: 8, max: 9 },
+      ...fields
+    });
+    const day = (prescriptions) => ({
+      title: "Monday - Full body A",
+      lines: ["- Dumbbell bench press: 3 x 8-10 (Rest 90s, stop 2 reps short of failure)"],
+      prescriptions
+    });
+
+    test("opens a card per prescription, with its rows and its targets", () => {
+      const [card] = buildPlanDayPrefill(day([prescription({})])).exerciseSets;
+
+      expect(card).toMatchObject({
+        name: "Dumbbell bench press",
+        kind: "reps",
+        perSide: false,
+        targets: { amount: "8-10", rpe: "8-9" }
+      });
+      expect(card.sets).toHaveLength(3);
+      for (const row of card.sets) expect(row).toMatchObject({ amount: "", load: "", rpe: "" });
+    });
+
+    test("counts seconds for a hold, each side where it says so, with no RPE target", () => {
+      const [card] = buildPlanDayPrefill(
+        day([
+          prescription({
+            name: "Side plank",
+            reps: null,
+            seconds: { min: 20, max: 30 },
+            perSide: true,
+            targetRpe: null
+          })
+        ])
+      ).exerciseSets;
+
+      expect(card).toMatchObject({
+        name: "Side plank",
+        kind: "seconds",
+        perSide: true,
+        targets: { amount: "20-30", rpe: "" }
+      });
+    });
+
+    test("writes a single number for a range that is one value", () => {
+      const [card] = buildPlanDayPrefill(
+        day([prescription({ reps: { min: 6, max: 6 }, targetRpe: { min: 8, max: 8 } })])
+      ).exerciseSets;
+
+      expect(card.targets).toEqual({ amount: "6", rpe: "8" });
+    });
+
+    // A rule-built day that prescribes no sets, a cardio day, opens no cards
+    // rather than guessing names from its lines.
+    test("opens no cards for a day that prescribes none", () => {
+      expect(buildPlanDayPrefill(day([])).exerciseSets).toEqual([]);
+    });
+
+    test("opens at most 18 cards", () => {
+      const many = Array.from({ length: 20 }, (_, index) =>
+        prescription({ name: `Exercise ${index + 1}` })
+      );
+
+      expect(buildPlanDayPrefill(day(many)).exerciseSets).toHaveLength(18);
+    });
   });
 });
 

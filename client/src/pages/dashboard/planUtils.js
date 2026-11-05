@@ -209,18 +209,41 @@ const exerciseNameOf = (line) => {
   return name.length <= PREFILL_MAX_EXERCISE_LENGTH ? name : "";
 };
 
+// A prescribed range as a placeholder reads it: "8-10", or "6" when it is one
+// value; "" for none.
+const rangeText = (range) =>
+  range ? (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`) : "";
+
+// The card a prescription opens: its rows, counted the prescribed way, with
+// its targets as placeholders. Every row opens empty.
+const cardFromPrescription = (prescription) =>
+  newCard({
+    name: prescription.name,
+    kind: prescription.seconds ? "seconds" : "reps",
+    perSide: prescription.perSide,
+    targets: {
+      amount: rangeText(prescription.reps ?? prescription.seconds),
+      rpe: rangeText(prescription.targetRpe)
+    },
+    rows: prescription.sets
+  });
+
 /**
  * The Log workout form's fields for a day of a saved plan: the day's title as
- * the focus, an exercise card with one empty set row for each name its
- * bullets prescribe (at most 18), and the day's lines as the notes, cut at 500
- * characters. The sets themselves are left to the person logging.
+ * the focus, its exercise cards (at most 18), and the day's lines as the
+ * notes, cut at 500 characters. A rule-built day's cards come from its
+ * prescriptions, with the prescribed rows and targets; any other day's are a
+ * card with one empty row for each name its bullets prescribe. The sets
+ * themselves are left to the person logging.
  */
 export const buildPlanDayPrefill = (day) => ({
   focus: day.title,
-  exerciseSets: day.lines
-    .map(exerciseNameOf)
-    .filter(Boolean)
-    .slice(0, PREFILL_MAX_EXERCISES)
-    .map((name) => newCard({ name })),
+  exerciseSets: Array.isArray(day.prescriptions)
+    ? day.prescriptions.slice(0, PREFILL_MAX_EXERCISES).map(cardFromPrescription)
+    : day.lines
+        .map(exerciseNameOf)
+        .filter(Boolean)
+        .slice(0, PREFILL_MAX_EXERCISES)
+        .map((name) => newCard({ name })),
   notes: day.lines.join("\n").slice(0, PREFILL_MAX_NOTES)
 });
