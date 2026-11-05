@@ -1,6 +1,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { PLAN_PAYLOAD_VERSION, buildPlanPayload, toPlanPayload } from "../planPayloadService.js";
+import {
+  PLAN_PAYLOAD_VERSION,
+  buildPlanPayload,
+  toPlanPayload,
+  withPrescriptions
+} from "../planPayloadService.js";
 
 // The structure a generated plan is saved with. The fixtures are eight real
 // /api/generate answers, captured on 2026-11-02 for synthetic planner profiles
@@ -263,5 +268,86 @@ describe("toPlanPayload", () => {
     ["notes that are not a list of strings", { ...valid(), notes: "Sleep well" }]
   ])("returns null for %s", (_label, value) => {
     expect(toPlanPayload(value)).toBeNull();
+  });
+});
+
+// Roadmap B1: a rule-built plan's days carry the generator's prescriptions, an
+// optional field at payload version 1. A day that has them is checked; a
+// malformed list is dropped from its day, and the rest of the plan stands.
+describe("the days' prescriptions", () => {
+  const bench = {
+    name: "Dumbbell bench press",
+    sets: 3,
+    reps: { min: 8, max: 10 },
+    seconds: null,
+    perSide: false,
+    targetRpe: { min: 8, max: 8 }
+  };
+  const plank = {
+    name: "Plank",
+    sets: 3,
+    reps: null,
+    seconds: { min: 20, max: 30 },
+    perSide: false,
+    targetRpe: null
+  };
+  const text = "Monday - Push\n- Dumbbell bench press: 3 x 8-10\nTuesday\nRest day.";
+  const week = [
+    { weekday: "Monday", prescriptions: [bench, plank] },
+    { weekday: "Tuesday", prescriptions: [] }
+  ];
+
+  test("withPrescriptions joins each weekday's prescriptions to its parsed day", () => {
+    const payload = withPrescriptions(buildPlanPayload(text), week);
+
+    expect(payload.days.map((day) => day.prescriptions)).toEqual([[bench, plank], []]);
+  });
+
+  test("a parsed day the generator did not write gets none, and so does a day with no weekday", () => {
+    const payload = withPrescriptions(buildPlanPayload("Do 20 push-ups"), week);
+
+    expect(payload.days[0]).not.toHaveProperty("prescriptions");
+    expect(withPrescriptions(buildPlanPayload(text), [week[0]]).days[1]).not.toHaveProperty(
+      "prescriptions"
+    );
+  });
+
+  test("toPlanPayload accepts days with and without prescriptions", () => {
+    const withThem = withPrescriptions(buildPlanPayload(text), week);
+
+    expect(toPlanPayload(withThem)).toEqual(withThem);
+    expect(toPlanPayload(buildPlanPayload(text))).toEqual(buildPlanPayload(text));
+  });
+
+  test.each([
+    ["a missing name", { ...bench, name: "" }],
+    ["no sets", { ...bench, sets: 0 }],
+    ["a fraction of a set", { ...bench, sets: 2.5 }],
+    ["a range whose min passes its max", { ...bench, reps: { min: 10, max: 8 } }],
+    ["a negative range", { ...bench, reps: { min: -1, max: 8 } }],
+    ["both reps and seconds", { ...bench, seconds: { min: 20, max: 30 } }],
+    ["neither reps nor seconds", { ...bench, reps: null }],
+    ["a perSide that is not a boolean", { ...bench, perSide: "yes" }],
+    ["a target that is not a range", { ...bench, targetRpe: 8 }],
+    ["an entry that is not an object", "bench"]
+  ])("drops a list holding %s, and keeps the plan", (_label, bad) => {
+    const payload = withPrescriptions(buildPlanPayload(text), [
+      { weekday: "Monday", prescriptions: [bench, bad] },
+      { weekday: "Tuesday", prescriptions: [plank] }
+    ]);
+
+    const read = toPlanPayload(payload);
+
+    expect(read).not.toBeNull();
+    expect(read.days[0]).not.toHaveProperty("prescriptions");
+    expect(read.days[0].lines).toEqual(payload.days[0].lines);
+    expect(read.days[1].prescriptions).toEqual([plank]);
+  });
+
+  test("drops a prescriptions value that is not a list", () => {
+    const payload = buildPlanPayload(text);
+    payload.days[0].prescriptions = { bench };
+
+    expect(toPlanPayload(payload).days[0]).not.toHaveProperty("prescriptions");
   });
 });

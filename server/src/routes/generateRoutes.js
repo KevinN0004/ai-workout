@@ -6,7 +6,7 @@
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { collapseWhitespace } from "../services/dashboard/dashboardDataBuildersService.js";
-import { buildPlanPayload } from "../services/dashboard/planPayloadService.js";
+import { buildPlanPayload, withPrescriptions } from "../services/dashboard/planPayloadService.js";
 import {
   DEFAULT_GEMINI_MODEL,
   NOTES_INSTRUCTION,
@@ -144,7 +144,8 @@ export const registerGenerateRoutes = (app, deps) => {
       });
 
       // Gemini's notes, or the rules' when they cannot be used; the safety
-      // lines follow either. The text and its payload come from one parse.
+      // lines follow either. The text and its payload come from one parse, and
+      // each weekday carries the generator's prescriptions (roadmap B1).
       const asked = await askForNotes({ gemini, fields, planText: plan.text, toPositiveInt });
       req.log?.info(
         {
@@ -156,7 +157,7 @@ export const registerGenerateRoutes = (app, deps) => {
       );
       const notes = [...(asked.lines ?? buildFallbackNotes(plan)), ...buildSafetyNotes(plan)];
       const text = `${plan.text}\n\nCoach Notes:\n${notes.join("\n")}`;
-      const payload = buildPlanPayload(text);
+      const payload = withPrescriptions(buildPlanPayload(text), plan.week);
 
       // Save the plan for a signed-in caller; an anonymous one gets the text only.
       const sessionUser = req.user;

@@ -111,8 +111,26 @@ describe("POST /api/generate", () => {
     test("answers the payload parsed from the text it answers", async () => {
       const response = await post(buildApp());
 
-      expect(response.body.payload).toEqual(buildPlanPayload(response.body.plan));
+      const parsed = buildPlanPayload(response.body.plan);
+      const { days, ...rest } = response.body.payload;
+      expect(rest).toEqual({ version: parsed.version, notes: parsed.notes });
+      expect(days.map(({ prescriptions: _p, ...day }) => day)).toEqual(parsed.days);
       expect(response.body.payload.notes.length).toBeGreaterThan(3);
+    });
+
+    // Roadmap B1: each weekday carries the generator's prescriptions, so
+    // logging the day can pre-fill its sets.
+    test("gives each weekday the generator's prescriptions", async () => {
+      const response = await post(buildApp());
+
+      const monday = response.body.payload.days.find((day) => day.weekday === "Monday");
+      expect(monday.prescriptions.length).toBeGreaterThan(0);
+      for (const prescription of monday.prescriptions) {
+        expect(monday.lines.some((line) => line.includes(`${prescription.name}: `))).toBe(true);
+      }
+      expect(response.body.payload.days.every((day) => Array.isArray(day.prescriptions))).toBe(
+        true
+      );
     });
 
     test("reads the health answers, and lightens the plan for a yes", async () => {
@@ -345,11 +363,14 @@ describe("POST /api/generate", () => {
       expect(Number.isNaN(Date.parse(entry.createdAt))).toBe(false);
     });
 
-    test("saves the payload parsed from the saved text", async () => {
-      await post(buildApp({}, { user: { id: "u-1" } }));
+    test("saves the payload it answers, parsed from the saved text", async () => {
+      const response = await post(buildApp({}, { user: { id: "u-1" } }));
 
       const { entry } = saveGeneratedPlan.mock.calls[0][0];
-      expect(entry.payload).toEqual(buildPlanPayload(entry.plan));
+      expect(entry.payload).toEqual(response.body.payload);
+      expect(entry.payload.days.map(({ prescriptions: _p, ...day }) => day)).toEqual(
+        buildPlanPayload(entry.plan).days
+      );
     });
 
     test("saves nothing for an anonymous caller", async () => {

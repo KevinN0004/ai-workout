@@ -15,6 +15,19 @@
  * @property {string | null} weekday
  * @property {string} title
  * @property {string[]} lines
+ * @property {Prescription[]} [prescriptions] a rule-built day's sets to log (roadmap B1)
+ */
+
+/**
+ * What one line of a rule-built day prescribes, as the server's generator
+ * writes it: reps or seconds, exactly one, each a range.
+ * @typedef {object} Prescription
+ * @property {string} name
+ * @property {number} sets
+ * @property {{ min: number, max: number } | null} reps
+ * @property {{ min: number, max: number } | null} seconds
+ * @property {boolean} perSide
+ * @property {{ min: number, max: number } | null} targetRpe
  */
 
 /**
@@ -156,13 +169,54 @@ const isPlanPayload = (value) =>
   isStringList(value.notes);
 
 /**
+ * A range of non-negative numbers whose min does not pass its max.
+ * @param {unknown} value
+ */
+const isRange = (value) =>
+  isRecord(value) &&
+  typeof value.min === "number" &&
+  typeof value.max === "number" &&
+  value.min >= 0 &&
+  value.min <= value.max;
+
+/**
+ * A prescription as the server's generator writes one: a name, a whole number
+ * of sets, reps or seconds (exactly one), and a target RPE range or none. The
+ * same check as the server's planPayloadService.
+ * @param {unknown} value
+ */
+const isPrescription = (value) =>
+  isRecord(value) &&
+  typeof value.name === "string" &&
+  value.name.length > 0 &&
+  Number.isInteger(value.sets) &&
+  /** @type {number} */ (value.sets) >= 1 &&
+  (value.reps === null) !== (value.seconds === null) &&
+  (value.reps === null || isRange(value.reps)) &&
+  (value.seconds === null || isRange(value.seconds)) &&
+  typeof value.perSide === "boolean" &&
+  (value.targetRpe === null || isRange(value.targetRpe));
+
+// A day as it is read: its prescriptions when every one is well formed, and
+// otherwise without them, so a bad list costs that day its pre-fill and never
+// the plan.
+/** @param {PlanDay} day */
+const keepValidPrescriptions = (day) => {
+  if (!("prescriptions" in day)) return day;
+  const { prescriptions, ...rest } = day;
+  return Array.isArray(prescriptions) && prescriptions.every(isPrescription) ? day : rest;
+};
+
+/**
  * A plan's saved days when the structure the server saved with it is valid,
  * and otherwise null. Only those days can be logged against: a workout
- * session's `planDayIndex` points into them, never into a text parse.
+ * session's `planDayIndex` points into them, never into a text parse. A day's
+ * malformed prescriptions are dropped, as the server drops them.
  * @param {{ payload?: unknown } | null | undefined} plan
  * @returns {PlanDay[] | null}
  */
-export const savedPlanDays = (plan) => (isPlanPayload(plan?.payload) ? plan.payload.days : null);
+export const savedPlanDays = (plan) =>
+  isPlanPayload(plan?.payload) ? plan.payload.days.map(keepValidPrescriptions) : null;
 
 /**
  * A plan's days and notes: from the structure the server saved with it when
@@ -172,7 +226,9 @@ export const savedPlanDays = (plan) => (isPlanPayload(plan?.payload) ? plan.payl
  * @returns {PlanSections}
  */
 export const readPlan = ({ payload, text }) =>
-  isPlanPayload(payload) ? { days: payload.days, notes: payload.notes } : parsePlanSections(text);
+  isPlanPayload(payload)
+    ? { days: payload.days.map(keepValidPrescriptions), notes: payload.notes }
+    : parsePlanSections(text);
 
 // A day's opening main entry: what follows its "Main lifts:" heading, on the
 // heading's line or the line below it, or its first line when it has none.
