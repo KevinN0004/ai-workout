@@ -3,6 +3,7 @@
  * week of meals (meal, plans and tips views, useDashboardMetrics), and the
  * workout form's pre-fill from a plan day (plans view).
  */
+import { newCard } from "../../app/exerciseSets";
 import { isRestDay } from "../../app/plans";
 import { hasWord } from "./wordMatch";
 
@@ -193,9 +194,8 @@ const PREFILL_MAX_NOTES = 500;
 
 // An exercise name from a "- Name: prescription" bullet, without its bracketed
 // asides or a superset's "A1." label, or "" for a line that names no exercise
-// (a rest, a ramp-up of the lift after it, a cool-down) or a name the form
-// cannot hold: the exercises field is split on commas, and an aside is where
-// real plans put theirs.
+// (a rest, a ramp-up of the lift after it, a cool-down) or a name longer than
+// an exercise can hold. A comma in a name stays: each name is its own card.
 const NOT_AN_EXERCISE = /^(rest|ramp-up|easy breathing|easy cooldown)\b/i;
 const exerciseNameOf = (line) => {
   if (!line.startsWith("- ")) return "";
@@ -205,22 +205,22 @@ const exerciseNameOf = (line) => {
     .replace(/\s*\([^)]*\)/g, "")
     .replace(/^[A-Z]\d\.\s+/, "")
     .trim();
-  if (NOT_AN_EXERCISE.test(name) || name.includes(",")) return "";
+  if (NOT_AN_EXERCISE.test(name)) return "";
   return name.length <= PREFILL_MAX_EXERCISE_LENGTH ? name : "";
 };
 
 /**
  * The Log workout form's fields for a day of a saved plan: the day's title as
- * the focus, the names its bullets prescribe as the comma-separated exercises
- * (at most 18), and the day's lines as the notes, cut at 500 characters. Sets,
- * reps and RPE are left to the person logging.
+ * the focus, an exercise card with one empty set row for each name its
+ * bullets prescribe (at most 18), and the day's lines as the notes, cut at 500
+ * characters. The sets themselves are left to the person logging.
  */
 export const buildPlanDayPrefill = (day) => ({
   focus: day.title,
-  exercises: day.lines
+  exerciseSets: day.lines
     .map(exerciseNameOf)
     .filter(Boolean)
     .slice(0, PREFILL_MAX_EXERCISES)
-    .join(", "),
+    .map((name) => newCard({ name })),
   notes: day.lines.join("\n").slice(0, PREFILL_MAX_NOTES)
 });

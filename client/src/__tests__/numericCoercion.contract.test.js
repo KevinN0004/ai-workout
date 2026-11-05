@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toNumberOrNull } from "../app/units";
+import { fromLoadKg, toLoadKg } from "../app/exerciseSets";
 
 // The client half of the invariant asserted in
 // server/src/__tests__/numericCoercion.contract.test.js:
@@ -31,6 +32,14 @@ const helpers = [
   {
     name: "toNumberOrNull (app/units)",
     call: (value) => toNumberOrNull(value),
+    absent: null
+  },
+  // A set's load as the Log workout form saves it. Metric, so a real
+  // measurement reads back as typed; the pound conversion is pinned in
+  // app/__tests__/exerciseSets.test.js. A 0 load is bodyweight work.
+  {
+    name: "toLoadKg (app/exerciseSets)",
+    call: (value) => toLoadKg(value, "metric"),
     absent: null
   }
 ];
@@ -71,3 +80,18 @@ describe.each(helpers)("$name", ({ call, absent }) => {
 //   so the guard only ever sees genuine absence. They are also string -> string
 //   converters rather than numeric coercion, returning "" for absent and the
 //   original value for non-numeric, so they do not share the contract above.
+//
+// - `fromLoadKg` in app/exerciseSets.js is the same kind of converter, a stored
+//   load in kg to the text the form and Logs show. It guards with
+//   toNumberOrNull first, so "" is for absent alone and a 0 kg load shows as
+//   "0". Pinned here because it shares the risk, not the shape:
+describe("fromLoadKg (app/exerciseSets)", () => {
+  test.each(ABSENT)("shows %s as no load", (_label, value) => {
+    expect(fromLoadKg(value, "metric")).toBe("");
+  });
+
+  test("shows a measured 0 kg as 0", () => {
+    expect(fromLoadKg(0, "metric")).toBe("0");
+    expect(fromLoadKg(0, "imperial")).toBe("0");
+  });
+});

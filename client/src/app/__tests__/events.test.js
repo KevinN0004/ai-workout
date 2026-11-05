@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { NO_PLAN_LINK } from "../plans";
+import { newCard } from "../exerciseSets";
 import { defaultAuthForm, defaultSignupProfileForm } from "../constants";
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg } from "../units";
 
@@ -549,14 +550,18 @@ describe("optimistic submissions", () => {
   const queued = () => deps.queueOptimisticLogCommit.mock.calls[0][0];
 
   describe("submitWorkout", () => {
+    // A card per name, each with one set of six reps at RPE 8; a blank name
+    // makes a wholly blank card.
+    const cards = (...names) =>
+      names.map((name) => {
+        const card = newCard({ name });
+        return name ? { ...card, sets: [{ ...card.sets[0], amount: "6", rpe: "8" }] } : card;
+      });
     const workoutForm = (overrides = {}) => ({
       date: "2026-03-02",
       focus: "Push",
       duration: "45",
-      exercises: "Bench press, Overhead press",
-      sets: "4",
-      reps: "6",
-      intensityRpe: "8",
+      exerciseSets: cards("Bench press", "Overhead press"),
       notes: "felt strong",
       ...overrides
     });
@@ -569,9 +574,9 @@ describe("optimistic submissions", () => {
       expect(queued().type).toBe("workout");
     });
 
-    test("splits the exercises on commas and trims them", async () => {
+    test("names the exercises from the cards, trimmed, leaving out a blank card", async () => {
       await build({
-        workoutForm: workoutForm({ exercises: " Bench press ,, Squat ,  " })
+        workoutForm: workoutForm({ exerciseSets: cards(" Bench press ", "", "Squat") })
       }).submitWorkout(submitEvent());
 
       expect(queued().item.exercises).toEqual(["Bench press", "Squat"]);
@@ -580,27 +585,21 @@ describe("optimistic submissions", () => {
     test("turns the numeric fields into numbers", async () => {
       await build({ workoutForm: workoutForm() }).submitWorkout(submitEvent());
 
-      expect(queued().item).toMatchObject({
-        duration: 45,
-        sets: 4,
-        reps: 6,
-        intensityRpe: 8
-      });
+      expect(queued().item.duration).toBe(45);
+      expect(queued().item.exerciseSets[0].sets).toEqual([
+        { reps: 6, seconds: null, loadKg: null, rpe: 8 }
+      ]);
     });
 
     // An empty field is absent, not zero. A workout logged with no duration
-    // must not read as a zero-minute session in the totals.
+    // must not read as a zero-minute session in the totals, and a set with no
+    // load is not a 0 kg set.
     test("leaves an empty numeric field null rather than zero", async () => {
-      await build({
-        workoutForm: workoutForm({ duration: "", sets: "", reps: "", intensityRpe: "" })
-      }).submitWorkout(submitEvent());
+      await build({ workoutForm: workoutForm({ duration: "" }) }).submitWorkout(submitEvent());
 
-      expect(queued().item).toMatchObject({
-        duration: null,
-        sets: null,
-        reps: null,
-        intensityRpe: null
-      });
+      expect(queued().item.duration).toBeNull();
+      expect(queued().item.exerciseSets[0].sets[0].loadKg).toBeNull();
+      expect(queued().item).toMatchObject({ sets: null, reps: null, intensityRpe: null });
     });
 
     test("falls back to today and a general focus", async () => {
@@ -617,7 +616,7 @@ describe("optimistic submissions", () => {
 
       expect(deps.setWorkoutModalOpen).toHaveBeenCalledWith(false);
       expect(deps.setWorkoutForm).toHaveBeenCalledWith(
-        expect.objectContaining({ focus: "", exercises: "", duration: "" })
+        expect.objectContaining({ focus: "", duration: "", exerciseSets: expect.any(Array) })
       );
     });
 

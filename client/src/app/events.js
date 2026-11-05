@@ -11,9 +11,9 @@ import {
   defaultAuthForm,
   defaultSignupProfileForm
 } from "./constants";
-import { NO_PLAN_LINK } from "./plans";
+import { newWorkoutForm, toExerciseSets } from "./exerciseSets";
 import { personalToProfile } from "./profileMapping";
-import { getLocalDateKey, splitFullName } from "./units";
+import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
 
 // The longest logout waits for the sends it flushes, in milliseconds. A save
 // still running when it passes may be lost: logout goes ahead without it.
@@ -375,16 +375,27 @@ export const createAppEventHandlers = ({
 
   const submitWorkout = async (event) => {
     event.preventDefault();
-    const normalizedExercises = workoutForm.exercises
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    // The modal has already checked the cards, so this only reads them: the
+    // exercises with their sets, loads in kg, and their names in order.
+    const { exerciseSets } = toExerciseSets(
+      workoutForm.exerciseSets ?? [],
+      getPreferredMeasurementSystem()
+    );
+    const exerciseNames = exerciseSets.map((exercise) => exercise.name);
     // A workout logged from a plan day carries its link. An ordinary one leaves
     // the link out: the server takes an absent planId, never a null one. The
     // label only names the day in the modal and is never sent.
-    const { planId, planDayIndex, planDayLabel: _label, ...formFields } = workoutForm;
+    const { planId, planDayIndex } = workoutForm;
     const link = planId ? { planId, planDayIndex } : null;
-    const payload = { ...formFields, exercises: normalizedExercises, ...link };
+    const payload = {
+      date: workoutForm.date,
+      focus: workoutForm.focus,
+      duration: workoutForm.duration,
+      notes: workoutForm.notes,
+      exercises: exerciseNames,
+      exerciseSets,
+      ...link
+    };
 
     // The entry shows at once and is sent only when the undo window closes,
     // unless it is undone first (useOptimisticLogs).
@@ -394,10 +405,11 @@ export const createAppEventHandlers = ({
       date: workoutForm.date || getLocalDateKey(),
       focus: workoutForm.focus || "General",
       duration: workoutForm.duration ? Number(workoutForm.duration) : null,
-      exercises: normalizedExercises,
-      sets: workoutForm.sets ? Number(workoutForm.sets) : null,
-      reps: workoutForm.reps ? Number(workoutForm.reps) : null,
-      intensityRpe: workoutForm.intensityRpe ? Number(workoutForm.intensityRpe) : null,
+      exercises: exerciseNames,
+      exerciseSets,
+      sets: null,
+      reps: null,
+      intensityRpe: null,
       notes: workoutForm.notes || "",
       planId: link?.planId ?? null,
       planDayIndex: link?.planDayIndex ?? null,
@@ -425,17 +437,7 @@ export const createAppEventHandlers = ({
     });
 
     // The form resets and the modal closes without waiting for the request.
-    setWorkoutForm({
-      date: getLocalDateKey(),
-      focus: "",
-      duration: "",
-      exercises: "",
-      sets: "",
-      reps: "",
-      intensityRpe: "",
-      notes: "",
-      ...NO_PLAN_LINK
-    });
+    setWorkoutForm(newWorkoutForm());
     setWorkoutModalOpen(false);
   };
 

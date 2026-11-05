@@ -46,13 +46,14 @@ const optionalNullableIntegerField = (min, max) =>
 // One logged set, in the ranges 006_exercise_sets.sql enforces: reps or
 // seconds, exactly one, and an optional load in kg and RPE. 0 reps and 0 kg
 // are measurements; a blank is null.
+const exerciseSetFields = {
+  reps: optionalNullableIntegerField(0, 200),
+  seconds: optionalNullableIntegerField(1, 3600),
+  loadKg: optionalNullableNumberField(0, 1000),
+  rpe: optionalNullableNumberField(1, 10)
+};
 const exerciseSetSchema = z
-  .object({
-    reps: optionalNullableIntegerField(0, 200),
-    seconds: optionalNullableIntegerField(1, 3600),
-    loadKg: optionalNullableNumberField(0, 1000),
-    rpe: optionalNullableNumberField(1, 10)
-  })
+  .object(exerciseSetFields)
   .refine((set) => ((set.reps ?? null) === null) !== ((set.seconds ?? null) === null), {
     message: "Each set needs reps or seconds, not both."
   });
@@ -283,4 +284,6 @@ export const validateBody = (req, res, schema) => {
 // Test-only access, following the `__testables` convention in index.js.
 // `toNumberInput` is passed by reference to `z.preprocess` rather than called,
 // so it has no ordinary call site for a test to reach it through.
-export const __testables = { toNumberInput };
+// `exerciseSetFields` are the fields of one set, nested in an array where a
+// client test cannot reach them through workoutSessionBodySchema.shape.
+export const __testables = { toNumberInput, exerciseSetFields };

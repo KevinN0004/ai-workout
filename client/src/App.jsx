@@ -27,7 +27,8 @@ import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
 import { fetchWithTimeout } from "./app/network";
-import { readPlan, extractLatestPlanByWeekday, NO_PLAN_LINK } from "./app/plans";
+import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
+import { newWorkoutForm } from "./app/exerciseSets";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
 import {
@@ -78,17 +79,7 @@ export default function App() {
   });
   const [signupHeightUnit, setSignupHeightUnit] = useState("ft");
   const [signupWeightUnit, setSignupWeightUnit] = useState("lb");
-  const [workoutForm, setWorkoutForm] = useState({
-    date: getLocalDateKey(),
-    focus: "",
-    duration: "",
-    exercises: "",
-    sets: "",
-    reps: "",
-    intensityRpe: "",
-    notes: "",
-    ...NO_PLAN_LINK
-  });
+  const [workoutForm, setWorkoutForm] = useState(newWorkoutForm);
   const [calorieForm, setCalorieForm] = useState({
     calories: ""
   });

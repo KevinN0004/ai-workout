@@ -174,7 +174,9 @@ details becomes a list of cards:
   measurement.
 - **On save,** a row left wholly blank is dropped. A row with a load or RPE but no reps or
   seconds stops the save with an inline "Enter reps or seconds" beside it. A load typed in
-  pounds is converted to kg with `toKg` and rounded to two decimals.
+  pounds is converted to kg and rounded to two decimals, by `toLoadKg` in
+  `app/exerciseSets.js`. `units.js`'s `toKg` does not fit: it rounds to a whole kilogram,
+  and reads a 0 load as blank (found in PR 5).
 - **Labels name the set and the exercise:** "Set 2 reps, Dumbbell bench press". The
   modal's focus trap (#342) and the phone tap test (#341) cover the cards.
 - The form state moves from `exercises`, `sets`, `reps` and `intensityRpe` to
@@ -191,9 +193,10 @@ without prescriptions gets one name-only card per exercise, using #339's rules.
 - The optimistic entry carries its `exerciseSets`, so Logs shows the sets before the server
   answers, and Undo works as today.
 - A session with sets shows one line per exercise, for example
-  "Dumbbell bench press: 10, 9, 8 reps · 22.5 kg · RPE 7-9", in the region's unit, with
+  "Dumbbell bench press: 10, 9, 8 reps | 22.5 kg | RPE 7-9", in the region's unit, with
   the load and RPE ranges collapsed when every set shares them.
-- A session without sets keeps its "3 sets · 10 reps · RPE 8" line.
+- A session without sets keeps its "3 sets | 10 reps | RPE 8" line. Logs already joins
+  that line with " | ", so the new lines do too (this spec first wrote " · ").
 
 ## PRs
 

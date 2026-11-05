@@ -76,8 +76,7 @@
   }
 
   .dashboard-workout-grid,
-  .dashboard-workout-grid-basics,
-  .dashboard-workout-grid-metrics {
+  .dashboard-workout-grid-basics {
     grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 10px;
   }

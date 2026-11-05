@@ -503,3 +503,56 @@ describe("WorkoutsView", () => {
     });
   });
 });
+
+// Roadmap B1: a session logged with sets shows a line per exercise; one from
+// before them keeps its names and summary line.
+describe("a workout's sets", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const benchSets = [
+    { reps: 10, seconds: null, loadKg: 22.5, rpe: 7 },
+    { reps: 8, seconds: null, loadKg: 22.5, rpe: 9 }
+  ];
+
+  test("shows each exercise's sets, in the region's unit", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
+    renderView({
+      workouts: [
+        dated("2026-11-05", {
+          exercises: ["Dumbbell bench press", "Plank"],
+          exerciseSets: [
+            { name: "Dumbbell bench press", sets: benchSets },
+            { name: "Plank", sets: [{ reps: null, seconds: 30, loadKg: null, rpe: null }] }
+          ]
+        })
+      ]
+    });
+
+    const row = within(section("workouts"));
+    expect(
+      row.getByText("Dumbbell bench press: 10, 8 reps | 22.5 kg | RPE 7-9")
+    ).toBeInTheDocument();
+    expect(row.getByText("Plank: 30 seconds")).toBeInTheDocument();
+    expect(row.queryByText("Dumbbell bench press, Plank")).toBeNull();
+  });
+
+  test("keeps the summary line for a session logged before sets", () => {
+    renderView({
+      workouts: [
+        dated("2026-10-01", {
+          exercises: ["Squat"],
+          sets: 3,
+          reps: 8,
+          intensityRpe: 8,
+          exerciseSets: []
+        })
+      ]
+    });
+
+    const row = within(section("workouts"));
+    expect(row.getByText("Squat")).toBeInTheDocument();
+    expect(row.getByText("3 sets | 8 reps | RPE 8")).toBeInTheDocument();
+  });
+});
