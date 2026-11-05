@@ -26,8 +26,9 @@ export default defineConfig({
       exclude: ["**/*.test.js", "src/generated/**"],
       reporter: ["text", "html"],
       // A ratchet, not a target -- see the note in client/vite.config.js.
-      // Measured 2026-11-04 (96.26 / 91.16 / 97.14 / 97.05), floored one
-      // decimal below. Branches read higher in CI than locally (91.5 against
+      // Measured 2026-11-05 (96.34 / 91.37 / 97.26 / 97.11), after per-set
+      // logging, with client/dist present, floored one decimal below.
+      // Branches read higher in CI than locally (91.5 against
       // 91.16 on 2026-11-04), so the floor follows the local figure, the lower
       // of the two. Locally they also depend on whether client/dist exists: a
       // built client is served, so staticClient.js's no-bundle arm goes
@@ -36,10 +37,10 @@ export default defineConfig({
       // decimal rather than whole percent, which would leave up to a point of
       // measured coverage free to slip without tripping anything.
       thresholds: {
-        statements: 96.2,
-        branches: 91.1,
-        functions: 97.1,
-        lines: 97
+        statements: 96.3,
+        branches: 91.3,
+        functions: 97.2,
+        lines: 97.1
       }
     }
   }
