@@ -122,10 +122,25 @@ test.describe.serial("generate a plan and log a day of it", () => {
 
     await monday.click();
     await page.getByRole("button", { name: "Log this workout" }).click();
-    // The day pre-fills the focus, exercises and notes; the duration is the
-    // one field left to the person, and it is required.
+    // The day pre-fills the focus and notes, and a card per prescribed
+    // exercise with its rows empty and its targets as placeholders. The
+    // duration is left to the person, and it is required.
     const log = page.getByRole("dialog", { name: "Log workout" });
     await expect(log.getByLabel("Focus")).toHaveValue("Monday - Full body A");
+    const squat = log.getByRole("group", { name: "Dumbbell box squat" });
+    await expect(squat.getByLabel(/^Set \d reps, Dumbbell box squat$/)).toHaveCount(3);
+    await expect(squat.getByLabel("Set 1 reps, Dumbbell box squat")).toHaveAttribute(
+      "placeholder",
+      "10-12"
+    );
+    await expect(squat.getByLabel("Set 1 reps, Dumbbell box squat")).toHaveValue("");
+
+    // Three sets of the squat, the first with its load; the other cards stay
+    // empty, and a blank row is no set.
+    for (const [index, reps] of ["12", "11", "10"].entries()) {
+      await squat.getByLabel(`Set ${index + 1} reps, Dumbbell box squat`).fill(reps);
+    }
+    await squat.getByLabel("Set 1 load in lb, Dumbbell box squat").fill("30");
     await log.getByLabel("Duration (minutes)").fill("45");
     await log.getByRole("button", { name: "Save workout" }).click();
 
@@ -141,5 +156,10 @@ test.describe.serial("generate a plan and log a day of it", () => {
     await page.reload();
 
     await expect(monday).toContainText("Logged");
+
+    // The sets came back from Postgres: in kg there, in pounds here again.
+    await page.goto("/dashboard/workouts");
+    const workoutLog = page.getByRole("heading", { name: "Workout log" }).locator("..");
+    await expect(workoutLog.getByText("Dumbbell box squat: 12, 11, 10 reps | 30 lb")).toBeVisible();
   });
 });
