@@ -8,10 +8,67 @@ import {
   allowedTrainingDayValues,
   buildDashboard,
   buildProfile,
+  buildWorkoutSessionEntry,
   defaultDashboard,
   defaultGoals,
   defaultProfile
 } from "../dashboardDataBuildersService";
+
+// The sets a workout body carries (roadmap B1). The schema has already
+// checked them; the builder cleans them as it cleans every other field, keeps
+// "not sent" apart from "sent empty", and names the exercises from the cards
+// when no names came.
+describe("buildWorkoutSessionEntry's exercise sets", () => {
+  const squat = {
+    name: "  Squat ",
+    sets: [{ reps: "5", seconds: null, loadKg: "100.5", rpe: 8 }]
+  };
+  const plank = { name: "Plank", sets: [{ reps: null, seconds: 30, loadKg: "", rpe: null }] };
+
+  test("carries the sets through, cleaned", () => {
+    const entry = buildWorkoutSessionEntry({ exerciseSets: [squat, plank] });
+
+    expect(entry.exerciseSets).toEqual([
+      { name: "Squat", sets: [{ reps: 5, seconds: null, loadKg: 100.5, rpe: 8 }] },
+      { name: "Plank", sets: [{ reps: null, seconds: 30, loadKg: null, rpe: null }] }
+    ]);
+  });
+
+  test("keeps 0 reps and 0 kg", () => {
+    const entry = buildWorkoutSessionEntry({
+      exerciseSets: [{ name: "Pull-up", sets: [{ reps: 0, seconds: null, loadKg: 0, rpe: 10 }] }]
+    });
+
+    expect(entry.exerciseSets[0].sets[0]).toEqual({ reps: 0, seconds: null, loadKg: 0, rpe: 10 });
+  });
+
+  // Undefined tells the repository to keep a session's stored sets; an empty
+  // list tells it to clear them. The old bundle sends neither.
+  test("leaves sets undefined when none were sent, and empty when an empty list was", () => {
+    expect(buildWorkoutSessionEntry({}).exerciseSets).toBeUndefined();
+    expect(buildWorkoutSessionEntry({ exerciseSets: [] }).exerciseSets).toEqual([]);
+  });
+
+  test("names the exercises from the cards when no names came", () => {
+    expect(buildWorkoutSessionEntry({ exerciseSets: [squat, plank] }).exercises).toEqual([
+      "Squat",
+      "Plank"
+    ]);
+  });
+
+  test("keeps the names that came over the cards' names", () => {
+    const entry = buildWorkoutSessionEntry({ exercises: ["Back squat"], exerciseSets: [squat] });
+
+    expect(entry.exercises).toEqual(["Back squat"]);
+  });
+
+  test("keeps the old body's names and summary as they were", () => {
+    const entry = buildWorkoutSessionEntry({ exercises: ["Squat"], sets: 3, reps: 8 });
+
+    expect(entry).toMatchObject({ exercises: ["Squat"], sets: 3, reps: 8 });
+    expect(entry.exerciseSets).toBeUndefined();
+  });
+});
 
 // A target weight is the user's own choice, so it is absent until they save
 // one: a default would be progress measured toward a number nobody picked.

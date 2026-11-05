@@ -186,21 +186,45 @@ export const buildDashboard = (input = {}) => {
   };
 };
 
+// A workout's exercises and their sets, cleaned and range-checked as the
+// table holds them, or undefined when none were sent: the repository keeps a
+// session's stored sets for undefined, and clears them for an empty list.
+const toExerciseSets = (value) =>
+  Array.isArray(value)
+    ? value.slice(0, 18).map((exercise) => ({
+        name: cleanText(exercise?.name, 140),
+        sets: (Array.isArray(exercise?.sets) ? exercise.sets : []).slice(0, 20).map((set) => ({
+          reps: toNullableNumber(set?.reps, 0, 200),
+          seconds: toNullableNumber(set?.seconds, 1, 3600),
+          loadKg: toNullableNumber(set?.loadKg, 0, 1000),
+          rpe: toNullableNumber(set?.rpe, 1, 10)
+        }))
+      }))
+    : undefined;
+
 /**
  * The workout session the workout route saves, built from a validated body.
  * Each field is cleaned or range-checked, `rpe` is accepted for
  * `intensityRpe`, an id is minted when the body has none, and `createdAt` is
  * now. `planId` and `planDayIndex` name the plan day it was logged against, or
  * are null; the index is a whole number, and 0, the first day, is kept.
+ * `exerciseSets` is carried through cleaned, and names the exercises when the
+ * body sent no `exercises` of its own.
  */
 export const buildWorkoutSessionEntry = (input = {}) => {
   const planDayIndex = toNullableNumber(input.planDayIndex, 0, 31);
+  const exerciseSets = toExerciseSets(input.exerciseSets);
+  const exerciseNames =
+    input.exercises === undefined && exerciseSets
+      ? exerciseSets.map((exercise) => exercise.name)
+      : input.exercises;
   return {
     id: cleanText(input.id, 64) || crypto.randomUUID(),
     date: cleanText(input.date, 20),
     focus: cleanText(input.focus, 80) || "General",
     duration: toNullableNumber(input.duration, 5, 360),
-    exercises: toCleanArray(input.exercises, 18, 140),
+    exercises: toCleanArray(exerciseNames, 18, 140),
+    exerciseSets,
     sets: toNullableNumber(input.sets, 1, 80),
     reps: toNullableNumber(input.reps, 1, 120),
     intensityRpe: toNullableNumber(input.intensityRpe ?? input.rpe, 1, 10),

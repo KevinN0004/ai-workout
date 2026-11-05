@@ -40,6 +40,34 @@ const optionalBooleanField = z
 const optionalNullableNumberField = (min, max) =>
   z.preprocess(toNumberInput, z.union([z.number().min(min).max(max), z.null()]).optional());
 const requiredNumberField = (min, max) => z.preprocess(toNumberInput, z.number().min(min).max(max));
+const optionalNullableIntegerField = (min, max) =>
+  z.preprocess(toNumberInput, z.union([z.number().int().min(min).max(max), z.null()]).optional());
+
+// One logged set, in the ranges 006_exercise_sets.sql enforces: reps or
+// seconds, exactly one, and an optional load in kg and RPE. 0 reps and 0 kg
+// are measurements; a blank is null.
+const exerciseSetSchema = z
+  .object({
+    reps: optionalNullableIntegerField(0, 200),
+    seconds: optionalNullableIntegerField(1, 3600),
+    loadKg: optionalNullableNumberField(0, 1000),
+    rpe: optionalNullableNumberField(1, 10)
+  })
+  .refine((set) => ((set.reps ?? null) === null) !== ((set.seconds ?? null) === null), {
+    message: "Each set needs reps or seconds, not both."
+  });
+
+// A workout's exercises with their sets: at most 18 exercises of 20 sets, as
+// the table's exercise_order and set_number allow.
+const exerciseSetsField = z
+  .array(
+    z.object({
+      name: requiredStringField(140),
+      sets: z.array(exerciseSetSchema).max(20)
+    })
+  )
+  .max(18)
+  .optional();
 const optionalStringArrayField = (maxItems, maxLen) =>
   z.preprocess(
     (value) => {
@@ -134,7 +162,8 @@ export const workoutSessionBodySchema = z
     // The plan day the workout was logged against: the plan's id as the client
     // knows it, and the day's index in the plan's saved structure.
     planId: optionalStringField(64),
-    planDayIndex: optionalNullableNumberField(0, 31)
+    planDayIndex: optionalNullableNumberField(0, 31),
+    exerciseSets: exerciseSetsField
   })
   .passthrough();
 
