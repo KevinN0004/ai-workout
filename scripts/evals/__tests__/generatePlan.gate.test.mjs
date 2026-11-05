@@ -34,6 +34,43 @@ const groupsOf = (day) =>
     .filter(([, patterns]) => day.exercises.some((exercise) => patterns.includes(exercise.pattern)))
     .map(([group]) => group);
 
+// A line whose dose is sets to log, read from its text alone: the name after
+// any superset label, the sets, a count or range of reps, seconds or steps,
+// "a side", and the bracketed note. Intervals ("8 x 30 seconds hard, …"),
+// minutes of cardio, rounds and the ramp-up line do not match.
+const SET_LINE =
+  /^- (?:[A-Z]\d\. )?(.+?): (\d+) x (\d+)(?:-(\d+))?( seconds| steps)?( a side)?(?: \((.*)\))?$/;
+const EFFORT_CUE = /stop (\d+)(?:-(\d+))? reps short of failure/;
+
+// Roadmap B1: each line of sets has exactly one prescription, in line order,
+// that says what the line says. Read independently of the generator, so a
+// prescription that drifts from its text fails here.
+const prescriptionFailures = (day) => {
+  const lines = day.lines.map((line) => SET_LINE.exec(line)).filter(Boolean);
+  if (lines.length !== day.prescriptions.length) {
+    return [
+      `${day.weekday}: ${lines.length} lines of sets, ${day.prescriptions.length} prescriptions`
+    ];
+  }
+  return lines.flatMap((match, index) => {
+    const [line, name, sets, min, max = min, unit, side, note] = match;
+    const prescription = day.prescriptions[index];
+    const seconds = unit === " seconds";
+    const range = seconds ? prescription.seconds : prescription.reps;
+    const cue = EFFORT_CUE.exec(note ?? "");
+    const rpe = cue ? { min: 10 - Number(cue[2] ?? cue[1]), max: 10 - Number(cue[1]) } : null;
+    const agrees =
+      prescription.name === name &&
+      prescription.sets === Number(sets) &&
+      range?.min === Number(min) &&
+      range?.max === Number(max) &&
+      (seconds ? prescription.reps : prescription.seconds) === null &&
+      prescription.perSide === Boolean(side) &&
+      JSON.stringify(prescription.targetRpe) === JSON.stringify(rpe);
+    return agrees ? [] : [`${day.weekday}: ${line}`];
+  });
+};
+
 // Every check the spec lists, for one input; each failure names its check.
 const checkPlan = (input) => {
   const plan = generatePlan(input);
@@ -64,6 +101,7 @@ const checkPlan = (input) => {
     }
   }
   week.forEach((day, index) => {
+    for (const detail of prescriptionFailures(day)) fail("prescription", detail);
     const next = week[(index + 1) % 7];
     if (STRENGTH.has(day.type) && STRENGTH.has(next.type) && index + 1 !== 7) {
       const shared = groupsOf(day).filter((group) => groupsOf(next).includes(group));

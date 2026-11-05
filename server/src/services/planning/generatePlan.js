@@ -53,6 +53,7 @@ import { EXERCISES, LEVELS, capabilitiesFor } from "./exerciseLibrary.js";
  * @property {number} walkMinutes
  * @property {number} aerobicMinutes moderate-equivalent minutes the day counts for
  * @property {string[]} lines
+ * @property {Prescription[]} prescriptions one per line of sets to log, in line order
  */
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -441,32 +442,74 @@ const choose = (pattern, rules, library, used, order) => {
 const effortCue = (rir) => `stop ${rir} reps short of failure`;
 
 /**
+ * One exercise's dose as numbers: its sets; an amount, a count ("5") or a
+ * range ("8-12"), of reps, seconds or steps; whether it is a side; the reps in
+ * reserve it targets, or null where the line gives none; and the note the line
+ * writes in brackets after it, or null.
+ * @typedef {object} LineDose
+ * @property {number} sets
+ * @property {string} amount
+ * @property {"reps" | "seconds" | "steps"} unit
+ * @property {boolean} perSide
+ * @property {string | null} rir
+ * @property {string | null} note
+ */
+
+/**
+ * What a strength-day line prescribes, for pre-filling the sets it logs (roadmap
+ * B1). Steps count as reps. `targetRpe` is 10 minus the reps in reserve.
+ * @typedef {object} Prescription
+ * @property {string} name
+ * @property {number} sets
+ * @property {{ min: number, max: number } | null} reps
+ * @property {{ min: number, max: number } | null} seconds
+ * @property {boolean} perSide
+ * @property {{ min: number, max: number } | null} targetRpe
+ */
+
+/**
+ * @param {number} sets
+ * @param {string} amount
+ * @param {"reps" | "seconds" | "steps"} unit
+ * @param {boolean} [perSide]
+ * @returns {LineDose}
+ */
+const plainDose = (sets, amount, unit, perSide = false) => ({
+  sets,
+  amount,
+  unit,
+  perSide,
+  rir: null,
+  note: null
+});
+
+/**
  * Step 6: the dose for one exercise on a strength day: core, balance and
  * mobility by their own rules, the rest by the scheme.
  * @param {ChosenExercise} exercise
  * @param {"main" | "accessory"} role
  * @param {Rules} rules
+ * @returns {LineDose}
  */
-const doseOf = (exercise, role, rules) => {
+const doseFor = (exercise, role, rules) => {
   const beginner = rules.level === "beginner";
   if (exercise.pattern === "core") {
-    if (CORE_HOLDS.has(exercise.id)) return beginner ? "3 x 10 seconds" : "3 x 20-30 seconds";
+    if (CORE_HOLDS.has(exercise.id)) return plainDose(3, beginner ? "10" : "20-30", "seconds");
     if (CORE_SIDE_HOLDS.has(exercise.id)) {
-      return beginner ? "3 x 10 seconds a side" : "3 x 20-30 seconds a side";
+      return plainDose(3, beginner ? "10" : "20-30", "seconds", true);
     }
-    if (CORE_CARRIES.has(exercise.id)) return "3 x 30 seconds a side";
-    const sets = beginner ? 2 : 3;
-    return CORE_PLAIN_REPS.has(exercise.id) ? `${sets} x 8-12` : `${sets} x 8-12 a side`;
+    if (CORE_CARRIES.has(exercise.id)) return plainDose(3, "30", "seconds", true);
+    return plainDose(beginner ? 2 : 3, "8-12", "reps", !CORE_PLAIN_REPS.has(exercise.id));
   }
   if (exercise.pattern === "balance") {
-    if (exercise.id === "heel-to-toe-walk") return "3 x 10 steps";
-    if (exercise.id === "paused-step-up") return "2 x 6 a side";
-    return "3 x 20-30 seconds a side";
+    if (exercise.id === "heel-to-toe-walk") return plainDose(3, "10", "steps");
+    if (exercise.id === "paused-step-up") return plainDose(2, "6", "reps", true);
+    return plainDose(3, "20-30", "seconds", true);
   }
   if (exercise.pattern === "mobility") {
-    const side = TWO_SIDED.has(exercise.id) ? "" : " a side";
-    if (DYNAMIC_MOBILITY.has(exercise.id)) return `2 x 8-10${side}`;
-    return `2 x ${rules.olderAdult ? 45 : 30} seconds${side}`;
+    const perSide = !TWO_SIDED.has(exercise.id);
+    if (DYNAMIC_MOBILITY.has(exercise.id)) return plainDose(2, "8-10", "reps", perSide);
+    return plainDose(2, rules.olderAdult ? "45" : "30", "seconds", perSide);
   }
   const scheme = SCHEMES[schemeOf(rules)];
   const asMain = role === "main" && !exercise.regressed;
@@ -483,9 +526,48 @@ const doseOf = (exercise, role, rules) => {
   if (asMain && rules.days === 1) sets = Math.max(3, sets + 1);
   if (rules.lightMode) rir = "3";
   const cue = exercise.cue ? `; ${exercise.area}: ${exercise.cue}` : "";
-  if (STRENGTH_HOLDS.has(exercise.id)) return `${sets} x 30-45 seconds (Rest 60s${cue})`;
+  if (STRENGTH_HOLDS.has(exercise.id)) {
+    return { ...plainDose(sets, "30-45", "seconds"), note: `Rest 60s${cue}` };
+  }
   const parts = [`Rest ${base.rest}`, ...(base.note ? [base.note] : []), effortCue(rir)];
-  return `${sets} x ${reps} (${parts.join(", ")}${cue})`;
+  return { ...plainDose(sets, reps, "reps"), rir, note: `${parts.join(", ")}${cue}` };
+};
+
+/**
+ * A dose as its line writes it: "3 x 8-10 (Rest 90s, …)", "3 x 20-30 seconds
+ * a side", "3 x 10 steps".
+ * @param {LineDose} dose
+ */
+const formatDose = (dose) =>
+  `${dose.sets} x ${dose.amount}${dose.unit === "reps" ? "" : ` ${dose.unit}`}` +
+  `${dose.perSide ? " a side" : ""}${dose.note ? ` (${dose.note})` : ""}`;
+
+/**
+ * "8-12" as { min: 8, max: 12 }, and "5" as { min: 5, max: 5 }.
+ * @param {string} text
+ */
+const rangeOf = (text) => {
+  const [min, max = min] = text.split("-").map(Number);
+  return { min, max };
+};
+
+/**
+ * The prescription for `exercise` at `dose`.
+ * @param {ChosenExercise} exercise
+ * @param {LineDose} dose
+ * @returns {Prescription}
+ */
+const prescriptionOf = (exercise, dose) => {
+  const amount = rangeOf(dose.amount);
+  const rir = dose.rir === null ? null : rangeOf(dose.rir);
+  return {
+    name: exercise.name,
+    sets: dose.sets,
+    reps: dose.unit === "seconds" ? null : amount,
+    seconds: dose.unit === "seconds" ? amount : null,
+    perSide: dose.perSide,
+    targetRpe: rir && { min: 10 - rir.max, max: 10 - rir.min }
+  };
 };
 
 /**
@@ -579,6 +661,21 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
   let exercises = [];
   /** @type {string[]} */
   let skipped = [];
+  /** @type {Prescription[]} */
+  const prescriptions = [];
+
+  /**
+   * A line whose dose is sets to log, written from the same numbers as the
+   * prescription it records alongside.
+   * @param {ChosenExercise} exercise
+   * @param {"main" | "accessory"} role
+   * @param {string} [label] the superset label
+   */
+  const prescribed = (exercise, role, label) => {
+    const dose = doseFor(exercise, role, rules);
+    prescriptions.push(prescriptionOf(exercise, dose));
+    return exerciseLine(exercise, formatDose(dose), label);
+  };
 
   if (type === "C" || type === "LC" || type === "E") {
     const block = choose(
@@ -617,11 +714,11 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
     if (filled.chosen.length) {
       lines.push("Accessories:");
       for (const exercise of filled.chosen) {
-        const dose =
+        lines.push(
           exercise.pattern === "conditioning"
-            ? "3 rounds of 1 minute at a moderate pace, 30 seconds easy"
-            : doseOf(exercise, "accessory", rules);
-        lines.push(exerciseLine(exercise, dose));
+            ? exerciseLine(exercise, "3 rounds of 1 minute at a moderate pace, 30 seconds easy")
+            : prescribed(exercise, "accessory")
+        );
       }
     }
     exercises = [...exercises, ...filled.chosen];
@@ -638,15 +735,9 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
     skipped = filled.skipped;
     lines.push(`Warmup: ${warmup} minutes - easy marching and slow breathing.`);
     lines.push("Main lifts:");
-    exercises
-      .slice(0, 2)
-      .forEach((exercise) => lines.push(exerciseLine(exercise, doseOf(exercise, "main", rules))));
+    exercises.slice(0, 2).forEach((exercise) => lines.push(prescribed(exercise, "main")));
     lines.push("Accessories:");
-    exercises
-      .slice(2)
-      .forEach((exercise) =>
-        lines.push(exerciseLine(exercise, doseOf(exercise, "accessory", rules)))
-      );
+    exercises.slice(2).forEach((exercise) => lines.push(prescribed(exercise, "accessory")));
     lines.push("Finisher/conditioning:");
     lines.push("- Easy breathing: 5 minutes");
   } else {
@@ -703,15 +794,13 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
     lines.push("Main lifts:");
     exercises
       .slice(0, 2)
-      .forEach((exercise, index) =>
-        lines.push(exerciseLine(exercise, doseOf(exercise, "main", rules), label(index)))
-      );
+      .forEach((exercise, index) => lines.push(prescribed(exercise, "main", label(index))));
     if (exercises.length > 2) {
       lines.push("Accessories:");
       exercises
         .slice(2)
         .forEach((exercise, index) =>
-          lines.push(exerciseLine(exercise, doseOf(exercise, "accessory", rules), label(index + 2)))
+          lines.push(prescribed(exercise, "accessory", label(index + 2)))
         );
     }
 
@@ -735,9 +824,7 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
     } else if (finisherMinutes && scheme === "mobility") {
       lines.push(`- Easy breathing: ${finisherMinutes} minutes`);
     }
-    closing.forEach((exercise) =>
-      lines.push(exerciseLine(exercise, doseOf(exercise, "accessory", rules)))
-    );
+    closing.forEach((exercise) => lines.push(prescribed(exercise, "accessory")));
   }
 
   return {
@@ -751,7 +838,8 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
     hard,
     walkMinutes: 0,
     aerobicMinutes: aerobic,
-    lines
+    lines,
+    prescriptions
   };
 };
 
@@ -826,7 +914,8 @@ export const generatePlan = (plan, library = EXERCISES) => {
         hard: false,
         walkMinutes: 0,
         aerobicMinutes: 0,
-        lines: []
+        lines: [],
+        prescriptions: []
       };
     }
     const title = type === "FB" ? `Full body ${fullBody++ % 2 === 0 ? "A" : "B"}` : TITLES[type];

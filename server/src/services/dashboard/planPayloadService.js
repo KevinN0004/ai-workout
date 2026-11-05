@@ -14,6 +14,19 @@
  * @property {string | null} weekday
  * @property {string} title
  * @property {string[]} lines
+ * @property {Prescription[]} [prescriptions] a rule-built day's sets to log (roadmap B1)
+ */
+
+/**
+ * What one line of a rule-built day prescribes, as generatePlan writes it:
+ * reps or seconds, exactly one, each a range.
+ * @typedef {object} Prescription
+ * @property {string} name
+ * @property {number} sets
+ * @property {{ min: number, max: number } | null} reps
+ * @property {{ min: number, max: number } | null} seconds
+ * @property {boolean} perSide
+ * @property {{ min: number, max: number } | null} targetRpe
  */
 
 /**
@@ -126,9 +139,48 @@ const isPlanDay = (day, position) =>
   isStringList(day.lines);
 
 /**
+ * A range of non-negative numbers whose min does not pass its max.
+ * @param {unknown} value
+ */
+const isRange = (value) =>
+  isRecord(value) &&
+  typeof value.min === "number" &&
+  typeof value.max === "number" &&
+  value.min >= 0 &&
+  value.min <= value.max;
+
+/**
+ * A prescription as generatePlan writes one: a name, a whole number of sets,
+ * reps or seconds (exactly one), and a target RPE range or none.
+ * @param {unknown} value
+ */
+const isPrescription = (value) =>
+  isRecord(value) &&
+  typeof value.name === "string" &&
+  value.name.length > 0 &&
+  Number.isInteger(value.sets) &&
+  /** @type {number} */ (value.sets) >= 1 &&
+  (value.reps === null) !== (value.seconds === null) &&
+  (value.reps === null || isRange(value.reps)) &&
+  (value.seconds === null || isRange(value.seconds)) &&
+  typeof value.perSide === "boolean" &&
+  (value.targetRpe === null || isRange(value.targetRpe));
+
+// A day as it is kept: its prescriptions when every one is well formed, and
+// otherwise without them, so a bad list costs that day its pre-fill and never
+// the plan.
+/** @param {PlanDay} day */
+const keepValidPrescriptions = (day) => {
+  if (!("prescriptions" in day)) return day;
+  const { prescriptions, ...rest } = day;
+  return Array.isArray(prescriptions) && prescriptions.every(isPrescription) ? day : rest;
+};
+
+/**
  * A stored or received payload when it is one of this version, shaped as
  * buildPlanPayload writes it, and otherwise null. An older plan's row holds
- * `{}`, so it reads as null: no payload.
+ * `{}`, so it reads as null: no payload. A day's malformed prescriptions are
+ * dropped, and the plan is kept.
  * @param {unknown} value
  * @returns {PlanPayload | null}
  */
@@ -137,5 +189,23 @@ export const toPlanPayload = (value) => {
   if (!Array.isArray(value.days) || !value.days.every(isPlanDay) || !isStringList(value.notes)) {
     return null;
   }
-  return /** @type {PlanPayload} */ (value);
+  const payload = /** @type {PlanPayload} */ (value);
+  const days = payload.days.map(keepValidPrescriptions);
+  return days.every((day, index) => day === payload.days[index]) ? payload : { ...payload, days };
 };
+
+/**
+ * `payload` with each weekday's prescriptions from `week`, generatePlan's
+ * days, joined by weekday. A parsed day the generator did not write, and the
+ * one "Your plan" day of text with no weekday, get none.
+ * @param {PlanPayload} payload
+ * @param {{ weekday: string, prescriptions: Prescription[] }[]} week
+ * @returns {PlanPayload}
+ */
+export const withPrescriptions = (payload, week) => ({
+  ...payload,
+  days: payload.days.map((day) => {
+    const generated = week.find((entry) => entry.weekday === day.weekday);
+    return generated ? { ...day, prescriptions: generated.prescriptions } : day;
+  })
+});

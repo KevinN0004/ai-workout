@@ -751,3 +751,102 @@ describe("the edges", () => {
     );
   });
 });
+
+// Roadmap B1: each strength, core, balance and mobility line carries its
+// numbers as a prescription, built from the same values the line is written
+// from, so logging a plan day can pre-fill its sets. The gate checks every
+// prescription against its line across both sweeps.
+describe("the prescriptions", () => {
+  const knee = generatePlan(input({ injuries: "Knee" })).week;
+  const day = (week, weekday) => week.find((d) => d.weekday === weekday);
+  const older = generatePlan(
+    input({ equipment: ["Bodyweight only"], level: "Beginner", days: 2, duration: 30, age: 70 })
+  ).week;
+
+  test("a reps dose gives its sets, its range and the RPE its reps in reserve make", () => {
+    expect(day(knee, "Monday").prescriptions).toEqual([
+      {
+        name: "Dumbbell box squat",
+        sets: 3,
+        reps: { min: 10, max: 12 },
+        seconds: null,
+        perSide: false,
+        targetRpe: { min: 8, max: 9 }
+      },
+      {
+        name: "Dumbbell bench press",
+        sets: 3,
+        reps: { min: 8, max: 10 },
+        seconds: null,
+        perSide: false,
+        targetRpe: { min: 8, max: 8 }
+      },
+      {
+        name: "Dumbbell Romanian deadlift",
+        sets: 3,
+        reps: { min: 10, max: 12 },
+        seconds: null,
+        perSide: false,
+        targetRpe: { min: 8, max: 9 }
+      },
+      {
+        name: "Chest-supported dumbbell row",
+        sets: 3,
+        reps: { min: 10, max: 12 },
+        seconds: null,
+        perSide: false,
+        targetRpe: { min: 8, max: 9 }
+      }
+    ]);
+  });
+
+  test("a hold gives seconds and no RPE", () => {
+    expect(day(knee, "Friday").prescriptions[0]).toEqual({
+      name: "Wall sit",
+      sets: 3,
+      reps: null,
+      seconds: { min: 30, max: 45 },
+      perSide: false,
+      targetRpe: null
+    });
+  });
+
+  test("three reps in reserve is RPE 7, and a superset's label is not part of the name", () => {
+    expect(day(older, "Monday").prescriptions[0]).toMatchObject({
+      name: "Bodyweight squat",
+      sets: 2,
+      reps: { min: 8, max: 10 },
+      targetRpe: { min: 7, max: 7 }
+    });
+  });
+
+  test("a side gives perSide, for reps and for holds", () => {
+    expect(day(older, "Monday").prescriptions.at(-1)).toEqual({
+      name: "Paused low step-up, hold at the top",
+      sets: 2,
+      reps: { min: 6, max: 6 },
+      seconds: null,
+      perSide: true,
+      targetRpe: null
+    });
+    expect(day(older, "Thursday").prescriptions.at(-1)).toEqual({
+      name: "Single-leg stand near a wall",
+      sets: 3,
+      reps: null,
+      seconds: { min: 20, max: 30 },
+      perSide: true,
+      targetRpe: null
+    });
+  });
+
+  // The ramp-up, the finisher and every cardio line are not sets to log.
+  test("prescribes only the lines that are sets", () => {
+    const monday = day(knee, "Monday");
+    expect(monday.prescriptions.map((p) => p.name)).not.toContain("Brisk walk");
+    expect(monday.prescriptions).toHaveLength(4);
+  });
+
+  test("a rest day has none", () => {
+    expect(day(knee, "Tuesday").prescriptions).toEqual([]);
+  });
+});

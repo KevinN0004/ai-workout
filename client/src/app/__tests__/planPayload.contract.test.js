@@ -1,9 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
   PLAN_PAYLOAD_VERSION as SERVER_PLAN_PAYLOAD_VERSION,
-  buildPlanPayload
+  buildPlanPayload,
+  toPlanPayload,
+  withPrescriptions
 } from "../../../../server/src/services/dashboard/planPayloadService.js";
-import { PLAN_PAYLOAD_VERSION, parsePlanSections } from "../plans";
+import { generatePlan } from "../../../../server/src/services/planning/generatePlan.js";
+import { PLAN_PAYLOAD_VERSION, parsePlanSections, readPlan, savedPlanDays } from "../plans";
 
 // The server parses each new plan's text when it saves the plan; this client
 // parses the text of a plan saved without that structure. A plan must read the
@@ -86,5 +89,69 @@ describe("the plan parse, on the server and here", () => {
     expect({ version: PLAN_PAYLOAD_VERSION, ...parsePlanSections(text) }).toEqual(
       buildPlanPayload(text)
     );
+  });
+});
+
+// Roadmap B1: a rule-built plan's days carry prescriptions. The server checks
+// them when it stores or reads a plan, and this client when it reads one, so
+// both must keep the same lists and drop the same malformed ones, each costing
+// only its own day.
+describe("the days' prescriptions, on the server and here", () => {
+  const week = generatePlan({
+    goal: "Build lean strength and energy",
+    environment: "Home",
+    equipment: ["Dumbbells", "Adjustable bench"],
+    level: "Intermediate",
+    days: 3,
+    duration: 45,
+    injuries: "Knee",
+    focuses: [],
+    health: {},
+    age: null
+  });
+  const ruleBuilt = withPrescriptions(buildPlanPayload(week.text), week.week);
+  const monday = ruleBuilt.days.findIndex((day) => day.weekday === "Monday");
+  const breaking = (change) => ({
+    ...ruleBuilt,
+    days: ruleBuilt.days.map((day, index) =>
+      index === monday ? { ...day, prescriptions: change(day.prescriptions) } : day
+    )
+  });
+  const [first] = ruleBuilt.days[monday].prescriptions;
+
+  const payloads = [
+    ["a rule-built plan", ruleBuilt],
+    ["a plan without prescriptions", buildPlanPayload(week.text)],
+    ["a missing name", breaking((list) => [{ ...first, name: "" }, ...list.slice(1)])],
+    ["no sets", breaking((list) => [{ ...first, sets: 0 }, ...list.slice(1)])],
+    ["a fraction of a set", breaking((list) => [{ ...first, sets: 1.5 }, ...list.slice(1)])],
+    [
+      "min past max",
+      breaking((list) => [{ ...first, reps: { min: 9, max: 8 } }, ...list.slice(1)])
+    ],
+    [
+      "a negative range",
+      breaking((list) => [{ ...first, reps: { min: -2, max: 8 } }, ...list.slice(1)])
+    ],
+    [
+      "reps and seconds",
+      breaking((list) => [{ ...first, seconds: { min: 5, max: 9 } }, ...list.slice(1)])
+    ],
+    ["neither", breaking((list) => [{ ...first, reps: null }, ...list.slice(1)])],
+    ["a perSide string", breaking((list) => [{ ...first, perSide: "no" }, ...list.slice(1)])],
+    ["a numeric target", breaking((list) => [{ ...first, targetRpe: 8 }, ...list.slice(1)])],
+    ["an entry that is text", breaking((list) => ["Squat", ...list.slice(1)])],
+    ["a list that is an object", breaking(() => ({ squat: first }))]
+  ];
+
+  test("the rule-built plan carries prescriptions to agree on", () => {
+    expect(ruleBuilt.days[monday].prescriptions.length).toBeGreaterThan(0);
+  });
+
+  test.each(payloads)("agree on %s", (_label, payload) => {
+    const server = toPlanPayload(payload);
+
+    expect(savedPlanDays({ payload })).toEqual(server.days);
+    expect(readPlan({ payload, text: "" }).days).toEqual(server.days);
   });
 });
