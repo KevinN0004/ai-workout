@@ -37,6 +37,7 @@
 - [2026-11-02 — Planned versus done](plans/2026-11-02-planned-versus-done.md)
 - [2026-11-03 — Plan-quality evals](plans/2026-11-03-plan-quality-evals.md)
 - [2026-11-03 — Rule-based plans](plans/2026-11-03-rule-based-plans.md)
+- [2026-11-05 — Per-set logging](plans/2026-11-05-per-set-logging.md)
 
 ## Specs
 
@@ -55,3 +56,4 @@
 - [2026-11-03 — Plan-quality evals](specs/2026-11-03-plan-quality-evals-design.md)
 - [2026-11-03 — Rule-based plans](specs/2026-11-03-rule-based-plans-design.md)
 - [2026-11-03 — Rule-based plans, evidence review](specs/2026-11-03-rule-based-plans-evidence.md)
+- [2026-11-05 — Per-set logging](specs/2026-11-05-per-set-logging-design.md)
