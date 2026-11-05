@@ -211,7 +211,8 @@ Steps:
 
 - Create: `client/src/pages/dashboard/components/ExerciseCard.jsx` (one card: name, the
   reps-or-seconds choice, its set rows and their buttons), with its test.
-- Create: `client/src/pages/dashboard/exerciseSets.js` (the form's pure rules: an empty
+- Create: `client/src/app/exerciseSets.js`, not under `pages/dashboard/` as first planned,
+  because `app/events.js` and `App.jsx` use it too (the form's pure rules: an empty
   card, add and remove, copy load, clean for save with the pound-to-kg conversion, and the
   validation messages), with its test.
 - Modify: `client/src/pages/dashboard/components/DashboardWorkoutModal.jsx`: the cards
@@ -236,7 +237,8 @@ Steps:
   - "0" reps and "0" load are kept, and "" is absent;
   - add set copies the previous load;
   - the caps of 18 cards and 20 rows hold.
-- [ ] Write it, importing `toNumberOrNull` and `toKg` from `app/units.js`. Add contract rows
+- [ ] Write it, importing `toNumberOrNull` from `app/units.js`, with its own `toLoadKg` and
+      `fromLoadKg`: `toKg` rounds to a whole kilogram and reads 0 as blank. Add contract rows
       for its parsers.
 - [ ] **Test first, the card and the modal:** labels read "Set 2 reps, <name>"; add and
       remove work from the keyboard; the reps-or-seconds choice relabels the rows; a

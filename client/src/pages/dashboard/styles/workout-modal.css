@@ -160,31 +160,6 @@
   text-wrap: balance;
 }
 
-/* Keeps .dashboard-workout-grid's twelve columns; the exercises field spans them all, and
-   so does the metrics grid inside it. */
-.dashboard-workout-grid-exercise {
-  display: grid;
-  gap: 12px;
-}
-
-.dashboard-workout-grid-metrics {
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(72px, 0.8fr) minmax(72px, 0.8fr) minmax(150px, 1.4fr);
-  gap: 10px 12px;
-  align-items: end;
-}
-
-.dashboard-workout-grid-metrics .dashboard-workout-field,
-.dashboard-workout-grid-metrics .dashboard-workout-field-half,
-.dashboard-workout-grid-metrics .dashboard-workout-field-full {
-  grid-column: auto;
-  align-content: end;
-}
-
-.dashboard-workout-grid-metrics .dashboard-workout-label {
-  white-space: nowrap;
-}
-
 .dashboard-workout-field {
   min-width: 0;
 }
@@ -195,6 +170,119 @@
 
 .dashboard-workout-field-half {
   grid-column: span 6;
+}
+
+/* ---- Exercise cards and their set rows (ExerciseCard) -------------------- */
+/* A set row is the set's number, three inputs and a remove button. The inputs share the
+   width evenly and the buttons keep a 44px target. */
+.set-log-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.set-log-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+
+.set-log-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto) 44px;
+  gap: 8px;
+  align-items: end;
+}
+
+.modal.dashboard-modal .dashboard-workout-form .set-log-card select {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  width: 100%;
+  font-size: 0.98rem;
+}
+
+.set-log-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.set-log-row {
+  display: grid;
+  grid-template-columns: 28px repeat(3, minmax(0, 1fr)) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.set-log-row-head {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #bdbdbd;
+}
+
+.set-log-number {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #d2d2d2;
+}
+
+.modal.dashboard-modal .dashboard-workout-form .set-log-row input {
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.set-log-remove {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+
+.set-log-add,
+.set-log-add-exercise {
+  justify-self: start;
+  min-height: 44px;
+}
+
+.set-log-hint,
+.set-log-empty {
+  margin: 0;
+}
+
+.set-log-error {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #ffb4b4;
+}
+
+/* On a phone the name takes the first row with the remove button, so it is not squeezed
+   beside the Counts select, which moves to a row of its own. */
+@media (max-width: 520px) {
+  .set-log-card-head {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .set-log-name {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .set-log-card-head > .set-log-remove {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .set-log-kind {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 /* ---- Actions ------------------------------------------------------------- */

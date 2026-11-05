@@ -3,7 +3,8 @@
  * logs, newest first. Rendered by DashboardPage, which loads it lazily.
  */
 import { useMemo, useState } from "react";
-import { getLocalDateKey } from "../../../app/units";
+import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
+import { formatExerciseLine } from "../../../app/exerciseSets";
 import { NO_PLAN_LINK } from "../../../app/plans";
 import useOlderLogPages from "../hooks/useOlderLogPages";
 import "./WorkoutsView.css";
@@ -55,6 +56,8 @@ export default function WorkoutsView({
   onOpenMeal
 }) {
   // ---- Sorted lists and the visible slice of each ---------------------------
+  // Loads show in the region's unit, read once per mount.
+  const measurementSystem = useMemo(() => getPreferredMeasurementSystem(), []);
   const [visibleRows, setVisibleRows] = useState({
     workouts: INITIAL_VISIBLE_ROWS,
     calories: INITIAL_VISIBLE_ROWS,
@@ -174,10 +177,23 @@ export default function WorkoutsView({
                   <div className="workout-row-copy">
                     <strong>{item.date || "--"}</strong>
                     <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
-                    {!!item.exercises?.length && (
-                      <p className="muted workout-detail">{item.exercises.join(", ")}</p>
+                    {item.exerciseSets?.length ? (
+                      item.exerciseSets.map((exercise, exerciseIndex) => (
+                        <p
+                          key={`${exercise.name}-${exerciseIndex}`}
+                          className="muted workout-detail"
+                        >
+                          {formatExerciseLine(exercise, measurementSystem)}
+                        </p>
+                      ))
+                    ) : (
+                      <>
+                        {!!item.exercises?.length && (
+                          <p className="muted workout-detail">{item.exercises.join(", ")}</p>
+                        )}
+                        {!!sessionMeta && <p className="muted workout-detail">{sessionMeta}</p>}
+                      </>
                     )}
-                    {!!sessionMeta && <p className="muted workout-detail">{sessionMeta}</p>}
                     {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
                   </div>
                   <span>{item.duration ?? "--"} min</span>

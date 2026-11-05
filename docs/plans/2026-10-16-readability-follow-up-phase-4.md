@@ -578,7 +578,7 @@ const BASE_STATES = [
       await advanceUntil(page, has, ".dashboard-workout-modal", "the workout modal");
       await advance(page, 1000);
     },
-    check: () => (document.querySelector(".dashboard-workout-modal .dashboard-workout-grid-metrics") ? null : "no workout modal")
+    check: () => (document.querySelector(".dashboard-workout-modal .dashboard-workout-section-exercise") ? null : "no workout modal")
   },
   {
     name: "dash-planner", motion: "reduce", path: "/dashboard", api: SIGNED_IN, viewports: ALL,

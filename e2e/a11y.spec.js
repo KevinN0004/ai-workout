@@ -94,6 +94,12 @@ test.describe.serial("accessibility", () => {
     const dialog = page.getByRole("dialog", { name: "Log workout" });
     await expect(dialog).toBeVisible();
 
+    // The set log (roadmap B1): scanned with two exercise cards and three set
+    // rows, so every control a card can hold is in the scan.
+    await dialog.getByRole("button", { name: "Add set to Exercise 1" }).click();
+    await dialog.getByRole("button", { name: "Add exercise" }).click();
+    await expect(dialog.getByRole("group", { name: "Exercise 2" })).toBeVisible();
+
     expectNoViolations(await analyze(page));
   });
 
@@ -216,6 +222,9 @@ test.describe.serial("accessibility", () => {
     await page.getByRole("button", { name: "Add workout" }).first().click();
     const workout = page.getByRole("dialog", { name: "Log workout" });
     expect(await tappable(workout.getByRole("button", { name: "Save workout" }))).toBe("tappable");
+    expect(await tappable(workout.getByRole("button", { name: "Add set to Exercise 1" }))).toBe(
+      "tappable"
+    );
     await page.keyboard.press("Escape");
 
     await page.goto("/dashboard/plans");

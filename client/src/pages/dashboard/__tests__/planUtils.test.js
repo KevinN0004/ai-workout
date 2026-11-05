@@ -24,21 +24,24 @@ const realDays = Object.entries(
 const realDay = (fixture, weekday) =>
   realDays.find(([label]) => label === `${fixture} ${weekday}`)[1];
 
+// The names of the exercise cards a pre-fill opens with.
+const namesOf = (prefill) => prefill.exerciseSets.map((card) => card.name);
+
 describe("buildPlanDayPrefill", () => {
   test("reads all 56 real days", () => {
     expect(realDays).toHaveLength(56);
   });
 
-  // The exercises field is split on commas, so a name holding one would log
-  // as two exercises; the server keeps 18 names of 140 characters.
+  // Each name is one exercise card; the server keeps 18 names of 140
+  // characters.
   test.each(realDays)("%s fits the form", (_label, day) => {
-    const { focus, exercises, notes } = buildPlanDayPrefill(day);
-    const names = exercises ? exercises.split(", ") : [];
+    const prefill = buildPlanDayPrefill(day);
+    const { focus, notes } = prefill;
+    const names = namesOf(prefill);
 
     expect(focus).toBe(day.title);
     expect(names.length).toBeLessThanOrEqual(18);
     for (const name of names) {
-      expect(name).not.toMatch(/,/);
       expect(name).not.toMatch(/^rest\b/i);
       expect(name).not.toMatch(/[()]/);
       expect(name.length).toBeGreaterThan(0);
@@ -49,9 +52,13 @@ describe("buildPlanDayPrefill", () => {
   });
 
   test("names each exercise a day's bullets prescribe, in order", () => {
-    expect(buildPlanDayPrefill(realDay("02-commercial-full-5d.txt", "Monday")).exercises).toBe(
-      "Back Squats, Conventional Deadlifts, Leg Press, Seated Calf Raises, Wall Sits"
-    );
+    expect(namesOf(buildPlanDayPrefill(realDay("02-commercial-full-5d.txt", "Monday")))).toEqual([
+      "Back Squats",
+      "Conventional Deadlifts",
+      "Leg Press",
+      "Seated Calf Raises",
+      "Wall Sits"
+    ]);
   });
 
   test("drops a bracketed aside, and the comma in it", () => {
@@ -60,16 +67,29 @@ describe("buildPlanDayPrefill", () => {
       lines: ["- Cable Rows (Close grip, focus on upright posture): 3 x 10"]
     };
 
-    expect(buildPlanDayPrefill(day).exercises).toBe("Cable Rows");
+    expect(namesOf(buildPlanDayPrefill(day))).toEqual(["Cable Rows"]);
   });
 
-  test("leaves out a rest line, and a name that still holds a comma", () => {
+  // A card holds its name whole, so a comma in it no longer splits it in two
+  // ("One-arm dumbbell row, hand on a bench" is one library exercise).
+  test("leaves out a rest line, and keeps a name that holds a comma", () => {
     const day = {
       title: "Monday",
       lines: ["- Rest: 30 seconds", "- Squats, then lunges: 3 x 10", "- Plank: 3 x 30s"]
     };
 
-    expect(buildPlanDayPrefill(day).exercises).toBe("Plank");
+    expect(namesOf(buildPlanDayPrefill(day))).toEqual(["Squats, then lunges", "Plank"]);
+  });
+
+  test("opens each card with one empty set row", () => {
+    const [card] = buildPlanDayPrefill({
+      title: "Monday",
+      lines: ["- Plank: 3 x 30s"]
+    }).exerciseSets;
+
+    expect(card).toMatchObject({ name: "Plank", kind: "reps", targets: null });
+    expect(card.sets).toHaveLength(1);
+    expect(card.sets[0]).toMatchObject({ amount: "", load: "", rpe: "" });
   });
 
   // The server keeps an exercise of at most 140 characters, so a longer name
@@ -80,7 +100,7 @@ describe("buildPlanDayPrefill", () => {
       lines: [`- ${"x".repeat(141)}: 3 x 10`, `- ${"y".repeat(140)}: 3 x 10`]
     };
 
-    expect(buildPlanDayPrefill(day).exercises).toBe("y".repeat(140));
+    expect(namesOf(buildPlanDayPrefill(day))).toEqual(["y".repeat(140)]);
   });
 
   test("keeps the whole day as notes, cut at 500 characters", () => {
@@ -94,7 +114,7 @@ describe("buildPlanDayPrefill", () => {
 
     expect(buildPlanDayPrefill(day)).toEqual({
       focus: "Monday",
-      exercises: "",
+      exerciseSets: [],
       notes: "Rest / Active Recovery\n(Light walking or gentle stretching permitted)"
     });
   });
@@ -131,8 +151,7 @@ describe("buildPlanDayPrefill", () => {
                 });
                 texts.push(text);
                 for (const day of parsePlanSections(text).days) {
-                  const { exercises } = buildPlanDayPrefill(day);
-                  for (const name of exercises ? exercises.split(", ") : [])
+                  for (const name of namesOf(buildPlanDayPrefill(day)))
                     if (!names.has(name)) strays.add(name);
                 }
               }

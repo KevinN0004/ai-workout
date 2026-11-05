@@ -89,9 +89,6 @@ export default function PlansView({
     setWorkoutForm({
       date: getLocalDateKey(),
       duration: "",
-      sets: "",
-      reps: "",
-      intensityRpe: "",
       ...buildPlanDayPrefill(day),
       planId: latestPlan.id,
       planDayIndex: day.index,

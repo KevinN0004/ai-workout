@@ -1,14 +1,19 @@
 /**
- * The Log workout modal: session details, exercise details and notes. Rendered
- * by DashboardPage, and opened by the glance panel's and WorkoutsView's Add
- * workout buttons, which date the form today and clear any plan-day link, and
- * by PlansView's Log this workout, which fills it from a plan day.
+ * The Log workout modal: session details, the exercises with their sets, and notes.
+ * Rendered by DashboardPage; opened by the Add workout buttons, which date the form
+ * today and clear any plan-day link, and by PlansView's Log this workout.
  */
+import { useMemo, useState } from "react";
 import ModalPortal from "../../../components/ModalPortal";
+import { getPreferredMeasurementSystem } from "../../../app/units";
+import { MAX_CARDS, addCard, toExerciseSets } from "../../../app/exerciseSets";
+import ExerciseCard from "./ExerciseCard";
 
 /**
- * A controlled form over App's `workoutForm`. `onSubmit` is submitWorkout in
- * events.js, which queues the entry behind the undo window, then resets the
+ * A controlled form over App's `workoutForm`, whose `exerciseSets` holds the
+ * exercise cards. Saving checks the cards first and stops with a message
+ * beside each set that cannot be logged; otherwise `onSubmit` is submitWorkout
+ * in events.js, which queues the entry behind the undo window, then resets the
  * form and closes the modal without waiting for the save. A form filled from a
  * plan day (PlansView) carries `planId` and says which day it is logging.
  */
@@ -19,16 +24,39 @@ export default function DashboardWorkoutModal({
   onClose,
   onSubmit
 }) {
+  const system = useMemo(() => getPreferredMeasurementSystem(), []);
+  const [errors, setErrors] = useState({});
   if (!open) return null;
 
+  const cards = Array.isArray(workoutForm.exerciseSets) ? workoutForm.exerciseSets : [];
+  const setCards = (updater) =>
+    setWorkoutForm((prev) => ({
+      ...prev,
+      exerciseSets: updater(Array.isArray(prev.exerciseSets) ? prev.exerciseSets : [])
+    }));
+  const close = () => {
+    setErrors({});
+    onClose();
+  };
+  const submit = (event) => {
+    const found = toExerciseSets(cards, system).errors;
+    if (Object.keys(found).length) {
+      event.preventDefault();
+      setErrors(found);
+      return;
+    }
+    setErrors({});
+    onSubmit(event);
+  };
+
   return (
-    <ModalPortal open={open} onClose={onClose}>
+    <ModalPortal open={open} onClose={close}>
       <div
         className="modal-backdrop dashboard-modal-backdrop"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workout-modal-title"
-        onClick={onClose}
+        onClick={close}
       >
         <div
           className="modal dashboard-modal dashboard-workout-modal"
@@ -48,7 +76,7 @@ export default function DashboardWorkoutModal({
               className="ghost icon-button"
               aria-label="Close workout modal"
               title="Close"
-              onClick={onClose}
+              onClick={close}
             >
               <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                 <path
@@ -61,7 +89,7 @@ export default function DashboardWorkoutModal({
               </svg>
             </button>
           </div>
-          <form className="form dashboard-workout-form" onSubmit={onSubmit}>
+          <form className="form dashboard-workout-form" onSubmit={submit}>
             {/* ---- Fields: session, exercise and notes ---- */}
             <div className="dashboard-workout-layout">
               <section className="dashboard-workout-section dashboard-workout-section-session">
@@ -109,69 +137,31 @@ export default function DashboardWorkoutModal({
 
               <section className="dashboard-workout-section dashboard-workout-section-exercise">
                 <h3>Exercise details</h3>
-                <div className="dashboard-workout-grid dashboard-workout-grid-exercise">
-                  <label className="dashboard-workout-field dashboard-workout-field-full">
-                    <span className="dashboard-workout-label">Exercises (comma-separated)</span>
-                    <input
-                      value={workoutForm.exercises}
-                      onChange={(e) =>
-                        setWorkoutForm((prev) => ({
-                          ...prev,
-                          exercises: e.target.value
-                        }))
-                      }
-                      placeholder="Squat, bench press, row"
-                    />
-                  </label>
-                  <div className="dashboard-workout-grid dashboard-workout-grid-metrics">
-                    <label className="dashboard-workout-field dashboard-workout-field-half">
-                      <span className="dashboard-workout-label">Sets</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="80"
-                        value={workoutForm.sets}
-                        onChange={(e) =>
-                          setWorkoutForm((prev) => ({
-                            ...prev,
-                            sets: e.target.value
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="dashboard-workout-field dashboard-workout-field-half">
-                      <span className="dashboard-workout-label">Reps</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="120"
-                        value={workoutForm.reps}
-                        onChange={(e) =>
-                          setWorkoutForm((prev) => ({
-                            ...prev,
-                            reps: e.target.value
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="dashboard-workout-field dashboard-workout-field-full">
-                      <span className="dashboard-workout-label">Intensity (RPE 1-10)</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        step="0.5"
-                        value={workoutForm.intensityRpe}
-                        onChange={(e) =>
-                          setWorkoutForm((prev) => ({
-                            ...prev,
-                            intensityRpe: e.target.value
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
+                {cards.length ? (
+                  <ol className="set-log-cards">
+                    {cards.map((card, index) => (
+                      <li key={card.key}>
+                        <ExerciseCard
+                          card={card}
+                          position={index + 1}
+                          unitLabel={system === "imperial" ? "lb" : "kg"}
+                          errors={errors}
+                          onChange={setCards}
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="muted set-log-empty">No exercises yet.</p>
+                )}
+                <button
+                  type="button"
+                  className="ghost set-log-add-exercise"
+                  disabled={cards.length >= MAX_CARDS}
+                  onClick={() => setCards(addCard)}
+                >
+                  Add exercise
+                </button>
               </section>
 
               <section className="dashboard-workout-section dashboard-workout-section-notes">
@@ -193,9 +183,15 @@ export default function DashboardWorkoutModal({
               </section>
             </div>
 
+            {Object.keys(errors).length ? (
+              <p className="set-log-error" role="alert">
+                Check the exercises marked above before saving.
+              </p>
+            ) : null}
+
             {/* ---- Cancel and save ---- */}
             <div className="modal-submit dashboard-workout-actions">
-              <button type="button" className="ghost" onClick={onClose}>
+              <button type="button" className="ghost" onClick={close}>
                 Cancel
               </button>
               <button className="cta" type="submit">

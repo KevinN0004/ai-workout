@@ -432,17 +432,20 @@ describe("logging a plan day", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Log this workout" }));
 
-    expect(setWorkoutForm).toHaveBeenCalledWith({
+    // Each card carries a fresh key, so the cards are compared by what they
+    // hold rather than by the object a second pre-fill would build.
+    const { exerciseSets, ...form } = setWorkoutForm.mock.calls[0][0];
+    const { exerciseSets: expectedCards, ...prefill } = buildPlanDayPrefill(mondayDay);
+    expect(form).toEqual({
       date: "2026-09-11",
       duration: "",
-      sets: "",
-      reps: "",
-      intensityRpe: "",
-      ...buildPlanDayPrefill(mondayDay),
+      ...prefill,
       planId: "plan-1",
       planDayIndex: 0,
       planDayLabel: "Monday"
     });
+    expect(exerciseSets.map((card) => card.name)).toEqual(expectedCards.map((card) => card.name));
+    expect(exerciseSets.length).toBeGreaterThan(0);
     expect(setWorkoutModalOpen).toHaveBeenCalledWith(true);
     expect(screen.queryByRole("dialog")).toBeNull();
     vi.useRealTimers();

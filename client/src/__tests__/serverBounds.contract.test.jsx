@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import AuthPage from "../pages/auth/AuthPage";
 import CaloriesView from "../pages/dashboard/views/CaloriesView";
 import DashboardWorkoutModal from "../pages/dashboard/components/DashboardWorkoutModal";
@@ -9,6 +9,7 @@ import PreviewPersonalChapter from "../pages/home/preview/components/PreviewPers
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "../app/units";
 import { fieldsForTab } from "../pages/dashboard/settings/settingsFields";
 import {
+  __testables as apiSchema,
   caloriesBodySchema,
   goalsBodySchema,
   mealLogBodySchema,
@@ -16,6 +17,7 @@ import {
   progressMetricBodySchema,
   workoutSessionBodySchema
 } from "../../../server/src/services/http/apiSchemaService.js";
+import { newCard, toLoadKg } from "../app/exerciseSets";
 
 // Every numeric input whose value is posted to a route with a numeric schema,
 // held to that schema's range. The client's bounds are attributes on rendered
@@ -85,16 +87,26 @@ const renderMealLogPanel = () =>
     />
   );
 
-const renderWorkoutModal = () =>
-  render(
+// The workout modal with one exercise card, its loads in kg unless a locale
+// is given: a set's numbers are bounded per row, against the fields of one set
+// of the server's exerciseSets.
+const setFields = apiSchema.exerciseSetFields;
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+const renderWorkoutModal = ({ kind = "reps", locale = "en-GB" } = {}) => {
+  vi.spyOn(navigator, "languages", "get").mockReturnValue([locale]);
+  return render(
     <DashboardWorkoutModal
       open
-      workoutForm={{}}
+      workoutForm={{ exerciseSets: [newCard({ name: "Squat", kind })] }}
       setWorkoutForm={noop}
       onClose={noop}
       onSubmit={noop}
     />
   );
+};
+const renderWorkoutHold = () => renderWorkoutModal({ kind: "seconds" });
 
 const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
   render(
@@ -231,14 +243,20 @@ const INPUTS = [
     byLabel("Duration (minutes)"),
     workoutSessionBodySchema.shape.duration
   ],
-  ["Workout: sets", renderWorkoutModal, byLabel("Sets"), workoutSessionBodySchema.shape.sets],
-  ["Workout: reps", renderWorkoutModal, byLabel("Reps"), workoutSessionBodySchema.shape.reps],
+  ["Workout: a set's reps", renderWorkoutModal, byLabel("Set 1 reps, Squat"), setFields.reps],
   [
-    "Workout: intensity",
-    renderWorkoutModal,
-    byLabel("Intensity (RPE 1-10)"),
-    workoutSessionBodySchema.shape.intensityRpe
+    "Workout: a hold's seconds",
+    renderWorkoutHold,
+    byLabel("Set 1 seconds, Squat"),
+    setFields.seconds
   ],
+  [
+    "Workout: a set's load in kg",
+    renderWorkoutModal,
+    byLabel("Set 1 load in kg, Squat"),
+    setFields.loadKg
+  ],
+  ["Workout: a set's RPE", renderWorkoutModal, byLabel("Set 1 RPE, Squat"), setFields.rpe],
   ["Sign-up: age", renderSignup, byName("age"), profileBodySchema.shape.age],
   ["Sign-up: height in cm", renderSignup, byName("heightCm"), profileBodySchema.shape.heightCm],
   ["Sign-up: weight in kg", renderSignup, byName("weight"), profileBodySchema.shape.weightKg],
@@ -298,6 +316,16 @@ describe("client input bounds match the server's", () => {
     renderForm("ft", "lb");
 
     expect(boundsOf()).toEqual(signup);
+  });
+
+  // A load typed in pounds has no schema of its own: both of the input's ends,
+  // converted as the save converts them, must land inside the server's range.
+  test("Workout: a set's load in pounds converts into the server's range", () => {
+    renderWorkoutModal({ locale: "en-US" });
+    const input = screen.getByLabelText("Set 1 load in lb, Squat");
+
+    expect(setFields.loadKg.safeParse(toLoadKg(input.min, "imperial")).success).toBe(true);
+    expect(setFields.loadKg.safeParse(toLoadKg(input.max, "imperial")).success).toBe(true);
   });
 
   test("Goal: the weekly workouts offered are every count the server accepts", () => {

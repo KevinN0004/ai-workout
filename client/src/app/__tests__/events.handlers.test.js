@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";
+import { newCard } from "../exerciseSets";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
@@ -11,6 +12,18 @@ const jsonResponse = (body, ok = true) => ({
   ok,
   json: async () => body
 });
+
+// The form's exercise cards: two filled, the first typed in pounds, and one
+// wholly blank, which a save drops.
+const workoutCards = () => {
+  const bench = newCard({ name: " Bench press " });
+  const squat = newCard({ name: "Squat" });
+  return [
+    { ...bench, sets: [{ ...bench.sets[0], amount: "10", load: "100", rpe: "7.5" }] },
+    { ...squat, sets: [{ ...squat.sets[0], amount: "5" }] },
+    newCard()
+  ];
+};
 
 const buildDeps = (overrides = {}) => {
   const deps = {
@@ -28,10 +41,7 @@ const buildDeps = (overrides = {}) => {
       date: "2026-03-01",
       focus: "Push",
       duration: "45",
-      exercises: " bench , , squat ,",
-      sets: "3",
-      reps: "10",
-      intensityRpe: "7.5",
+      exerciseSets: workoutCards(),
       notes: "felt good"
     },
     calorieForm: { calories: "2200" },
@@ -43,16 +53,31 @@ const buildDeps = (overrides = {}) => {
 const submitEvent = () => ({ preventDefault: vi.fn() });
 
 describe("submitWorkout", () => {
-  test("splits the exercise field into trimmed, non-empty entries", async () => {
+  // Loads are typed in the region's unit; pin an imperial one, so the
+  // conversion to kg is part of what these pin.
+  beforeEach(() => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const loggedSets = [
+    { name: "Bench press", sets: [{ reps: 10, seconds: null, loadKg: 45.36, rpe: 7.5 }] },
+    { name: "Squat", sets: [{ reps: 5, seconds: null, loadKg: null, rpe: null }] }
+  ];
+
+  test("names the exercises from the filled cards, in order", async () => {
     const { deps, handlers } = buildDeps();
 
     await handlers.submitWorkout(submitEvent());
 
     const commit = deps.queueOptimisticLogCommit.mock.calls[0][0];
-    expect(commit.item.exercises).toEqual(["bench", "squat"]);
+    expect(commit.item.exercises).toEqual(["Bench press", "Squat"]);
   });
 
-  test("coerces numeric fields and keeps the supplied date and focus", async () => {
+  test("shows the sets at once, loads in kg, with no session summary", async () => {
     const { deps, handlers } = buildDeps();
 
     await handlers.submitWorkout(submitEvent());
@@ -63,11 +88,12 @@ describe("submitWorkout", () => {
       date: "2026-03-01",
       focus: "Push",
       duration: 45,
-      sets: 3,
-      reps: 10,
-      intensityRpe: 7.5,
+      sets: null,
+      reps: null,
+      intensityRpe: null,
       notes: "felt good"
     });
+    expect(item.exerciseSets).toEqual(loggedSets);
   });
 
   test("falls back to General focus and null numerics when fields are blank", async () => {
@@ -76,10 +102,7 @@ describe("submitWorkout", () => {
         date: "",
         focus: "",
         duration: "",
-        exercises: "",
-        sets: "",
-        reps: "",
-        intensityRpe: "",
+        exerciseSets: [newCard()],
         notes: ""
       }
     });
@@ -89,10 +112,8 @@ describe("submitWorkout", () => {
     const { item } = deps.queueOptimisticLogCommit.mock.calls[0][0];
     expect(item.focus).toBe("General");
     expect(item.duration).toBeNull();
-    expect(item.sets).toBeNull();
-    expect(item.reps).toBeNull();
-    expect(item.intensityRpe).toBeNull();
     expect(item.exercises).toEqual([]);
+    expect(item.exerciseSets).toEqual([]);
     // A blank date falls back to today rather than posting an empty string.
     expect(item.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -107,7 +128,14 @@ describe("submitWorkout", () => {
     const [url, options] = deps.apiFetch.mock.calls[0];
     expect(url).toBe("/api/dashboard/workout-sessions");
     expect(options.method).toBe("POST");
-    expect(JSON.parse(options.body).exercises).toEqual(["bench", "squat"]);
+    const body = JSON.parse(options.body);
+    expect(body.exercises).toEqual(["Bench press", "Squat"]);
+    expect(body.exerciseSets).toEqual(loggedSets);
+    // The session summary is the old form's; the server keeps it for older
+    // sessions, and this form no longer sends it.
+    expect(body).not.toHaveProperty("sets");
+    expect(body).not.toHaveProperty("reps");
+    expect(body).not.toHaveProperty("intensityRpe");
   });
 
   test("surfaces the server's error message when the request fails", async () => {
@@ -140,9 +168,10 @@ describe("submitWorkout", () => {
 
     await handlers.submitWorkout(submitEvent());
 
-    expect(deps.setWorkoutForm).toHaveBeenCalledWith(
-      expect.objectContaining({ focus: "", exercises: "", notes: "" })
-    );
+    const reset = deps.setWorkoutForm.mock.calls.at(-1)[0];
+    expect(reset).toMatchObject({ focus: "", duration: "", notes: "", planId: null });
+    expect(reset.exerciseSets).toHaveLength(1);
+    expect(reset.exerciseSets[0].name).toBe("");
     expect(deps.setWorkoutModalOpen).toHaveBeenCalledWith(false);
   });
 });
