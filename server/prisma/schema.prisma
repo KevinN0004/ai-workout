@@ -25,6 +25,7 @@ model AppUser {
   progressMetrics ProgressMetric[]
   savedExercises  SavedExercise[]
   workoutSessions WorkoutSession[]
+  exerciseSets    ExerciseSet[]
 
   @@map("app_users")
 }
@@ -48,11 +49,34 @@ model WorkoutSession {
 
   user          AppUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
   generatedPlan GeneratedPlan? @relation(fields: [generatedPlanId], references: [id], onDelete: SetNull)
+  exerciseSets  ExerciseSet[]
 
   @@index([userId, createdAt(sort: Desc)], map: "workout_sessions_user_created_idx")
   @@index([userId, workoutDate(sort: Desc)], map: "workout_sessions_user_date_idx")
   @@index([generatedPlanId, planDayIndex], map: "workout_sessions_plan_day_idx")
   @@map("workout_sessions")
+}
+
+// One set of a session (006_exercise_sets.sql, which also holds the checks and
+// the per-user name index that schema.prisma cannot express).
+model ExerciseSet {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  exerciseOrder Int      @map("exercise_order") @db.SmallInt
+  exerciseName  String   @map("exercise_name")
+  setNumber     Int      @map("set_number") @db.SmallInt
+  reps          Int?     @db.SmallInt
+  seconds       Int?     @db.SmallInt
+  loadKg        Decimal? @map("load_kg") @db.Decimal(6, 2)
+  rpe           Decimal? @db.Decimal(3, 1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    AppUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, exerciseOrder, setNumber], map: "exercise_sets_session_order_set_key")
+  @@map("exercise_sets")
 }
 
 model MealLog {

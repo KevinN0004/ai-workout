@@ -120,10 +120,22 @@ Migration `server/db/postgres/006_exercise_sets.sql` adds `exercise_sets`, one r
   `set_number`, and `mapWorkoutSession` returns them grouped as `exerciseSets` in the shape
   the write takes. `load_kg` and `rpe` are Decimal columns, read through `toNumberOrNull`.
   `server/src/__tests__/numericCoercion.contract.test.js` gains a row for each new reader.
-- **The dashboard read's added size is not measured yet.** It reads up to 500 sessions, and
-  with sets each may carry about twenty more rows. PR 2 measures it on seeded data. If it is
-  too heavy, the dashboard read leaves sets out and only the paginated Logs route carries
-  them. The measurement and the choice go in that PR.
+- **The dashboard read carries the sets too** (decided by the owner on 2026-11-05, in
+  PR 2). This section first said that a read too heavy with sets would leave them to "the
+  paginated Logs route". That was wrong: Logs pages meal logs and metrics, but shows only
+  the workouts the dashboard read holds, so without sets there it would show none. PR 2
+  measured the session part of the read on local Postgres (median of 7 runs, the mapped
+  JSON's size):
+
+  | History                         | Without sets | With sets       |
+  | ------------------------------- | ------------ | --------------- |
+  | 52 sessions × 6 exercises × 3   | 1 ms, 18 KB  | 6 ms, 70 KB     |
+  | 150 sessions × 6 × 3            | 2 ms, 51 KB  | 15 ms, 203 KB   |
+  | 500 sessions × 6 × 3            | 4 ms, 169 KB | 46 ms, 676 KB   |
+  | 500 sessions × 18 × 3 (extreme) | 7 ms, 252 KB | 210 ms, 1.78 MB |
+
+  The server does not compress its responses. Only years of heavy daily logging reach the
+  last row; if a real account does, a later PR caps the read rather than this one.
 
 ### Plan prescriptions
 
