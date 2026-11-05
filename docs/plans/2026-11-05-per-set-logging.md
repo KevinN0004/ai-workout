@@ -43,8 +43,9 @@ mutation applied before trusting a run, and restore the file from a saved copy (
 Write mutation scripts with the Write tool, never a heredoc.
 
 **Coverage slack.** Client, measured on `8e677b6`: statements 2.61, branches 5.14,
-functions 0.55 and lines 4.30. The server's slack has not been measured since #336. Task 2
-measures it first, with `client/dist` present, and the rest of the plan reads that figure.
+functions 0.55 and lines 4.30. Server, measured on `8e677b6` with `client/dist` present:
+statements 2.08 (2966 of 3081), branches 1.64 (2168 of 2378), **functions 0.23** (510 of 525) and lines 1.57 (2639 of 2719). One untested server function fails CI, so every server
+function added ships with its test.
 
 **Absent is not zero** (ADR 0001). Every new numeric reader guards absent input before
 `Number()`, and gets a row in the numeric-coercion contract test on its side. 0 reps and
@@ -123,12 +124,12 @@ Steps:
     replaces the sets only when `session.exerciseSets` is an array.
 - [ ] **Contract rows:** the mapper's `loadKg` and `rpe` readers in the server's
       numeric-coercion contract, with zero meaningful for `loadKg` and not for `rpe`.
-- [ ] **Measure the dashboard read.** Seed one test user with 500 sessions of 18 exercises
-      × 3 sets. Time `userReadRepository`'s read with and without sets in the include, and
-      record the rows, bytes and milliseconds in the PR. If the read with sets costs more
-      than twice the time without them, give the dashboard read its own include without
-      sets, and leave them to the paginated Logs route. Record which way it went in the
-      spec's "The reads" section.
+- [x] **Measure the dashboard read.** Seeded histories from 52 to 500 sessions, timed with
+      and without sets. Every one passed the "twice the time" rule this step first set,
+      because the baseline is a few milliseconds. The rule's fallback, the paginated Logs
+      route, does not exist for workouts: Logs shows only the sessions the dashboard read
+      holds. So the owner decided on 2026-11-05 to keep sets in the dashboard read. The
+      figures are in the spec's "The reads" section.
 - [ ] **Mutations,** each of which must fail a test:
   - the transaction removed (two separate writes);
   - the "only when an array" guard removed;

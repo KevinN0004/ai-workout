@@ -9,11 +9,50 @@ import { legacyOrIdWhere, getUserPk } from "./userLookup.js";
 
 /**
  * What every read of workout_sessions includes, so mapWorkoutSession can give
- * a linked session its plan's id as the client knows it.
+ * a linked session its plan's id as the client knows it, and its sets in the
+ * order they were logged.
  */
 export const WORKOUT_SESSION_INCLUDE = {
-  generatedPlan: { select: { id: true, legacyId: true } }
+  generatedPlan: { select: { id: true, legacyId: true } },
+  exerciseSets: { orderBy: [{ exerciseOrder: "asc" }, { setNumber: "asc" }] }
 };
+
+// A session's set rows, already in order, grouped into one entry per
+// exercise as the API takes and returns them. Every number reads through
+// toNumberOrNull (`loadKg` and `rpe` are Decimal columns), so a missing one is
+// null and a measured 0, a failed set or a bodyweight load, stays 0.
+const groupExerciseSets = (rows) => {
+  const exercises = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const set = {
+      reps: toNumberOrNull(row.reps),
+      seconds: toNumberOrNull(row.seconds),
+      loadKg: toNumberOrNull(row.loadKg),
+      rpe: toNumberOrNull(row.rpe)
+    };
+    const last = exercises[exercises.length - 1];
+    if (last && last.order === row.exerciseOrder) last.sets.push(set);
+    else exercises.push({ order: row.exerciseOrder, name: row.exerciseName, sets: [set] });
+  }
+  return exercises.map(({ name, sets }) => ({ name, sets }));
+};
+
+// The rows for `exerciseSets`, numbered from 1 within each exercise, each
+// carrying the session's own user.
+const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
+  exerciseSets.flatMap((exercise, exerciseOrder) =>
+    exercise.sets.map((set, index) => ({
+      sessionId,
+      userId: userPk,
+      exerciseOrder,
+      exerciseName: exercise.name,
+      setNumber: index + 1,
+      reps: set.reps ?? null,
+      seconds: set.seconds ?? null,
+      loadKg: set.loadKg ?? null,
+      rpe: set.rpe ?? null
+    }))
+  );
 
 /**
  * Maps a workout_sessions row to the session the API returns. `intensityRpe`
@@ -36,6 +75,7 @@ export const mapWorkoutSession = (row = {}) => ({
   notes: row.notes || "",
   planId: row.generatedPlan ? row.generatedPlan.legacyId || row.generatedPlan.id : null,
   planDayIndex: row.generatedPlan ? row.planDayIndex : null,
+  exerciseSets: groupExerciseSets(row.exerciseSets),
   createdAt: toIso(row.createdAt)
 });
 
@@ -68,6 +108,11 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
    *
    * The link to a plan day is written whole or not at all: an update without
    * one clears it. Returns null when the user cannot be resolved.
+   *
+   * The session and its sets are written in one transaction, so a set the
+   * table refuses leaves no session behind. The sets are replaced only when
+   * `exerciseSets` is a list: an update without one, which is all a client on
+   * the old bundle can send, keeps the sets already stored.
    */
   const saveWorkoutSession = async ({ userId, session = {} }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -98,13 +143,21 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
       createdAt: session.createdAt ? new Date(session.createdAt) : new Date()
     };
 
-    const row = existing
-      ? await prisma.workoutSession.update({
-          where: { id: existing.id },
-          data,
-          include: WORKOUT_SESSION_INCLUDE
-        })
-      : await prisma.workoutSession.create({ data, include: WORKOUT_SESSION_INCLUDE });
+    const row = await prisma.$transaction(async (tx) => {
+      const saved = existing
+        ? await tx.workoutSession.update({ where: { id: existing.id }, data })
+        : await tx.workoutSession.create({ data });
+      if (Array.isArray(session.exerciseSets)) {
+        await tx.exerciseSet.deleteMany({ where: { sessionId: saved.id } });
+        await tx.exerciseSet.createMany({
+          data: toExerciseSetRows(saved.id, userPk, session.exerciseSets)
+        });
+      }
+      return tx.workoutSession.findUnique({
+        where: { id: saved.id },
+        include: WORKOUT_SESSION_INCLUDE
+      });
+    });
 
     return mapWorkoutSession(row);
   };

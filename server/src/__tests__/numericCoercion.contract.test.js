@@ -7,6 +7,13 @@ import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
 import { __testables as indexTestables } from "../index.js";
 import { validateEnv } from "../services/platform/envValidationService.js";
 import { createExternalDataService } from "../services/external/externalDataService.js";
+import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
+
+// One set row holding `value` in `field`, read back through the mapper.
+const readSetField = (field, value) =>
+  mapWorkoutSession({
+    exerciseSets: [{ exerciseOrder: 0, exerciseName: "Squat", setNumber: 1, [field]: value }]
+  }).exerciseSets[0].sets[0][field];
 
 // The NowCast is pure, so it is built through the factory with stub
 // dependencies rather than widening index.js's __testables for it.
@@ -126,7 +133,16 @@ const helpers = [
     call: (value) => pm25NowCast(threeHoursOf(value), NOW),
     absent: null,
     zeroIsValid: true
-  }
+  },
+  // A set's four numbers as mapWorkoutSession reads them from a row. The
+  // table never stores 0 seconds or RPE 0, but the reader must not decide
+  // that: it passes a stored value through, and makes nothing of a missing one.
+  ...["reps", "seconds", "loadKg", "rpe"].map((field) => ({
+    name: `mapWorkoutSession (a set's ${field})`,
+    call: (value) => readSetField(field, value),
+    absent: null,
+    zeroIsValid: true
+  }))
 ];
 
 describe.each(helpers)("$name", ({ call, absent, zeroIsValid }) => {
