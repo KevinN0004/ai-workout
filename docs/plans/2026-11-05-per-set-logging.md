@@ -15,6 +15,10 @@ payload field and the form rules are not repeated here.
 **Tech Stack:** Express 5, Prisma with Postgres, zod, React 19, Vitest 5 with v8 coverage,
 supertest, Testing Library, Playwright 1.64, Node 24, GitHub Actions, gh CLI.
 
+**Status: done 2026-11-05** (#344 to #351, all live; main `e208827`). #345 kept the sets in
+the dashboard read, the owner's call after its measurement. #348 put the form's rules in
+`client/src/app/exerciseSets.js` rather than under `pages/dashboard/`. Task 7 raised both
+sides' floors: the client's branches and lines (#350), and all four of the server's (#351).
 Every file and line below was read on `8e677b6`.
 
 ---

@@ -1,6 +1,7 @@
 # Per-set logging, design
 
-Status: **decided 2026-11-05**, section by section with the owner. The plan is
+Status: **decided 2026-11-05**, section by section with the owner; **applied 2026-11-05** in
+#344 to #349, with the floors raised in #350 and #351, all live. The plan is
 `docs/plans/2026-11-05-per-set-logging.md`. This is roadmap B1. It also carries G3, the
 pre-fill on plan-day logging, as far as the prescribed sets.
 
