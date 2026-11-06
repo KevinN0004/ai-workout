@@ -1,12 +1,15 @@
 /**
- * The dashboard's Logs view: the workout, calorie, meal and progress-metric
- * logs, newest first. Rendered by DashboardPage, which loads it lazily.
+ * The dashboard's Logs view: the Progress panel, then the workout, calorie,
+ * meal and progress-metric logs, newest first. Rendered by DashboardPage, which
+ * loads it lazily.
  */
 import { useMemo, useState } from "react";
 import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
 import { formatExerciseLine } from "../../../app/exerciseSets";
 import { NO_PLAN_LINK } from "../../../app/plans";
+import ProgressPanel, { PrTag } from "../components/ProgressPanel";
 import useOlderLogPages from "../hooks/useOlderLogPages";
+import { prSessions } from "../progress";
 import "./WorkoutsView.css";
 
 const INITIAL_VISIBLE_ROWS = 40;
@@ -56,8 +59,10 @@ export default function WorkoutsView({
   onOpenMeal
 }) {
   // ---- Sorted lists and the visible slice of each ---------------------------
-  // Loads show in the region's unit, read once per mount.
+  // Loads show in the region's unit, and progress counts weeks to today, each
+  // read once per mount.
   const measurementSystem = useMemo(() => getPreferredMeasurementSystem(), []);
+  const today = useMemo(() => getLocalDateKey(), []);
   const [visibleRows, setVisibleRows] = useState({
     workouts: INITIAL_VISIBLE_ROWS,
     calories: INITIAL_VISIBLE_ROWS,
@@ -89,6 +94,8 @@ export default function WorkoutsView({
     () => sortByDateDesc(Array.isArray(workouts) ? workouts : []),
     [workouts]
   );
+  // The records each session set, by id, for its PR tag.
+  const prMarks = useMemo(() => prSessions(workoutLogs), [workoutLogs]);
   const calorieLogs = useMemo(
     () => sortByDateDesc(Array.isArray(calories) ? calories : []),
     [calories]
@@ -157,11 +164,15 @@ export default function WorkoutsView({
       </div>
 
       <div className="logs-grid">
+        <ProgressPanel sessions={workoutLogs} today={today} measurementSystem={measurementSystem} />
+
         {/* ---- Workouts ---- */}
         <section className="log-section">
           <h3>Workout log</h3>
           <div className="log-list">
             {visibleWorkoutLogs.map((item, index) => {
+              // A row without an id cannot be matched to its marks.
+              const marks = item.id ? prMarks.get(String(item.id)) : undefined;
               const sessionMeta = [
                 item.sets ? `${item.sets} sets` : "",
                 item.reps ? `${item.reps} reps` : "",
@@ -176,6 +187,7 @@ export default function WorkoutsView({
                 >
                   <div className="workout-row-copy">
                     <strong>{item.date || "--"}</strong>
+                    {marks && <PrTag marks={marks} />}
                     <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
                     {item.exerciseSets?.length ? (
                       item.exerciseSets.map((exercise, exerciseIndex) => (

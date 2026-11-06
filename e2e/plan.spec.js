@@ -161,5 +161,17 @@ test.describe.serial("generate a plan and log a day of it", () => {
     await page.goto("/dashboard/workouts");
     const workoutLog = page.getByRole("heading", { name: "Workout log" }).locator("..");
     await expect(workoutLog.getByText("Dumbbell box squat: 12, 11, 10 reps | 30 lb")).toBeVisible();
+
+    // Roadmap B2: the Progress panel above it counts the squat's three sets
+    // toward Legs this week (the day was logged today), and its heaviest set is
+    // the loaded one. Twelve reps is past the e1RM window, so there is no e1RM.
+    const progress = page.getByRole("region", { name: "Progress", exact: true });
+    const legs = progress
+      .getByRole("row")
+      .filter({ has: page.getByRole("rowheader", { name: "Legs", exact: true }) });
+    await expect(legs.getByRole("cell").first()).toHaveText("3");
+    await expect(
+      progress.getByText("Dumbbell box squat: heaviest 30 lb × 12", { exact: true })
+    ).toBeVisible();
   });
 });

@@ -295,6 +295,22 @@ select:focus {
   color: #ffb4b4;
 }
 
+/* ---- Screen-reader-only text --------------------------------------------- */
+/* Read aloud but never drawn: clipped to one pixel and taken out of the
+   layout. In the base layer like the rest of this file, so it holds no
+   !important, and no page rule sets these properties on it. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ---- Modal --------------------------------------------------------------- */
 .modal-backdrop {
   position: fixed;

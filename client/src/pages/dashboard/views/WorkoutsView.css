@@ -1,6 +1,6 @@
-/* WorkoutsView, the dashboard's Logs view: a section for each log (workouts, calories,
-   meals and progress metrics), each a list of rows. Imported by the view, so it loads in
-   the view's lazy chunk. */
+/* WorkoutsView, the dashboard's Logs view: the Progress panel, then a section for each
+   log (workouts, calories, meals and progress metrics), each a list of rows. Imported by
+   the view, so it loads in the view's lazy chunk. */
 
 /* ---- View and log sections ----------------------------------------------- */
 .workouts-view {
@@ -59,6 +59,80 @@
 
 .workouts-view .log-list-row > span {
   flex-shrink: 0;
+}
+
+/* ---- Progress panel ------------------------------------------------------ */
+.workouts-view .progress-block {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Capped so a wide panel keeps each count next to its group. */
+.workouts-view .progress-table {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.workouts-view .progress-table th,
+.workouts-view .progress-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.workouts-view .progress-table th:first-child {
+  text-align: left;
+}
+
+/* A group's name stays on one line; on a phone the column headings wrap. */
+.workouts-view .progress-table tbody th {
+  white-space: nowrap;
+}
+
+.workouts-view .progress-table thead th {
+  color: #aab3ff;
+  font-weight: 600;
+}
+
+.workouts-view .progress-records {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+}
+
+.workouts-view .progress-records li {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.workouts-view .progress-block > .ghost {
+  justify-self: start;
+}
+
+.workouts-view .progress-note {
+  margin: 0;
+}
+
+/* ---- PR tag -------------------------------------------------------------- */
+/* A pill under a workout row's date, in the accent of the app's main buttons. */
+.workouts-view .pr-tag {
+  justify-self: start;
+  padding: 2px 10px;
+  border: 1px solid rgba(255, 95, 109, 0.55);
+  border-radius: 999px;
+  background: rgba(255, 95, 109, 0.16);
+  color: #ffd6da;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 /* ---- Empty state --------------------------------------------------------- */
