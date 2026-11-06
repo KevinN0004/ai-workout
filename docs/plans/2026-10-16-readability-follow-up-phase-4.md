@@ -120,6 +120,8 @@ Write each of these once, with the Write tool, into `$TOOLS` (any scratch folder
 
 `capture.mjs`:
 
+The `dash-logs` state, and the `dashboard` option of `routeApi` it answers with, were added on 2026-11-06 for roadmap B2's Progress panel (`docs/plans/2026-11-06-progress-records.md`, Task 4). They capture Logs at desktop, tablet and phone with five sessions of sets; the baseline above predates them.
+
 <!-- prettier-ignore -->
 ```js
 /**
@@ -367,10 +369,52 @@ const DASHBOARD = {
   },
   pagination: { workoutSessions: page0(), mealLogs: page0(), progressMetrics: page0() }
 };
+// Logs with sets (roadmap B2), for a capture day of 2026-09-29: every muscle
+// group, a bodyweight lift, a typed name, conditioning, records set in four
+// sessions, a change since 2026-09-01, and more lifts than Logs lists at first.
+const loggedSet = (reps, loadKg = null) => ({ reps, seconds: null, loadKg, rpe: null });
+const lift = (name, pattern, count, reps, loadKg = null) => ({
+  name, pattern, sets: Array.from({ length: count }, () => loggedSet(reps, loadKg))
+});
+const logged = (id, date, focus, exerciseSets) => ({
+  id, date, focus, duration: 50, exercises: exerciseSets.map((e) => e.name), sets: null, reps: null,
+  intensityRpe: null, notes: "", planId: null, planDayIndex: null, exerciseSets, createdAt: `${date}T18:00:00.000Z`
+});
+const LOGS_DASHBOARD = {
+  ...DASHBOARD,
+  dashboard: {
+    ...DASHBOARD.dashboard,
+    workouts: [
+      logged("w-5", "2026-09-28", "Lower and pull", [
+        lift("Barbell back squat", "squat", 3, 5, 100),
+        lift("Dumbbell bench press", "horizontal-push", 2, 8, 30),
+        { name: "Pull-up", pattern: "vertical-pull", sets: [loggedSet(10), loggedSet(9)] },
+        { name: "Plank", pattern: "core", sets: [{ reps: null, seconds: 60, loadKg: null, rpe: null }] }
+      ]),
+      logged("w-4", "2026-09-21", "Full body", [
+        lift("Barbell back squat", "squat", 3, 5, 95),
+        lift("Romanian deadlift", "hinge", 3, 8, 80),
+        lift("Overhead press", "vertical-push", 3, 6, 40),
+        lift("Barbell row", "horizontal-pull", 3, 8, 60),
+        lift("Dumbbell curl", "arms", 2, 12, 12),
+        lift("Hip thrust", "glutes-calves", 2, 10, 90),
+        lift("Split squat", "single-leg", 2, 10, 20)
+      ]),
+      logged("w-3", "2026-09-14", "Pull and core", [
+        lift("Pull-up", "vertical-pull", 2, 8),
+        lift("Cable crunch machine", null, 2, 12, 30),
+        { name: "Brisk walk", pattern: "conditioning", sets: [{ reps: null, seconds: 900, loadKg: null, rpe: null }] }
+      ]),
+      logged("w-2", "2026-09-07", "Back", [lift("Lat pulldown", "vertical-pull", 2, 10, 50), lift("Pull-up", "vertical-pull", 2, 7)]),
+      logged("w-1", "2026-08-24", "Squat", [lift("Barbell back squat", "squat", 3, 5, 90), lift("Pull-up", "vertical-pull", 1, 6)])
+    ]
+  }
+};
 
 // Answers every /api request from the browser. `hold` lists path prefixes left
-// unanswered, which keeps their loading state on screen.
-const routeApi = async (context, { signedIn, hold = [] }, unmocked) => {
+// unanswered, which keeps their loading state on screen, and `dashboard` is the
+// dashboard read's answer.
+const routeApi = async (context, { signedIn, hold = [], dashboard = DASHBOARD }, unmocked) => {
   await context.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
     const p = url.pathname;
@@ -379,7 +423,7 @@ const routeApi = async (context, { signedIn, hold = [] }, unmocked) => {
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (p === "/api/csrf-token") return json(200, { csrfToken: "capture-token" });
     if (p === "/api/auth/me") return signedIn ? json(200, { user: USER }) : json(401, { error: "Not signed in" });
-    if (p === "/api/dashboard") return json(200, DASHBOARD);
+    if (p === "/api/dashboard") return json(200, dashboard);
     if (p === "/api/mealdb/search") return json(200, { meals: [] });
     if (p === "/api/wger/meta") return json(200, { categories: [], muscles: [], equipment: [] });
     if (p === "/api/wger/exercises") return json(200, { exercises: [] });
@@ -579,6 +623,14 @@ const BASE_STATES = [
       await advance(page, 1000);
     },
     check: () => (document.querySelector(".dashboard-workout-modal .dashboard-workout-section-exercise") ? null : "no workout modal")
+  },
+  {
+    name: "dash-logs", motion: "reduce", path: "/dashboard/workouts", api: { ...SIGNED_IN, dashboard: LOGS_DASHBOARD }, viewports: ["desktop", "tablet", "phone"],
+    reach: async (page) => {
+      await advanceUntil(page, hasText, "Workout log", "the workout log");
+      await advance(page, 1000);
+    },
+    check: () => (document.querySelector(".workouts-view .log-section .workout-row") ? null : "no workout log")
   },
   {
     name: "dash-planner", motion: "reduce", path: "/dashboard", api: SIGNED_IN, viewports: ALL,

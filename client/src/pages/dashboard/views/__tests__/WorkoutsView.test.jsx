@@ -538,7 +538,7 @@ describe("a workout's sets", () => {
     expect(row.queryByText("Dumbbell bench press, Plank")).toBeNull();
   });
 
-  test("keeps the summary line for a session logged before sets", () => {
+  test("keeps the summary line for a session logged before sets, with no PR tag", () => {
     renderView({
       workouts: [
         dated("2026-10-01", {
@@ -554,5 +554,80 @@ describe("a workout's sets", () => {
     const row = within(section("workouts"));
     expect(row.getByText("Squat")).toBeInTheDocument();
     expect(row.getByText("3 sets | 8 reps | RPE 8")).toBeInTheDocument();
+  });
+});
+
+// Roadmap B2: the Progress panel sits above the workout log, and a session
+// that set a record shows a "PR" tag. The arithmetic and the panel's own lines
+// are pinned in progress.test.js and ProgressPanel.test.jsx; what is pinned
+// here is that the view hands them the workouts, today and the region.
+describe("progress", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const squat = (loadKg) => [
+    { name: "Squat", pattern: "squat", sets: [{ reps: 5, seconds: null, loadKg, rpe: null }] }
+  ];
+  const squatSession = (id, date, loadKg, createdAt) =>
+    dated(date, { id, createdAt, exerciseSets: squat(loadKg) });
+
+  test("the Progress panel comes before the workout log", () => {
+    renderView();
+
+    const headings = screen.getAllByRole("heading").map((heading) => heading.textContent);
+    expect(headings.indexOf("Progress")).toBeGreaterThan(-1);
+    expect(headings.indexOf("Progress")).toBeLessThan(headings.indexOf("Workout log"));
+  });
+
+  test("counts this week's sets as of today", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 4, 12));
+    renderView({
+      workouts: [squatSession("w-2", "2026-11-03", 100), squatSession("w-1", "2026-10-26", 100)]
+    });
+
+    const legs = screen.getByRole("rowheader", { name: "Legs" }).closest("tr");
+    expect(Array.from(legs.cells).map((cell) => cell.textContent)).toEqual(["Legs", "1", "0.3"]);
+  });
+
+  test("shows the records' loads in the region's unit", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
+    renderView({ workouts: [squatSession("w-1", "2026-11-03", 100)] });
+
+    expect(screen.getByText("Squat: e1RM 257.2 lb, heaviest 220.5 lb × 5")).toBeInTheDocument();
+  });
+
+  test("tags a session that set a record, and only that one", () => {
+    renderView({
+      workouts: [
+        squatSession("w-1", "2026-10-20", 100, "2026-10-20T08:00:00.000Z"),
+        squatSession("w-2", "2026-10-27", 110, "2026-10-27T08:00:00.000Z")
+      ]
+    });
+
+    const rows = rowsIn("workouts");
+    expect(rows).toHaveLength(2);
+    // Newest first: the 110 kg session beat the 100 kg one.
+    expect(within(rows[0]).getByText("PR")).toBeInTheDocument();
+    expect(
+      within(rows[0]).getByText("personal record: Squat, best e1RM and heaviest set")
+    ).toBeInTheDocument();
+    expect(within(rows[1]).queryByText("PR")).toBeNull();
+  });
+
+  // Without an id a row cannot be matched to its marks: every id-less session
+  // would share one key, and one record would tag them all.
+  test("tags no row without an id", () => {
+    renderView({
+      workouts: [
+        squatSession(undefined, "2026-10-20", 100, "2026-10-20T08:00:00.000Z"),
+        squatSession(undefined, "2026-10-27", 110, "2026-10-27T08:00:00.000Z")
+      ]
+    });
+
+    expect(rowsIn("workouts")).toHaveLength(2);
+    expect(screen.queryByText("PR")).toBeNull();
   });
 });

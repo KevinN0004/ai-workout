@@ -277,6 +277,40 @@ test.describe.serial("accessibility", () => {
     expectNoViolations(await analyze(page));
   });
 
+  // Logs with its Progress panel filled (roadmap B2): the sets table, the
+  // records, and a "PR" tag, whose visible text is hidden from screen readers
+  // in favour of a hidden label. Two workouts of one lift, the second heavier,
+  // so the second sets a record.
+  test("Logs with the Progress panel filled has no violations", async () => {
+    await page.goto("/dashboard/workouts");
+    for (const load of ["100", "110"]) {
+      await page.getByRole("button", { name: "Add workout" }).first().click();
+      const log = page.getByRole("dialog", { name: "Log workout" });
+      // The modal test above left a second, empty card in the form; a save
+      // drops it, so the first card is the one to fill.
+      await log.getByLabel("Exercise", { exact: true }).first().fill("Barbell back squat");
+      await log.getByLabel("Set 1 reps, Barbell back squat").fill("5");
+      await log.getByLabel("Set 1 load in lb, Barbell back squat").fill(load);
+      await log.getByLabel("Duration (minutes)").fill("30");
+      await log.getByRole("button", { name: "Save workout" }).click();
+      // The save waits out the undo window; the next one starts after it.
+      await page.waitForResponse(
+        (saved) =>
+          saved.url().includes("/api/dashboard/workout") &&
+          saved.request().method() === "POST" &&
+          saved.ok(),
+        { timeout: 15_000 }
+      );
+    }
+
+    const progress = page.getByRole("region", { name: "Progress", exact: true });
+    await expect(progress.getByRole("table", { name: "This week's sets" })).toBeVisible();
+    await expect(progress.getByRole("list", { name: "Records" })).toBeVisible();
+    await expect(page.getByText(/^personal record: Barbell back squat/)).toHaveCount(1);
+
+    expectNoViolations(await analyze(page));
+  });
+
   // The account tab is the newest surface in the app and the only one with a
   // destructive, multi-step confirmation. Two states matter: as first shown,
   // and with the confirmation revealed -- a different DOM with an extra
