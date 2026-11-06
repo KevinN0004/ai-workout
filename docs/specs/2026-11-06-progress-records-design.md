@@ -1,8 +1,9 @@
 # Progress: records, e1RM and weekly sets, design
 
-Status: **decided 2026-11-06**, section by section with the owner. The plan is
-`docs/plans/2026-11-06-progress-records.md`. This is roadmap B2, the first reader of the
-sets B1 stores.
+Status: **decided 2026-11-06**, section by section with the owner; **applied 2026-11-06** in
+#355 to #357, with the client floors raised in #358, all live. The plan is
+`docs/plans/2026-11-06-progress-records.md`, whose status says where the work went past
+this text. This is roadmap B2, the first reader of the sets B1 stores.
 
 B1 records each set of a workout. B2 turns those sets into the progress a lifter checks:
 how many hard sets each muscle group got this week, the best estimated one-rep max (e1RM)

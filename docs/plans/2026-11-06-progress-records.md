@@ -14,6 +14,27 @@ table and the panel's rules are not repeated here.
 **Tech Stack:** Express 5, Prisma with Postgres, React 19, Vitest 5 with v8 coverage,
 supertest, Testing Library, Playwright 1.64, Node 24, GitHub Actions, gh CLI.
 
+**Status: done 2026-11-06** (#354 to #358, all live; main `5f89e0f`). These are the places
+the work goes past or departs from the text below.
+
+- **#356 decided five things the spec left open.**
+  - An unknown pattern counts as Not sorted, alongside a typed name's null and an unsaved
+    entry's missing key.
+  - Records come from rep sets only, so a lift logged only as holds is not listed.
+  - The heaviest set's change is its load's.
+  - The "record then" includes the cutoff day.
+  - Task 3's "missing load read as 0" mutation is equivalent: behind the load-above-0 gate,
+    no load and 0 kg give the same answer. The test for a non-finite load is what
+    distinguishes `toNumberOrNull` from `Number()`.
+- **#357 grew the main chunk by 15 bytes, not 0.** In exact bytes it went from 462,506 to
+  462,521. That is two export entries, `toNumberOrNull` and `fromLoadKg`, which the lazy
+  Logs chunk now imports from the main chunk; with both stubbed, the main chunk measured
+  the same as before. Copying them into the chunk would break CLAUDE.md's "import it".
+- **#357's PR tag** hides the visible "PR" from screen readers, which read only the hidden
+  label. "Show all" is a toggle that stays in place.
+- **Task 5 raised the client's floors only (#358).** The server's local figures truncate to
+  its current floors.
+
 Every file and line below was read on `8f99904`.
 
 ---
