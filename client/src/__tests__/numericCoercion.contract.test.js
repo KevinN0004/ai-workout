@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toNumberOrNull } from "../app/units";
 import { fromLoadKg, toLoadKg } from "../app/exerciseSets";
+import { e1rmOf } from "../pages/dashboard/progress";
 
 // The client half of the invariant asserted in
 // server/src/__tests__/numericCoercion.contract.test.js:
@@ -93,5 +94,38 @@ describe("fromLoadKg (app/exerciseSets)", () => {
   test("shows a measured 0 kg as 0", () => {
     expect(fromLoadKg(0, "metric")).toBe("0");
     expect(fromLoadKg(0, "imperial")).toBe("0");
+  });
+});
+
+// - `e1rmOf` in pages/dashboard/progress.js reads a set's load and reps. Only a
+//   load above 0 has a one-rep max, so a measured 0 kg gives none, as no load
+//   does, and the table's zero row does not fit. Pinned for the other half: an
+//   absent or non-numeric load or rep count never becomes an estimate.
+describe("e1rmOf (pages/dashboard/progress)", () => {
+  test.each(ABSENT)("gives no estimate for a load given as %s", (_label, value) => {
+    expect(e1rmOf({ reps: 5, loadKg: value })).toBeNull();
+  });
+
+  test.each(ABSENT)("gives no estimate for reps given as %s", (_label, value) => {
+    expect(e1rmOf({ reps: value, loadKg: 100 })).toBeNull();
+  });
+
+  test("gives no estimate for a non-numeric load or rep count", () => {
+    expect(e1rmOf({ reps: 5, loadKg: "heavy" })).toBeNull();
+    expect(e1rmOf({ reps: "five", loadKg: 100 })).toBeNull();
+  });
+
+  // What toNumberOrNull adds over Number() behind the `load above 0` gate: an
+  // absent load fails that gate either way, but Infinity passes it.
+  test("gives no estimate for a load that is not finite", () => {
+    expect(e1rmOf({ reps: 5, loadKg: Infinity })).toBeNull();
+  });
+
+  test("gives none for a measured 0 kg, which is bodyweight work", () => {
+    expect(e1rmOf({ reps: 5, loadKg: 0 })).toBeNull();
+  });
+
+  test("still reads a real measurement given as strings", () => {
+    expect(e1rmOf({ reps: "1", loadKg: "100" })).toBe(100);
   });
 });
