@@ -8,6 +8,7 @@ import { __testables as indexTestables } from "../index.js";
 import { validateEnv } from "../services/platform/envValidationService.js";
 import { createExternalDataService } from "../services/external/externalDataService.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
+import { readSet } from "../services/planning/progression.js";
 
 // One set row holding `value` in `field`, read back through the mapper.
 const readSetField = (field, value) =>
@@ -140,6 +141,15 @@ const helpers = [
   ...["reps", "seconds", "loadKg", "rpe"].map((field) => ({
     name: `mapWorkoutSession (a set's ${field})`,
     call: (value) => readSetField(field, value),
+    absent: null,
+    zeroIsValid: true
+  })),
+  // The three numbers progression reads from a logged set (roadmap B4): a
+  // missing load is no load and a missing RPE is never easy, so neither may
+  // become 0.
+  ...["reps", "loadKg", "rpe"].map((field) => ({
+    name: `readSet (a set's ${field})`,
+    call: (value) => readSet({ [field]: value })[field],
     absent: null,
     zeroIsValid: true
   }))
