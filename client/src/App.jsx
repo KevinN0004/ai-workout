@@ -2,7 +2,7 @@
  * The app shell: owns the route, the signed-in user and the form state the
  * pages share, and renders the page for the current path. Rendered by main.jsx.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import HomePage from "./pages/home/HomePage";
@@ -21,7 +21,6 @@ import {
 } from "./app/constants";
 import { buildScopedCacheKey } from "./app/cache";
 import AppNotice from "./app/components/AppNotice";
-import PlannerSetupModal from "./app/components/PlannerSetupModal";
 import { mergeOptimisticDashboard } from "./app/dashboard";
 import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
@@ -40,6 +39,10 @@ import {
   toLb
 } from "./app/units";
 import "./styles/app.css";
+
+// The planner modal is its own chunk, fetched when App first renders it rather
+// than shipped in the main one: it and its inlined thumbnails are about 29 kB.
+const PlannerSetupModal = lazy(() => import("./app/components/PlannerSetupModal"));
 
 // How long the session check waits before asking again while the server cannot
 // answer it, in milliseconds: one delay per failed attempt, the last repeated.
@@ -400,21 +403,24 @@ export default function App() {
   });
 
   // ---- Modals and the parsed plan -------------------------------------------
+  // Its own Suspense boundary, so the page around it never waits for the chunk.
   const plannerModal = (
-    <PlannerSetupModal
-      plannerOpen={plannerOpen}
-      plannerStep={plannerStep}
-      setPlannerStep={setPlannerStep}
-      closePlanner={closePlanner}
-      form={form}
-      onEnvironmentChange={onEnvironmentChange}
-      toggleEquipment={toggleEquipment}
-      onChange={onChange}
-      toggleFocus={toggleFocus}
-      setHealthAnswer={setHealthAnswer}
-      loading={loading}
-      onSubmit={onSubmit}
-    />
+    <Suspense fallback={null}>
+      <PlannerSetupModal
+        plannerOpen={plannerOpen}
+        plannerStep={plannerStep}
+        setPlannerStep={setPlannerStep}
+        closePlanner={closePlanner}
+        form={form}
+        onEnvironmentChange={onEnvironmentChange}
+        toggleEquipment={toggleEquipment}
+        onChange={onChange}
+        toggleFocus={toggleFocus}
+        setHealthAnswer={setHealthAnswer}
+        loading={loading}
+        onSubmit={onSubmit}
+      />
+    </Suspense>
   );
 
   const planSections = useMemo(

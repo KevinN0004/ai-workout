@@ -408,11 +408,12 @@ expected symptom of switching sides, not a broken container
   deliberate now carry an inline disable explaining why. A new warning means you
   introduced it.
 - **`npm run build` is clean.** It used to emit a "chunks larger than 500 kB" warning;
-  that went away when `jspdf` moved to a dynamic import. The main chunk sits close under
-  that warning (the build prints its size, as `dist/assets/index-*.js`). It was ~407 kB
-  until React 19, which alone added the difference -- measured by building with nothing
-  else changed, not estimated. If the warning appears, check first whether something got
-  pulled onto the eager path; if nothing did, the margin simply ran out.
+  that went away when `jspdf` moved to a dynamic import. The main chunk (the build prints
+  its size, as `dist/assets/index-*.js`) was ~407 kB until React 19, which alone added the
+  difference -- measured by building with nothing else changed, not estimated. It reached
+  498.9 kB with B1, so the workout and planner modals are lazy too, bringing it to ~462 kB.
+  If the warning appears, check first whether something got pulled onto the eager path;
+  the next measured split is the home page (~145 kB), whose stylesheet order needs proving.
 - **A CSS or motion change is proved by screenshot, not by reading.** Capture `main`
   once, then compare each CSS PR against that capture, listing the visual and
   computed-style changes the PR expects (`docs/specs/2026-10-10-readability-follow-up-design.md`,

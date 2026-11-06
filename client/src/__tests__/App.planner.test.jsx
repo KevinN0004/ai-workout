@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { equipmentOptionsByEnv } from "../app/constants";
 
@@ -43,7 +43,7 @@ const setEnvironment = (environment) => act(() => planner.props.onEnvironmentCha
 
 const toggle = (item) => act(() => planner.props.toggleEquipment(item));
 
-beforeEach(() => {
+beforeEach(async () => {
   planner.props = null;
   window.history.pushState({}, "", "/");
   // Signed out: the session check answers 401.
@@ -52,6 +52,8 @@ beforeEach(() => {
     vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) })
   );
   render(<App />);
+  // The planner modal is lazy-loaded, so it renders once its import resolves.
+  await screen.findByTestId("planner");
 });
 
 afterEach(() => {
