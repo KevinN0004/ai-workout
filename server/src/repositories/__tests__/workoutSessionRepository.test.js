@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
-import { createWorkoutSessionRepository } from "../workoutSessionRepository.js";
+import { createWorkoutSessionRepository, mapWorkoutSession } from "../workoutSessionRepository.js";
 
 // Pins a session's sets against real Postgres: they are saved with the
 // session in one transaction, read back grouped and in order, replaced only
@@ -20,6 +20,11 @@ const bench = {
   ]
 };
 const plank = { name: "Plank", sets: [{ reps: null, seconds: 30, loadKg: null, rpe: null }] };
+
+// An exercise as a read returns it: tagged with its library pattern, or null.
+const tagged = (exercise, pattern = null) => ({ ...exercise, pattern });
+const benchRead = tagged(bench, "horizontal-push");
+const plankRead = tagged(plank);
 
 const save = (userId, session) =>
   saveWorkoutSession({
@@ -49,7 +54,7 @@ describe("a session's sets", () => {
   test("are saved with the session and read back grouped, in order", async () => {
     const saved = await save(user.id, { exerciseSets: [bench, plank] });
 
-    expect(saved.exerciseSets).toEqual([bench, plank]);
+    expect(saved.exerciseSets).toEqual([benchRead, plankRead]);
     const rows = await setRowsOf(user.id);
     expect(rows.map((row) => [row.exerciseOrder, row.exerciseName, row.setNumber])).toEqual([
       [0, "Dumbbell bench press", 1],
@@ -91,7 +96,7 @@ describe("a session's sets", () => {
 
     const saved = await save(user.id, { exerciseSets: [warmUp, working] });
 
-    expect(saved.exerciseSets).toEqual([warmUp, working]);
+    expect(saved.exerciseSets).toEqual([tagged(warmUp), tagged(working)]);
   });
 
   test("a session saved without sets reads back with none", async () => {
@@ -105,7 +110,7 @@ describe("a session's sets", () => {
 
     const saved = await save(user.id, { exerciseSets: [plank] });
 
-    expect(saved.exerciseSets).toEqual([plank]);
+    expect(saved.exerciseSets).toEqual([plankRead]);
     expect(await setRowsOf(user.id)).toHaveLength(1);
   });
 
@@ -117,7 +122,7 @@ describe("a session's sets", () => {
     const saved = await save(user.id, { notes: "edited" });
 
     expect(saved.notes).toBe("edited");
-    expect(saved.exerciseSets).toEqual([bench]);
+    expect(saved.exerciseSets).toEqual([benchRead]);
   });
 
   test("0 reps and 0 kg are kept as measurements, and blanks read as null", async () => {
@@ -126,7 +131,10 @@ describe("a session's sets", () => {
 
     const saved = await save(user.id, { exerciseSets: [failed, blank] });
 
-    expect(saved.exerciseSets).toEqual([failed, blank]);
+    expect(saved.exerciseSets).toEqual([
+      tagged(failed, "vertical-pull"),
+      tagged(blank, "horizontal-push")
+    ]);
   });
 
   // A set the table refuses must take the session row down with it: half a
@@ -217,5 +225,40 @@ describe("the exercise_sets checks", () => {
     await insert({});
 
     await expect(insert({})).rejects.toThrow();
+  });
+});
+
+// Roadmap B2: each logged exercise carries its library pattern, worked out on
+// every read, so the client can count sets per muscle group. A name typed by
+// hand, which the library does not hold, carries null.
+describe("each exercise's pattern", () => {
+  const rows = (...names) =>
+    names.map((name, exerciseOrder) => ({
+      exerciseOrder,
+      exerciseName: name,
+      setNumber: 1,
+      reps: 5
+    }));
+  const patternsOf = (...names) =>
+    mapWorkoutSession({ exerciseSets: rows(...names) }).exerciseSets.map((e) => e.pattern);
+
+  test("a library name carries its pattern", () => {
+    expect(patternsOf("Dumbbell box squat")).toEqual(["squat"]);
+  });
+
+  test("in any case, and with space around it", () => {
+    expect(patternsOf("  dumbbell BOX Squat ")).toEqual(["squat"]);
+  });
+
+  test("a name the library does not hold carries null", () => {
+    expect(patternsOf("My cable thing", "Plank")).toEqual([null, null]);
+  });
+
+  test("each exercise in a session carries its own", () => {
+    expect(patternsOf("Dumbbell bench press", "Pull-up", "Brisk walk")).toEqual([
+      "horizontal-push",
+      "vertical-pull",
+      "conditioning"
+    ]);
   });
 });
