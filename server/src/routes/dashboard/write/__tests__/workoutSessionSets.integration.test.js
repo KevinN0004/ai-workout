@@ -76,13 +76,19 @@ describe("POST /api/dashboard/workout-sessions with sets", () => {
       exerciseSets
     });
 
+    // Each exercise comes back tagged with its library pattern (roadmap B2):
+    // the bench press is a horizontal push, and "Plank" is not in the library.
+    const tagged = [
+      { ...exerciseSets[0], pattern: "horizontal-push" },
+      { ...exerciseSets[1], pattern: null }
+    ];
     expect(response.status).toBe(200);
-    expect(response.body.workoutSession.exerciseSets).toEqual(exerciseSets);
+    expect(response.body.workoutSession.exerciseSets).toEqual(tagged);
     expect(response.body.workoutSession.exercises).toEqual(["Dumbbell bench press", "Plank"]);
     const listed = response.body.dashboard.workouts.find(
       (workout) => workout.id === response.body.workoutSession.id
     );
-    expect(listed.exerciseSets).toEqual(exerciseSets);
+    expect(listed.exerciseSets).toEqual(tagged);
     expect(await prisma.exerciseSet.count()).toBe(3);
   });
 

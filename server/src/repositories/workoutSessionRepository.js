@@ -4,8 +4,15 @@
  * a link to a plan day only when that day exists in one of the user's plans.
  */
 import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
+import { EXERCISES } from "../services/planning/exerciseLibrary.js";
 import { dateOnlyToDate, toDateOnly, toIso, toJsonArray, toNumberOrNull } from "./rowValues.js";
 import { legacyOrIdWhere, getUserPk } from "./userLookup.js";
+
+// Each library exercise's movement pattern by its name, trimmed and lower-cased
+// (every name is distinct that way), for tagging a logged exercise (roadmap B2).
+const PATTERN_BY_NAME = new Map(
+  EXERCISES.map((exercise) => [exercise.name.trim().toLowerCase(), exercise.pattern])
+);
 
 /**
  * What every read of workout_sessions includes, so mapWorkoutSession can give
@@ -20,7 +27,8 @@ export const WORKOUT_SESSION_INCLUDE = {
 // A session's set rows, already in order, grouped into one entry per
 // exercise as the API takes and returns them. Every number reads through
 // toNumberOrNull (`loadKg` and `rpe` are Decimal columns), so a missing one is
-// null and a measured 0, a failed set or a bodyweight load, stays 0.
+// null and a measured 0, a failed set or a bodyweight load, stays 0. Each
+// exercise carries its library pattern, or null for a name typed by hand.
 const groupExerciseSets = (rows) => {
   const exercises = [];
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -34,7 +42,11 @@ const groupExerciseSets = (rows) => {
     if (last && last.order === row.exerciseOrder) last.sets.push(set);
     else exercises.push({ order: row.exerciseOrder, name: row.exerciseName, sets: [set] });
   }
-  return exercises.map(({ name, sets }) => ({ name, sets }));
+  return exercises.map(({ name, sets }) => ({
+    name,
+    pattern: PATTERN_BY_NAME.get(String(name).trim().toLowerCase()) ?? null,
+    sets
+  }));
 };
 
 // The rows for `exerciseSets`, numbered from 1 within each exercise, each
