@@ -38,6 +38,7 @@
 - [2026-11-03 — Plan-quality evals](plans/2026-11-03-plan-quality-evals.md)
 - [2026-11-03 — Rule-based plans](plans/2026-11-03-rule-based-plans.md)
 - [2026-11-05 — Per-set logging](plans/2026-11-05-per-set-logging.md)
+- [2026-11-06 — Progress records, e1RM and weekly sets](plans/2026-11-06-progress-records.md)
 
 ## Specs
 
@@ -57,3 +58,4 @@
 - [2026-11-03 — Rule-based plans](specs/2026-11-03-rule-based-plans-design.md)
 - [2026-11-03 — Rule-based plans, evidence review](specs/2026-11-03-rule-based-plans-evidence.md)
 - [2026-11-05 — Per-set logging](specs/2026-11-05-per-set-logging-design.md)
+- [2026-11-06 — Progress records, e1RM and weekly sets](specs/2026-11-06-progress-records-design.md)
