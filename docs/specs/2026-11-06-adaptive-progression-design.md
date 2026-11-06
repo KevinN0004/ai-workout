@@ -53,8 +53,8 @@ Made with the owner on 2026-11-06, within G4:
 
 ### The rules
 
-Worked out for the latest plan with a saved structure, for the week that starts on the
-Monday of the client's date.
+Worked out for the newest plan, the one the plan hub shows, when it was saved with its
+structure (none otherwise), for the week that starts on the Monday of the client's date.
 
 - **Lifts.** A lift is each exercise the plan prescribes in reps, not seconds. Logged sets
   are matched to it by name, ignoring case and surrounding space, as in B2. These lifts get
@@ -64,8 +64,8 @@ Monday of the client's date.
 - **Working load.** The heaviest load in the lift's most recent session in those four
   weeks.
 - **Step up.** The load goes up one step when that session has at least the prescribed
-  number of sets at the working load, each at the top of the rep range or more, and each
-  with an RPE of 8 or below. A set without an RPE is never easy.
+  number of sets at the working load, and every set at the working load reached the top of
+  the rep range or more with an RPE of 8 or below. A set without an RPE is never easy.
 - **Hold.** Anything else keeps the working load.
 - **Lift deload.** Either of these makes the target about 10% lighter:
   - the week before had no workout logged at all, though an earlier week had one;
@@ -73,11 +73,14 @@ Monday of the client's date.
     one before, the last above 8. A session with no RPE breaks the run.
 
   The target is the working load less 10%, rounded to the nearest step, and always at least
-  one step lighter: 60 kg goes to 55 kg, and 10 kg to 7.5 kg.
+  one step lighter: 60 kg goes to 55 kg, and 10 kg to 7.5 kg. A lift already at one step
+  holds there, because one step lighter would be no load.
 
 - **Deload week.** Weeks are walked from the first logged workout. A week with a workout
-  counts one more, and a missed week or a deload week resets the count to 0. The 6th counted
-  week is a deload week; a beginner plan's first is the 8th, and after that every 6th. The
+  counts one more, and a missed week or a deload week resets the count to 0. A week the
+  rules made a deload week resets it whether or not it was trained normally, so the walk
+  needs no past answers. The 6th counted week is a deload week; a beginner plan's first is
+  the 8th, and after that every 6th. The
   level is read as the generator reads it (`readInput`): the plan's `level` in lower case,
   with an unknown one read as intermediate. In a
   deload week every exercise is prescribed at `ceil(sets / 2)` sets, at least 1, and every
@@ -88,10 +91,13 @@ Monday of the client's date.
   (`buildInjuryText`, `detectInjuryAreas`), the library either tags the lift `modify` or
   `avoid`, or names it as a regression for that area. The second half is what finds the
   lifts a plan actually holds (found 4). The first half covers a note added after the plan
-  was made. Holds and deloads stay automatic, because lighter is safe.
+  was made. Holds and deloads stay automatic, because lighter is safe. Pregnancy is not an
+  area here: the health answers shape one plan and are not saved (`generateRoutes.js`), so
+  a lift regressed for pregnancy is not asked about.
 - **Units.** Each target is worked out twice, in kg with a 2.5 kg step and in lb with a
-  5 lb step, each rounded to its own step from the working load in that unit. The client
-  shows its region's.
+  5 lb step. In each unit, `from` is the working load rounded to the nearest step, at least
+  one step, and the target is worked from `from`, so a step up is exactly one step in both.
+  The client shows its region's.
 - **Why.** Every change carries a sentence naming the session and the reason. For example:
   "Every set reached 10 reps at RPE 8 or below on Mon 2 Nov", or "No workout logged last
   week; about 10% lighter to rebuild".
@@ -111,26 +117,39 @@ Monday of the client's date.
   The table is not tied to a plan, so a regenerated plan keeps the week's answers for the
   lifts it still has.
 - **Routes:**
-  - `PUT /api/dashboard/progression/:weekStart/:liftKey` takes `{ decision }`;
-  - `DELETE` on the same path takes an answer back.
-  - Both are zod-validated and CSRF-guarded, and both answer with the recomputed week.
-  - `weekStart` must be the current Monday or the one before, so an old link cannot
-    rewrite history.
+  - `PUT /api/dashboard/progression/:weekStart/lifts/:liftKey` takes `{ decision }`, one of
+    `undo`, `accept` and `decline`;
+  - `PUT /api/dashboard/progression/:weekStart/week` takes `{ decision: "normal" }`. The
+    week has its own path because `''` cannot be a path segment;
+  - `DELETE` on either path takes an answer back.
+  - All are zod-validated and CSRF-guarded, and all answer with the recomputed week.
+  - `weekStart` must be the Monday of a date within one day of the server's UTC date, the
+    same tolerance the read gives `today`, so an old link cannot rewrite history.
+  - A `liftKey` that is not one of the week's lifts is a 404, so no row is stored for a
+    lift the week does not hold. An answer that no longer fits its lift's change, as when a
+    later log turns a step up into a hold, is kept and ignored.
 - **Access** goes through a new `progressionDecisionRepository.js`. Reads take the week's
   rows only, and at most one row per lift per week leaves nothing to prune.
 
 ### Data flow and screens
 
-- **The dashboard read carries `progression`.** `GET /api/dashboard?today=YYYY-MM-DD`
-  sends the client's local date, which the server accepts within one day of its own UTC
-  date and otherwise replaces with its own. The answer gains:
+- **The week has its own read.** `GET /api/dashboard/progression?today=YYYY-MM-DD` sends
+  the client's local date, which the server accepts within one day of its own UTC date and
+  otherwise replaces with its own; a `today` that is not a date is a 400. It answers
+  `{ progression }`:
   - `weekStart`;
-  - `deloadWeek`: `{ active, count, reason, decision }`;
-  - `lifts`: `[{ name, change, kg: { from, target }, lb: { from, target }, sets, why,
+  - `deloadWeek`: `{ active, count, reason, decision }`, where `active` says the rules made
+    this a deload week and `decision` is `"normal"` or null;
+  - `lifts`: `[{ name, key, change, kg: { from, target }, lb: { from, target }, sets, why,
 decision }]`, with `change` one of `up`, `hold`, `deload`, `ask` and `none`.
 
-  `progression` is null when there is no plan with a saved structure. The PUT and DELETE
+  `progression` is null when the newest plan has no saved structure. The PUT and DELETE
   answers return the same object, and the client swaps it in.
+
+  It is not part of `GET /api/dashboard` (decided while planning). Every write route
+  answers with the dashboard and carries no `today`, and a workout dated in an earlier
+  week, a new plan or a changed profile note each change the week's targets. So the client
+  reads the week on its own, and reads it again when one of those changes.
 
 - **The plan hub's day details** show, under each lift, the week's load in the region's
   unit with its change, its reason and its controls: Undo, or Go up and Keep. A deload week
@@ -140,8 +159,10 @@ decision }]`, with `change` one of `up`, `hold`, `deload`, `ask` and `none`.
   rep and RPE placeholders. Nothing is typed for the user: a typed load in a row left blank
   would stop the save.
 - **The summary's plan line** adds "deload week" when one is active.
-- **The new client code is in lazy chunks.** The plan hub view and the log modal are lazy
-  already, so the main chunk grows by no more than the shared helpers they import from it.
+- **Most of the new client code is in lazy chunks.** The plan hub view and the log modal
+  are lazy already. The hook that reads the week and the summary's line are on the eager
+  path, because the summary view is, so the main chunk grows by them; the PR measures it
+  in exact bytes.
 
 ## PRs
 
@@ -150,8 +171,8 @@ One at a time, merged only when CLEAN, with main's CI and Deploy watched before 
 1. **Docs**: this spec and the plan.
 2. **The rules**: `server/src/services/planning/progression.js`, pure and type-checked, its
    tests, and the plan gate's history fixtures. Server only; nothing calls it yet.
-3. **The server API**: migration 007, the repository, `progression` in the dashboard read
-   with `?today=`, and the PUT and DELETE routes.
+3. **The server API**: migration 007, the repository, the progression read with
+   `?today=`, and the PUT and DELETE routes.
 4. **The client**: the plan hub, the pre-fill placeholders, the summary line, a `dash-plans`
    capture state, the E2E and the axe scan.
 5. **Floors**, one PR per side whose figure rose, then the close-out.
