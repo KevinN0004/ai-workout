@@ -9,12 +9,14 @@ import DashboardHeader from "./components/DashboardHeader";
 import DashboardDrawer from "./components/DashboardDrawer";
 import DashboardBottomNav from "./components/DashboardBottomNav";
 import DashboardAtAGlance from "./components/DashboardAtAGlance";
-import DashboardWorkoutModal from "./components/DashboardWorkoutModal";
 import useDashboardMetrics, { parseDateValue } from "./hooks/useDashboardMetrics";
 import { getLocalDateKey } from "../../app/units";
 import { NO_PLAN_LINK } from "../../app/plans";
 import "./DashboardPage.css";
 
+// The Log workout modal is its own chunk too, fetched when the page first
+// renders it, so it is ready long before anyone opens it.
+const DashboardWorkoutModal = lazy(() => import("./components/DashboardWorkoutModal"));
 const WorkoutsView = lazy(() => import("./views/WorkoutsView"));
 const CaloriesView = lazy(() => import("./views/CaloriesView"));
 const PlansView = lazy(() => import("./views/PlansView"));
@@ -536,14 +538,16 @@ export default function DashboardPage({
           </div>
         )}
 
-        {/* ---- Modals ---- */}
-        <DashboardWorkoutModal
-          open={workoutModalOpen}
-          workoutForm={workoutForm}
-          setWorkoutForm={setWorkoutForm}
-          onClose={() => setWorkoutModalOpen(false)}
-          onSubmit={submitWorkout}
-        />
+        {/* ---- Modals, each behind its own Suspense boundary ---- */}
+        <Suspense fallback={null}>
+          <DashboardWorkoutModal
+            open={workoutModalOpen}
+            workoutForm={workoutForm}
+            setWorkoutForm={setWorkoutForm}
+            onClose={() => setWorkoutModalOpen(false)}
+            onSubmit={submitWorkout}
+          />
+        </Suspense>
 
         {plannerModal}
       </div>
