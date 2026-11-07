@@ -1,7 +1,9 @@
 # Offline-ready PWA, design
 
-Status: **decided 2026-11-06**, section by section with the owner. The plan is
-`docs/plans/2026-11-06-offline-ready-pwa.md`. This is roadmap C1. No gate applies to it.
+Status: **decided 2026-11-06**, section by section with the owner; **applied 2026-11-07**,
+in #368 to #373, with the client floor raised in #374, all live. The plan is
+`docs/plans/2026-11-06-offline-ready-pwa.md`, whose status says where the work went past
+this text. This is roadmap C1. No gate applies to it.
 
 Gyms often have poor signal, and a logged set must not vanish because one request failed.
 Render's free tier also sleeps after 15 minutes idle, so the first request after a quiet

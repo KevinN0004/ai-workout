@@ -22,7 +22,77 @@ drains. The server's existing read-then-write by `legacy_id` makes a replay an u
 Prisma with Postgres, Vitest 5 with v8 coverage, supertest, Testing Library, Playwright,
 Node 24, GitHub Actions, gh CLI.
 
-**Status: not started.**
+**Status: done 2026-11-07** (#368 to #374, all live; main `50ae6fc`). These are the places
+the work goes past or departs from the text below.
+
+- **#368, the server.** The workout test passes two explicit `createdAt` values to the
+  repository instead of pinning the clock: just as deterministic, and closer to what a
+  replay sends.
+- **#369, the replay keys.** jsdom provides `crypto.randomUUID`, so no stub was needed.
+- **#370, the shell.**
+  - **The install resolves as of 14 days back**, with npm's `--before=2026-10-23` and
+    `--prefer-dedupe`. A plain install pulled 48 versions younger than two weeks, among
+    them `rollup` 4.68.0, published the same day. With the cut-off, no new or changed
+    version is younger than two weeks; six existing packages moved, all browserslist
+    data.
+  - **`workbox-window` is not a direct dependency.** `vite-plugin-pwa` lists it as its own,
+    and no client source imports it, so knip would flag it. The lockfile pins 7.4.1.
+  - **Four new advisories, all build-time and below the audit gate:** `deepmerge`
+    (GHSA-gcqx-w48m-w2h4, low) and the `glob` advisory the Sentry alert already carries
+    (GHSA-3g3m-2fjr-6pw4), on a second path through `workbox-build`. Dependabot opened
+    alert #3 for `deepmerge` and re-raised the `minimatch` alert as #4 (#2 now answers
+    "withdrawn"). All are left open, as with the Sentry one.
+  - **The PDF export's chunks stay out of the precache** (`jspdf`, `html2canvas`,
+    `purify`, `canvg`'s `index.es`, about 760 KiB). The precache is 29 entries and about
+    1,025 KiB instead of 1,785. Offline, a PDF download reports that it could not prepare
+    the PDF.
+  - **`includeManifestIcons: false`**: the PNG glob already precaches the icons, and both
+    together listed each one twice.
+  - **`setOffline` needed no fallback**: it cuts the page's network, and the offline
+    reload is answered by the worker (`fromServiceWorker()`).
+  - **`registerType: "autoUpdate"` is a known mutation survivor.** Only a second deploy
+    under an open page shows it; ADR 0005 records it.
+  - The test setup mocks `virtual:pwa-register/react` for every suite, and ESLint's
+    `import-x/no-unresolved` ignores `^virtual:`. The main chunk went from 464,437 to
+    466,241 bytes.
+- **#372, opening offline.**
+  - **The kept session is `{ user }`**, written by one effect in App whenever `user` is
+    set, with no `savedAt`: the notice's age comes from the dashboard cache.
+  - **A bug found and fixed:** `useDashboardData` wrote every dashboard it set back to the
+    cache as new, a restored one included, so opening the app reset the cache's age. A
+    dashboard read back from the cache is no longer written back.
+  - **The restore sits after the session check's `if (answered) return`.** The first
+    mutation run showed `!answered` was a second guard on the 401 path, which removes the
+    cache first, so it went. A storage that refuses the write but still reads is what the
+    "someone who signed in meanwhile" test stages: the one case its guard is for.
+  - **`useConnection` lives in shared `client/src/hooks/`**, and the hint is a shared
+    `components/OfflineHint` using the existing `muted` class, so no CSS changed. Ten
+    controls are disabled: Save goals and Save metric; Save to plan on each Tips tile and
+    in its details modal; Remove on a saved exercise; every progression answer; Generate
+    workout; the profile's Save; Change password; and Confirm deletion.
+  - **The notice's second sentence waited for #373**, which made it true.
+  - The test setup marks the connection answered after every test, and App's tests
+    clear the kept session before each one. `OfflineHint` was not run red first; two
+    mutations show its test holds. The main chunk went to 467,978 bytes.
+- **#373, the outbox.**
+  - **The log handlers keep their `request` closures**, built on a shared `postLog`, and
+    add an `outbox` ({ clientId, url, body }). Only a log with one can be kept, so the
+    existing `useOptimisticLogs` tests kept testing the unchanged behaviour.
+  - **A second CSRF refusal is kept, not dropped**: the body is not at fault, as with a
+    401, and a later replay fetches a fresh token again.
+  - **"Not sent yet" shows in the Logs view's three lists**, where every row is listed; the
+    Goals card and the meal panel do not show it.
+  - **The outbox entry holds no fallback message**; a refused replay names its entry
+    ("Unable to save workout.").
+  - **`offline.spec.js` counts within the Workout log section**: the dashboard's glance
+    line names the latest workout too. The `a11y.spec.js` scan of the confirm opens the
+    workout modal once while online, because the `chromium` project blocks the worker
+    that would otherwise serve its chunk offline.
+  - App's three wiring tests were written after the wiring, and two mutations show they
+    hold. The main chunk went to 471,894 bytes.
+- **#374, the floors.** The client's branch floor went from 95.3 to 95.4 (measured 99.17 /
+  95.49 / 99.36 / 99.63, the same in CI). The server's figures did not change, so it has no
+  floor PR.
 
 Every file and line below was read on `02e93f6`.
 
