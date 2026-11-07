@@ -36,6 +36,12 @@ const settleWithin = (promise, ms) => {
   return Promise.race([promise, cap]).finally(() => clearTimeout(timerId));
 };
 
+// The id an entry has on screen until the server answers. It is never sent:
+// each log's body carries its own replay key, from crypto.randomUUID(), as `id`
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). The server keeps that
+// key as the entry's id, so a resent entry updates its row instead of adding
+// one, and hands it back as the entry's id, which must not start "optimistic-"
+// (useProgression reads those as not yet saved).
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -388,6 +394,7 @@ export const createAppEventHandlers = ({
     const { planId, planDayIndex } = workoutForm;
     const link = planId ? { planId, planDayIndex } : null;
     const payload = {
+      id: crypto.randomUUID(),
       date: workoutForm.date,
       focus: workoutForm.focus,
       duration: workoutForm.duration,
@@ -446,6 +453,7 @@ export const createAppEventHandlers = ({
     const operationId = buildOptimisticId("calories");
     const payload = {
       ...calorieForm,
+      id: crypto.randomUUID(),
       date: getLocalDateKey()
     };
 
@@ -623,7 +631,7 @@ export const createAppEventHandlers = ({
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
-    const payload = { ...mealLogForm };
+    const payload = { ...mealLogForm, id: crypto.randomUUID() };
 
     // Queued like a workout: shown at once, sent when the undo window closes.
     queueOptimisticLogCommit({
