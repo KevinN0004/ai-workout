@@ -421,6 +421,56 @@ describe("the optimistic log requests", () => {
 // carries none, and its own default for a thrown error with no message. The
 // tests above supply a message every time, so only the server's own wording was
 // ever seen.
+// Each log's body carries its own replay key as `id`, which the server keeps as
+// the entry's id, so a resent entry updates its row instead of adding one
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). It is not the optimistic
+// id: the server hands the key back as the entry's id, and useProgression reads
+// an id starting "optimistic-" as not yet saved.
+describe("each log's replay key", () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+  const sentBody = async (deps, call) => {
+    await deps.queueOptimisticLogCommit.mock.calls[call][0].request();
+    return JSON.parse(deps.apiFetch.mock.calls[call][1].body);
+  };
+
+  describe.each([
+    ["a workout", "submitWorkout", {}],
+    ["calories", "submitCalories", {}],
+    [
+      "a meal",
+      "submitMealLog",
+      {
+        mealLogForm: { date: "2026-03-01", mealType: "lunch", name: "Rice bowl", calories: "600" },
+        setMealLogForm: () => {}
+      }
+    ]
+  ])("%s", (_label, method, extraDeps) => {
+    test("is sent as the body's id, a fresh UUID on every submit", async () => {
+      const { deps, handlers } = buildDeps(extraDeps);
+      await handlers[method](submitEvent());
+      await handlers[method](submitEvent());
+
+      const first = await sentBody(deps, 0);
+      const second = await sentBody(deps, 1);
+      expect(first.id).toMatch(UUID);
+      expect(second.id).toMatch(UUID);
+      expect(second.id).not.toBe(first.id);
+    });
+
+    test("is not the optimistic id, which stays the entry's on screen", async () => {
+      const { deps, handlers } = buildDeps(extraDeps);
+      await handlers[method](submitEvent());
+
+      const { item } = deps.queueOptimisticLogCommit.mock.calls[0][0];
+      const body = await sentBody(deps, 0);
+      expect(item.id).toMatch(/^optimistic-/);
+      expect(body.id).not.toMatch(/^optimistic-/);
+      expect(body.id).not.toBe(item.id);
+    });
+  });
+});
+
 describe("the direct write actions' fallback messages", () => {
   const goalForm = { targetWeight: "170", targetCalories: "2200", weeklyWorkouts: "4" };
   const progressForm = { date: "2026-03-01", weightLb: "170" };
