@@ -6,8 +6,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
 import { isRestDay, savedPlanDays } from "../../../app/plans";
-import { getLocalDateKey } from "../../../app/units";
+import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
 import ModalPortal from "../../../components/ModalPortal";
+import WeekProgression from "../components/WeekProgression";
 import "./PlansView.css";
 
 const SAVED_EXERCISE_PAGE_SIZE = 24;
@@ -23,7 +24,10 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * carry none. A training day the newest plan saved a structure for can be logged
  * against: its details fill App's workout form through `setWorkoutForm` and open
  * the modal with `setWorkoutModalOpen`, and its card says once a session links
- * to it. A rest day's card says so, and offers no log.
+ * to it. A rest day's card says so, and offers no log. `progression` is the
+ * week's (roadmap B4): a day's details show its lifts' loads, answered through
+ * `onAnswerProgression` with `progressionError` beside them, and the log opens
+ * at the week's sets and loads.
  */
 export default function PlansView({
   weekDays,
@@ -34,7 +38,10 @@ export default function PlansView({
   onRemoveSavedExercise,
   onOpenGuides,
   setWorkoutForm,
-  setWorkoutModalOpen
+  setWorkoutModalOpen,
+  progression = null,
+  onAnswerProgression,
+  progressionError = ""
 }) {
   // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -85,11 +92,14 @@ export default function PlansView({
     );
   }, [dashboard, latestPlan]);
 
+  // The loads show in the region's unit, as the Log workout modal enters them.
+  const system = useMemo(() => getPreferredMeasurementSystem(), []);
+
   const logPlanDay = (day) => {
     setWorkoutForm({
       date: getLocalDateKey(),
       duration: "",
-      ...buildPlanDayPrefill(day),
+      ...buildPlanDayPrefill(day, progression, system),
       planId: latestPlan.id,
       planDayIndex: day.index,
       planDayLabel: day.weekday
@@ -529,6 +539,15 @@ export default function PlansView({
                     ) : (
                       <p className="muted">Recovery or rest day. No workout block assigned.</p>
                     )}
+                    {selectedSavedDay ? (
+                      <WeekProgression
+                        week={progression}
+                        prescriptions={selectedSavedDay.prescriptions ?? []}
+                        system={system}
+                        onAnswer={onAnswerProgression}
+                        error={progressionError}
+                      />
+                    ) : null}
                     {selectedSavedDay ? (
                       <button
                         type="button"

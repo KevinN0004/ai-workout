@@ -25,7 +25,7 @@ import { getLocalDateKey, toNumberOrNull } from "./units";
  * @property {string} name
  * @property {"reps" | "seconds"} kind
  * @property {boolean} perSide
- * @property {{ amount: string, rpe: string } | null} targets
+ * @property {{ amount: string, rpe: string, load?: string } | null} targets
  * @property {SetRow[]} sets
  */
 

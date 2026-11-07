@@ -59,7 +59,8 @@ function TrendChart({
  * one-time load. The two cards' refresh buttons are always there, and each card
  * shows its error alongside any reading it still has. The air card labels its
  * US AQI a NowCast when the payload carries one, and the latest reading's when not.
- * The weekly card lists `planWeek`'s planned days, and shows `weightProgress`,
+ * The weekly card lists `planWeek`'s planned days, says when `deloadWeek`, the
+ * week's progression, makes this a lighter week, and shows `weightProgress`,
  * whose "Set a target weight" button calls `onOpenGoals`.
  */
 export default function SummaryView({
@@ -77,6 +78,7 @@ export default function SummaryView({
   todayRecommendation,
   weeklyTrends,
   planWeek,
+  deloadWeek,
   weightProgress,
   onOpenGoals,
   weatherData,
@@ -465,7 +467,7 @@ export default function SummaryView({
                 {planWeek.planned
                   ? `This week's plan: ${planWeek.done} of ${planWeek.planned} planned days done${
                       planWeek.missed ? `, ${planWeek.missed} missed` : ""
-                    }.`
+                    }${deloadWeek?.active && deloadWeek.decision === null ? ", deload week" : ""}.`
                   : "This week's plan: no training days planned."}
               </div>
               <div className="summary-list" role="list">

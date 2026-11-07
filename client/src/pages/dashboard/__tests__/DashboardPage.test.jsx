@@ -756,6 +756,7 @@ describe("DashboardPage", () => {
       "workouts",
       "weeklyTrends",
       "planWeek",
+      "deloadWeek",
       "weightProgress",
       "onOpenGoals",
       "buildLinePath",

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildPlanDayPrefill,
   buildWeeklyMealPlan,
+  deloadSets,
   detectTrack,
   getDailyCalories
 } from "../planUtils";
@@ -254,6 +255,106 @@ describe("buildPlanDayPrefill", () => {
 
       expect(buildPlanDayPrefill(day(many)).exerciseSets).toHaveLength(18);
     });
+
+    // Roadmap B4: the week's progression sets each lift's rows and its load,
+    // as a placeholder like the other targets. A typed load in a row left
+    // blank would stop the save, so nothing is typed.
+    describe("with the week's progression", () => {
+      const hold = prescription({
+        name: "Plank",
+        reps: null,
+        seconds: { min: 20, max: 30 },
+        targetRpe: null
+      });
+      const lift = (fields) => ({
+        name: "Dumbbell bench press",
+        key: "dumbbell bench press",
+        change: "up",
+        kg: { from: 20, target: 22.5 },
+        lb: { from: 45, target: 50 },
+        sets: 3,
+        why: "",
+        decision: null,
+        ...fields
+      });
+      const weekOf = (lifts, deloadWeek = { active: false, decision: null }) => ({
+        weekStart: "2026-11-09",
+        deloadWeek,
+        lifts
+      });
+      const cardsOf = (week, system = "metric", prescriptions = [prescription({}), hold]) =>
+        buildPlanDayPrefill(day(prescriptions), week, system).exerciseSets;
+
+      test("a lift's card has the week's load as its placeholder, in the region's unit", () => {
+        const [metric] = cardsOf(weekOf([lift({})]));
+        const [imperial] = cardsOf(weekOf([lift({})]), "imperial");
+
+        expect(metric.targets).toEqual({ amount: "8-10", rpe: "8-9", load: "22.5" });
+        expect(imperial.targets.load).toBe("50");
+        for (const row of metric.sets) expect(row.load).toBe("");
+      });
+
+      test("an asked step up not yet answered offers the load it is at", () => {
+        expect(cardsOf(weekOf([lift({ change: "ask" })]))[0].targets.load).toBe("20");
+        expect(cardsOf(weekOf([lift({ change: "up", decision: "accept" })]))[0].targets.load).toBe(
+          "22.5"
+        );
+      });
+
+      test("a lift with no load to set, or not in the week, gets no load", () => {
+        expect(cardsOf(weekOf([lift({ change: "none", kg: null, lb: null })]))[0].targets).toEqual({
+          amount: "8-10",
+          rpe: "8-9"
+        });
+        expect(cardsOf(weekOf([]))[0].targets).toEqual({ amount: "8-10", rpe: "8-9" });
+      });
+
+      test("a lift's card opens with the week's sets", () => {
+        expect(cardsOf(weekOf([lift({ sets: 2 })]))[0].sets).toHaveLength(2);
+      });
+
+      test("a deload week halves every card's rows, holds included", () => {
+        const [press, plank] = cardsOf(
+          weekOf([lift({ change: "hold", sets: 2 })], { active: true, decision: null })
+        );
+
+        expect(press.sets).toHaveLength(2);
+        expect(plank.sets).toHaveLength(2);
+      });
+
+      test("a deload week trained normally keeps the prescribed rows", () => {
+        const [, plank] = cardsOf(weekOf([lift({})], { active: true, decision: "normal" }));
+
+        expect(plank.sets).toHaveLength(3);
+      });
+
+      test("a timed exercise takes no load, even one the week holds as a lift", () => {
+        const [, plank] = cardsOf(weekOf([lift({ name: "Plank", key: "plank", sets: 1 })]));
+
+        expect(plank.targets).toEqual({ amount: "20-30", rpe: "" });
+        expect(plank.sets).toHaveLength(3);
+      });
+
+      test("the names of the week's lifts match in any case and spacing", () => {
+        const [card] = cardsOf(weekOf([lift({})]), "metric", [
+          prescription({ name: "  Dumbbell BENCH press " })
+        ]);
+
+        expect(card.targets.load).toBe("22.5");
+      });
+    });
+  });
+});
+
+describe("deloadSets", () => {
+  test.each([
+    [1, 1],
+    [2, 1],
+    [3, 2],
+    [4, 2],
+    [5, 3]
+  ])("halves %i sets, rounding up, to %i", (sets, halved) => {
+    expect(deloadSets(sets)).toBe(halved);
   });
 });
 

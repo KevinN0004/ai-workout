@@ -1,7 +1,7 @@
 /**
  * The dashboard's plan helpers: a goal's track, a day's calorie target and a
  * week of meals (meal, plans and tips views, useDashboardMetrics), and the
- * workout form's pre-fill from a plan day (plans view).
+ * workout form's pre-fill from a plan day, shaped by the week's progression.
  */
 import { newCard } from "../../app/exerciseSets";
 import { isRestDay } from "../../app/plans";
@@ -214,32 +214,70 @@ const exerciseNameOf = (line) => {
 const rangeText = (range) =>
   range ? (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`) : "";
 
+/**
+ * A lift's key, as the server keys the week's progression (roadmap B4): its
+ * name trimmed and lower-cased.
+ */
+export const liftKeyOf = (name) =>
+  String(name ?? "")
+    .trim()
+    .toLowerCase();
+
+/**
+ * An exercise's sets in a deload week: half, rounded up, and at least one, as
+ * the server's progression rules prescribe them.
+ */
+export const deloadSets = (sets) => Math.max(1, Math.ceil(sets / 2));
+
+// The load a lift's card offers as its placeholder: the week's target, or the
+// load it is at while an asked step up waits for its answer; null for a lift
+// with no load to set.
+const weekLoadOf = (lift, unit) => {
+  const load = lift?.[unit];
+  if (!load) return null;
+  return String(lift.change === "ask" ? load.from : load.target);
+};
+
 // The card a prescription opens: its rows, counted the prescribed way, with
-// its targets as placeholders. Every row opens empty.
-const cardFromPrescription = (prescription) =>
-  newCard({
+// its targets as placeholders. Every row opens empty. With the week's
+// progression, a lift opens with the week's sets and load, and in a deload
+// week every other exercise at half its sets.
+const cardFromPrescription = (prescription, week, unit) => {
+  const lift = prescription.reps
+    ? week?.lifts.find((entry) => entry.key === liftKeyOf(prescription.name))
+    : undefined;
+  const lightWeek = Boolean(week?.deloadWeek?.active) && week.deloadWeek.decision === null;
+  const load = weekLoadOf(lift, unit);
+  return newCard({
     name: prescription.name,
     kind: prescription.seconds ? "seconds" : "reps",
     perSide: prescription.perSide,
     targets: {
       amount: rangeText(prescription.reps ?? prescription.seconds),
-      rpe: rangeText(prescription.targetRpe)
+      rpe: rangeText(prescription.targetRpe),
+      ...(load === null ? {} : { load })
     },
-    rows: prescription.sets
+    rows: lift ? lift.sets : lightWeek ? deloadSets(prescription.sets) : prescription.sets
   });
+};
 
 /**
  * The Log workout form's fields for a day of a saved plan: the day's title as
  * the focus, its exercise cards (at most 18), and the day's lines as the
  * notes, cut at 500 characters. A rule-built day's cards come from its
- * prescriptions, with the prescribed rows and targets; any other day's are a
- * card with one empty row for each name its bullets prescribe. The sets
- * themselves are left to the person logging.
+ * prescriptions, with the prescribed rows and targets, shaped by `week`, the
+ * week's progression when there is one, with loads in `system`'s unit; any
+ * other day's are a card with one empty row for each name its bullets
+ * prescribe. The sets themselves are left to the person logging.
  */
-export const buildPlanDayPrefill = (day) => ({
+export const buildPlanDayPrefill = (day, week = null, system = "metric") => ({
   focus: day.title,
   exerciseSets: Array.isArray(day.prescriptions)
-    ? day.prescriptions.slice(0, PREFILL_MAX_EXERCISES).map(cardFromPrescription)
+    ? day.prescriptions
+        .slice(0, PREFILL_MAX_EXERCISES)
+        .map((prescription) =>
+          cardFromPrescription(prescription, week, system === "imperial" ? "lb" : "kg")
+        )
     : day.lines
         .map(exerciseNameOf)
         .filter(Boolean)

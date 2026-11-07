@@ -10,6 +10,7 @@ import DashboardDrawer from "./components/DashboardDrawer";
 import DashboardBottomNav from "./components/DashboardBottomNav";
 import DashboardAtAGlance from "./components/DashboardAtAGlance";
 import useDashboardMetrics, { parseDateValue } from "./hooks/useDashboardMetrics";
+import useProgression from "./hooks/useProgression";
 import { getLocalDateKey } from "../../app/units";
 import { NO_PLAN_LINK } from "../../app/plans";
 import "./DashboardPage.css";
@@ -63,7 +64,8 @@ const DASH_VIEW_ORDER = [
  * the summary loads lazily. Its data and handlers are App's: the dashboard and
  * the weather and air-quality readings and the dashboard's pagination totals
  * (useDashboardData), the forms, and the
- * events.js handlers. The page derives its numbers through useDashboardMetrics
+ * events.js handlers. The page derives its numbers through useDashboardMetrics,
+ * reads the week's progression through useProgression with App's `apiFetch`,
  * and keeps only the profile menu's state. Signed out, it renders the header
  * alone, which offers sign-in.
  */
@@ -119,7 +121,8 @@ export default function DashboardPage({
   onRemoveSavedExercise,
   plannerModal,
   dashboardToast,
-  clearDashboardToast
+  clearDashboardToast,
+  apiFetch
 }) {
   // ---- Profile menu, metrics and the next workout ---------------------------
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -176,6 +179,14 @@ export default function DashboardPage({
     if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
     return null;
   }, [recentWorkouts]);
+
+  // The week's progression (roadmap B4), read again when the newest plan, the
+  // profile note or the saved sessions change. Above the early return too.
+  const {
+    progression,
+    error: progressionError,
+    answer: answerProgression
+  } = useProgression({ dashboard, notes: user?.profile?.notes, apiFetch });
 
   // While the profile menu is open, a mousedown outside it or Escape closes it.
   // The listeners exist only while it is open.
@@ -272,6 +283,7 @@ export default function DashboardPage({
           workouts={recentWorkouts}
           weeklyTrends={weeklyTrends}
           planWeek={planWeek}
+          deloadWeek={progression?.deloadWeek ?? null}
           weightProgress={weightProgress}
           onOpenGoals={() => navigateDashView("calories")}
           buildLinePath={buildLinePath}
@@ -352,6 +364,9 @@ export default function DashboardPage({
             onOpenGuides={() => navigateDashView("tips")}
             setWorkoutForm={setWorkoutForm}
             setWorkoutModalOpen={setWorkoutModalOpen}
+            progression={progression}
+            onAnswerProgression={answerProgression}
+            progressionError={progressionError}
           />
         </Suspense>
       );

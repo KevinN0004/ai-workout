@@ -629,6 +629,7 @@ export default function App() {
         plannerModal={plannerModal}
         dashboardToast={dashboardToast}
         clearDashboardToast={clearDashboardToast}
+        apiFetch={apiFetch}
       />
     );
   }

@@ -1,7 +1,7 @@
 /**
  * The fetch every API write in the client goes through: it sends the session
  * cookie, adds the CSRF token and gives up at a deadline. Called once, by App,
- * which passes `apiFetch` to createAppEventHandlers.
+ * which passes `apiFetch` to createAppEventHandlers and DashboardPage.
  */
 import { useCallback } from "react";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../constants";

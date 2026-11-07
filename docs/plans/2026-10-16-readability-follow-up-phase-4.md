@@ -122,6 +122,8 @@ Write each of these once, with the Write tool, into `$TOOLS` (any scratch folder
 
 The `dash-logs` state, and the `dashboard` option of `routeApi` it answers with, were added on 2026-11-06 for roadmap B2's Progress panel (`docs/plans/2026-11-06-progress-records.md`, Task 4). They capture Logs at desktop, tablet and phone with five sessions of sets; the baseline above predates them.
 
+The `dash-plans` state, and the `progression` option of `routeApi` it answers with, were added on 2026-11-07 for roadmap B4's week of loads (`docs/plans/2026-11-06-adaptive-progression.md`, Task 4). They capture Monday's details in the plan hub at desktop, tablet and phone, with a week holding an asked step up, a step up, a lift deload and a bodyweight lift.
+
 <!-- prettier-ignore -->
 ```js
 /**
@@ -411,10 +413,58 @@ const LOGS_DASHBOARD = {
   }
 };
 
+// A saved plan with a structured Monday, and that week's progression (roadmap
+// B4), for a capture day of 2026-09-29: a step up asked first for the knee, an
+// automatic step up, a lift deload and a bodyweight lift.
+const planRx = (name, min, max) => ({
+  name, sets: 3, reps: { min, max }, seconds: null, perSide: false, targetRpe: { min: 8, max: 9 }
+});
+const PLAN_RX = [
+  planRx("Dumbbell box squat", 10, 12),
+  planRx("Dumbbell bench press", 8, 10),
+  planRx("Chest-supported dumbbell row", 10, 12),
+  planRx("Push-up", 8, 12)
+];
+const PLAN_LINES = PLAN_RX.map((rx) => `- ${rx.name}: 3 x ${rx.reps.min}-${rx.reps.max}`);
+const PLANS_DASHBOARD = {
+  ...DASHBOARD,
+  dashboard: {
+    ...DASHBOARD.dashboard,
+    plans: [{
+      id: "plan-1", createdAt: "2026-09-27T12:00:00.000Z", goal: "Build lean strength and energy",
+      equipment: ["Dumbbells", "Adjustable bench"], duration: 45, level: "Intermediate", injuries: "Knee",
+      days: 3, environment: "Home", focuses: [], plan: ["Monday - Full body A", ...PLAN_LINES].join("\n"),
+      payload: {
+        version: 1,
+        days: [{ index: 0, weekday: "Monday", title: "Monday - Full body A", lines: PLAN_LINES, prescriptions: PLAN_RX }],
+        notes: []
+      }
+    }]
+  }
+};
+const weekLift = (name, change, kg, lb, why) => ({
+  name, key: name.toLowerCase(), change, kg, lb, sets: 3, why, decision: null
+});
+const PLANS_PROGRESSION = {
+  progression: {
+    weekStart: "2026-09-28",
+    deloadWeek: { active: false, count: 3, reason: null, decision: null },
+    lifts: [
+      weekLift("Dumbbell box squat", "ask", { from: 20, target: 22.5 }, { from: 45, target: 50 },
+        "Every set reached 12 reps at RPE 8 or below on Mon 21 Sep. It asks first because your injury answer or note names your knee"),
+      weekLift("Dumbbell bench press", "up", { from: 17.5, target: 20 }, { from: 40, target: 45 },
+        "Every set reached 10 reps at RPE 8 or below on Mon 21 Sep"),
+      weekLift("Chest-supported dumbbell row", "deload", { from: 22.5, target: 20 }, { from: 50, target: 45 },
+        "RPE rose three sessions in a row, to 9 on Mon 21 Sep; about 10% lighter to recover"),
+      weekLift("Push-up", "none", null, null, "Bodyweight: no load to set")
+    ]
+  }
+};
+
 // Answers every /api request from the browser. `hold` lists path prefixes left
 // unanswered, which keeps their loading state on screen, and `dashboard` is the
-// dashboard read's answer.
-const routeApi = async (context, { signedIn, hold = [], dashboard = DASHBOARD }, unmocked) => {
+// dashboard read's answer, and `progression` the week's progression read's.
+const routeApi = async (context, { signedIn, hold = [], dashboard = DASHBOARD, progression = { progression: null } }, unmocked) => {
   await context.route("**/api/**", async (route) => {
     const url = new URL(route.request().url());
     const p = url.pathname;
@@ -424,6 +474,7 @@ const routeApi = async (context, { signedIn, hold = [], dashboard = DASHBOARD },
     if (p === "/api/csrf-token") return json(200, { csrfToken: "capture-token" });
     if (p === "/api/auth/me") return signedIn ? json(200, { user: USER }) : json(401, { error: "Not signed in" });
     if (p === "/api/dashboard") return json(200, dashboard);
+    if (p === "/api/dashboard/progression") return json(200, progression);
     if (p === "/api/mealdb/search") return json(200, { meals: [] });
     if (p === "/api/wger/meta") return json(200, { categories: [], muscles: [], equipment: [] });
     if (p === "/api/wger/exercises") return json(200, { exercises: [] });
@@ -631,6 +682,16 @@ const BASE_STATES = [
       await advance(page, 1000);
     },
     check: () => (document.querySelector(".workouts-view .log-section .workout-row") ? null : "no workout log")
+  },
+  {
+    name: "dash-plans", motion: "reduce", path: "/dashboard/plans", api: { ...SIGNED_IN, dashboard: PLANS_DASHBOARD, progression: PLANS_PROGRESSION }, viewports: ["desktop", "tablet", "phone"],
+    reach: async (page) => {
+      await advanceUntil(page, hasText, "Workout week", "the plan hub");
+      await page.getByRole("button", { name: /^Mon .*Dumbbell box squat/ }).click();
+      await advanceUntil(page, has, ".plan-day-detail-modal .plan-detail-list", "Monday's details");
+      await advance(page, 1000);
+    },
+    check: () => (document.querySelector(".plan-day-detail-modal .plan-detail-list") ? null : "no day details")
   },
   {
     name: "dash-planner", motion: "reduce", path: "/dashboard", api: SIGNED_IN, viewports: ALL,
