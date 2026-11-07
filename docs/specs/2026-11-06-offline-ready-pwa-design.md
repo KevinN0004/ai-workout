@@ -103,15 +103,19 @@ Made with the owner on 2026-11-06:
   - It reads `navigator.onLine` and the `online` and `offline` events.
   - A request that got no answer also counts as offline, because `onLine` stays true on Wi-Fi
     with no internet. The next answered request counts as online again.
+  - While offline it sends `GET /api/health` every 30 seconds and on the `online` event, so
+    a page with nothing else to send still finds the server again.
 - **What offline looks like.**
   - With a cached user, the notice reads "Offline — showing your data from 2 h ago. Entries
     you log are saved on this device and sent when you reconnect." Without one, today's
     sign-in notice stays.
   - The submit of each write that cannot queue is disabled, with "You're offline" beside it:
-    goals, body weight, saved exercises, plan generation, and the profile, password and
+    goals, body weight, saved exercises, plan generation, the plan hub's progression
+    answers (Undo, Accept, Decline and Train normally), and the profile, password and
     account-deletion settings.
-  - `apiFetch` refuses those writes at once while offline, as a backstop for a control that
-    was missed.
+  - `apiFetch` refuses those writes at once when `navigator.onLine` is false, as a backstop
+    for a control that was missed. It reads the browser's flag only: refusing on an
+    unanswered request could refuse the one request that would show the server is back.
 
 ### The outbox
 
@@ -167,7 +171,9 @@ Made with the owner on 2026-11-06:
 
 - The plugin's `onNeedRefresh` shows an app-level notice, "A new version is ready", with a
   Reload button that activates the new worker and reloads.
-- The notice waits while the planner or any modal is open.
+- While the planner or any modal is open, the notice cannot be reached: `ModalPortal` makes
+  everything outside the open modal inert. So a reload never lands in the middle of a form
+  without the visitor first closing it.
 - Nothing reloads by itself. A cold launch always gets the new version.
 - An old bundle now stays in use for longer, so a server change keeps accepting the
   previous client's requests. That has been the rule since P6.
@@ -188,7 +194,9 @@ Made with the owner on 2026-11-06:
     reload with the context offline still renders the dashboard.
   - A workout logged offline, then the context back online, is on the dashboard exactly
     once after a reload.
-- **axe** scans the offline notice, the update notice and the sign-out confirm.
+- **axe** scans the offline notice and the sign-out confirm. The update notice is the same
+  `AppNotice` with a button, and E2E cannot stage a waiting worker without a second build,
+  so its unit test pins the button's name.
 - **Coverage.** Server functions have no slack and client branches 0.19, so every new
   function and branch is covered in the PR that adds it.
 
