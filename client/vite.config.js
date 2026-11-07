@@ -5,9 +5,62 @@
  */
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // The installable shell (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+    // The worker precaches the build and answers navigations with index.html,
+    // but never an /api path, and caches no API response: the page's
+    // localStorage caches own the data. "prompt" leaves activating a new
+    // worker to the visitor, through useWorkerUpdate's Reload.
+    VitePWA({
+      strategies: "generateSW",
+      registerType: "prompt",
+      // useWorkerUpdate registers the worker; nothing is injected into the page.
+      injectRegister: false,
+      // workbox.globPatterns already precaches every icon in public/icons, so
+      // adding the manifest's icons again would list each one twice.
+      includeManifestIcons: false,
+      manifest: {
+        name: "PATH | Personalized AI Training Hub",
+        short_name: "PATH",
+        start_url: "/dashboard",
+        scope: "/",
+        display: "standalone",
+        // The page's own black (styles/base.css, body).
+        theme_color: "#000000",
+        background_color: "#000000",
+        icons: [
+          { src: "/icons/pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/pwa-512.png", sizes: "512x512", type: "image/png" },
+          {
+            src: "/icons/pwa-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable"
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // The PDF export's chunks (jspdf and the three only it imports), about
+        // 760 KiB a new install would otherwise download for a path most
+        // sessions never take. Offline, the export reports that it could not
+        // prepare the PDF.
+        globIgnores: [
+          "**/jspdf.es.min-*.js",
+          "**/html2canvas-*.js",
+          "**/purify.es-*.js",
+          "**/index.es-*.js"
+        ],
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api(\/|$)/],
+        cleanupOutdatedCaches: true
+      }
+    })
+  ],
 
   // ---- Dev server (npm run dev:client) --------------------------------------
   // /api goes to the Express server, so the client calls relative paths in

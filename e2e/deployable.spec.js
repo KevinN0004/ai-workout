@@ -129,3 +129,75 @@ test.describe("the express-served deployable", () => {
     expect(asset.headers()["cache-control"]).toContain("max-age=31536000");
   });
 });
+
+// The installable shell (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+// Only this project lets the worker run, and only the express origin sends the
+// CSP that has to allow the manifest.
+test.describe("the installable shell", () => {
+  /** Loads the page and waits until the worker controls it. */
+  const loadControlled = async (page) => {
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    // A first install controls the next load, not the one that installed it.
+    await page.reload({ waitUntil: "networkidle" });
+    await expect
+      .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+      .toBe(true);
+  };
+
+  test("installs its worker, which then controls the page, with no CSP violation", async ({
+    page
+  }) => {
+    const { consoleViolations, blockedRequests } = watchForCspViolations(page);
+
+    await loadControlled(page);
+
+    expect(consoleViolations).toEqual([]);
+    expect(blockedRequests).toEqual([]);
+  });
+
+  test("serves the manifest as a manifest, revalidated on every load", async ({ page }) => {
+    const manifest = await page.request.get("/manifest.webmanifest");
+
+    expect(manifest.status()).toBe(200);
+    expect(manifest.headers()["content-type"]).toContain("application/manifest+json");
+    expect(manifest.headers()["cache-control"]).toContain("no-cache");
+    expect(await manifest.json()).toMatchObject({ short_name: "PATH", start_url: "/dashboard" });
+
+    await page.goto("/", { waitUntil: "networkidle" });
+    expect(await page.locator('link[rel="manifest"]').getAttribute("href")).toBe(
+      "/manifest.webmanifest"
+    );
+  });
+
+  test("leaves an /api path to the server, never the cached shell", async ({ page }) => {
+    await loadControlled(page);
+
+    const missing = await page.goto("/api/definitely-not-a-route");
+
+    expect(missing.status()).toBe(404);
+    expect(await missing.text()).not.toContain('id="root"');
+  });
+
+  test("opens with no network, from the worker's cache", async ({ page, context }) => {
+    await loadControlled(page);
+
+    await context.setOffline(true);
+    try {
+      // The network really is gone: a request the worker does not answer fails.
+      const reached = await page.evaluate(() =>
+        fetch("/api/health").then(
+          () => "reached",
+          () => "failed"
+        )
+      );
+      expect(reached).toBe("failed");
+
+      const shell = await page.reload();
+      expect(shell.fromServiceWorker()).toBe(true);
+      await expect(page.locator("#root")).toContainText(/\S/);
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+});

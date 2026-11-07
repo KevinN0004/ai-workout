@@ -42,6 +42,11 @@ vi.mock("../pages/workout-result/WorkoutResultPage", () => ({
   }
 }));
 
+const workerUpdate = vi.hoisted(() => ({ ready: false, reload: null }));
+vi.mock("../app/hooks/useWorkerUpdate", () => ({
+  default: () => ({ ready: workerUpdate.ready, reload: workerUpdate.reload })
+}));
+
 import App from "../App";
 import { goalOptions } from "../app/constants";
 
@@ -344,6 +349,51 @@ describe("App", () => {
       });
 
       expect(sessionLookups()).toBe(1);
+    });
+  });
+
+  // A deploy reaches an open app as a waiting worker. It is offered, never
+  // forced: nothing reloads until the visitor asks
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+  describe("a new version of the app", () => {
+    const UPDATE_NOTICE = /a new version is ready/i;
+
+    beforeEach(() => {
+      workerUpdate.ready = true;
+      workerUpdate.reload = vi.fn();
+    });
+
+    afterEach(() => {
+      workerUpdate.ready = false;
+      workerUpdate.reload = null;
+    });
+
+    test("is offered with a Reload button, and reloads only when asked", async () => {
+      await renderSettled("/");
+
+      expect(screen.getByRole("status")).toHaveTextContent(UPDATE_NOTICE);
+      expect(workerUpdate.reload).not.toHaveBeenCalled();
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Reload" }).click();
+      });
+
+      expect(workerUpdate.reload).toHaveBeenCalledTimes(1);
+    });
+
+    test("is not offered while none is waiting", async () => {
+      workerUpdate.ready = false;
+      await renderSettled("/");
+
+      expect(screen.queryByText(UPDATE_NOTICE)).not.toBeInTheDocument();
+    });
+
+    test("waits behind the session notice, which says the data is stale", async () => {
+      stubSession(() => Promise.reject(new TypeError("Failed to fetch")));
+      await renderSettled("/");
+
+      expect(screen.getByRole("status")).toHaveTextContent(SESSION_NOTICE);
+      expect(screen.queryByText(UPDATE_NOTICE)).not.toBeInTheDocument();
     });
   });
 

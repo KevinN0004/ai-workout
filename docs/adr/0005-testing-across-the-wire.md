@@ -60,6 +60,19 @@ survived. Five things are worth knowing before touching it:
   cheap companion guard, but a well-formed header can still be wrong — the
   browser project is the one that proves the page runs.
 
+  Since the offline-ready PWA (roadmap C1), the built bundle carries a service
+  worker, and `vite preview` serves it too. The `chromium` project sets
+  `serviceWorkers: "block"`, so its specs keep every request on the network,
+  where they and `page.route` see it. The worker's specs run in `deployable`,
+  the only project whose CSP has to allow the manifest: the worker installs and
+  controls the page, the manifest is served as one, an `/api` navigation still
+  reaches the server, and a reload with the context offline is answered from
+  the worker's cache. `context.setOffline` does cut the page's network there:
+  a fetch the worker does not answer fails. Removing `/api` from the worker's
+  `navigateFallbackDenylist` is caught by the `/api` test. Switching
+  `registerType` to `"autoUpdate"` is caught by nothing: only a second deploy
+  under an open page shows it, which the suite cannot stage.
+
 - **Do not set `NODE_ENV=test` for the server it starts.** `index.js` guards its
   `startServer()` call with `NODE_ENV !== "test" && !VITEST` so the unit suite
   can import `app` without binding a port. Set it and the process loads, exports,

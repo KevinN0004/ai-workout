@@ -7,7 +7,7 @@ Playwright suites: the only tests that run the client and the server together. E
 | `smoke.spec.js`      | Sign up, log a workout that survives a reload, change the password without being signed out, delete the account                                                                                                                                                                                                                                           |
 | `plan.spec.js`       | The planner's four steps generate a rule-built plan, which the plan hub shows, and a day of it is logged with its pre-filled sets, which survive a reload into Logs                                                                                                                                                                                       |
 | `a11y.spec.js`       | axe scans that must find zero violations: login, signup, the dashboard, an open modal, keyboard-only modal dismissal, keyboard focus held inside an open modal and the menu drawer, each step of the planner and its link contrast, modal and drawer buttons the phone bottom bar must not cover, the settings forms and every state of the account panel |
-| `deployable.spec.js` | The Express-served app: renders with no CSP violations, loads its fonts, reaches its own API, serves client routes while still 404ing unknown `/api` paths, caches correctly                                                                                                                                                                              |
+| `deployable.spec.js` | The Express-served app: renders with no CSP violations, loads its fonts, reaches its own API, serves client routes while still 404ing unknown `/api` paths, caches correctly; its service worker installs, serves the manifest, leaves `/api` to the server, and opens the app offline                                                                    |
 
 `npx playwright test --list` lists every test, by project.
 
@@ -22,8 +22,8 @@ npm run test:e2e        # or npm run test:e2e:ui for Playwright's UI mode
 
 `playwright.config.js` starts both servers itself: the API on 5000 and `vite preview` on 4173. It has two projects:
 
-- **`chromium`** runs the smoke, plan and accessibility suites against the preview origin.
-- **`deployable`** points the browser at the Express origin instead. Only there are the real security headers and CSP in force; `vite preview` has neither.
+- **`chromium`** runs the smoke, plan and accessibility suites against the preview origin. It blocks the service worker the build carries, so every request stays on the network, where the specs and `page.route` see it.
+- **`deployable`** points the browser at the Express origin instead. Only there are the real security headers and CSP in force; `vite preview` has neither. The worker runs only here.
 
 ## Things to know
 

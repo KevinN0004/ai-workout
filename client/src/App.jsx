@@ -25,6 +25,7 @@ import { mergeOptimisticDashboard } from "./app/dashboard";
 import useApiClient from "./app/hooks/useApiClient";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
+import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
 import { fetchWithTimeout } from "./app/network";
 import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
 import { newWorkoutForm } from "./app/exerciseSets";
@@ -124,6 +125,7 @@ export default function App() {
 
   // ---- Dashboard data and the API client ------------------------------------
   const { apiFetch, ensureCsrfToken } = useApiClient();
+  const { ready: updateReady, reload: reloadForUpdate } = useWorkerUpdate();
   const isDashboardRoute = route === "/dashboard" || route.startsWith("/dashboard/");
   const dashboardCacheKey = useMemo(
     () => (user ? buildScopedCacheKey(DASHBOARD_CACHE_PREFIX, user) : ""),
@@ -514,7 +516,10 @@ export default function App() {
   // ---- The page for the route -----------------------------------------------
   // Every page renders with the session notice after it: while the session
   // check is still waiting for an answer, or after a sign-out the server could
-  // not complete, until it is dismissed or someone signs in.
+  // not complete, until it is dismissed or someone signs in. Otherwise, a new
+  // version of the app that is waiting is offered there, and loads only when
+  // the visitor presses Reload. The session notices come first, because they
+  // say what is on screen may be stale.
   const sessionNotice = sessionUnchecked ? (
     <AppNotice message="Can't reach the server to check your sign-in. Trying again..." />
   ) : signOutUnfinished && !user ? (
@@ -522,6 +527,8 @@ export default function App() {
       message="Signed out on this device, but the server could not end your session. It stays valid until it expires."
       onDismiss={() => setSignOutUnfinished(false)}
     />
+  ) : updateReady ? (
+    <AppNotice message="A new version is ready." actionLabel="Reload" onAction={reloadForUpdate} />
   ) : null;
   const withNotice = (page) => (
     <>

@@ -255,7 +255,8 @@ before touching it ([0005](docs/adr/0005-testing-across-the-wire.md) has the his
   express sets, the CSP among them, are visible; `chromium` runs the rest against the
   preview origin. `CLIENT_ORIGIN` names only the preview origin, so the `deployable`
   project also proves that `corsPolicy.js` allows the server's own origin unlisted. Adding
-  5000 back to that list would pass every test and remove the proof.
+  5000 back to that list would pass every test and remove the proof. `chromium` blocks the
+  service worker; the worker's specs run in `deployable`.
 - **Do not set `NODE_ENV=test` for the server it starts.** The process then loads,
   exports, and exits 0 with no output at all — which reads exactly like a crash.
 - **Geolocation is left denied**, so the dashboard never reaches the live weather and
