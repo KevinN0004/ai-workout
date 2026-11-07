@@ -88,6 +88,10 @@ test.describe.serial("a workout logged offline", () => {
   });
 
   test("reaches the server exactly once when the connection is back", async () => {
+    // A browser that fires no online event (Playwright's Firefox emulation)
+    // comes back on the connection probe's next 30-second tick, so the wait
+    // for the toast below needs more than the default 30-second test budget.
+    test.setTimeout(60_000);
     await context.setOffline(false);
 
     await expect(page.getByText("1 entry saved.")).toBeVisible({ timeout: 45_000 });

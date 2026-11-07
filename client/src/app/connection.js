@@ -49,6 +49,16 @@ export const markUnanswered = () => {
   notify();
 };
 
+// The probe's answer always tells subscribers to look again, even when no
+// request had gone unanswered: the store may read offline only because the
+// browser said so, and a browser can come back online without firing its
+// online event (Playwright's Firefox emulation does), which markAnswered alone
+// would never report.
+const onProbeAnswered = () => {
+  lastRequestUnanswered = false;
+  notify();
+};
+
 // Asks GET /api/health, with fetch itself rather than fetchWithTimeout, which
 // reports into this store. Any answer means the server is back; no answer
 // changes nothing.
@@ -56,7 +66,7 @@ function probe() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   fetch("/api/health", { cache: "no-store", signal: controller.signal })
-    .then(markAnswered, () => {})
+    .then(onProbeAnswered, () => {})
     .finally(() => clearTimeout(timer));
 }
 
