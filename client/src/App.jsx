@@ -22,12 +22,14 @@ import {
 } from "./app/constants";
 import { buildScopedCacheKey, readJsonCache, removeJsonCache, writeJsonCache } from "./app/cache";
 import AppNotice from "./app/components/AppNotice";
+import SignOutConfirm from "./app/components/SignOutConfirm";
 import { mergeOptimisticDashboard } from "./app/dashboard";
 import { describeAge } from "./app/describeAge";
 import useApiClient from "./app/hooks/useApiClient";
 import useConnection from "./hooks/useConnection";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
+import useOutboxReplay from "./app/hooks/useOutboxReplay";
 import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
 import { fetchWithTimeout } from "./app/network";
 import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
@@ -52,6 +54,10 @@ const PlannerSetupModal = lazy(() => import("./app/components/PlannerSetupModal"
 // answer it, in milliseconds: one delay per failed attempt, the last repeated.
 const SESSION_RETRY_DELAYS_MS = [2000, 5000, 15000, 30000];
 
+// The offline notice's second sentence: what happens to a workout, meal or
+// calorie entry logged while the server cannot be reached (app/outbox.js).
+const KEPT_ENTRIES = "Entries you log are saved on this device and sent when you reconnect.";
+
 /**
  * Routes on window.location.pathname without a router: /auth, /plan and
  * /dashboard with its subpaths each have a page, and any other path renders
@@ -75,6 +81,9 @@ export default function App() {
   const [sessionUnchecked, setSessionUnchecked] = useState(false);
   // True after a sign-out the server could not complete, until dismissed.
   const [signOutUnfinished, setSignOutUnfinished] = useState(false);
+  // How many entries kept on the device a sign-out would lose; above 0 while
+  // SignOutConfirm asks.
+  const [signOutConfirmCount, setSignOutConfirmCount] = useState(0);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -180,10 +189,23 @@ export default function App() {
     queueOptimisticLogCommit,
     clearOptimisticOperations,
     flushOptimisticOperations,
-    captureAccount
+    captureAccount,
+    removeQueuedEntry
   } = useOptimisticLogs({
     setDashboard,
-    setDashError
+    setDashError,
+    user,
+    ensureCsrfToken
+  });
+  useOutboxReplay({
+    user,
+    apiFetch,
+    ensureCsrfToken,
+    captureAccount,
+    setDashboard,
+    setDashError,
+    showDashboardToast,
+    removeQueuedEntry
   });
 
   // ---- Derived values and handlers ------------------------------------------
@@ -340,6 +362,7 @@ export default function App() {
     onAuthModeChange,
     onAuthSubmit,
     onLogout,
+    confirmSignOut,
     submitWorkout,
     submitCalories,
     submitGoals,
@@ -386,6 +409,7 @@ export default function App() {
     authForm,
     setUser,
     setSignOutUnfinished,
+    setSignOutConfirmCount,
     authAutoSignIn,
     clearOptimisticOperations,
     flushOptimisticOperations,
@@ -550,8 +574,8 @@ export default function App() {
   const describeKeptData = () => {
     const age = describeAge(readJsonCache(dashboardCacheKey)?.updatedAt, Date.now());
     return age
-      ? `Offline — showing your data from ${age}.`
-      : "Offline — showing the data saved on this device.";
+      ? `Offline — showing your data from ${age}. ${KEPT_ENTRIES}`
+      : `Offline — showing the data saved on this device. ${KEPT_ENTRIES}`;
   };
   const sessionNotice =
     user && (offline || sessionUnchecked) ? (
@@ -574,6 +598,11 @@ export default function App() {
     <>
       {page}
       {sessionNotice}
+      <SignOutConfirm
+        count={signOutConfirmCount}
+        onCancel={() => setSignOutConfirmCount(0)}
+        onConfirm={confirmSignOut}
+      />
     </>
   );
 

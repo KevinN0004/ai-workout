@@ -4,7 +4,20 @@
  * Called once, by App.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { classifySendFailure } from "../classifySendFailure";
 import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
+import { addToOutbox, readOutbox } from "../outbox";
+import { sendLog } from "../sendLog";
+
+const KEPT_MESSAGE = "Saved on this device. It will be sent when you're back online.";
+
+// An outbox entry as the dashboard shows it: pending, and marked not sent yet.
+const toKeptEntry = ({ type, item, queuedAt }) => ({
+  operationId: item.id,
+  type,
+  item: { ...item, isOptimistic: true, isQueued: true },
+  createdAt: queuedAt
+});
 
 /**
  * Owns the pending log entries and the dashboard's toast. Returns the entries,
@@ -19,8 +32,16 @@ import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
  * the toast unless the toast is offering a later entry's Undo, which stays. `setDashboard` and
  * `setDashError` are useDashboardData's: a send that succeeds replaces the
  * dashboard with the server's, and one that fails reports its error there.
+ *
+ * A log queued with an `outbox` ({ clientId, url, body }) is kept rather than
+ * lost when its send fails in a way a later send can fix: it goes to `user`'s
+ * outbox and stays on screen with `isQueued`, and a CSRF refusal is retried
+ * once with a token from `ensureCsrfToken({ refresh: true })`
+ * (docs/specs/2026-11-06-offline-ready-pwa-design.md). `user`'s kept entries
+ * are on screen from the start, and `removeQueuedEntry` takes one off once
+ * useOutboxReplay has sent it.
  */
-export default function useOptimisticLogs({ setDashboard, setDashError }) {
+export default function useOptimisticLogs({ setDashboard, setDashError, user, ensureCsrfToken }) {
   // ---- State and refs -------------------------------------------------------
   const [optimisticLogEntries, setOptimisticLogEntries] = useState([]);
   const [dashboardToast, setDashboardToast] = useState(null);
@@ -98,6 +119,17 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     );
   }, []);
 
+  // Marks an entry not sent yet, once it is kept on the device.
+  const markKept = useCallback((operationId) => {
+    setOptimisticLogEntries((current) =>
+      current.map((entry) =>
+        entry.operationId === operationId
+          ? { ...entry, item: { ...entry.item, isQueued: true } }
+          : entry
+      )
+    );
+  }, []);
+
   const clearOptimisticOperations = useCallback(() => {
     generationRef.current += 1;
     optimisticOpRef.current.forEach((operation) => {
@@ -140,8 +172,11 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
   );
 
   const queueOptimisticLogCommit = useCallback(
-    ({ type, item, request, pendingMessage, successMessage, undoMessage }) => {
+    ({ type, item, request, outbox, pendingMessage, successMessage, undoMessage }) => {
       const operationId = item.id;
+      // The account the entry is kept for, if it has to be: the one signed in
+      // when it was logged.
+      const owner = user;
       // Any earlier error clears, and the entry shows at once, ahead of any
       // already pending.
       setDashError("");
@@ -174,24 +209,34 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
             ? { ...current, message: "Saving...", actionLabel: "", onAction: null }
             : current
         );
-        try {
-          const data = await request();
-          if (!isSameAccount()) return;
-          optimisticOpRef.current.delete(operationId);
+        const { data, error } = await sendLog(request, ensureCsrfToken);
+        if (!isSameAccount()) return;
+        optimisticOpRef.current.delete(operationId);
+        if (!error) {
           removeOptimisticEntry(operationId);
           setDashboard(data.dashboard);
           // A later entry's Undo toast is left up (undoToastIdRef).
           if (!undoToastIdRef.current) showDashboardToast(successMessage || "Saved.");
-        } catch (err) {
-          if (!isSameAccount()) return;
-          optimisticOpRef.current.delete(operationId);
-          removeOptimisticEntry(operationId);
-          const message = err?.message || `Unable to save ${type}.`;
-          // The page shows the error either way; the toast yields to a later
-          // entry's Undo, as a success does.
-          setDashError(message);
-          if (!undoToastIdRef.current) showDashboardToast(message, "error");
+          return;
         }
+        // A failure a later send can fix keeps the entry on the device and on
+        // screen, marked not sent yet, for useOutboxReplay to send. One the
+        // device cannot store is reported like any other failure.
+        const kept =
+          outbox &&
+          classifySendFailure(error) !== "drop" &&
+          addToOutbox(owner, { ...outbox, type, item, queuedAt: Date.now() });
+        if (kept) {
+          markKept(operationId);
+          if (!undoToastIdRef.current) showDashboardToast(KEPT_MESSAGE);
+          return;
+        }
+        removeOptimisticEntry(operationId);
+        const message = error.message || `Unable to save ${type}.`;
+        // The page shows the error either way; the toast yields to a later
+        // entry's Undo, as a success does.
+        setDashError(message);
+        if (!undoToastIdRef.current) showDashboardToast(message, "error");
       };
 
       // Start the undo window, and offer Undo in a toast that outlasts it. The
@@ -214,13 +259,29 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
     },
     [
       captureAccount,
+      ensureCsrfToken,
+      markKept,
       removeOptimisticEntry,
       setDashError,
       setDashboard,
       showDashboardToast,
-      undoOptimisticOperation
+      undoOptimisticOperation,
+      user
     ]
   );
+
+  // The entries kept for this account are on screen from the start, and again
+  // whenever `user` is replaced, a profile save included, without doubling any.
+  useEffect(() => {
+    if (!user) return;
+    const kept = readOutbox(user).map(toKeptEntry);
+    if (!kept.length) return;
+    const keptIds = new Set(kept.map((entry) => entry.operationId));
+    setOptimisticLogEntries((current) => [
+      ...current.filter((entry) => !keptIds.has(entry.operationId)),
+      ...kept
+    ]);
+  }, [user]);
 
   // On unmount, every entry still inside its undo window is dropped, not sent.
   // clearOptimisticOperations is stable, so this runs only then.
@@ -232,6 +293,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError }) {
 
   return {
     optimisticLogEntries,
+    removeQueuedEntry: removeOptimisticEntry,
     dashboardToast,
     clearDashboardToast,
     showDashboardToast,

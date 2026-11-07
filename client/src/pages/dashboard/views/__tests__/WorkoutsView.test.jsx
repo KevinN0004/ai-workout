@@ -631,3 +631,21 @@ describe("progress", () => {
     expect(screen.queryByText("PR")).toBeNull();
   });
 });
+
+// An entry kept on the device because its send failed says so, until the
+// server has it (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("entries not sent yet", () => {
+  test.each([
+    ["workouts", "workouts"],
+    ["calories", "calories"],
+    ["meals", "mealLogs"]
+  ])("a kept %s row says Not sent yet, and a saved one does not", (name, prop) => {
+    renderView({
+      [prop]: [dated("2026-01-02", { isQueued: true }), dated("2026-01-01")]
+    });
+
+    const [kept, sent] = rowsIn(name);
+    expect(within(kept).getByText("Not sent yet")).toBeInTheDocument();
+    expect(within(sent).queryByText("Not sent yet")).not.toBeInTheDocument();
+  });
+});

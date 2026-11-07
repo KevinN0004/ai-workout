@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";
+import { addToOutbox, readOutbox } from "../outbox.js";
 import { newCard } from "../exerciseSets";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -1045,5 +1046,121 @@ describe("deleteAccount", () => {
         expect(window.localStorage.getItem(SESSION_CACHE_KEY)).not.toBeNull();
       });
     });
+  });
+});
+
+// Each log says how to send it again, so a failed send can be kept on the
+// device (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("each log's outbox", () => {
+  describe.each([
+    ["a workout", "submitWorkout", "/api/dashboard/workout-sessions", {}],
+    ["calories", "submitCalories", "/api/dashboard/calories", {}],
+    [
+      "a meal",
+      "submitMealLog",
+      "/api/dashboard/meal-logs",
+      {
+        mealLogForm: { date: "2026-03-01", mealType: "lunch", name: "Rice bowl", calories: "600" },
+        setMealLogForm: () => {}
+      }
+    ]
+  ])("%s", (_label, method, url, extraDeps) => {
+    test("names its replay key, its path and the body it sends", async () => {
+      const { deps, handlers } = buildDeps(extraDeps);
+      await handlers[method](submitEvent());
+
+      const { outbox, request } = deps.queueOptimisticLogCommit.mock.calls[0][0];
+      await request();
+      const sent = JSON.parse(deps.apiFetch.mock.calls[0][1].body);
+
+      expect(outbox).toEqual({ clientId: sent.id, url, body: sent });
+    });
+  });
+});
+
+// Entries that never reached the server are lost on sign-out, so it asks
+// first (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("signing out with entries not yet sent", () => {
+  const user = { email: "person@example.com" };
+  const keepEntry = (clientId) =>
+    addToOutbox(user, {
+      clientId,
+      type: "workout",
+      url: "/api/dashboard/workout-sessions",
+      body: { id: clientId },
+      item: { id: `op-${clientId}` },
+      queuedAt: 1
+    });
+  const signOutDeps = () => ({
+    user,
+    go: vi.fn(),
+    setUser: vi.fn(),
+    setSignOutUnfinished: vi.fn(),
+    setSignOutConfirmCount: vi.fn(),
+    clearOptimisticOperations: vi.fn(),
+    clearDashboardDataState: vi.fn(),
+    clearDashboardToast: vi.fn(),
+    resetPersonalFlow: vi.fn(),
+    apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  test("asks first, naming how many, and signs nobody out yet", async () => {
+    keepEntry("k1");
+    keepEntry("k2");
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.onLogout();
+
+    expect(deps.setSignOutConfirmCount).toHaveBeenCalledWith(2);
+    expect(deps.setUser).not.toHaveBeenCalled();
+    expect(deps.apiFetch).not.toHaveBeenCalled();
+    expect(readOutbox(user)).toHaveLength(2);
+  });
+
+  test("sends what it can first, and asks only about what is still unsent", async () => {
+    const deps = signOutDeps();
+    deps.flushOptimisticOperations = vi.fn(async () => {
+      keepEntry("k1");
+    });
+    const { handlers } = buildDeps(deps);
+
+    await handlers.onLogout();
+
+    expect(deps.setSignOutConfirmCount).toHaveBeenCalledWith(1);
+  });
+
+  test("signs out at once when nothing is waiting", async () => {
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.onLogout();
+
+    expect(deps.setSignOutConfirmCount).not.toHaveBeenCalled();
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+  });
+
+  test("Sign out anyway signs out and lets the entries go", async () => {
+    keepEntry("k1");
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.confirmSignOut();
+
+    expect(deps.setSignOutConfirmCount).toHaveBeenCalledWith(0);
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+    expect(deps.go).toHaveBeenCalledWith("/");
+    expect(readOutbox(user)).toEqual([]);
+  });
+
+  test("account deletion lets them go without asking", async () => {
+    keepEntry("k1");
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.deleteAccount("old-pass");
+
+    expect(deps.setSignOutConfirmCount).not.toHaveBeenCalled();
+    expect(readOutbox(user)).toEqual([]);
   });
 });

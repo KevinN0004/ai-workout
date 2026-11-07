@@ -50,6 +50,7 @@ vi.mock("../app/hooks/useWorkerUpdate", () => ({
 import App from "../App";
 import { DASHBOARD_CACHE_PREFIX, SESSION_CACHE_KEY, goalOptions } from "../app/constants";
 import { markUnanswered } from "../app/connection";
+import { addToOutbox, readOutbox } from "../app/outbox";
 
 const setPath = (path) => {
   window.history.pushState({}, "", path);
@@ -362,7 +363,8 @@ describe("App", () => {
   describe("opening offline", () => {
     const ada = { email: "ada@example.com", profile: { firstName: "Ada" } };
     const NOW = Date.UTC(2026, 10, 7, 12, 0, 0);
-    const OFFLINE_NOTICE = /^Offline — showing your data from 2 h ago\.$/;
+    const KEPT = "Entries you log are saved on this device and sent when you reconnect.";
+    const OFFLINE_NOTICE = `Offline — showing your data from 2 h ago. ${KEPT}`;
     const cachedSession = () => JSON.parse(localStorage.getItem(SESSION_CACHE_KEY) || "null");
     const cacheSession = (user) =>
       localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ user }));
@@ -407,7 +409,7 @@ describe("App", () => {
       await renderSettled("/dashboard");
 
       expect(screen.getByRole("status")).toHaveTextContent(
-        /^Offline — showing the data saved on this device\.$/
+        `Offline — showing the data saved on this device. ${KEPT}`
       );
     });
 
@@ -543,6 +545,98 @@ describe("App", () => {
 
       expect(dash.props.user).toEqual(ada);
       expect(screen.getByRole("status")).toHaveTextContent(/^Offline — /);
+    });
+  });
+
+  // Entries kept on the device are sent once App has a user and a connection,
+  // and a sign-out that would lose them asks first
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+  describe("entries kept on the device", () => {
+    const ada = { email: "ada@example.com" };
+    const keepEntry = () =>
+      addToOutbox(ada, {
+        clientId: "k1",
+        type: "workout",
+        url: "/api/dashboard/workout-sessions",
+        body: { id: "k1", focus: "Kept" },
+        item: { id: "op-k1", focus: "Kept" },
+        queuedAt: 1
+      });
+
+    beforeEach(() => {
+      document.cookie = "csrfToken=kept-token";
+    });
+
+    afterEach(() => {
+      document.cookie = "csrfToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.clear();
+    });
+
+    test("are sent once the user is signed in, and leave the device", async () => {
+      keepEntry();
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? sessionResponse({ user: ada })()
+          : sessionResponse({ dashboard: { workouts: [] } })()
+      );
+      await renderSettled("/dashboard");
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const sent = fetch.mock.calls.filter(([url]) => url === "/api/dashboard/workout-sessions");
+      expect(sent).toHaveLength(1);
+      expect(JSON.parse(sent[0][1].body)).toEqual({ id: "k1", focus: "Kept" });
+      expect(readOutbox(ada)).toEqual([]);
+    });
+
+    test("a sign-out that would lose them asks, and Sign out anyway signs out", async () => {
+      keepEntry();
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? sessionResponse({ user: ada })()
+          : url === "/api/dashboard/workout-sessions"
+            ? Promise.reject(new TypeError("Failed to fetch"))
+            : sessionResponse({})()
+      );
+      await renderSettled("/dashboard");
+
+      await act(async () => {
+        await dash.props.onLogout();
+      });
+      expect(screen.getByRole("dialog", { name: "Sign out?" })).toBeInTheDocument();
+      expect(dash.props.user).toEqual(ada);
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Sign out anyway" }).click();
+      });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(home.props.user).toBeNull();
+      expect(readOutbox(ada)).toEqual([]);
+    });
+
+    test("Cancel keeps the visitor signed in, and the entries", async () => {
+      keepEntry();
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? sessionResponse({ user: ada })()
+          : url === "/api/dashboard/workout-sessions"
+            ? Promise.reject(new TypeError("Failed to fetch"))
+            : sessionResponse({})()
+      );
+      await renderSettled("/dashboard");
+      await act(async () => {
+        await dash.props.onLogout();
+      });
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Cancel" }).click();
+      });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(dash.props.user).toEqual(ada);
+      expect(readOutbox(ada)).toHaveLength(1);
     });
   });
 

@@ -208,6 +208,8 @@ export const AIR_QUALITY_CACHE_PREFIX = "ai-workout-air-cache-v1";
 // The last signed-in user, so the app opens offline: one entry, not per
 // account, removed on sign-out, account deletion and a 401.
 export const SESSION_CACHE_KEY = "ai-workout-session-cache-v1";
+// The entries the server has not confirmed, per account (app/outbox.js).
+export const OUTBOX_CACHE_PREFIX = "ai-workout-outbox-v1";
 export const OPTIMISTIC_UNDO_WINDOW_MS = 4500;
 export const CSRF_COOKIE_NAME = "csrfToken";
 export const CSRF_HEADER_NAME = "x-csrf-token";

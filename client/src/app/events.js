@@ -13,7 +13,9 @@ import {
   defaultSignupProfileForm
 } from "./constants";
 import { newWorkoutForm, toExerciseSets } from "./exerciseSets";
+import { clearOutbox, readOutbox } from "./outbox";
 import { personalToProfile } from "./profileMapping";
+import { postLog } from "./sendLog";
 import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
 
 // The longest logout waits for the sends it flushes, in milliseconds. A save
@@ -84,8 +86,11 @@ const downloadPlanPdfFromText = async (planText) => {
  * logout runs before anything else and waits on for at most
  * LOGOUT_FLUSH_CAP_MS; and the resets logout and account
  * deletion run, `clearOptimisticOperations`, `clearDashboardDataState`,
- * `clearDashboardToast` and `resetPersonalFlow`; and `setSignOutUnfinished`,
- * which logout sets when the server could not end the session.
+ * `clearDashboardToast` and `resetPersonalFlow`; `setSignOutUnfinished`,
+ * which logout sets when the server could not end the session; and
+ * `setSignOutConfirmCount`, which logout sets to the number of entries kept on
+ * the device and still unsent, for SignOutConfirm to ask about, and
+ * `confirmSignOut` sets back to 0.
  */
 export const createAppEventHandlers = ({
   apiFetch,
@@ -123,6 +128,7 @@ export const createAppEventHandlers = ({
   authForm,
   setUser,
   setSignOutUnfinished,
+  setSignOutConfirmCount,
   authAutoSignIn,
   clearOptimisticOperations,
   flushOptimisticOperations,
@@ -344,14 +350,9 @@ export const createAppEventHandlers = ({
     }
   };
 
-  const onLogout = async () => {
-    // The entries still inside their undo window go first, on this account's
-    // session: their toast said they were saved, and the server refuses them
-    // once the session ends. The flush waits for every send this account
-    // started, but for no longer than LOGOUT_FLUSH_CAP_MS. A send still
-    // running then may be lost, because logout goes ahead without it rather
-    // than leaving the user signed in behind a request that may never answer.
-    await settleWithin(flushOptimisticOperations(), LOGOUT_FLUSH_CAP_MS);
+  // Ends the session on the server if it can, and clears this browser of the
+  // account either way.
+  const signOut = async () => {
     // Signing out locally must not depend on the request succeeding. The button
     // is wired straight to this, so an uncaught rejection would skip every clear
     // below and leave the previous account's dashboard on screen, with no sign
@@ -382,6 +383,32 @@ export const createAppEventHandlers = ({
     // Any answer but OK, the server's 503 included, means the session may still
     // be valid in the store until it expires, so the visitor is told.
     setSignOutUnfinished(!sessionEnded);
+  };
+
+  const onLogout = async () => {
+    // The entries still inside their undo window go first, on this account's
+    // session: their toast said they were saved, and the server refuses them
+    // once the session ends. The flush waits for every send this account
+    // started, but for no longer than LOGOUT_FLUSH_CAP_MS. A send still
+    // running then may be lost, because logout goes ahead without it rather
+    // than leaving the user signed in behind a request that may never answer.
+    await settleWithin(flushOptimisticOperations(), LOGOUT_FLUSH_CAP_MS);
+    // Entries kept on the device that still could not be sent are lost on
+    // sign-out, so it asks first; SignOutConfirm's Sign out anyway runs
+    // confirmSignOut (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+    const unsent = readOutbox(user).length;
+    if (unsent) {
+      setSignOutConfirmCount(unsent);
+      return;
+    }
+    await signOut();
+  };
+
+  // Signs out after the visitor chose to let the unsent entries go.
+  const confirmSignOut = async () => {
+    setSignOutConfirmCount(0);
+    clearOutbox(user);
+    await signOut();
   };
 
   const submitWorkout = async (event) => {
@@ -431,18 +458,13 @@ export const createAppEventHandlers = ({
     queueOptimisticLogCommit({
       type: "workout",
       item: optimisticWorkout,
-      request: async () => {
-        const res = await apiFetch("/api/dashboard/workout-sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const errorPayload = await res.json().catch(() => ({}));
-          throw new Error(errorPayload?.error || "Unable to save workout.");
-        }
-        return res.json();
-      },
+      request: () =>
+        postLog(
+          apiFetch,
+          { url: "/api/dashboard/workout-sessions", body: payload },
+          "Unable to save workout."
+        ),
+      outbox: { clientId: payload.id, url: "/api/dashboard/workout-sessions", body: payload },
       pendingMessage: "Workout added. Undo?",
       successMessage: "Workout saved.",
       undoMessage: "Workout entry removed."
@@ -470,18 +492,13 @@ export const createAppEventHandlers = ({
         calories: Number(calorieForm.calories || 0),
         createdAt: new Date().toISOString()
       },
-      request: async () => {
-        const res = await apiFetch("/api/dashboard/calories", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const errorPayload = await res.json().catch(() => ({}));
-          throw new Error(errorPayload?.error || "Unable to save calories.");
-        }
-        return res.json();
-      },
+      request: () =>
+        postLog(
+          apiFetch,
+          { url: "/api/dashboard/calories", body: payload },
+          "Unable to save calories."
+        ),
+      outbox: { clientId: payload.id, url: "/api/dashboard/calories", body: payload },
       pendingMessage: "Calories added. Undo?",
       successMessage: "Calories logged.",
       undoMessage: "Calorie entry removed."
@@ -630,6 +647,8 @@ export const createAppEventHandlers = ({
     resetPersonalFlow();
     scopedCacheKeysToClear.forEach(removeJsonCache);
     removeJsonCache(SESSION_CACHE_KEY);
+    // The account is gone, so its unsent entries can never be sent.
+    clearOutbox(user);
     go("/");
     return { ok: true };
   };
@@ -654,18 +673,13 @@ export const createAppEventHandlers = ({
         notes: mealLogForm.notes || "",
         loggedAt: new Date().toISOString()
       },
-      request: async () => {
-        const res = await apiFetch("/api/dashboard/meal-logs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const errorPayload = await res.json().catch(() => ({}));
-          throw new Error(errorPayload?.error || "Unable to save meal log.");
-        }
-        return res.json();
-      },
+      request: () =>
+        postLog(
+          apiFetch,
+          { url: "/api/dashboard/meal-logs", body: payload },
+          "Unable to save meal log."
+        ),
+      outbox: { clientId: payload.id, url: "/api/dashboard/meal-logs", body: payload },
       pendingMessage: "Meal added. Undo?",
       successMessage: "Meal logged.",
       undoMessage: "Meal entry removed."
@@ -780,6 +794,7 @@ export const createAppEventHandlers = ({
     onAuthModeChange,
     onAuthSubmit,
     onLogout,
+    confirmSignOut,
     submitWorkout,
     submitCalories,
     submitGoals,
