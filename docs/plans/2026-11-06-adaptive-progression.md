@@ -16,7 +16,51 @@ wins.
 **Tech Stack:** Express 5, zod, Prisma with Postgres, React 19, Vitest 5 with v8 coverage,
 supertest, Testing Library, Playwright 1.64, Node 24, GitHub Actions, gh CLI.
 
-**Status: not started.** Every file and line below was read on `ddc46f6`.
+**Status: done 2026-11-07** (#360 to #365, all live; main `9b7edd4`). These are the places
+the work goes past or departs from the text below.
+
+- **#361 settled five rules the spec left open.**
+  - A bodyweight lift is a library entry that needs no dumbbell, kettlebell, barbell, cable
+    or machine. "Inverted row under a racked barbell" needs a barbell only to hang from,
+    and is the one listed exception (`BODYWEIGHT_IDS`).
+  - The lightest-step floor reads the kg `from`. A lift at one step in pounds (under
+    7.5 lb) is always at one step in kg, so the kg floor covers both units and the two
+    never disagree on a deload.
+  - Every read of a lift stays inside the 28 days before the week, the rising-RPE run
+    included. A session in the current week counts from next week, so a week's targets do
+    not move while it is trained.
+  - A session's average RPE is taken over the sets at its working load that carry one. A
+    session with none of them breaks a rising run.
+  - An undone or declined change keeps its rule's `why`, and `decision` says it was
+    answered.
+- **The spec's "though an earlier week had one" needs no check of its own.** A lift with a
+  working load always has a workout before the week before, so the missed-week deload
+  reads the week before alone.
+- **The plan gate's progression sweep runs every main-sweep input** (11,970, under eight
+  histories, in about 22 s), and asserts that each kind of change is reached. One mutant
+  passes the gate and fails the unit tests: dropping the library-flag half of the injury
+  rule, since the generator never puts a lift flagged for a named area in a plan.
+- **#362's route tests insert their plan with Prisma,** not through `/api/generate`:
+  index.js builds its Gemini client from `server/.env` when it loads. The path, not the
+  trimmed key, decides a lift's answer from the week's, because a key of spaces trims to
+  the week's `''`. A stubbed-deps file covers the user-gone 404 and the 500s.
+- **#363 differs from Task 4 in four places.**
+  - App passes `apiFetch` to DashboardPage, which Task 4's file list left out.
+  - `buildPlanDayPrefill` takes the region's unit as a third argument, read once by
+    PlansView, so the helper stays pure.
+  - A timed exercise never takes a lift's load, even when another day prescribes the same
+    name in reps; a surviving mutant found the case.
+  - The axe scan of the day details runs in `plan.spec.js`, the only spec with a plan and
+    a logged week. `a11y.spec.js`'s account has no plan.
+- **#363 grew the main chunk by 1,847 bytes**, from 462,521 to 464,368. About 490 bytes are
+  `planUtils`'s additions, which are eager because the summary's metrics import the module,
+  and about 1,360 the hook, the summary's line and the wiring; `WeekProgression` stays in
+  the lazy PlansView chunk. Each part was measured by building without it.
+- **Task 5 raised both sides.** The client's branch floor went from 95.1 to 95.3 (#364).
+  The server's four went to 96.7 / 91.9 / 97.5 / 97.4 (#365), which leaves its function
+  slack at exactly 0.
+
+Every file and line below was read on `ddc46f6`.
 
 ---
 
