@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlannerSetupModal from "../PlannerSetupModal";
+import { markUnanswered } from "../../connection";
 import { equipmentOptionsByEnv, quickFocuses } from "../../constants";
 
 // The four-step planner a visitor actually fills in. The equipment logic
@@ -454,3 +455,18 @@ function formWith(overrides) {
     ...overrides
   };
 }
+
+// A plan is built by the server, so Generate waits for a connection
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("PlannerSetupModal offline", () => {
+  test("disables Generate workout and says why", () => {
+    markUnanswered();
+    const { onSubmit } = renderModal({ plannerStep: 4 });
+
+    const generate = screen.getByRole("button", { name: "Generate workout" });
+    expect(generate).toBeDisabled();
+    expect(screen.getByText("You're offline")).toBeInTheDocument();
+    fireEvent.click(generate);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

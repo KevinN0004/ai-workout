@@ -3,6 +3,8 @@
  * lift's load in the region's unit, its change and why, with Undo, or Go up and
  * Keep, and the deload week's banner with Train normally.
  */
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import { liftKeyOf } from "../planUtils";
 
 // What each change reads as, from the load in the unit shown.
@@ -27,8 +29,8 @@ const CHANGE_ANSWERS = {
 // A button whose visible label is short and whose full name, read by assistive
 // technology, says what it acts on. The space is its own text node: one at the
 // start of the hidden span is trimmed from the name.
-const AnswerButton = ({ label, rest, onClick }) => (
-  <button type="button" className="ghost week-lift-answer" onClick={onClick}>
+const AnswerButton = ({ label, rest, onClick, disabled }) => (
+  <button type="button" className="ghost week-lift-answer" onClick={onClick} disabled={disabled}>
     {label} <span className="visually-hidden">{rest}</span>
   </button>
 );
@@ -38,10 +40,12 @@ const AnswerButton = ({ label, rest, onClick }) => (
  * a line per lift the week holds, in the day's order, with loads in kg or lb
  * by `system`. Every answer goes through `onAnswer({ liftKey, decision })`,
  * the week's own without a `liftKey`, and a null decision takes one back.
+ * Offline, every answer is disabled: the server keeps them.
  * `error` is why the last answer failed. Nothing renders without a week, or
  * when the day holds none of its lifts outside a deload week.
  */
 export default function WeekProgression({ week, prescriptions, system, onAnswer, error }) {
+  const offline = useConnection() === "offline";
   if (!week) return null;
   const unit = system === "imperial" ? "lb" : "kg";
   const byKey = new Map(week.lifts.map((lift) => [lift.key, lift]));
@@ -55,6 +59,7 @@ export default function WeekProgression({ week, prescriptions, system, onAnswer,
   return (
     <section className="week-progression" aria-labelledby="week-progression-heading">
       <h4 id="week-progression-heading">This week&apos;s loads</h4>
+      <OfflineHint />
 
       {/* ---- The deload week ---- */}
       {deloadWeek?.active && deloadWeek.decision === null ? (
@@ -62,7 +67,12 @@ export default function WeekProgression({ week, prescriptions, system, onAnswer,
           <p>
             <strong>Lighter week:</strong> {deloadWeek.reason}
           </p>
-          <button type="button" className="ghost" onClick={() => onAnswer({ decision: "normal" })}>
+          <button
+            type="button"
+            className="ghost"
+            disabled={offline}
+            onClick={() => onAnswer({ decision: "normal" })}
+          >
             Train normally
           </button>
         </div>
@@ -73,6 +83,7 @@ export default function WeekProgression({ week, prescriptions, system, onAnswer,
           <AnswerButton
             label="Take back"
             rest="training normally"
+            disabled={offline}
             onClick={() => onAnswer({ decision: null })}
           />
         </div>
@@ -100,6 +111,7 @@ export default function WeekProgression({ week, prescriptions, system, onAnswer,
                         key={label}
                         label={label}
                         rest={`${rest} ${lift.name}`}
+                        disabled={offline}
                         onClick={() => onAnswer({ liftKey: lift.key, decision })}
                       />
                     ))}

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import SettingsAccountPanel from "../SettingsAccountPanel";
+import { markUnanswered } from "../../../../app/connection";
 
 // Two independent, unrelated flows in one panel: changing a password and
 // deleting the account. Both handlers resolve to { ok } / { ok, error } and
@@ -263,5 +264,20 @@ describe("SettingsAccountPanel", () => {
         expect(screen.getByRole("button", { name: "Confirm deletion" })).toBeEnabled()
       );
     });
+  });
+});
+
+// A password change and a deletion need the server, so both wait for a
+// connection (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("SettingsAccountPanel offline", () => {
+  test("disables Change password and Confirm deletion, and says why", async () => {
+    markUnanswered();
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "Change password" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    expect(screen.getByRole("button", { name: "Confirm deletion" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.getAllByText("You're offline")).toHaveLength(2);
   });
 });

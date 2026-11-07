@@ -2,13 +2,16 @@
  * The dashboard's Goal view: calories and progress metrics, each with its form
  * and log, and the goals form. Rendered by DashboardPage, which loads it lazily.
  */
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import "./CaloriesView.css";
 
 /**
  * The calorie, goals and progress-metric forms are controlled by App's state
  * and saved by the matching handlers in events.js; the header's Save goals
  * button submits the goals form by its id. The averages, chart series, day keys
- * and pace text come from useDashboardMetrics.
+ * and pace text come from useDashboardMetrics. Offline, Save goals and Save
+ * metric are disabled: neither can be kept for later, as a calorie entry is.
  */
 export default function CaloriesView({
   goalForm,
@@ -38,6 +41,7 @@ export default function CaloriesView({
   // useDashboardMetrics already hands over arrays.
   const calorieEntries = Array.isArray(calories) ? calories : [];
   const metricEntries = Array.isArray(progressMetrics) ? progressMetrics : [];
+  const offline = useConnection() === "offline";
 
   return (
     <section className="panel goal-view">
@@ -48,9 +52,10 @@ export default function CaloriesView({
             Target weight: {goalForm.targetWeight ? `${goalForm.targetWeight} lb` : "not set"}
           </p>
         </div>
-        <button className="cta" type="submit" form="goals-form">
+        <button className="cta" type="submit" form="goals-form" disabled={offline}>
           Save goals
         </button>
+        <OfflineHint />
       </header>
       <div className="goal-layout">
         <div className="goal-main">
@@ -296,9 +301,10 @@ export default function CaloriesView({
                   placeholder="Weekly check-in"
                 />
               </label>
-              <button className="ghost goal-action-button" type="submit">
+              <button className="ghost goal-action-button" type="submit" disabled={offline}>
                 Save metric
               </button>
+              <OfflineHint />
             </form>
 
             <div className="goal-list">

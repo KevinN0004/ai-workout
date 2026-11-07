@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { fetchWithTimeout } from "../network.js";
+import { getConnection, markAnswered, markUnanswered } from "../connection.js";
 
 const abortError = () => {
   const error = new Error("The operation was aborted.");
@@ -85,5 +86,39 @@ describe("fetchWithTimeout", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// Every request reports whether it got an answer, which is how the page knows
+// it is offline when the browser still says it is online
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("what fetchWithTimeout tells the connection store", () => {
+  afterEach(() => {
+    markAnswered();
+  });
+
+  test("an answer, even an error status, counts as answered", async () => {
+    markUnanswered();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await fetchWithTimeout("/api/thing");
+
+    expect(getConnection()).toBe("online");
+  });
+
+  test("a network error counts as no answer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(fetchWithTimeout("/api/thing")).rejects.toThrow("Failed to fetch");
+
+    expect(getConnection()).toBe("offline");
+  });
+
+  test("a timeout counts as no answer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(abortError()));
+
+    await expect(fetchWithTimeout("/api/thing")).rejects.toThrow("Request timed out.");
+
+    expect(getConnection()).toBe("offline");
   });
 });

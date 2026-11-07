@@ -3,13 +3,16 @@
  * category, name, equipment and the top reason, with a Save button. Rendered by
  * TipsView.
  */
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import { getExerciseImage } from "./recommendationUtils";
 
 /**
  * `recommendation` is the exercise's scoreExercise entry for a smart pick, and
  * absent in the exercise list. Opening the card hands `onOpen` the exercise
  * with that entry attached, so the details modal can list its reasons; `onSave`
- * receives the exercise and the entry.
+ * receives the exercise and the entry. Offline, Save is disabled: a saved
+ * exercise cannot be kept for later.
  */
 export default function ExerciseTile({
   exercise,
@@ -20,6 +23,7 @@ export default function ExerciseTile({
   isSaving
 }) {
   const imageUrl = getExerciseImage(exercise);
+  const offline = useConnection() === "offline";
   const equipmentText = (exercise.equipment || [])
     .map((item) => item?.name)
     .filter(Boolean)
@@ -53,11 +57,12 @@ export default function ExerciseTile({
         <button
           type="button"
           className="ghost save-chip"
-          disabled={saved || isSaving}
+          disabled={saved || isSaving || offline}
           onClick={() => onSave(exercise, recommendation)}
         >
           {saved ? "Saved" : isSaving ? "Saving..." : "Save to plan"}
         </button>
+        <OfflineHint />
       </div>
     </article>
   );

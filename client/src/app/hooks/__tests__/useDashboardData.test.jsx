@@ -232,6 +232,36 @@ describe("useDashboardData", () => {
       expect(stored.dashboard).toEqual(dashboard);
     });
 
+    // The cache's updatedAt is the age App's offline notice reports
+    // (docs/specs/2026-11-06-offline-ready-pwa-design.md). Writing a restored
+    // copy back with a new time would report hours-old data as fresh.
+    test("keeps the cached copy's age when it is shown, until the server's copy arrives", async () => {
+      const cached = { workouts: [{ id: "cached" }], goals: {} };
+      const savedAt = Date.now() - 2 * 60 * 60 * 1000;
+      window.localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ dashboard: cached, updatedAt: savedAt })
+      );
+      const answer = deferred();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => answer.promise)
+      );
+
+      const { result } = render();
+
+      await waitFor(() => expect(result.current.dashboard).toEqual(cached));
+      expect(JSON.parse(window.localStorage.getItem(CACHE_KEY)).updatedAt).toBe(savedAt);
+
+      const fresh = { workouts: [{ id: "fresh" }], goals: {} };
+      await act(async () => {
+        answer.resolve(jsonResponse({ dashboard: fresh }));
+      });
+
+      await waitFor(() => expect(result.current.dashboard).toEqual(fresh));
+      expect(JSON.parse(window.localStorage.getItem(CACHE_KEY)).updatedAt).toBeGreaterThan(savedAt);
+    });
+
     test("survives unparseable cached JSON", async () => {
       window.localStorage.setItem(CACHE_KEY, "{not json");
       vi.stubGlobal(

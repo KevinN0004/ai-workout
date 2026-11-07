@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlansView from "../PlansView";
+import { markUnanswered } from "../../../../app/connection";
 import { buildPlanDayPrefill } from "../../planUtils";
 
 // Prop-driven throughout -- no fetching -- so this drives the parts a visitor
@@ -647,5 +648,20 @@ describe("the week's progression", () => {
     const [squatCard] = loggedCards(setWorkoutForm);
     expect(squatCard.targets).toEqual({ amount: "3-5", rpe: "8" });
     expect(squatCard.sets).toHaveLength(3);
+  });
+});
+
+// Removing a saved exercise cannot be kept for later, so it waits for a
+// connection (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("PlansView offline", () => {
+  test("disables Remove on a saved exercise and says why", () => {
+    markUnanswered();
+    const { onRemoveSavedExercise } = renderView(withSaved(1));
+
+    const remove = screen.getByRole("button", { name: "Remove" });
+    expect(remove).toBeDisabled();
+    expect(screen.getByText("You're offline")).toBeInTheDocument();
+    fireEvent.click(remove);
+    expect(onRemoveSavedExercise).not.toHaveBeenCalled();
   });
 });

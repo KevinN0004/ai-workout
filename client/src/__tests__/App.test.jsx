@@ -48,7 +48,8 @@ vi.mock("../app/hooks/useWorkerUpdate", () => ({
 }));
 
 import App from "../App";
-import { goalOptions } from "../app/constants";
+import { DASHBOARD_CACHE_PREFIX, SESSION_CACHE_KEY, goalOptions } from "../app/constants";
+import { markUnanswered } from "../app/connection";
 
 const setPath = (path) => {
   window.history.pushState({}, "", path);
@@ -89,6 +90,9 @@ describe("App", () => {
     home.props = null;
     dash.props = null;
     stubSession(sessionResponse({}, false));
+    // A signed-in test keeps its user on the device; the next test starts
+    // with none, or a session check with no answer would sign that user in.
+    localStorage.removeItem(SESSION_CACHE_KEY);
   });
 
   afterEach(() => {
@@ -349,6 +353,196 @@ describe("App", () => {
       });
 
       expect(sessionLookups()).toBe(1);
+    });
+  });
+
+  // The last signed-in user stays on the device, so the app opens with no
+  // signal, and while the server wakes, from its cached dashboard
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+  describe("opening offline", () => {
+    const ada = { email: "ada@example.com", profile: { firstName: "Ada" } };
+    const NOW = Date.UTC(2026, 10, 7, 12, 0, 0);
+    const OFFLINE_NOTICE = /^Offline — showing your data from 2 h ago\.$/;
+    const cachedSession = () => JSON.parse(localStorage.getItem(SESSION_CACHE_KEY) || "null");
+    const cacheSession = (user) =>
+      localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ user }));
+    const cacheDashboard = (user, updatedAt) =>
+      localStorage.setItem(
+        `${DASHBOARD_CACHE_PREFIX}:${user.email}`,
+        JSON.stringify({ dashboard: { workouts: [] }, updatedAt })
+      );
+    const noAnswer = () => Promise.reject(new TypeError("Failed to fetch"));
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      localStorage.clear();
+    });
+
+    test("a signed-in answer is kept on the device", async () => {
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/dashboard");
+
+      expect(cachedSession()).toEqual({ user: ada });
+    });
+
+    test("with no answer, the kept user is signed in from the device, and told so", async () => {
+      cacheSession(ada);
+      cacheDashboard(ada, NOW - 2 * 60 * 60 * 1000);
+      stubSession(noAnswer);
+      await renderSettled("/dashboard");
+
+      expect(dash.props.user).toEqual(ada);
+      expect(screen.getByRole("status")).toHaveTextContent(OFFLINE_NOTICE);
+      expect(screen.queryByText(SESSION_NOTICE)).not.toBeInTheDocument();
+    });
+
+    test("leaves the age out when no dashboard is kept", async () => {
+      cacheSession(ada);
+      stubSession(noAnswer);
+      await renderSettled("/dashboard");
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /^Offline — showing the data saved on this device\.$/
+      );
+    });
+
+    test("keeps asking, and the server's answer takes over once it comes", async () => {
+      const grace = { email: "grace@example.com" };
+      cacheSession(ada);
+      const answers = [noAnswer, noAnswer, sessionResponse({ user: grace })];
+      stubSession((url) => (url === "/api/auth/me" ? answers.shift()() : noAnswer()));
+      await renderSettled("/dashboard");
+      expect(dash.props.user).toEqual(ada);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(dash.props.user).toEqual(ada);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(dash.props.user).toEqual(grace);
+      expect(cachedSession()).toEqual({ user: grace });
+    });
+
+    // Two checks with no answer first: the kept user is read from the device
+    // once, so the 401 still recognises the user it signed in.
+    test("a 401 after that signs the kept user out and forgets them", async () => {
+      cacheSession(ada);
+      const answers = [noAnswer, noAnswer, sessionResponse({}, false)];
+      stubSession((url) => (url === "/api/auth/me" ? answers.shift()() : noAnswer()));
+      await renderSettled("/dashboard");
+      expect(dash.props.user).toEqual(ada);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(dash.props.user).toEqual(ada);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(dash.props.user).toBeNull();
+      expect(cachedSession()).toBeNull();
+    });
+
+    test("a 401 forgets a kept user it never showed", async () => {
+      cacheSession(ada);
+      await renderSettled("/");
+
+      expect(cachedSession()).toBeNull();
+      expect(home.props.user).toBeNull();
+    });
+
+    test("a 401 does not sign out someone who signed in while it was on its way", async () => {
+      let answerCheck;
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? new Promise((resolve) => {
+              answerCheck = resolve;
+            })
+          : sessionResponse({ user: ada })()
+      );
+      document.cookie = "csrfToken=race-token";
+      try {
+        setPath("/auth");
+        render(<App />);
+        await act(async () => {
+          await auth.props.onAuthSubmit({ preventDefault: () => {} });
+        });
+        expect(dash.props?.user ?? null).toEqual(ada);
+
+        await act(async () => {
+          answerCheck({ ok: false, status: 401, json: async () => ({}) });
+        });
+
+        expect(dash.props.user).toEqual(ada);
+      } finally {
+        document.cookie = "csrfToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
+    });
+
+    // The device still holds Grace because it refuses to store Ada, as a full
+    // or locked-down storage does while it still reads.
+    test("a check with no answer does not replace someone who signed in meanwhile", async () => {
+      cacheSession({ email: "grace@example.com" });
+      const setItem = Storage.prototype.setItem;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (key, value) {
+        if (key === SESSION_CACHE_KEY)
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        return setItem.call(this, key, value);
+      });
+      let failCheck;
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? new Promise((_resolve, reject) => {
+              failCheck = reject;
+            })
+          : sessionResponse({ user: ada })()
+      );
+      document.cookie = "csrfToken=race-token";
+      try {
+        setPath("/auth");
+        render(<App />);
+        await act(async () => {
+          await auth.props.onAuthSubmit({ preventDefault: () => {} });
+        });
+
+        await act(async () => {
+          failCheck(new TypeError("Failed to fetch"));
+        });
+
+        expect(dash.props.user).toEqual(ada);
+      } finally {
+        document.cookie = "csrfToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
+    });
+
+    test("a request that gets no answer later shows the notice for a signed-in user", async () => {
+      cacheDashboard(ada, NOW - 2 * 60 * 60 * 1000);
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/dashboard");
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+      act(() => markUnanswered());
+
+      expect(screen.getByRole("status")).toHaveTextContent(OFFLINE_NOTICE);
+    });
+
+    test("a server that answers with an error is shown the same way", async () => {
+      cacheSession(ada);
+      stubSession(sessionResponse({}, false, 503));
+      await renderSettled("/dashboard");
+
+      expect(dash.props.user).toEqual(ada);
+      expect(screen.getByRole("status")).toHaveTextContent(/^Offline — /);
     });
   });
 

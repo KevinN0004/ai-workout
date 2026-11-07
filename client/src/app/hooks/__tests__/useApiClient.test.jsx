@@ -343,3 +343,77 @@ describe("apiFetch", () => {
     });
   });
 });
+
+// After a CSRF refusal the cookie may hold the token the server just refused,
+// so a refresh asks the server for a new one whatever the cookie says.
+describe("ensureCsrfToken with refresh", () => {
+  test("asks the server even when a cookie is set", async () => {
+    setCookie("stale-token");
+    fetchMock.mockImplementation(async () => {
+      setCookie("fresh-token");
+      return jsonResponse({ csrfToken: "fresh-token" });
+    });
+    const { current } = render();
+
+    await expect(current.ensureCsrfToken({ refresh: true })).resolves.toBe("fresh-token");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/csrf-token",
+      expect.objectContaining({ credentials: "include" })
+    );
+  });
+});
+
+// With no network at all, a write that cannot be kept for later is refused
+// before it is sent, with a reason the visitor can act on
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). The three logs are
+// left to fail as they would, because they are kept and sent later.
+describe("apiFetch with the browser offline", () => {
+  const OFFLINE = "You're offline. This needs a connection.";
+
+  beforeEach(() => {
+    setCookie("cookie-token");
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  });
+
+  test.each([
+    ["POST", "/api/dashboard/goals"],
+    ["POST", "/api/dashboard/progress-metrics"],
+    ["DELETE", "/api/dashboard/saved-exercises/e1"],
+    ["PUT", "/api/dashboard/progression/2026-11-02/week"],
+    ["POST", "/api/generate"]
+  ])("refuses %s %s without sending it", async (method, url) => {
+    const { current } = render();
+
+    await expect(current.apiFetch(url, { method })).rejects.toThrow(OFFLINE);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    "/api/dashboard/workout-sessions",
+    "/api/dashboard/meal-logs",
+    "/api/dashboard/calories"
+  ])("still sends a log to %s", async (url) => {
+    const { current } = render();
+
+    await current.apiFetch(url, { method: "POST" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(url);
+  });
+
+  test("still sends a read", async () => {
+    const { current } = render();
+
+    await current.apiFetch("/api/dashboard");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/dashboard");
+  });
+
+  test("sends a write once the browser is online", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    const { current } = render();
+
+    await current.apiFetch("/api/dashboard/goals", { method: "POST" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/dashboard/goals");
+  });
+});

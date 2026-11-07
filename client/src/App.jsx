@@ -10,6 +10,7 @@ import WorkoutResultPage from "./pages/workout-result/WorkoutResultPage";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
+  SESSION_CACHE_KEY,
   WEATHER_CACHE_PREFIX,
   createDefaultPlannerForm,
   defaultAuthForm,
@@ -19,10 +20,12 @@ import {
   samplePlan,
   weekDays
 } from "./app/constants";
-import { buildScopedCacheKey } from "./app/cache";
+import { buildScopedCacheKey, readJsonCache, removeJsonCache, writeJsonCache } from "./app/cache";
 import AppNotice from "./app/components/AppNotice";
 import { mergeOptimisticDashboard } from "./app/dashboard";
+import { describeAge } from "./app/describeAge";
 import useApiClient from "./app/hooks/useApiClient";
+import useConnection from "./hooks/useConnection";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
 import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
@@ -126,6 +129,7 @@ export default function App() {
   // ---- Dashboard data and the API client ------------------------------------
   const { apiFetch, ensureCsrfToken } = useApiClient();
   const { ready: updateReady, reload: reloadForUpdate } = useWorkerUpdate();
+  const offline = useConnection() === "offline";
   const isDashboardRoute = route === "/dashboard" || route.startsWith("/dashboard/");
   const dashboardCacheKey = useMemo(
     () => (user ? buildScopedCacheKey(DASHBOARD_CACHE_PREFIX, user) : ""),
@@ -456,10 +460,19 @@ export default function App() {
   // a timeout, means the server could not say: the visitor is told so and the
   // check is asked again, rather than shown the signed-out page as the answer.
   // An unmount stops the asking.
+  //
+  // While there is no answer, the last signed-in user kept on this device is
+  // signed in from it, so the app opens offline and while the server wakes
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md). It never replaces
+  // someone who signed in meanwhile. A 401 forgets the kept user, and signs
+  // them out if they are the one shown; a sign-in made while that answer was on
+  // its way stays.
   useEffect(() => {
     let cancelled = false;
     let retryTimer = null;
     let attempt = 0;
+    // The user signed in from the device, read once, at the first no-answer.
+    let restored;
     const loadSession = async () => {
       let answered = false;
       try {
@@ -468,8 +481,10 @@ export default function App() {
           const data = await res.json();
           setUser(data.user || null);
           answered = true;
-        } else {
-          answered = res.status === 401;
+        } else if (res.status === 401) {
+          answered = true;
+          removeJsonCache(SESSION_CACHE_KEY);
+          setUser((current) => (current === restored ? null : current));
         }
       } catch {
         // No answer: a network error, a timeout or a body that is not JSON.
@@ -477,6 +492,10 @@ export default function App() {
       if (cancelled) return;
       setSessionUnchecked(!answered);
       if (answered) return;
+      if (!restored) {
+        restored = readJsonCache(SESSION_CACHE_KEY)?.user;
+        if (restored) setUser((current) => current ?? restored);
+      }
       const delay = SESSION_RETRY_DELAYS_MS[Math.min(attempt, SESSION_RETRY_DELAYS_MS.length - 1)];
       attempt += 1;
       retryTimer = setTimeout(loadSession, delay);
@@ -487,6 +506,12 @@ export default function App() {
       clearTimeout(retryTimer);
     };
   }, []);
+
+  // Keeps the signed-in user on this device whenever it changes, for the
+  // session check above to sign in from when the server cannot answer.
+  useEffect(() => {
+    if (user) writeJsonCache(SESSION_CACHE_KEY, { user });
+  }, [user]);
 
   // Fetches the CSRF token up front, so the first write need not wait for it.
   // ensureCsrfToken is stable, so this runs once.
@@ -519,17 +544,32 @@ export default function App() {
   // not complete, until it is dismissed or someone signs in. Otherwise, a new
   // version of the app that is waiting is offered there, and loads only when
   // the visitor presses Reload. The session notices come first, because they
-  // say what is on screen may be stale.
-  const sessionNotice = sessionUnchecked ? (
-    <AppNotice message="Can't reach the server to check your sign-in. Trying again..." />
-  ) : signOutUnfinished && !user ? (
-    <AppNotice
-      message="Signed out on this device, but the server could not end your session. It stays valid until it expires."
-      onDismiss={() => setSignOutUnfinished(false)}
-    />
-  ) : updateReady ? (
-    <AppNotice message="A new version is ready." actionLabel="Reload" onAction={reloadForUpdate} />
-  ) : null;
+  // say what is on screen may be stale. A signed-in visitor the server cannot
+  // reach, whether the user came from the device or a later request went
+  // unanswered, is told the page shows what was saved here, and how old it is.
+  const describeKeptData = () => {
+    const age = describeAge(readJsonCache(dashboardCacheKey)?.updatedAt, Date.now());
+    return age
+      ? `Offline — showing your data from ${age}.`
+      : "Offline — showing the data saved on this device.";
+  };
+  const sessionNotice =
+    user && (offline || sessionUnchecked) ? (
+      <AppNotice message={describeKeptData()} />
+    ) : sessionUnchecked ? (
+      <AppNotice message="Can't reach the server to check your sign-in. Trying again..." />
+    ) : signOutUnfinished && !user ? (
+      <AppNotice
+        message="Signed out on this device, but the server could not end your session. It stays valid until it expires."
+        onDismiss={() => setSignOutUnfinished(false)}
+      />
+    ) : updateReady ? (
+      <AppNotice
+        message="A new version is ready."
+        actionLabel="Reload"
+        onAction={reloadForUpdate}
+      />
+    ) : null;
   const withNotice = (page) => (
     <>
       {page}
