@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 import DashboardPage from "../DashboardPage";
 
 const noop = () => {};
@@ -20,7 +21,7 @@ const baseDashboard = {
   }
 };
 
-function DashboardHarness({ dashboard = baseDashboard }) {
+function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
@@ -126,6 +127,7 @@ function DashboardHarness({ dashboard = baseDashboard }) {
       plannerModal={null}
       dashboardToast={toast}
       clearDashboardToast={() => setToast(null)}
+      apiFetch={apiFetch}
     />
   );
 }
@@ -227,5 +229,32 @@ describe("Dashboard integration flows", () => {
     render(<DashboardHarness dashboard={{ ...baseDashboard, plans: [plan] }} />);
 
     expect(screen.getByText(/of 7 planned days done/)).toBeInTheDocument();
+  });
+
+  // Roadmap B4: the page reads the week's progression with App's apiFetch and
+  // hands the summary its deload week.
+  test("reads the week's progression and marks a deload week on the summary", async () => {
+    const plan = {
+      id: "plan-1",
+      createdAt: "2026-01-01T12:00:00.000Z",
+      plan: "Monday",
+      payload: {
+        version: 1,
+        days: [{ index: 0, weekday: "Monday", title: "Monday", lines: ["Squat 5x5"] }],
+        notes: []
+      }
+    };
+    const progression = {
+      weekStart: "2026-11-09",
+      deloadWeek: { active: true, count: 5, reason: "Your 6th week in a row", decision: null },
+      lifts: []
+    };
+    const apiFetch = vi.fn(async () => ({ ok: true, json: async () => ({ progression }) }));
+    render(
+      <DashboardHarness dashboard={{ ...baseDashboard, plans: [plan] }} apiFetch={apiFetch} />
+    );
+
+    expect(await screen.findByText(/, deload week\.$/)).toBeInTheDocument();
+    expect(String(apiFetch.mock.calls[0][0])).toMatch(/^\/api\/dashboard\/progression\?today=/);
   });
 });

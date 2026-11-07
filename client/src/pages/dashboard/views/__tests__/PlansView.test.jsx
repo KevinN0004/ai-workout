@@ -520,3 +520,132 @@ describe("logging a plan day", () => {
     expect(within(card("Wed")).queryByText("Rest day")).toBeNull();
   });
 });
+
+// Roadmap B4: the day details show the week's load for each of the day's lifts,
+// and logging the day opens its cards at the week's sets and loads.
+describe("the week's progression", () => {
+  const squat = {
+    name: "Back Squats",
+    sets: 3,
+    reps: { min: 3, max: 5 },
+    seconds: null,
+    perSide: false,
+    targetRpe: { min: 8, max: 8 }
+  };
+  const plank = { ...squat, name: "Plank", reps: null, seconds: { min: 20, max: 30 } };
+  const mondayDay = {
+    index: 0,
+    weekday: "Monday",
+    title: "Monday - Full body A",
+    lines: ["- Back Squats: 3 x 3-5", "- Plank: 3 x 20-30 seconds"],
+    prescriptions: [squat, plank]
+  };
+  const plan = {
+    id: "plan-1",
+    goal: "Build lean strength and energy",
+    plan: "Monday - Full body A",
+    payload: { version: 1, days: [mondayDay], notes: [] }
+  };
+  const squatWeek = {
+    name: "Back Squats",
+    key: "back squats",
+    change: "up",
+    kg: { from: 100, target: 102.5 },
+    lb: { from: 220, target: 225 },
+    sets: 3,
+    why: "Every set reached 5 reps at RPE 8 or below on Mon 2 Nov",
+    decision: null
+  };
+  const weekOf = (deloadWeek = { active: false, count: 1, reason: null, decision: null }) => ({
+    weekStart: "2026-11-09",
+    deloadWeek,
+    lifts: [squatWeek]
+  });
+
+  const renderWeek = ({ progression = weekOf(), progressionError = "" } = {}) => {
+    const setWorkoutForm = vi.fn();
+    const onAnswerProgression = vi.fn();
+    renderView({
+      weekDays: [{ key: "Monday", label: "Mon" }],
+      latestPlanByWeekday: { Monday: mondayDay.lines },
+      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
+      setWorkoutForm,
+      setWorkoutModalOpen: vi.fn(),
+      progression,
+      onAnswerProgression,
+      progressionError
+    });
+    fireEvent.click(
+      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
+        "button",
+        { name: /^Mon/ }
+      )
+    );
+    return { setWorkoutForm, onAnswerProgression };
+  };
+  const loads = () => within(screen.getByRole("region", { name: "This week's loads" }));
+  const loggedCards = (setWorkoutForm) => {
+    fireEvent.click(screen.getByRole("button", { name: "Log this workout" }));
+    return setWorkoutForm.mock.calls[0][0].exerciseSets;
+  };
+
+  test("the day details show each lift's load in the region's unit, with its reason", () => {
+    renderWeek();
+
+    expect(loads().getByText(/Up to 225 lb, from 220/)).toBeInTheDocument();
+    expect(
+      loads().getByText("Every set reached 5 reps at RPE 8 or below on Mon 2 Nov")
+    ).toBeInTheDocument();
+  });
+
+  test("shows kilograms outside an imperial region", () => {
+    const languages = vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
+    try {
+      renderWeek();
+      expect(loads().getByText(/Up to 102.5 kg, from 100/)).toBeInTheDocument();
+    } finally {
+      languages.mockRestore();
+    }
+  });
+
+  test("an answer goes to the dashboard, and a failed one is announced", () => {
+    const { onAnswerProgression } = renderWeek({
+      progressionError: "Answers can only be given for this week."
+    });
+
+    fireEvent.click(loads().getByRole("button", { name: "Undo the step up for Back Squats" }));
+
+    expect(onAnswerProgression).toHaveBeenCalledWith({ liftKey: "back squats", decision: "undo" });
+    expect(loads().getByRole("alert")).toHaveTextContent(
+      "Answers can only be given for this week."
+    );
+  });
+
+  test("logging the day opens its cards at the week's load", () => {
+    const { setWorkoutForm } = renderWeek();
+
+    const [squatCard] = loggedCards(setWorkoutForm);
+
+    expect(squatCard.targets.load).toBe("225");
+  });
+
+  test("logging a deload week opens every card at half its sets", () => {
+    const { setWorkoutForm } = renderWeek({
+      progression: {
+        ...weekOf({ active: true, count: 5, reason: "Your 6th week in a row", decision: null }),
+        lifts: [{ ...squatWeek, change: "hold", sets: 2 }]
+      }
+    });
+
+    expect(loggedCards(setWorkoutForm).map((card) => card.sets.length)).toEqual([2, 2]);
+  });
+
+  test("without a week read, the details show no loads and the log opens as before", () => {
+    const { setWorkoutForm } = renderWeek({ progression: null });
+
+    expect(screen.queryByRole("region", { name: "This week's loads" })).toBeNull();
+    const [squatCard] = loggedCards(setWorkoutForm);
+    expect(squatCard.targets).toEqual({ amount: "3-5", rpe: "8" });
+    expect(squatCard.sets).toHaveLength(3);
+  });
+});

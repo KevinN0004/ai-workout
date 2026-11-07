@@ -118,6 +118,7 @@ export default function ExerciseCard({ card, position, unitLabel, errors, onChan
                     max={unitLabel === "lb" ? 2204.6 : 1000}
                     step="0.01"
                     value={row.load}
+                    placeholder={card.targets?.load ?? ""}
                     aria-label={`Set ${number} load in ${unitLabel}, ${label}`}
                     onChange={(e) => update({ load: e.target.value })}
                   />

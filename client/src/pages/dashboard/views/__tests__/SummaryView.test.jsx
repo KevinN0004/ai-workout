@@ -561,6 +561,25 @@ describe("SummaryView", () => {
 
       expect(container.textContent).not.toContain("This week's plan");
     });
+
+    // Roadmap B4: the week's progression says when this is a deload week.
+    test("adds the deload week when one is due and not trained normally", () => {
+      const planLine = () => planBlock().querySelector(".progress-label").textContent;
+
+      renderView({ planWeek, deloadWeek: { active: true, decision: null } });
+      expect(planLine()).toBe("This week's plan: 1 of 3 planned days done, 1 missed, deload week.");
+    });
+
+    test.each([
+      ["no deload week", { active: false, decision: null }],
+      ["a deload week trained normally", { active: true, decision: "normal" }],
+      ["no week read", null]
+    ])("leaves it out for %s", (_label, deloadWeek) => {
+      renderView({ planWeek, deloadWeek });
+
+      expect(planBlock()).toHaveTextContent("1 of 3 planned days done, 1 missed.");
+      expect(planBlock()).not.toHaveTextContent("deload");
+    });
   });
 
   describe("the target weight", () => {

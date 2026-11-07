@@ -187,6 +187,75 @@
   margin-top: 0;
 }
 
+/* ---- The week's loads (roadmap B4) ---------------------------------------- */
+/* In the day-detail modal, under the workout lines: a line per lift with its change and
+   why, its answers, and the deload week's banner. Nothing here moves. */
+.week-progression {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.week-progression h4 {
+  margin: 0;
+}
+
+.week-lift-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.week-lift {
+  display: grid;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 3px solid rgba(255, 255, 255, 0.25);
+}
+
+.week-lift-up,
+.week-lift-ask {
+  border-left-color: rgba(120, 220, 160, 0.8);
+}
+
+.week-lift-deload {
+  border-left-color: rgba(255, 190, 110, 0.8);
+}
+
+.week-lift p {
+  margin: 0;
+}
+
+.week-lift-why {
+  font-size: 0.85rem;
+}
+
+.week-lift-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.week-deload-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 190, 110, 0.12);
+}
+
+.week-deload-banner p {
+  margin: 0;
+}
+
 /* ---- Saved exercises and empty states ------------------------------------ */
 .plans-view .saved-exercise-card {
   gap: 8px;

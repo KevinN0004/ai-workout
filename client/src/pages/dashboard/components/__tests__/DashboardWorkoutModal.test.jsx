@@ -228,6 +228,22 @@ describe("the exercise cards", () => {
     expect(input("Set 1 RPE, Step-up").value).toBe("");
   });
 
+  // Roadmap B4: the week's load is a placeholder too, never a value, since a
+  // typed load in a row left blank would stop the save.
+  test("shows the week's load as each row's load placeholder, and none without one", () => {
+    const loaded = newCard({
+      name: "Bench press",
+      targets: { amount: "8-10", rpe: "8", load: "45" },
+      rows: 2
+    });
+    const unloaded = newCard({ name: "Plank", targets: { amount: "20-30", rpe: "" } });
+    render(<Stateful initial={{ ...workoutForm, exerciseSets: [loaded, unloaded] }} />);
+
+    expect(input("Set 2 load in lb, Bench press")).toHaveAttribute("placeholder", "45");
+    expect(input("Set 2 load in lb, Bench press").value).toBe("");
+    expect(input("Set 1 load in lb, Plank")).toHaveAttribute("placeholder", "");
+  });
+
   test("adds a set that copies the load above it, and removes one", () => {
     render(<Stateful />);
 

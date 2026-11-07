@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 // Plan generation end to end: the planner's four steps, the rule-based
@@ -172,6 +173,89 @@ test.describe.serial("generate a plan and log a day of it", () => {
     await expect(legs.getByRole("cell").first()).toHaveText("3");
     await expect(
       progress.getByText("Dumbbell box squat: heaviest 30 lb × 12", { exact: true })
+    ).toBeVisible();
+  });
+
+  // Roadmap B4: a day logged last week with every set at the top of the range
+  // at RPE 8 steps its lifts up this week. The plan answered "Knee", so the box
+  // squat, the knee's regression, asks first; the bench press has no knee flag
+  // and steps up on its own.
+  test("last week's sets set this week's loads, and a step up can be undone", async () => {
+    // Last week's Monday in the browser's own zone, as the log form dates it.
+    const lastMonday = await page.evaluate(() => {
+      const date = new Date();
+      date.setDate(date.getDate() - ((date.getDay() + 6) % 7) - 7);
+      const pad = (value) => String(value).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    });
+    const openMonday = async () => {
+      await page.getByRole("button", { name: /^Mon Warmup: 8 minutes/ }).click();
+      return page.getByRole("region", { name: "This week's loads" });
+    };
+
+    await page.goto("/dashboard/plans");
+    await openMonday();
+    await page.getByRole("button", { name: "Log this workout" }).click();
+    const log = page.getByRole("dialog", { name: "Log workout" });
+    await log.getByLabel("Date").fill(lastMonday);
+    for (const [name, reps, load] of [
+      ["Dumbbell box squat", "12", "30"],
+      ["Dumbbell bench press", "10", "40"]
+    ]) {
+      const card = log.getByRole("group", { name });
+      for (const set of [1, 2, 3]) {
+        await card.getByLabel(`Set ${set} reps, ${name}`).fill(reps);
+        await card.getByLabel(`Set ${set} load in lb, ${name}`).fill(load);
+        await card.getByLabel(`Set ${set} RPE, ${name}`).fill("8");
+      }
+    }
+    await log.getByLabel("Duration (minutes)").fill("45");
+    await log.getByRole("button", { name: "Save workout" }).click();
+    await page.waitForResponse(
+      (saved) =>
+        saved.url().includes("/api/dashboard/workout") &&
+        saved.request().method() === "POST" &&
+        saved.ok(),
+      { timeout: 15_000 }
+    );
+    await page.reload();
+
+    // 40 lb is stored as 18.14 kg and read back as 40 lb; 30 lb as 13.61 kg.
+    let loads = await openMonday();
+    const bench = loads.getByRole("listitem").filter({ hasText: /^Dumbbell bench press/ });
+    const squat = loads.getByRole("listitem").filter({ hasText: /^Dumbbell box squat/ });
+    await expect(bench).toContainText("Dumbbell bench press: Up to 45 lb, from 40");
+    await expect(bench).toContainText(/Every set reached 10 reps at RPE 8 or below on Mon \d+ \w+/);
+    await expect(squat).toContainText("Dumbbell box squat: Up to 35 lb? Now 30");
+    await expect(squat.getByRole("button", { name: "Go up on Dumbbell box squat" })).toBeVisible();
+    await expect(
+      squat.getByRole("button", { name: "Keep the load on Dumbbell box squat" })
+    ).toBeVisible();
+
+    // The day details with a change and a question on screen.
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.map((v) => `${v.id} (${v.impact}) x${v.nodes.length}`)).toEqual([]);
+
+    // The log offers the week's loads as placeholders: the step up's target,
+    // and the asked lift's current load until it is answered.
+    await page.getByRole("button", { name: "Log this workout" }).click();
+    await expect(log.getByLabel("Set 1 load in lb, Dumbbell bench press")).toHaveAttribute(
+      "placeholder",
+      "45"
+    );
+    await expect(log.getByLabel("Set 1 load in lb, Dumbbell bench press")).toHaveValue("");
+    await expect(log.getByLabel("Set 1 load in lb, Dumbbell box squat")).toHaveAttribute(
+      "placeholder",
+      "30"
+    );
+    await page.keyboard.press("Escape");
+    await expect(log).toBeHidden();
+
+    loads = await openMonday();
+    await loads.getByRole("button", { name: "Undo the step up for Dumbbell bench press" }).click();
+    await expect(bench).toContainText("Dumbbell bench press: Hold at 40 lb");
+    await expect(
+      bench.getByRole("button", { name: "Take back your answer for Dumbbell bench press" })
     ).toBeVisible();
   });
 });
