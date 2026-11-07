@@ -82,8 +82,11 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
         return res.status(400).json({ error: "Date and calories are required." });
       }
 
+      // The client's id is the replay key (docs/specs/2026-11-06-offline-ready-pwa-design.md):
+      // an entry resent after a lost answer updates its row in saveCalorieEntry
+      // instead of adding a second. Without one, each submission is a new entry.
       const entry = {
-        id: crypto.randomUUID(),
+        id: cleanText(body.id, 64) || crypto.randomUUID(),
         date: cleanText(date, 20),
         calories: parsedCalories,
         source: "manual",

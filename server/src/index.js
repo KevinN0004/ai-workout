@@ -230,6 +230,9 @@ app.use(
         // Session Replay compresses in a worker it starts from a blob: URL.
         // Only needed, so only allowed, when the client reports at all.
         ...(sentryIngestOrigin ? { "worker-src": ["'self'", "blob:"] } : {}),
+        // The web app manifest (vite-plugin-pwa) is fetched under manifest-src,
+        // which falls back to default-src 'none'.
+        "manifest-src": ["'self'"],
         "frame-ancestors": ["'none'"],
         "base-uri": ["'self'"],
         "form-action": ["'self'"],

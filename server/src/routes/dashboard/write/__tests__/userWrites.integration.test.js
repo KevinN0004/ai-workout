@@ -221,8 +221,33 @@ describe("remaining user write paths", () => {
         .set("X-CSRF-Token", csrfToken)
         .send({ date: "2026-08-02", calories: 2400 });
 
-      // The route mints a fresh uuid per submission, so both persist.
+      // Without an id the route mints a fresh uuid per submission, so both persist.
       expect(await prisma.calorieEntry.count()).toBe(2);
+    });
+
+    // The client's id is the replay key (docs/specs/2026-11-06-offline-ready-pwa-design.md):
+    // an entry resent after a lost answer must land once.
+    test("a resent entry carrying its id updates its row instead of adding one", async () => {
+      const id = "5f0c7d2e-3b1a-4c8e-9d6f-2a7b8c9d0e1f";
+      await postCalories({ id, date: "2026-08-02", calories: 2000 });
+      const resent = await postCalories({ id, date: "2026-08-02", calories: 2400 });
+
+      expect(resent.status).toBe(200);
+      const rows = await prisma.calorieEntry.findMany();
+      expect(rows.map(({ legacyId, calories }) => ({ legacyId, calories }))).toEqual([
+        { legacyId: id, calories: 2400 }
+      ]);
+    });
+
+    test("refuses an id longer than 64 characters", async () => {
+      const response = await postCalories({
+        id: "x".repeat(65),
+        date: "2026-08-02",
+        calories: 2000
+      });
+
+      expect(response.status).toBe(400);
+      expect(await prisma.calorieEntry.count()).toBe(0);
     });
 
     test("rejects a request missing date or calories", async () => {
