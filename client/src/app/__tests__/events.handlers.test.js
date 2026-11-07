@@ -5,6 +5,7 @@ import { newCard } from "../exerciseSets";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
+  SESSION_CACHE_KEY,
   WEATHER_CACHE_PREFIX
 } from "../constants";
 
@@ -993,6 +994,56 @@ describe("deleteAccount", () => {
       await handlers.onLogout();
 
       scopedKeys.forEach((key) => expect(window.localStorage.getItem(key)).not.toBeNull());
+    });
+
+    // The kept user is different: it is what signs the app in when the server
+    // cannot answer (docs/specs/2026-11-06-offline-ready-pwa-design.md), so
+    // after a sign-out an offline launch would sign the visitor back in.
+    describe("the kept sign-in", () => {
+      const keepSession = () =>
+        window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ user }));
+
+      afterEach(() => {
+        window.localStorage.removeItem(SESSION_CACHE_KEY);
+      });
+
+      test("onLogout forgets it, whether or not the server answers", async () => {
+        keepSession();
+        const { handlers } = buildDeps({
+          ...clearDeps(),
+          apiFetch: vi.fn(async () => {
+            throw new TypeError("Failed to fetch");
+          })
+        });
+
+        await handlers.onLogout();
+
+        expect(window.localStorage.getItem(SESSION_CACHE_KEY)).toBeNull();
+      });
+
+      test("a successful deletion forgets it", async () => {
+        keepSession();
+        const { handlers } = buildDeps({
+          ...clearDeps(),
+          apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+        });
+
+        await handlers.deleteAccount("old-pass");
+
+        expect(window.localStorage.getItem(SESSION_CACHE_KEY)).toBeNull();
+      });
+
+      test("a rejected password keeps it", async () => {
+        keepSession();
+        const { handlers } = buildDeps({
+          ...clearDeps(),
+          apiFetch: vi.fn(async () => jsonResponse({ error: "Password is incorrect." }, false))
+        });
+
+        await handlers.deleteAccount("wrong");
+
+        expect(window.localStorage.getItem(SESSION_CACHE_KEY)).not.toBeNull();
+      });
     });
   });
 });

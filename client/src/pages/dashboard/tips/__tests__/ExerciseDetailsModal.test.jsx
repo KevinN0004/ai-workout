@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import ExerciseDetailsModal from "../ExerciseDetailsModal";
+import { markUnanswered } from "../../../../app/connection";
 
 // The detail sheet behind every exercise card in Tips. Almost all of it is
 // fallback text for fields the wger catalogue leaves out -- category, muscles,
@@ -192,5 +193,17 @@ describe("ExerciseDetailsModal", () => {
 
       expect(onClose).not.toHaveBeenCalled();
     });
+  });
+});
+
+// A saved exercise cannot be kept for later, so Save waits for a connection
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("ExerciseDetailsModal offline", () => {
+  test("disables Save to my plan and says why", () => {
+    markUnanswered();
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "Save to my plan" })).toBeDisabled();
+    expect(screen.getByText("You're offline")).toBeInTheDocument();
   });
 });

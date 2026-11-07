@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import CaloriesView from "../CaloriesView";
+import { markUnanswered } from "../../../../app/connection";
 
 // The goal view: three forms, two logs, and two charts. Nothing here computes
 // much, but every field writes into a different slice of a different form, and
@@ -321,5 +322,28 @@ describe("CaloriesView", () => {
       expect(() => renderView({ calories: "not a list", progressMetrics: [] })).not.toThrow();
       expect(screen.getByText("No calories logged yet.")).toBeInTheDocument();
     });
+  });
+});
+
+// Goals and body weight cannot be kept for later, so they wait for a
+// connection; a calorie entry is a log and stays open
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("offline", () => {
+  test("disables Save goals and Save metric, says why, and leaves the calorie log open", () => {
+    markUnanswered();
+    renderView();
+
+    expect(screen.getByRole("button", { name: "Save goals" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save metric" })).toBeDisabled();
+    expect(screen.getAllByText("You're offline")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Log calories" })).toBeEnabled();
+  });
+
+  test("enables them again online", () => {
+    renderView();
+
+    expect(screen.getByRole("button", { name: "Save goals" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save metric" })).toBeEnabled();
+    expect(screen.queryByText("You're offline")).not.toBeInTheDocument();
   });
 });

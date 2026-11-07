@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SettingsEditForm from "../SettingsEditForm";
+import { markUnanswered } from "../../../../app/connection";
 
 const FIELDS = [
   { name: "name", label: "Name", type: "text", maxLength: 80 },
@@ -220,5 +221,18 @@ describe("SettingsEditForm", () => {
 
     expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  });
+});
+
+// A profile edit cannot be kept for later, so Save waits for a connection
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). Cancel stays open.
+describe("SettingsEditForm offline", () => {
+  test("disables Save, says why, and leaves Cancel open", () => {
+    markUnanswered();
+    renderForm();
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByText("You're offline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
   });
 });

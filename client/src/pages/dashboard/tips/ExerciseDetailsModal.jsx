@@ -4,12 +4,15 @@
  * Rendered by TipsView.
  */
 import ModalPortal from "../../../components/ModalPortal";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import { getExerciseImage, resolveMediaUrl } from "./recommendationUtils";
 
 /**
  * Renders nothing without `selectedExercise`. A smart pick arrives with its
  * `recommendation` attached by ExerciseTile, and its reasons are listed;
- * `onSave` receives the exercise and that recommendation.
+ * `onSave` receives the exercise and that recommendation. Offline, Save is
+ * disabled: a saved exercise cannot be kept for later.
  */
 export default function ExerciseDetailsModal({
   selectedExercise,
@@ -18,6 +21,7 @@ export default function ExerciseDetailsModal({
   isSaved,
   isSaving
 }) {
+  const offline = useConnection() === "offline";
   // The only guard on this, so ModalPortal gets `open` outright. Repeating the
   // condition there would add a check that is always true by the time it runs,
   // so no test could tell it working from broken. The children read
@@ -86,11 +90,12 @@ export default function ExerciseDetailsModal({
                 <button
                   type="button"
                   className="cta save-modal-button"
-                  disabled={isSaved || isSaving}
+                  disabled={isSaved || isSaving || offline}
                   onClick={() => onSave(selectedExercise, selectedExercise?.recommendation)}
                 >
                   {isSaved ? "Saved to plan" : isSaving ? "Saving..." : "Save to my plan"}
                 </button>
+                <OfflineHint />
               </div>
               {selectedExercise.description ? (
                 <p className="exercise-what">{selectedExercise.description}</p>

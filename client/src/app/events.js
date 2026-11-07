@@ -7,6 +7,7 @@ import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
+  SESSION_CACHE_KEY,
   WEATHER_CACHE_PREFIX,
   defaultAuthForm,
   defaultSignupProfileForm
@@ -373,6 +374,10 @@ export const createAppEventHandlers = ({
     clearDashboardDataState();
     clearDashboardToast();
     resetPersonalFlow();
+    // The dashboard cache stays for this account's return, but the kept sign-in
+    // goes: with it, a launch with no answer from the server would sign the
+    // visitor back in.
+    removeJsonCache(SESSION_CACHE_KEY);
     go("/");
     // Any answer but OK, the server's 503 included, means the session may still
     // be valid in the store until it expires, so the visitor is told.
@@ -624,6 +629,7 @@ export const createAppEventHandlers = ({
     clearDashboardToast();
     resetPersonalFlow();
     scopedCacheKeysToClear.forEach(removeJsonCache);
+    removeJsonCache(SESSION_CACHE_KEY);
     go("/");
     return { ok: true };
   };

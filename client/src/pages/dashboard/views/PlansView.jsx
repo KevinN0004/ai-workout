@@ -8,6 +8,8 @@ import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
 import { isRestDay, savedPlanDays } from "../../../app/plans";
 import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
 import ModalPortal from "../../../components/ModalPortal";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import WeekProgression from "../components/WeekProgression";
 import "./PlansView.css";
 
@@ -27,7 +29,8 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * to it. A rest day's card says so, and offers no log. `progression` is the
  * week's (roadmap B4): a day's details show its lifts' loads, answered through
  * `onAnswerProgression` with `progressionError` beside them, and the log opens
- * at the week's sets and loads.
+ * at the week's sets and loads. Offline, removing a saved exercise is
+ * disabled: it cannot be kept for later.
  */
 export default function PlansView({
   weekDays,
@@ -46,6 +49,7 @@ export default function PlansView({
   // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [visibleSavedCount, setVisibleSavedCount] = useState(SAVED_EXERCISE_PAGE_SIZE);
+  const offline = useConnection() === "offline";
 
   const weeklyMealPlan = useMemo(() => {
     const latestPlan = dashboard?.plans?.[0];
@@ -343,10 +347,12 @@ export default function PlansView({
                   <button
                     type="button"
                     className="ghost"
+                    disabled={offline}
                     onClick={() => onRemoveSavedExercise?.(item.id)}
                   >
                     Remove
                   </button>
+                  <OfflineHint />
                 </div>
               </article>
             ))}

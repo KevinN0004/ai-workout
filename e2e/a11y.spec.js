@@ -355,4 +355,28 @@ test.describe.serial("accessibility", () => {
     // state rather than inheriting this failed attempt.
     await page.getByRole("button", { name: "Cancel" }).click();
   });
+
+  // Offline, the page says so in its notice, and each write that cannot be
+  // kept for later is disabled with "You're offline" beside it
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md). The hint is muted
+  // text, whose contrast is what this measures.
+  test("offline, the notice and the disabled writes have no violations", async () => {
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /^account/i }).click();
+    await expect(page.getByLabel("Current password")).toBeVisible();
+
+    await context.setOffline(true);
+    try {
+      await expect(page.getByRole("status")).toHaveText(/^Offline — /);
+      await expect(page.getByRole("button", { name: "Change password" })).toBeDisabled();
+      await expect(page.getByText("You're offline").first()).toBeVisible();
+
+      expectNoViolations(await analyze(page));
+    } finally {
+      await context.setOffline(false);
+    }
+    // Back online, the store's probe finds the server and the page reopens,
+    // so the afterAll deletion starts from an online page.
+    await expect(page.getByRole("button", { name: "Change password" })).toBeEnabled();
+  });
 });

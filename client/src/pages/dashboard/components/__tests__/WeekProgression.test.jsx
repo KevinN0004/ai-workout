@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import WeekProgression from "../WeekProgression";
+import { markUnanswered } from "../../../../app/connection";
 
 // The week's loads for one plan day (roadmap B4): each lift's change, its
 // reason and its controls, and the deload week's banner.
@@ -241,5 +242,33 @@ describe("WeekProgression", () => {
 
     expect(none).toBeEmptyDOMElement();
     expect(empty).toBeEmptyDOMElement();
+  });
+});
+
+// An answer to the week is saved by the server, so every answer waits for a
+// connection (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+describe("WeekProgression offline", () => {
+  test("disables every answer, the week's included, and says why once", () => {
+    markUnanswered();
+    renderWeek({
+      week: weekOf([lift("Leg press", "up"), lift("Dumbbell box squat", "ask")], {
+        active: true,
+        count: 6,
+        reason: "Sixth week in a row.",
+        decision: null
+      })
+    });
+
+    const answers = screen.getAllByRole("button");
+    expect(answers.length).toBeGreaterThan(2);
+    answers.forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getAllByText("You're offline")).toHaveLength(1);
+  });
+
+  test("online, every answer is open", () => {
+    renderWeek({ week: weekOf([lift("Leg press", "up")]) });
+
+    screen.getAllByRole("button").forEach((button) => expect(button).toBeEnabled());
+    expect(screen.queryByText("You're offline")).not.toBeInTheDocument();
   });
 });

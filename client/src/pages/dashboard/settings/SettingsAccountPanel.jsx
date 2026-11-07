@@ -3,15 +3,19 @@
  * a confirmation step. Rendered by SettingsView on that tab.
  */
 import { useEffect, useRef, useState } from "react";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import "./SettingsAccountPanel.css";
 
 /**
  * Two independent forms, each with its own state. Both handlers (changePassword
  * and deleteAccount in events.js) report the request's outcome as
  * `{ ok: true }` or `{ ok: false, error }` rather than throwing a failure, so
- * every branch here is driven by the resolved value.
+ * every branch here is driven by the resolved value. Offline, both submits are
+ * disabled: each needs the server.
  */
 export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount }) {
+  const offline = useConnection() === "offline";
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -105,9 +109,10 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
             {passwordError}
           </p>
         )}
-        <button type="submit" disabled={passwordSaving}>
+        <button type="submit" disabled={passwordSaving || offline}>
           {passwordSaving ? "Changing..." : "Change password"}
         </button>
+        <OfflineHint />
       </form>
 
       <div className="settings-account-danger">
@@ -141,9 +146,10 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
               <button type="button" onClick={handleCancelDelete} disabled={deleteSaving}>
                 Cancel
               </button>
-              <button type="submit" disabled={deleteSaving}>
+              <button type="submit" disabled={deleteSaving || offline}>
                 {deleteSaving ? "Deleting..." : "Confirm deletion"}
               </button>
+              <OfflineHint />
             </div>
           </form>
         )}

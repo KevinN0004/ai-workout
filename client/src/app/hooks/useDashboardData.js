@@ -73,6 +73,9 @@ export default function useDashboardData({
   const weatherDataRef = useRef(null);
   const airQualityDataRef = useRef(null);
   const dashboardRequestRef = useRef(0);
+  // The dashboards read back from the cache, which the write-through below
+  // leaves alone so the cache keeps the time the server's copy arrived.
+  const restoredDashboardsRef = useRef(new WeakSet());
   const weatherRequestRef = useRef(0);
   const airRequestRef = useRef(0);
   const hasAutoLoadedEnvironmentRef = useRef(false);
@@ -257,6 +260,7 @@ export default function useDashboardData({
     const cached = readJsonCache(dashboardCacheKey);
     const cachedDashboard = cached?.dashboard;
     if (!cachedDashboard) return;
+    restoredDashboardsRef.current.add(cachedDashboard);
     setDashboard((current) => current || cachedDashboard);
     applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
   }, [dashboardCacheKey, setGoalForm, user]);
@@ -286,9 +290,11 @@ export default function useDashboardData({
   }, [airCacheKey, user]);
 
   // Every new dashboard is written through to the cache. A cleared one (logout)
-  // is not, which is what keeps the cache for the same account's return.
+  // is not, which is what keeps the cache for the same account's return, and
+  // neither is one read back from the cache: its updatedAt is the age App's
+  // offline notice reports, and a restored copy is not new.
   useEffect(() => {
-    if (!dashboardCacheKey || !dashboard) return;
+    if (!dashboardCacheKey || !dashboard || restoredDashboardsRef.current.has(dashboard)) return;
     writeJsonCache(dashboardCacheKey, {
       dashboard,
       updatedAt: Date.now()
@@ -312,6 +318,7 @@ export default function useDashboardData({
       const cachedDashboard = readJsonCache(dashboardCacheKey)?.dashboard || null;
       const hasCachedFallback = Boolean(cachedDashboard);
       if (cachedDashboard) {
+        restoredDashboardsRef.current.add(cachedDashboard);
         setDashboard((current) => current || cachedDashboard);
         applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
       }

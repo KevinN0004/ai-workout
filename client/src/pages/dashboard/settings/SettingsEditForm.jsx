@@ -3,6 +3,8 @@
  * settingsFields.js. Rendered by SettingsView while the tab is being edited.
  */
 import { useState } from "react";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 
 const unitsFor = (measurementSystem) =>
   measurementSystem === "imperial"
@@ -13,7 +15,8 @@ const unitsFor = (measurementSystem) =>
  * Edits a draft copied once from `values`, the whole stored profile rather than
  * only this tab's fields, so saving hands `onSave` a complete profile. Height
  * and weight render in `measurementSystem`'s units, which go to `onSave` with
- * the draft. `error` and `saving` belong to SettingsView's save.
+ * the draft. `error` and `saving` belong to SettingsView's save. Offline, Save
+ * is disabled: a profile edit cannot be kept for later.
  */
 export default function SettingsEditForm({
   fields,
@@ -26,6 +29,7 @@ export default function SettingsEditForm({
 }) {
   const [draft, setDraft] = useState(() => ({ ...values }));
   const units = unitsFor(measurementSystem);
+  const offline = useConnection() === "offline";
 
   const setField = (name, value) => setDraft((prev) => ({ ...prev, [name]: value }));
 
@@ -158,9 +162,10 @@ export default function SettingsEditForm({
         <button type="button" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
-        <button type="submit" disabled={saving}>
+        <button type="submit" disabled={saving || offline}>
           {saving ? "Saving..." : "Save"}
         </button>
+        <OfflineHint />
       </div>
     </form>
   );

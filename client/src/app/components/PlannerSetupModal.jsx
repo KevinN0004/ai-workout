@@ -4,6 +4,8 @@
  * App builds it; HomePage and DashboardPage render it.
  */
 import ModalPortal from "../../components/ModalPortal";
+import OfflineHint from "../../components/OfflineHint";
+import useConnection from "../../hooks/useConnection";
 import { equipmentOptionsByEnv, injuryOptions, quickFocuses } from "../constants";
 import thumbHomeBodyweight from "../assets/planner-thumbs/home-bodyweight.svg";
 import thumbHomeDumbbells from "../assets/planner-thumbs/home-dumbbells.svg";
@@ -89,7 +91,8 @@ const resolveEquipmentThumb = (label) => {
 /**
  * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 4). Every
  * choice it shows is App's `form`, changed through the handlers passed in; the
- * last step's button calls `onSubmit`, which generates the plan.
+ * last step's button calls `onSubmit`, which generates the plan; it is
+ * disabled offline, because the server builds the plan.
  */
 export default function PlannerSetupModal({
   plannerOpen,
@@ -105,6 +108,7 @@ export default function PlannerSetupModal({
   loading,
   onSubmit
 }) {
+  const offline = useConnection() === "offline";
   if (!plannerOpen) return null;
   const plannerHeaderTitle = plannerHeaderTitleByStep[plannerStep] || plannerHeaderTitleByStep[1];
   const isCommercialEnvironment = form.environment === "Commercial";
@@ -330,9 +334,17 @@ export default function PlannerSetupModal({
                   Next
                 </button>
               ) : (
-                <button className="cta" type="button" disabled={loading} onClick={onSubmit}>
-                  {loading ? "Generating..." : "Generate workout"}
-                </button>
+                <>
+                  <button
+                    className="cta"
+                    type="button"
+                    disabled={loading || offline}
+                    onClick={onSubmit}
+                  >
+                    {loading ? "Generating..." : "Generate workout"}
+                  </button>
+                  <OfflineHint />
+                </>
               )}
             </div>
           </div>

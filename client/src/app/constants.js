@@ -205,6 +205,9 @@ export const DASHBOARD_ROUTE_VIEW_MAP = {
 export const DASHBOARD_CACHE_PREFIX = "ai-workout-dashboard-cache-v1";
 export const WEATHER_CACHE_PREFIX = "ai-workout-weather-cache-v1";
 export const AIR_QUALITY_CACHE_PREFIX = "ai-workout-air-cache-v1";
+// The last signed-in user, so the app opens offline: one entry, not per
+// account, removed on sign-out, account deletion and a 401.
+export const SESSION_CACHE_KEY = "ai-workout-session-cache-v1";
 export const OPTIMISTIC_UNDO_WINDOW_MS = 4500;
 export const CSRF_COOKIE_NAME = "csrfToken";
 export const CSRF_HEADER_NAME = "x-csrf-token";

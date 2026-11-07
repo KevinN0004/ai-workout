@@ -12,22 +12,35 @@ import { fetchWithTimeout } from "../network";
 // names `timeoutMs`: network.js's own default, which the dashboard's reads use.
 const API_TIMEOUT_MS = 15000;
 
+// The writes the page keeps and sends later when they cannot be sent now
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). Every other write is
+// refused while the browser reports no network.
+const QUEUED_LOG_PATHS = new Set([
+  "/api/dashboard/workout-sessions",
+  "/api/dashboard/meal-logs",
+  "/api/dashboard/calories"
+]);
+const OFFLINE_WRITE_MESSAGE = "You're offline. This needs a connection.";
+
 /**
  * Returns `apiFetch`, fetch with credentials included and, for any method other
  * than GET, HEAD or OPTIONS, the CSRF header set; and `ensureCsrfToken`, which
- * resolves the token, fetching one when no cookie holds it. Both are stable
- * across renders. `apiFetch` rejects before sending a write it has no token
- * for, or when fetching one fails, and rejects with "Request timed out. Please
- * try again." when the server has not answered within `options.timeoutMs`
- * (API_TIMEOUT_MS by default), as does the token fetch.
+ * resolves the token, fetching one when no cookie holds it, or always with
+ * `{ refresh: true }`. Both are stable across renders. `apiFetch` rejects
+ * before sending a write it has no token for, or when fetching one fails; a
+ * write other than the three logs while the browser reports no network, with
+ * "You're offline. This needs a connection."; and with "Request timed out.
+ * Please try again." when the server has not answered within
+ * `options.timeoutMs` (API_TIMEOUT_MS by default), as does the token fetch.
  */
 export default function useApiClient() {
   // ---- CSRF token -----------------------------------------------------------
   // The server sets the token as a cookie scripts can read, and /api/csrf-token
   // also returns it in the body. The cookie wins, and the body is the fallback
-  // when no cookie can be read.
-  const ensureCsrfToken = useCallback(async () => {
-    const existingToken = readCookie(CSRF_COOKIE_NAME);
+  // when no cookie can be read. `refresh` asks the server even when a cookie
+  // is set, for a retry after the server refused the token the cookie holds.
+  const ensureCsrfToken = useCallback(async ({ refresh = false } = {}) => {
+    const existingToken = refresh ? "" : readCookie(CSRF_COOKIE_NAME);
     if (existingToken) {
       return existingToken;
     }
@@ -57,6 +70,11 @@ export default function useApiClient() {
       };
 
       if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        // Only the browser's own flag: refusing on an unanswered request could
+        // refuse the one request that would show the server is back.
+        if (navigator.onLine === false && !QUEUED_LOG_PATHS.has(url)) {
+          throw new Error(OFFLINE_WRITE_MESSAGE);
+        }
         const csrfToken = await ensureCsrfToken();
         if (!csrfToken) {
           throw new Error("Security token unavailable. Refresh and try again.");
