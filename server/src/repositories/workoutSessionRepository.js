@@ -111,7 +111,7 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
 
   /**
    * Inserts a session, or updates the existing row carrying the same legacy id
-   * for this user.
+   * for this user, keeping that row's `createdAt`.
    *
    * Read-then-write rather than a Prisma `upsert` for the same reason as
    * progress metrics: `workout_sessions_user_legacy_idx` is a *partial* unique
@@ -156,8 +156,14 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
     };
 
     const row = await prisma.$transaction(async (tx) => {
+      // An update keeps the time the session was first saved, so a replay of an
+      // entry logged offline does not move it. Prisma leaves an undefined field
+      // untouched.
       const saved = existing
-        ? await tx.workoutSession.update({ where: { id: existing.id }, data })
+        ? await tx.workoutSession.update({
+            where: { id: existing.id },
+            data: { ...data, createdAt: undefined }
+          })
         : await tx.workoutSession.create({ data });
       if (Array.isArray(session.exerciseSets)) {
         await tx.exerciseSet.deleteMany({ where: { sessionId: saved.id } });

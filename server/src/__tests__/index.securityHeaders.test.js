@@ -63,6 +63,12 @@ describe("the content security policy", () => {
     expect(directive(await getCsp(), "connect-src")).toContain("'self'");
   });
 
+  test("allows the app's own web app manifest", async () => {
+    // manifest-src falls back to default-src when absent, so without it the
+    // browser refuses manifest.webmanifest and the app cannot be installed.
+    expect(directive(await getCsp(), "manifest-src")).toBe("'self'");
+  });
+
   test("allows the image hosts the app actually renders from", async () => {
     const imgSrc = directive(await getCsp(), "img-src");
 

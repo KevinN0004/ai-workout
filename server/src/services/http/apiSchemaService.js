@@ -170,6 +170,8 @@ export const workoutSessionBodySchema = z
 
 export const caloriesBodySchema = z
   .object({
+    // The client's replay key; the route keeps it as the entry's id.
+    id: optionalStringField(64),
     date: requiredStringField(20),
     calories: requiredNumberField(800, 10000)
   })

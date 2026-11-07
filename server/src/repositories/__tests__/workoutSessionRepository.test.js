@@ -116,6 +116,19 @@ describe("a session's sets", () => {
 
   // The old bundle sends no exerciseSets, so an update from it must not wipe
   // the sets a newer client saved.
+  // A replay of a workout logged offline is a second save with the same id
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md). It updates the row and
+  // keeps the time the workout was first saved.
+  test("saving the session again keeps the time it was first saved", async () => {
+    await save(user.id, { createdAt: "2026-11-05T08:00:00.000Z" });
+    await save(user.id, { focus: "Pull", createdAt: "2026-11-05T09:30:00.000Z" });
+
+    const rows = await prisma.workoutSession.findMany({ where: { userId: user.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].focus).toBe("Pull");
+    expect(rows[0].createdAt.toISOString()).toBe("2026-11-05T08:00:00.000Z");
+  });
+
   test("saving the session again without sets keeps the stored ones", async () => {
     await save(user.id, { exerciseSets: [bench] });
 
