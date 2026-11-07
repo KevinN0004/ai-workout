@@ -253,8 +253,8 @@ The server exposes:
 
 - System: `GET /api/health`, `GET /api/ready`, `GET /api/metrics`, `GET /api/csrf-token`
 - Auth/profile: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`, `DELETE /api/auth/me`, `GET/POST /api/profile`
-- Dashboard: `GET /api/dashboard`, `GET /api/dashboard/workout-sessions`, `GET /api/dashboard/meal-logs`, `GET /api/dashboard/progress-metrics`
-- Dashboard writes: workout sessions, workout aliases, calories, goals, meal logs, progress metrics, and saved exercises under `/api/dashboard`
+- Dashboard: `GET /api/dashboard`, `GET /api/dashboard/workout-sessions`, `GET /api/dashboard/meal-logs`, `GET /api/dashboard/progress-metrics`, `GET /api/dashboard/progression?today=` (the week's load for each lift of the newest plan)
+- Dashboard writes: workout sessions, workout aliases, calories, goals, meal logs, progress metrics, and saved exercises under `/api/dashboard`; answers to the week's progression with `PUT` and `DELETE` on `/api/dashboard/progression/:weekStart/lifts/:liftKey` and `/api/dashboard/progression/:weekStart/week`
 - Generation: `POST /api/generate`
 - External data: weather, air quality, wger exercise data, and MealDB meal search under `/api`
 

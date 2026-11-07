@@ -53,6 +53,7 @@ import { createWorkoutSessionRepository } from "./repositories/workoutSessionRep
 import { createMealLogRepository } from "./repositories/mealLogRepository.js";
 import { createDashboardCollectionRepository } from "./repositories/dashboardCollectionRepository.js";
 import { createSavedExerciseRepository } from "./repositories/savedExerciseRepository.js";
+import { createProgressionDecisionRepository } from "./repositories/progressionDecisionRepository.js";
 import { createUserRepository } from "./repositories/userRepository.js";
 import { createGeneratedPlanRepository } from "./repositories/generatedPlanRepository.js";
 import {
@@ -361,6 +362,9 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 const { saveMealLogWithDailySync } = createMealLogRepository({ prisma });
 const { loadCollectionPage } = createDashboardCollectionRepository({ prisma });
 const { saveExercise, removeExercise } = createSavedExerciseRepository({ prisma });
+const { listWeekDecisions, saveDecision, removeDecision } = createProgressionDecisionRepository({
+  prisma
+});
 const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, deleteUser } =
   createUserRepository({
     prisma
@@ -770,6 +774,9 @@ registerApiRoutes(app, {
   buildSavedExerciseEntry,
   saveExercise,
   removeExercise,
+  listWeekDecisions,
+  saveDecision,
+  removeDecision,
   updateProfile,
   updateGoals,
   saveCalorieEntry,
