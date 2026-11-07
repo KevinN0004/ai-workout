@@ -1,8 +1,9 @@
 # Plans that adapt to your history, design
 
-Status: **decided 2026-11-06**, section by section with the owner. The plan is
-`docs/plans/2026-11-06-adaptive-progression.md`. This is roadmap B4. It carries G4,
-decided on 2026-11-02: automatic within bounds.
+Status: **decided 2026-11-06**, section by section with the owner; **applied 2026-11-07** in
+#361 to #363, with the floors raised in #364 and #365, all live. The plan is
+`docs/plans/2026-11-06-adaptive-progression.md`, whose status says where the work went past
+this text. This is roadmap B4. It carries G4, decided on 2026-11-02: automatic within bounds.
 
 A plan is a weekly template that stays the same until it is regenerated. B4 turns it into a
 coach: each week, the server reads what you logged against the plan and sets that week's
