@@ -195,4 +195,25 @@ describe("the probe", () => {
 
     expect(healthChecks()).toBe(1);
   });
+
+  // The probe is the backstop for an online event that never comes, as under
+  // Playwright's Firefox offline emulation: navigator.onLine turns true with no
+  // event, and the store, offline only because the browser said so, must still
+  // find out once the server answers.
+  test("an answer brings the page back online when the browser's online event never came", async () => {
+    const { getConnection, subscribeConnection } = await loadStore();
+    onLine = false;
+    const listener = vi.fn();
+    subscribeConnection(listener);
+    expect(getConnection()).toBe("offline");
+
+    onLine = true;
+    fetch.mockImplementation(() => Promise.resolve({ ok: true, status: 200 }));
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(listener).toHaveBeenCalled();
+    expect(getConnection()).toBe("online");
+    await vi.advanceTimersByTimeAsync(90000);
+    expect(healthChecks()).toBe(1);
+  });
 });
