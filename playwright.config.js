@@ -67,7 +67,10 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore: /deployable\.spec\.js/,
-      use: { ...devices["Desktop Chrome"] }
+      // vite preview serves the built bundle, worker included. Blocking it
+      // keeps every request on the network, where these specs and page.route
+      // see it; the worker's own specs run in "deployable".
+      use: { ...devices["Desktop Chrome"], serviceWorkers: "block" }
     },
     {
       name: "deployable",

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PATH">
+  <!-- The app's mark: a white P on the page's black. The PNG icons in this
+       folder are rendered from this file; replace it and re-render them to
+       change the art. -->
+  <rect width="512" height="512" fill="#000000"/>
+  <path d="M176 384 V128 H256 a80 80 0 0 1 0 160 H176" fill="none" stroke="#ffffff"
+        stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

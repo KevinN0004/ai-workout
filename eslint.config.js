@@ -70,7 +70,10 @@ const testFiles = ["**/*.test.{js,jsx,mjs}", "client/src/test/**"];
 // load the config -- but omitting this spread just silently drops the rules.
 const importRules = {
   "import-x/no-cycle": "error",
-  "import-x/no-unresolved": "error",
+  // A `virtual:` id is a module a Vite plugin makes inside the build (the
+  // client's useWorkerUpdate imports vite-plugin-pwa's), with no file on disk
+  // for the resolver to find.
+  "import-x/no-unresolved": ["error", { ignore: ["^virtual:"] }],
   "import-x/no-self-import": "error",
   "import-x/no-duplicates": "error"
 };
