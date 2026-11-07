@@ -45,7 +45,8 @@ const mergeById = (held, older) => {
  * (useOlderLogPages), for as long as `pagination`, the dashboard response's,
  * says the server holds more. Both Add workout buttons set the workout form's
  * date to today and open the Log workout modal; the other empty states link to
- * the view where that log is entered.
+ * the view where that log is entered. A workout, calorie or meal row kept on
+ * the device and not yet sent (`isQueued`, useOptimisticLogs) says so.
  */
 export default function WorkoutsView({
   workouts,
@@ -207,6 +208,7 @@ export default function WorkoutsView({
                       </>
                     )}
                     {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
+                    {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
                   </div>
                   <span>{item.duration ?? "--"} min</span>
                 </div>
@@ -251,6 +253,7 @@ export default function WorkoutsView({
                 <div className="workout-row-copy">
                   <strong>{item.date || "--"}</strong>
                   <p className="muted workout-detail">{item.calories ?? "--"} kcal</p>
+                  {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
                 </div>
               </div>
             ))}
@@ -291,6 +294,7 @@ export default function WorkoutsView({
                     {item.carbsG ?? "--"} / F {item.fatG ?? "--"}
                   </p>
                   {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
+                  {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
                 </div>
               </div>
             ))}

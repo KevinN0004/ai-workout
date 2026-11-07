@@ -379,4 +379,38 @@ test.describe.serial("accessibility", () => {
     // so the afterAll deletion starts from an online page.
     await expect(page.getByRole("button", { name: "Change password" })).toBeEnabled();
   });
+
+  // A sign-out that would lose an entry kept on the device asks first
+  // (docs/specs/2026-11-06-offline-ready-pwa-design.md). This project blocks
+  // the service worker, so the workout modal's chunk is loaded once while
+  // online, before the network goes.
+  test("the sign-out confirm, with an entry not yet sent, has no violations", async () => {
+    await page.goto("/dashboard/workouts");
+    await page.getByRole("button", { name: "Add workout" }).first().click();
+    await expect(page.getByLabel("Duration (minutes)")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await context.setOffline(true);
+    try {
+      await page.getByRole("button", { name: "Add workout" }).first().click();
+      await page.getByLabel("Duration (minutes)").fill("30");
+      await page.getByLabel("Focus").fill("Kept for later");
+      await page.getByRole("button", { name: "Save workout" }).click();
+      await expect(page.getByText("Not sent yet")).toBeVisible({ timeout: 15_000 });
+
+      await page.getByRole("button", { name: "Open profile menu" }).click();
+      await page.getByRole("menuitem", { name: "Log out" }).click();
+      await expect(page.getByRole("dialog", { name: "Sign out?" })).toBeVisible();
+
+      expectNoViolations(await analyze(page));
+
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    } finally {
+      await context.setOffline(false);
+    }
+    // The entry is sent once the connection is back, so the afterAll deletion
+    // starts with nothing waiting.
+    await expect(page.getByText("1 entry saved.")).toBeVisible({ timeout: 45_000 });
+  });
 });

@@ -66,7 +66,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /deployable\.spec\.js/,
+      testIgnore: /(deployable|offline)\.spec\.js/,
       // vite preview serves the built bundle, worker included. Blocking it
       // keeps every request on the network, where these specs and page.route
       // see it; the worker's own specs run in "deployable".
@@ -74,7 +74,8 @@ export default defineConfig({
     },
     {
       name: "deployable",
-      testMatch: /deployable\.spec\.js/,
+      // offline.spec.js reloads with no network, which only the worker answers.
+      testMatch: /(deployable|offline)\.spec\.js/,
       use: { ...devices["Desktop Chrome"], baseURL: serverURL }
     }
   ],

@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useOptimisticLogs from "../useOptimisticLogs";
 import { OPTIMISTIC_UNDO_WINDOW_MS } from "../../constants";
+import { addToOutbox, readOutbox } from "../../outbox";
 
 // The optimistic log layer: an entry appears on the dashboard before anything
 // is sent, and the request is held back for an undo window so the write can
@@ -14,8 +15,8 @@ import { OPTIMISTIC_UNDO_WINDOW_MS } from "../../constants";
 let setDashboard;
 let setDashError;
 
-const render = () => {
-  const hook = renderHook(() => useOptimisticLogs({ setDashboard, setDashError }));
+const render = (extra = {}) => {
+  const hook = renderHook(() => useOptimisticLogs({ setDashboard, setDashError, ...extra }));
   return hook;
 };
 
@@ -777,5 +778,220 @@ describe("an answer that arrives while a later entry offers Undo", () => {
     });
 
     expect(result.current.dashboardToast).toMatchObject({ message: "Meal saved." });
+  });
+});
+
+// An entry whose send got no answer is kept on the device and stays on screen
+// as not sent yet, instead of vanishing with an error
+// (docs/specs/2026-11-06-offline-ready-pwa-design.md). Only a log that says
+// how to send it again, its `outbox`, can be kept.
+describe("keeping an entry for later", () => {
+  const ada = { email: "ada@example.com" };
+  const outbox = {
+    clientId: "k1",
+    url: "/api/dashboard/meal-logs",
+    body: { id: "k1", name: "Porridge" }
+  };
+  const failingWith = (status, message = "Server unavailable.") =>
+    vi.fn(async () => {
+      throw Object.assign(new Error(message), status === undefined ? {} : { status });
+    });
+  const keptFor = (user) => readOutbox(user);
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  test("a send with no answer is kept, and stays on screen as not sent yet", async () => {
+    const { result } = render({ user: ada });
+
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(undefined, "Failed to fetch"), outbox })
+      )
+    );
+    await runUndoWindow();
+
+    expect(result.current.optimisticLogEntries).toEqual([
+      expect.objectContaining({
+        operationId: "op-1",
+        item: expect.objectContaining({ isQueued: true })
+      })
+    ]);
+    expect(keptFor(ada)).toEqual([
+      expect.objectContaining({
+        clientId: "k1",
+        type: "meal log",
+        url: "/api/dashboard/meal-logs",
+        body: { id: "k1", name: "Porridge" },
+        item: { id: "op-1", title: "Porridge" }
+      })
+    ]);
+    expect(setDashError).not.toHaveBeenCalledWith(expect.stringMatching(/\S/));
+    expect(result.current.dashboardToast).toMatchObject({
+      message: "Saved on this device. It will be sent when you're back online.",
+      tone: "success"
+    });
+  });
+
+  test("a 503 is kept too", async () => {
+    const { result } = render({ user: ada });
+
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(503), outbox })
+      )
+    );
+    await runUndoWindow();
+
+    expect(keptFor(ada)).toHaveLength(1);
+  });
+
+  test("a 400 is dropped and reported, as before", async () => {
+    const { result } = render({ user: ada });
+
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(400, "Date is required."), outbox })
+      )
+    );
+    await runUndoWindow();
+
+    expect(result.current.optimisticLogEntries).toHaveLength(0);
+    expect(keptFor(ada)).toEqual([]);
+    expect(setDashError).toHaveBeenLastCalledWith("Date is required.");
+  });
+
+  test("a CSRF refusal fetches a fresh token and sends once more", async () => {
+    const ensureCsrfToken = vi.fn(async () => "fresh");
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error("Invalid or missing CSRF token."), { status: 403 })
+      )
+      .mockResolvedValueOnce({ dashboard: { mealLogs: [] } });
+    const { result } = render({ user: ada, ensureCsrfToken });
+
+    act(() => result.current.queueOptimisticLogCommit(queue(undefined, { request, outbox })));
+    await runUndoWindow();
+
+    expect(ensureCsrfToken).toHaveBeenCalledWith({ refresh: true });
+    expect(setDashboard).toHaveBeenCalledWith({ mealLogs: [] });
+    expect(result.current.optimisticLogEntries).toHaveLength(0);
+  });
+
+  test("an entry the device cannot store is reported, never shown as kept", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+    const { result } = render({ user: ada });
+
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(undefined, "Failed to fetch"), outbox })
+      )
+    );
+    await runUndoWindow();
+
+    expect(result.current.optimisticLogEntries).toHaveLength(0);
+    expect(setDashError).toHaveBeenLastCalledWith("Failed to fetch");
+  });
+
+  test("a kept entry cannot be undone", async () => {
+    const { result } = render({ user: ada });
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(undefined), outbox })
+      )
+    );
+    const undo = result.current.dashboardToast.onAction;
+    await runUndoWindow();
+
+    act(() => undo());
+
+    expect(result.current.optimisticLogEntries).toHaveLength(1);
+    expect(keptFor(ada)).toHaveLength(1);
+  });
+
+  test("an answer that arrives while a later entry offers Undo leaves that toast", async () => {
+    const { result } = render({ user: ada });
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, { request: failingWith(undefined), outbox })
+      )
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(OPTIMISTIC_UNDO_WINDOW_MS - 1);
+    });
+    act(() =>
+      result.current.queueOptimisticLogCommit(
+        queue(undefined, {
+          item: { id: "op-2", title: "Eggs" },
+          request: failingWith(undefined),
+          pendingMessage: "Eggs added. Undo?"
+        })
+      )
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(result.current.dashboardToast).toMatchObject({ message: "Eggs added. Undo?" });
+  });
+
+  test("entries kept for this account are back on screen after a reload", () => {
+    addToOutbox(ada, {
+      ...outbox,
+      type: "meal",
+      item: { id: "op-9", title: "Soup" },
+      queuedAt: 1234
+    });
+
+    const { result } = render({ user: ada });
+
+    expect(result.current.optimisticLogEntries).toEqual([
+      {
+        operationId: "op-9",
+        type: "meal",
+        item: { id: "op-9", title: "Soup", isOptimistic: true, isQueued: true },
+        createdAt: 1234
+      }
+    ]);
+  });
+
+  test("a replaced user, as after a profile save, does not double them", () => {
+    addToOutbox(ada, { ...outbox, type: "meal", item: { id: "op-9" }, queuedAt: 1 });
+    let user = ada;
+    const { result, rerender } = renderHook(() =>
+      useOptimisticLogs({ setDashboard, setDashError, user })
+    );
+
+    user = { ...ada, profile: { firstName: "Ada" } };
+    rerender();
+
+    expect(result.current.optimisticLogEntries.map((entry) => entry.operationId)).toEqual(["op-9"]);
+  });
+
+  test("another account's entries are not", () => {
+    addToOutbox(ada, { ...outbox, type: "meal", item: { id: "op-9" }, queuedAt: 1 });
+
+    const { result } = render({ user: { email: "grace@example.com" } });
+
+    expect(result.current.optimisticLogEntries).toEqual([]);
+  });
+
+  test("no one signed in reads nothing", () => {
+    const { result } = render({ user: null });
+
+    expect(result.current.optimisticLogEntries).toEqual([]);
+  });
+
+  test("removeQueuedEntry takes one entry off the screen", () => {
+    addToOutbox(ada, { ...outbox, type: "meal", item: { id: "op-9" }, queuedAt: 1 });
+    const { result } = render({ user: ada });
+
+    act(() => result.current.removeQueuedEntry("op-9"));
+
+    expect(result.current.optimisticLogEntries).toEqual([]);
   });
 });

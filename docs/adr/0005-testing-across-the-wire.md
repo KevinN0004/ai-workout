@@ -73,6 +73,12 @@ survived. Five things are worth knowing before touching it:
   `registerType` to `"autoUpdate"` is caught by nothing: only a second deploy
   under an open page shows it, which the suite cannot stage.
 
+  `offline.spec.js` runs in `deployable` too, because its reload with no
+  network is answered by the worker. It logs a workout offline, sees it kept
+  as not sent yet, reloads with no network, and reconnects; the workout
+  reaches the server exactly once, counted in the Logs view's workout list,
+  because the dashboard's glance line names the latest workout as well.
+
 - **Do not set `NODE_ENV=test` for the server it starts.** `index.js` guards its
   `startServer()` call with `NODE_ENV !== "test" && !VITEST` so the unit suite
   can import `app` without binding a port. Set it and the process loads, exports,
