@@ -40,6 +40,7 @@
 - [2026-11-05 — Per-set logging](plans/2026-11-05-per-set-logging.md)
 - [2026-11-06 — Progress records, e1RM and weekly sets](plans/2026-11-06-progress-records.md)
 - [2026-11-06 — Plans that adapt to your history](plans/2026-11-06-adaptive-progression.md)
+- [2026-11-06 — Offline-ready PWA](plans/2026-11-06-offline-ready-pwa.md)
 
 ## Specs
 
@@ -61,3 +62,4 @@
 - [2026-11-05 — Per-set logging](specs/2026-11-05-per-set-logging-design.md)
 - [2026-11-06 — Progress records, e1RM and weekly sets](specs/2026-11-06-progress-records-design.md)
 - [2026-11-06 — Plans that adapt to your history](specs/2026-11-06-adaptive-progression-design.md)
+- [2026-11-06 — Offline-ready PWA](specs/2026-11-06-offline-ready-pwa-design.md)
