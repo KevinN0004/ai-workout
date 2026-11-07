@@ -16,6 +16,28 @@ export const savedExerciseParamsSchema = z.object({
   id: z.string().trim().min(1).max(64)
 });
 
+// The shape of a date key. Whether it is a real date, and a week that may still
+// be answered, is checked by the progression rules.
+const dateKeyField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** The progression read's query: the client's local date, optional. */
+export const progressionQuerySchema = z.object({ today: dateKeyField.optional() }).passthrough();
+
+/** The week answer's path. */
+export const progressionWeekParamsSchema = z.object({ weekStart: dateKeyField });
+
+/** A lift answer's path: the week and the lift's key, as the progression read gives it. */
+export const progressionLiftParamsSchema = z.object({
+  weekStart: dateKeyField,
+  liftKey: z.string().min(1).max(140)
+});
+
+/** What a lift can be answered: undo an automatic change, or settle an asked step up. */
+export const liftDecisionBodySchema = z.object({ decision: z.enum(["undo", "accept", "decline"]) });
+
+/** What the week can be answered: train a deload week normally. */
+export const weekDecisionBodySchema = z.object({ decision: z.literal("normal") });
+
 /**
  * Validates `req.query` against `schema` and returns the parsed data. On failure
  * it answers 400 with the first issue and returns null, so the route stops on a

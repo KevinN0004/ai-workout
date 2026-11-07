@@ -19,13 +19,14 @@ model AppUser {
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  calorieEntries  CalorieEntry[]
-  generatedPlans  GeneratedPlan[]
-  mealLogs        MealLog[]
-  progressMetrics ProgressMetric[]
-  savedExercises  SavedExercise[]
-  workoutSessions WorkoutSession[]
-  exerciseSets    ExerciseSet[]
+  calorieEntries       CalorieEntry[]
+  generatedPlans       GeneratedPlan[]
+  mealLogs             MealLog[]
+  progressMetrics      ProgressMetric[]
+  savedExercises       SavedExercise[]
+  workoutSessions      WorkoutSession[]
+  exerciseSets         ExerciseSet[]
+  progressionDecisions ProgressionDecision[]
 
   @@map("app_users")
 }
@@ -77,6 +78,23 @@ model ExerciseSet {
 
   @@unique([sessionId, exerciseOrder, setNumber], map: "exercise_sets_session_order_set_key")
   @@map("exercise_sets")
+}
+
+// One answer per user, week and lift to the week's progression (roadmap B4).
+// The unique key is a full constraint, unlike the legacy-id tables', so upsert
+// can target it (server/db/postgres/007_progression_decisions.sql).
+model ProgressionDecision {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  weekStart DateTime @map("week_start") @db.Date
+  liftKey   String   @map("lift_key")
+  decision  String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart, liftKey], map: "progression_decisions_user_week_lift_key")
+  @@map("progression_decisions")
 }
 
 model MealLog {
