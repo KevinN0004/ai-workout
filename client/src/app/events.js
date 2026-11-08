@@ -3,6 +3,7 @@
  * logout, the dashboard's logs, goals and saved exercises, and the account
  * settings. App rebuilds them from its current state on every render.
  */
+import { clearActiveSession } from "./activeSession";
 import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -17,6 +18,7 @@ import { clearOutbox, readOutbox } from "./outbox";
 import { personalToProfile } from "./profileMapping";
 import { postLog } from "./sendLog";
 import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
+import { toWorkoutSave } from "./workoutSession";
 
 // The longest logout waits for the sends it flushes, in milliseconds. A save
 // still running when it passes may be lost: logout goes ahead without it.
@@ -411,26 +413,28 @@ export const createAppEventHandlers = ({
     await signOut();
   };
 
-  const submitWorkout = async (event) => {
-    event.preventDefault();
-    // The modal has already checked the cards, so this only reads them: the
-    // exercises with their sets, loads in kg, and their names in order.
-    const { exerciseSets } = toExerciseSets(
-      workoutForm.exerciseSets ?? [],
-      getPreferredMeasurementSystem()
-    );
+  // The Log workout save, shared by the form and the in-gym session's Finish
+  // (roadmap B6): `id` is the replay key, and `exerciseSets` are in the API's
+  // shape, in kg. A workout logged from a plan day carries its link; an ordinary
+  // one leaves it out, since the server takes an absent planId, never a null one.
+  const queueWorkout = ({
+    id,
+    date,
+    focus,
+    duration,
+    notes,
+    exerciseSets,
+    planId,
+    planDayIndex
+  }) => {
     const exerciseNames = exerciseSets.map((exercise) => exercise.name);
-    // A workout logged from a plan day carries its link. An ordinary one leaves
-    // the link out: the server takes an absent planId, never a null one. The
-    // label only names the day in the modal and is never sent.
-    const { planId, planDayIndex } = workoutForm;
     const link = planId ? { planId, planDayIndex } : null;
     const payload = {
-      id: crypto.randomUUID(),
-      date: workoutForm.date,
-      focus: workoutForm.focus,
-      duration: workoutForm.duration,
-      notes: workoutForm.notes,
+      id,
+      date,
+      focus,
+      duration,
+      notes,
       exercises: exerciseNames,
       exerciseSets,
       ...link
@@ -441,15 +445,15 @@ export const createAppEventHandlers = ({
     const operationId = buildOptimisticId("workout");
     const optimisticWorkout = {
       id: operationId,
-      date: workoutForm.date || getLocalDateKey(),
-      focus: workoutForm.focus || "General",
-      duration: workoutForm.duration ? Number(workoutForm.duration) : null,
+      date: date || getLocalDateKey(),
+      focus: focus || "General",
+      duration: duration ? Number(duration) : null,
       exercises: exerciseNames,
       exerciseSets,
       sets: null,
       reps: null,
       intensityRpe: null,
-      notes: workoutForm.notes || "",
+      notes: notes || "",
       planId: link?.planId ?? null,
       planDayIndex: link?.planDayIndex ?? null,
       createdAt: new Date().toISOString()
@@ -469,10 +473,40 @@ export const createAppEventHandlers = ({
       successMessage: "Workout saved.",
       undoMessage: "Workout entry removed."
     });
+  };
+
+  const submitWorkout = async (event) => {
+    event.preventDefault();
+    // The modal has already checked the cards, so this only reads them: the
+    // exercises with their sets, loads in kg. The label only names the day in
+    // the modal and is never sent.
+    const { exerciseSets } = toExerciseSets(
+      workoutForm.exerciseSets ?? [],
+      getPreferredMeasurementSystem()
+    );
+    queueWorkout({
+      id: crypto.randomUUID(),
+      date: workoutForm.date,
+      focus: workoutForm.focus,
+      duration: workoutForm.duration,
+      notes: workoutForm.notes,
+      exerciseSets,
+      planId: workoutForm.planId,
+      planDayIndex: workoutForm.planDayIndex
+    });
 
     // The form resets and the modal closes without waiting for the request.
     setWorkoutForm(newWorkoutForm());
     setWorkoutModalOpen(false);
+  };
+
+  // Finish in the in-gym session: the session is saved like the form's
+  // workout, under its own replay key, then leaves the device, and the Logs
+  // open (roadmap B6).
+  const finishSession = (session) => {
+    queueWorkout(toWorkoutSave(session, Date.now()));
+    clearActiveSession(user);
+    go("/dashboard/workouts");
   };
 
   const submitCalories = async (event) => {
@@ -647,8 +681,10 @@ export const createAppEventHandlers = ({
     resetPersonalFlow();
     scopedCacheKeysToClear.forEach(removeJsonCache);
     removeJsonCache(SESSION_CACHE_KEY);
-    // The account is gone, so its unsent entries can never be sent.
+    // The account is gone, so its unsent entries and any open in-gym session
+    // can never be sent.
     clearOutbox(user);
+    clearActiveSession(user);
     go("/");
     return { ok: true };
   };
@@ -796,6 +832,7 @@ export const createAppEventHandlers = ({
     onLogout,
     confirmSignOut,
     submitWorkout,
+    finishSession,
     submitCalories,
     submitGoals,
     submitProfile,
