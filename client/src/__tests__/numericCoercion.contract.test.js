@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toNumberOrNull } from "../app/units";
 import { fromLoadKg, toLoadKg } from "../app/exerciseSets";
+import { topOfRange } from "../app/workoutSession";
 import { e1rmOf } from "../pages/dashboard/progress";
 
 // The client half of the invariant asserted in
@@ -41,6 +42,13 @@ const helpers = [
   {
     name: "toLoadKg (app/exerciseSets)",
     call: (value) => toLoadKg(value, "metric"),
+    absent: null
+  },
+  // A target as an in-gym set opens with it: the top of a card's range text.
+  // A target of 0 reps is a measurement like any other.
+  {
+    name: "topOfRange (app/workoutSession)",
+    call: (value) => topOfRange(value),
     absent: null
   }
 ];

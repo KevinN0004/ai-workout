@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";
 import { addToOutbox, readOutbox } from "../outbox.js";
+import { readActiveSession, writeActiveSession } from "../activeSession.js";
+import { logSet, sessionFromPlanDay } from "../workoutSession.js";
 import { newCard } from "../exerciseSets";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -1162,5 +1164,113 @@ describe("signing out with entries not yet sent", () => {
 
     expect(deps.setSignOutConfirmCount).not.toHaveBeenCalled();
     expect(readOutbox(user)).toEqual([]);
+  });
+});
+
+// Finish in the in-gym session queues the same save the Log workout form does,
+// under the session's own replay key (roadmap B6).
+describe("finishing an in-gym session", () => {
+  const user = { email: "person@example.com" };
+  const NOW = Date.UTC(2026, 10, 9, 17, 0, 0);
+  const plannedDay = {
+    index: 1,
+    weekday: "Tuesday",
+    title: "Lower A",
+    lines: [],
+    prescriptions: [{ name: "Squat", restSeconds: 120 }]
+  };
+  const finished = () => {
+    const started = sessionFromPlanDay({
+      day: plannedDay,
+      cards: [newCard({ name: "Squat", targets: { amount: "5", rpe: "", load: "100" } })],
+      planId: "plan-1",
+      system: "metric",
+      now: NOW
+    });
+    return logSet(started, { amount: 5, loadKg: 100, rpe: 8 }, NOW + 60 * 1000);
+  };
+
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW + 40 * 60 * 1000);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  test("queues the session's body under its own key, clears it and opens the Logs", async () => {
+    const session = finished();
+    writeActiveSession(user, session);
+    const { deps, handlers } = buildDeps({ user, go: vi.fn() });
+
+    handlers.finishSession(session);
+
+    const { request, outbox, type } = deps.queueOptimisticLogCommit.mock.calls[0][0];
+    expect(type).toBe("workout");
+    await request();
+    const [url, options] = deps.apiFetch.mock.calls[0];
+    expect(url).toBe("/api/dashboard/workout-sessions");
+    expect(JSON.parse(options.body)).toEqual({
+      id: session.clientId,
+      date: session.date,
+      focus: "Lower A",
+      duration: 40,
+      notes: "",
+      exercises: ["Squat"],
+      exerciseSets: [{ name: "Squat", sets: [{ reps: 5, seconds: null, loadKg: 100, rpe: 8 }] }],
+      planId: "plan-1",
+      planDayIndex: 1
+    });
+    expect(outbox.clientId).toBe(session.clientId);
+    expect(readActiveSession(user)).toBeNull();
+    expect(deps.go).toHaveBeenCalledWith("/dashboard/workouts");
+  });
+
+  // A metric region, so the form's typed "100" is 100 kg, as the session's is.
+  test("sends the same sets the Log workout form sends for the same workout", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
+    vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
+    const card = newCard({ name: "Squat" });
+    const form = {
+      date: "2026-11-09",
+      focus: "Lower A",
+      duration: "40",
+      notes: "",
+      exerciseSets: [{ ...card, sets: [{ ...card.sets[0], amount: "5", load: "100", rpe: "8" }] }],
+      planId: "plan-1",
+      planDayIndex: 1
+    };
+    const fromForm = buildDeps({ user, workoutForm: form });
+    await fromForm.handlers.submitWorkout(submitEvent());
+    await fromForm.deps.queueOptimisticLogCommit.mock.calls[0][0].request();
+    const fromSession = buildDeps({ user, go: vi.fn() });
+    fromSession.handlers.finishSession(finished());
+    await fromSession.deps.queueOptimisticLogCommit.mock.calls[0][0].request();
+
+    const formBody = JSON.parse(fromForm.deps.apiFetch.mock.calls[0][1].body);
+    const sessionBody = JSON.parse(fromSession.deps.apiFetch.mock.calls[0][1].body);
+    for (const field of ["exercises", "exerciseSets", "planId", "planDayIndex", "focus"]) {
+      expect(sessionBody[field]).toEqual(formBody[field]);
+    }
+  });
+
+  test("account deletion clears an open session", async () => {
+    writeActiveSession(user, finished());
+    const { handlers } = buildDeps({
+      user,
+      go: vi.fn(),
+      setUser: vi.fn(),
+      setSignOutUnfinished: vi.fn(),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn(),
+      apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+    });
+
+    await handlers.deleteAccount("old-pass");
+
+    expect(readActiveSession(user)).toBeNull();
   });
 });
