@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
 import { isRestDay, savedPlanDays } from "../../../app/plans";
 import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
+import { sessionFromPlanDay } from "../../../app/workoutSession";
 import ModalPortal from "../../../components/ModalPortal";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
@@ -29,7 +30,8 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * to it. A rest day's card says so, and offers no log. `progression` is the
  * week's (roadmap B4): a day's details show its lifts' loads, answered through
  * `onAnswerProgression` with `progressionError` beside them, and the log opens
- * at the week's sets and loads. Offline, removing a saved exercise is
+ * at the week's sets and loads. Start workout hands `onStartSession` the day as
+ * an in-gym session (roadmap B6). Offline, removing a saved exercise is
  * disabled: it cannot be kept for later.
  */
 export default function PlansView({
@@ -44,7 +46,8 @@ export default function PlansView({
   setWorkoutModalOpen,
   progression = null,
   onAnswerProgression,
-  progressionError = ""
+  progressionError = "",
+  onStartSession
 }) {
   // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -110,6 +113,20 @@ export default function PlansView({
     });
     setSelectedDetail(null);
     setWorkoutModalOpen(true);
+  };
+  // The in-gym session for the day (roadmap B6), from the same cards the Log
+  // workout form opens with, so both start at the week's sets and loads.
+  const startPlanDay = (day) => {
+    setSelectedDetail(null);
+    onStartSession(
+      sessionFromPlanDay({
+        day,
+        cards: buildPlanDayPrefill(day, progression, system).exerciseSets,
+        planId: latestPlan.id,
+        system,
+        now: Date.now()
+      })
+    );
   };
   const selectedSavedDay = selectedDay ? savedDayFor(selectedDay.key) : null;
 
@@ -555,13 +572,22 @@ export default function PlansView({
                       />
                     ) : null}
                     {selectedSavedDay ? (
-                      <button
-                        type="button"
-                        className="cta"
-                        onClick={() => logPlanDay(selectedSavedDay)}
-                      >
-                        Log this workout
-                      </button>
+                      <div className="plan-day-actions">
+                        <button
+                          type="button"
+                          className="cta"
+                          onClick={() => startPlanDay(selectedSavedDay)}
+                        >
+                          Start workout
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => logPlanDay(selectedSavedDay)}
+                        >
+                          Log this workout
+                        </button>
+                      </div>
                     ) : null}
                   </section>
                 ) : (

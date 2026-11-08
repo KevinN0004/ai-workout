@@ -311,6 +311,42 @@ test.describe.serial("accessibility", () => {
     expectNoViolations(await analyze(page));
   });
 
+  // The in-gym session screen (roadmap B6) with a set logged, and one set
+  // walked with the keyboard alone: Tab from the RPE buttons to Done, Enter
+  // logs the set and leaves focus on Done, and Tab goes on to its Undo. Then
+  // the discard question, and Discard, so no session is left open to put a
+  // Resume notice in front of the tests after this one.
+  test("the session screen has no violations, and a set can be logged by keyboard", async () => {
+    await page.goto("/dashboard/workouts");
+    await page.getByRole("button", { name: "Start a blank workout" }).click();
+    await expect(page).toHaveURL(/\/workout$/);
+    await page.getByLabel("Exercise name").fill("Goblet squat");
+    await page.getByRole("button", { name: "Add exercise" }).click();
+    await page.getByRole("button", { name: "Done" }).click();
+    const sets = page.getByRole("list", { name: "Sets done" }).getByRole("listitem");
+    await expect(sets).toHaveCount(1);
+
+    expectNoViolations(await analyze(page));
+
+    await page.getByRole("button", { name: "RPE 10" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Done" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(sets).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Done" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Undo set 2" })).toBeFocused();
+
+    await page.getByRole("button", { name: "Cancel workout" }).click();
+    const discard = page.getByRole("dialog", { name: "Discard this workout?" });
+    await expect(discard).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+
+    await discard.getByRole("button", { name: "Discard" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/workouts$/);
+  });
+
   // The account tab is the newest surface in the app and the only one with a
   // destructive, multi-step confirmation. Two states matter: as first shown,
   // and with the confirmation revealed -- a different DOM with an extra

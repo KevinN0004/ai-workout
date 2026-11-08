@@ -410,15 +410,43 @@ describe("logging a plan day", () => {
   const renderWithPlan = ({ plan = savedPlan(), workoutSessions = [] } = {}) => {
     const setWorkoutForm = vi.fn();
     const setWorkoutModalOpen = vi.fn();
+    const onStartSession = vi.fn();
     const utils = renderView({
       weekDays: WEEK,
       latestPlanByWeekday: { Monday: mondayDay.lines, Tuesday: tuesdayDay.lines },
       dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions },
       setWorkoutForm,
-      setWorkoutModalOpen
+      setWorkoutModalOpen,
+      onStartSession
     });
-    return { ...utils, setWorkoutForm, setWorkoutModalOpen };
+    return { ...utils, setWorkoutForm, setWorkoutModalOpen, onStartSession };
   };
+
+  // Roadmap B6: the day's session, built from the same cards the Log workout
+  // form opens with, and linked to the plan day.
+  test("Start workout starts an in-gym session from the day", () => {
+    const { onStartSession } = renderWithPlan();
+    openDay("Mon");
+    expect(screen.getByRole("button", { name: "Log this workout" })).toHaveClass("ghost");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start workout" }));
+
+    const session = onStartSession.mock.calls[0][0];
+    expect(session).toMatchObject({ title: "Monday", planId: "plan-1", planDayIndex: 0 });
+    expect(session.exercises.map((exercise) => exercise.name)).toEqual(
+      buildPlanDayPrefill(mondayDay).exerciseSets.map((card) => card.name)
+    );
+    // The day's details close, so App's question about an open session is the
+    // only modal on screen.
+    expect(screen.queryByRole("button", { name: "Log this workout" })).toBeNull();
+  });
+
+  test("offers no Start workout where it offers no log", () => {
+    renderWithPlan({ plan: savedPlan({ payload: null }) });
+    openDay("Mon");
+
+    expect(screen.queryByRole("button", { name: "Start workout" })).toBeNull();
+  });
   // The workout week's cards: the meals week has a card per day as well.
   const workoutWeek = () =>
     within(screen.getByRole("heading", { name: "Workout week" }).closest("section"));

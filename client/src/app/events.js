@@ -3,7 +3,7 @@
  * logout, the dashboard's logs, goals and saved exercises, and the account
  * settings. App rebuilds them from its current state on every render.
  */
-import { clearActiveSession } from "./activeSession";
+import { clearActiveSession, readActiveSession, writeActiveSession } from "./activeSession";
 import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -18,7 +18,7 @@ import { clearOutbox, readOutbox } from "./outbox";
 import { personalToProfile } from "./profileMapping";
 import { postLog } from "./sendLog";
 import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
-import { toWorkoutSave } from "./workoutSession";
+import { loggedSetCount, toWorkoutSave } from "./workoutSession";
 
 // The longest logout waits for the sends it flushes, in milliseconds. A save
 // still running when it passes may be lost: logout goes ahead without it.
@@ -131,6 +131,8 @@ export const createAppEventHandlers = ({
   setUser,
   setSignOutUnfinished,
   setSignOutConfirmCount,
+  pendingSession,
+  setPendingSession,
   authAutoSignIn,
   clearOptimisticOperations,
   flushOptimisticOperations,
@@ -379,8 +381,9 @@ export const createAppEventHandlers = ({
     resetPersonalFlow();
     // The dashboard cache stays for this account's return, but the kept sign-in
     // goes: with it, a launch with no answer from the server would sign the
-    // visitor back in.
+    // visitor back in. So does an open in-gym session, which is this account's.
     removeJsonCache(SESSION_CACHE_KEY);
+    clearActiveSession(user);
     go("/");
     // Any answer but OK, the server's 503 included, means the session may still
     // be valid in the store until it expires, so the visitor is told.
@@ -397,8 +400,10 @@ export const createAppEventHandlers = ({
     await settleWithin(flushOptimisticOperations(), LOGOUT_FLUSH_CAP_MS);
     // Entries kept on the device that still could not be sent are lost on
     // sign-out, so it asks first; SignOutConfirm's Sign out anyway runs
-    // confirmSignOut (docs/specs/2026-11-06-offline-ready-pwa-design.md).
-    const unsent = readOutbox(user).length;
+    // confirmSignOut (docs/specs/2026-11-06-offline-ready-pwa-design.md). An
+    // open in-gym session with logged sets counts as one more.
+    const openSession = readActiveSession(user);
+    const unsent = readOutbox(user).length + (openSession && loggedSetCount(openSession) ? 1 : 0);
     if (unsent) {
       setSignOutConfirmCount(unsent);
       return;
@@ -505,6 +510,35 @@ export const createAppEventHandlers = ({
   // open (roadmap B6).
   const finishSession = (session) => {
     queueWorkout(toWorkoutSave(session, Date.now()));
+    clearActiveSession(user);
+    go("/dashboard/workouts");
+  };
+
+  // Start workout and Start a blank workout: the new session is kept on the
+  // device and opened. With one already open, App asks first
+  // (StartSessionConfirm), holding the new one as `pendingSession`.
+  const startSession = (session) => {
+    if (readActiveSession(user)) {
+      setPendingSession(session);
+      return;
+    }
+    if (!writeActiveSession(user, session)) {
+      setDashError("This device can't keep a workout in progress, so it can't start one.");
+      return;
+    }
+    go("/workout");
+  };
+
+  // StartSessionConfirm's answer: "resume" opens the session already open, and
+  // "replace" discards it for the one waiting.
+  const resolveSessionConflict = (choice) => {
+    if (choice === "replace") writeActiveSession(user, pendingSession);
+    setPendingSession(null);
+    go("/workout");
+  };
+
+  // Cancel workout, once confirmed: the session leaves the device unsaved.
+  const discardSession = () => {
     clearActiveSession(user);
     go("/dashboard/workouts");
   };
@@ -833,6 +867,9 @@ export const createAppEventHandlers = ({
     confirmSignOut,
     submitWorkout,
     finishSession,
+    startSession,
+    resolveSessionConflict,
+    discardSession,
     submitCalories,
     submitGoals,
     submitProfile,

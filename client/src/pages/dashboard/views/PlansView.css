@@ -187,6 +187,12 @@
   margin-top: 0;
 }
 
+/* Start workout over Log this workout, each as wide as the column (roadmap B6). */
+.plan-day-actions {
+  display: grid;
+  gap: 10px;
+}
+
 /* ---- The week's loads (roadmap B4) ---------------------------------------- */
 /* In the day-detail modal, under the workout lines: a line per lift with its change and
    why, its answers, and the deload week's banner. Nothing here moves. */

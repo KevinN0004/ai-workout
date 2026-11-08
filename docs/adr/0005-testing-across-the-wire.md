@@ -90,6 +90,9 @@ survived. Five things are worth knowing before touching it:
   covers it: `playwright.config.js` sets `GEMINI_API_KEY` empty, so a key in
   `server/.env` never reaches Gemini and the notes are the rule-written ones.
   Its account is `plan-<timestamp>@example.test`, deleted in `afterAll`.
+  `session.spec.js` (roadmap B6) generates the same plan to start a day of it
+  as an in-gym session; its account is `session-<timestamp>@example.test`,
+  deleted in `afterAll` too.
 - **Each run creates an account** (`e2e-<timestamp>@example.test`) and now
   deletes it before the file ends. `smoke.spec.js` deletes it as its last
   test, the thing under test; `a11y.spec.js` deletes its own account

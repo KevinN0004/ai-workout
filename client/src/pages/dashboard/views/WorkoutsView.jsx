@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
 import { formatExerciseLine } from "../../../app/exerciseSets";
 import { NO_PLAN_LINK } from "../../../app/plans";
+import { blankSession } from "../../../app/workoutSession";
 import ProgressPanel, { PrTag } from "../components/ProgressPanel";
 import useOlderLogPages from "../hooks/useOlderLogPages";
 import { prSessions } from "../progress";
@@ -45,8 +46,10 @@ const mergeById = (held, older) => {
  * (useOlderLogPages), for as long as `pagination`, the dashboard response's,
  * says the server holds more. Both Add workout buttons set the workout form's
  * date to today and open the Log workout modal; the other empty states link to
- * the view where that log is entered. A workout, calorie or meal row kept on
- * the device and not yet sent (`isQueued`, useOptimisticLogs) says so.
+ * the view where that log is entered. Start a blank workout hands
+ * `onStartSession` an in-gym session with no exercises (roadmap B6). A workout,
+ * calorie or meal row kept on the device and not yet sent (`isQueued`,
+ * useOptimisticLogs) says so.
  */
 export default function WorkoutsView({
   workouts,
@@ -57,7 +60,8 @@ export default function WorkoutsView({
   setWorkoutForm,
   setWorkoutModalOpen,
   onOpenCalories,
-  onOpenMeal
+  onOpenMeal,
+  onStartSession
 }) {
   // ---- Sorted lists and the visible slice of each ---------------------------
   // Loads show in the region's unit, and progress counts weeks to today, each
@@ -148,20 +152,29 @@ export default function WorkoutsView({
             View all logged items across workouts, calories, meals, and metrics.
           </p>
         </div>
-        <button
-          type="button"
-          className="cta"
-          onClick={() => {
-            setWorkoutForm((prev) => ({
-              ...prev,
-              date: getLocalDateKey(),
-              ...NO_PLAN_LINK
-            }));
-            setWorkoutModalOpen(true);
-          }}
-        >
-          Add workout
-        </button>
+        <div className="logs-header-actions">
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => onStartSession(blankSession({ now: Date.now() }))}
+          >
+            Start a blank workout
+          </button>
+          <button
+            type="button"
+            className="cta"
+            onClick={() => {
+              setWorkoutForm((prev) => ({
+                ...prev,
+                date: getLocalDateKey(),
+                ...NO_PLAN_LINK
+              }));
+              setWorkoutModalOpen(true);
+            }}
+          >
+            Add workout
+          </button>
+        </div>
       </div>
 
       <div className="logs-grid">
