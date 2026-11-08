@@ -1,11 +1,11 @@
 /**
  * Pins the in-gym session screen (roadmap B6): one exercise at a time, a set
  * pre-filled, stepped and logged with Done, Undo, moving between exercises,
- * adding one, and Finish, Cancel and leaving.
+ * adding one, Finish, Cancel and leaving, and the rest timer, sound and wake lock.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import SessionPage from "../SessionPage";
 import { readActiveSession } from "../../../app/activeSession";
 import { blankSession, sessionFromPlanDay } from "../../../app/workoutSession";
@@ -284,5 +284,194 @@ describe("SessionPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This device isn't keeping this workout. Finish it before you close the app."
     );
+  });
+});
+
+// An AudioContext that counts the beeps played through it. The session page
+// keeps the context it first unlocks for the page's life, so every test in the
+// file shares this one class and counts from zero.
+let beeps = 0;
+class FakeAudioContext {
+  state = "running";
+  currentTime = 0;
+  destination = {};
+  resume = () => Promise.resolve();
+  createOscillator() {
+    beeps += 1;
+    return { frequency: { value: 0 }, connect: () => {}, start: () => {}, stop: () => {} };
+  }
+  createGain() {
+    return { gain: { value: 1 }, connect: () => {} };
+  }
+}
+
+describe("SessionPage's rest timer, sound and screen", () => {
+  const tick = (ms) =>
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  const press = (name) => fireEvent.click(screen.getByRole("button", { name }));
+  const liveRegion = () => document.querySelector(".session-page [aria-live='polite']");
+  let vibrate;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW });
+    window.AudioContext = FakeAudioContext;
+    beeps = 0;
+    vibrate = vi.fn(() => true);
+    Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete window.AudioContext;
+    delete navigator.vibrate;
+    delete navigator.wakeLock;
+  });
+
+  test("Done starts the exercise's rest, and the live region says so once", () => {
+    renderPage();
+    expect(screen.queryByRole("region", { name: "Rest" })).not.toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent(/^$/);
+
+    press("Done");
+    const rest = screen.getByRole("region", { name: "Rest" });
+    expect(rest).toHaveTextContent("1:30");
+    expect(liveRegion()).toHaveTextContent(/^Rest 90 seconds$/);
+
+    tick(1000);
+    expect(rest).toHaveTextContent("1:29");
+    // The digits change each second, outside the live region, which is unchanged.
+    expect(screen.getByText("1:29").closest("[aria-live]")).toBeNull();
+    expect(liveRegion()).toHaveTextContent(/^Rest 90 seconds$/);
+  });
+
+  test("an exercise with no rest from the plan rests for 90 seconds", () => {
+    renderPage();
+    press("Next exercise");
+    press("Done");
+
+    expect(screen.getByRole("region", { name: "Rest" })).toHaveTextContent("1:30");
+  });
+
+  test("−15 s and +15 s move the rest, and Skip rest ends it", () => {
+    renderPage();
+    press("Done");
+    const rest = screen.getByRole("region", { name: "Rest" });
+
+    press("+15 s");
+    expect(rest).toHaveTextContent("1:45");
+    press("−15 s");
+    press("−15 s");
+    expect(rest).toHaveTextContent("1:15");
+
+    press("Skip rest");
+    expect(screen.queryByRole("region", { name: "Rest" })).not.toBeInTheDocument();
+  });
+
+  test("Undo takes the rest back with the set", () => {
+    renderPage();
+    press("Done");
+
+    press("Undo set 1");
+
+    expect(screen.queryByRole("region", { name: "Rest" })).not.toBeInTheDocument();
+  });
+
+  test("the end of a rest buzzes, beeps and says Rest over, once", () => {
+    renderPage();
+    press("Done");
+
+    tick(90_000);
+
+    expect(screen.getByRole("region", { name: "Rest" })).toHaveTextContent("Rest over");
+    expect(liveRegion()).toHaveTextContent(/^Rest over$/);
+    expect(vibrate).toHaveBeenCalledWith([200, 100, 200]);
+    expect(beeps).toBe(1);
+
+    // A second at a time, as a page renders them: one act batches its ticks.
+    for (let second = 0; second < 10; second += 1) tick(1000);
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(beeps).toBe(1);
+  });
+
+  test("with Sound off the end buzzes without a beep, and the switch is remembered", () => {
+    renderPage();
+    const sound = screen.getByRole("button", { name: "Sound" });
+    expect(sound).toHaveAttribute("aria-pressed", "true");
+    expect(sound).toHaveTextContent("Sound on");
+
+    press("Sound");
+    expect(sound).toHaveAttribute("aria-pressed", "false");
+    expect(sound).toHaveTextContent("Sound off");
+    press("Done");
+    tick(90_000);
+
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(beeps).toBe(0);
+    expect(JSON.parse(window.localStorage.getItem("ai-workout-session-sound-v1"))).toBe(false);
+  });
+
+  test("Sound starts off when the device remembers it off, and turns back on", () => {
+    window.localStorage.setItem("ai-workout-session-sound-v1", "false");
+    renderPage();
+    const sound = screen.getByRole("button", { name: "Sound" });
+    expect(sound).toHaveAttribute("aria-pressed", "false");
+
+    press("Sound");
+    press("Done");
+    tick(90_000);
+
+    expect(sound).toHaveAttribute("aria-pressed", "true");
+    expect(beeps).toBe(1);
+    expect(JSON.parse(window.localStorage.getItem("ai-workout-session-sound-v1"))).toBe(true);
+  });
+
+  test("a rest already over when the page opens shows Rest over, with no late alert", () => {
+    const session = { ...planned(), restEndsAt: NOW - 60_000 };
+    renderPage(session);
+
+    expect(screen.getByRole("region", { name: "Rest" })).toHaveTextContent("Rest over");
+    tick(1000);
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(beeps).toBe(0);
+  });
+
+  test("the header shows the time since the start, each second", () => {
+    renderPage();
+    expect(screen.getByText("0:00")).toBeInTheDocument();
+
+    tick(754_000);
+    expect(screen.getByText("12:34")).toBeInTheDocument();
+    expect(screen.getByText("12:34")).toHaveTextContent("Time so far 12:34");
+  });
+
+  test("past an hour the time since the start shows its hours", () => {
+    vi.setSystemTime(NOW + 3_723_000);
+    renderPage();
+
+    expect(screen.getByText("1:02:03")).toBeInTheDocument();
+  });
+
+  test("asks for the screen to stay awake while open", async () => {
+    const lock = { release: vi.fn(() => Promise.resolve()) };
+    const request = vi.fn(() => Promise.resolve(lock));
+    Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
+
+    const { unmount } = render(
+      <SessionPage
+        user={user}
+        initialSession={planned()}
+        system="metric"
+        onFinish={vi.fn()}
+        onDiscard={vi.fn()}
+        onLeave={vi.fn()}
+      />
+    );
+    await act(async () => {});
+    expect(request).toHaveBeenCalledWith("screen");
+
+    unmount();
+    expect(lock.release).toHaveBeenCalledTimes(1);
   });
 });
