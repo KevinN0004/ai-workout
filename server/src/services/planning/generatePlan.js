@@ -444,14 +444,16 @@ const effortCue = (rir) => `stop ${rir} reps short of failure`;
 /**
  * One exercise's dose as numbers: its sets; an amount, a count ("5") or a
  * range ("8-12"), of reps, seconds or steps; whether it is a side; the reps in
- * reserve it targets, or null where the line gives none; and the note the line
- * writes in brackets after it, or null.
+ * reserve it targets, or null where the line gives none; the rest its note
+ * names, in seconds at the top of its range, or null where it names none; and
+ * the note the line writes in brackets after it, or null.
  * @typedef {object} LineDose
  * @property {number} sets
  * @property {string} amount
  * @property {"reps" | "seconds" | "steps"} unit
  * @property {boolean} perSide
  * @property {string | null} rir
+ * @property {number | null} restSeconds
  * @property {string | null} note
  */
 
@@ -465,6 +467,8 @@ const effortCue = (rir) => `stop ${rir} reps short of failure`;
  * @property {{ min: number, max: number } | null} seconds
  * @property {boolean} perSide
  * @property {{ min: number, max: number } | null} targetRpe
+ * @property {number | null} restSeconds the rest after each set, for the in-gym
+ *   timer (roadmap B6), or null where the line names none
  */
 
 /**
@@ -480,6 +484,7 @@ const plainDose = (sets, amount, unit, perSide = false) => ({
   unit,
   perSide,
   rir: null,
+  restSeconds: null,
   note: null
 });
 
@@ -527,10 +532,15 @@ const doseFor = (exercise, role, rules) => {
   if (rules.lightMode) rir = "3";
   const cue = exercise.cue ? `; ${exercise.area}: ${exercise.cue}` : "";
   if (STRENGTH_HOLDS.has(exercise.id)) {
-    return { ...plainDose(sets, "30-45", "seconds"), note: `Rest 60s${cue}` };
+    return { ...plainDose(sets, "30-45", "seconds"), restSeconds: 60, note: `Rest 60s${cue}` };
   }
   const parts = [`Rest ${base.rest}`, ...(base.note ? [base.note] : []), effortCue(rir)];
-  return { ...plainDose(sets, reps, "reps"), rir, note: `${parts.join(", ")}${cue}` };
+  return {
+    ...plainDose(sets, reps, "reps"),
+    rir,
+    restSeconds: restSecondsOf(base.rest),
+    note: `${parts.join(", ")}${cue}`
+  };
 };
 
 /**
@@ -541,6 +551,14 @@ const doseFor = (exercise, role, rules) => {
 const formatDose = (dose) =>
   `${dose.sets} x ${dose.amount}${dose.unit === "reps" ? "" : ` ${dose.unit}`}` +
   `${dose.perSide ? " a side" : ""}${dose.note ? ` (${dose.note})` : ""}`;
+
+/**
+ * The top of a scheme's rest in seconds: "90s" is 90, and "60-90s" is 90. Every
+ * rest in SCHEMES ends in its seconds and an "s", which the plan gate checks
+ * against each line.
+ * @param {string} rest
+ */
+const restSecondsOf = (rest) => Number(/(\d+)s$/.exec(rest)?.[1]);
 
 /**
  * "8-12" as { min: 8, max: 12 }, and "5" as { min: 5, max: 5 }.
@@ -566,7 +584,8 @@ const prescriptionOf = (exercise, dose) => {
     reps: dose.unit === "seconds" ? null : amount,
     seconds: dose.unit === "seconds" ? amount : null,
     perSide: dose.perSide,
-    targetRpe: rir && { min: 10 - rir.max, max: 10 - rir.min }
+    targetRpe: rir && { min: 10 - rir.max, max: 10 - rir.min },
+    restSeconds: dose.restSeconds
   };
 };
 

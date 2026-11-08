@@ -28,6 +28,8 @@
  * @property {{ min: number, max: number } | null} seconds
  * @property {boolean} perSide
  * @property {{ min: number, max: number } | null} targetRpe
+ * @property {number | null} [restSeconds] the rest after each set (roadmap B6);
+ *   absent from a plan saved before it, and null where the line names none
  */
 
 /**

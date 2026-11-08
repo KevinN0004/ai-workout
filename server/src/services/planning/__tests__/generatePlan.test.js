@@ -771,7 +771,8 @@ describe("the prescriptions", () => {
         reps: { min: 10, max: 12 },
         seconds: null,
         perSide: false,
-        targetRpe: { min: 8, max: 9 }
+        targetRpe: { min: 8, max: 9 },
+        restSeconds: 90
       },
       {
         name: "Dumbbell bench press",
@@ -779,7 +780,8 @@ describe("the prescriptions", () => {
         reps: { min: 8, max: 10 },
         seconds: null,
         perSide: false,
-        targetRpe: { min: 8, max: 8 }
+        targetRpe: { min: 8, max: 8 },
+        restSeconds: 90
       },
       {
         name: "Dumbbell Romanian deadlift",
@@ -787,7 +789,8 @@ describe("the prescriptions", () => {
         reps: { min: 10, max: 12 },
         seconds: null,
         perSide: false,
-        targetRpe: { min: 8, max: 9 }
+        targetRpe: { min: 8, max: 9 },
+        restSeconds: 90
       },
       {
         name: "Chest-supported dumbbell row",
@@ -795,19 +798,37 @@ describe("the prescriptions", () => {
         reps: { min: 10, max: 12 },
         seconds: null,
         perSide: false,
-        targetRpe: { min: 8, max: 9 }
+        targetRpe: { min: 8, max: 9 },
+        restSeconds: 90
       }
     ]);
   });
 
-  test("a hold gives seconds and no RPE", () => {
+  test("a hold gives seconds and no RPE, and the hold's own rest", () => {
     expect(day(knee, "Friday").prescriptions[0]).toEqual({
       name: "Wall sit",
       sets: 3,
       reps: null,
       seconds: { min: 30, max: 45 },
       perSide: false,
-      targetRpe: null
+      targetRpe: null,
+      restSeconds: 60
+    });
+  });
+
+  // Roadmap B6: the rest the in-gym timer counts, the top of the line's rest
+  // ("60-90s" is 90), and null for a line that names none.
+  test("the rest is the top of the line's rest, for each scheme", () => {
+    const strength = generatePlan(input({ focuses: ["Strength"] })).week;
+    const fatLoss = generatePlan(input({ goal: "Lose fat" })).week;
+
+    expect(day(strength, "Monday").prescriptions[0]).toMatchObject({
+      reps: { min: 5, max: 5 },
+      restSeconds: 180
+    });
+    expect(day(fatLoss, "Monday").prescriptions[2]).toMatchObject({
+      name: "Dumbbell Romanian deadlift",
+      restSeconds: 60
     });
   });
 
@@ -820,6 +841,7 @@ describe("the prescriptions", () => {
     });
   });
 
+  // A balance line names no rest, so it has none.
   test("a side gives perSide, for reps and for holds", () => {
     expect(day(older, "Monday").prescriptions.at(-1)).toEqual({
       name: "Paused low step-up, hold at the top",
@@ -827,7 +849,8 @@ describe("the prescriptions", () => {
       reps: { min: 6, max: 6 },
       seconds: null,
       perSide: true,
-      targetRpe: null
+      targetRpe: null,
+      restSeconds: null
     });
     expect(day(older, "Thursday").prescriptions.at(-1)).toEqual({
       name: "Single-leg stand near a wall",
@@ -835,7 +858,8 @@ describe("the prescriptions", () => {
       reps: null,
       seconds: { min: 20, max: 30 },
       perSide: true,
-      targetRpe: null
+      targetRpe: null,
+      restSeconds: null
     });
   });
 
