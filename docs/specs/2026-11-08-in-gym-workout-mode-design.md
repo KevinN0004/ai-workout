@@ -1,8 +1,10 @@
 # In-gym workout mode, design
 
-Status: **decided 2026-11-07**, section by section with the owner. The plan is
-`docs/plans/2026-11-08-in-gym-workout-mode.md`. This is roadmap B6. It needs B1 (per-set
-logging) and C1 (offline-ready PWA), both done. No gate applies to it.
+Status: **decided 2026-11-07**, section by section with the owner; **applied 2026-11-08**,
+in #378 to #381, with the client floor raised in #382, all live. The plan is
+`docs/plans/2026-11-08-in-gym-workout-mode.md`, whose status says where the work went past
+this text. This is roadmap B6. It needs B1 (per-set logging) and C1 (offline-ready PWA),
+both done. No gate applies to it.
 
 Logging happens on a phone between sets, and the Log workout modal is built for a desk: a
 form of typed fields, saved once at the end. B6 adds a full-screen session to train in.
