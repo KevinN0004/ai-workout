@@ -1,13 +1,16 @@
 /**
  * The in-gym session screen at /workout (roadmap B6): one exercise at a time,
- * its next set pre-filled to step and log with Done, the sets done with Undo,
- * the exercise list, and Finish or Cancel. Kept on the device as it changes.
+ * its next set logged with Done, a rest timer that buzzes and beeps, the sets
+ * done with Undo, the exercise list, and Finish or Cancel. Kept on the device.
  */
 import { useState } from "react";
 import "./SessionPage.css";
+import { readJsonCache, writeJsonCache } from "../../app/cache";
 import { fromLoadKg } from "../../app/exerciseSets";
 import {
   addExercise,
+  adjustRest,
+  endRest,
   goTo,
   loggedSetCount,
   logSet,
@@ -15,11 +18,18 @@ import {
   undoLastSet
 } from "../../app/workoutSession";
 import DiscardConfirm from "./components/DiscardConfirm";
+import ElapsedTime from "./components/ElapsedTime";
 import ExerciseList from "./components/ExerciseList";
+import RestTimer from "./components/RestTimer";
 import SetPanel from "./components/SetPanel";
 import useSessionState from "./hooks/useSessionState";
+import useWakeLock from "./hooks/useWakeLock";
+import { beep, buzz, unlockAudio } from "./restAlert";
 
 const UNIT = { metric: "kg", imperial: "lb" };
+// The Sound switch, kept for the device rather than the account, and on until
+// turned off.
+const SOUND_KEY = "ai-workout-session-sound-v1";
 
 /** A load in kg as the region shows it, with its unit, or null for none. */
 const loadText = (loadKg, system) => {
@@ -50,6 +60,10 @@ export default function SessionPage({
 }) {
   const { session, update, kept } = useSessionState(user, initialSession);
   const [confirming, setConfirming] = useState(false);
+  const [sound, setSound] = useState(() => readJsonCache(SOUND_KEY) !== false);
+  // What the live region says: a rest starting, and a rest over.
+  const [announcement, setAnnouncement] = useState("");
+  useWakeLock();
   const exercise = session.exercises[session.current];
   const count = loggedSetCount(session);
   const last = session.current === session.exercises.length - 1;
@@ -59,14 +73,48 @@ export default function SessionPage({
     else onDiscard();
   };
 
+  const toggleSound = () => {
+    setSound(!sound);
+    writeJsonCache(SOUND_KEY, !sound);
+    unlockAudio();
+  };
+
+  // Done is a tap, so it also unlocks the audio the rest's end will beep with.
+  const logDone = (set) => {
+    unlockAudio();
+    update(logSet(session, set, Date.now()));
+    setAnnouncement(`Rest ${exercise.restSeconds} seconds`);
+  };
+
+  const restOver = () => {
+    buzz();
+    if (sound) beep();
+    setAnnouncement("Rest over");
+  };
+
   return (
     <main className="session-page">
       <header className="session-header">
         <button type="button" className="ghost" onClick={onLeave}>
           Dashboard
         </button>
-        <h1>{session.title}</h1>
+        <div className="session-heading">
+          <h1>{session.title}</h1>
+          <ElapsedTime startedAt={session.startedAt} />
+        </div>
+        <button
+          type="button"
+          className="ghost session-sound"
+          aria-pressed={sound}
+          onClick={toggleSound}
+        >
+          Sound<span aria-hidden="true">{sound ? " on" : " off"}</span>
+        </button>
       </header>
+
+      <p className="visually-hidden" aria-live="polite">
+        {announcement}
+      </p>
 
       {!kept ? (
         <p className="session-warning" role="alert">
@@ -92,11 +140,7 @@ export default function SessionPage({
             </p>
           ) : null}
 
-          <SetPanel
-            exercise={exercise}
-            system={system}
-            onDone={(set) => update(logSet(session, set, Date.now()))}
-          />
+          <SetPanel exercise={exercise} system={system} onDone={logDone} />
 
           {exercise.sets.length ? (
             <ol className="session-sets" aria-label="Sets done">
@@ -116,6 +160,15 @@ export default function SessionPage({
                 </li>
               ))}
             </ol>
+          ) : null}
+
+          {session.restEndsAt !== null ? (
+            <RestTimer
+              restEndsAt={session.restEndsAt}
+              onAdjust={(seconds) => update(adjustRest(session, seconds, Date.now()))}
+              onSkip={() => update(endRest(session))}
+              onEnd={restOver}
+            />
           ) : null}
 
           <div className="session-move">

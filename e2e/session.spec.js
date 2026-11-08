@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 // The in-gym session end to end (roadmap B6): a plan day started as a session,
-// sets logged with Done and one undone, the session kept on the device across a
-// reload and a trip to the dashboard, and Finish saving it as a workout that
-// Postgres keeps. The plan is generated as plan.spec.js does, with the same
-// fixed answers, so Monday is "Full body A".
+// sets logged with Done and one undone, a rest run to its end and one skipped,
+// the session kept on the device across a reload and a trip to the dashboard,
+// and Finish saving it as a workout that Postgres keeps. The plan is generated
+// as plan.spec.js does, with the same fixed answers, so Monday is "Full body A".
 
 const account = {
   email: `session-${Date.now()}@example.test`,
@@ -20,6 +20,9 @@ test.describe.serial("start a plan day as a session and finish it", () => {
     // session kept in localStorage, have to survive into every later test.
     context = await browser.newContext();
     page = await context.newPage();
+    // Installed before the first page loads and never paused, so time flows as
+    // usual, and fastForward can move a rest to its end without waiting for it.
+    await page.clock.install();
   });
 
   test.afterAll(async () => {
@@ -95,10 +98,25 @@ test.describe.serial("start a plan day as a session and finish it", () => {
     await expect(sets.getByRole("listitem")).toHaveCount(1);
     await expect(sets).toContainText(/^Set 1: \d+ reps, 20 lb, RPE 8/);
 
-    // The second set copies the first's reps and load, never its RPE; undone,
-    // it goes, and logged again it comes back.
+    // Done starts the exercise's rest, and the live region says how long it is.
+    // Moved to its end, the rest is over: the timer and the live region say so.
+    const rest = page.getByRole("region", { name: "Rest" });
+    const live = page.locator(".session-page [aria-live='polite']");
+    await expect(rest).toContainText(/^\d+:\d\d/);
+    await expect(live).toHaveText(/^Rest \d+ seconds$/);
+    const restSeconds = Number((await live.textContent()).match(/\d+/)[0]);
+    await page.clock.fastForward(restSeconds * 1000);
+    await expect(rest).toHaveText("Rest over");
+    await expect(live).toHaveText("Rest over");
+
+    // The second set copies the first's reps and load, never its RPE. Its rest
+    // starts, and Skip rest ends it. Undone, the set goes, and logged again it
+    // comes back.
     await page.getByRole("button", { name: "Done" }).click();
     await expect(sets.getByRole("listitem")).toHaveCount(2);
+    await expect(rest).toContainText(/^\d+:\d\d/);
+    await page.getByRole("button", { name: "Skip rest" }).click();
+    await expect(rest).toHaveCount(0);
     await page.getByRole("button", { name: "Undo set 2" }).click();
     await expect(sets.getByRole("listitem")).toHaveCount(1);
     await page.getByRole("button", { name: "Done" }).click();

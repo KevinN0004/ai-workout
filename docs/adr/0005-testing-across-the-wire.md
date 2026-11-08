@@ -92,7 +92,9 @@ survived. Five things are worth knowing before touching it:
   Its account is `plan-<timestamp>@example.test`, deleted in `afterAll`.
   `session.spec.js` (roadmap B6) generates the same plan to start a day of it
   as an in-gym session; its account is `session-<timestamp>@example.test`,
-  deleted in `afterAll` too.
+  deleted in `afterAll` too. It installs Playwright's clock before the first
+  page loads and never pauses it, so time flows as usual and `fastForward`
+  moves a rest to its end without waiting for it.
 - **Each run creates an account** (`e2e-<timestamp>@example.test`) and now
   deletes it before the file ends. `smoke.spec.js` deletes it as its last
   test, the thing under test; `a11y.spec.js` deletes its own account
