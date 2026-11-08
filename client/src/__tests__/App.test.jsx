@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const home = vi.hoisted(() => ({ props: null }));
@@ -42,6 +42,14 @@ vi.mock("../pages/workout-result/WorkoutResultPage", () => ({
   }
 }));
 
+const sessionPage = vi.hoisted(() => ({ props: null }));
+vi.mock("../pages/workout/SessionPage", () => ({
+  default: (props) => {
+    sessionPage.props = props;
+    return <div data-testid="session-page">Session page</div>;
+  }
+}));
+
 const workerUpdate = vi.hoisted(() => ({ ready: false, reload: null }));
 vi.mock("../app/hooks/useWorkerUpdate", () => ({
   default: () => ({ ready: workerUpdate.ready, reload: workerUpdate.reload })
@@ -51,6 +59,8 @@ import App from "../App";
 import { DASHBOARD_CACHE_PREFIX, SESSION_CACHE_KEY, goalOptions } from "../app/constants";
 import { markUnanswered } from "../app/connection";
 import { addToOutbox, readOutbox } from "../app/outbox";
+import { readActiveSession, writeActiveSession } from "../app/activeSession";
+import { addExercise, blankSession, logSet } from "../app/workoutSession";
 
 const setPath = (path) => {
   window.history.pushState({}, "", path);
@@ -637,6 +647,157 @@ describe("App", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(dash.props.user).toEqual(ada);
       expect(readOutbox(ada)).toHaveLength(1);
+    });
+  });
+
+  // The in-gym session's route, its Resume notice, and the question when one is
+  // already open (roadmap B6).
+  describe("the in-gym session", () => {
+    const ada = { email: "ada@example.com" };
+    const STARTED = Date.UTC(2026, 10, 9, 17, 5, 0);
+    const started = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(STARTED);
+    const withSet = () =>
+      logSet(
+        addExercise(blankSession({ now: STARTED }), { name: "Squat", kind: "reps" }),
+        { amount: 5, loadKg: 100, rpe: null },
+        STARTED
+      );
+
+    beforeEach(() => {
+      sessionPage.props = null;
+      document.cookie = "csrfToken=session-token";
+    });
+
+    afterEach(() => {
+      document.cookie = "csrfToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.clear();
+    });
+
+    test("/workout opens the session kept on the device", async () => {
+      const open = withSet();
+      writeActiveSession(ada, open);
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/workout");
+
+      expect(await screen.findByTestId("session-page")).toBeInTheDocument();
+      expect(sessionPage.props.initialSession).toEqual(open);
+      expect(sessionPage.props.user).toEqual(ada);
+    });
+
+    test("/workout with no session open goes to the Logs", async () => {
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/workout");
+
+      expect(window.location.pathname).toBe("/dashboard/workouts");
+    });
+
+    test("/workout with nobody signed in asks to sign in", async () => {
+      await renderSettled("/workout");
+
+      expect(screen.getByText("Sign in to continue your workout.")).toBeInTheDocument();
+      await act(async () => {
+        screen.getByRole("button", { name: "Sign in" }).click();
+      });
+      expect(window.location.pathname).toBe("/auth");
+    });
+
+    test("leaving keeps the session, and the dashboard offers to resume it", async () => {
+      writeActiveSession(ada, withSet());
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/workout");
+      await screen.findByTestId("session-page");
+
+      await act(async () => sessionPage.props.onLeave());
+
+      expect(window.location.pathname).toBe("/dashboard/workouts");
+      expect(screen.getByRole("status")).toHaveTextContent(
+        `Workout in progress, started ${started}.`
+      );
+      await act(async () => {
+        screen.getByRole("button", { name: "Resume" }).click();
+      });
+      expect(window.location.pathname).toBe("/workout");
+    });
+
+    test("no Resume notice off the dashboard", async () => {
+      writeActiveSession(ada, withSet());
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/plan");
+
+      expect(screen.queryByText(/Workout in progress/)).not.toBeInTheDocument();
+    });
+
+    test("no Resume notice on the session screen itself", async () => {
+      writeActiveSession(ada, withSet());
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/workout");
+      await screen.findByTestId("session-page");
+
+      expect(screen.queryByText(/Workout in progress/)).not.toBeInTheDocument();
+    });
+
+    test("starting one while another is open asks, and each answer does its part", async () => {
+      const open = withSet();
+      writeActiveSession(ada, open);
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/dashboard/plans");
+      const draft = blankSession({ now: STARTED + 60 * 60 * 1000 });
+
+      await act(async () => dash.props.onStartSession(draft));
+      expect(screen.getByRole("dialog", { name: "A workout is in progress" })).toBeInTheDocument();
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Discard and start" }).click();
+      });
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(readActiveSession(ada)).toEqual(draft);
+      expect(window.location.pathname).toBe("/workout");
+    });
+
+    test("Resume opens the session already open, and drops the new one", async () => {
+      const open = withSet();
+      writeActiveSession(ada, open);
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/dashboard/plans");
+
+      await act(async () => dash.props.onStartSession(blankSession({ now: STARTED })));
+      await act(async () => {
+        within(screen.getByRole("dialog")).getByRole("button", { name: "Resume" }).click();
+      });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(readActiveSession(ada)).toEqual(open);
+      expect(window.location.pathname).toBe("/workout");
+    });
+
+    test("closing the question leaves the open session as it was", async () => {
+      const open = withSet();
+      writeActiveSession(ada, open);
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/dashboard/plans");
+
+      await act(async () => dash.props.onStartSession(blankSession({ now: STARTED })));
+      await act(async () => {
+        fireEvent.keyDown(document, { key: "Escape" });
+      });
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(readActiveSession(ada)).toEqual(open);
+    });
+
+    test("Finish and Cancel reach the session handlers", async () => {
+      writeActiveSession(ada, withSet());
+      stubSession(sessionResponse({ user: ada }));
+      await renderSettled("/workout");
+      await screen.findByTestId("session-page");
+
+      await act(async () => sessionPage.props.onDiscard());
+
+      expect(readActiveSession(ada)).toBeNull();
+      expect(window.location.pathname).toBe("/dashboard/workouts");
     });
   });
 

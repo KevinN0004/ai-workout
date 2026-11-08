@@ -3,7 +3,7 @@ import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";
 import { addToOutbox, readOutbox } from "../outbox.js";
 import { readActiveSession, writeActiveSession } from "../activeSession.js";
-import { logSet, sessionFromPlanDay } from "../workoutSession.js";
+import { addExercise, blankSession, logSet, sessionFromPlanDay } from "../workoutSession.js";
 import { newCard } from "../exerciseSets";
 import {
   AIR_QUALITY_CACHE_PREFIX,
@@ -1270,6 +1270,168 @@ describe("finishing an in-gym session", () => {
     });
 
     await handlers.deleteAccount("old-pass");
+
+    expect(readActiveSession(user)).toBeNull();
+  });
+});
+
+// Starting, resolving and leaving an in-gym session (roadmap B6). Only one is
+// open at a time, so starting another while one is open asks first.
+describe("starting an in-gym session", () => {
+  const user = { email: "person@example.com" };
+  const draft = blankSession({ now: Date.UTC(2026, 10, 9, 17, 0, 0) });
+  const open = () =>
+    logSet(
+      addExercise(blankSession({ now: 1 }), { name: "Squat", kind: "reps" }),
+      { amount: 1, loadKg: null, rpe: null },
+      1
+    );
+
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  test("keeps the session on the device and opens /workout", () => {
+    const { deps, handlers } = buildDeps({ user, go: vi.fn(), setPendingSession: vi.fn() });
+
+    handlers.startSession(draft);
+
+    expect(readActiveSession(user)).toEqual(draft);
+    expect(deps.go).toHaveBeenCalledWith("/workout");
+  });
+
+  test("with one already open, asks instead of replacing it", () => {
+    const current = open();
+    writeActiveSession(user, current);
+    const { deps, handlers } = buildDeps({ user, go: vi.fn(), setPendingSession: vi.fn() });
+
+    handlers.startSession(draft);
+
+    expect(deps.setPendingSession).toHaveBeenCalledWith(draft);
+    expect(readActiveSession(user)).toEqual(current);
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("says so, and stays put, when the device will not store it", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Quota exceeded", "QuotaExceededError");
+    });
+    const { deps, handlers } = buildDeps({ user, go: vi.fn(), setPendingSession: vi.fn() });
+
+    handlers.startSession(draft);
+
+    expect(deps.setDashError).toHaveBeenCalledWith(
+      "This device can't keep a workout in progress, so it can't start one."
+    );
+    expect(deps.go).not.toHaveBeenCalled();
+  });
+
+  test("Resume keeps the open session and opens it", () => {
+    const current = open();
+    writeActiveSession(user, current);
+    const { deps, handlers } = buildDeps({
+      user,
+      go: vi.fn(),
+      pendingSession: draft,
+      setPendingSession: vi.fn()
+    });
+
+    handlers.resolveSessionConflict("resume");
+
+    expect(deps.setPendingSession).toHaveBeenCalledWith(null);
+    expect(readActiveSession(user)).toEqual(current);
+    expect(deps.go).toHaveBeenCalledWith("/workout");
+  });
+
+  test("Discard and start replaces it with the new one", () => {
+    writeActiveSession(user, open());
+    const { deps, handlers } = buildDeps({
+      user,
+      go: vi.fn(),
+      pendingSession: draft,
+      setPendingSession: vi.fn()
+    });
+
+    handlers.resolveSessionConflict("replace");
+
+    expect(readActiveSession(user)).toEqual(draft);
+    expect(deps.setPendingSession).toHaveBeenCalledWith(null);
+    expect(deps.go).toHaveBeenCalledWith("/workout");
+  });
+
+  test("Cancel workout discards the session and opens the Logs", () => {
+    writeActiveSession(user, open());
+    const { deps, handlers } = buildDeps({ user, go: vi.fn() });
+
+    handlers.discardSession();
+
+    expect(readActiveSession(user)).toBeNull();
+    expect(deps.go).toHaveBeenCalledWith("/dashboard/workouts");
+  });
+});
+
+// An open session with logged sets is unsent work like a queued entry, so
+// sign-out counts it; sign-out always clears it (roadmap B6).
+describe("signing out with a workout in progress", () => {
+  const user = { email: "person@example.com" };
+  const signOutDeps = () => ({
+    user,
+    go: vi.fn(),
+    setUser: vi.fn(),
+    setSignOutUnfinished: vi.fn(),
+    setSignOutConfirmCount: vi.fn(),
+    clearOptimisticOperations: vi.fn(),
+    clearDashboardDataState: vi.fn(),
+    clearDashboardToast: vi.fn(),
+    resetPersonalFlow: vi.fn(),
+    apiFetch: vi.fn(async () => jsonResponse({ ok: true }))
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  test("counts a session with logged sets, and asks", async () => {
+    writeActiveSession(
+      user,
+      logSet(
+        addExercise(blankSession({ now: 1 }), { name: "Squat", kind: "reps" }),
+        { amount: 1, loadKg: null, rpe: null },
+        1
+      )
+    );
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.onLogout();
+
+    expect(deps.setSignOutConfirmCount).toHaveBeenCalledWith(1);
+    expect(deps.setUser).not.toHaveBeenCalled();
+  });
+
+  test("does not count one with no sets, and clears it on the way out", async () => {
+    writeActiveSession(user, blankSession({ now: 1 }));
+    const { deps, handlers } = buildDeps(signOutDeps());
+
+    await handlers.onLogout();
+
+    expect(deps.setSignOutConfirmCount).not.toHaveBeenCalled();
+    expect(deps.setUser).toHaveBeenCalledWith(null);
+    expect(readActiveSession(user)).toBeNull();
+  });
+
+  test("Sign out anyway clears it", async () => {
+    writeActiveSession(
+      user,
+      logSet(
+        addExercise(blankSession({ now: 1 }), { name: "Squat", kind: "reps" }),
+        { amount: 1, loadKg: null, rpe: null },
+        1
+      )
+    );
+    const { handlers } = buildDeps(signOutDeps());
+
+    await handlers.confirmSignOut();
 
     expect(readActiveSession(user)).toBeNull();
   });

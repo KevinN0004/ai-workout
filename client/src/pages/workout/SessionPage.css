@@ -1,0 +1,231 @@
+/* The in-gym session screen (SessionPage.jsx, roadmap B6): one column sized for a phone
+   held in one hand, large steppers and a full-width Done near the thumb. Every rule is
+   scoped to .session-page, and nothing here moves. */
+
+.session-page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 16px 32px;
+  display: grid;
+  gap: 20px;
+}
+
+.session-page button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ---- Header -------------------------------------------------------------- */
+.session-page .session-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-page .session-header h1 {
+  margin: 0;
+  font-size: var(--font-h3-max);
+  overflow-wrap: anywhere;
+}
+
+.session-page .session-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 95, 109, 0.14);
+  border: 1px solid rgba(255, 95, 109, 0.4);
+  color: #ffd2d6;
+}
+
+/* ---- The current exercise ------------------------------------------------ */
+.session-page .session-exercise {
+  display: grid;
+  gap: 12px;
+}
+
+.session-page .session-position,
+.session-page .session-target {
+  margin: 0;
+  color: #aab3ff;
+  font-size: var(--font-small);
+}
+
+.session-page .session-exercise h2 {
+  margin: 0;
+  font-size: var(--font-h2-max);
+  overflow-wrap: anywhere;
+}
+
+.session-page .session-empty {
+  margin: 0;
+  color: #cdd4ff;
+}
+
+/* ---- The set panel: steppers, RPE and Done ------------------------------- */
+.session-page .set-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(12, 16, 30, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.session-page .stepper {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-page .stepper-button {
+  height: 64px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5ff;
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.session-page .stepper-value {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-page .stepper-value output {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.session-page .stepper-value-load output {
+  font-size: 30px;
+}
+
+.session-page .stepper-unit {
+  color: #aab3ff;
+  font-size: var(--font-small);
+}
+
+.session-page .rpe-group {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.session-page .rpe-group button {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: #cdd4ff;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.session-page .rpe-group button[aria-pressed="true"] {
+  background: rgba(255, 179, 71, 0.2);
+  border-color: rgba(255, 179, 71, 0.6);
+  color: #ffd9a0;
+}
+
+.session-page .session-done {
+  min-height: 60px;
+  font-size: 20px;
+}
+
+/* ---- Sets done and moving between exercises ------------------------------ */
+.session-page .session-sets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.session-page .session-sets li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #cdd4ff;
+}
+
+.session-page .session-undo {
+  padding: 6px 12px;
+}
+
+.session-page .session-move,
+.session-page .session-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.session-page .session-move button,
+.session-page .session-footer button {
+  min-height: 48px;
+}
+
+/* ---- The exercise list --------------------------------------------------- */
+.session-page .session-exercises {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+
+.session-page .session-exercises summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.session-page .session-exercise-list {
+  margin: 8px 0 16px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.session-page .session-exercise-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-page .session-exercise-jump {
+  flex: 1;
+  min-height: 44px;
+  text-align: left;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5ff;
+  padding: 8px 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.session-page .session-exercise-jump[aria-current="step"] {
+  outline: 2px solid rgba(255, 179, 71, 0.6);
+}
+
+.session-page .is-skipped .session-exercise-jump {
+  color: #8e96c8;
+  text-decoration: line-through;
+}
+
+.session-page .session-add {
+  display: grid;
+  gap: 12px;
+}

@@ -398,3 +398,13 @@ export const toWorkoutSave = (session, now) => ({
   planId: session.planId,
   planDayIndex: session.planDayIndex
 });
+
+/**
+ * When `session` started, as the clock reads it in the visitor's locale, for
+ * "started 18:05".
+ * @param {{ startedAt: number }} session
+ */
+export const startedAtText = (session) =>
+  new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(
+    session.startedAt
+  );

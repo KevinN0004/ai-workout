@@ -14,6 +14,13 @@
   gap: 16px;
 }
 
+/* Start a blank workout beside Add workout, wrapping under it on a narrow screen. */
+.workouts-view .logs-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .workouts-view .log-section {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;

@@ -649,3 +649,19 @@ describe("entries not sent yet", () => {
     expect(within(sent).queryByText("Not sent yet")).not.toBeInTheDocument();
   });
 });
+
+// Roadmap B6: an in-gym session with no plan day behind it.
+describe("starting a blank workout", () => {
+  test("Start a blank workout starts an empty session", () => {
+    const onStartSession = vi.fn();
+    renderView({ onStartSession });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a blank workout" }));
+
+    expect(onStartSession.mock.calls[0][0]).toMatchObject({
+      title: "Workout",
+      planId: null,
+      exercises: []
+    });
+  });
+});

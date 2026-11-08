@@ -66,7 +66,8 @@ const DASH_VIEW_ORDER = [
  * (useDashboardData), the forms, and the
  * events.js handlers. The page derives its numbers through useDashboardMetrics,
  * reads the week's progression through useProgression with App's `apiFetch`,
- * and keeps only the profile menu's state. Signed out, it renders the header
+ * and keeps only the profile menu's state. `onStartSession` reaches the Plans
+ * and Logs views, which start an in-gym session. Signed out, it renders the header
  * alone, which offers sign-in.
  */
 export default function DashboardPage({
@@ -122,7 +123,8 @@ export default function DashboardPage({
   plannerModal,
   dashboardToast,
   clearDashboardToast,
-  apiFetch
+  apiFetch,
+  onStartSession
 }) {
   // ---- Profile menu, metrics and the next workout ---------------------------
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -318,6 +320,7 @@ export default function DashboardPage({
             setWorkoutModalOpen={setWorkoutModalOpen}
             onOpenCalories={() => navigateDashView("calories")}
             onOpenMeal={() => navigateDashView("meal")}
+            onStartSession={onStartSession}
           />
         </Suspense>
       );
@@ -367,6 +370,7 @@ export default function DashboardPage({
             progression={progression}
             onAnswerProgression={answerProgression}
             progressionError={progressionError}
+            onStartSession={onStartSession}
           />
         </Suspense>
       );

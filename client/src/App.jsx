@@ -7,6 +7,7 @@ import AuthPage from "./pages/auth/AuthPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import HomePage from "./pages/home/HomePage";
 import WorkoutResultPage from "./pages/workout-result/WorkoutResultPage";
+import SessionSignIn from "./pages/workout/components/SessionSignIn";
 import {
   AIR_QUALITY_CACHE_PREFIX,
   DASHBOARD_CACHE_PREFIX,
@@ -23,6 +24,8 @@ import {
 import { buildScopedCacheKey, readJsonCache, removeJsonCache, writeJsonCache } from "./app/cache";
 import AppNotice from "./app/components/AppNotice";
 import SignOutConfirm from "./app/components/SignOutConfirm";
+import StartSessionConfirm from "./app/components/StartSessionConfirm";
+import { readActiveSession } from "./app/activeSession";
 import { mergeOptimisticDashboard } from "./app/dashboard";
 import { describeAge } from "./app/describeAge";
 import useApiClient from "./app/hooks/useApiClient";
@@ -36,6 +39,7 @@ import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
 import { newWorkoutForm } from "./app/exerciseSets";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
+import { startedAtText } from "./app/workoutSession";
 import {
   getLocalDateKey,
   getPreferredMeasurementSystem,
@@ -49,6 +53,9 @@ import "./styles/app.css";
 // The planner modal is its own chunk, fetched when App first renders it rather
 // than shipped in the main one: it and its inlined thumbnails are about 29 kB.
 const PlannerSetupModal = lazy(() => import("./app/components/PlannerSetupModal"));
+// The in-gym session screen is its own chunk too, fetched on the first visit to
+// /workout: most visits never open it.
+const SessionPage = lazy(() => import("./pages/workout/SessionPage"));
 
 // How long the session check waits before asking again while the server cannot
 // answer it, in milliseconds: one delay per failed attempt, the last repeated.
@@ -59,8 +66,8 @@ const SESSION_RETRY_DELAYS_MS = [2000, 5000, 15000, 30000];
 const KEPT_ENTRIES = "Entries you log are saved on this device and sent when you reconnect.";
 
 /**
- * Routes on window.location.pathname without a router: /auth, /plan and
- * /dashboard with its subpaths each have a page, and any other path renders
+ * Routes on window.location.pathname without a router: /auth, /plan, /workout
+ * and /dashboard with its subpaths each have a page, and any other path renders
  * HomePage. The planner modal is built here and passed to HomePage and
  * DashboardPage, which both render it.
  */
@@ -84,6 +91,8 @@ export default function App() {
   // How many entries kept on the device a sign-out would lose; above 0 while
   // SignOutConfirm asks.
   const [signOutConfirmCount, setSignOutConfirmCount] = useState(0);
+  // A new in-gym session waiting while StartSessionConfirm asks about the open one.
+  const [pendingSession, setPendingSession] = useState(null);
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -140,6 +149,7 @@ export default function App() {
   const { ready: updateReady, reload: reloadForUpdate } = useWorkerUpdate();
   const offline = useConnection() === "offline";
   const isDashboardRoute = route === "/dashboard" || route.startsWith("/dashboard/");
+  const isWorkoutRoute = route === "/workout" || route === "/workout/";
   const dashboardCacheKey = useMemo(
     () => (user ? buildScopedCacheKey(DASHBOARD_CACHE_PREFIX, user) : ""),
     [user]
@@ -372,7 +382,11 @@ export default function App() {
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
-    removeSavedExercise
+    removeSavedExercise,
+    finishSession,
+    startSession,
+    resolveSessionConflict,
+    discardSession
   } = createAppEventHandlers({
     apiFetch,
     user,
@@ -429,7 +443,9 @@ export default function App() {
     mealLogForm,
     setMealLogForm,
     progressForm,
-    setProgressForm
+    setProgressForm,
+    pendingSession,
+    setPendingSession
   });
 
   // ---- Modals and the parsed plan -------------------------------------------
@@ -461,6 +477,11 @@ export default function App() {
   const latestPlanByWeekday = useMemo(() => extractLatestPlanByWeekday(dashboard), [dashboard]);
 
   // ---- Routing and session --------------------------------------------------
+
+  // The in-gym session kept on this device for the user: /workout opens it, and
+  // the dashboard offers to resume it.
+  const openSession = user ? readActiveSession(user) : null;
+  const hasOpenSession = Boolean(openSession);
 
   // `go` navigates with pushState, which fires no event, so the browser's back and
   // forward buttons are the only route changes this has to hear about.
@@ -562,10 +583,17 @@ export default function App() {
     }
   }, [go, route, user]);
 
+  // /workout with no session open, a finished one reopened from history among
+  // them, has nothing to show, so it goes to the Logs.
+  useEffect(() => {
+    if (isWorkoutRoute && user && !hasOpenSession) go("/dashboard/workouts");
+  }, [go, isWorkoutRoute, user, hasOpenSession]);
+
   // ---- The page for the route -----------------------------------------------
   // Every page renders with the session notice after it: while the session
   // check is still waiting for an answer, or after a sign-out the server could
-  // not complete, until it is dismissed or someone signs in. Otherwise, a new
+  // not complete, until it is dismissed or someone signs in. Otherwise, on the
+  // dashboard, an in-gym session left open is offered to resume; and then a new
   // version of the app that is waiting is offered there, and loads only when
   // the visitor presses Reload. The session notices come first, because they
   // say what is on screen may be stale. A signed-in visitor the server cannot
@@ -587,6 +615,12 @@ export default function App() {
         message="Signed out on this device, but the server could not end your session. It stays valid until it expires."
         onDismiss={() => setSignOutUnfinished(false)}
       />
+    ) : isDashboardRoute && openSession ? (
+      <AppNotice
+        message={`Workout in progress, started ${startedAtText(openSession)}.`}
+        actionLabel="Resume"
+        onAction={() => go("/workout")}
+      />
     ) : updateReady ? (
       <AppNotice
         message="A new version is ready."
@@ -603,8 +637,34 @@ export default function App() {
         onCancel={() => setSignOutConfirmCount(0)}
         onConfirm={confirmSignOut}
       />
+      <StartSessionConfirm
+        openSession={openSession}
+        waiting={Boolean(pendingSession)}
+        onResume={() => resolveSessionConflict("resume")}
+        onReplace={() => resolveSessionConflict("replace")}
+        onCancel={() => setPendingSession(null)}
+      />
     </>
   );
+
+  if (isWorkoutRoute) {
+    if (!user) return withNotice(<SessionSignIn onSignIn={() => go("/auth")} />);
+    return withNotice(
+      openSession ? (
+        <Suspense fallback={null}>
+          <SessionPage
+            key={openSession.clientId}
+            user={user}
+            initialSession={openSession}
+            system={getPreferredMeasurementSystem()}
+            onFinish={finishSession}
+            onDiscard={discardSession}
+            onLeave={() => go("/dashboard/workouts")}
+          />
+        </Suspense>
+      ) : null
+    );
+  }
 
   if (route === "/auth" || route === "/auth/") {
     return withNotice(
@@ -706,6 +766,7 @@ export default function App() {
         dashboardToast={dashboardToast}
         clearDashboardToast={clearDashboardToast}
         apiFetch={apiFetch}
+        onStartSession={startSession}
       />
     );
   }
