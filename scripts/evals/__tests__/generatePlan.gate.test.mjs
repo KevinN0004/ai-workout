@@ -57,6 +57,7 @@ const groupsOf = (day) =>
 const SET_LINE =
   /^- (?:[A-Z]\d\. )?(.+?): (\d+) x (\d+)(?:-(\d+))?( seconds| steps)?( a side)?(?: \((.*)\))?$/;
 const EFFORT_CUE = /stop (\d+)(?:-(\d+))? reps short of failure/;
+const REST_CUE = /Rest (\d+)(?:-(\d+))?s/;
 
 // Roadmap B1: each line of sets has exactly one prescription, in line order,
 // that says what the line says. Read independently of the generator, so a
@@ -75,6 +76,10 @@ const prescriptionFailures = (day) => {
     const range = seconds ? prescription.seconds : prescription.reps;
     const cue = EFFORT_CUE.exec(note ?? "");
     const rpe = cue ? { min: 10 - Number(cue[2] ?? cue[1]), max: 10 - Number(cue[1]) } : null;
+    // Roadmap B6: the rest the in-gym timer counts is the top of the line's rest,
+    // and null when the line names none.
+    const rest = REST_CUE.exec(note ?? "");
+    const restSeconds = rest ? Number(rest[2] ?? rest[1]) : null;
     const agrees =
       prescription.name === name &&
       prescription.sets === Number(sets) &&
@@ -82,7 +87,8 @@ const prescriptionFailures = (day) => {
       range?.max === Number(max) &&
       (seconds ? prescription.reps : prescription.seconds) === null &&
       prescription.perSide === Boolean(side) &&
-      JSON.stringify(prescription.targetRpe) === JSON.stringify(rpe);
+      JSON.stringify(prescription.targetRpe) === JSON.stringify(rpe) &&
+      prescription.restSeconds === restSeconds;
     return agrees ? [] : [`${day.weekday}: ${line}`];
   });
 };
