@@ -120,12 +120,12 @@ export default defineConfig({
       // uncovered statement anywhere in src fails CI. Cover it; do not lower
       // the floor.
       //
-      // Measured 2026-11-07 (99.17 / 95.49 / 99.36 / 99.63), after the
-      // offline-ready PWA (roadmap C1), the same locally and in CI.
+      // Measured 2026-11-08 (99.22 / 95.59 / 99.41 / 99.65), after in-gym
+      // workout mode (roadmap B6), the same locally and in CI.
       thresholds: {
-        statements: 99.1,
-        branches: 95.4,
-        functions: 99.3,
+        statements: 99.2,
+        branches: 95.5,
+        functions: 99.4,
         lines: 99.6
       }
     }
