@@ -26,7 +26,50 @@ behaviour, the spec's wording wins.
 **Tech Stack:** React 19, Vite 8, Express 5, Vitest 5 with v8 coverage, Testing Library,
 Playwright 1.64, the Screen Wake Lock, Vibration and Web Audio APIs.
 
-**Status: not started.**
+**Status: done 2026-11-08** (#377 to #382, all live; main `e30ede9`). These are the places
+the work goes past or departs from the text below.
+
+- **#378, the server.** `restSeconds` is the top of each dose's rest, read from its
+  scheme by one private helper. "45-60s" gives 60. No validator changed, and the main
+  chunk did not move.
+- **#379, the session module.**
+  - **`sessionFromPlanDay` takes the plan hub's `cards`**, not the week. Nothing in
+    `client/src/app/` imports from `pages/`, so the plan hub passes in the cards
+    `buildPlanDayPrefill` makes, and B4's week logic is still reused, not copied.
+  - `draftFor` takes no `system`. Untargeted exercises start at 10 reps or 30 seconds;
+    the plan named no default.
+  - `MIN_REST_SECONDS`, `MAX_REST_SECONDS` and `LOAD_STEP` are module-private: knip
+    flagged them as unused exports.
+  - The module is on the eager path through `events.js`: the main chunk went from
+    471,914 to 472,627 bytes.
+- **#380, the screen.**
+  - **`/workout` with nobody signed in shows "Sign in to continue your workout."**
+    instead of redirecting. On a load the user is unknown until the session check
+    answers, and a redirect in that window would lose the route.
+  - **Start workout closes the day's details**, so the "A workout is in progress"
+    question never opens over another modal. One Escape would otherwise close both.
+  - **The set panel resets its draft during render**, not by a key remount, so Done
+    keeps keyboard focus after each set.
+  - **App reads the open session on every route.** A route check on that read was a
+    second guard: its mutation survived, since each reader checks its own route.
+  - Finish and Cancel sit in a footer below the exercise list, not in the top bar.
+  - The main chunk went to 477,648 bytes; `SessionPage` is its own lazy chunk.
+- **#381, the rest timer.**
+  - **The time since the start is in the header**, under the title. The spec's top bar
+    has it; the tasks above left it out.
+  - **The timer's skip reads "Skip rest"**, since the exercise list has Skip buttons too.
+  - **The live region is the page's, not `RestTimer`'s**, and is `aria-live="polite"`
+    with no role, so App's notices stay the only `status` elements.
+  - **One clock, `hooks/useNow.js`**, serves the timer and the elapsed time. A new rest
+    reads it at once, so a rest started between ticks never shows a second too many.
+  - The main chunk went to 477,880 bytes: `adjustRest` and `endRest` are now used, so
+    the build keeps them where `workoutSession.js` lives.
+  - `session.spec.js` installs Playwright's clock unpaused before the first page loads,
+    and `fastForward`s a rest to its end.
+- **#382, the floors.** The client's rose to 99.2 / 95.5 / 99.4 / 99.6. Every server
+  figure truncates to its existing floor, so the plan's second floor PR was not needed.
+- **WebKit and Firefox** (Playwright 1.64.1) each passed `session.spec.js`, 4 of 4, twice,
+  on `e30ede9`.
 
 Every file and line below was read on `2c20546`.
 
