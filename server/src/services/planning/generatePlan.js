@@ -378,16 +378,17 @@ const dayTypesOf = (rules) => {
 };
 
 /**
- * Step 5: the first entry of `pattern` that fits the rules, preferring one not in
- * `used`; a modify entry is replaced by its regression. Null when nothing fits.
+ * Step 5's candidates: every entry of `pattern` that fits the rules, in priority
+ * order (the ids in `order` first), with a modify entry replaced by its
+ * regression where that fits and is untagged. The one rule both for choosing a
+ * plan's exercises and for the alternatives a swap offers (roadmap C4).
  * @param {string} pattern
  * @param {Rules} rules
  * @param {Exercise[]} library
- * @param {Set<string>} used
  * @param {string[]} [order] ids to try first
- * @returns {ChosenExercise | null}
+ * @returns {ChosenExercise[]}
  */
-const choose = (pattern, rules, library, used, order) => {
+export const candidatesFor = (pattern, rules, library, order) => {
   const byId = new Map(library.map((entry) => [entry.id, entry]));
   const rank = LEVELS.indexOf(rules.level);
   const lowImpactOnly = rules.areas.some((area) => ["knee", "hip", "pregnancy"].includes(area));
@@ -435,6 +436,21 @@ const choose = (pattern, rules, library, used, order) => {
       cue: entry.regressions[area].cue
     });
   }
+  return candidates;
+};
+
+/**
+ * Step 5: the first candidate of `pattern` not in `used`, else the first. Null
+ * when nothing fits.
+ * @param {string} pattern
+ * @param {Rules} rules
+ * @param {Exercise[]} library
+ * @param {Set<string>} used
+ * @param {string[]} [order] ids to try first
+ * @returns {ChosenExercise | null}
+ */
+const choose = (pattern, rules, library, used, order) => {
+  const candidates = candidatesFor(pattern, rules, library, order);
   return candidates.find((candidate) => !used.has(candidate.id)) ?? candidates[0] ?? null;
 };
 
@@ -469,7 +485,13 @@ const effortCue = (rir) => `stop ${rir} reps short of failure`;
  * @property {{ min: number, max: number } | null} targetRpe
  * @property {number | null} restSeconds the rest after each set, for the in-gym
  *   timer (roadmap B6), or null where the line names none
+ * @property {string} exerciseId the library entry it prescribes (roadmap C4)
+ * @property {"main" | "accessory" | null} role its slot's role, which a swap doses
+ *   the new exercise in; null for the patterns dosed by their own rules
  */
+
+// The patterns doseFor doses by their own rules, whatever the slot's role.
+const OWN_DOSE_PATTERNS = new Set(["core", "balance", "mobility"]);
 
 /**
  * @param {number} sets
@@ -570,12 +592,13 @@ const rangeOf = (text) => {
 };
 
 /**
- * The prescription for `exercise` at `dose`.
+ * The prescription for `exercise` at `dose`, in a slot of `role`.
  * @param {ChosenExercise} exercise
  * @param {LineDose} dose
+ * @param {"main" | "accessory"} role
  * @returns {Prescription}
  */
-const prescriptionOf = (exercise, dose) => {
+const prescriptionOf = (exercise, dose, role) => {
   const amount = rangeOf(dose.amount);
   const rir = dose.rir === null ? null : rangeOf(dose.rir);
   return {
@@ -585,7 +608,9 @@ const prescriptionOf = (exercise, dose) => {
     seconds: dose.unit === "seconds" ? amount : null,
     perSide: dose.perSide,
     targetRpe: rir && { min: 10 - rir.max, max: 10 - rir.min },
-    restSeconds: dose.restSeconds
+    restSeconds: dose.restSeconds,
+    exerciseId: exercise.id,
+    role: OWN_DOSE_PATTERNS.has(exercise.pattern) ? null : role
   };
 };
 
@@ -596,6 +621,24 @@ const prescriptionOf = (exercise, dose) => {
  */
 const exerciseLine = (exercise, dose, label) =>
   `- ${label ? `${label}. ` : ""}${exercise.name}: ${dose}`;
+
+/**
+ * `exercise`'s prescription in a slot of `role`, and the line that writes it
+ * with any superset `label`, both from one dose, as a plan day writes them. A
+ * swap (roadmap C4) writes its new exercise with it too.
+ * @param {ChosenExercise} exercise
+ * @param {"main" | "accessory"} role
+ * @param {Rules} rules
+ * @param {string} [label]
+ * @returns {{ prescription: Prescription, line: string }}
+ */
+export const prescribe = (exercise, role, rules, label) => {
+  const dose = doseFor(exercise, role, rules);
+  return {
+    prescription: prescriptionOf(exercise, dose, role),
+    line: exerciseLine(exercise, formatDose(dose), label)
+  };
+};
 
 /** @param {number} minutes */
 const warmupMinutesOf = (minutes) => (minutes <= 20 ? 3 : minutes < 45 ? 5 : 8);
@@ -691,9 +734,9 @@ const buildTrainingDay = ({ weekday, type, title, hard, stretches }, rules, libr
    * @param {string} [label] the superset label
    */
   const prescribed = (exercise, role, label) => {
-    const dose = doseFor(exercise, role, rules);
-    prescriptions.push(prescriptionOf(exercise, dose));
-    return exerciseLine(exercise, formatDose(dose), label);
+    const { prescription, line } = prescribe(exercise, role, rules, label);
+    prescriptions.push(prescription);
+    return line;
   };
 
   if (type === "C" || type === "LC" || type === "E") {

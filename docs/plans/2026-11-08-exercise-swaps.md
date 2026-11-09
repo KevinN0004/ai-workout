@@ -48,7 +48,7 @@ Made 2026-11-08:
 
 1. **The profile's age is read at swap time, not saved.** `/api/generate` passes
    `req.user.profile.age` to `generatePlan`, where it sets the older-adult mobility doses.
-   The swap routes read it the same way, so the payload gains only `health`.
+   The swap routes read it the same way, so nothing about the person is saved for swaps.
 2. **`replaceExercise(session, index, prescription)` builds the new exercise from the
    prescription.** The spec's signature also took a card. A card comes from
    `buildPlanDayPrefill` in `pages/dashboard/`, which `app/` never imports, and a swapped
@@ -65,8 +65,14 @@ Made 2026-11-08:
      exercise not in the plan.
    - 409 (on POST): a `from` no longer in the plan, a `to` not offered, or an undo with
      nothing swapped. Each means the plan changed under the client.
-7. **The health answers are saved as four booleans**, each `true` only when the answer
-   was `true`: `{ condition, symptoms, supervised, pregnant }`.
+7. **The health answers stay unsaved** (owner, 2026-11-08, while starting PR 2). As first
+   written, this plan saved them in the payload. The rule-based plans spec decided they
+   are not stored, and a route test holds that.
+   - Swaps read them back from the plan's safety notes instead, with `healthFromNotes`
+     in `fallbackNotes.js`.
+   - Its result is `{ pregnant, condition }`. `condition` is `true` when the
+     light-to-moderate line is there, since any of the three yes answers writes that one
+     line and gives the same rules.
 
 ## Conventions
 
@@ -91,8 +97,8 @@ saved copy (ADR 0015). Write the runners with the Write tool.
 **Absent is not zero** (ADR 0001):
 
 - A swapped exercise's load is `null` until it is logged.
-- A health answer that is absent reads as `false` when a plan is generated. A plan with
-  no saved `health` at all reads as pregnant for swaps, which only removes options.
+- A safety line that is absent from the notes reads as a `false` health answer: its rule
+  did not apply when the plan was generated.
 
 **Paths:** run every command from `D:/ai-workout`. The shell resets to lowercase `d:\`,
 and the client suite then fails dozens of tests.
@@ -122,8 +128,8 @@ Deploy to green.
 
 ## Task 2: one rule, and what a plan records (PR 2)
 
-No behaviour changes: every generated plan is the same, except that its prescriptions
-and payload carry three more fields.
+No behaviour changes: every generated plan is the same, except that each prescription
+carries two more fields. Nothing new is saved about the person.
 
 **Files:**
 
@@ -159,20 +165,21 @@ and payload carry three more fields.
 
   - **The `Prescription` typedef** gains `exerciseId` (string) and `role`
     (`"main" | "accessory" | null`).
-- Modify: `server/src/routes/generateRoutes.js`. The payload gains
-  `health: savedHealthOf(body.health)`, a module-private helper with the four booleans
-  (Decided 7). The comment "neither is saved with it" changes to say the health answers
-  are saved in the payload for swaps, and the age is not.
+- Modify: `server/src/services/planning/fallbackNotes.js` (Decided 7):
+  - export `LIGHT_MODE_LINE` and `PREGNANCY_LINE`, the two sentences `buildSafetyNotes`
+    already writes, and write them from the constants;
+  - export `healthFromNotes(notes)`, which returns
+    `{ pregnant: notes.includes(PREGNANCY_LINE), condition: notes.includes(LIGHT_MODE_LINE) }`,
+    reading anything that is not a list of strings as no notes.
 - Modify: `server/src/services/dashboard/planPayloadService.js` and
-  `client/src/app/plans.js`, the typedefs only:
-  - `Prescription` gains optional `exerciseId`, `role`, `swappedFrom` and `swapReason`;
-  - `PlanPayload` gains optional `health`.
-
-  Both validators keep unknown fields, so neither changes.
-
+  `client/src/app/plans.js`, the typedefs only: `Prescription` gains optional
+  `exerciseId`, `role`, `swappedFrom` and `swapReason`. Both validators keep unknown
+  fields, so neither changes.
+- `server/src/routes/generateRoutes.js` does not change. Its test that the health
+  answers are not saved stays as it is.
 - Tests:
   - `server/src/services/planning/__tests__/generatePlan.test.js`;
-  - `server/src/routes/__tests__/generateRoutes.test.js`;
+  - `server/src/services/planning/__tests__/fallbackNotes.test.js`;
   - `scripts/evals/__tests__/generatePlan.gate.test.mjs`.
 
 Steps:
@@ -192,8 +199,16 @@ Steps:
     and mobility.
   - `prescribe` returns the same prescription and line the generator writes for that
     exercise.
-  - The generate route saves `payload.health` as the four booleans: `true` only for a
-    `true` answer, `false` for an absent one.
+  - `healthFromNotes`, over the notes `buildSafetyNotes` writes:
+    - `{ pregnant: true, condition: true }` for a pregnant plan, which is also
+      light-to-moderate;
+    - `{ pregnant: false, condition: true }` for each of `condition`, `symptoms` and
+      `supervised`;
+    - both `false` for no health answer;
+    - both `false` for `undefined`, or a list holding something other than strings.
+  - **Round trip:** for each health answer, `readInput` given
+    `healthFromNotes(buildSafetyNotes(plan))` gives the same `areas` and `lightMode` as
+    the plan's own rules.
   - **The gate:** in `prescriptionFailures`, every prescription's `exerciseId` names a
     library entry whose name is the prescription's name, and its `role` is in
     `["main", "accessory", null]`. Run `npm run test:scripts` red first.
@@ -204,8 +219,10 @@ Steps:
   - `choose()` taking the last candidate instead of the first;
   - `candidatesFor` keeping avoid entries;
   - `role` always `"main"`;
-  - `savedHealthOf` keeping a non-boolean answer.
-- [ ] Gates and server coverage. `candidatesFor`, `prescribe` and `savedHealthOf` are
+  - `healthFromNotes` ignoring the pregnancy line;
+  - `buildSafetyNotes` writing its own copy of a sentence instead of the constant (the
+    round trip must catch it).
+- [ ] Gates and server coverage. `candidatesFor`, `prescribe` and `healthFromNotes` are
       three new functions; each must be covered, which the json-summary shows.
 
 ## Task 3: the swap itself, pure (PR 3)
@@ -224,9 +241,9 @@ Steps:
 export const SWAP_AREAS = INJURY_AREAS;
 
 /**
- * The rules `plan` was built under, read by readInput from its saved columns and
- * health answers, with `age` from the profile and `area` added when it is given and
- * not already there. A plan with no saved health answers reads as pregnant.
+ * The rules `plan` was built under, read by readInput from its saved columns and the
+ * health answers its safety notes imply (healthFromNotes), with `age` from the
+ * profile and `area` added when it is given and not already there.
  * @param {SavedPlan} plan
  * @param {{ age: number | null, area: string | null }} options
  */
@@ -273,12 +290,13 @@ Steps:
 
 - [ ] Branch `feat/swaps-module`.
 - [ ] **Tests first**, on plans generated by `generatePlan` and saved as the route saves
-      them (text, payload with `withPrescriptions`, health):
+      them (text with its notes, and payload with `withPrescriptions`):
   - `rulesForPlan`:
     - reads the plan's level, equipment and injuries;
     - adds `area`;
     - adds nothing for an area already present;
-    - reads a plan without `health` as pregnant;
+    - reads a plan generated for pregnancy as pregnant, and one generated with a yes
+      to a health question as light-to-moderate, from its notes;
     - passes `age` through.
   - `swapOptions`:
     - offers only the exercise's pattern;
@@ -320,7 +338,7 @@ Steps:
 - [ ] **Mutations,** each of which must fail a test:
   - `swapOptions` not leaving out the day's exercises;
   - `rulesForPlan` not adding `area`;
-  - the missing-health default as not pregnant;
+  - `rulesForPlan` not reading the notes' health;
   - `applySwap` reaching only the first day;
   - the second swap overwriting `swappedFrom`;
   - `roleOf` always `"accessory"`;

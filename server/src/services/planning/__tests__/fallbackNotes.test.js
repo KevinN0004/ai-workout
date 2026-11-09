@@ -3,8 +3,11 @@ import { generatePlan } from "../generatePlan.js";
 import {
   RED_FLAG_LINE,
   GENERAL_NOTICE,
+  LIGHT_MODE_LINE,
+  PREGNANCY_LINE,
   buildFallbackNotes,
-  buildSafetyNotes
+  buildSafetyNotes,
+  healthFromNotes
 } from "../fallbackNotes.js";
 
 // The rule-written coach notes (docs/specs/2026-11-03-rule-based-plans-design.md,
@@ -121,5 +124,58 @@ describe("buildSafetyNotes", () => {
       RED_FLAG_LINE.slice(0, 20),
       GENERAL_NOTICE.slice(0, 20)
     ]);
+  });
+});
+
+// Roadmap C4: the health answers are never saved with a plan, so a swap reads
+// back the rules they set from the safety lines the plan carries.
+describe("healthFromNotes", () => {
+  test.each([
+    ["pregnant", { pregnant: true, condition: true }],
+    ["condition", { pregnant: false, condition: true }],
+    ["symptoms", { pregnant: false, condition: true }],
+    ["supervised", { pregnant: false, condition: true }]
+  ])("reads a plan generated with a yes to %s", (answer, health) => {
+    const notes = [...fallback({}), ...safety({ health: { [answer]: true } })];
+    expect(healthFromNotes(notes)).toEqual(health);
+  });
+
+  test("reads a plan with no yes as neither", () => {
+    expect(healthFromNotes([...fallback({}), ...safety({ injuries: "Knee" })])).toEqual({
+      pregnant: false,
+      condition: false
+    });
+  });
+
+  test.each([
+    ["no notes", undefined],
+    ["notes that are not a list", "Because you are pregnant"],
+    ["a list holding something other than text", [PREGNANCY_LINE, 7]]
+  ])("reads %s as neither", (_label, notes) => {
+    expect(healthFromNotes(notes)).toEqual({ pregnant: false, condition: false });
+  });
+
+  // The reader and the writer share the sentences, so the rules come back whole:
+  // for every answer, the health read from the notes gives the plan's own areas
+  // and light-to-moderate mode.
+  test.each([
+    {},
+    { pregnant: true },
+    { condition: true },
+    { symptoms: true },
+    { supervised: true }
+  ])("gives back the rules of a plan generated with %j", (health) => {
+    const plan = generatePlan(input({ injuries: "Knee", health }));
+    const read = generatePlan(
+      input({ injuries: "Knee", health: healthFromNotes(buildSafetyNotes(plan)) })
+    );
+    expect(read.rules.areas).toEqual(plan.rules.areas);
+    expect(read.rules.lightMode).toBe(plan.rules.lightMode);
+  });
+
+  test("the two lines are the ones buildSafetyNotes writes", () => {
+    expect(safety({ health: { pregnant: true } })).toEqual(
+      expect.arrayContaining([LIGHT_MODE_LINE, PREGNANCY_LINE])
+    );
   });
 });
