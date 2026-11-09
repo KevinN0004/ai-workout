@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@sentry/react": "^11.9.0",
+    "@sentry/react": "^11.11.0",
     "animejs": "^4.5.0",
     "jspdf": "^4.2.1",
     "react": "^19.3.1",
@@ -22,9 +22,9 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.2.1",
     "jsdom": "^30.1.3",
-    "vite": "^8.3.5",
+    "vite": "^8.3.6",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.2"
   },
