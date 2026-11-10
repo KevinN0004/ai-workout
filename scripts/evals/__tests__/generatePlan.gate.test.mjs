@@ -15,7 +15,13 @@ import {
   buildProgression,
   deloadSets
 } from "../../../server/src/services/planning/progression.js";
-import { EXERCISES } from "../../../server/src/services/planning/exerciseLibrary.js";
+import { EXERCISES, LEVELS } from "../../../server/src/services/planning/exerciseLibrary.js";
+import {
+  SWAP_AREAS,
+  applySwap,
+  rulesForPlan,
+  swapOptions
+} from "../../../server/src/services/planning/swaps.js";
 import {
   buildInjuryText,
   detectInjuryAreas
@@ -337,6 +343,106 @@ const progressionFailures = (input, seen) => {
   return failures;
 };
 
+// Roadmap C4: a plan as the generate route saves it, its text with the
+// rule-written notes and its payload with each day's prescriptions.
+const ENTRY_BY_NAME = new Map(EXERCISES.map((entry) => [entry.name, entry]));
+const savedPlanOf = (input) => {
+  const plan = generatePlan(input);
+  const notes = [...buildFallbackNotes(plan), ...buildSafetyNotes(plan)];
+  const text = `${plan.text}\n\nCoach Notes:\n${notes.join("\n")}`;
+  // The route saves the planner's answers, never the health answers or the age.
+  const columns = { ...input };
+  delete columns.health;
+  delete columns.age;
+  return {
+    plan,
+    saved: {
+      ...columns,
+      plan: text,
+      payload: withPrescriptions(buildPlanPayload(text), plan.week)
+    }
+  };
+};
+
+// Every alternative a swap offers, for each exercise in the plan, with no area
+// and with each area a swap can name, under the same checks the generator's own
+// choices pass, read from the generator's own rules for the plan rather than the
+// swap's: its pattern, the plan's equipment and level, no tag for any of the
+// plan's areas or the one named, no high impact for a knee, hip or pregnancy,
+// and nothing already on a day the exercise is on. The saved plan holds no
+// health answers, as the route saves it. The first alternative is then swapped
+// in, and the swapped plan's lines must still agree with their prescriptions,
+// and its text pass the scorer's equipment and injury checks.
+const swapFailures = (input, seen) => {
+  const { plan, saved } = savedPlanOf(input);
+  const failures = [];
+  const fail = (check, detail) => failures.push(`swap ${check}: ${detail}`);
+  const names = [
+    ...new Set(saved.payload.days.flatMap((day) => (day.prescriptions ?? []).map((p) => p.name)))
+  ];
+  for (const area of [null, ...SWAP_AREAS]) {
+    const rules = rulesForPlan(saved, { age: input.age, area });
+    const areas = [
+      ...plan.rules.areas,
+      ...(area && !plan.rules.areas.includes(area) ? [area] : [])
+    ];
+    const lowImpactOnly = areas.some((name) => ["knee", "hip", "pregnancy"].includes(name));
+    for (const name of names) {
+      const options = swapOptions(saved, name, rules);
+      if (options === null) {
+        fail("not offered", name);
+        continue;
+      }
+      const pattern = ENTRY_BY_NAME.get(name).pattern;
+      const onItsDays = new Set(
+        saved.payload.days
+          .filter((day) => (day.prescriptions ?? []).some((p) => p.name === name))
+          .flatMap((day) => day.prescriptions.map((p) => p.name))
+      );
+      for (const option of options) {
+        seen.options += 1;
+        const entry = ENTRY_BY_NAME.get(option.name);
+        const where = `${name} -> ${option.name} (${area ?? "no area"})`;
+        if (entry.pattern !== pattern) fail("pattern", where);
+        if (!entry.needs.every((need) => plan.rules.capabilities.includes(need))) {
+          fail("equipment", where);
+        }
+        if (LEVELS.indexOf(entry.level) > LEVELS.indexOf(plan.rules.level)) fail("level", where);
+        if (areas.some((tagged) => entry.flags[tagged])) fail("area", where);
+        if (lowImpactOnly && entry.impact === "high") fail("impact", where);
+        if (onItsDays.has(option.name)) fail("already on its days", where);
+      }
+      if (!options.length) continue;
+      const result = applySwap(saved, { from: name, to: options[0].name, area }, rules);
+      if (!result) {
+        fail("not applied", `${name} -> ${options[0].name}`);
+        continue;
+      }
+      seen.swaps += 1;
+      for (const day of result.payload.days) {
+        for (const detail of prescriptionFailures({
+          ...day,
+          prescriptions: day.prescriptions ?? []
+        })) {
+          fail("prescription", detail);
+        }
+      }
+      const score = scorePlan(
+        {
+          days: input.days,
+          equipment: input.equipment,
+          injuries: input.injuries,
+          health: input.health
+        },
+        { text: result.planText, finishReason: "STOP" }
+      );
+      for (const hit of score.equipmentHits) fail("equipment text", `${hit.weekday} ${hit.line}`);
+      for (const hit of score.injuryHits) fail("avoid text", `${hit.weekday} ${hit.line}`);
+    }
+  }
+  return failures;
+};
+
 describe("the quality gate", () => {
   test(
     "the main sweep: environments, equipment, days, injuries, goals and levels",
@@ -420,6 +526,34 @@ describe("the quality gate", () => {
       expect(failed.length, describeFailures(failed)).toBe(0);
       // Each change is reached, so no check above passes for want of a case.
       for (const kind of Object.keys(seen)) expect(seen[kind], kind).toBeGreaterThan(0);
+    },
+    SWEEP_TIMEOUT_MS
+  );
+
+  test(
+    "the swap sweep: every alternative of every exercise, three-day plans, each area",
+    () => {
+      const seen = { options: 0, swaps: 0 };
+      const failed = [];
+      let count = 0;
+      // Three-day plans, and each with no injury again as pregnant, the one
+      // health answer that changes which exercises fit.
+      const swapInputs = function* () {
+        for (const input of mainInputs()) {
+          if (input.days !== 3) continue;
+          yield input;
+          if (input.injuries === injuryOptions[0]) yield { ...input, health: { pregnant: true } };
+        }
+      };
+      for (const input of swapInputs()) {
+        count += 1;
+        const failures = swapFailures(input, seen);
+        if (failures.length) failed.push({ input, failures });
+      }
+      expect(count).toBeGreaterThan(1500);
+      expect(failed.length, describeFailures(failed)).toBe(0);
+      expect(seen.options).toBeGreaterThan(count);
+      expect(seen.swaps).toBeGreaterThan(count);
     },
     SWEEP_TIMEOUT_MS
   );
