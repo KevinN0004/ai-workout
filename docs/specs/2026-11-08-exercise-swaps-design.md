@@ -34,11 +34,15 @@ rules)` gives core, balance and mobility their own doses, and every other patter
    scheme's `main` or `accessory` dose. A regressed exercise always takes the accessory
    dose. A `Prescription` saves `name`, `sets`, `reps` or `seconds`, `perSide`,
    `targetRpe` and `restSeconds`, but neither the role nor the library id.
-4. **The plan does not save its health answers.** `readInput` reads `plan.health`
-   (`pregnant`, `condition`, `symptoms`, `supervised`) into the areas and the
-   light-to-moderate mode. `generated_plans` keeps the goal, the equipment and
+4. **The plan does not save its health answers, on purpose.** `readInput` reads
+   `plan.health` (`pregnant`, `condition`, `symptoms`, `supervised`) into the areas and
+   the light-to-moderate mode. `generated_plans` keeps the goal, the equipment and
    environment, the level, the injuries, the days, the duration and the focuses, but no
-   health answers. So the rules a plan was built under cannot be read back in full.
+   health answers. The rule-based plans spec decided that "the health answers are not
+   stored", and a route test holds it.
+   - **The saved notes say which health rules applied.** `buildSafetyNotes`
+     (`fallbackNotes.js`) adds one fixed sentence for the light-to-moderate mode and one
+     for pregnancy, to every plan, whoever wrote the rest of the notes.
 5. **The plan text is the days' lines.** `generatePlan` writes `text` from each day's
    heading and `lines`. The payload's days hold the same lines. The PDF export prints
    `planText` (`downloadPlanPdfFromText`, `client/src/app/events.js`).
@@ -62,6 +66,9 @@ Made with the owner on 2026-11-08:
 - **A swap reaches every day the exercise appears.**
 - **A swapped exercise says what it replaced and why, with an Undo** that restores the
   original everywhere.
+- **The health answers stay unsaved** (decided while starting PR 2, after this spec
+  first proposed saving them). A swap reads the plan's health rules from its saved
+  safety notes instead.
 
 ## Design
 
@@ -78,9 +85,14 @@ Made with the owner on 2026-11-08:
   - without the exercise itself, or anything already on a day the exercise is on;
   - each with its name, the equipment it needs, and, for a regression, the area and
     the cue.
-- **The plan's rules** come from `readInput` over the saved plan's columns and its saved
-  health answers (below). A plan saved before C4 has no health answers, so its swaps
-  read it as pregnant, which only removes options.
+- **The plan's rules** come from `readInput` over the saved plan's columns, the
+  profile's age, and the health answers its safety notes imply:
+  - `healthFromNotes(notes)` (`fallbackNotes.js`, beside the sentences it reads) gives
+    `pregnant: true` when the notes hold the pregnancy line, and `condition: true` when
+    they hold the light-to-moderate line, and `false` otherwise;
+  - the sentences are exported constants that `buildSafetyNotes` writes, so writer and
+    reader cannot drift apart;
+  - this works the same for every plan saved since rule-based plans, before C4 or after.
 
 ### What a plan records
 
@@ -88,8 +100,7 @@ Made with the owner on 2026-11-08:
   `null` for core, balance and mobility). A prescription saved before C4 finds its entry
   by name. Its role is the one whose dose `doseFor` gives that matches the saved
   prescription's sets and amounts, or `"accessory"` when neither matches.
-- **Each new payload gains `health`**, the four answers as the plan was generated with
-  them. Both payload validators keep unknown fields, so neither changes.
+- **No health answer is saved.** The payload carries the notes it already did.
 - **A swapped prescription** is the new exercise's prescription, at the dose `doseFor`
   gives it in the old one's role, with:
   - `swappedFrom`, the plan's original prescription and line, kept whole so Undo can put
@@ -109,7 +120,7 @@ Made with the owner on 2026-11-08:
 - **`GET /api/dashboard/plans/:planId/swaps?exercise=<name>&area=<area>`** returns
   `{ exercise, area, areas, alternatives }`.
   - `areas` lists the areas a swap can name: the injury areas (`INJURY_AREAS`, lower
-    back to elbow). Pregnancy comes only from the plan's health answers.
+    back to elbow). Pregnancy comes only from the plan's safety notes.
   - It answers 404 for a plan that is not the user's, and 400 for a name not in the plan
     or an area not in the list.
 - **`POST /api/dashboard/plans/:planId/swaps`** with `{ from, to, area }`:
@@ -165,7 +176,8 @@ Made with the owner on 2026-11-08:
   - `candidatesFor` returns `choose()`'s choice first, for the gate's plans;
   - the swap, the undo, a superset label, every day reached, and `swappedFrom` kept;
   - the role found for a prescription saved before C4;
-  - a plan with no health answers treated as pregnant.
+  - the health rules read back from the safety notes, for each health answer the planner
+    takes, and nothing saved.
 - **Route tests, against Postgres:** another user's plan, a name or area not in the plan,
   a `to` that is not offered, two swaps at once, and undo.
 - **The plan gate:** for its generated plans, every alternative of every prescription,
@@ -184,8 +196,8 @@ Made with the owner on 2026-11-08:
 Each step ships after the one it relies on:
 
 1. **Docs:** this spec and its plan.
-2. **Server, no change in behaviour:** `candidatesFor`, and `exerciseId`, `role` and
-   `health` on new plans.
+2. **Server, no change in behaviour:** `candidatesFor` and `prescribe`, `exerciseId` and
+   `role` on new prescriptions, and `healthFromNotes`.
 3. **Server:** `swaps.js`, and the three routes.
 4. **Client:** the swap in the plan hub.
 5. **Client:** the swap on the in-gym screen.

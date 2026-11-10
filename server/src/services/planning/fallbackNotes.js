@@ -1,7 +1,7 @@
 /**
  * The rule-written coach notes: those that stand in when Gemini's cannot be
- * used, and the safety lines every plan carries whoever wrote the rest
- * (docs/specs/2026-11-03-rule-based-plans-design.md, "The coach notes").
+ * used, the safety lines every plan carries whoever wrote the rest, and the
+ * health rules those lines say applied (docs/specs/2026-11-03-rule-based-plans-design.md).
  */
 // @ts-check
 
@@ -14,6 +14,14 @@ export const RED_FLAG_LINE =
 /** The general notice every plan carries. */
 export const GENERAL_NOTICE =
   "This plan is general fitness guidance, not medical advice. If you have a heart, lung, metabolic or kidney condition, are pregnant, or have symptoms like chest pain or fainting, check with a health professional first.";
+
+/** The referral line a plan carries in light-to-moderate mode: a yes to a health question. */
+export const LIGHT_MODE_LINE =
+  "Because you answered yes to a health question, keep every session at a pace where you can talk, and check with a health professional before you train harder.";
+
+/** The line a plan carries when it was generated for pregnancy or after a recent birth. */
+export const PREGNANCY_LINE =
+  "Because you are pregnant or have recently given birth, check with your midwife or doctor before you start, and skip anything that feels wrong.";
 
 const PAIN_GUIDANCE =
   "This is not a rehab programme. Mild discomfort that stays at about 3 out of 10 or less, settles within a day and does not build from week to week is usually fine. Stop an exercise if the pain is sharp, keeps building, changes how you move, or is worse the next day, and see a physiotherapist or doctor if it does not settle.";
@@ -66,16 +74,24 @@ export const buildSafetyNotes = ({ rules }) => {
       `We could not adjust this plan for "${rules.injuryText}". Train within what feels comfortable, and check with a physiotherapist or doctor if it hurts.`
     );
   }
-  if (rules.lightMode) {
-    lines.push(
-      "Because you answered yes to a health question, keep every session at a pace where you can talk, and check with a health professional before you train harder."
-    );
-  }
-  if (rules.areas.includes("pregnancy")) {
-    lines.push(
-      "Because you are pregnant or have recently given birth, check with your midwife or doctor before you start, and skip anything that feels wrong."
-    );
-  }
+  if (rules.lightMode) lines.push(LIGHT_MODE_LINE);
+  if (rules.areas.includes("pregnancy")) lines.push(PREGNANCY_LINE);
   lines.push(RED_FLAG_LINE, GENERAL_NOTICE);
   return lines;
+};
+
+/**
+ * The health answers a saved plan's `notes` imply, for readInput (roadmap C4).
+ * The answers themselves are never saved with a plan, but the safety lines that
+ * every plan carries say which rules they set: `pregnant` when the pregnancy
+ * line is there, and `condition` when the light-to-moderate line is, since any
+ * of the three yes answers writes that one line and sets the same rules.
+ * Anything that is not a list of strings reads as no notes.
+ * @param {unknown} notes
+ * @returns {{ pregnant: boolean, condition: boolean }}
+ */
+export const healthFromNotes = (notes) => {
+  const lines =
+    Array.isArray(notes) && notes.every((line) => typeof line === "string") ? notes : [];
+  return { pregnant: lines.includes(PREGNANCY_LINE), condition: lines.includes(LIGHT_MODE_LINE) };
 };

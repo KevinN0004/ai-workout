@@ -59,6 +59,13 @@ const SET_LINE =
 const EFFORT_CUE = /stop (\d+)(?:-(\d+))? reps short of failure/;
 const REST_CUE = /Rest (\d+)(?:-(\d+))?s/;
 
+// Roadmap C4: a prescription names its library entry, and the role of its slot,
+// which core, balance and mobility, dosed by their own rules, do not have.
+const ENTRY_BY_ID = new Map(EXERCISES.map((entry) => [entry.id, entry]));
+const OWN_DOSE_PATTERNS = new Set(["core", "balance", "mobility"]);
+const roleAgrees = (role, pattern) =>
+  OWN_DOSE_PATTERNS.has(pattern) ? role === null : role === "main" || role === "accessory";
+
 // Roadmap B1: each line of sets has exactly one prescription, in line order,
 // that says what the line says. Read independently of the generator, so a
 // prescription that drifts from its text fails here.
@@ -80,7 +87,10 @@ const prescriptionFailures = (day) => {
     // and null when the line names none.
     const rest = REST_CUE.exec(note ?? "");
     const restSeconds = rest ? Number(rest[2] ?? rest[1]) : null;
+    const entry = ENTRY_BY_ID.get(prescription.exerciseId);
     const agrees =
+      entry?.name === name &&
+      roleAgrees(prescription.role, entry.pattern) &&
       prescription.name === name &&
       prescription.sets === Number(sets) &&
       range?.min === Number(min) &&

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { generatePlan, readInput } from "../generatePlan.js";
+import { candidatesFor, generatePlan, prescribe, readInput } from "../generatePlan.js";
 import { buildPlanPayload } from "../../dashboard/planPayloadService.js";
 import { isRestDay } from "../../../../../client/src/app/plans.js";
 
@@ -767,6 +767,8 @@ describe("the prescriptions", () => {
     expect(day(knee, "Monday").prescriptions).toEqual([
       {
         name: "Dumbbell box squat",
+        exerciseId: "dumbbell-box-squat",
+        role: "main",
         sets: 3,
         reps: { min: 10, max: 12 },
         seconds: null,
@@ -776,6 +778,8 @@ describe("the prescriptions", () => {
       },
       {
         name: "Dumbbell bench press",
+        exerciseId: "dumbbell-bench-press",
+        role: "main",
         sets: 3,
         reps: { min: 8, max: 10 },
         seconds: null,
@@ -785,6 +789,8 @@ describe("the prescriptions", () => {
       },
       {
         name: "Dumbbell Romanian deadlift",
+        exerciseId: "dumbbell-romanian-deadlift",
+        role: "accessory",
         sets: 3,
         reps: { min: 10, max: 12 },
         seconds: null,
@@ -794,6 +800,8 @@ describe("the prescriptions", () => {
       },
       {
         name: "Chest-supported dumbbell row",
+        exerciseId: "chest-supported-dumbbell-row",
+        role: "accessory",
         sets: 3,
         reps: { min: 10, max: 12 },
         seconds: null,
@@ -807,6 +815,8 @@ describe("the prescriptions", () => {
   test("a hold gives seconds and no RPE, and the hold's own rest", () => {
     expect(day(knee, "Friday").prescriptions[0]).toEqual({
       name: "Wall sit",
+      exerciseId: "wall-sit",
+      role: "main",
       sets: 3,
       reps: null,
       seconds: { min: 30, max: 45 },
@@ -845,6 +855,8 @@ describe("the prescriptions", () => {
   test("a side gives perSide, for reps and for holds", () => {
     expect(day(older, "Monday").prescriptions.at(-1)).toEqual({
       name: "Paused low step-up, hold at the top",
+      exerciseId: "paused-step-up",
+      role: null,
       sets: 2,
       reps: { min: 6, max: 6 },
       seconds: null,
@@ -854,6 +866,8 @@ describe("the prescriptions", () => {
     });
     expect(day(older, "Thursday").prescriptions.at(-1)).toEqual({
       name: "Single-leg stand near a wall",
+      exerciseId: "single-leg-stand",
+      role: null,
       sets: 3,
       reps: null,
       seconds: { min: 20, max: 30 },
@@ -872,5 +886,139 @@ describe("the prescriptions", () => {
 
   test("a rest day has none", () => {
     expect(day(knee, "Tuesday").prescriptions).toEqual([]);
+  });
+});
+
+// Roadmap C4: the one rule for choosing and for swapping. candidatesFor is
+// every candidate choose() works out, in its order; choose() takes the first
+// not yet used. prescribe writes a prescription and its line as the generator
+// does, so a swap writes them the same way.
+describe("candidatesFor and prescribe", () => {
+  const ex = (id, pattern, needs = [], level = "beginner", extra = {}) => ({
+    id,
+    name: id.replace(/-/g, " "),
+    pattern,
+    needs,
+    level,
+    flags: {},
+    regressions: {},
+    supine: false,
+    ...extra
+  });
+  // Home with dumbbells and a bench, at intermediate.
+  const rules = (overrides) => readInput(input(overrides));
+  const ids = (candidates) => candidates.map((candidate) => candidate.id);
+
+  test("lists every entry of the pattern that fits, in priority order", () => {
+    const library = [
+      ex("barbell-squat", "squat", ["barbell"]),
+      ex("goblet", "squat", ["dumbbell"]),
+      ex("pistol", "squat", [], "advanced"),
+      ex("air-squat", "squat"),
+      ex("push-up", "horizontal-push")
+    ];
+    expect(ids(candidatesFor("squat", rules(), library))).toEqual(["goblet", "air-squat"]);
+  });
+
+  test("leaves out an entry to avoid, and a high-impact one for a knee", () => {
+    const library = [
+      ex("split", "squat", [], "beginner", { flags: { knee: "avoid" } }),
+      ex("jump", "squat", [], "beginner", { impact: "high" }),
+      ex("air-squat", "squat")
+    ];
+    expect(ids(candidatesFor("squat", rules({ injuries: "Knee" }), library))).toEqual([
+      "air-squat"
+    ]);
+    expect(ids(candidatesFor("squat", rules(), library))).toEqual(["split", "jump", "air-squat"]);
+  });
+
+  test("puts a modify entry's regression in its place, with the area and cue", () => {
+    const library = [
+      ex("goblet", "squat", ["dumbbell"], "beginner", {
+        flags: { knee: "modify" },
+        regressions: { knee: { id: "box", cue: "sit back to a box" } }
+      }),
+      ex("box", "squat", ["dumbbell"])
+    ];
+    expect(candidatesFor("squat", rules({ injuries: "Knee" }), library)).toEqual([
+      {
+        id: "box",
+        name: "box",
+        pattern: "squat",
+        needs: ["dumbbell"],
+        regressed: true,
+        area: "knee",
+        cue: "sit back to a box"
+      },
+      { id: "box", name: "box", pattern: "squat", needs: ["dumbbell"], regressed: false }
+    ]);
+  });
+
+  test("leaves out a modify entry whose regression does not fit", () => {
+    const library = [
+      ex("goblet", "squat", ["dumbbell"], "beginner", {
+        flags: { knee: "modify" },
+        regressions: { knee: { id: "barbell-box", cue: "sit back to a box" } }
+      }),
+      ex("barbell-box", "squat", ["barbell"])
+    ];
+    expect(candidatesFor("squat", rules({ injuries: "Knee" }), library)).toEqual([]);
+  });
+
+  test("tries the order's ids first, then the rest in library order", () => {
+    const library = [ex("a", "core"), ex("b", "core"), ex("c", "core")];
+    expect(ids(candidatesFor("core", rules(), library, ["c"]))).toEqual(["c", "a", "b"]);
+  });
+
+  test("prescribe writes the prescription and line the generator writes", () => {
+    const plan = generatePlan(input({ injuries: "Knee" }));
+    const monday = plan.week.find((day) => day.weekday === "Monday");
+    const lineOf = (name) => monday.lines.find((line) => line.startsWith(`- ${name}: `));
+    const [squat, , hinge] = monday.exercises;
+
+    expect(prescribe(squat, "main", plan.rules)).toEqual({
+      prescription: monday.prescriptions[0],
+      line: lineOf(squat.name)
+    });
+    expect(prescribe(hinge, "accessory", plan.rules)).toEqual({
+      prescription: monday.prescriptions[2],
+      line: lineOf(hinge.name)
+    });
+  });
+
+  test("prescribe writes a superset label before the name", () => {
+    const plan = generatePlan(input());
+    const [lead] = plan.week.find((day) => day.weekday === "Monday").exercises;
+    const { line } = prescribe(lead, "main", plan.rules, "A1");
+    expect(line.startsWith(`- A1. ${lead.name}: `)).toBe(true);
+  });
+
+  // The role is the slot's: the first two of a strength day are main lifts, the
+  // rest accessories, and core, balance and mobility, dosed by their own rules,
+  // have none. A regression in a main slot keeps the slot's role, so a swap out
+  // of it takes the dose the generator gives that slot.
+  test("each prescription names its library entry and its slot's role", () => {
+    const knee = generatePlan(input({ injuries: "Knee" })).week;
+    const older = generatePlan(
+      input({ equipment: ["Bodyweight only"], level: "Beginner", days: 2, duration: 30, age: 70 })
+    ).week;
+    const pairs = (week, weekday) =>
+      week
+        .find((day) => day.weekday === weekday)
+        .prescriptions.map((prescription) => [prescription.exerciseId, prescription.role]);
+
+    expect(pairs(knee, "Monday")).toEqual([
+      ["dumbbell-box-squat", "main"],
+      ["dumbbell-bench-press", "main"],
+      ["dumbbell-romanian-deadlift", "accessory"],
+      ["chest-supported-dumbbell-row", "accessory"]
+    ]);
+    expect(pairs(older, "Monday")).toEqual([
+      ["bodyweight-squat", "main"],
+      ["push-up", "main"],
+      ["glute-bridge", "accessory"],
+      ["door-frame-row", "accessory"],
+      ["paused-step-up", null]
+    ]);
   });
 });
