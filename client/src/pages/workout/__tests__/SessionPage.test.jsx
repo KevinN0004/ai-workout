@@ -3,12 +3,13 @@
  * pre-filled, stepped and logged with Done, Undo, moving between exercises,
  * adding one, Finish, Cancel and leaving, and the rest timer, sound and wake lock.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import SessionPage from "../SessionPage";
 import { readActiveSession } from "../../../app/activeSession";
-import { blankSession, sessionFromPlanDay } from "../../../app/workoutSession";
+import { addExercise, blankSession, sessionFromPlanDay } from "../../../app/workoutSession";
+import { markUnanswered } from "../../../app/connection";
 import { newCard } from "../../../app/exerciseSets";
 
 const user = { email: "ada@example.com" };
@@ -473,5 +474,134 @@ describe("SessionPage's rest timer, sound and screen", () => {
 
     unmount();
     expect(lock.release).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Roadmap C4: an exercise with no sets logged can be swapped on the in-gym
+// screen, which changes the plan and the open session alike.
+describe("swapping an exercise on the in-gym screen", () => {
+  const SUMO = {
+    name: "Dumbbell sumo squat",
+    needs: ["dumbbell"],
+    regressed: false,
+    area: null,
+    cue: null
+  };
+  const sumo = {
+    name: "Dumbbell sumo squat",
+    sets: 3,
+    reps: { min: 8, max: 10 },
+    seconds: null,
+    perSide: false,
+    targetRpe: { min: 7, max: 8 },
+    restSeconds: 120
+  };
+  const swappedPlan = {
+    id: "plan-1",
+    payload: {
+      version: 1,
+      notes: [],
+      days: [{ index: 0, weekday: "Monday", title: "Upper A", lines: [], prescriptions: [sumo] }]
+    }
+  };
+  const respond = (body) => ({ ok: true, json: async () => body });
+  const swapFetch = (answered) =>
+    vi.fn(async (_path, options) =>
+      options?.method === "POST"
+        ? respond({ plan: answered })
+        : respond({ areas: ["knee"], alternatives: [SUMO] })
+    );
+
+  const renderSwaps = (initialSession = planned(), answered = swappedPlan) => {
+    const handlers = {
+      onFinish: vi.fn(),
+      onDiscard: vi.fn(),
+      onLeave: vi.fn(),
+      onPlanChanged: vi.fn()
+    };
+    const apiFetch = swapFetch(answered);
+    render(
+      <SessionPage
+        user={user}
+        initialSession={initialSession}
+        system="metric"
+        apiFetch={apiFetch}
+        {...handlers}
+      />
+    );
+    return { ...handlers, apiFetch };
+  };
+  const list = () => within(screen.getByRole("list", { name: "Exercises" }));
+
+  test("offers Swap on a plan session's exercises with no sets logged", async () => {
+    renderSwaps();
+    await done();
+
+    expect(list().queryByRole("button", { name: "Swap Bench press" })).toBeNull();
+    expect(list().getByRole("button", { name: "Swap Plank" })).toBeEnabled();
+  });
+
+  // Its exercises are added in the session, with no planned sets, and nothing
+  // to swap means nothing to say offline either.
+  test("a blank session has no plan, so no Swap, and no offline hint for it", () => {
+    markUnanswered();
+    renderSwaps(addExercise(blankSession({ now: NOW }), { name: "Squat", kind: "reps" }));
+    expect(list().queryByRole("button", { name: /^Swap / })).toBeNull();
+    expect(screen.queryByText("You're offline")).toBeNull();
+  });
+
+  test("a swap changes the plan and the exercise, and keeps the session on the device", async () => {
+    const { onPlanChanged } = renderSwaps();
+
+    await userEvent.click(list().getByRole("button", { name: "Swap Bench press" }));
+    expect(screen.getByRole("heading", { name: "Swap Bench press" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Exercises" })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /^Dumbbell sumo squat/ }));
+
+    await waitFor(() => expect(onPlanChanged).toHaveBeenCalledWith(swappedPlan));
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Dumbbell sumo squat" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("8-10 reps @ RPE 7-8")).toBeInTheDocument();
+    expect(readActiveSession(user).exercises[0]).toMatchObject({
+      name: "Dumbbell sumo squat",
+      restSeconds: 120
+    });
+  });
+
+  test("a plan whose day no longer holds the exercise leaves the session as it was", async () => {
+    const elsewhere = {
+      ...swappedPlan,
+      payload: {
+        ...swappedPlan.payload,
+        days: [{ ...swappedPlan.payload.days[0], prescriptions: undefined }]
+      }
+    };
+    const { onPlanChanged } = renderSwaps(planned(), elsewhere);
+
+    await userEvent.click(list().getByRole("button", { name: "Swap Bench press" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Dumbbell sumo squat/ }));
+
+    await waitFor(() => expect(onPlanChanged).toHaveBeenCalledWith(elsewhere));
+    expect(screen.getByRole("heading", { level: 2, name: "Bench press" })).toBeInTheDocument();
+  });
+
+  test("Back leaves the swap with the session as it was", async () => {
+    const { onPlanChanged } = renderSwaps();
+
+    await userEvent.click(list().getByRole("button", { name: "Swap Bench press" }));
+    await screen.findByRole("button", { name: /^Dumbbell sumo squat/ });
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(list().getByRole("button", { name: "Swap Bench press" })).toBeInTheDocument();
+    expect(onPlanChanged).not.toHaveBeenCalled();
+  });
+
+  test("offline, Swap is disabled, and it says why", () => {
+    markUnanswered();
+    renderSwaps();
+
+    expect(list().getByRole("button", { name: "Swap Bench press" })).toBeDisabled();
+    expect(screen.getByText("You're offline")).toBeInTheDocument();
   });
 });

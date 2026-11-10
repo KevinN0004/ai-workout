@@ -14,6 +14,7 @@ import {
   goTo,
   loggedSetCount,
   logSet,
+  replaceExercise,
   skipExercise,
   undoLastSet
 } from "../../app/workoutSession";
@@ -21,6 +22,7 @@ import DiscardConfirm from "./components/DiscardConfirm";
 import ElapsedTime from "./components/ElapsedTime";
 import ExerciseList from "./components/ExerciseList";
 import RestTimer from "./components/RestTimer";
+import SwapStep from "../../components/SwapStep";
 import SetPanel from "./components/SetPanel";
 import useSessionState from "./hooks/useSessionState";
 import useWakeLock from "./hooks/useWakeLock";
@@ -48,7 +50,9 @@ const setText = (exercise, set, index, system) => {
 /**
  * The session for `user`, from `initialSession`, with loads in `system`'s unit.
  * Finish hands the session to `onFinish`, a confirmed Cancel runs `onDiscard`,
- * and Dashboard runs `onLeave`, which keeps the session for later.
+ * and Dashboard runs `onLeave`, which keeps the session for later. In a session
+ * from a plan, an exercise can be swapped over `apiFetch` (roadmap C4): the plan
+ * the server answers goes to `onPlanChanged`, and the session takes the new one.
  */
 export default function SessionPage({
   user,
@@ -56,10 +60,27 @@ export default function SessionPage({
   system,
   onFinish,
   onDiscard,
-  onLeave
+  onLeave,
+  apiFetch,
+  onPlanChanged
 }) {
   const { session, update, kept } = useSessionState(user, initialSession);
   const [confirming, setConfirming] = useState(false);
+  // The index of the exercise being swapped, or null.
+  const [swapping, setSwapping] = useState(null);
+
+  // The plan as swapped goes to the dashboard, and the session takes the new
+  // exercise's prescription from the session's plan day. A plan that no longer
+  // holds it there, as after a change on another device, leaves the session.
+  const swapped = (plan, name) => {
+    onPlanChanged(plan);
+    const prescription = plan.payload.days
+      .filter((day) => day.index === session.planDayIndex)
+      .flatMap((day) => day.prescriptions ?? [])
+      .find((entry) => entry.name === name);
+    if (prescription) update(replaceExercise(session, swapping, prescription));
+    setSwapping(null);
+  };
   const [sound, setSound] = useState(() => readJsonCache(SOUND_KEY) !== false);
   // What the live region says: a rest starting, and a rest over.
   const [announcement, setAnnouncement] = useState("");
@@ -198,12 +219,23 @@ export default function SessionPage({
         <p className="session-empty">Add your first exercise below.</p>
       )}
 
-      <ExerciseList
-        session={session}
-        onGoTo={(index) => update(goTo(session, index))}
-        onSkip={(index) => update(skipExercise(session, index))}
-        onAdd={(added) => update(addExercise(session, added))}
-      />
+      {swapping === null ? (
+        <ExerciseList
+          session={session}
+          onGoTo={(index) => update(goTo(session, index))}
+          onSkip={(index) => update(skipExercise(session, index))}
+          onAdd={(added) => update(addExercise(session, added))}
+          onSwap={setSwapping}
+        />
+      ) : (
+        <SwapStep
+          apiFetch={apiFetch}
+          planId={session.planId}
+          exercise={session.exercises[swapping].name}
+          onSwapped={swapped}
+          onBack={() => setSwapping(null)}
+        />
+      )}
 
       <footer className="session-footer">
         <button type="button" className="ghost" onClick={cancel}>

@@ -661,6 +661,8 @@ export default function App() {
             onFinish={finishSession}
             onDiscard={discardSession}
             onLeave={() => go("/dashboard/workouts")}
+            apiFetch={apiFetch}
+            onPlanChanged={replacePlan}
           />
         </Suspense>
       ) : null
