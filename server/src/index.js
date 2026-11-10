@@ -372,7 +372,8 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, delete
   createUserRepository({
     prisma
   });
-const { saveGeneratedPlan, pruneGeneratedPlans } = createGeneratedPlanRepository({ prisma });
+const { saveGeneratedPlan, pruneGeneratedPlans, findPlanForUser, rewritePlan } =
+  createGeneratedPlanRepository({ prisma });
 
 // ---- Services ---------------------------------------------------------------
 // The cache is built here but sessionService, which owns the Redis client, is not
@@ -791,6 +792,8 @@ registerApiRoutes(app, {
   generatePlanBodySchema,
   saveGeneratedPlan,
   pruneGeneratedPlans,
+  findPlanForUser,
+  rewritePlan,
   toCleanArray,
   toPositiveInt
 });

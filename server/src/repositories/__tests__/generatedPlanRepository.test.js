@@ -14,7 +14,8 @@ import { createUserReadRepository } from "../userReadRepository.js";
 // dashboard reads them in, so the tests compare against that read rather than
 // restating the order.
 
-const { saveGeneratedPlan, pruneGeneratedPlans } = createGeneratedPlanRepository({ prisma });
+const { saveGeneratedPlan, pruneGeneratedPlans, findPlanForUser, rewritePlan } =
+  createGeneratedPlanRepository({ prisma });
 
 // One of the real answers planPayloadService's tests are built on.
 const realAnswer = readFileSync(
@@ -152,5 +153,85 @@ describe("pruneGeneratedPlans", () => {
 
     expect(await pruneGeneratedPlans({ userId: "legacy-prune" })).toBe(1);
     expect(await pruneGeneratedPlans({ userId: crypto.randomUUID() })).toBe(0);
+  });
+});
+
+// Roadmap C4: a plan read for a swap, and rewritten under its row's lock.
+describe("findPlanForUser and rewritePlan", () => {
+  const payload = buildPlanPayload(realAnswer);
+  const seedPlan = async (email, legacyId = null) => {
+    const user = await createUser(email);
+    const row = await prisma.generatedPlan.create({
+      data: { userId: user.id, legacyId, planText: realAnswer, planPayload: payload }
+    });
+    return { user, row };
+  };
+  const textOf = async (id) =>
+    (await prisma.generatedPlan.findUnique({ where: { id }, select: { planText: true } })).planText;
+
+  test("finds the user's plan by its legacy id or its id, and no one else's", async () => {
+    const { user, row } = await seedPlan("find-plan@example.com", "plan-legacy");
+    const other = await createUser("find-plan-other@example.com");
+
+    const byLegacy = await findPlanForUser({ userId: user.id, planId: "plan-legacy" });
+    expect(byLegacy).toMatchObject({ id: "plan-legacy", plan: realAnswer, payload });
+    expect(await findPlanForUser({ userId: user.id, planId: row.id })).toEqual(byLegacy);
+    expect(await findPlanForUser({ userId: other.id, planId: "plan-legacy" })).toBeNull();
+    expect(await findPlanForUser({ userId: crypto.randomUUID(), planId: row.id })).toBeNull();
+  });
+
+  test("writes what the rewrite returns, and returns the plan as written", async () => {
+    const { user, row } = await seedPlan("rewrite-plan@example.com");
+    const next = { ...payload, notes: ["A new note."] };
+
+    const result = await rewritePlan({
+      userId: user.id,
+      planId: row.id,
+      rewrite: (plan) => ({ payload: next, planText: `${plan.plan}\nchanged` })
+    });
+
+    expect(result.plan).toMatchObject({ id: row.id, payload: next });
+    expect(await textOf(row.id)).toBe(`${realAnswer}\nchanged`);
+  });
+
+  test("changes nothing when the rewrite declines, and nothing for no such plan", async () => {
+    const { user, row } = await seedPlan("rewrite-declined@example.com");
+    const other = await createUser("rewrite-other@example.com");
+    const rewrite = () => ({ payload, planText: "never" });
+
+    expect(await rewritePlan({ userId: user.id, planId: row.id, rewrite: () => null })).toEqual({
+      conflict: true
+    });
+    expect(await rewritePlan({ userId: other.id, planId: row.id, rewrite })).toBeNull();
+    expect(await rewritePlan({ userId: crypto.randomUUID(), planId: row.id, rewrite })).toBeNull();
+    expect(await textOf(row.id)).toBe(realAnswer);
+  });
+
+  // The race, staged: the first rewrite reads the plan and then waits inside its
+  // transaction. The lock makes the second wait for the first to commit, so it
+  // reads the first's text and both changes land. Without the lock the second
+  // reads the old text, writes, and the first's write then drops it.
+  test("a rewrite waits for one in flight, so neither is lost", async () => {
+    const { user, row } = await seedPlan("rewrite-race@example.com");
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    let firstRead;
+    const firstHasRead = new Promise((resolve) => (firstRead = resolve));
+    const appending = (suffix, wait) => async (plan) => {
+      if (wait) {
+        firstRead();
+        await held;
+      }
+      return { payload, planText: `${plan.plan}${suffix}` };
+    };
+
+    const first = rewritePlan({ userId: user.id, planId: row.id, rewrite: appending("+x", true) });
+    await firstHasRead;
+    const second = rewritePlan({ userId: user.id, planId: row.id, rewrite: appending("+y") });
+    await Promise.race([second, new Promise((resolve) => setTimeout(resolve, 300))]);
+    release();
+    await Promise.all([first, second]);
+
+    expect(await textOf(row.id)).toBe(`${realAnswer}+x+y`);
   });
 });

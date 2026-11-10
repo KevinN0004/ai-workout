@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
+import { SWAP_AREAS } from "../../services/planning/swaps.js";
 
 export const dashboardPaginationQuerySchema = z
   .object({
@@ -57,3 +58,27 @@ export const validateParams = (req, res, schema, fallbackPath = "params") => {
   res.status(400).json({ error });
   return null;
 };
+
+// Roadmap C4: a plan's id as the client knows it, an exercise's name as the
+// plan writes it, and an area a swap can name.
+const planIdField = z.string().trim().min(1).max(100);
+const exerciseNameField = z.string().trim().min(1).max(140);
+const swapAreaField = z.enum([...SWAP_AREAS]);
+
+/** A plan swap's path: the plan. */
+export const planSwapParamsSchema = z.object({ planId: planIdField });
+
+/** The alternatives' query: the exercise, and an area that bothers, optional. */
+export const planSwapQuerySchema = z
+  .object({ exercise: exerciseNameField, area: swapAreaField.optional() })
+  .passthrough();
+
+/** A swap: the exercise in the plan, the alternative chosen, and any area named. */
+export const planSwapBodySchema = z.object({
+  from: exerciseNameField,
+  to: exerciseNameField,
+  area: swapAreaField.nullable().optional()
+});
+
+/** An undo: the swapped exercise's name. */
+export const planUndoBodySchema = z.object({ name: exerciseNameField });
