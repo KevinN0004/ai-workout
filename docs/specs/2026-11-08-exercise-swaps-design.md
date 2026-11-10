@@ -1,8 +1,10 @@
 # Exercise swaps from the library, design
 
-Status: **decided 2026-11-08**, section by section with the owner. This is roadmap C4. It
-needs B4 (adaptive progression), done, and applies gate G4: a swap waits for the user's
-tap, and shows why, with an undo.
+Status: **decided 2026-11-08**, section by section with the owner; **applied 2026-11-10**,
+in #385 to #390, with the floors raised in #391 and #392, all live. The plan is
+`docs/plans/2026-11-08-exercise-swaps.md`, whose status says where the work went past
+this text. This is roadmap C4. It needs B4 (adaptive progression), done, and applies gate
+G4: a swap waits for the user's tap, and shows why, with an undo.
 
 "Something easier on my shoulder" and "I have no cable machine" are questions the curated
 exercise library can already answer. C4 lets someone swap an exercise in their plan for
