@@ -1,0 +1,74 @@
+/* The step that swaps one exercise (SwapStep.jsx, roadmap C4), in the plan hub's day
+   details and on the in-gym screen. Every rule is scoped to .swap-step, and nothing
+   here moves. */
+
+.swap-step {
+  display: grid;
+  gap: 12px;
+}
+
+.swap-step h3,
+.swap-step p {
+  margin: 0;
+}
+
+.swap-step .swap-areas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.swap-step .swap-areas p {
+  flex-basis: 100%;
+}
+
+.swap-step .swap-areas button {
+  min-height: 44px;
+}
+
+.swap-step .swap-areas button[aria-pressed="true"] {
+  background: rgba(255, 179, 71, 0.2);
+  border-color: rgba(255, 179, 71, 0.6);
+  color: #ffd9a0;
+}
+
+.swap-step .swap-options {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swap-step .swap-options button {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.swap-step .swap-options button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.swap-step .swap-options .muted {
+  font-size: 0.85rem;
+}
+
+.swap-step .swap-error {
+  color: #ffd2d6;
+}
+
+.swap-step > .ghost {
+  justify-self: start;
+}

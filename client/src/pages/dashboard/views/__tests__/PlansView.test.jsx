@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlansView from "../PlansView";
 import { markUnanswered } from "../../../../app/connection";
@@ -691,5 +691,117 @@ describe("PlansView offline", () => {
     expect(screen.getByText("You're offline")).toBeInTheDocument();
     fireEvent.click(remove);
     expect(onRemoveSavedExercise).not.toHaveBeenCalled();
+  });
+});
+
+// Roadmap C4: swapping an exercise from a plan day's details. The swap is a step
+// inside the same dialog, never a second one, and the plan the server answers
+// goes back to the dashboard through onPlanChanged.
+describe("swapping an exercise", () => {
+  const squat = {
+    name: "Back Squats",
+    sets: 3,
+    reps: { min: 3, max: 5 },
+    seconds: null,
+    perSide: false,
+    targetRpe: null
+  };
+  const mondayDay = {
+    index: 0,
+    weekday: "Monday",
+    title: "Monday - Full body A",
+    lines: ["- Back Squats: 3 x 3-5"],
+    prescriptions: [squat]
+  };
+  const plan = {
+    id: "plan-1",
+    goal: "Build lean strength and energy",
+    plan: "Monday - Full body A\n- Back Squats: 3 x 3-5",
+    payload: { version: 1, days: [mondayDay], notes: [] }
+  };
+  const swapped = { ...plan, plan: "Monday - Full body A\n- Goblet squat: 3 x 8-10" };
+  const GOBLET = {
+    name: "Goblet squat",
+    needs: ["dumbbell"],
+    regressed: false,
+    area: null,
+    cue: null
+  };
+  const respond = (body) => ({ ok: true, json: async () => body });
+  const apiFetch = () =>
+    vi.fn(async (_path, options) =>
+      options?.method === "POST"
+        ? respond({ plan: swapped })
+        : respond({ areas: ["knee"], alternatives: [GOBLET] })
+    );
+
+  const renderSwaps = () => {
+    const onPlanChanged = vi.fn();
+    renderView({
+      weekDays: [{ key: "Monday", label: "Mon" }],
+      latestPlanByWeekday: { Monday: mondayDay.lines },
+      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
+      setWorkoutForm: vi.fn(),
+      setWorkoutModalOpen: vi.fn(),
+      apiFetch: apiFetch(),
+      onPlanChanged
+    });
+    fireEvent.click(
+      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
+        "button",
+        { name: /^Mon/ }
+      )
+    );
+    return { onPlanChanged };
+  };
+
+  test("Swap opens the step inside the same dialog", async () => {
+    renderSwaps();
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap Back Squats" }));
+
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(
+      within(screen.getByRole("dialog")).getByRole("heading", { name: "Swap Back Squats" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start workout" })).toBeNull();
+    await screen.findByRole("button", { name: /^Goblet squat/ });
+  });
+
+  test("a swap hands the plan to the dashboard and returns to the day", async () => {
+    const { onPlanChanged } = renderSwaps();
+    fireEvent.click(screen.getByRole("button", { name: "Swap Back Squats" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Goblet squat/ }));
+
+    await waitFor(() => expect(onPlanChanged).toHaveBeenCalledWith(swapped));
+    expect(screen.getByRole("button", { name: "Start workout" })).toBeInTheDocument();
+  });
+
+  test("Back returns to the day's details", async () => {
+    renderSwaps();
+    fireEvent.click(screen.getByRole("button", { name: "Swap Back Squats" }));
+    await screen.findByRole("button", { name: /^Goblet squat/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByRole("button", { name: "Start workout" })).toBeInTheDocument();
+  });
+
+  test("Escape from the step closes the dialog, and it opens on the day again", async () => {
+    renderSwaps();
+    fireEvent.click(screen.getByRole("button", { name: "Swap Back Squats" }));
+    await screen.findByRole("button", { name: /^Goblet squat/ });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(
+      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
+        "button",
+        { name: /^Mon/ }
+      )
+    );
+    expect(screen.getByRole("button", { name: "Start workout" })).toBeInTheDocument();
   });
 });

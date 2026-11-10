@@ -1436,3 +1436,26 @@ describe("signing out with a workout in progress", () => {
     expect(readActiveSession(user)).toBeNull();
   });
 });
+
+// Roadmap C4: the plan a swap or an undo answers takes the place of the plan
+// with its id, and no other.
+describe("replacePlan", () => {
+  test("puts the plan in place of the one with its id, leaving the rest", () => {
+    const { deps, handlers } = buildDeps();
+    const swapped = { id: "plan-2", plan: "swapped" };
+
+    handlers.replacePlan(swapped);
+
+    const update = deps.setDashboard.mock.calls[0][0];
+    const plans = [
+      { id: "plan-1", plan: "newer" },
+      { id: "plan-2", plan: "as generated" }
+    ];
+    expect(update({ goals: {}, plans })).toEqual({
+      goals: {},
+      plans: [{ id: "plan-1", plan: "newer" }, swapped]
+    });
+    expect(update(null)).toBeNull();
+    expect(update({ goals: {} })).toEqual({ goals: {}, plans: [] });
+  });
+});
