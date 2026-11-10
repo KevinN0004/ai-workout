@@ -28,7 +28,53 @@ behaviour, the spec's wording wins.
 **Tech Stack:** Express 5, Prisma with Postgres, zod, React 19, Vitest 5 with v8 coverage,
 Testing Library, Playwright 1.64.
 
-**Status: not started.**
+**Status: done 2026-11-10** (#384 to #392, all live; main `5851e87`). These are the
+places the work goes past or departs from the text below.
+
+- **#385, one rule.**
+  - **The health answers stay unsaved** (owner, 2026-11-08). As first written, this plan
+    saved them in the payload. The rule-based plans spec decided they are not stored,
+    and a route test holds that. `healthFromNotes` in `fallbackNotes.js` reads them back
+    from the safety lines instead, whose sentences are now constants the writer shares.
+    The spec and this plan were corrected in the same PR.
+  - Each prescription's `role` is its slot's. A regression in a main slot keeps
+    `"main"`, so a swap out of it takes the dose the generator gives that slot.
+- **#387, the swap, pure.**
+  - **A day's ramp-up follows its lead lift**, which the plan did not foresee. It is
+    renamed, or dropped for a bodyweight lift, and `swappedFrom.rampLine` restores it.
+  - **A plan whose text does not hold a day's lines as its payload does** is not
+    swapped, and the route answers 409.
+  - `SavedPlan`'s text columns are required, since `mapGeneratedPlan` always fills them.
+    Defaults for them were unreachable branch arms, which put server branches below
+    their floor until removed.
+  - The gate's swap sweep checks every alternative against the generator's own rules,
+    not the swap's, and also runs each three-day plan with no injury as pregnant, so
+    reading health from the notes is exercised. With options taken from the whole
+    pattern, it fails by itself.
+- **#388, the routes.** The lock is proved by a staged race: the first rewrite waits
+  inside its transaction, and without `FOR UPDATE` the second's change is lost. Age
+  only changes an older adult's static-stretch dose, so a stubbed test with a
+  70-year-old pins that the profile's age reaches the rules.
+- **#389, the plan hub.**
+  - **`useProgression` reads the week again when the plan's lifts change.** A swap
+    keeps the plan's id, and the week is built from its prescriptions, so the swapped
+    lift's load waited for a reload. The plan missed this.
+  - **The area buttons stay put while the alternatives load.** Shown only with an
+    answer, they vanished on every tap; the tests found it.
+  - `SwapStep` has its own `SwapStep.css`, scoped to `.swap-step`, since it is shared.
+  - The swap step's axe scan is in `plan.spec.js`, which has a plan on screen, not
+    `a11y.spec.js`. `capture.mjs` gained `CAPTURE_SKIP`, for a state `main` cannot reach.
+- **#390, the in-gym screen.**
+  - **Swap is offered by the planned-sets rule alone.** A blank session's exercises
+    have no planned sets, so a check for the session's plan was a second guard on the
+    same thing, and is gone. It stays only on the offline hint.
+  - `SwapStep`'s `onSwapped` passes the name swapped in as well, and the session finds
+    the new prescription on its plan day by it. A plan whose day no longer holds it
+    leaves the session's exercise.
+- **#391 and #392, the floors.** Client branches rose to 95.7. All four server floors
+  rose, to 96.9 / 92.3 / 97.6 / 97.5.
+- **WebKit and Firefox** (Playwright 1.64.1) each passed `plan.spec.js` and
+  `session.spec.js`, 9 of 9, twice, on `36e9258`.
 
 Every file and line below was read on `f4b9c76`.
 
@@ -439,7 +485,7 @@ Steps:
 
 - Create: `client/src/components/SwapStep.jsx`, with its test. Props:
   `{ apiFetch, planId, exercise, onSwapped, onBack }`. It renders:
-  - a heading "Swap <exercise>";
+  - a heading `Swap <exercise>`;
   - an "It bothers my…" group, where each area is a toggle button (`aria-pressed`) and
     a second tap clears it;
   - the alternatives as buttons, each with its equipment and any cue;
@@ -450,8 +496,8 @@ Steps:
   Choosing an alternative calls `swapExercise`, then `onSwapped(plan)`.
 
 - Create: `client/src/pages/dashboard/components/PlanDaySwaps.jsx`, with its test. It is
-  the day's prescriptions, each with Swap. A swapped one reads "Swapped from <original>
-  (<area>)" with Undo. Offline, Swap and Undo are disabled, with `OfflineHint`.
+  the day's prescriptions, each with Swap. A swapped one reads `Swapped from <original>
+(<area>)` with Undo. Offline, Swap and Undo are disabled, with `OfflineHint`.
 - Modify: `client/src/pages/dashboard/views/PlansView.jsx`. The details modal holds
   `swapping` state (the exercise name, or null). While it is set, the modal body shows
   `SwapStep` instead of the day's details. `onSwapped` calls `onPlanChanged(plan)` and
