@@ -14,6 +14,8 @@ const account = {
 test.describe.serial("start a plan day as a session and finish it", () => {
   let context;
   let page;
+  // The exercise swapped out on the in-gym screen (roadmap C4).
+  let swappedOut;
 
   test.beforeAll(async ({ browser }) => {
     // One context for the whole file: the session cookie set at signup, and the
@@ -83,6 +85,24 @@ test.describe.serial("start a plan day as a session and finish it", () => {
     await expect(page).toHaveURL(/\/workout$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Full body A/);
     await expect(page.getByText(/^Exercise 1 of \d+ · Set 1 of 3$/)).toBeVisible();
+
+    // Roadmap C4: the second exercise, with no sets yet, is swapped in the plan
+    // and in the session alike. The list folds away while the swap is chosen.
+    const exercises = page.getByRole("list", { name: "Exercises" });
+    const openList = () => page.locator("summary", { hasText: /^Exercises \(/ }).click();
+    await openList();
+    const second = exercises.getByRole("listitem").nth(1).getByRole("button").first();
+    swappedOut = (await second.textContent()).replace(/, \d+ of \d+ sets$/, "");
+    await exercises.getByRole("button", { name: `Swap ${swappedOut}` }).click();
+    const alternative = page
+      .getByRole("list", { name: "Alternatives" })
+      .getByRole("button")
+      .first();
+    const swappedIn = (await alternative.locator("strong").textContent()).trim();
+    await alternative.click();
+    await openList();
+    await expect(exercises.getByRole("listitem").nth(1)).toContainText(`${swappedIn}, 0 of`);
+    await expect(exercises).not.toContainText(`${swappedOut}, 0 of`);
 
     // A first week has no loads yet, so the set opens at bodyweight; four steps
     // of 5 lb make it 20 lb. The RPE is tapped for the first set only.
@@ -176,6 +196,11 @@ test.describe.serial("start a plan day as a session and finish it", () => {
     await expect(page.getByRole("button", { name: /^Mon Warmup: 8 minutes/ })).toContainText(
       "Logged"
     );
+
+    // The swap made in the gym is the plan's: the day's details say so.
+    await page.getByRole("button", { name: /^Mon Warmup: 8 minutes/ }).click();
+    await expect(page.getByRole("dialog").getByText(`Swapped from ${swappedOut}`)).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // With no session open, /workout has nothing to show and goes to the Logs.
     await page.goto("/workout");

@@ -13,6 +13,7 @@ import {
   endRest,
   goTo,
   logSet,
+  replaceExercise,
   loggedSetCount,
   sessionFromPlanDay,
   skipExercise,
@@ -373,5 +374,67 @@ describe("the save Finish queues", () => {
 
     expect(toWorkoutSave(session, NOW + 2 * MINUTE).duration).toBe(5);
     expect(toWorkoutSave(session, NOW + 30 * 60 * MINUTE).duration).toBe(360);
+  });
+});
+
+// Roadmap C4: an exercise swapped on the in-gym screen takes the new
+// exercise's prescription, as the plan now holds it.
+describe("replacing an exercise after a swap", () => {
+  const goblet = {
+    name: "Dumbbell goblet squat",
+    sets: 3,
+    reps: { min: 8, max: 10 },
+    seconds: null,
+    perSide: false,
+    targetRpe: { min: 7, max: 8 },
+    restSeconds: 120
+  };
+
+  test("takes the new exercise's name, targets, sets and rest, with no load and no sets", () => {
+    const session = fromPlan();
+    const replaced = replaceExercise(session, 0, goblet);
+
+    expect(replaced.exercises[0]).toEqual({
+      key: expect.any(String),
+      name: "Dumbbell goblet squat",
+      kind: "reps",
+      perSide: false,
+      targetAmount: 10,
+      targetText: "8-10 reps @ RPE 7-8",
+      targetLoadKg: null,
+      plannedSets: 3,
+      restSeconds: 120,
+      skipped: false,
+      sets: []
+    });
+    expect(replaced.exercises[0].key).not.toBe(session.exercises[0].key);
+    expect(replaced.exercises[1]).toBe(session.exercises[1]);
+  });
+
+  test("a held exercise counts seconds, a single value reads as one, and no rest is 90 s", () => {
+    const replaced = replaceExercise(fromPlan(), 1, {
+      name: "Side plank",
+      sets: 3,
+      reps: null,
+      seconds: { min: 30, max: 30 },
+      perSide: true,
+      targetRpe: null,
+      restSeconds: null
+    });
+
+    expect(replaced.exercises[1]).toMatchObject({
+      kind: "seconds",
+      perSide: true,
+      targetAmount: 30,
+      targetText: "30 s a side",
+      restSeconds: DEFAULT_REST_SECONDS
+    });
+  });
+
+  test("leaves an exercise that has sets logged, and an index past the end, alone", () => {
+    const session = logSet(fromPlan(), { amount: 10, loadKg: 22.5, rpe: null }, NOW);
+
+    expect(replaceExercise(session, 0, goblet)).toBe(session);
+    expect(replaceExercise(session, 5, goblet)).toBe(session);
   });
 });

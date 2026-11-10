@@ -53,6 +53,18 @@ import { getLocalDateKey, toNumberOrNull } from "./units";
  */
 
 /**
+ * The fields of a plan's prescription a swapped-in exercise reads (roadmap C4).
+ * @typedef {object} SessionPrescription
+ * @property {string} name
+ * @property {number} sets
+ * @property {{ min: number, max: number } | null} reps
+ * @property {{ min: number, max: number } | null} seconds
+ * @property {boolean} perSide
+ * @property {{ min: number, max: number } | null} targetRpe
+ * @property {unknown} [restSeconds]
+ */
+
+/**
  * The fields of a Log workout card (app/exerciseSets.js) the session reads.
  * @typedef {{ key: string, name: string, kind: "reps" | "seconds", perSide: boolean, targets: { amount?: string, rpe?: string, load?: string } | null, sets: unknown[] }} SessionCard
  */
@@ -283,6 +295,61 @@ export const undoLastSet = (session) => {
  */
 export const goTo = (session, index) =>
   index >= 0 && index < session.exercises.length ? { ...session, current: index } : session;
+
+/**
+ * A prescribed range as the cards write it: "8-10", or "30" when it is one
+ * value; "" for none.
+ * @param {{ min: number, max: number } | null} range
+ */
+const rangeTextOf = (range) =>
+  range ? (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`) : "";
+
+/**
+ * `session` with the exercise at `index` replaced by the one `prescription`
+ * prescribes, after a swap in the plan (roadmap C4): its targets, sets and
+ * rest, a new key, no load to suggest and no sets. An exercise with sets
+ * logged, or an index past the end, leaves `session` as it is.
+ * @param {WorkoutSession} session
+ * @param {number} index
+ * @param {SessionPrescription} prescription
+ * @returns {WorkoutSession}
+ */
+export const replaceExercise = (session, index, prescription) => {
+  const current = session.exercises[index];
+  if (!current || current.sets.length) return session;
+  /** @type {SessionCard} */
+  const card = {
+    key: crypto.randomUUID(),
+    name: prescription.name,
+    kind: prescription.seconds ? "seconds" : "reps",
+    perSide: prescription.perSide,
+    targets: {
+      amount: rangeTextOf(prescription.reps ?? prescription.seconds),
+      rpe: rangeTextOf(prescription.targetRpe)
+    },
+    sets: []
+  };
+  return withExercises(
+    session,
+    session.exercises.map((exercise, at) =>
+      at === index
+        ? {
+            key: card.key,
+            name: card.name,
+            kind: card.kind,
+            perSide: card.perSide,
+            targetAmount: topOfRange(card.targets?.amount),
+            targetText: targetTextOf(card),
+            targetLoadKg: null,
+            plannedSets: prescription.sets,
+            restSeconds: restOf(prescription.restSeconds),
+            skipped: false,
+            sets: []
+          }
+        : exercise
+    )
+  );
+};
 
 /**
  * `session` with the exercise at `index` marked skipped, or back again.

@@ -147,7 +147,7 @@ describe("SwapStep", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^Box squat to a chair/ }));
 
-    await waitFor(() => expect(onSwapped).toHaveBeenCalledWith(PLAN));
+    await waitFor(() => expect(onSwapped).toHaveBeenCalledWith(PLAN, "Box squat to a chair"));
     const [path, request] = apiFetch.mock.calls.at(-1);
     expect(path).toBe("/api/dashboard/plans/plan-1/swaps");
     expect(JSON.parse(request.body)).toEqual({
@@ -170,7 +170,7 @@ describe("SwapStep", () => {
 
     expect(screen.getByRole("button", { name: /^Bodyweight squat/ })).toBeDisabled();
     await act(async () => sent.resolve(respond({ plan: PLAN })));
-    expect(onSwapped).toHaveBeenCalledWith(PLAN);
+    expect(onSwapped).toHaveBeenCalledWith(PLAN, "Dumbbell sumo squat");
   });
 
   test("says when nothing else fits", async () => {

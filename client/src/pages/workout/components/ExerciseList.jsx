@@ -1,18 +1,23 @@
 /**
- * The session page's list of exercises: jump to one, skip or restore one, and
- * add one by name (roadmap B6). Folded away until opened, except while the
- * session has no exercises.
+ * The session page's list of exercises: jump to one, skip, restore or swap one,
+ * and add one by name (roadmap B6, C4). Folded away until opened, except while
+ * the session has no exercises.
  */
 import { useState } from "react";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 
 /**
  * Lists `session`'s exercises, the current one marked. `onGoTo(index)` jumps
  * to one, `onSkip(index)` skips or restores one, and `onAdd({ name, kind })`
- * adds one.
+ * adds one. `onSwap(index)` swaps an exercise from the plan with no sets logged
+ * (roadmap C4); only a plan session has one, and it needs the server, so Swap is
+ * disabled offline.
  */
-export default function ExerciseList({ session, onGoTo, onSkip, onAdd }) {
+export default function ExerciseList({ session, onGoTo, onSkip, onAdd, onSwap }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState("reps");
+  const offline = useConnection() === "offline";
 
   const add = (event) => {
     event.preventDefault();
@@ -46,10 +51,22 @@ export default function ExerciseList({ session, onGoTo, onSkip, onAdd }) {
               >
                 {exercise.skipped ? "Restore" : "Skip"}
               </button>
+              {exercise.plannedSets && !exercise.sets.length ? (
+                <button
+                  type="button"
+                  className="ghost session-exercise-skip"
+                  aria-label={`Swap ${exercise.name}`}
+                  disabled={offline}
+                  onClick={() => onSwap(index)}
+                >
+                  Swap
+                </button>
+              ) : null}
             </li>
           );
         })}
       </ol>
+      {session.planId ? <OfflineHint /> : null}
 
       <form className="session-add" onSubmit={add}>
         <label>

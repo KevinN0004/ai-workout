@@ -13,8 +13,8 @@ const needsText = (needs) => (needs.length ? `Needs ${needs.join(", ")}` : "No e
 /**
  * Swaps `exercise` in the plan `planId` over `apiFetch`. It lists the
  * alternatives, asking again when an area is chosen or cleared, and a choice
- * swaps it and hands the plan the server answers to `onSwapped`. Back calls
- * `onBack`. Each failure is said in an alert.
+ * swaps it and hands `onSwapped` the plan the server answers and the name of
+ * the exercise swapped in. Back calls `onBack`. Each failure is said in an alert.
  */
 export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack }) {
   const [area, setArea] = useState(null);
@@ -51,7 +51,8 @@ export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack
     setSending(true);
     setError("");
     try {
-      onSwapped(await swapExercise(apiFetch, planId, { from: exercise, to: option.name, area }));
+      const plan = await swapExercise(apiFetch, planId, { from: exercise, to: option.name, area });
+      onSwapped(plan, option.name);
     } catch (err) {
       setError(err.message);
       setSending(false);
