@@ -10,7 +10,9 @@ import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/uni
 import { sessionFromPlanDay } from "../../../app/workoutSession";
 import ModalPortal from "../../../components/ModalPortal";
 import OfflineHint from "../../../components/OfflineHint";
+import SwapStep from "../../../components/SwapStep";
 import useConnection from "../../../hooks/useConnection";
+import PlanDaySwaps from "../components/PlanDaySwaps";
 import WeekProgression from "../components/WeekProgression";
 import "./PlansView.css";
 
@@ -31,7 +33,9 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * week's (roadmap B4): a day's details show its lifts' loads, answered through
  * `onAnswerProgression` with `progressionError` beside them, and the log opens
  * at the week's sets and loads. Start workout hands `onStartSession` the day as
- * an in-gym session (roadmap B6). Offline, removing a saved exercise is
+ * an in-gym session (roadmap B6). A day's exercises can be swapped (roadmap C4)
+ * in a step inside the same dialog, over `apiFetch`, and the plan the server
+ * answers goes to `onPlanChanged`. Offline, removing a saved exercise is
  * disabled: it cannot be kept for later.
  */
 export default function PlansView({
@@ -47,7 +51,9 @@ export default function PlansView({
   progression = null,
   onAnswerProgression,
   progressionError = "",
-  onStartSession
+  onStartSession,
+  apiFetch,
+  onPlanChanged
 }) {
   // ---- State, the meals week and the day details ----------------------------
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -550,7 +556,18 @@ export default function PlansView({
                 </button>
               </div>
               <div className="modal-body plan-day-detail-grid">
-                {selectedDetail?.mode === "workout" ? (
+                {selectedDetail?.swapping && selectedSavedDay ? (
+                  <SwapStep
+                    apiFetch={apiFetch}
+                    planId={latestPlan.id}
+                    exercise={selectedDetail.swapping}
+                    onSwapped={(plan) => {
+                      onPlanChanged(plan);
+                      setSelectedDetail((detail) => ({ ...detail, swapping: null }));
+                    }}
+                    onBack={() => setSelectedDetail((detail) => ({ ...detail, swapping: null }))}
+                  />
+                ) : selectedDetail?.mode === "workout" ? (
                   <section className="plan-day-detail-col">
                     <h3>Workout details</h3>
                     {selectedDay.workoutLines.length ? (
@@ -569,6 +586,17 @@ export default function PlansView({
                         system={system}
                         onAnswer={onAnswerProgression}
                         error={progressionError}
+                      />
+                    ) : null}
+                    {selectedSavedDay?.prescriptions?.length ? (
+                      <PlanDaySwaps
+                        apiFetch={apiFetch}
+                        planId={latestPlan.id}
+                        prescriptions={selectedSavedDay.prescriptions}
+                        onSwap={(name) =>
+                          setSelectedDetail((detail) => ({ ...detail, swapping: name }))
+                        }
+                        onPlanChanged={onPlanChanged}
                       />
                     ) : null}
                     {selectedSavedDay ? (

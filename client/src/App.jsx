@@ -386,7 +386,8 @@ export default function App() {
     finishSession,
     startSession,
     resolveSessionConflict,
-    discardSession
+    discardSession,
+    replacePlan
   } = createAppEventHandlers({
     apiFetch,
     user,
@@ -767,6 +768,7 @@ export default function App() {
         clearDashboardToast={clearDashboardToast}
         apiFetch={apiFetch}
         onStartSession={startSession}
+        onPlanChanged={replacePlan}
       />
     );
   }

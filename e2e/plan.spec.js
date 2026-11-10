@@ -258,4 +258,45 @@ test.describe.serial("generate a plan and log a day of it", () => {
       bench.getByRole("button", { name: "Take back your answer for Dumbbell bench press" })
     ).toBeVisible();
   });
+
+  // Roadmap C4: an exercise swapped from the day's details changes the plan on
+  // the server, survives a reload, and its Undo puts the plan back.
+  test("an exercise is swapped from the day's details, and the swap undone", async () => {
+    const openMonday = async () => {
+      await page.getByRole("button", { name: /^Mon Warmup: 8 minutes/ }).click();
+      return page.getByRole("dialog");
+    };
+
+    await page.goto("/dashboard/plans");
+    let dialog = await openMonday();
+    await dialog.getByRole("button", { name: "Swap Dumbbell box squat" }).click();
+    await expect(dialog.getByRole("heading", { name: "Swap Dumbbell box squat" })).toBeVisible();
+    const alternatives = dialog.getByRole("list", { name: "Alternatives" });
+
+    // An area narrows the list. The step with an area chosen, scanned.
+    await expect(alternatives.getByRole("button").first()).toBeVisible();
+    await dialog.getByRole("button", { name: "Shoulder" }).click();
+    await expect(dialog.getByRole("button", { name: "Shoulder" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(alternatives.getByRole("button").first()).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.map((v) => `${v.id} (${v.impact}) x${v.nodes.length}`)).toEqual([]);
+
+    const first = alternatives.getByRole("button").first();
+    const to = (await first.locator("strong").textContent()).trim();
+    await first.click();
+    await expect(dialog.getByText("Swapped from Dumbbell box squat (shoulder)")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: `Swap ${to}` })).toBeVisible();
+
+    // The swap is the server's: it is there after a reload.
+    await page.reload();
+    dialog = await openMonday();
+    await expect(dialog.getByText("Swapped from Dumbbell box squat (shoulder)")).toBeVisible();
+
+    await dialog.getByRole("button", { name: `Undo the swap of ${to}` }).click();
+    await expect(dialog.getByRole("button", { name: "Swap Dumbbell box squat" })).toBeVisible();
+    await expect(dialog.getByText(/^Swapped from/)).toHaveCount(0);
+  });
 });

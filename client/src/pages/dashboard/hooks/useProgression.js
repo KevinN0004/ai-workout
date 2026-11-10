@@ -11,8 +11,8 @@ const ANSWER_FAILED = "Could not save that answer. Try again.";
 
 /**
  * Reads the week for `dashboard`'s newest plan with today's local date, and
- * reads it again whenever that plan, the profile `notes` or the saved workout
- * sessions change, since each can move the week's targets. A session whose id
+ * reads it again whenever that plan or its lifts, the profile `notes` or the
+ * saved workout sessions change, since each can move the week's targets. A session whose id
  * starts `optimistic-` is not saved yet and is left out. A stale answer is
  * dropped by request id, and a failed read leaves the week null. Returns
  * `progression`, null without a plan; `answer({ liftKey, decision })`, which
@@ -28,7 +28,12 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
   const savedIds = (Array.isArray(dashboard?.workoutSessions) ? dashboard.workoutSessions : [])
     .map((session) => String(session.id))
     .filter((id) => !id.startsWith("optimistic-"));
-  const key = JSON.stringify([planId, notes ?? "", savedIds]);
+  // A swap (roadmap C4) keeps the plan's id and changes its lifts, which the
+  // week is built from.
+  const liftNames = (dashboard?.plans?.[0]?.payload?.days ?? []).flatMap((day) =>
+    (day.prescriptions ?? []).map((prescription) => prescription.name)
+  );
+  const key = JSON.stringify([planId, notes ?? "", savedIds, liftNames]);
 
   // Reads the week whenever its key changes. The key is in the dependencies
   // because it, not anything read here, says when the week may have moved.

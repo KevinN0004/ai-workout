@@ -855,7 +855,20 @@ export const createAppEventHandlers = ({
     }
   };
 
+  // Roadmap C4: the plan a swap or an undo answers, in place of the plan with
+  // its id. The swap's own request is made where the swap is chosen.
+  const replacePlan = (plan) =>
+    setDashboard((prev) =>
+      prev
+        ? {
+            ...prev,
+            plans: (prev.plans || []).map((entry) => (entry.id === plan.id ? plan : entry))
+          }
+        : prev
+    );
+
   return {
+    replacePlan,
     onSubmit,
     openSignupWithPrefilledProfile,
     downloadPlanPdf,

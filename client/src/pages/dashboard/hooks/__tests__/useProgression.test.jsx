@@ -65,7 +65,23 @@ describe("useProgression: reading the week", () => {
   test.each([
     ["a new newest plan", { dashboard: dashboardOf({ planId: "plan-2" }), notes: "" }],
     ["a changed profile note", { dashboard: dashboardOf(), notes: "sore knee" }],
-    ["a newly saved session", { dashboard: dashboardOf({ sessionIds: ["w-2", "w-1"] }), notes: "" }]
+    [
+      "a newly saved session",
+      { dashboard: dashboardOf({ sessionIds: ["w-2", "w-1"] }), notes: "" }
+    ],
+    // Roadmap C4: a swap keeps the plan's id but changes its lifts.
+    [
+      "an exercise swapped in the plan",
+      {
+        dashboard: {
+          ...dashboardOf(),
+          plans: [
+            { id: "plan-1", payload: { days: [{ prescriptions: [{ name: "Goblet squat" }] }] } }
+          ]
+        },
+        notes: ""
+      }
+    ]
   ])("reads the week again after %s", async (_label, next) => {
     const apiFetch = vi.fn(async () => respond({ progression: WEEK }));
     const { rerender } = renderProgression({ dashboard: dashboardOf(), notes: "", apiFetch });

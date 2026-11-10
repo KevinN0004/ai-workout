@@ -262,6 +262,53 @@
   margin: 0;
 }
 
+/* ---- Swapping an exercise (roadmap C4) ------------------------------------ */
+/* Under the week's loads: each exercise with Swap, and a swapped one's line saying what
+   it replaced, with Undo. The swap step itself is SwapStep.css. Nothing here moves. */
+.plan-day-swaps {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.plan-day-swaps h4,
+.plan-day-swaps p {
+  margin: 0;
+}
+
+.plan-day-swap-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-day-swap-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.plan-day-swap-name {
+  flex: 1;
+}
+
+.plan-day-swap-list li > .muted {
+  order: 3;
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}
+
+.plan-day-swap-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---- Saved exercises and empty states ------------------------------------ */
 .plans-view .saved-exercise-card {
   gap: 8px;
