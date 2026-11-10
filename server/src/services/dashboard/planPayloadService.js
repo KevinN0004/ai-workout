@@ -30,8 +30,9 @@
  * @property {string} [exerciseId] its library entry (roadmap C4); absent from a
  *   plan saved before C4
  * @property {"main" | "accessory" | null} [role] its slot's role (roadmap C4)
- * @property {{ prescription: Prescription, line: string }} [swappedFrom] what the
- *   plan was generated with, on an exercise swapped since (roadmap C4)
+ * @property {{ prescription: Prescription, line: string, rampLine: string | null }} [swappedFrom]
+ *   what the plan was generated with, and its day's ramp-up if it led, on an
+ *   exercise swapped since (roadmap C4)
  * @property {string | null} [swapReason] the area the latest swap named, if any
  */
 

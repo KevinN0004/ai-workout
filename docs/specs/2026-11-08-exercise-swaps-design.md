@@ -113,6 +113,14 @@ Made with the owner on 2026-11-08:
 - **Its line** is rewritten the way the generator writes lines, keeping a superset label
   ("A1."). The same line in `planText` is replaced too, so the plan page, the PDF and
   the notes read the same plan.
+- **A day's ramp-up follows its lead lift** (found while building PR 3). The generator
+  writes `- Ramp-up: <lead> x 8 at about half your working weight, …` only for a lead
+  that takes a load. A swap of the lead renames that line, or leaves it out for a
+  bodyweight lift. `swappedFrom.rampLine` keeps the original, so Undo, or a later swap
+  to a loaded lift, puts it back after the warm-up.
+- **A plan whose text does not hold a day's lines as its payload does is not swapped.**
+  No saved plan is like that, and the route answers 409 rather than letting the two
+  drift apart.
 - **Nothing in the database schema changes.** The payload is JSON.
 
 ### The server
