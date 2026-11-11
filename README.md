@@ -255,6 +255,7 @@ The server exposes:
 - Auth/profile: `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`, `DELETE /api/auth/me`, `GET/POST /api/profile`
 - Dashboard: `GET /api/dashboard`, `GET /api/dashboard/workout-sessions`, `GET /api/dashboard/meal-logs`, `GET /api/dashboard/progress-metrics`, `GET /api/dashboard/progression?today=` (the week's load for each lift of the newest plan)
 - Dashboard writes: workout sessions, workout aliases, calories, goals, meal logs, progress metrics, and saved exercises under `/api/dashboard`; answers to the week's progression with `PUT` and `DELETE` on `/api/dashboard/progression/:weekStart/lifts/:liftKey` and `/api/dashboard/progression/:weekStart/week`. Workout, meal and calorie writes take an optional client `id`, and a repeat with the same `id` updates that entry instead of adding one
+- Plan swaps: `GET /api/dashboard/plans/:planId/swaps?exercise=&area=` (an exercise's alternatives under the plan's rules), `POST` on the same path to swap it, and `POST /api/dashboard/plans/:planId/swaps/undo`
 - Generation: `POST /api/generate`
 - External data: weather, air quality, wger exercise data, and MealDB meal search under `/api`
 
