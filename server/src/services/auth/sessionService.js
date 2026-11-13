@@ -109,10 +109,14 @@ export const withTimeout = (promise, timeoutMs, message) => {
   });
 };
 
-// The CSRF check's one comparison. An empty token never matches, not even an
-// empty one: timingSafeEqual calls two empty buffers equal, so requireCsrfToken
-// relies on this to refuse a write that carries neither cookie nor header.
-const tokensMatch = (a, b) => {
+/**
+ * Compares two secrets in constant time. An empty one never matches, not even
+ * an empty one: timingSafeEqual calls two empty buffers equal, so the CSRF
+ * check relies on this to refuse a write that carries neither cookie nor
+ * header. The Strava routes use it for the OAuth state and the webhook's
+ * verify token.
+ */
+export const tokensMatch = (a, b) => {
   const left = Buffer.from(String(a || ""), "utf8");
   const right = Buffer.from(String(b || ""), "utf8");
   if (left.length === 0 || right.length === 0) return false;

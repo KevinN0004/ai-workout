@@ -233,7 +233,7 @@ null` stops an activity being imported twice. Prisma cannot express it, so the
   - A failure while handling is logged with the event's type and ids, never its body,
     and left to the catch-up.
 - **The subscription** is one per Strava app. The owner manages it with
-  `server/scripts/strava-webhook.mjs create|view|delete`, run in their own terminal
+  `server/scripts/strava-webhook.js create|view|delete`, run in their own terminal
   with the server's environment.
 
 ### Catch-up sync
@@ -309,8 +309,10 @@ and what the user already has:
 - **The startup check:**
   - The first three are all set or all unset; partly set is a startup error.
   - The key must decode to 32 bytes.
-  - The two webhook settings are optional. Without them the webhook route answers 404,
-    and the catch-up still works.
+  - The two webhook settings are optional, and the catch-up works without them. The
+    setup check needs only the verify token, since Strava calls it while the
+    subscription is being created, before its id exists; an event needs the
+    subscription id. Without its setting, each answers 404 (found in PR 5).
   - `STRAVA_BASE_URL` is a startup error in production.
 - **Documented** in the README's environment table, and blank in `env.example`.
 - **The owner sets them in Render. Claude never reads them.**
@@ -398,7 +400,7 @@ safe to deploy.
 1. Register an API app at strava.com/settings/api, with the callback domain set to the
    Render host. Strava requires a Strava subscription for this.
 2. Set the five settings in Render.
-3. Run `strava-webhook.mjs create` once, and set the subscription id it prints.
+3. Run `strava-webhook.js create` once, and set the subscription id it prints.
 
 ## Risks
 

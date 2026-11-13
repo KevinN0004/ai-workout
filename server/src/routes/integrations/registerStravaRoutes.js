@@ -3,7 +3,8 @@
  * docs/specs/2026-11-12-strava-import-design.md, "Connecting"): the state
  * Settings shows, the authorize link, Strava's return, and the disconnect.
  */
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { tokensMatch } from "../../services/auth/sessionService.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
 const BASE = "/api/integrations/strava";
@@ -14,17 +15,6 @@ const ACTIVITY_SCOPES = ["activity:read_all", "activity:read"];
 
 /** @param {unknown} value */
 const queryText = (value) => (typeof value === "string" ? value.trim().slice(0, 300) : "");
-
-/**
- * Whether the state Strava returned is the one this browser was given, compared
- * in constant time.
- * @param {string} expected
- * @param {string} returned
- */
-const statesMatch = (expected, returned) => {
-  if (!expected || expected.length !== returned.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(returned));
-};
 
 /**
  * Registers the four routes. `getStravaConfig` is read on every request, so
@@ -86,7 +76,9 @@ export const registerStravaRoutes = (app, deps) => {
 
     const query = req.query;
     if (queryText(query.error)) return land("cancelled");
-    if (!statesMatch(expected, queryText(query.state))) {
+    // In constant time, and never an empty state, which the cookie lacks on a
+    // return this browser did not start.
+    if (!tokensMatch(expected, queryText(query.state))) {
       req.log.warn({ event: "strava_state_mismatch" }, "Strava's return did not match its state.");
       return land("failed");
     }

@@ -17,6 +17,7 @@ import { createShutdownHandler } from "./shutdown.js";
 import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRequestContextMiddleware } from "./middleware/requestContext.js";
 import { registerApiRoutes } from "./routes/registerApiRoutes.js";
+import { registerStravaWebhook } from "./routes/integrations/registerStravaWebhook.js";
 import { registerClientStatic, resolveClientDistPath } from "./staticClient.js";
 import { createAuthUserService } from "./services/auth/authUserService.js";
 import {
@@ -691,6 +692,38 @@ const generateDailyLimiter = rateLimit({
       error: "Workout generation has reached today's limit. Please try again later."
     });
   }
+});
+
+// Strava's webhook, a server-to-server call that carries no CSRF token, so it is
+// mounted ahead of /api with its own limit. Strava sends a handful of events a
+// day per athlete, and every event is checked with Strava before anything
+// changes, so a flood costs only API calls, which this caps.
+const stravaWebhookLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  store: rateLimitStore("strava_webhook"),
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    metrics.rateLimited += 1;
+    req.log.warn(
+      {
+        event: "rate_limited",
+        scope: "strava_webhook",
+        method: req.method,
+        path: requestLogPath(req)
+      },
+      "Strava webhook rate limited."
+    );
+    res.status(429).json({ error: "Too many requests." });
+  }
+});
+registerStravaWebhook(app, {
+  getStravaConfig,
+  stravaService,
+  stravaWebhookLimiter,
+  // After the response: Strava allows two seconds for the 200.
+  scheduleStravaEvent: (task) => setImmediate(task)
 });
 
 // ---- Limits and CSRF on /api ------------------------------------------------
