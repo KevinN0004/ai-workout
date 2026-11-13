@@ -68,6 +68,28 @@ From Strava's developer documentation and coverage of its API agreement, checked
   law or an agreement with them says otherwise. This came from a forum post quoting the
   terms; the agreement's own text could not be opened.
 
+**Re-checked on 2026-11-13 against Strava's own developer pages** (authentication,
+webhooks, reference, rate limits, getting started), while starting PR 3:
+
+- **"A Strava subscription is a prerequisite for creating an app"** (getting started).
+  It is not tied to a tier, so it applies to a single-player app too. The owner chose to
+  go on with C2 on that basis.
+- **Revoking access is `POST https://www.strava.com/oauth/revoke`**, with the app's
+  client id and secret as HTTP Basic auth and the `token` to revoke. Strava recommends it
+  from 1 June 2026, and `/oauth/deauthorize` stops being supported on 1 June 2027.
+- **Tokens:** an access token lasts six hours. A refresh may return a new refresh token,
+  and "the older refresh token is invalidated immediately".
+- **No answer is documented for an app at its athlete limit.** The token exchange's
+  refusal (403) is read as the limit.
+- **`sport_type` replaces the deprecated `type`.** `WeightTraining`, `Workout` and
+  `Crossfit` are sport types.
+- **The activity list** takes `after` as "an epoch timestamp", and `per_page` defaults to
+  30 with no maximum stated. `has_heartrate` and `average_heartrate` appear in the
+  reference's sample activities but in no activity model, so both are read as optional.
+- **The webhook:** one subscription per app, events unsigned, a 200 within two seconds,
+  three attempts. A deauthorization always carries `"authorized": "false"` in `updates`.
+- **The default read limits** are 100 requests per 15 minutes and 1,000 a day.
+
 Because the server sleeps far longer than two seconds, a webhook alone would lose most
 activities finished while it slept. So C2 adds a catch-up sync.
 
@@ -109,7 +131,10 @@ null` stops an activity being imported twice. Prisma cannot express it, so the
 - **How an activity becomes a workout:**
   - **date:** the date part of `start_date_local`;
   - **focus:** the sport's label (`Run`, `Weight training`), cut to 80 characters;
-  - **minutes:** `moving_time` in minutes, rounded, and NULL when absent;
+  - **minutes:** `moving_time` in minutes, rounded. NULL when absent, and NULL outside
+    5 to 360, the range `workout_sessions` checks (found in PR 3): a 3-minute walk or a
+    7-hour ride still imports, without a duration, rather than failing or being clamped
+    to a number that is not true;
   - **notes:** the activity's title, cut to the notes limit;
   - **plan link:** none, so it is an off-plan session;
   - **exercises, sets, reps, RPE:** empty or NULL. Progression reads sets, so it ignores
@@ -201,8 +226,9 @@ null` stops an activity being imported twice. Prisma cannot express it, so the
   - **Strava doesn't sign events, so an event is only a hint**, checked against Strava:
     - **activity created or updated:** fetch the activity, then import or update it;
     - **activity deleted:** fetch it, and only a `not_found` removes the import;
-    - **athlete deauthorized** (`updates.authorized` is `"false"`): try a refresh, and
-      only a refusal disconnects.
+    - **access revoked** (`updates.authorized` is `"false"`, whatever the object type,
+      since Strava's page does not name it): try a refresh, and only a refusal
+      disconnects.
   - A forged event costs at most an API call.
   - A failure while handling is logged with the event's type and ids, never its body,
     and left to the catch-up.
@@ -244,7 +270,8 @@ and what the user already has:
 
 - **`DELETE /api/integrations/strava`**, with Settings' confirm saying the imported
   workouts will be removed:
-  1. asks Strava to revoke access, as a best effort;
+  1. asks Strava to revoke access (`/oauth/revoke`, the refresh token), as a best
+     effort;
   2. deletes the connection, every session with `source = 'strava'`, and the deleted
      list, in one transaction.
 - **A confirmed deauthorization** does the same.
@@ -369,7 +396,7 @@ safe to deploy.
 ### What the owner does, after PR 9
 
 1. Register an API app at strava.com/settings/api, with the callback domain set to the
-   Render host.
+   Render host. Strava requires a Strava subscription for this.
 2. Set the five settings in Render.
 3. Run `strava-webhook.mjs create` once, and set the subscription id it prints.
 

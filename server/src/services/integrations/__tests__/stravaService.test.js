@@ -1,0 +1,347 @@
+import { describe, expect, test, vi } from "vitest";
+import { createStravaService } from "../stravaService.js";
+import { createTokenCipher } from "../tokenCipher.js";
+
+// The Strava service's token handling and single-activity import (roadmap C2,
+// docs/specs/2026-11-12-strava-import-design.md, "Tokens", "The import rules").
+// The repositories are in-memory fakes, fetch is stubbed, and the clock is fixed.
+
+const NOW = new Date("2026-11-13T10:00:00Z");
+const KEY = Buffer.alloc(32);
+const cipher = createTokenCipher(KEY);
+const CONFIG = {
+  clientId: "12345",
+  clientSecret: "test-client-secret",
+  key: KEY,
+  webBase: "http://strava.test",
+  verifyToken: null,
+  subscriptionId: null
+};
+const minutesFromNow = (minutes) => new Date(NOW.getTime() + minutes * 60000);
+
+const answer = (status, body = {}) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+
+const NEW_TOKENS = {
+  access_token: "access-new",
+  refresh_token: "refresh-new",
+  expires_at: Math.floor(minutesFromNow(360).getTime() / 1000)
+};
+
+const ACTIVITY = {
+  id: 9001,
+  name: "Morning run",
+  sport_type: "Run",
+  start_date_local: "2026-11-12T07:15:00Z",
+  moving_time: 1800,
+  distance: 5000,
+  has_heartrate: false
+};
+
+const connectionRow = (overrides = {}) => ({
+  userPk: "pk-1",
+  athleteId: 4242,
+  athleteName: "Jo S.",
+  accessToken: cipher.seal("access-old"),
+  refreshToken: cipher.seal("refresh-old"),
+  expiresAt: minutesFromNow(120),
+  connectedAt: new Date("2026-11-01T00:00:00Z"),
+  lastSyncedAt: null,
+  lastSyncError: null,
+  needsReconnect: false,
+  ...overrides
+});
+
+// The connection store over one row. `underLock` replaces the row the lock reads,
+// to stage a refresh another request finished first.
+const fakeConnections = (row, { underLock } = {}) => {
+  const state = { row, locks: 0, updates: [], reconnects: 0 };
+  return {
+    state,
+    findConnection: async () => (state.row ? { ...state.row } : null),
+    withRefreshLock: async (_args, fn) => {
+      state.locks += 1;
+      const locked = underLock === undefined ? state.row : underLock;
+      return locked ? fn("tx", { ...locked }) : null;
+    },
+    updateTokens: async (tx, { accessToken, refreshToken, expiresAt }) => {
+      state.updates.push({ tx, accessToken, refreshToken, expiresAt });
+      state.row = { ...state.row, accessToken, refreshToken, expiresAt, needsReconnect: false };
+    },
+    markNeedsReconnect: async () => {
+      state.reconnects += 1;
+      state.row = { ...state.row, needsReconnect: true };
+      return 1;
+    }
+  };
+};
+
+const fakeImports = ({ deleted = [], existing = [], appDays = [] } = {}) => {
+  const state = { saved: [], removed: [], dayChecks: [] };
+  return {
+    state,
+    isDeletedHere: async ({ externalId }) => deleted.includes(externalId),
+    hasImport: async ({ externalId }) => existing.includes(externalId),
+    hasAppWorkoutOn: async ({ date }) => {
+      state.dayChecks.push(date);
+      return appDays.includes(date);
+    },
+    saveImport: async ({ workout }) => {
+      state.saved.push(workout);
+      return existing.includes(workout.externalId) ? "updated" : "created";
+    },
+    removeImport: async ({ externalId }) => {
+      state.removed.push(externalId);
+      return 1;
+    }
+  };
+};
+
+const serviceWith = ({
+  row = connectionRow(),
+  underLock,
+  imports = fakeImports(),
+  responses = [],
+  config = CONFIG
+} = {}) => {
+  const connections = fakeConnections(row, { underLock });
+  const fetchImpl = vi.fn(async () => {
+    const next = responses.shift();
+    if (!next) throw new Error("unexpected Strava call");
+    return next;
+  });
+  const service = createStravaService({
+    connections,
+    imports,
+    getConfig: () => config,
+    fetchImpl,
+    now: () => NOW
+  });
+  return { service, connections, imports, fetchImpl };
+};
+
+describe("accessTokenFor", () => {
+  test("a token with time left is opened, and Strava is not called", async () => {
+    const { service, connections, fetchImpl } = serviceWith();
+
+    expect(await service.accessTokenFor("u-1")).toBe("access-old");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(connections.state.locks).toBe(0);
+  });
+
+  test("a token within five minutes of expiry is refreshed under the lock, and stored sealed", async () => {
+    const { service, connections, fetchImpl } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(4) }),
+      responses: [answer(200, NEW_TOKENS)]
+    });
+
+    expect(await service.accessTokenFor("u-1")).toBe("access-new");
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(connections.state.updates).toHaveLength(1);
+    const [stored] = connections.state.updates;
+    expect(stored.tx).toBe("tx");
+    expect(stored.accessToken).not.toContain("access-new");
+    expect(cipher.open(stored.accessToken)).toBe("access-new");
+    expect(cipher.open(stored.refreshToken)).toBe("refresh-new");
+    expect(stored.expiresAt).toEqual(new Date(NEW_TOKENS.expires_at * 1000));
+    const form = new URLSearchParams(String(fetchImpl.mock.calls[0][1].body));
+    expect(form.get("refresh_token")).toBe("refresh-old");
+  });
+
+  test("a token exactly five minutes from expiry is refreshed", async () => {
+    const { service } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(5) }),
+      responses: [answer(200, NEW_TOKENS)]
+    });
+    expect(await service.accessTokenFor("u-1")).toBe("access-new");
+  });
+
+  test("when another request refreshed first, the token read under the lock is used", async () => {
+    const { service, fetchImpl, connections } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      underLock: connectionRow({
+        accessToken: cipher.seal("access-theirs"),
+        expiresAt: minutesFromNow(360)
+      })
+    });
+
+    expect(await service.accessTokenFor("u-1")).toBe("access-theirs");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(connections.state.updates).toHaveLength(0);
+  });
+
+  test("forceRefresh refreshes a token with time left", async () => {
+    const { service, fetchImpl } = serviceWith({ responses: [answer(200, NEW_TOKENS)] });
+
+    expect(await service.accessTokenFor("u-1", { forceRefresh: true })).toBe("access-new");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test("a refused refresh marks the connection for reconnecting, and deletes nothing", async () => {
+    const { service, connections } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      responses: [answer(400, { message: "Bad Request" })]
+    });
+
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "reconnect" });
+    expect(connections.state.reconnects).toBe(1);
+    expect(connections.state.row).not.toBeNull();
+    expect(connections.state.updates).toHaveLength(0);
+  });
+
+  test("a refresh token that will not open marks the connection for reconnecting", async () => {
+    const { service, connections, fetchImpl } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1), refreshToken: "v1.not.sealed.here" })
+    });
+
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "reconnect" });
+    expect(connections.state.reconnects).toBe(1);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("an access token that will not open marks the connection for reconnecting", async () => {
+    const { service, connections } = serviceWith({
+      row: connectionRow({ accessToken: "garbage" })
+    });
+
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "reconnect" });
+    expect(connections.state.reconnects).toBe(1);
+  });
+
+  test("a Strava outage during a refresh is passed on, and marks nothing", async () => {
+    const { service, connections } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      responses: [answer(503)]
+    });
+
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "unavailable" });
+    expect(connections.state.reconnects).toBe(0);
+  });
+
+  test("a store failure while saving refreshed tokens is passed on, and marks nothing", async () => {
+    const { service, connections } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      responses: [answer(200, NEW_TOKENS)]
+    });
+    connections.updateTokens = async () => {
+      throw new Error("database down");
+    };
+
+    await expect(service.accessTokenFor("u-1")).rejects.toThrow("database down");
+    expect(connections.state.reconnects).toBe(0);
+  });
+
+  test("a connection already marked for reconnecting calls Strava for nothing", async () => {
+    const { service, fetchImpl } = serviceWith({ row: connectionRow({ needsReconnect: true }) });
+
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "reconnect" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("no connection, before or under the lock, is not connected", async () => {
+    await expect(serviceWith({ row: null }).service.accessTokenFor("u-1")).rejects.toMatchObject({
+      kind: "not_connected"
+    });
+    await expect(
+      serviceWith({
+        row: connectionRow({ expiresAt: minutesFromNow(1) }),
+        underLock: null
+      }).service.accessTokenFor("u-1")
+    ).rejects.toMatchObject({ kind: "not_connected" });
+  });
+
+  test("with no Strava configured, it is not configured", async () => {
+    await expect(serviceWith({ config: null }).service.accessTokenFor("u-1")).rejects.toMatchObject(
+      {
+        kind: "not_configured"
+      }
+    );
+  });
+});
+
+describe("importActivity", () => {
+  test("a new activity is fetched with the token, mapped and saved", async () => {
+    const { service, imports, fetchImpl } = serviceWith({ responses: [answer(200, ACTIVITY)] });
+
+    expect(await service.importActivity("u-1", "9001")).toBe("create");
+
+    expect(String(fetchImpl.mock.calls[0][0])).toBe("http://strava.test/api/v3/activities/9001");
+    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe("Bearer access-old");
+    expect(imports.state.saved).toEqual([
+      expect.objectContaining({
+        externalId: "9001",
+        workoutDate: "2026-11-12",
+        distanceMeters: 5000
+      })
+    ]);
+  });
+
+  test("an activity already here is updated", async () => {
+    const imports = fakeImports({ existing: ["9001"] });
+    const { service } = serviceWith({ imports, responses: [answer(200, ACTIVITY)] });
+
+    expect(await service.importActivity("u-1", "9001")).toBe("update");
+    expect(imports.state.saved).toHaveLength(1);
+  });
+
+  test("an activity deleted here is not saved", async () => {
+    const imports = fakeImports({ deleted: ["9001"] });
+    const { service } = serviceWith({ imports, responses: [answer(200, ACTIVITY)] });
+
+    expect(await service.importActivity("u-1", "9001")).toBe("skip-deleted");
+    expect(imports.state.saved).toHaveLength(0);
+  });
+
+  test("a new strength activity on a day with an app workout is not saved", async () => {
+    const imports = fakeImports({ appDays: ["2026-11-12"] });
+    const { service } = serviceWith({
+      imports,
+      responses: [answer(200, { ...ACTIVITY, sport_type: "WeightTraining" })]
+    });
+
+    expect(await service.importActivity("u-1", "9001")).toBe("skip-duplicate");
+    expect(imports.state.saved).toHaveLength(0);
+  });
+
+  test("an activity with no date is never matched against an undated workout", async () => {
+    const imports = fakeImports({ appDays: [null] });
+    const { service } = serviceWith({
+      imports,
+      responses: [answer(200, { ...ACTIVITY, sport_type: "Workout", start_date_local: undefined })]
+    });
+
+    expect(await service.importActivity("u-1", "9001")).toBe("create");
+    expect(imports.state.dayChecks).toEqual([]);
+  });
+});
+
+describe("removeIfGone", () => {
+  test("an activity Strava no longer has is removed", async () => {
+    const { service, imports } = serviceWith({
+      responses: [answer(404, { message: "Not Found" })]
+    });
+
+    expect(await service.removeIfGone("u-1", 9001)).toBe(true);
+    expect(imports.state.removed).toEqual(["9001"]);
+  });
+
+  test("an activity Strava still has stays", async () => {
+    const { service, imports } = serviceWith({ responses: [answer(200, ACTIVITY)] });
+
+    expect(await service.removeIfGone("u-1", "9001")).toBe(false);
+    expect(imports.state.removed).toEqual([]);
+  });
+
+  test("any other answer is passed on, and removes nothing", async () => {
+    const { service, imports } = serviceWith({ responses: [answer(500)] });
+
+    await expect(service.removeIfGone("u-1", "9001")).rejects.toMatchObject({
+      kind: "unavailable"
+    });
+    expect(imports.state.removed).toEqual([]);
+  });
+});

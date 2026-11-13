@@ -119,7 +119,8 @@ saved copy (ADR 0015). Write the runners with the Write tool, in the scratchpad.
 
 - **Distance:** a positive number, or NULL. Strava's `0` is "no distance".
 - **Heart rate:** a positive number when `has_heartrate` is true, or NULL.
-- **Minutes:** NULL when `moving_time` is absent. The guard comes before `Number()`.
+- **Minutes:** NULL when `moving_time` is absent, and outside the table's 5 to 360
+  check. The guard comes before `Number()`.
 - **A missing `last_synced_at`** reads as "Not synced yet", never as the epoch.
 
 **Secrets:**
@@ -547,20 +548,26 @@ Still unused by any route.
   `…/integrations/__tests__/stravaMapping.test.js`, `…/stravaImport.test.js`,
   `…/stravaService.test.js`, `server/src/__tests__/numericCoercion.contract.test.js`
 
-- [ ] **Re-check Strava's documentation first** (Conventions), and correct the spec and
-      this plan where it differs.
+- [x] **Re-check Strava's documentation first** (Conventions), and correct the spec and
+      this plan where it differs. Done 2026-11-13: the spec's "What Strava requires" now
+      holds the findings. The owner chose to go on after learning that creating any app
+      needs a Strava subscription.
 
 ### The client
 
 - [ ] Test first, with `fetchImpl` a `vi.fn()` that answers `new Response(...)`:
-  - `exchangeCode(code, redirectUri)` POSTs form fields `client_id`, `client_secret`,
-    `code`, `grant_type=authorization_code` to `${webBase}/oauth/token`. It returns
+  - `exchangeCode(code)` POSTs form fields `client_id`, `client_secret`, `code`,
+    `grant_type=authorization_code` to `${webBase}/oauth/token`. Strava's exchange takes
+    no `redirect_uri` (re-check, 2026-11-13). It returns
     `{ accessToken, refreshToken, expiresAt, athleteId, athleteName }`, with
     `expiresAt` a Date from `expires_at` seconds, and the name joined from the athlete's
     first name and last initial;
   - `refresh(refreshToken)` POSTs `grant_type=refresh_token`, and returns the three
     token fields;
-  - `revoke(accessToken)` POSTs to `${webBase}/oauth/deauthorize`;
+  - `revoke(refreshToken)` POSTs `token` and `token_type_hint=refresh_token` to
+    `${webBase}/oauth/revoke`, with the client id and secret as HTTP Basic auth. That is
+    the endpoint Strava recommends since 1 June 2026; `/oauth/deauthorize` ends on
+    1 June 2027 (re-check);
   - `listActivities(accessToken, { after, page, perPage })` GETs
     `${webBase}/api/v3/athlete/activities?after=&page=&per_page=` with a bearer header;
   - `getActivity(accessToken, id)` GETs `${webBase}/api/v3/activities/<id>`;
@@ -568,9 +575,9 @@ Still unused by any route.
     - 401 → `unauthorized`;
     - 404 → `not_found`;
     - 429 → `rate_limited`;
-    - a 403 whose body mentions the athlete limit → `capacity` (match the message
-      found in the re-check);
-    - 400 on a refresh → `unauthorized`;
+    - a 403 from the code exchange → `capacity`. Strava documents no answer for an app
+      at its athlete limit (re-check), so the exchange's refusal is read as the limit;
+    - 400 and 403 elsewhere → `unauthorized`, since a refused refresh is a 400;
     - any other status → `unavailable`;
     - a thrown fetch → `unavailable`;
     - a timeout → `unavailable`;
@@ -590,8 +597,9 @@ Still unused by any route.
   - `has_heartrate: false` with `average_heartrate: 140` gives `null`;
     `has_heartrate: true` with `average_heartrate: 0` gives `null`, and with `141.6`
     gives `141.6`;
-  - `moving_time` absent gives `durationMinutes: null`, `0` gives `0`, and `1799` gives
-    `30`;
+  - `moving_time` absent gives `durationMinutes: null`, and `1799` gives `30`. Under
+    5 minutes or over 360 gives `null`, since `workout_sessions` checks that range (found
+    in PR 3; the plan had `0` giving `0`, which the table refuses);
   - `start_date_local: "2026-11-12T07:15:00Z"` gives `workoutDate: "2026-11-12"`. The
     local date is the string's own date part, never converted through a time zone;
   - `sport_type: "WeightTraining"` gives `focus: "Weight training"`, and
@@ -620,11 +628,18 @@ Still unused by any route.
 
 ### The service: the refresh and importing one activity
 
-- [ ] Test first, `createStravaService({ connections, imports, getConfig, fetchImpl, logger, now })`,
-      with the repositories as in-memory fakes, and the clock fixed:
-  - **`accessTokenFor(userId)`:**
+- [ ] Test first, `createStravaService({ connections, imports, getConfig, fetchImpl, now })`,
+      with the repositories as in-memory fakes, and the clock fixed. Nothing in this PR
+      logs, so the logger joins in PR 5 with `handleEvent`, where its leak test belongs.
+  - **The import repository gains `hasImport({ userId, externalId })`**, with its
+    Postgres test. `decideImport` needs to know whether the activity is already here.
+  - **`accessTokenFor(userId, { forceRefresh })`:**
     - returns the opened token when it expires more than five minutes from now, and
       calls Strava for nothing;
+    - a connection already marked `needsReconnect` throws `reconnect`, and calls Strava
+      for nothing;
+    - `forceRefresh` refreshes whatever the expiry. PR 5 uses it to confirm a
+      deauthorization;
     - refreshes when it is due: it seals and stores both new tokens through
       `updateTokens`, inside `withRefreshLock`, and returns the new access token;
     - **another request already refreshed:** when the row read under the lock is no
@@ -641,8 +656,6 @@ Still unused by any route.
     - a `not_found` from Strava calls `removeImport`;
     - a found activity removes nothing;
     - any other error is rethrown.
-  - **the logger** receives the event's kind and the activity id only. A test spies on
-    it and asserts no call argument holds a token or the secret.
 - [ ] Write those three functions in `stravaService.js`. `getConfig` defaults to
       `() => readStravaConfig(process.env)`. The cipher and the client are built from it
       on each call.
@@ -933,7 +946,7 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   - `GET /oauth/authorize` redirects to `redirect_uri?code=e2e-code&state=<state>&scope=read,activity:read_all`;
   - `POST /oauth/token` answers fixed tokens, an `expires_at` six hours on, and an
     athlete;
-  - `POST /oauth/deauthorize` answers 200;
+  - `POST /oauth/revoke` answers 200;
   - `GET /api/v3/athlete/activities` answers the activities after `after`, paged;
   - `GET /api/v3/activities/:id` answers one, or 404.
 - [ ] **The spec**, which signs up, adds one run to the fake, then:
