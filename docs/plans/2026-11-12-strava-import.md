@@ -633,13 +633,15 @@ Still unused by any route.
       logs, so the logger joins in PR 5 with `handleEvent`, where its leak test belongs.
   - **The import repository gains `hasImport({ userId, externalId })`**, with its
     Postgres test. `decideImport` needs to know whether the activity is already here.
-  - **`accessTokenFor(userId, { forceRefresh })`:**
+  - **`accessTokenFor(userId)`:**
     - returns the opened token when it expires more than five minutes from now, and
       calls Strava for nothing;
     - a connection already marked `needsReconnect` throws `reconnect`, and calls Strava
       for nothing;
-    - `forceRefresh` refreshes whatever the expiry. PR 5 uses it to confirm a
-      deauthorization;
+    - PR 3 also had a `forceRefresh` option, for PR 5 to confirm a deauthorization. PR 5
+      replaced it with `confirmRevoked(userId)`, which shares the locked refresh. It
+      answers true only when Strava refuses the refresh: a token that will not open is
+      this server's fault, so with a forged event it must not delete anything;
     - refreshes when it is due: it seals and stores both new tokens through
       `updateTokens`, inside `withRefreshLock`, and returns the new access token;
     - **another request already refreshed:** when the row read under the lock is no
@@ -756,7 +758,7 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   limiters and the CSRF middleware, with its own limiter: `rateLimit` with
   `rateLimitStore("strava_webhook")`, 120 a minute.
 - Modify: `server/src/services/integrations/stravaService.js` (`handleEvent`)
-- Create: `server/scripts/strava-webhook.mjs`
+- Create: `server/scripts/strava-webhook.js`
 - Modify: `knip.jsonc`, if knip does not see the script as an entry
 - Tests: `…/integrations/__tests__/stravaWebhook.test.js` (stubbed),
   `…/stravaWebhook.integration.test.js`, `…/stravaService.test.js`
@@ -784,14 +786,14 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
 - [ ] **Integration:** a stubbed Strava, a connected user, then a `create` POST imports
       the activity; an `update` POST changes its title; a `delete` POST with Strava
       answering 404 removes it.
-- [ ] **The script**, `server/scripts/strava-webhook.mjs create|view|delete`:
+- [ ] **The script**, `server/scripts/strava-webhook.js create|view|delete`:
   - it reads `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_WEBHOOK_VERIFY_TOKEN`
     and, for `create`, `--callback <url>`;
   - it calls `POST`, `GET` or `DELETE /api/v3/push_subscriptions` on Strava;
   - it prints the subscription id, or the error's status, and never prints a secret;
   - it is a thin wrapper over an exported `runWebhookCommand(argv, env, fetchImpl)`,
     tested with a stubbed fetch. The owner runs it with
-    `node --env-file=server/.env server/scripts/strava-webhook.mjs create --callback https://<host>/webhooks/strava`.
+    `node --env-file=server/.env server/scripts/strava-webhook.js create --callback https://<host>/webhooks/strava`.
 - [ ] Gates, mutations (skip the subscription check, delete without the 404, drop the
       deauthorize confirmation), commit, push, open the PR and report.
 

@@ -5,6 +5,7 @@
  */
 // @ts-check
 import { StravaError, createStravaClient } from "../external/stravaClient.js";
+import { readEvent } from "./stravaEvent.js";
 import { decideImport } from "./stravaImport.js";
 import { toWorkout } from "./stravaMapping.js";
 import { TokenCipherError, createTokenCipher } from "./tokenCipher.js";
@@ -40,45 +41,38 @@ export const createStravaService = ({
   const isDue = (row) => row.expiresAt.getTime() - now().getTime() <= REFRESH_MARGIN_MS;
 
   /**
-   * An access token for the user's Strava account, refreshed first when it is
-   * due, or always with `forceRefresh`, which confirms access is still granted.
-   * A refused refresh, or a token that will not open, marks the connection for
-   * reconnecting and throws `reconnect`; nothing is deleted on that alone.
-   * @param {string} userId
-   * @param {{ forceRefresh?: boolean }} [options]
-   * @returns {Promise<string>}
+   * The token `sealed` holds, or null for one that will not open.
+   * @param {{ open: (sealed: string) => string }} cipher
+   * @param {string} sealed
    */
-  const accessTokenFor = async (userId, { forceRefresh = false } = {}) => {
-    const { cipher, client } = tools();
-    const reconnect = async () => {
-      await connections.markNeedsReconnect({ userId });
-      return new StravaError("reconnect");
-    };
-    // Opens a sealed token, or answers null for one that will not open.
-    /** @param {string} sealed */
-    const openOrNull = (sealed) => {
-      try {
-        return cipher.open(sealed);
-      } catch {
-        return null;
-      }
-    };
-
-    const current = await connections.findConnection({ userId });
-    if (!current) throw new StravaError("not_connected");
-    if (current.needsReconnect) throw new StravaError("reconnect");
-    if (!forceRefresh && !isDue(current)) {
-      const token = openOrNull(current.accessToken);
-      if (token === null) throw await reconnect();
-      return token;
+  const openOrNull = (cipher, sealed) => {
+    try {
+      return cipher.open(sealed);
+    } catch {
+      return null;
     }
+  };
 
-    /** @type {(tx: any, row: any) => Promise<{ token: string | null }>} */
-    const refreshUnderLock = async (tx, row) => {
-      // Another request may have refreshed while this one waited for the lock.
-      if (!forceRefresh && !isDue(row)) return { token: openOrNull(row.accessToken) };
-      const refreshToken = openOrNull(row.refreshToken);
-      if (refreshToken === null) return { token: null };
+  /**
+   * Refreshes the user's tokens under their lock, storing the new pair sealed.
+   * `{ token }`; `{ refused: true }` when Strava refuses the refresh token;
+   * `{ unreadable: true }` when a stored token will not open; null without a
+   * connection. Unless `force`, a token another request refreshed while this
+   * one waited is used as it is.
+   * @param {string} userId
+   * @param {boolean} force
+   * @returns {Promise<{ token: string } | { refused: true } | { unreadable: true } | null>}
+   */
+  const refreshLocked = (userId, force) => {
+    const { cipher, client } = tools();
+    /** @type {(tx: any, row: any) => Promise<{ token: string } | { refused: true } | { unreadable: true }>} */
+    const underLock = async (tx, row) => {
+      if (!force && !isDue(row)) {
+        const token = openOrNull(cipher, row.accessToken);
+        return token === null ? { unreadable: true } : { token };
+      }
+      const refreshToken = openOrNull(cipher, row.refreshToken);
+      if (refreshToken === null) return { unreadable: true };
       try {
         const fresh = await client.refresh(refreshToken);
         await connections.updateTokens(tx, {
@@ -89,14 +83,49 @@ export const createStravaService = ({
         });
         return { token: fresh.accessToken };
       } catch (error) {
-        if (error instanceof StravaError && error.kind === "unauthorized") return { token: null };
+        if (error instanceof StravaError && error.kind === "unauthorized") return { refused: true };
         throw error;
       }
     };
-    const result = await connections.withRefreshLock({ userId }, refreshUnderLock);
+    return connections.withRefreshLock({ userId }, underLock);
+  };
+
+  /**
+   * An access token for the user's Strava account, refreshed first when it is
+   * due. A refused refresh, or a token that will not open, marks the connection
+   * for reconnecting and throws `reconnect`; nothing is deleted on that alone.
+   * @param {string} userId
+   * @returns {Promise<string>}
+   */
+  const accessTokenFor = async (userId) => {
+    const { cipher } = tools();
+    const current = await connections.findConnection({ userId });
+    if (!current) throw new StravaError("not_connected");
+    if (current.needsReconnect) throw new StravaError("reconnect");
+    /** @type {{ token: string } | { refused: true } | { unreadable: true } | null} */
+    let result;
+    if (isDue(current)) {
+      result = await refreshLocked(userId, false);
+    } else {
+      const token = openOrNull(cipher, current.accessToken);
+      result = token === null ? { unreadable: true } : { token };
+    }
     if (!result) throw new StravaError("not_connected");
-    if (result.token === null) throw await reconnect();
-    return result.token;
+    if ("token" in result) return result.token;
+    await connections.markNeedsReconnect({ userId });
+    throw new StravaError("reconnect");
+  };
+
+  /**
+   * Whether Strava has revoked the app's access: true only when Strava refuses
+   * a forced refresh, whatever the token's expiry or reconnect mark. A token
+   * here that will not open is this server's fault, not proof, so it answers
+   * false, as does a refresh that works, whose new tokens are kept.
+   * @param {string} userId
+   */
+  const confirmRevoked = async (userId) => {
+    const result = await refreshLocked(userId, true);
+    return Boolean(result && "refused" in result);
   };
 
   /**
@@ -225,8 +254,56 @@ export const createStravaService = ({
     return { removed, revokeError };
   };
 
+  /**
+   * Handles one webhook event, after the 200 has gone back to Strava. Strava does
+   * not sign events, so each one is only a hint, checked with Strava before
+   * anything changes: an activity is fetched before it is imported, a delete
+   * needs Strava's not_found, and a revoke needs Strava to refuse a refresh.
+   * Answers what it did, and never throws: a failure is logged by the event's
+   * types, id and the error's kind, and left to the catch-up sync.
+   * @param {unknown} body
+   * @param {{ warn: (fields: object, message: string) => void }} logger
+   */
+  const handleEvent = async (body, logger) => {
+    const config = getConfig();
+    const event = readEvent(body);
+    if (!config || !event || event.subscriptionId !== config.subscriptionId) return "ignored";
+    try {
+      const connection = await connections.findConnectionByAthlete({ athleteId: event.ownerId });
+      if (!connection) return "ignored";
+      const userId = connection.userPk;
+      if (event.deauthorized) {
+        if (!(await confirmRevoked(userId))) return "kept";
+        await connections.removeConnectionAndImports({ userId });
+        return "disconnected";
+      }
+      if (event.objectType !== "activity" || !event.objectId) return "ignored";
+      if (event.aspectType === "create" || event.aspectType === "update") {
+        return await importActivity(userId, event.objectId);
+      }
+      if (event.aspectType === "delete") {
+        return (await removeIfGone(userId, event.objectId)) ? "removed" : "kept";
+      }
+      return "ignored";
+    } catch (error) {
+      logger.warn(
+        {
+          event: "strava_event_failed",
+          objectType: event.objectType,
+          aspectType: event.aspectType,
+          objectId: event.objectId,
+          kind: String(/** @type {{ kind?: string }} */ (error).kind || "error")
+        },
+        "A Strava event could not be handled."
+      );
+      return "failed";
+    }
+  };
+
   return {
     accessTokenFor,
+    handleEvent,
+    confirmRevoked,
     importActivity,
     removeIfGone,
     authorizeUrl,

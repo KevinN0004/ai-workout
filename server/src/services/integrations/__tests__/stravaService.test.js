@@ -84,6 +84,8 @@ const fakeConnections = (row, { underLock } = {}) => {
       state.row = connectionRow({ ...args, userPk: args.userId });
       return state.row;
     },
+    findConnectionByAthlete: async ({ athleteId }) =>
+      state.row && state.row.athleteId === athleteId ? { ...state.row } : null,
     removeConnectionAndImports: async () => {
       state.removedAll = (state.removedAll || 0) + 1;
       state.row = null;
@@ -187,11 +189,15 @@ describe("accessTokenFor", () => {
     expect(connections.state.updates).toHaveLength(0);
   });
 
-  test("forceRefresh refreshes a token with time left", async () => {
-    const { service, fetchImpl } = serviceWith({ responses: [answer(200, NEW_TOKENS)] });
+  test("an access token that will not open under the lock marks the connection for reconnecting", async () => {
+    const { service, connections, fetchImpl } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      underLock: connectionRow({ accessToken: "garbage", expiresAt: minutesFromNow(360) })
+    });
 
-    expect(await service.accessTokenFor("u-1", { forceRefresh: true })).toBe("access-new");
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await expect(service.accessTokenFor("u-1")).rejects.toMatchObject({ kind: "reconnect" });
+    expect(connections.state.reconnects).toBe(1);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   test("a refused refresh marks the connection for reconnecting, and deletes nothing", async () => {
@@ -273,6 +279,55 @@ describe("accessTokenFor", () => {
         kind: "not_configured"
       }
     );
+  });
+});
+
+// A revoke event is unsigned, so only Strava refusing the refresh token
+// confirms it; a token here that will not open is this server's fault, not
+// proof (docs/specs/2026-11-12-strava-import-design.md, "The webhook").
+describe("confirmRevoked", () => {
+  test("Strava refusing a refresh confirms it, and nothing is marked", async () => {
+    const { service, connections } = serviceWith({ responses: [answer(401)] });
+
+    expect(await service.confirmRevoked("u-1")).toBe(true);
+    expect(connections.state.reconnects).toBe(0);
+  });
+
+  test("a refresh Strava accepts refutes it, and its new tokens are kept", async () => {
+    const { service, connections, fetchImpl } = serviceWith({
+      responses: [answer(200, NEW_TOKENS)]
+    });
+
+    expect(await service.confirmRevoked("u-1")).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(cipher.open(connections.state.row.refreshToken)).toBe("refresh-new");
+  });
+
+  test("it refreshes even a token with hours left, and one marked for reconnecting", async () => {
+    const { service, fetchImpl } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(300), needsReconnect: true }),
+      responses: [answer(401)]
+    });
+
+    expect(await service.confirmRevoked("u-1")).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  test("a refresh token that will not open proves nothing", async () => {
+    const { service, fetchImpl } = serviceWith({ row: connectionRow({ refreshToken: "garbage" }) });
+
+    expect(await service.confirmRevoked("u-1")).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("no connection proves nothing", async () => {
+    expect(await serviceWith({ underLock: null }).service.confirmRevoked("u-1")).toBe(false);
+  });
+
+  test("a Strava outage is passed on", async () => {
+    await expect(
+      serviceWith({ responses: [answer(503)] }).service.confirmRevoked("u-1")
+    ).rejects.toMatchObject({ kind: "unavailable" });
   });
 });
 
@@ -521,5 +576,147 @@ describe("revokeAccess and disconnect", () => {
 
     expect(await service.disconnect("u-1")).toEqual({ removed: 2, revokeError: "unavailable" });
     expect(connections.state.removedAll).toBe(1);
+  });
+});
+
+describe("handleEvent", () => {
+  const SUBSCRIBED = { ...CONFIG, subscriptionId: 77 };
+  const eventOf = (overrides = {}) => ({
+    object_type: "activity",
+    object_id: 9001,
+    aspect_type: "create",
+    updates: {},
+    owner_id: 4242,
+    subscription_id: 77,
+    ...overrides
+  });
+  const DEAUTH = eventOf({
+    object_type: "athlete",
+    object_id: 4242,
+    aspect_type: "update",
+    updates: { authorized: "false" }
+  });
+  const logger = () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() });
+  const handled = (options, body) => {
+    const setup = serviceWith({ config: SUBSCRIBED, ...options });
+    const log = logger();
+    return { ...setup, log, outcome: setup.service.handleEvent(body, log) };
+  };
+
+  test.each([
+    ["another subscription", { config: SUBSCRIBED }, eventOf({ subscription_id: 78 })],
+    ["no subscription configured", { config: CONFIG }, eventOf()],
+    ["no Strava configured", { config: null }, eventOf()],
+    ["a malformed body", { config: SUBSCRIBED }, { owner_id: "who" }],
+    ["an athlete nobody here connected", { config: SUBSCRIBED }, eventOf({ owner_id: 999 })],
+    ["an aspect Strava does not send", { config: SUBSCRIBED }, eventOf({ aspect_type: "merge" })],
+    [
+      "an athlete event that revokes nothing",
+      { config: SUBSCRIBED },
+      eventOf({ object_type: "athlete" })
+    ],
+    ["an activity event with no id", { config: SUBSCRIBED }, eventOf({ object_id: "none" })]
+  ])("%s is ignored, and Strava is not called", async (_label, options, body) => {
+    const { outcome, fetchImpl, imports, connections } = handled(options, body);
+
+    expect(await outcome).toBe("ignored");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(imports.state.saved).toEqual([]);
+    expect(connections.state.removedAll).toBeUndefined();
+  });
+
+  test("a new activity is fetched and imported", async () => {
+    const { outcome, imports } = handled({ responses: [answer(200, ACTIVITY)] }, eventOf());
+
+    expect(await outcome).toBe("create");
+    expect(imports.state.saved).toEqual([expect.objectContaining({ externalId: "9001" })]);
+  });
+
+  test("an edited activity is fetched and updated", async () => {
+    const imports = fakeImports({ existing: ["9001"] });
+    const { outcome } = handled(
+      { imports, responses: [answer(200, ACTIVITY)] },
+      eventOf({ aspect_type: "update", updates: { title: "Renamed" } })
+    );
+
+    expect(await outcome).toBe("update");
+    expect(imports.state.saved).toHaveLength(1);
+  });
+
+  test("a delete Strava confirms removes the import", async () => {
+    const { outcome, imports } = handled(
+      { responses: [answer(404)] },
+      eventOf({ aspect_type: "delete" })
+    );
+
+    expect(await outcome).toBe("removed");
+    expect(imports.state.removed).toEqual(["9001"]);
+  });
+
+  test("a delete of an activity Strava still has removes nothing", async () => {
+    const { outcome, imports } = handled(
+      { responses: [answer(200, ACTIVITY)] },
+      eventOf({ aspect_type: "delete" })
+    );
+
+    expect(await outcome).toBe("kept");
+    expect(imports.state.removed).toEqual([]);
+  });
+
+  test("a revoke Strava confirms disconnects, removing the imports", async () => {
+    const { outcome, connections } = handled({ responses: [answer(401)] }, DEAUTH);
+
+    expect(await outcome).toBe("disconnected");
+    expect(connections.state.removedAll).toBe(1);
+  });
+
+  test("a revoke the refresh refutes keeps everything, with the new tokens", async () => {
+    const { outcome, connections } = handled({ responses: [answer(200, NEW_TOKENS)] }, DEAUTH);
+
+    expect(await outcome).toBe("kept");
+    expect(connections.state.removedAll).toBeUndefined();
+    expect(cipher.open(connections.state.row.refreshToken)).toBe("refresh-new");
+  });
+
+  test("a revoke with a token here that will not open keeps everything", async () => {
+    const { outcome, connections, fetchImpl } = handled(
+      { row: connectionRow({ refreshToken: "garbage" }) },
+      DEAUTH
+    );
+
+    expect(await outcome).toBe("kept");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(connections.state.removedAll).toBeUndefined();
+  });
+
+  test("a failure is logged by type, id and kind alone, and never thrown", async () => {
+    const { outcome, log } = handled({ responses: [answer(503)] }, eventOf());
+
+    expect(await outcome).toBe("failed");
+    expect(log.warn).toHaveBeenCalledWith(
+      {
+        event: "strava_event_failed",
+        objectType: "activity",
+        aspectType: "create",
+        objectId: "9001",
+        kind: "unavailable"
+      },
+      expect.any(String)
+    );
+    const logged = JSON.stringify(log.warn.mock.calls);
+    for (const secret of ["access-old", "refresh-old", "test-client-secret"]) {
+      expect(logged).not.toContain(secret);
+    }
+  });
+
+  test("a store failure is logged as an error, and never thrown", async () => {
+    const setup = serviceWith({ config: SUBSCRIBED });
+    setup.connections.findConnectionByAthlete = async () => {
+      throw new Error("database down");
+    };
+    const log = logger();
+
+    expect(await setup.service.handleEvent(eventOf(), log)).toBe("failed");
+    expect(log.warn.mock.calls[0][0]).toMatchObject({ kind: "error" });
   });
 });
