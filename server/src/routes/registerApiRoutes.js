@@ -7,12 +7,13 @@ import { registerAuthRoutes } from "./authRoutes.js";
 import { registerDashboardRoutes } from "./dashboardRoutes.js";
 import { registerExternalRoutes } from "./externalRoutes.js";
 import { registerGenerateRoutes } from "./generateRoutes.js";
+import { registerStravaRoutes } from "./integrations/registerStravaRoutes.js";
 import { registerSystemRoutes } from "./systemRoutes.js";
 
 /**
- * Registers the system, external-data, account, dashboard and plan-generation
- * routes. Every registrar receives the same `deps` and destructures only what
- * it uses.
+ * Registers the system, external-data, account, dashboard, plan-generation and
+ * Strava routes. Every registrar receives the same `deps` and destructures only
+ * what it uses.
  */
 export const registerApiRoutes = (app, deps) => {
   registerSystemRoutes(app, deps);
@@ -20,4 +21,5 @@ export const registerApiRoutes = (app, deps) => {
   registerAuthRoutes(app, deps);
   registerDashboardRoutes(app, deps);
   registerGenerateRoutes(app, deps);
+  registerStravaRoutes(app, deps);
 };

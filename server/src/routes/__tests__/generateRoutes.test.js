@@ -455,4 +455,36 @@ describe("POST /api/generate", () => {
       expect(response.body.plan.startsWith(ruleText(body()))).toBe(true);
     });
   });
+
+  // Strava's API agreement bars its data from AI models (roadmap C2,
+  // docs/specs/2026-11-12-strava-import-design.md, "Strava data and AI"). The
+  // route is given no reader of a user's workouts at all; this pins that what
+  // Gemini is sent holds nothing of an import, even where one is to hand.
+  describe("Strava data", () => {
+    test("an import never reaches Gemini", async () => {
+      const imported = {
+        source: "strava",
+        externalId: "9001",
+        sport: "VirtualRide",
+        notes: "Strava-only title 7c1",
+        distanceMeters: 40123.4,
+        averageHeartrate: 151.2
+      };
+      const app = buildApp(
+        {
+          findUserWithDashboard: async () => ({ dashboard: { workoutSessions: [imported] } })
+        },
+        { user: { id: "u-1", profile: { age: 30 }, workoutSessions: [imported] } }
+      );
+
+      const response = await post(app);
+
+      expect(response.status).toBe(200);
+      expect(generateContent).toHaveBeenCalledTimes(1);
+      const sent = JSON.stringify(requestSent());
+      for (const value of ["Strava-only title 7c1", "VirtualRide", "40123.4", "151.2"]) {
+        expect(sent).not.toContain(value);
+      }
+    });
+  });
 });

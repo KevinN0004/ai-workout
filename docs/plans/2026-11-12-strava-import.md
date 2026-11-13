@@ -666,7 +666,9 @@ Still unused by any route.
 
 **Files:**
 
-- Create: `server/src/routes/integrations/registerStravaRoutes.js`
+- Create: `server/src/routes/integrations/registerStravaRoutes.js`. It is not
+  `// @ts-check`, like every other route file: the repo has no Express type
+  declarations, and adding them is a dependency decision (found in PR 4).
 - Modify: `server/src/routes/registerApiRoutes.js`, `server/src/index.js` (the
   repositories and the service into `deps`), `server/src/corsPolicy.js` (export
   `requestOrigin`)
@@ -705,8 +707,9 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   3. the `scope` lacks both `activity:read_all` and `activity:read` → `no-access`;
   4. the exchange fails with `capacity` → `limit`, and with any other kind →
      `unavailable`;
-  5. `saveConnection` says `conflict` → `taken`. The just-issued token is revoked as a
-     best effort;
+  5. `saveConnection` says `conflict` → `taken`. Nothing is revoked (changed in PR 4):
+     Strava's grant belongs to the athlete, so revoking the token just issued would cut
+     off the account that holds the link too;
   6. otherwise → `connected`.
 - `DELETE /api/integrations/strava`, with `requireAuth`, calls `disconnect` and answers
   `{ ok: true }`:

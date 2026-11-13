@@ -43,6 +43,7 @@ let metrics;
 let cookieCalls;
 let deps;
 let logError;
+let logWarn;
 
 // The in-memory rows stand in for both reads: the user row the auth lookups
 // take, and the full load the profile route re-reads after a write.
@@ -60,7 +61,7 @@ const buildApp = (overrides = {}) => {
   // Every handler reads req.log optionally; give it one so the log assertions
   // have something to see.
   app.use((req, _res, next) => {
-    req.log = { error: logError, warn: vi.fn(), info: vi.fn() };
+    req.log = { error: logError, warn: logWarn, info: vi.fn() };
     next();
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
@@ -119,6 +120,7 @@ beforeEach(() => {
   metrics = { authFailures: 0 };
   cookieCalls = { session: [], csrf: [], clearedSession: 0, clearedCsrf: 0 };
   logError = vi.fn();
+  logWarn = vi.fn();
 
   const authUserService = createAuthUserService({
     cleanText,
@@ -192,6 +194,9 @@ beforeEach(() => {
     deleteSession: vi.fn(async (token) => {
       sessions = sessions.filter((item) => item.token !== token);
     }),
+    // stravaService.revokeAccess: a best effort that never throws, answering
+    // null, or why Strava did not revoke.
+    revokeStravaAccess: vi.fn(async () => null),
     // A stand-in for userRepository's deleteUser: drops the row, and reports
     // whether there was one.
     deleteUser: vi.fn(async ({ userId }) => {
@@ -1048,6 +1053,56 @@ describe("DELETE /api/auth/me", () => {
       .post("/api/auth/login")
       .send({ email: signupBody().email, password: signupBody().password })
       .expect(401);
+  });
+
+  // Roadmap C2: the account's Strava access is revoked before the account goes,
+  // while its tokens can still be read; the cascade removes the rest.
+  test("Strava access is revoked first, for the signed-in user", async () => {
+    const order = [];
+    const app = deleteApp({
+      revokeStravaAccess: async (userId) => {
+        order.push(`revoke ${userId}`);
+        return null;
+      },
+      deleteUser: async ({ userId }) => {
+        order.push(`delete ${userId}`);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+    const [{ userId }] = rows;
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(order).toEqual([`revoke ${userId}`, `delete ${userId}`]);
+  });
+
+  test("a revoke Strava refused is logged by kind, and never blocks the delete", async () => {
+    const deleted = [];
+    const app = deleteApp({
+      revokeStravaAccess: async () => "unavailable",
+      deleteUser: async ({ userId }) => {
+        deleted.push(userId);
+        return true;
+      }
+    });
+    const cookie = await signUpAndGetCookie(app);
+
+    await request(app)
+      .delete("/api/auth/me")
+      .set("Cookie", cookie)
+      .send({ password: signupBody().password })
+      .expect(200);
+
+    expect(deleted).toHaveLength(1);
+    expect(logWarn).toHaveBeenCalledWith(
+      { event: "strava_revoke_failed", kind: "unavailable" },
+      expect.any(String)
+    );
   });
 
   test("a wrong password is rejected and the account survives", async () => {

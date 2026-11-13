@@ -40,6 +40,7 @@ export const registerAuthRoutes = (app, deps) => {
     passwordChangeBodySchema,
     accountDeleteBodySchema,
     updatePasswordHash,
+    revokeStravaAccess,
     deleteUser,
     metrics,
     getDummyPasswordRecord,
@@ -304,6 +305,16 @@ export const registerAuthRoutes = (app, deps) => {
       if (!correct) {
         metrics.authFailures += 1;
         return res.status(401).json({ error: "Password is incorrect." });
+      }
+
+      // Strava access is revoked while its tokens can still be read, as a best
+      // effort that never throws: a refusal must not keep the account.
+      const revokeError = await revokeStravaAccess(req.user.id);
+      if (revokeError) {
+        req.log.warn(
+          { event: "strava_revoke_failed", kind: revokeError },
+          "Strava did not revoke access."
+        );
       }
 
       // Every AppUser relation cascades on delete (see schema.prisma), so this
