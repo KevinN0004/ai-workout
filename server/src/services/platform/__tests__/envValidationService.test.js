@@ -184,3 +184,63 @@ describe("validateEnv", () => {
     expect(errors[0]).toContain("DATABASE_URL");
   });
 });
+
+// The Strava settings (docs/specs/2026-11-12-strava-import-design.md, "Settings,
+// the server's environment"): the client id, the secret and the key together or
+// not at all, a key of 32 bytes, and the E2E fake's base URL never in production.
+describe("validateEnv, the Strava settings", () => {
+  const KEY = Buffer.alloc(32).toString("base64");
+  const strava = {
+    STRAVA_CLIENT_ID: "12345",
+    STRAVA_CLIENT_SECRET: "test-client-secret",
+    STRAVA_TOKEN_KEY: KEY
+  };
+  const TOGETHER =
+    "STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET and STRAVA_TOKEN_KEY must be set together.";
+
+  test("none of them, or all three, is valid", () => {
+    expect(validateEnv(validEnv)).toEqual([]);
+    expect(validateEnv({ ...validEnv, ...strava })).toEqual([]);
+  });
+
+  test.each(["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_TOKEN_KEY"])(
+    "all but %s is an error",
+    (name) => {
+      expect(validateEnv({ ...validEnv, ...strava, [name]: " " })).toEqual([TOGETHER]);
+    }
+  );
+
+  test("one of the three alone is an error", () => {
+    expect(validateEnv({ ...validEnv, STRAVA_CLIENT_ID: "12345" })).toEqual([TOGETHER]);
+  });
+
+  test("a key that is not 32 bytes in base64 is an error", () => {
+    expect(validateEnv({ ...validEnv, ...strava, STRAVA_TOKEN_KEY: "short" })).toEqual([
+      "STRAVA_TOKEN_KEY must be 32 bytes in base64."
+    ]);
+  });
+
+  test("STRAVA_BASE_URL is refused in production, and allowed outside it", () => {
+    const fake = { ...validEnv, ...strava, STRAVA_BASE_URL: "http://127.0.0.1:5099" };
+
+    expect(validateEnv({ ...fake, NODE_ENV: "production" })).toEqual([
+      "STRAVA_BASE_URL is for tests and cannot be set in production."
+    ]);
+    expect(validateEnv(fake)).toEqual([]);
+  });
+
+  test("STRAVA_BASE_URL must be a URL", () => {
+    const errors = validateEnv({ ...validEnv, STRAVA_BASE_URL: "not a url" });
+    expect(errors).toEqual(['STRAVA_BASE_URL must be a valid URL (received "not a url").']);
+  });
+
+  test.each(["abc", "1e3", "1.5", "0", "-3"])("a subscription id of %j is an error", (value) => {
+    expect(validateEnv({ ...validEnv, STRAVA_WEBHOOK_SUBSCRIPTION_ID: value })).toEqual([
+      `STRAVA_WEBHOOK_SUBSCRIPTION_ID must be a whole number above 0 (received "${value}").`
+    ]);
+  });
+
+  test("a subscription id of digits is valid", () => {
+    expect(validateEnv({ ...validEnv, STRAVA_WEBHOOK_SUBSCRIPTION_ID: " 678 " })).toEqual([]);
+  });
+});

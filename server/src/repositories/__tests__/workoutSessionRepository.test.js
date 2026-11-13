@@ -275,3 +275,45 @@ describe("each exercise's pattern", () => {
     ]);
   });
 });
+
+// An import from Strava (roadmap C2, 008_strava_import.sql) reads back with its
+// source, activity, sport and numbers; a session logged in the app reads all
+// five as null, and a missing number stays null rather than 0.
+describe("a session's Strava fields", () => {
+  test("an import carries them", () => {
+    expect(
+      mapWorkoutSession({
+        source: "strava",
+        externalId: "9001",
+        sport: "Run",
+        distanceMeters: "5012.4",
+        averageHeartrate: "148.2"
+      })
+    ).toMatchObject({
+      source: "strava",
+      externalId: "9001",
+      sport: "Run",
+      distanceMeters: 5012.4,
+      averageHeartrate: 148.2
+    });
+  });
+
+  test("a session logged in the app reads them as null", () => {
+    expect(
+      mapWorkoutSession({
+        source: null,
+        externalId: null,
+        sport: null,
+        distanceMeters: null,
+        averageHeartrate: null
+      })
+    ).toMatchObject({
+      source: null,
+      externalId: null,
+      sport: null,
+      distanceMeters: null,
+      averageHeartrate: null
+    });
+    expect(mapWorkoutSession({})).toMatchObject({ source: null, sport: null });
+  });
+});

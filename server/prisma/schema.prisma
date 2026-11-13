@@ -27,26 +27,35 @@ model AppUser {
   workoutSessions      WorkoutSession[]
   exerciseSets         ExerciseSet[]
   progressionDecisions ProgressionDecision[]
+  stravaConnection     StravaConnection?
+  stravaDeletions      StravaDeletedActivity[]
 
   @@map("app_users")
 }
 
 model WorkoutSession {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String    @map("user_id") @db.Uuid
-  legacyId        String?   @map("legacy_id")
-  workoutDate     DateTime? @map("workout_date") @db.Date
-  focus           String    @default("General")
-  durationMinutes Int?      @map("duration_minutes")
-  exercises       Json      @default("[]")
-  sets            Int?
-  reps            Int?
-  intensityRpe    Decimal?  @map("intensity_rpe") @db.Decimal(4, 1)
-  notes           String    @default("")
-  generatedPlanId String?   @map("generated_plan_id") @db.Uuid
-  planDayIndex    Int?      @map("plan_day_index") @db.SmallInt
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  legacyId         String?   @map("legacy_id")
+  workoutDate      DateTime? @map("workout_date") @db.Date
+  focus            String    @default("General")
+  durationMinutes  Int?      @map("duration_minutes")
+  exercises        Json      @default("[]")
+  sets             Int?
+  reps             Int?
+  intensityRpe     Decimal?  @map("intensity_rpe") @db.Decimal(4, 1)
+  notes            String    @default("")
+  generatedPlanId  String?   @map("generated_plan_id") @db.Uuid
+  planDayIndex     Int?      @map("plan_day_index") @db.SmallInt
+  // An import from Strava (008_strava_import.sql), all NULL for a session
+  // logged in the app. A partial unique index keeps one row per activity.
+  source           String?
+  externalId       String?   @map("external_id")
+  sport            String?
+  distanceMeters   Decimal?  @map("distance_meters") @db.Decimal(10, 1)
+  averageHeartrate Decimal?  @map("average_heartrate") @db.Decimal(5, 1)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user          AppUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
   generatedPlan GeneratedPlan? @relation(fields: [generatedPlanId], references: [id], onDelete: SetNull)
@@ -95,6 +104,39 @@ model ProgressionDecision {
 
   @@unique([userId, weekStart, liftKey], map: "progression_decisions_user_week_lift_key")
   @@map("progression_decisions")
+}
+
+// A user's Strava connection (008_strava_import.sql). One per user and one per
+// athlete; the tokens are sealed by services/integrations/tokenCipher.js.
+model StravaConnection {
+  userId         String    @id @map("user_id") @db.Uuid
+  athleteId      BigInt    @unique @map("athlete_id")
+  athleteName    String    @default("") @map("athlete_name")
+  accessToken    String    @map("access_token")
+  refreshToken   String    @map("refresh_token")
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  connectedAt    DateTime  @default(now()) @map("connected_at") @db.Timestamptz(6)
+  lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  lastSyncError  String?   @map("last_sync_error")
+  needsReconnect Boolean   @default(false) @map("needs_reconnect")
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("strava_connections")
+}
+
+// A Strava activity the user deleted here, never imported again
+// (008_strava_import.sql).
+model StravaDeletedActivity {
+  userId     String   @map("user_id") @db.Uuid
+  externalId String   @map("external_id")
+  deletedAt  DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, externalId])
+  @@map("strava_deleted_activities")
 }
 
 model MealLog {
