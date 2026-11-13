@@ -197,5 +197,22 @@ export const createStravaClient = ({ config, fetchImpl = fetch, timeoutMs = 8000
     return data;
   };
 
-  return { exchangeCode, refresh, revoke, listActivities, getActivity };
+  /**
+   * Strava's authorize page for this app, asking for every activity (private
+   * ones too), returning to `redirectUri` with `state`.
+   * @param {{ redirectUri: string, state: string }} args
+   */
+  const authorizeUrl = ({ redirectUri, state }) => {
+    const query = new URLSearchParams({
+      client_id: config.clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      approval_prompt: "auto",
+      scope: "activity:read_all",
+      state
+    });
+    return `${oauth}/authorize?${query}`;
+  };
+
+  return { authorizeUrl, exchangeCode, refresh, revoke, listActivities, getActivity };
 };

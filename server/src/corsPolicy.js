@@ -14,12 +14,15 @@ const isLoopbackOrigin = (origin) => {
   }
 };
 
-// The origin this request was addressed to: its scheme (X-Forwarded-Proto only
-// behind the one proxy index.js trusts in production) and its raw Host header.
-// A browser cannot set Host, so a page on another site cannot make its Origin
-// equal this, short of rebinding its own name to our address, which
-// createCorsPolicy answers. With no Host there is no own origin to match.
-const requestOrigin = (req) => {
+/**
+ * The origin this request was addressed to: its scheme (X-Forwarded-Proto only
+ * behind the one proxy index.js trusts in production) and its raw Host header.
+ * A browser cannot set Host, so a page on another site cannot make its Origin
+ * equal this, short of rebinding its own name to our address, which
+ * createCorsPolicy answers. With no Host there is no own origin to match. The
+ * Strava routes build their OAuth callback URL from it.
+ */
+export const requestOrigin = (req) => {
   const host = req.get("host");
   return host ? `${req.protocol}://${host}` : null;
 };

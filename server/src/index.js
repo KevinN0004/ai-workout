@@ -43,7 +43,7 @@ import {
   createExternalApiLatencyRecorder,
   createMetrics
 } from "./services/platform/metricsService.js";
-import { createCorsPolicy } from "./corsPolicy.js";
+import { createCorsPolicy, requestOrigin } from "./corsPolicy.js";
 import { createHttpCacheService } from "./services/external/httpCacheService.js";
 import { isUpstreamFailureStatus } from "./services/platform/platformHealthService.js";
 import { createDashboardCollectionService } from "./services/dashboard/dashboardCollectionService.js";
@@ -56,6 +56,10 @@ import { createSavedExerciseRepository } from "./repositories/savedExerciseRepos
 import { createProgressionDecisionRepository } from "./repositories/progressionDecisionRepository.js";
 import { createUserRepository } from "./repositories/userRepository.js";
 import { createGeneratedPlanRepository } from "./repositories/generatedPlanRepository.js";
+import { createStravaConnectionRepository } from "./repositories/stravaConnectionRepository.js";
+import { createStravaImportRepository } from "./repositories/stravaImportRepository.js";
+import { readStravaConfig } from "./services/integrations/stravaConfig.js";
+import { createStravaService } from "./services/integrations/stravaService.js";
 import {
   buildDashboard,
   buildMealLogEntry,
@@ -374,6 +378,18 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry, delete
   });
 const { saveGeneratedPlan, pruneGeneratedPlans, findPlanForUser, rewritePlan } =
   createGeneratedPlanRepository({ prisma });
+
+// Strava import (roadmap C2). The settings are read on every call, so a server
+// without them answers Strava's routes with 404 and is otherwise unchanged.
+// fetch is looked up at call time, so a test that stubs the global reaches it.
+const getStravaConfig = () => readStravaConfig(process.env);
+const stravaService = createStravaService({
+  connections: createStravaConnectionRepository({ prisma }),
+  imports: createStravaImportRepository({ prisma }),
+  getConfig: getStravaConfig,
+  fetchImpl: (...args) => fetch(...args),
+  now: () => new Date()
+});
 
 // ---- Services ---------------------------------------------------------------
 // The cache is built here but sessionService, which owns the Redis client, is not
@@ -788,6 +804,12 @@ registerApiRoutes(app, {
   accountDeleteBodySchema,
   updatePasswordHash,
   deleteUser,
+  attachOptionalUser,
+  cookieSecure,
+  getStravaConfig,
+  requestOrigin,
+  stravaService,
+  revokeStravaAccess: stravaService.revokeAccess,
   gemini,
   generatePlanBodySchema,
   saveGeneratedPlan,

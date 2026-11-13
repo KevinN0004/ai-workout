@@ -7,7 +7,7 @@
 import { StravaError, createStravaClient } from "../external/stravaClient.js";
 import { decideImport } from "./stravaImport.js";
 import { toWorkout } from "./stravaMapping.js";
-import { createTokenCipher } from "./tokenCipher.js";
+import { TokenCipherError, createTokenCipher } from "./tokenCipher.js";
 
 // A token this close to its expiry is refreshed before use.
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
@@ -144,5 +144,95 @@ export const createStravaService = ({
     return true;
   };
 
-  return { accessTokenFor, importActivity, removeIfGone };
+  /**
+   * Strava's authorize page for this app, returning to `redirectUri` with
+   * `state`.
+   * @param {{ redirectUri: string, state: string }} args
+   */
+  const authorizeUrl = (args) => tools().client.authorizeUrl(args);
+
+  /**
+   * Trades the code from Strava's redirect for the athlete's tokens and stores
+   * them sealed. "connected"; "taken" when the athlete is linked to another
+   * account, whose link is left as it is (Strava's grant is the athlete's, so a
+   * revoke here would cut that account off too); "failed" when the user is gone.
+   * A refused exchange is passed on, so the athlete limit reads as `capacity`.
+   * @param {string} userId
+   * @param {string} code
+   */
+  const connect = async (userId, code) => {
+    const { cipher, client } = tools();
+    const granted = await client.exchangeCode(code);
+    const saved = await connections.saveConnection({
+      userId,
+      athleteId: granted.athleteId,
+      athleteName: granted.athleteName,
+      accessToken: cipher.seal(granted.accessToken),
+      refreshToken: cipher.seal(granted.refreshToken),
+      expiresAt: granted.expiresAt
+    });
+    if (!saved) return "failed";
+    return "conflict" in saved ? "taken" : "connected";
+  };
+
+  /**
+   * What Settings shows: whether the server has Strava, and the user's
+   * connection, without its tokens.
+   * @param {string} userId
+   */
+  const connectionState = async (userId) => {
+    const available = Boolean(getConfig());
+    const row = available ? await connections.findConnection({ userId }) : null;
+    return {
+      available,
+      connected: Boolean(row),
+      athleteName: row?.athleteName ?? "",
+      lastSyncedAt: row?.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
+      lastSyncError: row?.lastSyncError ?? null,
+      needsReconnect: row?.needsReconnect ?? false
+    };
+  };
+
+  /**
+   * Asks Strava to revoke the app's access to the user's account, as a best
+   * effort: it never throws. Null when it was revoked or there was nothing to
+   * revoke, and otherwise why not, so the caller can log it.
+   * @param {string} userId
+   * @returns {Promise<string | null>}
+   */
+  const revokeAccess = async (userId) => {
+    if (!getConfig()) return null;
+    const { cipher, client } = tools();
+    try {
+      const row = await connections.findConnection({ userId });
+      if (!row) return null;
+      await client.revoke(cipher.open(row.refreshToken));
+      return null;
+    } catch (error) {
+      if (error instanceof TokenCipherError) return "unreadable";
+      return String(/** @type {{ kind?: string }} */ (error).kind || "error");
+    }
+  };
+
+  /**
+   * Revokes access as a best effort, then removes the connection and every
+   * import, which Strava's terms require once access is withdrawn.
+   * @param {string} userId
+   */
+  const disconnect = async (userId) => {
+    const revokeError = await revokeAccess(userId);
+    const { removed } = await connections.removeConnectionAndImports({ userId });
+    return { removed, revokeError };
+  };
+
+  return {
+    accessTokenFor,
+    importActivity,
+    removeIfGone,
+    authorizeUrl,
+    connect,
+    connectionState,
+    revokeAccess,
+    disconnect
+  };
 };
