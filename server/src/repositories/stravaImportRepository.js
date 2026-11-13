@@ -83,6 +83,20 @@ export const createStravaImportRepository = ({ prisma }) => {
   };
 
   /**
+   * Whether the activity `externalId` is already imported for the user, so a
+   * later save is an update the duplicate rule does not apply to.
+   * @param {{ userId: string, externalId: string }} args
+   */
+  const hasImport = async ({ userId, externalId }) => {
+    const userPk = await getUserPk(prisma, userId);
+    if (!userPk) return false;
+    const count = await prisma.workoutSession.count({
+      where: { userId: userPk, source: SOURCE, externalId }
+    });
+    return count > 0;
+  };
+
+  /**
    * The user's imports dated on or after `since`, as `{ id, externalId, date }`:
    * what a complete catch-up list is compared against.
    * @param {{ userId: string, since: string }} args
@@ -145,6 +159,7 @@ export const createStravaImportRepository = ({ prisma }) => {
     saveImport,
     hasAppWorkoutOn,
     isDeletedHere,
+    hasImport,
     listImportsSince,
     removeImport,
     deleteImportById

@@ -11,6 +11,7 @@ const {
   saveImport,
   hasAppWorkoutOn,
   isDeletedHere,
+  hasImport,
   listImportsSince,
   removeImport,
   deleteImportById
@@ -191,7 +192,19 @@ describe("stravaImportRepository", () => {
     expect(await prisma.stravaDeletedActivity.count({ where: { userId: user.id } })).toBe(0);
   });
 
+  test("hasImport finds only this user's import of that activity", async () => {
+    const user = await createUser(EMAILS[0]);
+    const other = await createUser(EMAILS[1]);
+    await saveImport({ userId: other.id, workout: RUN });
+
+    expect(await hasImport({ userId: user.id, externalId: "9001" })).toBe(false);
+    await saveImport({ userId: user.id, workout: RUN });
+    expect(await hasImport({ userId: user.id, externalId: "9001" })).toBe(true);
+    expect(await hasImport({ userId: user.id, externalId: "9002" })).toBe(false);
+  });
+
   test("an unknown user finds and changes nothing", async () => {
+    expect(await hasImport({ userId: "nobody", externalId: "9001" })).toBe(false);
     expect(await saveImport({ userId: "nobody", workout: RUN })).toBeNull();
     expect(await hasAppWorkoutOn({ userId: "nobody", date: "2026-11-12" })).toBe(false);
     expect(await isDeletedHere({ userId: "nobody", externalId: "9001" })).toBe(false);

@@ -10,6 +10,7 @@ import { createExternalDataService } from "../services/external/externalDataServ
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 import { readSet } from "../services/planning/progression.js";
 import { parseSubscriptionId } from "../services/integrations/stravaConfig.js";
+import { positiveOrNull } from "../services/integrations/stravaMapping.js";
 
 // One set row holding `value` in `field`, read back through the mapper.
 const readSetField = (field, value) =>
@@ -124,6 +125,14 @@ const helpers = [
   {
     name: "parseRedisPort",
     call: (value) => parseRedisPort(value),
+    absent: null,
+    zeroIsValid: false
+  },
+  // An imported activity's distance and heart rate (roadmap C2): Strava reports
+  // a distance of 0 for an activity with none, so here 0 is no reading.
+  {
+    name: "positiveOrNull (stravaMapping)",
+    call: (value) => positiveOrNull(value),
     absent: null,
     zeroIsValid: false
   },
