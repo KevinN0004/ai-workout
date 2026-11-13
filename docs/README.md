@@ -43,6 +43,7 @@
 - [2026-11-06 — Offline-ready PWA](plans/2026-11-06-offline-ready-pwa.md)
 - [2026-11-08 — In-gym workout mode](plans/2026-11-08-in-gym-workout-mode.md)
 - [2026-11-08 — Exercise swaps](plans/2026-11-08-exercise-swaps.md)
+- [2026-11-12 — Strava import](plans/2026-11-12-strava-import.md)
 
 ## Specs
 
@@ -67,3 +68,4 @@
 - [2026-11-06 — Offline-ready PWA](specs/2026-11-06-offline-ready-pwa-design.md)
 - [2026-11-08 — In-gym workout mode](specs/2026-11-08-in-gym-workout-mode-design.md)
 - [2026-11-08 — Exercise swaps](specs/2026-11-08-exercise-swaps-design.md)
+- [2026-11-12 — Strava import](specs/2026-11-12-strava-import-design.md)
