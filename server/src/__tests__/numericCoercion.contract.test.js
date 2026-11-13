@@ -9,6 +9,7 @@ import { validateEnv } from "../services/platform/envValidationService.js";
 import { createExternalDataService } from "../services/external/externalDataService.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 import { readSet } from "../services/planning/progression.js";
+import { parseSubscriptionId } from "../services/integrations/stravaConfig.js";
 
 // One set row holding `value` in `field`, read back through the mapper.
 const readSetField = (field, value) =>
@@ -126,6 +127,13 @@ const helpers = [
     absent: null,
     zeroIsValid: false
   },
+  // Strava numbers subscriptions from 1, so 0 names none.
+  {
+    name: "parseSubscriptionId",
+    call: (value) => parseSubscriptionId(value),
+    absent: null,
+    zeroIsValid: false
+  },
   // Takes a list of hours rather than one value, so the row feeds it three
   // steady hours of the value under test: absent hours are missing hours, and
   // three missing hours are no NowCast at all, never a NowCast of 0.
@@ -141,6 +149,15 @@ const helpers = [
   ...["reps", "seconds", "loadKg", "rpe"].map((field) => ({
     name: `mapWorkoutSession (a set's ${field})`,
     call: (value) => readSetField(field, value),
+    absent: null,
+    zeroIsValid: true
+  })),
+  // An import's two numbers (roadmap C2), read the same way. The table keeps
+  // only a positive distance or heart rate, and Strava's 0 is turned away
+  // before it is saved, but the reader still passes a stored value through.
+  ...["distanceMeters", "averageHeartrate"].map((field) => ({
+    name: `mapWorkoutSession (an import's ${field})`,
+    call: (value) => mapWorkoutSession({ [field]: value })[field],
     absent: null,
     zeroIsValid: true
   })),

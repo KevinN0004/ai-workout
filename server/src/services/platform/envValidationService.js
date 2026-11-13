@@ -3,6 +3,8 @@
  * (outside the test suites) before its own module-scope reads of process.env,
  * and exits on any error. Imported modules such as prisma.js read it earlier.
  */
+import { parseSubscriptionId } from "../integrations/stravaConfig.js";
+import { parseTokenKey } from "../integrations/tokenCipher.js";
 
 // Every min/max here is meant to match what the corresponding reader in
 // index.js / sessionService.js / generateRoutes.js actually accepts, not just
@@ -57,7 +59,17 @@ const NUMERIC_VARS = [
 // Only HTTP endpoints are parsed. Postgres and Redis connection strings are
 // checked for presence alone -- passwords routinely contain characters that
 // make new URL() throw on a perfectly valid DSN.
-const URL_VARS = ["OPEN_METEO_BASE_URL", "OPENAQ_BASE_URL", "WGER_BASE_URL", "MEALDB_BASE_URL"];
+const URL_VARS = [
+  "OPEN_METEO_BASE_URL",
+  "OPENAQ_BASE_URL",
+  "WGER_BASE_URL",
+  "MEALDB_BASE_URL",
+  "STRAVA_BASE_URL"
+];
+
+// Strava runs on all three or none (readStravaConfig): a server given only some
+// would show Connect and then fail every exchange.
+const STRAVA_REQUIRED = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_TOKEN_KEY"];
 
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === "";
 
@@ -112,6 +124,26 @@ export const validateEnv = (env = {}) => {
         `SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1 (received "${env.SENTRY_TRACES_SAMPLE_RATE}").`
       );
     }
+  }
+
+  // Strava: the three together, a key the cipher can use, a subscription id the
+  // reader keeps, and the E2E fake's base URL never in production.
+  const stravaSet = STRAVA_REQUIRED.filter((name) => !isBlank(env[name]));
+  if (stravaSet.length && stravaSet.length < STRAVA_REQUIRED.length) {
+    errors.push(
+      "STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET and STRAVA_TOKEN_KEY must be set together."
+    );
+  } else if (stravaSet.length && !parseTokenKey(env.STRAVA_TOKEN_KEY)) {
+    errors.push("STRAVA_TOKEN_KEY must be 32 bytes in base64.");
+  }
+  const subscription = env.STRAVA_WEBHOOK_SUBSCRIPTION_ID;
+  if (!isBlank(subscription) && parseSubscriptionId(subscription) === null) {
+    errors.push(
+      `STRAVA_WEBHOOK_SUBSCRIPTION_ID must be a whole number above 0 (received "${subscription}").`
+    );
+  }
+  if (!isBlank(env.STRAVA_BASE_URL) && env.NODE_ENV === "production") {
+    errors.push("STRAVA_BASE_URL is for tests and cannot be set in production.");
   }
 
   return errors;

@@ -12,15 +12,16 @@ npm run prisma:generate -w server
 
 ## The migrations
 
-| File                                  | What it does                                                                                                                                                                                                                                                                 |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `001_foundation.sql`                  | The seven tables, their indexes and `updated_at` triggers                                                                                                                                                                                                                    |
-| `002_password_changed_at.sql`         | Adds `app_users.password_changed_at`, set only when a user deliberately changes their password, so sessions issued before it can be rejected. The silent pbkdf2 → argon2id rehash on login does not set it                                                                   |
-| `003_utc_timezone.sql`                | Makes UTC the database's timezone. It used to be set per connection with `options=-c timezone=UTC`, which the pooled (PgBouncer) endpoint refuses                                                                                                                            |
-| `004_workout_plan_day.sql`            | Links a workout session to a day of a generated plan (`generated_plan_id`, `plan_day_index`). Deleting a plan clears only the reference, so a session survives the prune with its index left behind                                                                          |
-| `005_clear_default_target_weight.sql` | Removes the 160 lb target weight sign-up stored, from accounts whose goals are still exactly the sign-up defaults. A target is absent until the user saves one                                                                                                               |
-| `006_exercise_sets.sql`               | One row per set of a workout session: reps or seconds (exactly one), an optional load in kg and an optional RPE, each range-checked. Removed with its session or its user. `user_id` repeats the session's, for per-user queries over every set                              |
-| `007_progression_decisions.sql`       | One answer per user, week and lift to the week's progression (roadmap B4): `undo`, `accept`, `decline`, or `normal` for the week under `lift_key` `''`. The week starts on a Monday, and the unique key is a full constraint, so Prisma upserts on it. Removed with its user |
+| File                                  | What it does                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_foundation.sql`                  | The seven tables, their indexes and `updated_at` triggers                                                                                                                                                                                                                                                                                                  |
+| `002_password_changed_at.sql`         | Adds `app_users.password_changed_at`, set only when a user deliberately changes their password, so sessions issued before it can be rejected. The silent pbkdf2 → argon2id rehash on login does not set it                                                                                                                                                 |
+| `003_utc_timezone.sql`                | Makes UTC the database's timezone. It used to be set per connection with `options=-c timezone=UTC`, which the pooled (PgBouncer) endpoint refuses                                                                                                                                                                                                          |
+| `004_workout_plan_day.sql`            | Links a workout session to a day of a generated plan (`generated_plan_id`, `plan_day_index`). Deleting a plan clears only the reference, so a session survives the prune with its index left behind                                                                                                                                                        |
+| `005_clear_default_target_weight.sql` | Removes the 160 lb target weight sign-up stored, from accounts whose goals are still exactly the sign-up defaults. A target is absent until the user saves one                                                                                                                                                                                             |
+| `006_exercise_sets.sql`               | One row per set of a workout session: reps or seconds (exactly one), an optional load in kg and an optional RPE, each range-checked. Removed with its session or its user. `user_id` repeats the session's, for per-user queries over every set                                                                                                            |
+| `007_progression_decisions.sql`       | One answer per user, week and lift to the week's progression (roadmap B4): `undo`, `accept`, `decline`, or `normal` for the week under `lift_key` `''`. The week starts on a Monday, and the unique key is a full constraint, so Prisma upserts on it. Removed with its user                                                                               |
+| `008_strava_import.sql`               | Strava import (roadmap C2): five nullable columns on `workout_sessions` (`source`, `external_id`, `sport`, and a positive `distance_meters` and `average_heartrate`) with a partial unique index per activity, `strava_connections` (one per user and per athlete, tokens sealed) and `strava_deleted_activities`. Both tables are removed with their user |
 
 **The server reads `password_changed_at` on every user read**, so migrations must run
 before new code starts; a server started against an unmigrated database fails every
@@ -28,9 +29,9 @@ authenticated request.
 
 ## What is modelled
 
-Nine tables: `app_users`, `workout_sessions`, `exercise_sets`, `meal_logs`,
+Eleven tables: `app_users`, `workout_sessions`, `exercise_sets`, `meal_logs`,
 `progress_metrics`, `calorie_entries`, `generated_plans`, `saved_exercises`,
-`progression_decisions`. Flexible AI and external-API
+`progression_decisions`, `strava_connections`, `strava_deleted_activities`. Flexible AI and external-API
 payloads are kept in `jsonb`; everything else is relational with foreign keys and indexes.
 
 **Auth sessions are not in Postgres.** They live in Redis when it is configured and in
@@ -39,8 +40,8 @@ is a training log, not a session store.
 
 ## Two things that will bite you
 
-**Six of the unique indexes are partial** (`where legacy_id is not null`, and one on
-`external_exercise_id`). `schema.prisma` cannot express partial indexes, so Prisma does
+**Seven of the unique indexes are partial** (`where legacy_id is not null`, one on
+`external_exercise_id`, and 008's on `external_id`). `schema.prisma` cannot express partial indexes, so Prisma does
 not know they exist and `upsert` has no constraint to target. The repositories in
 `server/src/repositories/` do an explicit read-then-write instead. That is deliberate.
 

@@ -74,6 +74,11 @@ const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
  * off-plan session, and for one whose plan was deleted, which leaves the index
  * behind (004_workout_plan_day.sql). A linked row always has its index: the
  * migration's link check refuses a plan without one.
+ *
+ * An import from Strava carries `source` "strava", its activity's
+ * `externalId` and `sport`, and its distance and average heart rate, each null
+ * when Strava had none (008_strava_import.sql). All five are null for a
+ * session logged in the app.
  */
 export const mapWorkoutSession = (row = {}) => ({
   id: row.legacyId || row.id,
@@ -88,6 +93,11 @@ export const mapWorkoutSession = (row = {}) => ({
   planId: row.generatedPlan ? row.generatedPlan.legacyId || row.generatedPlan.id : null,
   planDayIndex: row.generatedPlan ? row.planDayIndex : null,
   exerciseSets: groupExerciseSets(row.exerciseSets),
+  source: row.source ?? null,
+  externalId: row.externalId ?? null,
+  sport: row.sport ?? null,
+  distanceMeters: toNumberOrNull(row.distanceMeters),
+  averageHeartrate: toNumberOrNull(row.averageHeartrate),
   createdAt: toIso(row.createdAt)
 });
 
