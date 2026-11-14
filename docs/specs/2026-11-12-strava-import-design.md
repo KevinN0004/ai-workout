@@ -1,7 +1,10 @@
 # Strava import, design
 
-Status: **decided 2026-11-12**, section by section with the owner. The plan is
-`docs/plans/2026-11-12-strava-import.md`. This is roadmap C2. It needs B1 (per-set
+Status: **decided 2026-11-12**, section by section with the owner; **applied 2026-11-13**,
+in #396 to #403, with the server floors raised in #404, all live. It waits on the owner's
+Strava app and settings ("What the owner does, after PR 9"). The plan is
+`docs/plans/2026-11-12-strava-import.md`, whose status says where the work went past this
+text. This is roadmap C2. It needs B1 (per-set
 logging), done, and applies gate G2: Strava only, with Garmin later.
 
 Someone who records a run, a ride or a gym session in Strava should see it in the app
