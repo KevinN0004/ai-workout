@@ -392,6 +392,81 @@ test.describe.serial("accessibility", () => {
     await page.getByRole("button", { name: "Cancel" }).click();
   });
 
+  // Settings' Strava panel and an imported workout (roadmap C2). The E2E server
+  // has Strava's settings, pointed at the fake, so the panel offers Connect for
+  // real. The connected state, with its retry line, and an import in the Logs
+  // come from stubbed answers, since strava.spec.js is what connects for real.
+  test("the Strava panel, not connected, has no violations", async () => {
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /Connected Apps/ }).click();
+    await expect(page.getByRole("button", { name: "Connect with Strava" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+  });
+
+  test("the Strava panel, connected, and its disconnect confirm have no violations", async () => {
+    await page.route("**/api/integrations/strava", (route) =>
+      route.request().method() === "GET"
+        ? route.fulfill({
+            json: {
+              available: true,
+              connected: true,
+              athleteName: "Jordan L.",
+              lastSyncedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+              lastSyncError: "unavailable",
+              needsReconnect: false
+            }
+          })
+        : route.continue()
+    );
+    await page.goto("/dashboard/settings");
+    await page.getByRole("tab", { name: /Connected Apps/ }).click();
+    await expect(page.getByText("Connected as Jordan L.")).toBeVisible();
+    await expect(page.getByText("The last sync didn't finish. It will try again.")).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+
+    await page.getByRole("button", { name: "Disconnect" }).click();
+    await expect(page.getByRole("button", { name: "Confirm disconnect" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+    await page.unroute("**/api/integrations/strava");
+  });
+
+  test("an imported workout in the Logs, and its delete confirm, have no violations", async () => {
+    const imported = {
+      id: "a11y-import",
+      date: new Date().toISOString().slice(0, 10),
+      focus: "Run",
+      duration: 31,
+      exercises: [],
+      notes: "Morning run",
+      exerciseSets: [],
+      source: "strava",
+      externalId: "9001",
+      sport: "Run",
+      distanceMeters: 5012.4,
+      averageHeartrate: 142.4
+    };
+    await page.route("**/api/dashboard", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.dashboard.workoutSessions = [imported, ...(body.dashboard.workoutSessions || [])];
+      await route.fulfill({ response, json: body });
+    });
+    await page.goto("/dashboard/workouts");
+    const row = page.locator(".workout-row", { hasText: "Morning run" });
+    await expect(row.getByRole("link", { name: "View on Strava" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+
+    await row.getByRole("button", { name: "Delete" }).click();
+    await expect(row.getByRole("button", { name: "Delete workout" })).toBeVisible();
+
+    expectNoViolations(await analyze(page));
+    await page.unroute("**/api/dashboard");
+  });
+
   // Offline, the page says so in its notice, and each write that cannot be
   // kept for later is disabled with "You're offline" beside it
   // (docs/specs/2026-11-06-offline-ready-pwa-design.md). The hint is muted

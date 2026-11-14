@@ -143,8 +143,10 @@
 }
 
 /* ---- A workout imported from Strava -------------------------------------- */
-/* "View on Strava" is bold and in Strava's orange, as its brand guidelines ask of a link
-   back to an activity; Delete, and its confirm, sit beside it. */
+/* "View on Strava" is bold and underlined, two of the three marks Strava's brand guidelines
+   accept for a link back to an activity. The third, its orange #fc5200, measures 4.27:1 on a
+   row (axe, e2e/a11y.spec.js), under the 4.5:1 text needs. Delete, and its confirm, sit beside
+   it. */
 .workouts-view .workout-import-actions {
   display: flex;
   flex-wrap: wrap;
@@ -157,9 +159,10 @@
 }
 
 .workouts-view .workout-strava-link {
-  color: #fc5200;
+  color: inherit;
   font-size: 0.8rem;
   font-weight: 700;
+  text-decoration: underline;
 }
 
 /* ---- Empty state --------------------------------------------------------- */

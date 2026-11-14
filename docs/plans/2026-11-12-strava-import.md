@@ -1013,6 +1013,25 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   6. deletes the account, as every spec does.
 - [ ] Run the full suite twice, then `strava.spec.js` once in WebKit and in Firefox
       (ad hoc, as in C1). Then gates, commit, push, open the PR and report.
+- [ ] **Found and changed in PR 9:**
+  - **The fake is `e2e/fakeStrava.js`,** not `.mjs`, so ESLint lints it. knip needs no
+    entry for it: its Playwright plugin reads the `webServer` command.
+  - **The webhook settings are set,** to `e2e-verify` and `4242`, not left empty, so the
+    spec delivers events as Strava would.
+  - **Imports arrive by the landing's sync and by webhook events, not Sync now.** The
+    landing's quiet sync counts as an attempt, so a Sync now within the minute after it
+    is skipped. The run the landing imports starts two minutes ahead, since the sync
+    window opens at the moment of connecting.
+  - **A server bug the spec found:** every dashboard visit before connecting recorded
+    an attempt in the sync's throttle, so the landing's sync was skipped and nothing
+    imported for fifteen minutes. `connect` now clears the user's attempt, with a
+    service test.
+  - **A contrast defect the a11y scan found in PR 8's row:** "View on Strava" in
+    `#FC5200` measures 4.27:1 on a row's `#2B2B2B`. It is now bold and underlined in the
+    row's own colour, two of the three marks Strava's guidelines accept.
+  - **The spec's value is shown by mutation:** a deleted import that comes back, a
+    disconnect that leaves the imports, and a connect that keeps the throttle each fail
+    it.
 
 ## Task 10 and 11: the floors
 
