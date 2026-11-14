@@ -1,13 +1,20 @@
 import { describe, expect, test } from "vitest";
-import { defaultSignupProfileForm } from "../constants";
+import { defaultSignupProfileForm, goalOptions } from "../constants";
 import {
   accountDeleteBody,
+  blankGoalsForm,
   blankProgressForm,
   caloriesBody,
+  createDefaultPlannerForm,
+  liftDecisionBody,
   loginBody,
   mealLogBody,
   passwordChangeBody,
+  planSwapBody,
+  planUndoBody,
+  savedExerciseBody,
   signupBody,
+  weekDecisionBody,
   workoutSessionBody
 } from "../requestBodies";
 
@@ -156,5 +163,123 @@ describe("blankProgressForm", () => {
 
   test("is a fresh object each time", () => {
     expect(blankProgressForm("2026-03-01")).not.toBe(blankProgressForm("2026-03-01"));
+  });
+});
+
+// Moved unchanged from constants.test.js with the function itself.
+describe("createDefaultPlannerForm", () => {
+  // The planner's fallback must stay a member of the list, or a signed-out
+  // visitor gets a goal the profile select cannot represent.
+  test("the planner default is one of them", () => {
+    expect(goalOptions).toContain(createDefaultPlannerForm().goal);
+  });
+
+  // PlannerSetupModal never exposes goal -- it offers days, duration, level and
+  // injuries only -- so before this took an argument, every generated plan for
+  // every user carried the same hardcoded goal into the Gemini prompt. The
+  // profile's goal is what makes it the user's own.
+  test("takes the goal it is given", () => {
+    expect(createDefaultPlannerForm("Mobility").goal).toBe("Mobility");
+  });
+
+  test.each([
+    ["nothing", undefined],
+    ["an empty string", ""],
+    ["null", null]
+  ])("falls back to the first option when given %s", (_label, goal) => {
+    expect(createDefaultPlannerForm(goal).goal).toBe(goalOptions[0]);
+  });
+
+  test("leaves the rest of the planner form alone", () => {
+    expect(createDefaultPlannerForm("Recovery")).toMatchObject({
+      equipment: [],
+      duration: "45",
+      level: "Intermediate",
+      injuries: "None",
+      days: "3",
+      focuses: [],
+      environment: "Home",
+      health: { condition: false, symptoms: false, supervised: false, pregnant: false }
+    });
+  });
+
+  test("gives each planner a fresh set of health answers", () => {
+    const first = createDefaultPlannerForm();
+    first.health.pregnant = true;
+
+    expect(createDefaultPlannerForm().health.pregnant).toBe(false);
+  });
+
+  test("is the planner body, in the order the planner sends it", () => {
+    expect(json(createDefaultPlannerForm("Mobility"))).toBe(
+      '{"goal":"Mobility","equipment":[],"duration":"45","level":"Intermediate",' +
+        '"injuries":"None","days":"3","focuses":[],"environment":"Home","health":' +
+        '{"condition":false,"symptoms":false,"supervised":false,"pregnant":false}}'
+    );
+  });
+});
+
+describe("blankGoalsForm", () => {
+  test("starts blank but for the calorie and workout defaults", () => {
+    expect(json(blankGoalsForm())).toBe(
+      '{"targetWeight":"","targetCalories":"2200","weeklyWorkouts":"3"}'
+    );
+  });
+
+  test("is a fresh object each time", () => {
+    expect(blankGoalsForm()).not.toBe(blankGoalsForm());
+  });
+});
+
+describe("savedExerciseBody", () => {
+  const media = { imageUrl: "https://wger.de/media/row.png", videoUrl: "" };
+
+  test("names the category, muscles and equipment, then the media and the reason", () => {
+    const exercise = {
+      id: 7,
+      name: "Row",
+      category: { name: "Back" },
+      muscles: [{ name: "Lats" }, { name: "Biceps" }],
+      equipment: [{ name: "Cable" }]
+    };
+
+    expect(json(savedExerciseBody(exercise, { reasons: ["Pull day", "Back"] }, media))).toBe(
+      '{"exerciseId":7,"name":"Row","category":"Back","muscles":["Lats","Biceps"],' +
+        '"equipment":["Cable"],"imageUrl":"https://wger.de/media/row.png","videoUrl":"",' +
+        '"reason":"Pull day"}'
+    );
+  });
+
+  test("sends null, blanks and empty lists for an exercise with nothing", () => {
+    expect(json(savedExerciseBody(null, null, { imageUrl: "", videoUrl: "" }))).toBe(
+      '{"exerciseId":null,"name":"","category":"","muscles":[],"equipment":[],' +
+        '"imageUrl":"","videoUrl":"","reason":""}'
+    );
+  });
+
+  test("keeps an id of 0, which is not absent", () => {
+    expect(savedExerciseBody({ id: 0, name: "Row" }, null, media).exerciseId).toBe(0);
+  });
+});
+
+describe("the swap and undo bodies", () => {
+  test("a swap sends from, to and the area, null included", () => {
+    expect(json(planSwapBody({ from: "Goblet squat", to: "Box squat", area: "knee" }))).toBe(
+      '{"from":"Goblet squat","to":"Box squat","area":"knee"}'
+    );
+    expect(json(planSwapBody({ from: "a", to: "b", area: null }))).toBe(
+      '{"from":"a","to":"b","area":null}'
+    );
+  });
+
+  test("an undo sends the swapped exercise's name", () => {
+    expect(json(planUndoBody("Box squat"))).toBe('{"name":"Box squat"}');
+  });
+});
+
+describe("the progression decision bodies", () => {
+  test("a lift's decision and the week's", () => {
+    expect(json(liftDecisionBody("accept"))).toBe('{"decision":"accept"}');
+    expect(json(weekDecisionBody("normal"))).toBe('{"decision":"normal"}');
   });
 });

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import TipsView from "../TipsView";
-import { createDefaultPlannerForm } from "../../../../app/constants";
+import { createDefaultPlannerForm } from "../../../../app/requestBodies";
 
 // The largest untested view in the client, and not just markup: it owns two
 // fetches, a debounced search, and the error and empty states a visitor
@@ -532,6 +532,35 @@ describe("TipsView", () => {
 
       await waitFor(() => expect(onSaveExerciseToPlan).toHaveBeenCalled());
       expect(onSaveExerciseToPlan.mock.calls[0][0].reason).toBe("");
+    });
+
+    test("a library exercise's whole body, as one string", async () => {
+      // Pinned before the body moved to requestBodies.js (roadmap D1 phase 2).
+      // The library tile carries no recommendation, so every value is fixed.
+      withExercises([
+        {
+          id: 7,
+          name: "Row",
+          category: { name: "Back" },
+          muscles: [{ name: "Lats" }, { name: "Biceps" }],
+          equipment: [{ name: "Cable" }],
+          images: [{ url: "/media/row.png", isMain: true }],
+          videos: [{ url: "https://cdn.example/row.mp4" }]
+        }
+      ]);
+      const onSaveExerciseToPlan = vi.fn(async () => ({ ok: true }));
+      renderView({ onSaveExerciseToPlan });
+      await screen.findByText("Smart picks for you");
+      setView("library");
+
+      fireEvent.click(screen.getByText("Save to plan"));
+
+      await waitFor(() => expect(onSaveExerciseToPlan).toHaveBeenCalled());
+      expect(JSON.stringify(onSaveExerciseToPlan.mock.calls[0][0])).toBe(
+        '{"exerciseId":7,"name":"Row","category":"Back","muscles":["Lats","Biceps"],' +
+          '"equipment":["Cable"],"imageUrl":"https://wger.de/media/row.png",' +
+          '"videoUrl":"https://cdn.example/row.mp4","reason":""}'
+      );
     });
   });
 

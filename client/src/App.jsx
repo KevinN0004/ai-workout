@@ -13,7 +13,6 @@ import {
   DASHBOARD_CACHE_PREFIX,
   SESSION_CACHE_KEY,
   WEATHER_CACHE_PREFIX,
-  createDefaultPlannerForm,
   defaultAuthForm,
   defaultPersonalForm,
   defaultSignupProfileForm,
@@ -37,7 +36,7 @@ import useStravaSync from "./app/hooks/useStravaSync";
 import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
 import { fetchWithTimeout } from "./app/network";
 import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
-import { blankProgressForm } from "./app/requestBodies";
+import { blankGoalsForm, blankProgressForm, createDefaultPlannerForm } from "./app/requestBodies";
 import { newWorkoutForm } from "./app/exerciseSets";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
@@ -121,11 +120,7 @@ export default function App() {
     notes: ""
   });
   const [progressForm, setProgressForm] = useState(() => blankProgressForm(getLocalDateKey()));
-  const [goalForm, setGoalForm] = useState({
-    targetWeight: "",
-    targetCalories: "2200",
-    weeklyWorkouts: "3"
-  });
+  const [goalForm, setGoalForm] = useState(blankGoalsForm);
   const [dashView, setDashView] = useState(
     () => resolveDashViewFromPath(window.location.pathname) || "summary"
   );

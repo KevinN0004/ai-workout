@@ -4,6 +4,7 @@
  * DashboardPage, above its signed-out return.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { liftDecisionBody, weekDecisionBody } from "../../../app/requestBodies";
 import { getLocalDateKey } from "../../../app/units";
 
 const PROGRESSION_PATH = "/api/dashboard/progression";
@@ -67,7 +68,7 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
         ? {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ decision })
+            body: JSON.stringify(liftKey ? liftDecisionBody(decision) : weekDecisionBody(decision))
           }
         : { method: "DELETE" };
       // The answer's week is newer than any read still in flight.

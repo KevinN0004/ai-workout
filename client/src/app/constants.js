@@ -10,8 +10,9 @@ export const APP_BRAND_TAGLINE = "Your guide for this journey.";
 export const quickFocuses = ["Strength", "Weight Loss", "Mobility", "Recovery", "Cardio"];
 
 // The goals Settings offers (settingsFields.js). The profile carries one, and
-// createDefaultPlannerForm seeds the planner from it, falling back to the first.
-// Like the lists below, it must match the server's allowedGoalValues.
+// createDefaultPlannerForm (requestBodies.js) seeds the planner from it,
+// falling back to the first. Like the lists below, it must match the server's
+// allowedGoalValues.
 export const goalOptions = [
   "Build lean strength and energy",
   "Fat loss + conditioning",
@@ -168,27 +169,6 @@ export const defaultPersonalForm = {
   cardio: "",
   notes: ""
 };
-
-/**
- * A fresh planner form, seeded with `goal`, which App's resetPlannerFlow passes
- * from the signed-in visitor's profile. PlannerSetupModal never asks for one --
- * its steps cover environment, equipment, schedule, level, injuries, focus and
- * the health check -- so without an argument every generated plan would follow
- * the same goal's rules, whatever the visitor wanted. The first of goalOptions
- * is the fallback for a visitor with no goal on file, signed in or not. The
- * health answers start as no, and a fresh object is built each time.
- */
-export const createDefaultPlannerForm = (goal) => ({
-  goal: goal || goalOptions[0],
-  equipment: [],
-  duration: "45",
-  level: "Intermediate",
-  injuries: "None",
-  days: "3",
-  focuses: [],
-  environment: "Home",
-  health: { condition: false, symptoms: false, supervised: false, pregnant: false }
-});
 
 export const DASHBOARD_ROUTE_VIEW_MAP = {
   "": "summary",

@@ -3,6 +3,7 @@
  * an exercise's alternatives in a saved plan, the swap and the undo, over App's
  * apiFetch. Each returns what the server answers, or throws its message.
  */
+import { planSwapBody, planUndoBody } from "./requestBodies";
 
 const OPTIONS_FAILED = "Could not load the alternatives. Try again.";
 const SWAP_FAILED = "Could not swap that exercise. Try again.";
@@ -38,8 +39,9 @@ export const fetchSwapOptions = (apiFetch, planId, exercise, area) => {
 
 /** Swaps `from` for `to` in the plan `planId`, and returns the plan as swapped. */
 export const swapExercise = async (apiFetch, planId, { from, to, area }) =>
-  (await send(apiFetch, pathOf(planId), postOf({ from, to, area }), SWAP_FAILED)).plan;
+  (await send(apiFetch, pathOf(planId), postOf(planSwapBody({ from, to, area })), SWAP_FAILED))
+    .plan;
 
 /** Takes back the swap that put `name` in the plan `planId`, and returns the plan. */
 export const undoExerciseSwap = async (apiFetch, planId, name) =>
-  (await send(apiFetch, `${pathOf(planId)}/undo`, postOf({ name }), UNDO_FAILED)).plan;
+  (await send(apiFetch, `${pathOf(planId)}/undo`, postOf(planUndoBody(name)), UNDO_FAILED)).plan;

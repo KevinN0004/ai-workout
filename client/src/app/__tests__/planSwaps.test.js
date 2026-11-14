@@ -24,6 +24,16 @@ describe("fetchSwapOptions", () => {
 });
 
 describe("swapExercise and undoExerciseSwap", () => {
+  test("a swap that names an area sends it, after the two exercises", async () => {
+    const apiFetch = vi.fn(async () => respond({ plan: PLAN }));
+
+    await swapExercise(apiFetch, "plan-1", { from: "Goblet squat", to: "Box squat", area: "knee" });
+
+    expect(apiFetch.mock.calls[0][1].body).toBe(
+      '{"from":"Goblet squat","to":"Box squat","area":"knee"}'
+    );
+  });
+
   test("post the swap and the undo, and return the plan the server answers", async () => {
     const apiFetch = vi.fn(async () => respond({ plan: PLAN }));
 
