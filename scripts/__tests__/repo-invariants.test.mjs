@@ -849,7 +849,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 26;
+  const TYPE_CHECKED_FILES = 28;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -908,5 +908,32 @@ describe("type-checked files", () => {
   test("CI runs npm run typecheck", () => {
     const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
     expect(ci).toMatch(/^\s*run: npm run typecheck\s*$/m);
+  });
+
+  // D1 phase 2: each body schema has a typedef of its declared fields, which
+  // the client's request builders name (docs/specs/2026-11-14-api-body-types-design.md).
+  const SCHEMA_FILES = [
+    "server/src/services/http/apiSchemaService.js",
+    "server/src/routes/dashboard/validation.js"
+  ];
+  const bodyTypedefs = SCHEMA_FILES.flatMap((file) => {
+    const text = readFileSync(path.join(repoRoot, file), "utf8");
+    const schemas = [...text.matchAll(/^export const (\w+BodySchema)\b/gm)].map((m) => m[1]);
+    const typedefs = [
+      ...text.matchAll(/@typedef \{[^}]*DeclaredBody<typeof (\w+BodySchema)>\} (\w+)/g)
+    ].map((m) => ({ schema: m[1], name: m[2] }));
+    return schemas.map((schema) => ({
+      file,
+      schema,
+      name: typedefs.find((t) => t.schema === schema)?.name ?? null
+    }));
+  });
+
+  test("every body schema has a DeclaredBody typedef", () => {
+    expect(bodyTypedefs.length, "the sweep found no body schemas").toBeGreaterThan(0);
+    const missing = bodyTypedefs.filter(({ name }) => !name).map((t) => `${t.file} ${t.schema}`);
+    expect(missing, "add `@typedef {DeclaredBody<typeof xBodySchema>} XBody` below each").toEqual(
+      []
+    );
   });
 });
