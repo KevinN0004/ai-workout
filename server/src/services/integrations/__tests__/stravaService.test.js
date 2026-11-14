@@ -84,6 +84,14 @@ const fakeConnections = (row, { underLock } = {}) => {
       state.row = connectionRow({ ...args, userPk: args.userId });
       return state.row;
     },
+    markSynced: async ({ at }) => {
+      state.synced = at;
+      return 1;
+    },
+    markSyncFailed: async ({ error }) => {
+      state.failed = error;
+      return 1;
+    },
     findConnectionByAthlete: async ({ athleteId }) =>
       state.row && state.row.athleteId === athleteId ? { ...state.row } : null,
     removeConnectionAndImports: async () => {
@@ -94,8 +102,16 @@ const fakeConnections = (row, { underLock } = {}) => {
   };
 };
 
-const fakeImports = ({ deleted = [], existing = [], appDays = [] } = {}) => {
-  const state = { saved: [], removed: [], dayChecks: [] };
+// `unchanged` lists the imports a save finds already up to date, and `held`
+// the imports a listing since a date answers.
+const fakeImports = ({
+  deleted = [],
+  existing = [],
+  appDays = [],
+  unchanged = [],
+  held = []
+} = {}) => {
+  const state = { saved: [], removed: [], dayChecks: [], since: [] };
   return {
     state,
     isDeletedHere: async ({ externalId }) => deleted.includes(externalId),
@@ -106,7 +122,12 @@ const fakeImports = ({ deleted = [], existing = [], appDays = [] } = {}) => {
     },
     saveImport: async ({ workout }) => {
       state.saved.push(workout);
+      if (unchanged.includes(workout.externalId)) return "unchanged";
       return existing.includes(workout.externalId) ? "updated" : "created";
+    },
+    listImportsSince: async ({ since }) => {
+      state.since.push(since);
+      return held;
     },
     removeImport: async ({ externalId }) => {
       state.removed.push(externalId);
@@ -718,5 +739,180 @@ describe("handleEvent", () => {
 
     expect(await setup.service.handleEvent(eventOf(), log)).toBe("failed");
     expect(log.warn.mock.calls[0][0]).toMatchObject({ kind: "error" });
+  });
+});
+
+describe("sync", () => {
+  // NOW is 2026-11-13T10:00Z and the connection dates from 2026-11-01, so the
+  // window is the last seven days: after 2026-11-06T10:00Z.
+  const AFTER = Math.floor(Date.parse("2026-11-06T10:00:00Z") / 1000);
+  const run = (id, overrides = {}) => ({ ...ACTIVITY, id, ...overrides });
+  const page = (count, start = 1) => Array.from({ length: count }, (_, i) => run(start + i));
+  const listCalls = (fetchImpl) =>
+    fetchImpl.mock.calls
+      .map(([url]) => new URL(String(url)))
+      .filter((url) => url.pathname === "/api/v3/athlete/activities");
+
+  test("lists the last seven days, imports each activity, and counts what changed", async () => {
+    const imports = fakeImports({ existing: ["2", "3"], unchanged: ["3"] });
+    const { service, fetchImpl, connections } = serviceWith({
+      imports,
+      responses: [answer(200, [run(1), run(2), run(3)])]
+    });
+
+    expect(await service.sync("u-1")).toEqual({
+      imported: 1,
+      updated: 1,
+      removed: 0,
+      lastSyncedAt: NOW.toISOString()
+    });
+
+    const [call] = listCalls(fetchImpl);
+    expect(Object.fromEntries(call.searchParams)).toEqual({
+      after: String(AFTER),
+      page: "1",
+      per_page: "100"
+    });
+    expect(imports.state.saved.map((workout) => workout.externalId)).toEqual(["1", "2", "3"]);
+    expect(connections.state.synced).toEqual(NOW);
+  });
+
+  test("never reaches back past the moment of connecting", async () => {
+    const connectedAt = new Date("2026-11-12T08:00:00Z");
+    const { service, fetchImpl } = serviceWith({
+      row: connectionRow({ connectedAt }),
+      responses: [answer(200, [])]
+    });
+
+    await service.sync("u-1");
+    expect(listCalls(fetchImpl)[0].searchParams.get("after")).toBe(
+      String(Math.floor(connectedAt.getTime() / 1000))
+    );
+  });
+
+  test("the import rules apply to a listed activity, as to a webhook's", async () => {
+    const imports = fakeImports({ deleted: ["1"], appDays: ["2026-11-12"] });
+    const { service } = serviceWith({
+      imports,
+      responses: [answer(200, [run(1), run(2, { sport_type: "WeightTraining" }), run(3)])]
+    });
+
+    expect(await service.sync("u-1")).toMatchObject({ imported: 1, updated: 0 });
+    expect(imports.state.saved.map((workout) => workout.externalId)).toEqual(["3"]);
+  });
+
+  test("a complete list removes the imports Strava no longer lists, past the first two days", async () => {
+    const imports = fakeImports({
+      held: [
+        { id: "a", externalId: "1", date: "2026-11-10" },
+        { id: "b", externalId: "9", date: "2026-11-11" }
+      ]
+    });
+    const { service } = serviceWith({ imports, responses: [answer(200, [run(1)])] });
+
+    expect(await service.sync("u-1")).toMatchObject({ removed: 1 });
+    expect(imports.state.removed).toEqual(["9"]);
+    // The window opens on 6 Nov in UTC, which can be the 5th or the 7th where
+    // the athlete is; the first two days are left to the webhook.
+    expect(imports.state.since).toEqual(["2026-11-08"]);
+  });
+
+  test("pages until a short page, and a full third page leaves the list incomplete", async () => {
+    const imports = fakeImports({ held: [{ id: "a", externalId: "999", date: "2026-11-12" }] });
+    const { service, fetchImpl } = serviceWith({
+      imports,
+      responses: [answer(200, page(100)), answer(200, page(100, 101)), answer(200, page(100, 201))]
+    });
+
+    expect(await service.sync("u-1")).toMatchObject({ imported: 300, removed: 0 });
+    expect(listCalls(fetchImpl).map((url) => url.searchParams.get("page"))).toEqual([
+      "1",
+      "2",
+      "3"
+    ]);
+    expect(imports.state.removed).toEqual([]);
+  });
+
+  test("a short second page completes the list", async () => {
+    const imports = fakeImports({ held: [{ id: "a", externalId: "999", date: "2026-11-12" }] });
+    const { service } = serviceWith({
+      imports,
+      responses: [answer(200, page(100)), answer(200, page(5, 101))]
+    });
+
+    expect(await service.sync("u-1")).toMatchObject({ imported: 105, removed: 1 });
+  });
+
+  test("a failing page stops the sync, records why, and deletes nothing", async () => {
+    const imports = fakeImports({ held: [{ id: "a", externalId: "999", date: "2026-11-12" }] });
+    const { service, connections } = serviceWith({
+      imports,
+      responses: [answer(200, page(100)), answer(429)]
+    });
+
+    expect(await service.sync("u-1")).toEqual({ error: "rate_limited" });
+    expect(connections.state.failed).toBe("rate_limited");
+    expect(connections.state.synced).toBeUndefined();
+    expect(imports.state.removed).toEqual([]);
+  });
+
+  test("a refused refresh answers reconnect, and imports nothing", async () => {
+    const { service, imports } = serviceWith({
+      row: connectionRow({ expiresAt: minutesFromNow(1) }),
+      responses: [answer(400)]
+    });
+
+    expect(await service.sync("u-1")).toEqual({ error: "reconnect" });
+    expect(imports.state.saved).toEqual([]);
+  });
+
+  test("a store failure is recorded as an error", async () => {
+    const imports = fakeImports();
+    imports.saveImport = async () => {
+      throw new Error("database down");
+    };
+    const { service, connections } = serviceWith({
+      imports,
+      responses: [answer(200, [run(1)])]
+    });
+
+    expect(await service.sync("u-1")).toEqual({ error: "error" });
+    expect(connections.state.failed).toBe("error");
+  });
+
+  test("no connection is not connected", async () => {
+    expect(await serviceWith({ row: null }).service.sync("u-1")).toEqual({
+      error: "not_connected"
+    });
+  });
+
+  test("a sync within fifteen minutes of the last one is skipped", async () => {
+    const { service, fetchImpl } = serviceWith({
+      row: connectionRow({ lastSyncedAt: new Date(NOW.getTime() - 14 * 60000) })
+    });
+
+    expect(await service.sync("u-1")).toEqual({ skipped: true });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("Sync now may run a minute after the last one, and not sooner", async () => {
+    const minuteAgo = serviceWith({
+      row: connectionRow({ lastSyncedAt: new Date(NOW.getTime() - 60000) }),
+      responses: [answer(200, [])]
+    });
+    expect(await minuteAgo.service.sync("u-1", { manual: true })).toMatchObject({ imported: 0 });
+
+    const secondsAgo = serviceWith({
+      row: connectionRow({ lastSyncedAt: new Date(NOW.getTime() - 30000) })
+    });
+    expect(await secondsAgo.service.sync("u-1", { manual: true })).toEqual({ skipped: true });
+  });
+
+  test("a second sync straight after a failed one is skipped, so an outage is not hammered", async () => {
+    const { service, fetchImpl } = serviceWith({ responses: [answer(503)] });
+
+    expect(await service.sync("u-1")).toEqual({ error: "unavailable" });
+    expect(await service.sync("u-1")).toEqual({ skipped: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

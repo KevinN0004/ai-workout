@@ -1,7 +1,7 @@
 /**
- * Connecting and disconnecting Strava (roadmap C2,
- * docs/specs/2026-11-12-strava-import-design.md, "Connecting"): the state
- * Settings shows, the authorize link, Strava's return, and the disconnect.
+ * The Strava routes Settings and the dashboard call (roadmap C2,
+ * docs/specs/2026-11-12-strava-import-design.md): the state Settings shows, the
+ * authorize link, Strava's return, the catch-up sync, and the disconnect.
  */
 import { randomBytes } from "node:crypto";
 import { tokensMatch } from "../../services/auth/sessionService.js";
@@ -17,10 +17,11 @@ const ACTIVITY_SCOPES = ["activity:read_all", "activity:read"];
 const queryText = (value) => (typeof value === "string" ? value.trim().slice(0, 300) : "");
 
 /**
- * Registers the four routes. `getStravaConfig` is read on every request, so
+ * Registers the five routes. `getStravaConfig` is read on every request, so
  * without Strava's settings each answers 404 but the state, which answers
  * `available: false`. Strava's return is a page load, not a fetch, so it always
- * redirects: to Settings with the result, or to sign-in without a session.
+ * redirects: to Settings with the result, or to sign-in without a session. The
+ * sync answers its outcome with a 200, its error included, for Settings to show.
  */
 export const registerStravaRoutes = (app, deps) => {
   const {
@@ -94,6 +95,17 @@ export const registerStravaRoutes = (app, deps) => {
       if (kind === "capacity") return land("limit");
       req.log.warn({ event: "strava_connect_failed", kind }, "Connecting Strava failed.");
       return land("unavailable");
+    }
+  });
+
+  app.post(`${BASE}/sync`, requireAuth, async (req, res) => {
+    if (!getStravaConfig()) return notAvailable(res);
+    try {
+      // Only a real true is Sync now; anything else is the dashboard's quiet sync.
+      const manual = req.body?.manual === true;
+      res.json(await stravaService.sync(req.user.id, { manual }));
+    } catch (err) {
+      sendErrorResponse(req, res, err);
     }
   });
 

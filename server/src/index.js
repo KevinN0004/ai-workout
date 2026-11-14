@@ -384,9 +384,10 @@ const { saveGeneratedPlan, pruneGeneratedPlans, findPlanForUser, rewritePlan } =
 // without them answers Strava's routes with 404 and is otherwise unchanged.
 // fetch is looked up at call time, so a test that stubs the global reaches it.
 const getStravaConfig = () => readStravaConfig(process.env);
+const stravaImports = createStravaImportRepository({ prisma });
 const stravaService = createStravaService({
   connections: createStravaConnectionRepository({ prisma }),
-  imports: createStravaImportRepository({ prisma }),
+  imports: stravaImports,
   getConfig: getStravaConfig,
   fetchImpl: (...args) => fetch(...args),
   now: () => new Date()
@@ -843,6 +844,7 @@ registerApiRoutes(app, {
   requestOrigin,
   stravaService,
   revokeStravaAccess: stravaService.revokeAccess,
+  deleteImportById: stravaImports.deleteImportById,
   gemini,
   generatePlanBodySchema,
   saveGeneratedPlan,

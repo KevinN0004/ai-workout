@@ -1,16 +1,17 @@
 /**
- * POST routes for workout sessions, daily calories and goals. Registered by
- * registerDashboardWriteRoutes.js.
+ * The write routes for workout sessions, daily calories and goals, and the
+ * delete of an imported workout. Registered by registerDashboardWriteRoutes.js.
  */
 import crypto from "crypto";
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
+import { validateParams, workoutParamsSchema } from "../validation.js";
 
 /**
  * Registers POST /api/dashboard/workouts (also answered at
  * /api/dashboard/workout-sessions), /api/dashboard/calories and
- * /api/dashboard/goals. All three require a session and answer with the
- * refreshed dashboard; the workout route adds the saved session as
- * `workoutSession`.
+ * /api/dashboard/goals, and DELETE /api/dashboard/workouts/:id for a workout
+ * imported from Strava. Each requires a session and answers with the refreshed
+ * dashboard; the workout route adds the saved session as `workoutSession`.
  */
 export const registerWorkoutAndGoalRoutes = (app, deps) => {
   const {
@@ -27,7 +28,8 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
     caloriesBodySchema,
     toNullableNumber,
     cleanText,
-    goalsBodySchema
+    goalsBodySchema,
+    deleteImportById
   } = deps;
 
   app.post(
@@ -128,6 +130,25 @@ export const registerWorkoutAndGoalRoutes = (app, deps) => {
       const updated = mapDbDocToUser(updatedDoc);
       const response = await buildDashboardResponse(updated);
       return res.json(response);
+    } catch (err) {
+      return sendErrorResponse(req, res, err, 500);
+    }
+  });
+
+  // Roadmap C2: only a workout imported from Strava can be deleted, and the
+  // delete is remembered so no import brings it back. A workout logged in the
+  // app answers 404, as an unknown id does.
+  app.delete("/api/dashboard/workouts/:id", requireAuth, async (req, res) => {
+    try {
+      const params = validateParams(req, res, workoutParamsSchema);
+      if (!params) return;
+      const deleted = await deleteImportById({ userId: req.user.id, id: params.id });
+      if (!deleted) return res.status(404).json({ error: "Workout not found." });
+
+      const updatedDoc = await findUserWithDashboard(req.user.id);
+      if (!updatedDoc) return res.status(404).json({ error: "User not found." });
+      const response = await buildDashboardResponse(mapDbDocToUser(updatedDoc));
+      return res.json({ ...response, ok: true });
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
     }

@@ -6,12 +6,23 @@
 // @ts-check
 import { StravaError, createStravaClient } from "../external/stravaClient.js";
 import { readEvent } from "./stravaEvent.js";
-import { decideImport } from "./stravaImport.js";
+import { decideImport, deletionsFrom } from "./stravaImport.js";
 import { toWorkout } from "./stravaMapping.js";
 import { TokenCipherError, createTokenCipher } from "./tokenCipher.js";
 
 // A token this close to its expiry is refreshed before use.
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+
+// The catch-up: how often it may run, how far back it reads, how much of the
+// list it reads (pages of 100, at most 3), and how much of its window's start
+// it leaves to the webhook when removing what Strava no longer lists.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SYNC_GAP_MS = 15 * 60 * 1000;
+const MANUAL_SYNC_GAP_MS = 60 * 1000;
+const SYNC_DAYS = 7;
+const PAGE_SIZE = 100;
+const MAX_PAGES = 3;
+const DELETE_MARGIN_DAYS = 2;
 
 /**
  * Builds the Strava service. `getConfig` (readStravaConfig over process.env, in
@@ -27,6 +38,11 @@ export const createStravaService = ({
   fetchImpl = fetch,
   now
 }) => {
+  // When each user's catch-up last began, in this process: a failed attempt
+  // records no sync, and still holds the next one off.
+  /** @type {Map<string, Date>} */
+  const lastAttempts = new Map();
+
   // The cipher and the client over the current settings, or not_configured.
   const tools = () => {
     const config = getConfig();
@@ -129,15 +145,14 @@ export const createStravaService = ({
   };
 
   /**
-   * Fetches the activity `activityId`, and imports or updates it unless the
-   * import rules skip it. Returns the rule's decision.
+   * Imports or updates `workout` unless the import rules skip it, for the
+   * webhook and the catch-up alike. `{ decision, saved }`: the rule's decision,
+   * and what the save did ("created", "updated" or "unchanged"), or null when
+   * nothing was saved.
    * @param {string} userId
-   * @param {string | number} activityId
+   * @param {ReturnType<typeof toWorkout>} workout
    */
-  const importActivity = async (userId, activityId) => {
-    const token = await accessTokenFor(userId);
-    const activity = await tools().client.getActivity(token, String(activityId));
-    const workout = toWorkout(activity);
+  const importWorkout = async (userId, workout) => {
     const { externalId } = workout;
     const [deletedHere, existing, appWorkoutThatDay] = await Promise.all([
       imports.isDeletedHere({ userId, externalId }),
@@ -147,10 +162,23 @@ export const createStravaService = ({
         : Promise.resolve(false)
     ]);
     const decision = decideImport({ workout, deletedHere, appWorkoutThatDay, existing });
-    if (decision === "create" || decision === "update") {
-      await imports.saveImport({ userId, workout });
-    }
-    return decision;
+    const saved =
+      decision === "create" || decision === "update"
+        ? await imports.saveImport({ userId, workout })
+        : null;
+    return { decision, saved };
+  };
+
+  /**
+   * Fetches the activity `activityId`, and imports or updates it unless the
+   * import rules skip it. Returns the rule's decision.
+   * @param {string} userId
+   * @param {string | number} activityId
+   */
+  const importActivity = async (userId, activityId) => {
+    const token = await accessTokenFor(userId);
+    const activity = await tools().client.getActivity(token, String(activityId));
+    return (await importWorkout(userId, toWorkout(activity))).decision;
   };
 
   /**
@@ -300,8 +328,78 @@ export const createStravaService = ({
     }
   };
 
+  /**
+   * The catch-up (docs/specs/2026-11-12-strava-import-design.md, "Catch-up
+   * sync"): lists the activities of the last seven days, never from before
+   * connecting, imports or updates each under the import rules, and, only from
+   * a complete list, removes the imports Strava no longer lists. At most once
+   * every fifteen minutes, or a minute when `manual`, counting a failed attempt
+   * too, so an outage is not asked again on every dashboard open. Answers the
+   * counts, `{ skipped: true }`, or `{ error: kind }`; a failure is recorded on
+   * the connection and deletes nothing.
+   * @param {string} userId
+   * @param {{ manual?: boolean }} [options]
+   */
+  const sync = async (userId, { manual = false } = {}) => {
+    const at = now();
+    const gap = manual ? MANUAL_SYNC_GAP_MS : SYNC_GAP_MS;
+    /** @param {Date | null | undefined} time */
+    const recent = (time) =>
+      Boolean(time) && at.getTime() - /** @type {Date} */ (time).getTime() < gap;
+    // Checked and set before the first await, so two syncs at once run one.
+    if (recent(lastAttempts.get(userId))) return { skipped: true };
+    lastAttempts.set(userId, at);
+
+    const connection = await connections.findConnection({ userId });
+    if (!connection) return { error: "not_connected" };
+    if (recent(connection.lastSyncedAt)) return { skipped: true };
+    const afterMs = Math.max(connection.connectedAt.getTime(), at.getTime() - SYNC_DAYS * DAY_MS);
+
+    try {
+      const token = await accessTokenFor(userId);
+      const { client } = tools();
+      /** @type {any[]} */
+      const listed = [];
+      let complete = false;
+      for (let page = 1; page <= MAX_PAGES && !complete; page += 1) {
+        const activities = await client.listActivities(token, {
+          after: Math.floor(afterMs / 1000),
+          page,
+          perPage: PAGE_SIZE
+        });
+        listed.push(...activities);
+        complete = activities.length < PAGE_SIZE;
+      }
+
+      const counts = { imported: 0, updated: 0, removed: 0 };
+      for (const activity of listed) {
+        const { saved } = await importWorkout(userId, toWorkout(activity));
+        if (saved === "created") counts.imported += 1;
+        if (saved === "updated") counts.updated += 1;
+      }
+
+      // Strava's window opens at a UTC instant, and an import is dated where
+      // the athlete was, up to a day either side, so the first two days are
+      // left to the webhook rather than risk removing what was never listed.
+      const since = new Date(afterMs + DELETE_MARGIN_DAYS * DAY_MS).toISOString().slice(0, 10);
+      const held = await imports.listImportsSince({ userId, since });
+      const listedIds = new Set(listed.map((activity) => String(activity.id)));
+      for (const externalId of deletionsFrom({ imports: held, listedIds, complete })) {
+        counts.removed += await imports.removeImport({ userId, externalId });
+      }
+
+      await connections.markSynced({ userId, at });
+      return { ...counts, lastSyncedAt: at.toISOString() };
+    } catch (error) {
+      const kind = String(/** @type {{ kind?: string }} */ (error).kind || "error");
+      await connections.markSyncFailed({ userId, error: kind });
+      return { error: kind };
+    }
+  };
+
   return {
     accessTokenFor,
+    sync,
     handleEvent,
     confirmRevoked,
     importActivity,
