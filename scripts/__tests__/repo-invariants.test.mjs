@@ -849,7 +849,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 28;
+  const TYPE_CHECKED_FILES = 30;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -935,5 +935,35 @@ describe("type-checked files", () => {
     expect(missing, "add `@typedef {DeclaredBody<typeof xBodySchema>} XBody` below each").toEqual(
       []
     );
+  });
+
+  // Body types no checked client file names yet. It only shrinks, and is gone
+  // once every body the client sends is built by a typed builder.
+  const PENDING_BODY_TYPES = [
+    "WorkoutSessionBody",
+    "CaloriesBody",
+    "GoalsBody",
+    "MealLogBody",
+    "ProgressMetricBody",
+    "SavedExerciseBody",
+    "GeneratePlanBody",
+    "LiftDecisionBody",
+    "WeekDecisionBody",
+    "PlanSwapBody",
+    "PlanUndoBody"
+  ];
+
+  test("every body typedef is named by a checked client file", () => {
+    const clientText = checked
+      .filter(({ file }) => file.startsWith("client/"))
+      .map(({ lines }) => lines.join("\n"))
+      .join("\n");
+    const unnamed = bodyTypedefs
+      .map(({ name }) => name)
+      .filter((name) => name && !new RegExp(`\\.${name}\\b`).test(clientText));
+    expect(
+      unnamed,
+      "name each body type in a checked client file, and take it off PENDING_BODY_TYPES"
+    ).toEqual(PENDING_BODY_TYPES);
   });
 });
