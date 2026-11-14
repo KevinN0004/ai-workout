@@ -418,6 +418,7 @@ export default function DashboardPage({
             onSaveProfile={onSaveProfile}
             onChangePassword={onChangePassword}
             onDeleteAccount={onDeleteAccount}
+            apiFetch={apiFetch}
           />
         </Suspense>
       );

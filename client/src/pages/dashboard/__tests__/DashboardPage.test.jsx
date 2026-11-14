@@ -16,6 +16,7 @@ const bottomNav = vi.hoisted(() => ({ props: null }));
 const summary = vi.hoisted(() => ({ props: null }));
 const workoutsView = vi.hoisted(() => ({ props: null }));
 const plansView = vi.hoisted(() => ({ props: null }));
+const settingsView = vi.hoisted(() => ({ props: null }));
 
 vi.mock("../components/DashboardAtAGlance", () => ({
   default: (props) => {
@@ -76,7 +77,10 @@ vi.mock("../views/TipsView", () => ({
   default: () => <div data-testid="tips-view" />
 }));
 vi.mock("../views/SettingsView", () => ({
-  default: () => <div data-testid="settings-view" />
+  default: (props) => {
+    settingsView.props = props;
+    return <div data-testid="settings-view" />;
+  }
 }));
 vi.mock("../views/DashboardHomeView", () => ({
   default: () => <div data-testid="home-view" />
@@ -891,6 +895,15 @@ describe("DashboardPage", () => {
       act(() => plansView.props.onOpenGuides());
 
       expect(go).toHaveBeenCalledWith("/dashboard/tips");
+    });
+
+    // The Connected Apps tab reads Strava through the same client as the rest.
+    test("the settings view is handed apiFetch", async () => {
+      const apiFetch = vi.fn();
+      renderPage({ dashView: "settings", apiFetch });
+      await screen.findByTestId("settings-view");
+
+      expect(settingsView.props.apiFetch).toBe(apiFetch);
     });
 
     // The plans view logs a plan day through the same form and modal.
