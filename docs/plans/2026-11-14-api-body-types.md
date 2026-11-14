@@ -12,7 +12,39 @@ two decisions (body builders; bodies exactly as today) are not repeated here.
 **Tech Stack:** TypeScript 7.0.2 over JSDoc, zod 4.6.7, React 19, Vite 8, Vitest 5 with v8
 coverage, Playwright, gh CLI.
 
-**Status: a plan.** Every file and line below was read on `b6b6d92`.
+**Status: done 2026-11-14** (#406 to #410, all live; main `3e0b7c6`). Every file and line
+below was read on `b6b6d92`. These are the places the work went past or departs from the
+text below.
+
+- **#407, the server.** As planned. Both files parse to the same AST as on main, and 7 of 7
+  mutations were killed, among them a type error in each file and `validateBody` returning a
+  number. The mutation runner gained a `typecheck` suite.
+- **#408, the account bodies.** The pins copy `events.test.js`'s dependency builder only;
+  the log handlers' deps were added in #409. `TYPE_CHECKED_FILES` counts files git tracks, so
+  a new checked file is staged before the guard counts it. No parameter needed widening to
+  `units.js`'s signatures. Signup's profile carries `heightFeet`, `heightInches` and
+  `weight`, which its schema does not declare, by spread: kept, as decided. One run of
+  `DashboardPage.integration.test.jsx` failed under full coverage, waiting the default 1 s
+  for the lazy Logs view; it passed alone and on the next run, and was left alone.
+- **#409, the log bodies.** The pins fix the clock and `crypto.randomUUID`, and each queued
+  one checks the outbox holds the body it sent. The two optimistic-entry reads that replaced
+  `link` were mutated as well, and both were caught.
+- **#410, the rest.** The swap, undo and decision bodies were already pinned as exact
+  strings, so only a swap with an area was added. The saved-exercise pin goes through the
+  library view, whose `reason` is `""`. The wger check: the exercises route maps every
+  muscle and equipment item to `{ id, name }` with `name` a string, so the body can send
+  `""` for an item wger gives no name, which the schema refuses with a 400; never `null`.
+  Two gaps, both older than this work: no test checks `App.jsx`'s starting goals or progress
+  form (either can be `{}` and the whole client suite passes), and `useProgression`'s choice
+  of decision builder gives the same JSON either way, so it matters only to the types.
+- **Task 6, no floor PR.** On main after #410, with `client/dist` present, every figure
+  truncates to its floor: client 99.25 / 95.79 / 99.45 / 99.67, server 97.39 / 93.41 /
+  98.03 / 97.93. Slack: client functions 0.87, server functions 0.24 and branches 0.37.
+- **The bundle.** The main chunk went from 472.93 kB to 473.79 kB over the phase, and the
+  `TipsView` chunk from 20.00 kB to 19.77 kB.
+- **What the types cannot see.** The goals body's three fields and every other coerced field
+  are checked by name only; a swap's `area` is any string, since `SWAP_AREAS` is a plain
+  array; callers of the builders stay unchecked until phase 3.
 
 ---
 

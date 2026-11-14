@@ -211,6 +211,8 @@ the cache.
   TypeScript ignores it anywhere else, silently. Checking a file raises
   `TYPE_CHECKED_FILES` in `repo-invariants.test.mjs`, and in a checked file every parameter
   the checker cannot infer gets a `@param {Type}` (`docs/code-readability-sop.md`, rule 2).
+  Client source names server code only inside a JSDoc `import()` type, as the request bodies
+  in `app/requestBodies.js` do; runtime imports of server code stay in tests.
 - Validate user input at system boundaries
 - Sanitize file paths to prevent directory traversal
 - Server config is env-driven — see the Environment Variables table in `README.md`

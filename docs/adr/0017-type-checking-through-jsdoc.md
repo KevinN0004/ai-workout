@@ -59,3 +59,25 @@ a checked file `npm run typecheck` checks every one, so they cannot drift. There
 parameter the checker cannot infer gets a `@param {Type}` line below the prose summary. A
 `@returns {Type}` is added only where the inferred return is wider than the truth. Unchecked
 files keep the ban.
+
+## Types shared across the workspaces (phase 2)
+
+Decided 2026-11-14, `docs/specs/2026-11-14-api-body-types-design.md`. Each request body the
+client sends is built by a function in `client/src/app/requestBodies.js` (and the profile by
+`personalToProfile`), whose `@returns` names a typedef beside the server's zod schema, so a
+misspelled or mistyped field fails `npm run typecheck`.
+
+- **Client source names server code only inside a JSDoc `import()` type.** That is a comment
+  to Vite, so nothing reaches the bundle. Runtime imports of server code stay in test files.
+- **`DeclaredBody<S>` is a schema's declared fields,** `z.input` of a `ZodObject` built from
+  its `shape`. Plain `z.input` of a `.passthrough()` schema carries an index signature, and a
+  misspelled key passes. A field zod coerces (numbers, booleans) reads as `unknown`, so only
+  its name and whether it is required are checked. Keys arriving by spread are not checked
+  for extras, so signup's nested profile still carries undeclared keys.
+- **It rests on two conditions.** `zod` resolves from the root `node_modules`, because npm
+  hoists it; a server-only install would break the client's typecheck. And once a client file
+  names a checked server file, the client's program checks that file too, under the client's
+  options, so it must pass both.
+
+`repo-invariants.test.mjs` holds it: every exported `…BodySchema` in the two schema files has
+a `DeclaredBody` typedef, and every such typedef is named by a checked client file.

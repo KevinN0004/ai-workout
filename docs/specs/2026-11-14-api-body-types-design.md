@@ -1,7 +1,8 @@
 # Request body types from the zod schemas (roadmap lane D1, phase 2), design
 
-Status: **decided 2026-11-14** with the owner, probed, nothing applied. The plan is
-`docs/plans/2026-11-14-api-body-types.md`. Phase 1 is
+Status: **decided 2026-11-14** with the owner, probed; **applied 2026-11-14**, in #407
+to #410, all live, with no floor PR. The plan is `docs/plans/2026-11-14-api-body-types.md`,
+whose status says where the work went past this text. Phase 1 is
 `docs/specs/2026-11-02-jsdoc-type-checking-design.md`, which names this phase: "API types
 inferred from the zod schemas and shared by both sides through JSDoc `import()` types, so a
 form and the route that validates it cannot disagree about a field."
