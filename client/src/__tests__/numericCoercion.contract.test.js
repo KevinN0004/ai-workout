@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
-import { toNumberOrNull } from "../app/units";
+import { toKmOrMi, toNumberOrNull } from "../app/units";
 import { fromLoadKg, toLoadKg } from "../app/exerciseSets";
 import { topOfRange } from "../app/workoutSession";
 import { e1rmOf } from "../pages/dashboard/progress";
@@ -135,5 +135,33 @@ describe("e1rmOf (pages/dashboard/progress)", () => {
 
   test("still reads a real measurement given as strings", () => {
     expect(e1rmOf({ reps: "1", loadKg: "100" })).toBe(100);
+  });
+});
+
+// - `toKmOrMi` in app/units.js shows an imported workout's distance (roadmap
+//   C2). Strava sends 0 for an activity with no distance, a treadmill session or
+//   a weights workout, so a measured 0 is no distance here, as absent is, and
+//   the table's zero row does not fit. Pinned so that neither ever reads "0.0 km":
+describe("toKmOrMi (app/units)", () => {
+  test.each(ABSENT)("shows no distance for %s", (_label, value) => {
+    expect(toKmOrMi(value, "metric")).toBeNull();
+  });
+
+  test("shows no distance for a non-numeric or non-finite value", () => {
+    expect(toKmOrMi("far", "metric")).toBeNull();
+    expect(toKmOrMi(Infinity, "imperial")).toBeNull();
+  });
+
+  test.each([
+    ["a number", 0],
+    ["a numeric string", "0"],
+    ["a negative number", -5]
+  ])("shows no distance for %s at or below zero", (_label, value) => {
+    expect(toKmOrMi(value, "metric")).toBeNull();
+    expect(toKmOrMi(value, "imperial")).toBeNull();
+  });
+
+  test("still shows a real distance given as a string", () => {
+    expect(toKmOrMi("1000", "metric")).toBe("1.0 km");
   });
 });

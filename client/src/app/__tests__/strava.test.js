@@ -8,6 +8,7 @@ import {
   fetchStravaState,
   readStravaResult,
   startStravaConnect,
+  syncChangedWorkouts,
   syncStrava
 } from "../strava";
 
@@ -96,6 +97,24 @@ describe("a refused request", () => {
     await expect(disconnectStrava(apiFetch)).rejects.toThrow(
       "Could not disconnect Strava. Try again."
     );
+  });
+});
+
+describe("syncChangedWorkouts", () => {
+  test.each([
+    [{ imported: 1, updated: 0, removed: 0 }],
+    [{ imported: 0, updated: 1, removed: 0 }],
+    [{ imported: 0, updated: 0, removed: 1 }]
+  ])("is true when a sync imported, updated or removed one: %o", (answer) => {
+    expect(syncChangedWorkouts(answer)).toBe(true);
+  });
+
+  test.each([
+    [{ imported: 0, updated: 0, removed: 0 }],
+    [{ skipped: true }],
+    [{ error: "unavailable" }]
+  ])("is false when it changed nothing, or did not run: %o", (answer) => {
+    expect(syncChangedWorkouts(answer)).toBe(false);
   });
 });
 

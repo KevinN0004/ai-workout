@@ -855,6 +855,34 @@ export const createAppEventHandlers = ({
     }
   };
 
+  // Roadmap C2: deletes a workout imported from Strava, which the server
+  // remembers so no sync brings it back. The route refuses a workout logged in
+  // the app, and answers the dashboard without the deleted one.
+  const deleteImportedWorkout = async (workoutId) => {
+    setDashError("");
+    const isSameAccount = captureAccount();
+    try {
+      const res = await apiFetch(`/api/dashboard/workouts/${encodeURIComponent(workoutId)}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || "Unable to delete that workout.");
+      }
+      const data = await res.json();
+      // As in submitGoals. The caller still hears that the delete went through.
+      if (!isSameAccount()) return { ok: true, data };
+      setDashboard(data.dashboard);
+      showDashboardToast("Workout deleted.");
+      return { ok: true, data };
+    } catch (err) {
+      const message = err.message || "Unable to delete that workout.";
+      setDashError(message);
+      showDashboardToast(message, "error");
+      return { ok: false, error: message };
+    }
+  };
+
   // Roadmap C4: the plan a swap or an undo answers, in place of the plan with
   // its id. The swap's own request is made where the swap is chosen.
   const replacePlan = (plan) =>
@@ -891,6 +919,7 @@ export const createAppEventHandlers = ({
     submitMealLog,
     submitProgressMetric,
     saveExerciseToPlan,
-    removeSavedExercise
+    removeSavedExercise,
+    deleteImportedWorkout
   };
 };

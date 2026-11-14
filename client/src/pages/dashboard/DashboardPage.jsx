@@ -121,6 +121,8 @@ export default function DashboardPage({
   refreshAirQuality,
   onSaveExerciseToPlan,
   onRemoveSavedExercise,
+  onDeleteImportedWorkout,
+  reloadDashboard,
   plannerModal,
   dashboardToast,
   clearDashboardToast,
@@ -323,6 +325,7 @@ export default function DashboardPage({
             onOpenCalories={() => navigateDashView("calories")}
             onOpenMeal={() => navigateDashView("meal")}
             onStartSession={onStartSession}
+            onDeleteImportedWorkout={onDeleteImportedWorkout}
           />
         </Suspense>
       );
@@ -419,6 +422,7 @@ export default function DashboardPage({
             onChangePassword={onChangePassword}
             onDeleteAccount={onDeleteAccount}
             apiFetch={apiFetch}
+            onStravaChange={reloadDashboard}
           />
         </Suspense>
       );

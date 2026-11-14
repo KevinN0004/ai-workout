@@ -561,6 +561,62 @@ describe("App", () => {
   // Entries kept on the device are sent once App has a user and a connection,
   // and a sign-out that would lose them asks first
   // (docs/specs/2026-11-06-offline-ready-pwa-design.md).
+  // Roadmap C2: the quiet Strava catch-up, and the two Strava handlers the
+  // dashboard is handed.
+  describe("Strava", () => {
+    const ada = { email: "ada@example.com" };
+    const callsTo = (path) => fetch.mock.calls.filter(([url]) => url === path);
+
+    beforeEach(() => {
+      document.cookie = "csrfToken=strava-token";
+    });
+
+    afterEach(() => {
+      document.cookie = "csrfToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      localStorage.clear();
+    });
+
+    const signedIn = (syncAnswer) =>
+      stubSession((url) => {
+        if (url === "/api/auth/me") return sessionResponse({ user: ada })();
+        if (url === "/api/integrations/strava/sync") return sessionResponse(syncAnswer)();
+        return sessionResponse({ dashboard: { workouts: [] } })();
+      });
+
+    test("syncs on entering the dashboard, and loads it again when workouts changed", async () => {
+      signedIn({ imported: 1, updated: 0, removed: 0 });
+      await renderSettled("/dashboard");
+
+      await waitFor(() => expect(callsTo("/api/dashboard")).toHaveLength(2));
+      expect(callsTo("/api/integrations/strava/sync")).toHaveLength(1);
+    });
+
+    test("a sync that changed nothing loads the dashboard once", async () => {
+      signedIn({ skipped: true });
+      await renderSettled("/dashboard");
+
+      await waitFor(() => expect(callsTo("/api/integrations/strava/sync")).toHaveLength(1));
+      await act(async () => {});
+      expect(callsTo("/api/dashboard")).toHaveLength(1);
+    });
+
+    test("hands the dashboard the import delete and the reload", async () => {
+      signedIn({ skipped: true });
+      await renderSettled("/dashboard");
+      await waitFor(() => expect(callsTo("/api/dashboard")).toHaveLength(1));
+
+      await act(async () => {
+        await dash.props.onDeleteImportedWorkout("import-1");
+      });
+      expect(callsTo("/api/dashboard/workouts/import-1")[0][1]).toMatchObject({
+        method: "DELETE"
+      });
+
+      act(() => dash.props.reloadDashboard());
+      await waitFor(() => expect(callsTo("/api/dashboard")).toHaveLength(2));
+    });
+  });
+
   describe("entries kept on the device", () => {
     const ada = { email: "ada@example.com" };
     const keepEntry = () =>
@@ -1057,7 +1113,12 @@ describe("App", () => {
         await dash.props.onLogout();
       });
 
-      expect(posts).toEqual(["/api/dashboard/meal-logs", "/api/auth/logout"]);
+      // Entering the dashboard also posts the quiet Strava catch-up (roadmap
+      // C2), which has no bearing on the order asked about here.
+      expect(posts.filter((path) => path !== "/api/integrations/strava/sync")).toEqual([
+        "/api/dashboard/meal-logs",
+        "/api/auth/logout"
+      ]);
     });
 
     // Sign-out clears this browser's cookies whatever happens, so a 503 means

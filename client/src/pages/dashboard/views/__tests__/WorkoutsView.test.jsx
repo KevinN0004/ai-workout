@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import WorkoutsView from "../WorkoutsView";
 import { NO_PLAN_LINK } from "../../../../app/plans";
+import { markUnanswered } from "../../../../app/connection";
 
 // Four log lists over one shared paging state. Prop-driven, but not markup:
 // it sorts every list by date with its own guard against unparseable ones,
@@ -662,6 +663,160 @@ describe("starting a blank workout", () => {
       title: "Workout",
       planId: null,
       exercises: []
+    });
+  });
+});
+
+// Roadmap C2: a workout imported from Strava. Strava's brand guidelines ask for
+// a "View on Strava" link back to the activity; the delete is remembered by the
+// server, so no sync brings the workout back.
+describe("a workout imported from Strava", () => {
+  const RUN = dated("2026-11-12", {
+    id: "import-1",
+    source: "strava",
+    externalId: "9001",
+    sport: "Run",
+    focus: "Run",
+    duration: 31,
+    notes: "Morning run",
+    exercises: [],
+    distanceMeters: 5012.4,
+    averageHeartrate: 142.4
+  });
+
+  const useLocale = (locale) => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue([locale]);
+    vi.spyOn(navigator, "language", "get").mockReturnValue(locale);
+  };
+
+  test("says it is from Strava, with its distance and heart rate", () => {
+    useLocale("en-GB");
+    renderView({ workouts: [RUN] });
+
+    expect(within(rowsIn("workouts")[0]).getByText("From Strava | 5.0 km | 142 bpm")).toBeVisible();
+    expect(within(rowsIn("workouts")[0]).getByText("Morning run")).toBeVisible();
+  });
+
+  test("shows the distance in miles for an imperial region", () => {
+    useLocale("en-US");
+    renderView({ workouts: [RUN] });
+
+    expect(within(rowsIn("workouts")[0]).getByText("From Strava | 3.1 mi | 142 bpm")).toBeVisible();
+  });
+
+  // Absent is not zero: Strava's 0 m is no distance, and no heart rate is none.
+  test.each([
+    ["no distance", { distanceMeters: null }, "From Strava | 142 bpm"],
+    ["a distance of 0", { distanceMeters: 0 }, "From Strava | 142 bpm"],
+    ["no heart rate", { averageHeartrate: null }, "From Strava | 5.0 km"],
+    ["neither", { distanceMeters: null, averageHeartrate: null }, "From Strava"]
+  ])("with %s, leaves that part out", (_label, change, line) => {
+    useLocale("en-GB");
+    renderView({ workouts: [{ ...RUN, ...change }] });
+
+    expect(within(rowsIn("workouts")[0]).getByText(line)).toBeVisible();
+  });
+
+  test("links to the activity on Strava, in a new tab", () => {
+    renderView({ workouts: [RUN] });
+
+    const link = within(rowsIn("workouts")[0]).getByRole("link", { name: "View on Strava" });
+    expect(link).toHaveAttribute("href", "https://www.strava.com/activities/9001");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  test("a workout logged in the app has none of it", () => {
+    renderView({ workouts: [dated("2026-11-12", { focus: "Legs" })] });
+
+    const row = rowsIn("workouts")[0];
+    expect(within(row).queryByText(/From Strava/)).toBeNull();
+    expect(within(row).queryByRole("link")).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  describe("deleting it", () => {
+    test("asks first, and puts focus on Cancel", () => {
+      const onDeleteImportedWorkout = vi.fn();
+      renderView({ workouts: [RUN], onDeleteImportedWorkout });
+
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(
+        screen.getByText("Delete this workout? Syncing with Strava won't bring it back.")
+      ).toBeVisible();
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+      expect(onDeleteImportedWorkout).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByText(/Delete this workout\?/)).toBeNull();
+      expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    });
+
+    test("on confirming, deletes it by id, disabled until it answers", async () => {
+      let finish;
+      const onDeleteImportedWorkout = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+      );
+      renderView({ workouts: [RUN], onDeleteImportedWorkout });
+
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete workout" }));
+
+      expect(onDeleteImportedWorkout).toHaveBeenCalledWith("import-1");
+      expect(screen.getByRole("button", { name: "Deleting..." })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      finish({ ok: true });
+
+      await waitFor(() => expect(screen.queryByText(/Delete this workout\?/)).toBeNull());
+    });
+
+    test("a failed delete keeps the confirm open, to try again", async () => {
+      const onDeleteImportedWorkout = vi.fn(async () => ({ ok: false, error: "Offline." }));
+      renderView({ workouts: [RUN], onDeleteImportedWorkout });
+
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete workout" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Delete workout" })).toBeEnabled()
+      );
+      expect(screen.getByText(/Delete this workout\?/)).toBeVisible();
+    });
+
+    test("asks about one workout at a time", () => {
+      renderView({
+        workouts: [RUN, { ...RUN, id: "import-2", externalId: "9002", date: "2026-11-11" }]
+      });
+
+      const [first, second] = rowsIn("workouts");
+      fireEvent.click(within(first).getByRole("button", { name: "Delete" }));
+
+      expect(within(first).getByText(/Delete this workout\?/)).toBeVisible();
+      expect(within(second).queryByText(/Delete this workout\?/)).toBeNull();
+      expect(within(second).getByRole("button", { name: "Delete" })).toBeVisible();
+    });
+
+    // The outbox replays saves, not deletes, so a delete needs the server.
+    test("offline, Delete is disabled, and says why", () => {
+      markUnanswered();
+      renderView({ workouts: [RUN] });
+
+      expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+      expect(within(rowsIn("workouts")[0]).getByText("You're offline")).toBeVisible();
+    });
+
+    test("going offline with the confirm open disables Delete workout, not Cancel", () => {
+      renderView({ workouts: [RUN] });
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+      act(() => markUnanswered());
+
+      expect(screen.getByRole("button", { name: "Delete workout" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     });
   });
 });

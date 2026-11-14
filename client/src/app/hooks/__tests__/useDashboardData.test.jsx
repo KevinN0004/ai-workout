@@ -398,6 +398,36 @@ describe("useDashboardData", () => {
 
   // The dashboard response carries each collection's total. The Logs view
   // reads it to know whether there is a page past the first.
+  // A Strava sync or disconnect changes the workouts on the server (roadmap C2),
+  // and the hook fetches the dashboard again for them.
+  describe("reloadDashboard", () => {
+    test("fetches the dashboard again, and shows the new one", async () => {
+      const first = { workouts: [{ id: "w1" }], goals: {} };
+      const second = { workouts: [{ id: "w1" }, { id: "w2" }], goals: {} };
+      const answers = [first, second];
+      const fetchMock = vi.fn(async () => jsonResponse({ dashboard: answers.shift() }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { result } = render();
+      await waitFor(() => expect(result.current.dashboard).toEqual(first));
+
+      act(() => result.current.reloadDashboard());
+
+      await waitFor(() => expect(result.current.dashboard).toEqual(second));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    test("keeps the load's own guards: off the dashboard it fetches nothing", async () => {
+      const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { result } = render({ isDashboardRoute: false });
+
+      act(() => result.current.reloadDashboard());
+      await act(async () => {});
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("pagination", () => {
     const pagination = { mealLogs: { total: 120, limit: 50, offset: 0, source: "collection" } };
 

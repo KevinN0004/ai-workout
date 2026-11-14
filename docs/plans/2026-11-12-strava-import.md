@@ -935,7 +935,9 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
 - [ ] **`toKmOrMi(meters, measurementSystem)`, test first:**
   - `5000` metric gives `"5.0 km"`, and imperial gives `"3.1 mi"`;
   - `null`, `""`, `undefined` and `0` give `null`;
-  - a contract row with `zeroIsValid: false`.
+  - a contract row with `zeroIsValid: false`. In PR 8 the client's contract table has
+    no such column, so `toKmOrMi` has its own block beside `e1rmOf`'s, as a helper whose
+    zero is no reading; a negative distance gives `null` too.
 - [ ] **The Workouts list, test first, for an import row** (`source: "strava"`):
   - "From Strava", the sport, the distance through `toKmOrMi`, and "142 bpm", each only
     when present;
@@ -944,11 +946,18 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   - **Delete**, behind the confirm. It calls `onDeleteImportedWorkout(item.id)`, and is
     disabled offline with the hint;
   - an app-logged row has none of these.
+  - In PR 8 the line reads "From Strava | 5.0 km | 142 bpm", the separator the row's
+    session line uses. The sport is not repeated: the row's focus is already its label
+    (`sportLabel`). The link is bold and in Strava's orange, `#FC5200`, as the
+    guidelines ask of a "View on Strava" link. The confirm is one row at a time, and
+    focus moves to its Cancel.
 - [ ] **`reloadDashboard`, test first:** it bumps a counter in the load effect's
       dependencies, so the effect fetches again. The effect's existing guards still
       apply.
 - [ ] **`useStravaSync({ user, isDashboardRoute, apiFetch, reloadDashboard })`, test
-      first:**
+      first:** In PR 8 it takes `accountKey`, App's account-scoped dashboard cache key,
+      in place of `user`, so a profile save, which replaces `user`, does not sync again.
+      Offline it waits, and syncs once the connection is back if this visit has not.
   - **when:** it calls `syncStrava` once per signed-in entry to the dashboard routes,
     and not again while moving between views;
   - **after:** a result with any of `imported`, `updated` or `removed` above 0 calls
@@ -957,10 +966,18 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
     reported to Sentry, since it is expected when Strava is off;
   - **offline:** it does not call at all.
 - [ ] **App:** the delete handler calls `deleteImportedWorkout`, then `reloadDashboard`.
-      A failure shows the app's existing error notice.
+      A failure shows the app's existing error notice. In PR 8 the handler is
+      `deleteImportedWorkout` in `events.js`, in `removeSavedExercise`'s shape: the route
+      answers the dashboard (PR 6), so it stores that, with no second fetch, and shows
+      "Workout deleted." or the error toast.
 - [ ] **Found in PR 7:** a disconnect deletes every import on the server, but the
       dashboard keeps its copy until it loads again. Settings' panel calls
-      `reloadDashboard` after a disconnect too, passed down as `apiFetch` is.
+      `reloadDashboard` after a disconnect too, passed down as `apiFetch` is. In PR 8
+      it also does after a Sync now that changed workouts; `syncChangedWorkouts` in
+      `app/strava.js` is the one test of that, for the panel and the hook.
+- [ ] **Found in PR 8:** the eager bundle grows 2 kB, as the hook puts `app/strava.js`
+      on it, and Rolldown now splits React into its own shared chunk (7.9 kB), so
+      `index-*.js` reads 472.9 kB where it read 478.8 kB.
 - [ ] Gates, with E2E (the E2E server still has no keys), the screenshot compare for an
       import row, then mutations, commit, push, open the PR and report.
 

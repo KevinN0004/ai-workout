@@ -3,8 +3,15 @@
  * meal and progress-metric logs, newest first. Rendered by DashboardPage, which
  * loads it lazily.
  */
-import { useMemo, useState } from "react";
-import { getLocalDateKey, getPreferredMeasurementSystem } from "../../../app/units";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  getLocalDateKey,
+  getPreferredMeasurementSystem,
+  toKmOrMi,
+  toNumberOrNull
+} from "../../../app/units";
+import OfflineHint from "../../../components/OfflineHint";
+import useConnection from "../../../hooks/useConnection";
 import { formatExerciseLine } from "../../../app/exerciseSets";
 import { NO_PLAN_LINK } from "../../../app/plans";
 import { blankSession } from "../../../app/workoutSession";
@@ -28,6 +35,19 @@ const toSortTime = (value) => {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
+// An imported workout's line: where it came from, then its distance and
+// average heart rate, each only when Strava had one.
+const importLine = (item, measurementSystem) => {
+  const bpm = toNumberOrNull(item.averageHeartrate);
+  return [
+    "From Strava",
+    toKmOrMi(item.distanceMeters, measurementSystem),
+    bpm === null ? "" : `${Math.round(bpm)} bpm`
+  ]
+    .filter(Boolean)
+    .join(" | ");
+};
+
 const sortByDateDesc = (items) =>
   [...items].sort((a, b) => toSortTime(b?.date) - toSortTime(a?.date));
 
@@ -49,7 +69,11 @@ const mergeById = (held, older) => {
  * the view where that log is entered. Start a blank workout hands
  * `onStartSession` an in-gym session with no exercises (roadmap B6). A workout,
  * calorie or meal row kept on the device and not yet sent (`isQueued`,
- * useOptimisticLogs) says so.
+ * useOptimisticLogs) says so. A workout imported from Strava (roadmap C2) says
+ * so, with its distance and heart rate, links to the activity on Strava, and
+ * offers Delete behind a confirm, which calls `onDeleteImportedWorkout` with its
+ * id (deleteImportedWorkout in events.js, `{ ok }` or `{ ok: false, error }`).
+ * Delete needs the server, so it is disabled offline.
  */
 export default function WorkoutsView({
   workouts,
@@ -61,7 +85,8 @@ export default function WorkoutsView({
   setWorkoutModalOpen,
   onOpenCalories,
   onOpenMeal,
-  onStartSession
+  onStartSession,
+  onDeleteImportedWorkout
 }) {
   // ---- Sorted lists and the visible slice of each ---------------------------
   // Loads show in the region's unit, and progress counts weeks to today, each
@@ -130,6 +155,28 @@ export default function WorkoutsView({
     () => progressLogs.slice(0, visibleRows.progress),
     [progressLogs, visibleRows.progress]
   );
+
+  // ---- Deleting an imported workout -----------------------------------------
+  const offline = useConnection() === "offline";
+  // The id of the import whose delete is being confirmed, or null.
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const cancelDeleteRef = useRef(null);
+
+  // Asking unmounts the Delete button that had focus; Cancel takes it, the
+  // choice that changes nothing.
+  useEffect(() => {
+    if (confirmingDelete) cancelDeleteRef.current.focus();
+  }, [confirmingDelete]);
+
+  // A refused delete leaves the confirm open to try again; the handler shows
+  // the error.
+  const deleteImport = async (id) => {
+    setDeleting(true);
+    const result = await onDeleteImportedWorkout(id);
+    setDeleting(false);
+    if (result.ok) setConfirmingDelete(null);
+  };
 
   const expandRows = (key) => {
     setVisibleRows((prev) => ({ ...prev, [key]: prev[key] + ROW_BATCH_SIZE }));
@@ -222,6 +269,58 @@ export default function WorkoutsView({
                     )}
                     {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
                     {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
+                    {item.source === "strava" && (
+                      <>
+                        <p className="muted workout-detail">
+                          {importLine(item, measurementSystem)}
+                        </p>
+                        {confirmingDelete === item.id ? (
+                          <div className="workout-import-actions">
+                            <p className="workout-detail">
+                              Delete this workout? Syncing with Strava won&apos;t bring it back.
+                            </p>
+                            <button
+                              ref={cancelDeleteRef}
+                              type="button"
+                              className="ghost"
+                              onClick={() => setConfirmingDelete(null)}
+                              disabled={deleting}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => deleteImport(item.id)}
+                              disabled={deleting || offline}
+                            >
+                              {deleting ? "Deleting..." : "Delete workout"}
+                            </button>
+                            <OfflineHint />
+                          </div>
+                        ) : (
+                          <div className="workout-import-actions">
+                            <a
+                              className="workout-strava-link"
+                              href={`https://www.strava.com/activities/${encodeURIComponent(item.externalId)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View on Strava
+                            </a>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => setConfirmingDelete(item.id)}
+                              disabled={offline}
+                            >
+                              Delete
+                            </button>
+                            <OfflineHint />
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <span>{item.duration ?? "--"} min</span>
                 </div>

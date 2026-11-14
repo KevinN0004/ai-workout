@@ -142,6 +142,26 @@
   letter-spacing: 0.06em;
 }
 
+/* ---- A workout imported from Strava -------------------------------------- */
+/* "View on Strava" is bold and in Strava's orange, as its brand guidelines ask of a link
+   back to an activity; Delete, and its confirm, sit beside it. */
+.workouts-view .workout-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.workouts-view .workout-import-actions .workout-detail {
+  flex-basis: 100%;
+}
+
+.workouts-view .workout-strava-link {
+  color: #fc5200;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 /* ---- Empty state --------------------------------------------------------- */
 .workouts-view .log-empty-state {
   display: grid;

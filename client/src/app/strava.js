@@ -47,6 +47,14 @@ export const syncStrava = (apiFetch, { manual }) =>
     SYNC_FAILED
   );
 
+/**
+ * Whether a sync's answer imported, updated or removed a workout, so the
+ * dashboard's copy is stale. A skipped or unfinished sync carries no counts:
+ * their sum is NaN, which is not above 0.
+ */
+export const syncChangedWorkouts = (answer) =>
+  answer.imported + answer.updated + answer.removed > 0;
+
 /** Disconnects Strava; the server deletes the tokens and every import. */
 export const disconnectStrava = (apiFetch) =>
   send(apiFetch, BASE, { method: "DELETE" }, DISCONNECT_FAILED);
