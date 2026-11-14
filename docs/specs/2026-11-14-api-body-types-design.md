@@ -127,7 +127,7 @@ listed in the PR and the plan's status for the owner.
 In `scripts/__tests__/repo-invariants.test.mjs`:
 
 1. every exported `…BodySchema` in the two schema files has a typedef `DeclaredBody` of it
-   directly below, so a new schema cannot arrive without its type;
+   in the same file, so a new schema cannot arrive without its type;
 2. each of those typedefs is named by a checked client file, so a type nothing uses shows;
 3. `TYPE_CHECKED_FILES` rises by four, from 26 to 30: the two schema files,
    `requestBodies.js` and `profileMapping.js`.
