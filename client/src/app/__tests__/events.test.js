@@ -976,7 +976,8 @@ describe("an answer that arrives after the account signed out", () => {
     ["submitGoals", (handlers) => handlers.submitGoals(submitEvent())],
     ["submitProgressMetric", (handlers) => handlers.submitProgressMetric(submitEvent())],
     ["saveExerciseToPlan", (handlers) => handlers.saveExerciseToPlan({ name: "Row" })],
-    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")]
+    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")],
+    ["deleteImportedWorkout", (handlers) => handlers.deleteImportedWorkout("w1")]
   ])("%s leaves the dashboard and the toast alone", async (_name, run) => {
     await run(build(signedOutMidRequest({ dashboard: { goals: {} } })));
 
@@ -986,7 +987,8 @@ describe("an answer that arrives after the account signed out", () => {
 
   test.each([
     ["saveExerciseToPlan", (handlers) => handlers.saveExerciseToPlan({ name: "Row" })],
-    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")]
+    ["removeSavedExercise", (handlers) => handlers.removeSavedExercise("s1")],
+    ["deleteImportedWorkout", (handlers) => handlers.deleteImportedWorkout("w1")]
   ])("%s still tells its caller the write went through", async (_name, run) => {
     const result = await run(build(signedOutMidRequest({ dashboard: { goals: {} } })));
 

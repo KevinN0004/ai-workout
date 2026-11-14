@@ -33,6 +33,7 @@ import useConnection from "./hooks/useConnection";
 import useDashboardData from "./app/hooks/useDashboardData";
 import useOptimisticLogs from "./app/hooks/useOptimisticLogs";
 import useOutboxReplay from "./app/hooks/useOutboxReplay";
+import useStravaSync from "./app/hooks/useStravaSync";
 import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
 import { fetchWithTimeout } from "./app/network";
 import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
@@ -181,6 +182,7 @@ export default function App() {
     airQualityLastUpdatedAt,
     loadWeatherRecommendation,
     loadAirQuality,
+    reloadDashboard,
     clearDashboardDataState
   } = useDashboardData({
     user,
@@ -216,6 +218,12 @@ export default function App() {
     setDashError,
     showDashboardToast,
     removeQueuedEntry
+  });
+  useStravaSync({
+    accountKey: dashboardCacheKey,
+    isDashboardRoute,
+    apiFetch,
+    reloadDashboard
   });
 
   // ---- Derived values and handlers ------------------------------------------
@@ -383,6 +391,7 @@ export default function App() {
     submitProgressMetric,
     saveExerciseToPlan,
     removeSavedExercise,
+    deleteImportedWorkout,
     finishSession,
     startSession,
     resolveSessionConflict,
@@ -765,6 +774,8 @@ export default function App() {
         refreshAirQuality={loadAirQuality}
         onSaveExerciseToPlan={saveExerciseToPlan}
         onRemoveSavedExercise={removeSavedExercise}
+        onDeleteImportedWorkout={deleteImportedWorkout}
+        reloadDashboard={reloadDashboard}
         plannerModal={plannerModal}
         dashboardToast={dashboardToast}
         clearDashboardToast={clearDashboardToast}

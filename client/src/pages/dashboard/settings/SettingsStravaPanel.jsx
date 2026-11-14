@@ -12,6 +12,7 @@ import {
   fetchStravaState,
   readStravaResult,
   startStravaConnect,
+  syncChangedWorkouts,
   syncStrava
 } from "../../../app/strava";
 import connectWithStrava from "./assets/btn_strava_connect_with_orange.svg";
@@ -40,8 +41,8 @@ const resultMessage = (result) =>
 const syncMessage = (answer) => {
   if (answer.skipped) return "Synced a moment ago. Try again in a minute.";
   if (answer.error) return "The sync didn't finish. Try again later.";
+  if (!syncChangedWorkouts(answer)) return "Sync finished. Nothing new.";
   const { imported, updated, removed } = answer;
-  if (imported + updated + removed === 0) return "Sync finished. Nothing new.";
   return `Sync finished: ${imported} new, ${updated} updated, ${removed} removed.`;
 };
 
@@ -55,10 +56,11 @@ const lastSyncedText = (iso) =>
  * "Not available" without Strava on the server, Strava's Connect button, or the
  * connected account with Sync now and Disconnect, or Reconnect when Strava
  * refused the tokens. Connecting leaves for Strava's page; the server sends the
- * visitor back with a result, which shows once. Offline, every action is
- * disabled.
+ * visitor back with a result, which shows once. A sync that changed workouts,
+ * and a disconnect, call `onImportsChange` (App's reloadDashboard), since the
+ * dashboard's copy is then stale. Offline, every action is disabled.
  */
-export default function SettingsStravaPanel({ apiFetch }) {
+export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
   const offline = useConnection() === "offline";
   const [state, setState] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -116,7 +118,9 @@ export default function SettingsStravaPanel({ apiFetch }) {
     setError("");
     setNotice("");
     try {
-      setNotice(syncMessage(await syncStrava(apiFetch, { manual: true })));
+      const answer = await syncStrava(apiFetch, { manual: true });
+      setNotice(syncMessage(answer));
+      if (syncChangedWorkouts(answer)) onImportsChange();
       await reload();
     } catch (err) {
       setError(err.message);
@@ -132,6 +136,7 @@ export default function SettingsStravaPanel({ apiFetch }) {
       await disconnectStrava(apiFetch);
       setConfirming(false);
       setNotice(DISCONNECTED);
+      onImportsChange();
       await reload();
     } catch (err) {
       setError(err.message);

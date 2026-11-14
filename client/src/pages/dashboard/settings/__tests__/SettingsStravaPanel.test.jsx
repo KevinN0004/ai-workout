@@ -35,7 +35,15 @@ const fakeApi = (routes) =>
 
 const stateRoute = (state) => ({ "GET /api/integrations/strava": () => respond(state) });
 
-const renderPanel = (apiFetch) => render(<SettingsStravaPanel apiFetch={apiFetch} />);
+// `onImportsChange` is App's reloadDashboard: a sync that changed workouts, or
+// a disconnect, leaves the dashboard's copy stale.
+const renderPanel = (apiFetch) => {
+  const onImportsChange = vi.fn();
+  const utils = render(
+    <SettingsStravaPanel apiFetch={apiFetch} onImportsChange={onImportsChange} />
+  );
+  return { ...utils, onImportsChange };
+};
 
 // A promise the test settles when it chooses.
 const deferred = () => {
@@ -207,7 +215,7 @@ describe("Sync now", () => {
       { imported: 2, updated: 1, removed: 1, lastSyncedAt: "2026-11-13T12:00:00Z" },
       { ...CONNECTED, lastSyncedAt: "2026-11-13T12:00:00Z" }
     );
-    renderPanel(apiFetch);
+    const { onImportsChange } = renderPanel(apiFetch);
 
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
 
@@ -222,23 +230,25 @@ describe("Sync now", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Sync finished: 2 new, 1 updated, 1 removed."
     );
+    expect(onImportsChange).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("Last synced just now")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
   });
 
   test("a sync that changed nothing says so", async () => {
     const { apiFetch, finish } = syncing({ imported: 0, updated: 0, removed: 0 });
-    renderPanel(apiFetch);
+    const { onImportsChange } = renderPanel(apiFetch);
 
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
     await finish();
 
     expect(screen.getByRole("status")).toHaveTextContent("Sync finished. Nothing new.");
+    expect(onImportsChange).not.toHaveBeenCalled();
   });
 
   test("a sync inside the throttle says to wait a minute", async () => {
     const { apiFetch, finish } = syncing({ skipped: true });
-    renderPanel(apiFetch);
+    const { onImportsChange } = renderPanel(apiFetch);
 
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
     await finish();
@@ -246,6 +256,7 @@ describe("Sync now", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Synced a moment ago. Try again in a minute."
     );
+    expect(onImportsChange).not.toHaveBeenCalled();
   });
 
   test("a sync that did not finish says so, and the state read after it shows why", async () => {
@@ -253,7 +264,7 @@ describe("Sync now", () => {
       { error: "unavailable" },
       { ...CONNECTED, lastSyncError: "unavailable" }
     );
-    renderPanel(apiFetch);
+    const { onImportsChange } = renderPanel(apiFetch);
 
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
     await finish();
@@ -261,6 +272,7 @@ describe("Sync now", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "The sync didn't finish. Try again later."
     );
+    expect(onImportsChange).not.toHaveBeenCalled();
     expect(
       await screen.findByText("The last sync didn't finish. It will try again.")
     ).toBeInTheDocument();
@@ -332,7 +344,7 @@ describe("disconnecting", () => {
         return done.promise;
       }
     });
-    renderPanel(apiFetch);
+    const { onImportsChange } = renderPanel(apiFetch);
 
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     await userEvent.click(screen.getByRole("button", { name: "Confirm disconnect" }));
@@ -344,11 +356,12 @@ describe("disconnecting", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Strava is disconnected, and the workouts imported from it are removed."
     );
+    expect(onImportsChange).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("button", { name: "Connect with Strava" })).toBeEnabled();
   });
 
   test("a refused disconnect shows why, and keeps the confirm open", async () => {
-    renderPanel(
+    const { onImportsChange } = renderPanel(
       fakeApi({
         ...stateRoute(CONNECTED),
         "DELETE /api/integrations/strava": () => respond({ error: "Try again." }, false)
@@ -361,6 +374,7 @@ describe("disconnecting", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Try again.");
     expect(screen.getByRole("button", { name: "Confirm disconnect" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(onImportsChange).not.toHaveBeenCalled();
   });
 });
 

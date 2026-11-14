@@ -7,6 +7,7 @@ import {
   toCmFromFeetInches,
   toFeetInchesFromCm,
   toKg,
+  toKmOrMi,
   toLb
 } from "../units";
 
@@ -306,5 +307,14 @@ describe("weight conversion", () => {
   test("never converts twice for an unknown source unit", () => {
     expect(toKg("76", "stone")).toBe("76");
     expect(toLb("168", "stone")).toBe("168");
+  });
+});
+
+// An imported workout's distance (roadmap C2), in the visitor's units.
+describe("toKmOrMi", () => {
+  test("shows meters as kilometers, or as miles for the imperial system, to a tenth", () => {
+    expect(toKmOrMi(5000, "metric")).toBe("5.0 km");
+    expect(toKmOrMi(5000, "imperial")).toBe("3.1 mi");
+    expect(toKmOrMi("42195", "metric")).toBe("42.2 km");
   });
 });

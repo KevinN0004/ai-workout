@@ -897,13 +897,24 @@ describe("DashboardPage", () => {
       expect(go).toHaveBeenCalledWith("/dashboard/tips");
     });
 
-    // The Connected Apps tab reads Strava through the same client as the rest.
-    test("the settings view is handed apiFetch", async () => {
+    // The Connected Apps tab reads Strava through the same client as the rest,
+    // and reloads the dashboard after a change to the imports.
+    test("the settings view is handed apiFetch and the reload", async () => {
       const apiFetch = vi.fn();
-      renderPage({ dashView: "settings", apiFetch });
+      const reloadDashboard = vi.fn();
+      renderPage({ dashView: "settings", apiFetch, reloadDashboard });
       await screen.findByTestId("settings-view");
 
       expect(settingsView.props.apiFetch).toBe(apiFetch);
+      expect(settingsView.props.onStravaChange).toBe(reloadDashboard);
+    });
+
+    test("the Logs view is handed the import delete", async () => {
+      const onDeleteImportedWorkout = vi.fn();
+      renderPage({ dashView: "workouts", onDeleteImportedWorkout });
+      await screen.findByTestId("workouts-view");
+
+      expect(workoutsView.props.onDeleteImportedWorkout).toBe(onDeleteImportedWorkout);
     });
 
     // The plans view logs a plan day through the same form and modal.

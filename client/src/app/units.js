@@ -160,3 +160,19 @@ export const toLb = (value, fromUnit) => {
   if (Number.isNaN(num)) return value;
   return fromUnit === "kg" ? String(Math.round(num / 0.453592)) : String(num);
 };
+
+/**
+ * A distance in meters as "5.0 km", or "3.1 mi" for the imperial system, to a
+ * tenth; null when it is absent, not a finite number, or not above 0, since
+ * Strava sends 0 for an activity with no distance (roadmap C2). It guards
+ * before it converts, as toNumberOrNull does.
+ * @param {unknown} meters
+ * @param {string} measurementSystem
+ */
+export const toKmOrMi = (meters, measurementSystem) => {
+  const value = toNumberOrNull(meters);
+  if (value === null || value <= 0) return null;
+  return measurementSystem === "imperial"
+    ? `${(value / 1609.344).toFixed(1)} mi`
+    : `${(value / 1000).toFixed(1)} km`;
+};

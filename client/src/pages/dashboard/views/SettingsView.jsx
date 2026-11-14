@@ -46,8 +46,9 @@ const displayValue = (value) => {
  * locale units, and edits the profile, training and lifestyle tabs one at a
  * time (EDITABLE_TABS). `onSaveProfile` is submitProfile in events.js, which
  * resolves to `{ ok: true }` or `{ ok: false, error }`; the account handlers go
- * to SettingsAccountPanel on the Account tab, and `apiFetch` to the Strava
- * panel on the Connected Apps tab, which opens first after Strava's return. The
+ * to SettingsAccountPanel on the Account tab, and `apiFetch` and
+ * `onStravaChange` (App's reloadDashboard) to the Strava panel on the Connected
+ * Apps tab, which opens first after Strava's return. The
  * privacy and notifications tabs, and the rest of Connected Apps, show fixed text.
  */
 export default function SettingsView({
@@ -55,7 +56,8 @@ export default function SettingsView({
   onSaveProfile,
   onChangePassword,
   onDeleteAccount,
-  apiFetch
+  apiFetch,
+  onStravaChange
 }) {
   // ---- Profile and units ----------------------------------------------------
 
@@ -293,7 +295,9 @@ export default function SettingsView({
                   onDeleteAccount={onDeleteAccount}
                 />
               )}
-              {activeTabData.id === "connected-apps" && <SettingsStravaPanel apiFetch={apiFetch} />}
+              {activeTabData.id === "connected-apps" && (
+                <SettingsStravaPanel apiFetch={apiFetch} onImportsChange={onStravaChange} />
+              )}
             </>
           )}
         </section>

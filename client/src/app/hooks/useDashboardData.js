@@ -36,7 +36,8 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
  * `dashboardPagination`, the collection totals the last
  * dashboard load carried (null until one does), for the Logs view. It returns
  * them with `setDashboard` and `setDashError` for the
- * handlers that write, the two location-based loaders, and
+ * handlers that write, the two location-based loaders, `reloadDashboard`, which
+ * fetches the dashboard again after a change made elsewhere (a Strava sync), and
  * `clearDashboardDataState` for logout and account deletion. Expects from App
  * the three cache keys (empty while signed out), `isDashboardRoute`,
  * `shouldLoadAmbientData` (true on the summary view) and `setGoalForm`, which
@@ -56,6 +57,8 @@ export default function useDashboardData({
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
   const [dashboardPagination, setDashboardPagination] = useState(null);
+  // Raised by reloadDashboard; the load effect depends on it, so it runs again.
+  const [reloadCount, setReloadCount] = useState(0);
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
@@ -304,8 +307,8 @@ export default function useDashboardData({
   // ---- Dashboard load -------------------------------------------------------
 
   // Fetches the dashboard when a signed-in visitor enters the dashboard routes,
-  // or `user` is replaced while there. Moving between dashboard views does not
-  // refetch: isDashboardRoute stays true.
+  // or `user` is replaced while there, or reloadDashboard is called. Moving
+  // between dashboard views does not refetch: isDashboardRoute stays true.
   useEffect(() => {
     if (!isDashboardRoute || !user || !dashboardCacheKey) return;
     // Each run takes a new request id. A response to an older run, or one that
@@ -355,7 +358,9 @@ export default function useDashboardData({
     return () => {
       cancelled = true;
     };
-  }, [dashboardCacheKey, isDashboardRoute, setGoalForm, user]);
+  }, [dashboardCacheKey, isDashboardRoute, reloadCount, setGoalForm, user]);
+
+  const reloadDashboard = useCallback(() => setReloadCount((count) => count + 1), []);
 
   // ---- One-time weather and air-quality load --------------------------------
 
@@ -429,6 +434,7 @@ export default function useDashboardData({
     airQualityLastUpdatedAt,
     loadWeatherRecommendation,
     loadAirQuality,
+    reloadDashboard,
     clearDashboardDataState
   };
 }

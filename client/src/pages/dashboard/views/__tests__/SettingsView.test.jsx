@@ -207,6 +207,32 @@ describe("SettingsView", () => {
       expect(screen.queryByText("Last sync")).toBeNull();
     });
 
+    test("hands the panel onStravaChange, which a sync that changed workouts calls", async () => {
+      useLocale("en-GB");
+      const onStravaChange = vi.fn();
+      const connected = {
+        available: true,
+        connected: true,
+        athleteName: "Jo S.",
+        lastSyncedAt: null,
+        lastSyncError: null,
+        needsReconnect: false
+      };
+      const apiFetch = vi.fn(async (path) => ({
+        ok: true,
+        json: async () =>
+          path === "/api/integrations/strava/sync"
+            ? { imported: 1, updated: 0, removed: 0, lastSyncedAt: null }
+            : connected
+      }));
+      renderView({ apiFetch, onStravaChange });
+
+      fireEvent.click(screen.getByRole("tab", { name: /Connected Apps/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+
+      await waitFor(() => expect(onStravaChange).toHaveBeenCalledTimes(1));
+    });
+
     test("no other tab reads Strava", () => {
       useLocale("en-GB");
       const apiFetch = stravaApi();

@@ -284,6 +284,41 @@ describe("removeSavedExercise", () => {
   });
 });
 
+// A workout imported from Strava (roadmap C2). The route answers the dashboard
+// without the deleted workout, and refuses a workout logged in the app.
+describe("deleteImportedWorkout", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test("deletes by id and stores the returned dashboard", async () => {
+    const dashboard = { workoutSessions: [] };
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ dashboard, ok: true }))
+    });
+
+    const result = await handlers.deleteImportedWorkout("session 1");
+
+    expect(deps.apiFetch).toHaveBeenCalledWith("/api/dashboard/workouts/session%201", {
+      method: "DELETE"
+    });
+    expect(deps.setDashboard).toHaveBeenCalledWith(dashboard);
+    expect(result).toEqual({ ok: true, data: { dashboard, ok: true } });
+    expect(deps.showDashboardToast).toHaveBeenCalledWith("Workout deleted.");
+  });
+
+  test("reports failure without clearing the dashboard", async () => {
+    const { deps, handlers } = buildDeps({
+      apiFetch: vi.fn(async () => jsonResponse({ error: "Workout not found." }, false))
+    });
+
+    const result = await handlers.deleteImportedWorkout("own-1");
+
+    expect(result).toEqual({ ok: false, error: "Workout not found." });
+    expect(deps.showDashboardToast).toHaveBeenCalledWith("Workout not found.", "error");
+    expect(deps.setDashError).toHaveBeenCalledWith("Workout not found.");
+    expect(deps.setDashboard).not.toHaveBeenCalled();
+  });
+});
+
 // The optimistic log actions hand a `request` closure to
 // `queueOptimisticLogCommit` rather than calling the API themselves, and every
 // test above mocks that queue -- so the closure, and the failure handling
@@ -488,7 +523,8 @@ describe("the direct write actions' fallback messages", () => {
       [submitEvent()]
     ],
     ["saveExerciseToPlan", "Unable to save exercise.", {}, [{ name: "Row" }]],
-    ["removeSavedExercise", "Unable to remove saved exercise.", {}, ["entry-1"]]
+    ["removeSavedExercise", "Unable to remove saved exercise.", {}, ["entry-1"]],
+    ["deleteImportedWorkout", "Unable to delete that workout.", {}, ["import-1"]]
   ];
 
   test.each(cases)(
