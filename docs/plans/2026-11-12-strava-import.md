@@ -32,7 +32,39 @@ behaviour, the spec's wording wins.
 **Tech Stack:** Express 5, Prisma with Postgres, zod, Node's `crypto` (AES-256-GCM),
 React 19, Vitest 5 with v8 coverage, Testing Library, Playwright 1.64.
 
-**Status: planned.**
+**Status: done 2026-11-13** (#395 to #404, all live; main `cb21b7b`). Strava stays off in
+production until the owner registers the app and sets its settings (the spec's "What the
+owner does, after PR 9"). These are the places the work goes past or departs from the
+text below; each task's own notes give the detail.
+
+- **#396, the data.** The webhook subscription id is read by `parseSubscriptionId`,
+  shared with the startup check, which as first planned would have passed `"1e3"`.
+- **#397, the client and the rules.** Strava's documentation was re-checked: creating
+  any API app needs a Strava subscription, the owner chose to go on, and revoking is
+  `POST /oauth/revoke`, since `/oauth/deauthorize` ends on 1 June 2027.
+- **#398, connecting.** A Strava account already linked here is `taken`, and its grant
+  is left alone. The service's clock and settings are required arguments, since their
+  defaults were unreachable branch arms.
+- **#399, the webhook.** The setup check needs only the verify token, since Strava calls
+  it before the subscription's id exists. A deauthorization is acted on only when Strava
+  refuses a forced refresh (`confirmRevoked`).
+- **#400, the sync and the delete.** An unchanged activity is not rewritten
+  (`saveImport` answers `unchanged`); deletes skip the window's first two days; the
+  throttle counts failed attempts; the delete answers the dashboard.
+- **#401, Settings.** It opens on Connected Apps after Strava's return.
+  `deleteImportedWorkout` moved to PR 8, its first caller.
+- **#402, the Logs and the catch-up.** The delete lives in `events.js`, in
+  `removeSavedExercise`'s shape. The hook takes the account's cache key, not the user.
+  Settings reloads the dashboard after a disconnect or a Sync now that changed workouts.
+  Rolldown split React into its own chunk, so the eager bundle grew 2 kB while
+  `index-*.js` shrank.
+- **#403, E2E.** It found two defects, fixed there: attempts made before connecting
+  throttled the landing's sync, so nothing imported for fifteen minutes, and "View on
+  Strava" in `#FC5200` measured 4.27:1 on a row, so it is bold and underlined instead.
+  WebKit and Firefox each passed `strava.spec.js`, 5 of 5; WebKit's process did not
+  exit afterwards.
+- **#404, the floors.** The server's rose to 97.3 / 93.4 / 98.0 / 97.9. The client's
+  figures truncate to its current floors, so it had no floor PR.
 
 Every file and line below was read on `46f4e0d`.
 
