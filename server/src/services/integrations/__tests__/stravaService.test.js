@@ -908,6 +908,20 @@ describe("sync", () => {
     expect(await secondsAgo.service.sync("u-1", { manual: true })).toEqual({ skipped: true });
   });
 
+  // Every dashboard visit syncs, connected or not, and the landing back from
+  // Strava is one more: an attempt made before connecting must not hold it off,
+  // or nothing imports for fifteen minutes (found by e2e/strava.spec.js).
+  test("connecting clears the throttle, so the sync on the landing after it runs", async () => {
+    const { service } = serviceWith({
+      responses: [answer(503), answer(200, EXCHANGED), answer(200, [])]
+    });
+
+    expect(await service.sync("u-1")).toEqual({ error: "unavailable" });
+    expect(await service.connect("u-1", "code-xyz")).toBe("connected");
+
+    expect(await service.sync("u-1")).toMatchObject({ imported: 0, updated: 0, removed: 0 });
+  });
+
   test("a second sync straight after a failed one is skipped, so an outage is not hammered", async () => {
     const { service, fetchImpl } = serviceWith({ responses: [answer(503)] });
 

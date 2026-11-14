@@ -229,7 +229,11 @@ export const createStravaService = ({
       expiresAt: granted.expiresAt
     });
     if (!saved) return "failed";
-    return "conflict" in saved ? "taken" : "connected";
+    if ("conflict" in saved) return "taken";
+    // Attempts made before connecting found nothing to sync; the landing back
+    // from Strava syncs at once rather than waiting out their throttle.
+    lastAttempts.delete(userId);
+    return "connected";
   };
 
   /**

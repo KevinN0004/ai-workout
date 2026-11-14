@@ -29,6 +29,13 @@ const baseURL = `http://localhost:${PORT}`;
 const SERVER_PORT = 5000;
 const serverURL = `http://localhost:${SERVER_PORT}`;
 
+// The fake Strava (e2e/fakeStrava.js) that strava.spec.js connects to. The
+// server's STRAVA_BASE_URL points at it, so the browser's trip to "Strava"
+// lands here, and so do the server's own calls. Its webhook settings are the
+// fake's too, so the spec can deliver an event as Strava would.
+const FAKE_STRAVA_PORT = 5099;
+const fakeStravaURL = `http://127.0.0.1:${FAKE_STRAVA_PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   // These share one database and one account namespace, so they run in order.
@@ -66,7 +73,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /(deployable|offline)\.spec\.js/,
+      testIgnore: /(deployable|offline|strava)\.spec\.js/,
       // vite preview serves the built bundle, worker included. Blocking it
       // keeps every request on the network, where these specs and page.route
       // see it; the worker's own specs run in "deployable".
@@ -75,7 +82,9 @@ export default defineConfig({
     {
       name: "deployable",
       // offline.spec.js reloads with no network, which only the worker answers.
-      testMatch: /(deployable|offline)\.spec\.js/,
+      // strava.spec.js follows a redirect to the fake Strava and back to the
+      // server's callback, which is the server's own origin, as in production.
+      testMatch: /(deployable|offline|strava)\.spec\.js/,
       use: { ...devices["Desktop Chrome"], baseURL: serverURL }
     }
   ],
@@ -109,8 +118,23 @@ export default defineConfig({
         // Empty, not absent: dotenv fills only absent keys, so this keeps a
         // key in server/.env from reaching Gemini. Plans are built by rule and
         // their notes written by rule, so plan.spec.js is deterministic.
-        GEMINI_API_KEY: ""
+        GEMINI_API_KEY: "",
+        // Strava (roadmap C2), pointed at the fake. Fixture values: the key is
+        // 32 zero bytes, as the server's own tests use.
+        STRAVA_CLIENT_ID: "e2e",
+        STRAVA_CLIENT_SECRET: "e2e-secret",
+        STRAVA_TOKEN_KEY: Buffer.alloc(32).toString("base64"),
+        STRAVA_BASE_URL: fakeStravaURL,
+        STRAVA_WEBHOOK_VERIFY_TOKEN: "e2e-verify",
+        STRAVA_WEBHOOK_SUBSCRIPTION_ID: "4242"
       }
+    },
+    {
+      command: "node e2e/fakeStrava.js",
+      url: `${fakeStravaURL}/__control`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+      env: { FAKE_STRAVA_PORT: String(FAKE_STRAVA_PORT) }
     },
     {
       command: "npm run preview -w client",
