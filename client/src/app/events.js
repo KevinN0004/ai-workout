@@ -16,6 +16,7 @@ import {
 import { newWorkoutForm, toExerciseSets } from "./exerciseSets";
 import { clearOutbox, readOutbox } from "./outbox";
 import { personalToProfile } from "./profileMapping";
+import { accountDeleteBody, loginBody, passwordChangeBody, signupBody } from "./requestBodies";
 import { postLog } from "./sendLog";
 import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
 import { loggedSetCount, toWorkoutSave } from "./workoutSession";
@@ -296,24 +297,17 @@ export const createAppEventHandlers = ({
       // Sign-up: the profile goes in centimetres and kilograms, converted from
       // the form's units, and the new account comes back signed in.
       if (authMode === "signup") {
-        const normalizedProfile = {
-          ...signupProfileForm,
-          heightCm:
-            signupHeightUnit === "ft"
-              ? toCmFromFeetInches(signupProfileForm.heightFeet, signupProfileForm.heightInches)
-              : signupProfileForm.heightCm,
-          weightKg:
-            signupWeightUnit === "lb"
-              ? toKg(signupProfileForm.weight, "lb")
-              : signupProfileForm.weight || signupProfileForm.weightKg
-        };
         const res = await apiFetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...authForm,
-            profile: normalizedProfile
-          })
+          body: JSON.stringify(
+            signupBody({
+              authForm,
+              profileForm: signupProfileForm,
+              heightUnit: signupHeightUnit,
+              weightUnit: signupWeightUnit
+            })
+          )
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
@@ -333,10 +327,7 @@ export const createAppEventHandlers = ({
       const res = await apiFetch(`/api/auth/${authMode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...authForm,
-          rememberMe: authAutoSignIn
-        })
+        body: JSON.stringify(loginBody(authForm, authAutoSignIn))
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -648,7 +639,7 @@ export const createAppEventHandlers = ({
       const res = await apiFetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword })
+        body: JSON.stringify(passwordChangeBody({ currentPassword, newPassword }))
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));
@@ -673,7 +664,7 @@ export const createAppEventHandlers = ({
       const res = await apiFetch("/api/auth/me", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password })
+        body: JSON.stringify(accountDeleteBody(password))
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));

@@ -3,6 +3,7 @@
  * it: personalToProfile for a save (submitProfile in events.js), and
  * profileToPersonal to seed Settings' form from user.profile.
  */
+// @ts-check
 import {
   splitFullName,
   toCmFromFeetInches,
@@ -14,8 +15,10 @@ import {
 import { defaultPersonalForm } from "./constants";
 
 // The mirror: a stored null is an empty form field, never the string "0".
+/** @param {unknown} value */
 const toFormValue = (value) => (value === null || value === undefined ? "" : String(value));
 
+/** @param {unknown} value */
 const toDayList = (value) => (Array.isArray(value) ? value : []);
 
 /**
@@ -33,6 +36,9 @@ const toDayList = (value) => (Array.isArray(value) ? value : []);
  * Both arguments are read through `|| {}` rather than a `= {}` default, which
  * only fires on undefined: this is a shared module, and a future caller can
  * reach it with an explicit null.
+ * @param {Record<string, any> | null | undefined} personal
+ * @param {{ heightUnit?: string, weightUnit?: string } | null | undefined} units
+ * @returns {import("../../../server/src/services/http/apiSchemaService.js").ProfileBody}
  */
 export const personalToProfile = (personal, units) => {
   const { heightUnit = "cm", weightUnit = "kg" } = units || {};
@@ -80,6 +86,8 @@ export const personalToProfile = (personal, units) => {
  * The way back: a stored profile as form state, height in both centimetres and
  * feet and inches, weight in `units.weightUnit` (kg unless "lb"). An absent
  * value reads as "" (training days as []), except activity, as noted below.
+ * @param {Record<string, any> | null | undefined} profile
+ * @param {{ heightUnit?: string, weightUnit?: string } | null | undefined} units
  */
 export const profileToPersonal = (profile, units) => {
   const { weightUnit = "kg" } = units || {};
