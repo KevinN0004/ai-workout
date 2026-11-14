@@ -3,6 +3,7 @@
  * a route calls to parse one or answer 400. The closed-set profile fields take
  * their option lists from dashboardDataBuildersService.
  */
+// @ts-check
 import { z } from "zod";
 import {
   allowedActivityValues,
@@ -16,6 +17,15 @@ import {
 } from "../dashboard/dashboardDataBuildersService.js";
 import { validationMessage } from "./validationMessages.js";
 
+/**
+ * A body schema's declared fields as a client sends them, without the index
+ * signature `.passthrough()` adds, so a misspelled key is an error. A field
+ * zod coerces (numbers, booleans) reads as `unknown`.
+ * @template {import("zod").ZodObject<any>} S
+ * @typedef {import("zod").input<import("zod").ZodObject<S["shape"]>>} DeclaredBody
+ */
+
+/** @param {unknown} value */
 const toNumberInput = (value) => {
   if (value === "") return null;
   if (value === undefined || value === null) return value;
@@ -23,7 +33,9 @@ const toNumberInput = (value) => {
   return Number.isFinite(parsed) ? parsed : value;
 };
 
+/** @param {number} maxLen */
 const requiredStringField = (maxLen) => z.string().trim().min(1).max(maxLen);
+/** @param {number} maxLen */
 const optionalStringField = (maxLen) => z.string().trim().max(maxLen).optional();
 const optionalBooleanField = z
   .preprocess((value) => {
@@ -37,9 +49,21 @@ const optionalBooleanField = z
     return value;
   }, z.boolean())
   .optional();
+/**
+ * @param {number} min
+ * @param {number} max
+ */
 const optionalNullableNumberField = (min, max) =>
   z.preprocess(toNumberInput, z.union([z.number().min(min).max(max), z.null()]).optional());
+/**
+ * @param {number} min
+ * @param {number} max
+ */
 const requiredNumberField = (min, max) => z.preprocess(toNumberInput, z.number().min(min).max(max));
+/**
+ * @param {number} min
+ * @param {number} max
+ */
 const optionalNullableIntegerField = (min, max) =>
   z.preprocess(toNumberInput, z.union([z.number().int().min(min).max(max), z.null()]).optional());
 
@@ -69,6 +93,10 @@ const exerciseSetsField = z
   )
   .max(18)
   .optional();
+/**
+ * @param {number} maxItems
+ * @param {number} maxLen
+ */
 const optionalStringArrayField = (maxItems, maxLen) =>
   z.preprocess(
     (value) => {
@@ -119,6 +147,7 @@ export const signupBodySchema = z
     rememberMe: optionalBooleanField
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof signupBodySchema>} SignupBody */
 
 export const loginBodySchema = z
   .object({
@@ -127,6 +156,7 @@ export const loginBodySchema = z
     rememberMe: optionalBooleanField
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof loginBodySchema>} LoginBody */
 
 // The asymmetry is deliberate and matches the schemas above: signupBodySchema
 // requires 8 for a password being set, loginBodySchema requires 1 for one
@@ -137,6 +167,7 @@ export const passwordChangeBodySchema = z
     newPassword: z.string().min(8).max(256)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof passwordChangeBodySchema>} PasswordChangeBody */
 
 // A current password being checked, same as loginBodySchema and
 // passwordChangeBodySchema's currentPassword: min 1, not min 8.
@@ -145,8 +176,10 @@ export const accountDeleteBodySchema = z
     password: z.string().min(1).max(256)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof accountDeleteBodySchema>} AccountDeleteBody */
 
 export const profileBodySchema = profileInputSchema;
+/** @typedef {DeclaredBody<typeof profileBodySchema>} ProfileBody */
 
 export const workoutSessionBodySchema = z
   .object({
@@ -167,6 +200,7 @@ export const workoutSessionBodySchema = z
     exerciseSets: exerciseSetsField
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof workoutSessionBodySchema>} WorkoutSessionBody */
 
 export const caloriesBodySchema = z
   .object({
@@ -176,6 +210,7 @@ export const caloriesBodySchema = z
     calories: requiredNumberField(800, 10000)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof caloriesBodySchema>} CaloriesBody */
 
 export const goalsBodySchema = z
   .object({
@@ -184,6 +219,7 @@ export const goalsBodySchema = z
     weeklyWorkouts: optionalNullableNumberField(1, 7)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof goalsBodySchema>} GoalsBody */
 
 export const mealLogBodySchema = z
   .object({
@@ -198,6 +234,7 @@ export const mealLogBodySchema = z
     notes: optionalStringField(300)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof mealLogBodySchema>} MealLogBody */
 
 export const progressMetricBodySchema = z
   .object({
@@ -210,6 +247,7 @@ export const progressMetricBodySchema = z
     notes: optionalStringField(320)
   })
   .strict();
+/** @typedef {DeclaredBody<typeof progressMetricBodySchema>} ProgressMetricBody */
 
 const namedValueSchema = z
   .object({
@@ -236,6 +274,7 @@ export const savedExerciseBodySchema = z
     reason: optionalStringField(260)
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof savedExerciseBodySchema>} SavedExerciseBody */
 
 export const generatePlanBodySchema = z
   .object({
@@ -259,10 +298,12 @@ export const generatePlanBodySchema = z
       .optional()
   })
   .passthrough();
+/** @typedef {DeclaredBody<typeof generatePlanBodySchema>} GeneratePlanBody */
 
 /**
  * The first issue in a zod error as `path: message`, cut to 240 characters. The
  * path is "request" when the issue names none.
+ * @param {{ issues?: Array<{ path?: PropertyKey[], message?: string }> } | null | undefined} error
  */
 export const getValidationMessage = (error) => {
   const issue = error?.issues?.[0];
@@ -272,9 +313,24 @@ export const getValidationMessage = (error) => {
 };
 
 /**
+ * The part of an Express request validateBody reads.
+ * @typedef {{ body?: unknown }} BodyRequest
+ */
+
+/**
+ * The part of an Express response the validators answer a 400 with.
+ * @typedef {{ status: (code: number) => { json: (body: unknown) => unknown } }} JsonResponse
+ */
+
+/**
  * Parses `req.body` with `schema`, in zod 3's wording (validationMessages.js),
  * and returns the parsed data. On failure it answers 400 with the first issue
  * and returns null, so a route must return as soon as this returns null.
+ * @template {import("zod").ZodType} S
+ * @param {BodyRequest} req
+ * @param {JsonResponse} res
+ * @param {S} schema
+ * @returns {import("zod").output<S> | null}
  */
 export const validateBody = (req, res, schema) => {
   const result = schema.safeParse(req.body || {}, { error: validationMessage });

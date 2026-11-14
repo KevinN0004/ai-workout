@@ -2,6 +2,7 @@
  * Query and params schemas for the dashboard routes, and the helpers that
  * validate a request against them.
  */
+// @ts-check
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { SWAP_AREAS } from "../../services/planning/swaps.js";
@@ -40,14 +41,19 @@ export const progressionLiftParamsSchema = z.object({
 
 /** What a lift can be answered: undo an automatic change, or settle an asked step up. */
 export const liftDecisionBodySchema = z.object({ decision: z.enum(["undo", "accept", "decline"]) });
+/** @typedef {import("../../services/http/apiSchemaService.js").DeclaredBody<typeof liftDecisionBodySchema>} LiftDecisionBody */
 
 /** What the week can be answered: train a deload week normally. */
 export const weekDecisionBodySchema = z.object({ decision: z.literal("normal") });
+/** @typedef {import("../../services/http/apiSchemaService.js").DeclaredBody<typeof weekDecisionBodySchema>} WeekDecisionBody */
 
 /**
  * Validates `req.query` against `schema` and returns the parsed data. On failure
  * it answers 400 with the first issue and returns null, so the route stops on a
  * null.
+ * @param {{ query?: unknown }} req
+ * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
+ * @param {import("zod").ZodType} schema
  */
 export const validateQuery = (req, res, schema, fallbackPath = "query") => {
   const { data, error } = validateSchemaInput(schema, req.query || {}, fallbackPath);
@@ -56,7 +62,12 @@ export const validateQuery = (req, res, schema, fallbackPath = "query") => {
   return null;
 };
 
-/** The same as validateQuery, for `req.params`. */
+/**
+ * The same as validateQuery, for `req.params`.
+ * @param {{ params?: unknown }} req
+ * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
+ * @param {import("zod").ZodType} schema
+ */
 export const validateParams = (req, res, schema, fallbackPath = "params") => {
   const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);
   if (!error) return data;
@@ -84,6 +95,8 @@ export const planSwapBodySchema = z.object({
   to: exerciseNameField,
   area: swapAreaField.nullable().optional()
 });
+/** @typedef {import("../../services/http/apiSchemaService.js").DeclaredBody<typeof planSwapBodySchema>} PlanSwapBody */
 
 /** An undo: the swapped exercise's name. */
 export const planUndoBodySchema = z.object({ name: exerciseNameField });
+/** @typedef {import("../../services/http/apiSchemaService.js").DeclaredBody<typeof planUndoBodySchema>} PlanUndoBody */
