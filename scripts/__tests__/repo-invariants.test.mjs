@@ -940,11 +940,7 @@ describe("type-checked files", () => {
   // Body types no checked client file names yet. It only shrinks, and is gone
   // once every body the client sends is built by a typed builder.
   const PENDING_BODY_TYPES = [
-    "WorkoutSessionBody",
-    "CaloriesBody",
     "GoalsBody",
-    "MealLogBody",
-    "ProgressMetricBody",
     "SavedExerciseBody",
     "GeneratePlanBody",
     "LiftDecisionBody",

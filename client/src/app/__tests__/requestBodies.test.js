@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { defaultSignupProfileForm } from "../constants";
-import { accountDeleteBody, loginBody, passwordChangeBody, signupBody } from "../requestBodies";
+import {
+  accountDeleteBody,
+  blankProgressForm,
+  caloriesBody,
+  loginBody,
+  mealLogBody,
+  passwordChangeBody,
+  signupBody,
+  workoutSessionBody
+} from "../requestBodies";
 
 // Each builder's JSON, as a string, so key order is pinned with every value:
 // a builder must send exactly what its caller sent inline before it existed.
@@ -70,5 +79,82 @@ describe("passwordChangeBody", () => {
 describe("accountDeleteBody", () => {
   test("sends the confirming password", () => {
     expect(json(accountDeleteBody("old-pass"))).toBe('{"password":"old-pass"}');
+  });
+});
+
+describe("workoutSessionBody", () => {
+  const exerciseSets = [
+    { name: "Squat", sets: [{ reps: 5, seconds: null, loadKg: 100, rpe: 8 }] },
+    { name: "Row", sets: [{ reps: 10, seconds: null, loadKg: null, rpe: null }] }
+  ];
+  const workout = {
+    id: "w-1",
+    date: "2026-03-01",
+    focus: "Pull",
+    duration: "45",
+    notes: "",
+    exerciseSets
+  };
+
+  test("names the exercises from their sets, in order, and adds no link without a plan", () => {
+    expect(json(workoutSessionBody(workout))).toBe(
+      '{"id":"w-1","date":"2026-03-01","focus":"Pull","duration":"45","notes":"",' +
+        '"exercises":["Squat","Row"],"exerciseSets":' +
+        json(exerciseSets) +
+        "}"
+    );
+  });
+
+  test("adds the plan day's link last when it has a plan", () => {
+    const body = workoutSessionBody({ ...workout, planId: "plan-1", planDayIndex: 0 });
+
+    expect(json(body).endsWith(',"planId":"plan-1","planDayIndex":0}')).toBe(true);
+  });
+
+  test("leaves the link out for a null plan, index and all", () => {
+    const body = workoutSessionBody({ ...workout, planId: null, planDayIndex: 3 });
+
+    expect(body).not.toHaveProperty("planId");
+    expect(body).not.toHaveProperty("planDayIndex");
+  });
+});
+
+describe("caloriesBody", () => {
+  test("is the form, then the replay key and the date", () => {
+    expect(json(caloriesBody({ calories: "2200" }, "c-1", "2026-03-01"))).toBe(
+      '{"calories":"2200","id":"c-1","date":"2026-03-01"}'
+    );
+  });
+});
+
+describe("mealLogBody", () => {
+  test("is the form, then the replay key", () => {
+    const form = {
+      date: "2026-03-01",
+      mealType: "lunch",
+      name: "Rice bowl",
+      calories: "600",
+      proteinG: "",
+      carbsG: "",
+      fatG: "",
+      notes: ""
+    };
+
+    expect(json(mealLogBody(form, "m-1"))).toBe(
+      '{"date":"2026-03-01","mealType":"lunch","name":"Rice bowl","calories":"600",' +
+        '"proteinG":"","carbsG":"","fatG":"","notes":"","id":"m-1"}'
+    );
+  });
+});
+
+describe("blankProgressForm", () => {
+  test("is the date with every other field blank", () => {
+    expect(json(blankProgressForm("2026-03-01"))).toBe(
+      '{"date":"2026-03-01","weightLb":"","bodyFatPct":"","waistCm":"","restingHr":"","notes":""}'
+    );
+  });
+
+  test("is a fresh object each time", () => {
+    expect(blankProgressForm("2026-03-01")).not.toBe(blankProgressForm("2026-03-01"));
   });
 });
