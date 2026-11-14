@@ -879,11 +879,16 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
     `syncStrava(apiFetch, { manual })`, `disconnectStrava(apiFetch)`,
     `deleteImportedWorkout(apiFetch, id)`;
   - each refusal throws the server's message, or the fixed one.
+  - In PR 7, `deleteImportedWorkout` moves to PR 8, its first caller: knip fails an
+    export nothing imports. `readStravaResult(search)` joins them, read by the panel
+    and by SettingsView.
 - [ ] **The panel, test first**, for each state:
   - **`available: false`:** "Not available";
   - **not connected:** the Connect button, an `<a>`-free `<button>` with the image and
     the accessible name "Connect with Strava". Clicking it calls `startStravaConnect`,
-    then `window.location.assign(url)`; stub `assign` in the test;
+    then `window.location.assign(url)`; stub `assign` in the test. In PR 7 jsdom
+    refuses `vi.spyOn(window.location, "assign")` ("Cannot redefine property"), so the
+    test stubs the whole `location` with `vi.stubGlobal`;
   - **connected:**
     - "Connected as Jo S.";
     - "Last synced" with the time, or "Not synced yet";
@@ -891,16 +896,26 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
     - **Disconnect**, behind the app's confirm pattern, read from
       `SettingsAccountPanel.jsx`, with the line "Your workouts imported from Strava
       will be removed.";
-  - **`needsReconnect`:** "Reconnect Strava", which starts the same connect;
+  - **`needsReconnect`:** "Reconnect Strava", which starts the same connect. In PR 7 it
+    takes Sync now's place, and the retry line below is left out, since no sync will
+    try again until the visitor reconnects;
   - **`lastSyncError`:** "The last sync didn't finish. It will try again.";
   - **the callback result**, from the `strava` query parameter: one message per result,
     for `connected`, `cancelled`, `no-access`, `limit`, `taken`, `unavailable` and
-    `failed`. It shows once, and the parameter is removed with `history.replaceState`;
+    `failed`. It shows once, and the parameter is removed with `history.replaceState`.
+    In PR 7, SettingsView also opens on the Connected Apps tab when the parameter is
+    there, since the view opens on Profile, where the message would be hidden. An
+    unknown value, `constructor` included, shows nothing;
   - **offline:** Connect, Sync now and Disconnect are disabled, with the existing
     offline hint.
+  - In PR 7, after Sync now or a disconnect the panel reads the state again, for the
+    new time, error or connection.
 - [ ] **CSS:** scoped to `.settings-strava`, with base.css tokens and a
       `prefers-reduced-motion` block only if anything moves. Run the screenshot compare
       for the Connected Apps tab: expect its two rows replaced, and nothing else changed.
+      In PR 7, base.css has font tokens only, so the box takes the account panel's
+      border and radius; nothing moves, so there is no motion block. The button is
+      Strava's orange SVG, at its own 48px.
 - [ ] Gates, with E2E. The E2E server has no Strava keys yet, so the panel reads "Not
       available" and nothing else changes. Then mutations, commit, push, open the PR and
       report.
@@ -943,6 +958,9 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   - **offline:** it does not call at all.
 - [ ] **App:** the delete handler calls `deleteImportedWorkout`, then `reloadDashboard`.
       A failure shows the app's existing error notice.
+- [ ] **Found in PR 7:** a disconnect deletes every import on the server, but the
+      dashboard keeps its copy until it loads again. Settings' panel calls
+      `reloadDashboard` after a disconnect too, passed down as `apiFetch` is.
 - [ ] Gates, with E2E (the E2E server still has no keys), the screenshot compare for an
       import row, then mutations, commit, push, open the PR and report.
 

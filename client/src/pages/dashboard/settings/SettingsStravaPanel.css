@@ -1,0 +1,54 @@
+/* SettingsStravaPanel, the Connected Apps tab's Strava box: the connection, its actions and
+   the disconnect confirm. Imported by the panel, so it loads in SettingsView's lazy chunk. Strava's
+   button artwork is shown as Strava supplies it, at its own 48px height. */
+
+.settings-strava {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+}
+
+.settings-strava h4,
+.settings-strava p {
+  margin: 0;
+}
+
+.settings-strava-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-strava-confirm {
+  display: grid;
+  gap: 10px;
+}
+
+/* ---- Strava's button: the artwork alone, with no button chrome around it ---- */
+.settings-strava-connect {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.settings-strava-connect img {
+  display: block;
+}
+
+.settings-strava-connect:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.settings-strava-connect:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

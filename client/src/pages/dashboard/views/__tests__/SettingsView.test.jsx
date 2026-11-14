@@ -181,6 +181,57 @@ describe("SettingsView", () => {
       expect(screen.getByRole("button", { name: "Delete account" })).toBeInTheDocument();
     });
   });
+
+  // Strava's panel takes the rows a real connection replaces (roadmap C2);
+  // SettingsStravaPanel.test.jsx pins the panel itself.
+  describe("the connected apps tab", () => {
+    const stravaApi = () =>
+      vi.fn(async () => ({ ok: true, json: async () => ({ available: false }) }));
+
+    afterEach(() => {
+      window.history.replaceState(null, "", "/");
+    });
+
+    test("shows the Strava panel through the apiFetch passed in, beside the other rows", async () => {
+      useLocale("en-GB");
+      const apiFetch = stravaApi();
+      renderView({ apiFetch });
+
+      fireEvent.click(screen.getByRole("tab", { name: /Connected Apps/ }));
+
+      expect(await screen.findByText("Not available")).toBeInTheDocument();
+      expect(apiFetch).toHaveBeenCalledWith("/api/integrations/strava", undefined);
+      expect(rowValue("Health data sync")).toBe("Not connected");
+      expect(rowValue("Calendar sync")).toBe("Not connected");
+      expect(screen.queryByText("Wearable devices")).toBeNull();
+      expect(screen.queryByText("Last sync")).toBeNull();
+    });
+
+    test("no other tab reads Strava", () => {
+      useLocale("en-GB");
+      const apiFetch = stravaApi();
+      renderView({ apiFetch });
+
+      fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
+
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+
+    // Strava's return lands on /dashboard/settings with its result, which the
+    // panel shows, so the view opens where the panel is.
+    test("opens on it when Strava's return left a result", async () => {
+      useLocale("en-GB");
+      window.history.replaceState(null, "", "/dashboard/settings?strava=cancelled");
+      renderView({ apiFetch: stravaApi() });
+
+      expect(screen.getByRole("tab", { name: /Connected Apps/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("Connecting Strava was cancelled.");
+      await screen.findByText("Not available");
+    });
+  });
 });
 
 // Everything the view shows and edits comes from the stored profile. It used to

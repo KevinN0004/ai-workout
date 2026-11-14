@@ -8,6 +8,8 @@ import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";
 import SettingsEditForm from "../settings/SettingsEditForm";
 import SettingsAccountPanel from "../settings/SettingsAccountPanel";
+import SettingsStravaPanel from "../settings/SettingsStravaPanel";
+import { readStravaResult } from "../../../app/strava";
 import { EDITABLE_TABS, fieldsForTab } from "../settings/settingsFields";
 import "./SettingsView.css";
 
@@ -44,10 +46,17 @@ const displayValue = (value) => {
  * locale units, and edits the profile, training and lifestyle tabs one at a
  * time (EDITABLE_TABS). `onSaveProfile` is submitProfile in events.js, which
  * resolves to `{ ok: true }` or `{ ok: false, error }`; the account handlers go
- * to SettingsAccountPanel on the Account tab. The connected-apps, privacy and
- * notifications tabs show fixed text.
+ * to SettingsAccountPanel on the Account tab, and `apiFetch` to the Strava
+ * panel on the Connected Apps tab, which opens first after Strava's return. The
+ * privacy and notifications tabs, and the rest of Connected Apps, show fixed text.
  */
-export default function SettingsView({ user, onSaveProfile, onChangePassword, onDeleteAccount }) {
+export default function SettingsView({
+  user,
+  onSaveProfile,
+  onChangePassword,
+  onDeleteAccount,
+  apiFetch
+}) {
   // ---- Profile and units ----------------------------------------------------
 
   // Memoized so the memos below keep their inputs: the profile fallback and the
@@ -74,7 +83,10 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
   const trainingDays = stored.trainingDays;
 
   // ---- Tabs and their rows --------------------------------------------------
-  const [activeTab, setActiveTab] = useState("profile");
+  // Strava's return lands here with its result, which the Strava panel shows.
+  const [activeTab, setActiveTab] = useState(() =>
+    readStravaResult(window.location.search) ? "connected-apps" : "profile"
+  );
   const [editingTab, setEditingTab] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -139,10 +151,8 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
         label: "Connected Apps",
         description: "External integrations and sync.",
         rows: [
-          { label: "Wearable devices", value: "Not connected" },
           { label: "Health data sync", value: "Not connected" },
-          { label: "Calendar sync", value: "Not connected" },
-          { label: "Last sync", value: "Not synced yet" }
+          { label: "Calendar sync", value: "Not connected" }
         ]
       },
       {
@@ -283,6 +293,7 @@ export default function SettingsView({ user, onSaveProfile, onChangePassword, on
                   onDeleteAccount={onDeleteAccount}
                 />
               )}
+              {activeTabData.id === "connected-apps" && <SettingsStravaPanel apiFetch={apiFetch} />}
             </>
           )}
         </section>
