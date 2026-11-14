@@ -17,6 +17,11 @@ export const savedExerciseParamsSchema = z.object({
   id: z.string().trim().min(1).max(64)
 });
 
+/** The id in DELETE /api/dashboard/workouts/:id, as the client holds it. */
+export const workoutParamsSchema = z.object({
+  id: z.string().trim().min(1).max(64)
+});
+
 // The shape of a date key. Whether it is a real date, and a week that may still
 // be answered, is checked by the progression rules.
 const dateKeyField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);

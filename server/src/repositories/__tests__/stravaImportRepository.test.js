@@ -108,6 +108,59 @@ describe("stravaImportRepository", () => {
     expect(rows[0].workoutDate?.toISOString().slice(0, 10)).toBe("2026-11-11");
   });
 
+  // The catch-up lists a week of activities on every sync, so an activity that
+  // has not changed must not be rewritten, nor counted as an update.
+  test("saving an activity unchanged writes nothing, and says so", async () => {
+    const user = await createUser(EMAILS[0]);
+    await saveImport({ userId: user.id, workout: RUN });
+    const [before] = await rowsOf(user.id);
+
+    expect(await saveImport({ userId: user.id, workout: { ...RUN } })).toBe("unchanged");
+    expect((await rowsOf(user.id))[0].updatedAt).toEqual(before.updatedAt);
+  });
+
+  test.each([
+    ["sport", { sport: "TrailRun" }],
+    ["date", { workoutDate: "2026-11-13" }],
+    ["focus", { focus: "Trail run" }],
+    ["minutes", { durationMinutes: 32 }],
+    ["minutes gone", { durationMinutes: null }],
+    ["title", { notes: "Evening run" }],
+    ["distance", { distanceMeters: 5012.5 }],
+    ["distance gone", { distanceMeters: null }],
+    ["heart rate", { averageHeartrate: 148.3 }],
+    ["heart rate gone", { averageHeartrate: null }]
+  ])("a change of %s is an update", async (_label, change) => {
+    const user = await createUser(EMAILS[0]);
+    await saveImport({ userId: user.id, workout: RUN });
+
+    expect(await saveImport({ userId: user.id, workout: { ...RUN, ...change } })).toBe("updated");
+  });
+
+  // Strava sends distances like 5012.43; the column keeps 5012.4.
+  test("an activity with more decimals than its columns keep, saved again, is unchanged", async () => {
+    const user = await createUser(EMAILS[0]);
+    const precise = { ...RUN, distanceMeters: 5012.43, averageHeartrate: 148.27 };
+    await saveImport({ userId: user.id, workout: precise });
+
+    expect(await saveImport({ userId: user.id, workout: { ...precise } })).toBe("unchanged");
+  });
+
+  test("an undated activity saved again unchanged is unchanged", async () => {
+    const user = await createUser(EMAILS[0]);
+    const undated = { ...RUN, workoutDate: null };
+    await saveImport({ userId: user.id, workout: undated });
+
+    expect(await saveImport({ userId: user.id, workout: { ...undated } })).toBe("unchanged");
+  });
+
+  test("an activity that gains a heart rate is an update", async () => {
+    const user = await createUser(EMAILS[0]);
+    await saveImport({ userId: user.id, workout: { ...RUN, averageHeartrate: null } });
+
+    expect(await saveImport({ userId: user.id, workout: RUN })).toBe("updated");
+  });
+
   test("the same activity id for two users is two imports", async () => {
     const first = await createUser(EMAILS[0]);
     const second = await createUser(EMAILS[1]);

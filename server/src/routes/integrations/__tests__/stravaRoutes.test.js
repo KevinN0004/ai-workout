@@ -20,6 +20,12 @@ const stubService = (overrides = {}) => ({
   ),
   connect: vi.fn(async () => "connected"),
   disconnect: vi.fn(async () => ({ removed: 3, revokeError: null })),
+  sync: vi.fn(async () => ({
+    imported: 1,
+    updated: 0,
+    removed: 0,
+    lastSyncedAt: "2026-11-13T10:00:00.000Z"
+  })),
   ...overrides
 });
 
@@ -309,5 +315,67 @@ describe("DELETE /api/integrations/strava", () => {
       disconnect: vi.fn(async () => Promise.reject(new Error("down")))
     });
     await request(buildApp({ service }).app).delete(STATE_PATH).expect(500);
+  });
+});
+
+describe("POST /api/integrations/strava/sync", () => {
+  const SYNC = `${STATE_PATH}/sync`;
+
+  test("answers the sync's result for the signed-in user", async () => {
+    const { app, service } = buildApp();
+
+    const response = await request(app).post(SYNC).send({}).expect(200);
+
+    expect(response.body).toEqual({
+      imported: 1,
+      updated: 0,
+      removed: 0,
+      lastSyncedAt: "2026-11-13T10:00:00.000Z"
+    });
+    expect(service.sync).toHaveBeenCalledWith("u-1", { manual: false });
+  });
+
+  test("Sync now asks for a manual sync", async () => {
+    const { app, service } = buildApp();
+    await request(app).post(SYNC).send({ manual: true }).expect(200);
+    expect(service.sync).toHaveBeenCalledWith("u-1", { manual: true });
+  });
+
+  test.each([
+    ["a string", { manual: "true" }],
+    ["a number", { manual: 1 }]
+  ])("manual given as %s is not manual", async (_label, body) => {
+    const { app, service } = buildApp();
+    await request(app).post(SYNC).send(body).expect(200);
+    expect(service.sync).toHaveBeenCalledWith("u-1", { manual: false });
+  });
+
+  test("a sync with no body is not manual", async () => {
+    const { app, service } = buildApp();
+    await request(app).post(SYNC).expect(200);
+    expect(service.sync).toHaveBeenCalledWith("u-1", { manual: false });
+  });
+
+  test("a sync that went wrong answers its error with a 200, for Settings to show", async () => {
+    const service = stubService({ sync: vi.fn(async () => ({ error: "rate_limited" })) });
+    const response = await request(buildApp({ service }).app).post(SYNC).expect(200);
+    expect(response.body).toEqual({ error: "rate_limited" });
+  });
+
+  test("without Strava on the server it is a 404", async () => {
+    await request(buildApp({ configured: false }).app)
+      .post(SYNC)
+      .expect(404);
+  });
+
+  test("needs a session", async () => {
+    await request(buildApp({ user: null }).app)
+      .post(SYNC)
+      .expect(401);
+  });
+
+  test("a failing store is a 500", async () => {
+    const service = stubService({ sync: vi.fn(async () => Promise.reject(new Error("down"))) });
+    await request(buildApp({ service }).app).post(SYNC).expect(500);
   });
 });

@@ -4,7 +4,7 @@
  * 'strava', one per activity, and the list of activities deleted here.
  */
 // @ts-check
-import { dateOnlyToDate, toDateOnly } from "./rowValues.js";
+import { dateOnlyToDate, toDateOnly, toNumberOrNull } from "./rowValues.js";
 import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
 
 /**
@@ -21,6 +21,38 @@ import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
 
 const SOURCE = "strava";
 
+// The columns an import's fields are compared on, as they read back.
+const COMPARED = {
+  sport: true,
+  focus: true,
+  durationMinutes: true,
+  notes: true,
+  distanceMeters: true,
+  averageHeartrate: true,
+  workoutDate: true
+};
+
+/**
+ * A number as its numeric(…, 1) column keeps it, so a value Strava sends with
+ * more decimals compares equal to what was stored.
+ * @param {number | null} value
+ */
+const tenth = (value) => (value === null ? null : Math.round(value * 10) / 10);
+
+/**
+ * Whether the stored import `row` already holds `workout`, field by field.
+ * @param {any} row
+ * @param {ImportedWorkout} workout
+ */
+const sameImport = (row, workout) =>
+  row.sport === workout.sport &&
+  row.focus === workout.focus &&
+  row.durationMinutes === workout.durationMinutes &&
+  row.notes === workout.notes &&
+  toNumberOrNull(row.distanceMeters) === tenth(workout.distanceMeters) &&
+  toNumberOrNull(row.averageHeartrate) === tenth(workout.averageHeartrate) &&
+  toDateOnly(row.workoutDate) === (workout.workoutDate || "");
+
 /**
  * Builds the import store over `prisma`. stravaService.js imports, updates and
  * removes through it, and the delete route deletes through it. Every function
@@ -31,8 +63,9 @@ const SOURCE = "strava";
 export const createStravaImportRepository = ({ prisma }) => {
   /**
    * Imports `workout`, or updates the import of the same activity in place.
-   * Returns "created" or "updated", or null for an unknown user. The unique
-   * index is partial, so this reads first and then writes.
+   * Returns "created", "updated", or "unchanged" when the import already holds
+   * it, which writes nothing; null for an unknown user. The unique index is
+   * partial, so this reads first and then writes.
    * @param {{ userId: string, workout: ImportedWorkout }} args
    */
   const saveImport = async ({ userId, workout }) => {
@@ -42,9 +75,10 @@ export const createStravaImportRepository = ({ prisma }) => {
     const data = { ...fields, workoutDate: dateOnlyToDate(workoutDate) };
     const existing = await prisma.workoutSession.findFirst({
       where: { userId: userPk, source: SOURCE, externalId },
-      select: { id: true }
+      select: { id: true, ...COMPARED }
     });
     if (existing) {
+      if (sameImport(existing, workout)) return "unchanged";
       await prisma.workoutSession.update({ where: { id: existing.id }, data });
       return "updated";
     }

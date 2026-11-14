@@ -811,8 +811,14 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
 
 - [ ] **`sync(userId, { manual, now })`, test first:**
   - **The throttle:** a sync within 15 minutes of `lastSyncedAt` (1 minute when
-    `manual`) calls Strava for nothing, and answers
-    `{ skipped: true, lastSyncedAt }`.
+    `manual`) calls Strava for nothing, and answers `{ skipped: true }`. In PR 6 the
+    throttle also counts the last attempt, held in memory: a failed sync records no
+    `lastSyncedAt`, and without it an outage would be asked again on every dashboard
+    open. The attempt is set before the first await, so two syncs at once run one.
+  - **Unchanged activities** (found in PR 6): the list holds a week every time, so
+    `saveImport` compares first and answers `"unchanged"` without writing. Distance and
+    heart rate are compared at the column's one decimal. Only real changes count as
+    updated, so the dashboard reloads only when something changed.
   - **The window:** `after` is the larger of `connectedAt` and `now − 7 days`, in epoch
     seconds. Pages of 100, at most 3.
   - **Each listed activity** goes through `decideImport` with the list's own fields.
@@ -820,7 +826,10 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
     confirm that in PR 3's re-check.
   - **Deletes:** `complete` is true when a page held fewer than 100, or the list was
     empty, within 3 pages. Only then does `deletionsFrom` against `listImportsSince`
-    remove anything.
+    remove anything. `listImportsSince` starts two days into the window (PR 6):
+    `after` is a UTC instant, and an import is dated where the athlete was, up to a day
+    either side, so an import from the window's first day may never have been listed.
+    The webhook covers those two days.
   - **The answer:** `{ imported, updated, removed, lastSyncedAt }`, then `markSynced`.
   - **A failure** (`rate_limited` or `unavailable`) on any page: `markSyncFailed(kind)`,
     and an answer of `{ error: kind }`. Nothing is deleted, since the list is not
@@ -829,9 +838,12 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   - **`reconnect`:** answers `{ error: "reconnect" }`.
 - [ ] **The route** answers the sync's result with 200. With no connection it answers
       `{ error: "not_connected" }`, and with no configuration 404. The body is
-      `{ manual?: boolean }`, validated with zod.
+      `{ manual?: boolean }`. In PR 6 only `manual === true` is a manual sync, and
+      anything else the dashboard's quiet one, so no zod schema was needed.
 - [ ] **`DELETE /api/dashboard/workouts/:id`**, with `requireAuth`: `deleteImportById`.
-      200 `{ ok: true }`, or 404 `{ error: "Workout not found." }`.
+      In PR 6 it answers the refreshed dashboard with `ok: true`, as the saved-exercise
+      delete does, so the client needs no second fetch; or 404
+      `{ error: "Workout not found." }`.
 - [ ] **Integration:**
   - two activities listed: both imported;
   - the same list again within the throttle: skipped;
@@ -840,7 +852,8 @@ Every field is present. `lastSyncedAt` is an ISO string or `null`.
   - a strength activity on a day with an app-logged workout: not imported;
   - deleting an import, then syncing with it still listed: not brought back;
   - deleting an app-logged workout's id: 404, and it is still there;
-  - a 3-page list of 100 each: nothing deleted.
+  - a 3-page list of 100 each: nothing deleted. In PR 6 this is a service test, which
+    pages through stubs, rather than 300 inserts in Postgres.
 - [ ] Gates, mutations (drop `complete`, drop the throttle, drop the deleted-here
       check), commit, push, open the PR and report.
 
