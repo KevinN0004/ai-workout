@@ -937,18 +937,8 @@ describe("type-checked files", () => {
     );
   });
 
-  // Body types no checked client file names yet. It only shrinks, and is gone
-  // once every body the client sends is built by a typed builder.
-  const PENDING_BODY_TYPES = [
-    "GoalsBody",
-    "SavedExerciseBody",
-    "GeneratePlanBody",
-    "LiftDecisionBody",
-    "WeekDecisionBody",
-    "PlanSwapBody",
-    "PlanUndoBody"
-  ];
-
+  // A body type no checked client file names checks nothing: the client's
+  // builders in requestBodies.js (and personalToProfile) are what it types.
   test("every body typedef is named by a checked client file", () => {
     const clientText = checked
       .filter(({ file }) => file.startsWith("client/"))
@@ -957,9 +947,6 @@ describe("type-checked files", () => {
     const unnamed = bodyTypedefs
       .map(({ name }) => name)
       .filter((name) => name && !new RegExp(`\\.${name}\\b`).test(clientText));
-    expect(
-      unnamed,
-      "name each body type in a checked client file, and take it off PENDING_BODY_TYPES"
-    ).toEqual(PENDING_BODY_TYPES);
+    expect(unnamed, "name each body type in a checked client file").toEqual([]);
   });
 });

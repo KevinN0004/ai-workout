@@ -4,6 +4,7 @@
  * what its caller sent inline before, key order included.
  */
 // @ts-check
+import { goalOptions } from "./constants";
 import { toCmFromFeetInches, toKg } from "./units";
 
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").SignupBody} SignupBody */
@@ -14,6 +15,13 @@ import { toCmFromFeetInches, toKg } from "./units";
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").CaloriesBody} CaloriesBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").MealLogBody} MealLogBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").ProgressMetricBody} ProgressMetricBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").GoalsBody} GoalsBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").GeneratePlanBody} GeneratePlanBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").SavedExerciseBody} SavedExerciseBody */
+/** @typedef {import("../../../server/src/routes/dashboard/validation.js").PlanSwapBody} PlanSwapBody */
+/** @typedef {import("../../../server/src/routes/dashboard/validation.js").PlanUndoBody} PlanUndoBody */
+/** @typedef {import("../../../server/src/routes/dashboard/validation.js").LiftDecisionBody} LiftDecisionBody */
+/** @typedef {import("../../../server/src/routes/dashboard/validation.js").WeekDecisionBody} WeekDecisionBody */
 
 /** @typedef {{ email: string, password: string }} AuthForm */
 
@@ -148,3 +156,100 @@ export const blankProgressForm = (date) => ({
   restingHr: "",
   notes: ""
 });
+
+/**
+ * A fresh planner form, seeded with `goal`, which App's resetPlannerFlow passes
+ * from the signed-in visitor's profile. PlannerSetupModal never asks for one --
+ * its steps cover environment, equipment, schedule, level, injuries, focus and
+ * the health check -- so without an argument every generated plan would follow
+ * the same goal's rules, whatever the visitor wanted. The first of goalOptions
+ * is the fallback for a visitor with no goal on file, signed in or not. The
+ * health answers start as no, and a fresh object is built each time.
+ * @param {string | null | undefined} [goal]
+ * @returns {GeneratePlanBody}
+ */
+export const createDefaultPlannerForm = (goal) => ({
+  goal: goal || goalOptions[0],
+  equipment: [],
+  duration: "45",
+  level: "Intermediate",
+  injuries: "None",
+  days: "3",
+  focuses: [],
+  environment: "Home",
+  health: { condition: false, symptoms: false, supervised: false, pregnant: false }
+});
+
+/**
+ * The goals form before the dashboard fills it: no target weight, 2,200
+ * calories, three workouts a week. It is submitted whole, so its keys are the
+ * body's.
+ * @returns {GoalsBody}
+ */
+export const blankGoalsForm = () => ({
+  targetWeight: "",
+  targetCalories: "2200",
+  weeklyWorkouts: "3"
+});
+
+/**
+ * A library exercise as the exercises route maps it from wger: every muscle
+ * and equipment item has a name, though it may be "".
+ * @typedef {{
+ *   id?: number | null,
+ *   name?: string,
+ *   category?: { name?: string } | null,
+ *   muscles?: Array<{ name: string }>,
+ *   equipment?: Array<{ name: string }>
+ * }} LibraryExercise
+ */
+
+/**
+ * The body that saves a library exercise to the plan: its id, name, category,
+ * muscles and equipment by name, its media, and the first reason it was
+ * recommended for, or "" from the library.
+ * @param {LibraryExercise | null | undefined} exercise
+ * @param {{ reasons?: string[] } | null | undefined} recommendation
+ * @param {{ imageUrl: string, videoUrl: string }} media
+ * @returns {SavedExerciseBody}
+ */
+export const savedExerciseBody = (exercise, recommendation, media) => ({
+  exerciseId: exercise?.id ?? null,
+  name: exercise?.name || "",
+  category: exercise?.category?.name || "",
+  muscles: Array.isArray(exercise?.muscles) ? exercise.muscles.map((item) => item?.name) : [],
+  equipment: Array.isArray(exercise?.equipment) ? exercise.equipment.map((item) => item?.name) : [],
+  imageUrl: media.imageUrl,
+  videoUrl: media.videoUrl,
+  reason: recommendation?.reasons?.[0] || ""
+});
+
+/**
+ * A plan swap's body: the exercise in the plan, the one chosen, and the area
+ * named, if any. The server's areas are a plain list, so `area` types as any
+ * string.
+ * @param {{ from: string, to: string, area?: string | null }} swap
+ * @returns {PlanSwapBody}
+ */
+export const planSwapBody = ({ from, to, area }) => ({ from, to, area });
+
+/**
+ * An undo's body: the swapped exercise's name.
+ * @param {string} name
+ * @returns {PlanUndoBody}
+ */
+export const planUndoBody = (name) => ({ name });
+
+/**
+ * A lift's progression answer.
+ * @param {LiftDecisionBody["decision"]} decision
+ * @returns {LiftDecisionBody}
+ */
+export const liftDecisionBody = (decision) => ({ decision });
+
+/**
+ * The week's progression answer.
+ * @param {WeekDecisionBody["decision"]} decision
+ * @returns {WeekDecisionBody}
+ */
+export const weekDecisionBody = (decision) => ({ decision });

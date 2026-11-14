@@ -4,6 +4,7 @@
  * plan. Rendered by DashboardPage, which loads it lazily.
  */
 import { useEffect, useMemo, useState } from "react";
+import { savedExerciseBody } from "../../../app/requestBodies";
 import { detectTrack } from "../planUtils";
 import ExerciseTile from "../tips/ExerciseTile";
 import ExerciseDetailsModal from "../tips/ExerciseDetailsModal";
@@ -255,19 +256,6 @@ export default function TipsView({
 
   const isSaved = (exercise) => savedKeys.has(toExerciseKey(exercise));
 
-  const buildSavePayload = (exercise, recommendation) => ({
-    exerciseId: exercise?.id ?? null,
-    name: exercise?.name || "",
-    category: exercise?.category?.name || "",
-    muscles: Array.isArray(exercise?.muscles) ? exercise.muscles.map((item) => item?.name) : [],
-    equipment: Array.isArray(exercise?.equipment)
-      ? exercise.equipment.map((item) => item?.name)
-      : [],
-    imageUrl: getExerciseImage(exercise),
-    videoUrl: resolveMediaUrl(exercise?.videos?.[0]?.url || ""),
-    reason: recommendation?.reasons?.[0] || ""
-  });
-
   const saveExercise = async (exercise, recommendation) => {
     if (!onSaveExerciseToPlan) return;
     const key = toExerciseKey(exercise);
@@ -281,7 +269,12 @@ export default function TipsView({
     setSaveError("");
     setSavingIds((prev) => ({ ...prev, [key]: true }));
     try {
-      const result = await onSaveExerciseToPlan(buildSavePayload(exercise, recommendation));
+      const result = await onSaveExerciseToPlan(
+        savedExerciseBody(exercise, recommendation, {
+          imageUrl: getExerciseImage(exercise),
+          videoUrl: resolveMediaUrl(exercise?.videos?.[0]?.url || "")
+        })
+      );
       if (!result?.ok) {
         throw new Error(result?.error || "Couldn't save this exercise right now.");
       }

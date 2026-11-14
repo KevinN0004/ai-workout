@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { defaultPersonalForm, defaultSignupProfileForm } from "../constants";
 import { newCard } from "../exerciseSets";
+import { createDefaultPlannerForm } from "../requestBodies";
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg } from "../units";
 import { logSet, sessionFromPlanDay } from "../workoutSession";
 
@@ -288,5 +289,41 @@ describe("log bodies", () => {
     expect(JSON.stringify(deps.setProgressForm.mock.calls[0][0])).toBe(
       `{"date":"${today}","weightLb":"","bodyFatPct":"","waistCm":"","restingHr":"","notes":""}`
     );
+  });
+});
+
+describe("plan and dashboard bodies", () => {
+  beforeEach(() => {
+    deps.setLoading = vi.fn();
+    deps.setError = vi.fn();
+    deps.setResult = vi.fn();
+    deps.setResultPayload = vi.fn();
+    deps.setDashboard = vi.fn();
+    deps.apiFetch = vi.fn(async () => jsonResponse({ dashboard: {} }));
+  });
+
+  test("the planner form, sent whole to generate a plan", async () => {
+    await build({ form: createDefaultPlannerForm("Mobility") }).onSubmit(submitEvent());
+
+    expect(sentBody()).toBe(
+      '{"goal":"Mobility","equipment":[],"duration":"45","level":"Intermediate",' +
+        '"injuries":"None","days":"3","focuses":[],"environment":"Home","health":' +
+        '{"condition":false,"symptoms":false,"supervised":false,"pregnant":false}}'
+    );
+  });
+
+  test("the goals form, sent whole", async () => {
+    const goalForm = { targetWeight: "", targetCalories: "2200", weeklyWorkouts: "3" };
+    await build({ goalForm }).submitGoals(submitEvent());
+
+    expect(sentBody()).toBe('{"targetWeight":"","targetCalories":"2200","weeklyWorkouts":"3"}');
+  });
+
+  test("a saved exercise is sent as the view built it, and none as {}", async () => {
+    await build().saveExerciseToPlan({ exerciseId: 7, name: "Row" });
+    await build().saveExerciseToPlan(undefined);
+
+    expect(sentBody(0)).toBe('{"exerciseId":7,"name":"Row"}');
+    expect(sentBody(1)).toBe("{}");
   });
 });
