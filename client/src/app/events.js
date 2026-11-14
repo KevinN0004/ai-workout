@@ -16,7 +16,16 @@ import {
 import { newWorkoutForm, toExerciseSets } from "./exerciseSets";
 import { clearOutbox, readOutbox } from "./outbox";
 import { personalToProfile } from "./profileMapping";
-import { accountDeleteBody, loginBody, passwordChangeBody, signupBody } from "./requestBodies";
+import {
+  accountDeleteBody,
+  blankProgressForm,
+  caloriesBody,
+  loginBody,
+  mealLogBody,
+  passwordChangeBody,
+  signupBody,
+  workoutSessionBody
+} from "./requestBodies";
 import { postLog } from "./sendLog";
 import { getLocalDateKey, getPreferredMeasurementSystem, splitFullName } from "./units";
 import { loggedSetCount, toWorkoutSave } from "./workoutSession";
@@ -423,18 +432,16 @@ export const createAppEventHandlers = ({
     planId,
     planDayIndex
   }) => {
-    const exerciseNames = exerciseSets.map((exercise) => exercise.name);
-    const link = planId ? { planId, planDayIndex } : null;
-    const payload = {
+    const payload = workoutSessionBody({
       id,
       date,
       focus,
       duration,
       notes,
-      exercises: exerciseNames,
       exerciseSets,
-      ...link
-    };
+      planId,
+      planDayIndex
+    });
 
     // The entry shows at once and is sent only when the undo window closes,
     // unless it is undone first (useOptimisticLogs).
@@ -444,14 +451,14 @@ export const createAppEventHandlers = ({
       date: date || getLocalDateKey(),
       focus: focus || "General",
       duration: duration ? Number(duration) : null,
-      exercises: exerciseNames,
+      exercises: payload.exercises,
       exerciseSets,
       sets: null,
       reps: null,
       intensityRpe: null,
       notes: notes || "",
-      planId: link?.planId ?? null,
-      planDayIndex: link?.planDayIndex ?? null,
+      planId: payload.planId ?? null,
+      planDayIndex: payload.planDayIndex ?? null,
       createdAt: new Date().toISOString()
     };
 
@@ -537,11 +544,7 @@ export const createAppEventHandlers = ({
   const submitCalories = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("calories");
-    const payload = {
-      ...calorieForm,
-      id: crypto.randomUUID(),
-      date: getLocalDateKey()
-    };
+    const payload = caloriesBody(calorieForm, crypto.randomUUID(), getLocalDateKey());
 
     queueOptimisticLogCommit({
       type: "calorie",
@@ -717,7 +720,7 @@ export const createAppEventHandlers = ({
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
-    const payload = { ...mealLogForm, id: crypto.randomUUID() };
+    const payload = mealLogBody(mealLogForm, crypto.randomUUID());
 
     // Queued like a workout: shown at once, sent when the undo window closes.
     queueOptimisticLogCommit({
@@ -778,14 +781,7 @@ export const createAppEventHandlers = ({
       // is dropped.
       if (!isSameAccount()) return;
       setDashboard(data.dashboard);
-      setProgressForm({
-        date: getLocalDateKey(),
-        weightLb: "",
-        bodyFatPct: "",
-        waistCm: "",
-        restingHr: "",
-        notes: ""
-      });
+      setProgressForm(blankProgressForm(getLocalDateKey()));
       showDashboardToast("Progress metric saved.");
     } catch (err) {
       const message = err.message || "Unable to save progress metric.";

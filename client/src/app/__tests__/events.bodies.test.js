@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { defaultPersonalForm, defaultSignupProfileForm } from "../constants";
+import { newCard } from "../exerciseSets";
 import { toCmFromFeetInches, toFeetInchesFromCm, toKg } from "../units";
+import { logSet, sessionFromPlanDay } from "../workoutSession";
 
 // The exact JSON each handler sends, as a string, so key order is pinned as
 // well as every value. Each was pinned against the inline code before its body
@@ -129,6 +131,162 @@ describe("account bodies", () => {
       '{"firstName":"Sam","lastName":"","name":"Sam","age":null,"heightCm":178,' +
         '"weightKg":77,"sex":"","bodyFat":null,"activity":"Moderate","notes":"","sleep":"",' +
         '"timeline":"","experience":"","nutrition":"","cardio":"","goal":"","trainingDays":[]}'
+    );
+  });
+});
+
+// The logs reach the outbox, which stores a body and replays it later, so a
+// body queued before a deploy must replay unchanged after it. The clock and the
+// replay key are fixed so each body is one exact string.
+describe("log bodies", () => {
+  const ID = "00000000-0000-4000-8000-000000000001";
+  const today = "2026-03-01";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 2, 1, 12, 0, 0));
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(ID);
+    deps.queueOptimisticLogCommit = vi.fn();
+    deps.setWorkoutForm = vi.fn();
+    deps.setWorkoutModalOpen = vi.fn();
+    deps.setCalorieForm = vi.fn();
+    deps.setMealLogForm = vi.fn();
+    deps.setProgressForm = vi.fn();
+    deps.setDashboard = vi.fn();
+    deps.apiFetch = vi.fn(async () => jsonResponse({ dashboard: {} }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  // Runs the queued commit's request and answers the body it sent, after
+  // checking the outbox holds that same body for a replay.
+  const queuedBody = async () => {
+    const commit = deps.queueOptimisticLogCommit.mock.calls[0][0];
+    await commit.request();
+    expect(JSON.stringify(commit.outbox.body)).toBe(sentBody());
+    return sentBody();
+  };
+
+  const squatCard = () => {
+    const card = newCard({ name: "Squat" });
+    return { ...card, sets: [{ ...card.sets[0], amount: "5", rpe: "8" }] };
+  };
+  const workoutForm = {
+    date: today,
+    focus: "Push",
+    duration: "45",
+    notes: "felt good",
+    exerciseSets: [squatCard()]
+  };
+  const SQUAT_SETS =
+    '"exercises":["Squat"],"exerciseSets":[{"name":"Squat","sets":[{"reps":5,"seconds":null,' +
+    '"loadKg":null,"rpe":8}]}]';
+
+  test("a workout from the form, with no plan day", async () => {
+    await build({ workoutForm }).submitWorkout(submitEvent());
+
+    expect(await queuedBody()).toBe(
+      `{"id":"${ID}","date":"${today}","focus":"Push","duration":"45","notes":"felt good",` +
+        `${SQUAT_SETS}}`
+    );
+  });
+
+  test("a workout from the form, logged against a plan day", async () => {
+    await build({
+      workoutForm: { ...workoutForm, planId: "plan-1", planDayIndex: 2 }
+    }).submitWorkout(submitEvent());
+
+    expect(await queuedBody()).toBe(
+      `{"id":"${ID}","date":"${today}","focus":"Push","duration":"45","notes":"felt good",` +
+        `${SQUAT_SETS},"planId":"plan-1","planDayIndex":2}`
+    );
+  });
+
+  test("a finished in-gym session", async () => {
+    const NOW = Date.UTC(2026, 10, 9, 17, 0, 0);
+    vi.setSystemTime(NOW + 40 * 60 * 1000);
+    const started = sessionFromPlanDay({
+      day: { index: 1, weekday: "Tuesday", title: "Lower A", lines: [], prescriptions: [] },
+      cards: [newCard({ name: "Squat", targets: { amount: "5", rpe: "", load: "100" } })],
+      planId: "plan-1",
+      system: "metric",
+      now: NOW
+    });
+    const session = logSet(started, { amount: 5, loadKg: 100, rpe: 8 }, NOW + 60 * 1000);
+
+    build({ user: { email: "person@example.com" } }).finishSession(session);
+
+    expect(await queuedBody()).toBe(
+      `{"id":"${session.clientId}","date":"${session.date}","focus":"Lower A","duration":40,` +
+        '"notes":"","exercises":["Squat"],"exerciseSets":[{"name":"Squat","sets":[{"reps":5,' +
+        '"seconds":null,"loadKg":100,"rpe":8}]}],"planId":"plan-1","planDayIndex":1}'
+    );
+  });
+
+  test("a calorie entry", async () => {
+    await build({ calorieForm: { calories: "2200" } }).submitCalories(submitEvent());
+
+    expect(await queuedBody()).toBe(`{"calories":"2200","id":"${ID}","date":"${today}"}`);
+  });
+
+  test("a meal, filled in", async () => {
+    const mealLogForm = {
+      date: today,
+      mealType: "lunch",
+      name: "Rice bowl",
+      calories: "600",
+      proteinG: "30",
+      carbsG: "80",
+      fatG: "12",
+      notes: "post-run"
+    };
+    await build({ mealLogForm }).submitMealLog(submitEvent());
+
+    expect(await queuedBody()).toBe(
+      `{"date":"${today}","mealType":"lunch","name":"Rice bowl","calories":"600",` +
+        `"proteinG":"30","carbsG":"80","fatG":"12","notes":"post-run","id":"${ID}"}`
+    );
+  });
+
+  test("a meal with only its name", async () => {
+    const mealLogForm = {
+      date: today,
+      mealType: "breakfast",
+      name: "Toast",
+      calories: "",
+      proteinG: "",
+      carbsG: "",
+      fatG: "",
+      notes: ""
+    };
+    await build({ mealLogForm }).submitMealLog(submitEvent());
+
+    expect(await queuedBody()).toBe(
+      `{"date":"${today}","mealType":"breakfast","name":"Toast","calories":"","proteinG":"",` +
+        `"carbsG":"","fatG":"","notes":"","id":"${ID}"}`
+    );
+  });
+
+  test("a progress metric, and the blank form it resets to", async () => {
+    const progressForm = {
+      date: today,
+      weightLb: "170",
+      bodyFatPct: "",
+      waistCm: "81",
+      restingHr: "",
+      notes: ""
+    };
+    await build({ progressForm }).submitProgressMetric(submitEvent());
+
+    expect(sentBody()).toBe(
+      `{"date":"${today}","weightLb":"170","bodyFatPct":"","waistCm":"81","restingHr":"",` +
+        '"notes":""}'
+    );
+    expect(JSON.stringify(deps.setProgressForm.mock.calls[0][0])).toBe(
+      `{"date":"${today}","weightLb":"","bodyFatPct":"","waistCm":"","restingHr":"","notes":""}`
     );
   });
 });

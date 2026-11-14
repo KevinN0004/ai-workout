@@ -37,6 +37,7 @@ import useStravaSync from "./app/hooks/useStravaSync";
 import useWorkerUpdate from "./app/hooks/useWorkerUpdate";
 import { fetchWithTimeout } from "./app/network";
 import { readPlan, extractLatestPlanByWeekday } from "./app/plans";
+import { blankProgressForm } from "./app/requestBodies";
 import { newWorkoutForm } from "./app/exerciseSets";
 import { resolveDashViewFromPath } from "./app/routing";
 import { createAppEventHandlers } from "./app/events";
@@ -119,14 +120,7 @@ export default function App() {
     fatG: "",
     notes: ""
   });
-  const [progressForm, setProgressForm] = useState({
-    date: getLocalDateKey(),
-    weightLb: "",
-    bodyFatPct: "",
-    waistCm: "",
-    restingHr: "",
-    notes: ""
-  });
+  const [progressForm, setProgressForm] = useState(() => blankProgressForm(getLocalDateKey()));
   const [goalForm, setGoalForm] = useState({
     targetWeight: "",
     targetCalories: "2200",

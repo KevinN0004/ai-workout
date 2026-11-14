@@ -10,6 +10,10 @@ import { toCmFromFeetInches, toKg } from "./units";
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").LoginBody} LoginBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").PasswordChangeBody} PasswordChangeBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").AccountDeleteBody} AccountDeleteBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").WorkoutSessionBody} WorkoutSessionBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").CaloriesBody} CaloriesBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").MealLogBody} MealLogBody */
+/** @typedef {import("../../../server/src/services/http/apiSchemaService.js").ProgressMetricBody} ProgressMetricBody */
 
 /** @typedef {{ email: string, password: string }} AuthForm */
 
@@ -59,3 +63,88 @@ export const passwordChangeBody = ({ currentPassword, newPassword }) => ({
  * @returns {AccountDeleteBody}
  */
 export const accountDeleteBody = (password) => ({ password });
+
+/**
+ * A workout's body, from the form or a finished session: the exercises named
+ * from their sets, and the plan day's link only when it has a plan, since the
+ * server takes an absent planId, never a null one.
+ * @param {{
+ *   id: string,
+ *   date: string,
+ *   focus: string,
+ *   duration: string | number,
+ *   notes: string,
+ *   exerciseSets: NonNullable<WorkoutSessionBody["exerciseSets"]>,
+ *   planId?: string | null,
+ *   planDayIndex?: number | null
+ * }} workout
+ * @returns {WorkoutSessionBody}
+ */
+export const workoutSessionBody = ({
+  id,
+  date,
+  focus,
+  duration,
+  notes,
+  exerciseSets,
+  planId,
+  planDayIndex
+}) => {
+  const link = planId ? { planId, planDayIndex } : null;
+  return {
+    id,
+    date,
+    focus,
+    duration,
+    notes,
+    exercises: exerciseSets.map((exercise) => exercise.name),
+    exerciseSets,
+    ...link
+  };
+};
+
+/**
+ * A calorie entry's body: the form, its replay key and its date.
+ * @param {{ calories: string }} calorieForm
+ * @param {string} id
+ * @param {string} date
+ * @returns {CaloriesBody}
+ */
+export const caloriesBody = (calorieForm, id, date) => ({ ...calorieForm, id, date });
+
+/**
+ * The meal form as MealView edits it.
+ * @typedef {{
+ *   date: string,
+ *   mealType: string,
+ *   name: string,
+ *   calories: string,
+ *   proteinG: string,
+ *   carbsG: string,
+ *   fatG: string,
+ *   notes: string
+ * }} MealLogForm
+ */
+
+/**
+ * A meal's body: the form and its replay key.
+ * @param {MealLogForm} mealLogForm
+ * @param {string} id
+ * @returns {MealLogBody}
+ */
+export const mealLogBody = (mealLogForm, id) => ({ ...mealLogForm, id });
+
+/**
+ * The progress form as it starts and after each save: the date given, the rest
+ * blank. It is submitted whole, so its keys are the body's.
+ * @param {string} date
+ * @returns {ProgressMetricBody}
+ */
+export const blankProgressForm = (date) => ({
+  date,
+  weightLb: "",
+  bodyFatPct: "",
+  waistCm: "",
+  restingHr: "",
+  notes: ""
+});
