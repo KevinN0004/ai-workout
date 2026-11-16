@@ -1,7 +1,9 @@
 # Type-checking the client's data layer (roadmap lane D1, phase 3), design
 
-Status: **decided 2026-11-16** with the owner, measured. The plan is
-`docs/plans/2026-11-16-client-data-layer-types.md`. Phase 2 is
+Status: **decided 2026-11-16** with the owner, measured; **applied 2026-11-16**, in #417
+and #419 to #422, all live, with no floor PR. The plan is
+`docs/plans/2026-11-16-client-data-layer-types.md`, whose status says where the work went
+past this text. Phase 2 is
 `docs/specs/2026-11-14-api-body-types-design.md`, which left its callers to this phase: "the
 types prove each builder's output against the schema's declared fields for the inputs the
 builder declares, not what an unchecked caller passes in. Phase 3 checks the callers."
