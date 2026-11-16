@@ -49,18 +49,24 @@ describe("DashboardAtAGlance", () => {
       expect(headline("workout")).toBeUndefined();
     });
 
-    test("names the session and its context once there is one", () => {
+    // The card reads logged workouts, so only one dated after today is still
+    // planned; one dated today or earlier has been logged.
+    test.each([
+      ["Today", "Today's workout", "45 min logged"],
+      ["Upcoming", "Upcoming workout", "45 min planned"],
+      ["Latest", "Latest workout", "45 min logged"]
+    ])("names a %s session and says whether it is planned", (context, heading, duration) => {
       renderGlance({
-        nextWorkout: { context: "Next", date: "Mon 5 May", focus: "Push", duration: 45 }
+        nextWorkout: { context, date: "Mon 5 May", focus: "Push", duration: 45 }
       });
 
-      expect(within(card("workout")).getByRole("heading")).toHaveTextContent("Next workout");
+      expect(within(card("workout")).getByRole("heading")).toHaveTextContent(heading);
       expect(headline("workout")).toBe("Mon 5 May - Push");
-      expect(note("workout")).toBe("45 min planned");
+      expect(note("workout")).toBe(duration);
     });
 
     test("stands in for each missing part of a session rather than rendering a gap", () => {
-      renderGlance({ nextWorkout: { context: "Today" } });
+      renderGlance({ nextWorkout: { context: "Upcoming" } });
 
       expect(headline("workout")).toBe("Date pending - General");
       expect(note("workout")).toBe("-- min planned");
@@ -72,7 +78,7 @@ describe("DashboardAtAGlance", () => {
       // guard is not mistaken for a finite check later.
       renderGlance({ nextWorkout: { context: "Today", date: "Mon", focus: "Pull", duration: 0 } });
 
-      expect(note("workout")).toBe("-- min planned");
+      expect(note("workout")).toBe("-- min logged");
     });
   });
 

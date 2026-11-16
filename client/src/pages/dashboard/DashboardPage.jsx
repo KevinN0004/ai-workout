@@ -170,18 +170,25 @@ export default function DashboardPage({
   // previous render.", crashing the page.
   //
   // The glance panel's workout: the earliest dated today or later, else the
-  // most recent. A bare YYYY-MM-DD is read as local midnight, as
-  // useDashboardMetrics reads it, so a workout dated today counts as upcoming
-  // in every time zone. A missing or unparseable date is 0, long past.
+  // most recent. Its context is "Today" before tomorrow's local midnight,
+  // "Upcoming" from then on, and "Latest" for the fallback. A bare YYYY-MM-DD
+  // is read as local midnight, as useDashboardMetrics reads it, so a workout
+  // dated today is today's in every time zone. A missing or unparseable date
+  // is 0, long past.
   const nextWorkout = useMemo(() => {
     const parseDateAsTime = (value) => parseDateValue(value)?.getTime() || 0;
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const tomorrowStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
     const upcoming = recentWorkouts
       .map((item) => ({ ...item, parsedDate: new Date(parseDateAsTime(item?.date)) }))
       .filter((item) => item.parsedDate.getTime() >= todayStart.getTime())
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
-    if (upcoming.length) return { ...upcoming[0], context: "Upcoming" };
+    if (upcoming.length) {
+      const soonest = upcoming[0];
+      const isToday = soonest.parsedDate.getTime() < tomorrowStart.getTime();
+      return { ...soonest, context: isToday ? "Today" : "Upcoming" };
+    }
     if (recentWorkouts.length) return { ...recentWorkouts[0], context: "Latest" };
     return null;
   }, [recentWorkouts]);

@@ -213,13 +213,13 @@ describe("DashboardPage", () => {
       expect(nextWorkout().context).toBe("Upcoming");
     });
 
-    // A bare YYYY-MM-DD is a calendar date, so a session dated today is ahead
-    // of the visitor wherever they are. Read as UTC midnight it would sit
-    // before local midnight west of UTC, and be labelled "Latest", as though
-    // already done. Los Angeles is the zone that tells the two readings apart;
-    // UTC and Tokyo pin the other two sides of it.
+    // A bare YYYY-MM-DD is a calendar date, so a session dated today is today's
+    // wherever the visitor is. Read as UTC midnight it would sit before local
+    // midnight west of UTC, and be labelled "Latest" behind an older session's
+    // place. Los Angeles is the zone that tells the two readings apart; UTC and
+    // Tokyo pin the other two sides of it.
     test.each(["America/Los_Angeles", "UTC", "Asia/Tokyo"])(
-      "a session dated today is upcoming in %s",
+      "a session dated today is today's in %s",
       (zone) => {
         process.env.TZ = zone;
         vi.setSystemTime(new Date(2026, 8, 11, 12, 0, 0));
@@ -227,12 +227,36 @@ describe("DashboardPage", () => {
           renderPage(withWorkouts([{ id: "today", date: "2026-09-11" }]));
 
           expect(nextWorkout().id).toBe("today");
-          expect(nextWorkout().context).toBe("Upcoming");
+          expect(nextWorkout().context).toBe("Today");
         } finally {
           process.env.TZ = SYSTEM_ZONE;
         }
       }
     );
+
+    test("today's session comes before a later one", () => {
+      renderPage(
+        withWorkouts([
+          { id: "tomorrow", date: "2026-09-12" },
+          { id: "today", date: "2026-09-11" }
+        ])
+      );
+
+      expect(nextWorkout().id).toBe("today");
+      expect(nextWorkout().context).toBe("Today");
+    });
+
+    // A timestamp is today's for the whole local day, whatever its hour, and
+    // tomorrow's midnight is the first moment that is not.
+    test.each([
+      ["earlier today", "Today", new Date(2026, 8, 11, 8, 0, 0)],
+      ["later today", "Today", new Date(2026, 8, 11, 23, 59, 0)],
+      ["at tomorrow's midnight", "Upcoming", new Date(2026, 8, 12, 0, 0, 0)]
+    ])("a session timestamped %s reads as %s", (_label, context, at) => {
+      renderPage(withWorkouts([{ id: "stamped", date: at.toISOString() }]));
+
+      expect(nextWorkout().context).toBe(context);
+    });
 
     test("a session dated tomorrow is upcoming in every timezone", () => {
       // A full day of margin swamps any offset, so this is the assertion that

@@ -6,8 +6,9 @@
 /**
  * Shows the next or latest workout, the calorie gap, and the weather and air
  * quality, the last two each with a line saying when they were updated.
- * DashboardPage derives every value: `nextWorkout` carries a `context` of
- * "Upcoming" or "Latest", `caloriesGap` is the goal minus `avgCalories`
+ * DashboardPage derives every value: `nextWorkout` is a logged workout whose
+ * `context` is "Today", "Upcoming" or "Latest", and only an upcoming one's
+ * minutes read as planned. `caloriesGap` is the goal minus `avgCalories`
  * (positive means under target), and `formatRelativeUpdatedAt` words the update
  * times. The weather and air cards offer Retry while their last load has an
  * error; a reading already on screen stays in place of the error text. With no
@@ -48,7 +49,11 @@ export default function DashboardAtAGlance({
         {/* ---- Next workout ---- */}
         <article className="dashboard-glance-card card-shell">
           <div className="card-section-head">
-            <h3>{nextWorkout ? `${nextWorkout.context} workout` : "Workout status"}</h3>
+            <h3>
+              {nextWorkout
+                ? `${nextWorkout.context === "Today" ? "Today's" : nextWorkout.context} workout`
+                : "Workout status"}
+            </h3>
           </div>
           <div className="card-section-body">
             {nextWorkout ? (
@@ -56,7 +61,10 @@ export default function DashboardAtAGlance({
                 <p className="dashboard-glance-value">
                   {nextWorkout.date || "Date pending"} - {nextWorkout.focus || "General"}
                 </p>
-                <p className="muted">{nextWorkout.duration || "--"} min planned</p>
+                <p className="muted">
+                  {nextWorkout.duration || "--"} min{" "}
+                  {nextWorkout.context === "Upcoming" ? "planned" : "logged"}
+                </p>
               </>
             ) : (
               <p className="muted">No workout logged yet. Add one to get started.</p>
