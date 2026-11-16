@@ -3,13 +3,26 @@
  * (roadmap B6): resume the open one, or discard it and start the new one.
  * Rendered by App.
  */
+// @ts-check
 import ModalPortal from "../../components/ModalPortal";
 import { loggedSetCount, startedAtText } from "../workoutSession";
+
+/** @typedef {import("../workoutSession.js").WorkoutSession} WorkoutSession */
+
+/**
+ * @typedef {object} StartSessionConfirmProps
+ * @property {WorkoutSession | null} openSession
+ * @property {boolean} waiting
+ * @property {() => void} onResume
+ * @property {() => void} onReplace
+ * @property {() => void} onCancel
+ */
 
 /**
  * Open while `waiting` (a new session waits). It names `openSession`'s start
  * and logged sets. Resume runs `onResume`, Discard and start `onReplace`, and
  * Escape and the backdrop `onCancel`, which keeps everything as it was.
+ * @param {StartSessionConfirmProps} props
  */
 export default function StartSessionConfirm({
   openSession,
@@ -19,9 +32,11 @@ export default function StartSessionConfirm({
   onCancel
 }) {
   const open = Boolean(waiting && openSession);
-  const sets = open ? loggedSetCount(openSession) : 0;
+  // `open` holds only when there is an open session, which Boolean() does not
+  // tell the checker, so the two reads below say so.
+  const sets = open ? loggedSetCount(/** @type {WorkoutSession} */ (openSession)) : 0;
   const detail = open
-    ? `Started ${startedAtText(openSession)}, with ${sets} ${sets === 1 ? "set" : "sets"} logged.`
+    ? `Started ${startedAtText(/** @type {WorkoutSession} */ (openSession))}, with ${sets} ${sets === 1 ? "set" : "sets"} logged.`
     : "";
 
   return (

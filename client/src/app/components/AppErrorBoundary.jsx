@@ -2,6 +2,7 @@
  * The root error boundary: main.jsx renders App inside it, so a crash anywhere
  * in the app leaves a message on screen rather than an empty page.
  */
+// @ts-check
 import { Component } from "react";
 
 /**
@@ -14,10 +15,12 @@ import { Component } from "react";
 export default class AppErrorBoundary extends Component {
   state = { error: null };
 
+  /** @param {unknown} error */
   static getDerivedStateFromError(error) {
     return { error };
   }
 
+  /** @param {unknown} error */
   componentDidCatch(error) {
     reportError(error);
   }

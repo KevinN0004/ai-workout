@@ -2,11 +2,13 @@
  * Asks before a sign-out that would lose entries kept on the device and not
  * yet sent (docs/specs/2026-11-06-offline-ready-pwa-design.md). Rendered by App.
  */
+// @ts-check
 import ModalPortal from "../../components/ModalPortal";
 
 /**
  * Open while `count`, the entries still unsent, is above 0. Sign out anyway
  * runs `onConfirm`; Cancel, Escape and the backdrop run `onCancel`.
+ * @param {{ count: number, onCancel: () => void, onConfirm: () => void }} props
  */
 export default function SignOutConfirm({ count, onCancel, onConfirm }) {
   const lost =
