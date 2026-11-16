@@ -3,6 +3,7 @@
  * and DashboardDrawer. Focus moves in when it opens, cannot Tab out, and goes
  * back to whatever opened it when it closes.
  */
+// @ts-check
 import { useEffect } from "react";
 
 // What Tab can reach. A control that is disabled, taken out of the tab order,
@@ -21,8 +22,13 @@ const FOCUSABLE = [
   "[tabindex]"
 ].join(", ");
 
+// Every selector in FOCUSABLE matches an HTML element, or with [tabindex] an
+// SVG one, and both have tabIndex and focus.
+/** @param {HTMLElement} container */
 const focusablesIn = (container) =>
-  [...container.querySelectorAll(FOCUSABLE)].filter(
+  [
+    .../** @type {NodeListOf<HTMLElement | SVGElement>} */ (container.querySelectorAll(FOCUSABLE))
+  ].filter(
     (element) =>
       element.tabIndex >= 0 &&
       !element.closest("[hidden], [inert]") &&
@@ -32,6 +38,10 @@ const focusablesIn = (container) =>
 // Moves focus to the container's first control, or its last when `fromEnd`.
 // A control can refuse focus (one hidden by CSS does), so each is tried in
 // turn until one takes it.
+/**
+ * @param {HTMLElement} container
+ * @param {boolean} fromEnd
+ */
 const focusEdge = (container, fromEnd) => {
   const candidates = focusablesIn(container);
   if (fromEnd) candidates.reverse();
@@ -43,6 +53,7 @@ const focusEdge = (container, fromEnd) => {
 
 // The open traps, oldest first. Only the newest acts, so an overlay opened
 // over another holds focus until it closes and hands it back.
+/** @type {{ container: HTMLElement }[]} */
 const openTraps = [];
 
 /**
@@ -51,6 +62,8 @@ const openTraps = [];
  * Done by watching where focus lands rather than by marking the page behind
  * `inert`: inert would also take the dashboard's toast, a live region, out of
  * the accessibility tree, and a modal can raise one while it stays open.
+ * @param {boolean} active
+ * @param {import("react").RefObject<HTMLElement | null>} containerRef
  */
 export default function useFocusTrap(active, containerRef) {
   // Runs when the overlay opens; the cleanup releases the trap and returns
@@ -59,7 +72,9 @@ export default function useFocusTrap(active, containerRef) {
     const container = containerRef.current;
     if (!active || !container || typeof document === "undefined") return undefined;
 
-    const opener = document.activeElement;
+    // The focused element of an HTML page is an HTML or SVG element, or null,
+    // which `opener?.focus?.()` below already allows for.
+    const opener = /** @type {HTMLElement | SVGElement | null} */ (document.activeElement);
     const trap = { container };
     openTraps.push(trap);
     let backwards = false;
@@ -67,6 +82,7 @@ export default function useFocusTrap(active, containerRef) {
     // Tab on the last control and Shift+Tab on the first wrap round here:
     // left to the browser, focus would leave the page for its toolbar when
     // the overlay is the last thing in the document.
+    /** @param {KeyboardEvent} event */
     const wrapAtTheEdges = (event) => {
       backwards = event.key === "Tab" && event.shiftKey;
       if (event.key !== "Tab" || openTraps[openTraps.length - 1] !== trap) return;
@@ -78,9 +94,11 @@ export default function useFocusTrap(active, containerRef) {
         focusEdge(container, backwards);
       }
     };
+    /** @param {FocusEvent} event */
     const keepFocusInside = (event) => {
       if (openTraps[openTraps.length - 1] !== trap) return;
-      if (container.contains(event.target)) return;
+      // A focusin's target is the element that took focus, a Node.
+      if (container.contains(/** @type {Node} */ (event.target))) return;
       focusEdge(container, backwards);
     };
 

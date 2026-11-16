@@ -3,6 +3,7 @@
  * ModalPortal, which every modal goes through, and by DashboardDrawer, a plain
  * overlay rendered in place.
  */
+// @ts-check
 import { useEffect } from "react";
 
 /**
@@ -13,11 +14,14 @@ import { useEffect } from "react";
  * the shape that drifts, so there is one. It is also what lets each backdrop's
  * onClick stay a mouse-only convenience instead of needing a key handler of its
  * own: without it, a keyboard user would have to find the Close button.
+ * @param {boolean} active
+ * @param {(() => void) | undefined} onClose
  */
 export default function useCloseOnEscape(active, onClose) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return undefined;
 
+    /** @param {KeyboardEvent} event */
     const closeOnEscape = (event) => {
       if (event.key === "Escape") onClose?.();
     };

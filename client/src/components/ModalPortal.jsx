@@ -2,6 +2,7 @@
  * The portal every modal in the app renders through, from the planner modal
  * in app/components to the dashboard's own.
  */
+// @ts-check
 import { useRef } from "react";
 import { createPortal } from "react-dom";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";
@@ -12,6 +13,7 @@ import useFocusTrap from "../hooks/useFocusTrap";
  * Renders `children` into document.body while `open`, and nothing otherwise.
  * While open, the page behind stops scrolling, Escape calls `onClose`, and
  * keyboard focus stays inside the modal and returns to its opener on close.
+ * @param {{ open: boolean, onClose: () => void, children: import("react").ReactNode }} props
  */
 export default function ModalPortal({ open, onClose, children }) {
   const trapRef = useRef(null);

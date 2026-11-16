@@ -3,26 +3,42 @@
  * alternatives under the plan's rules, an area that bothers to narrow them, and
  * the swap. Shared: the plan hub's day details and the in-gym screen show it.
  */
+// @ts-check
 import { useEffect, useState } from "react";
 import "./SwapStep.css";
 import { fetchSwapOptions, swapExercise } from "../app/planSwaps";
 
+/** @param {string} text */
 const capitalised = (text) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+/** @param {string[]} needs */
 const needsText = (needs) => (needs.length ? `Needs ${needs.join(", ")}` : "No equipment");
+
+/**
+ * The plan `onSwapped` receives is the server's answer, not typed yet (D1 phase
+ * 3 spec, decision 2).
+ * @typedef {object} SwapStepProps
+ * @property {import("../app/network.js").ApiFetch} apiFetch
+ * @property {string} planId
+ * @property {string} exercise
+ * @property {(plan: any, name: string) => void} onSwapped
+ * @property {() => void} onBack
+ */
 
 /**
  * Swaps `exercise` in the plan `planId` over `apiFetch`. It lists the
  * alternatives, asking again when an area is chosen or cleared, and a choice
  * swaps it and hands `onSwapped` the plan the server answers and the name of
  * the exercise swapped in. Back calls `onBack`. Each failure is said in an alert.
+ * @param {SwapStepProps} props
  */
 export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack }) {
-  const [area, setArea] = useState(null);
+  const [area, setArea] = useState(/** @type {string | null} */ (null));
   // What the server answered for the area asked about, null while it is asked.
-  const [answer, setAnswer] = useState(null);
+  // The answer is not typed yet (D1 phase 3 spec, decision 2).
+  const [answer, setAnswer] = useState(/** @type {any} */ (null));
   // The areas a swap can name, kept once known, so the buttons stay put (and
   // keep focus) while the alternatives for a new area are asked for.
-  const [areas, setAreas] = useState([]);
+  const [areas, setAreas] = useState(/** @type {string[]} */ ([]));
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -47,6 +63,7 @@ export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack
     };
   }, [apiFetch, planId, exercise, area]);
 
+  /** @param {{ name: string }} option */
   const choose = async (option) => {
     setSending(true);
     setError("");
@@ -54,11 +71,15 @@ export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack
       const plan = await swapExercise(apiFetch, planId, { from: exercise, to: option.name, area });
       onSwapped(plan, option.name);
     } catch (err) {
-      setError(err.message);
+      // Everything swapExercise throws is an Error: its own with the server's
+      // message, or fetch's DOMException or TypeError.
+      setError(/** @type {Error} */ (err).message);
       setSending(false);
     }
   };
 
+  // As the server answers them, not typed yet (D1 phase 3 spec, decision 2).
+  /** @type {any[]} */
   const alternatives = answer?.alternatives ?? [];
   return (
     <section className="swap-step" aria-labelledby="swap-step-title">

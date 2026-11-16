@@ -2,6 +2,7 @@
  * The connection store as React state, for the controls that disable a write
  * offline and for App's offline notice.
  */
+// @ts-check
 import { useSyncExternalStore } from "react";
 import { getConnection, subscribeConnection } from "../app/connection";
 
