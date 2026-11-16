@@ -2,6 +2,7 @@
  * What becomes of a workout, meal or calorie entry whose send failed, read by
  * useOptimisticLogs and useOutboxReplay.
  */
+// @ts-check
 
 // The message the server's CSRF guard answers a refused token with
 // (server/src/services/auth/sessionService.js).
@@ -14,6 +15,7 @@ const CSRF_REFUSAL = "Invalid or missing CSRF token.";
  * `error.status` is the answer's status, and absent when no answer came. A
  * 5xx, a 429 and a 401 are kept, because the body is not at fault; any other
  * 4xx is dropped, because resending the same body cannot fix it.
+ * @param {import("./sendLog.js").SendError | null | undefined} error
  */
 export const classifySendFailure = (error) => {
   const status = error?.status;

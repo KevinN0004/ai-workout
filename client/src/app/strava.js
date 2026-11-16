@@ -3,6 +3,7 @@
  * the connection's state, the authorize link, the sync and the disconnect, over
  * App's apiFetch. Each returns what the server answers, or throws its message.
  */
+// @ts-check
 
 const BASE = "/api/integrations/strava";
 const STATE_FAILED = "Could not load your Strava connection. Try again.";
@@ -10,8 +11,17 @@ const CONNECT_FAILED = "Could not start connecting Strava. Try again.";
 const SYNC_FAILED = "Could not sync with Strava. Try again.";
 const DISCONNECT_FAILED = "Could not disconnect Strava. Try again.";
 
-// The parsed answer, or an Error with the server's message, or `fallback` when
-// the refusal says nothing it can read.
+/** @typedef {import("./network.js").ApiFetch} ApiFetch */
+
+/**
+ * The parsed answer, or an Error with the server's message, or `fallback` when
+ * the refusal says nothing it can read. The answer is not typed yet (D1 phase 3
+ * spec, decision 2).
+ * @param {ApiFetch} apiFetch
+ * @param {string} path
+ * @param {RequestInit | undefined} options
+ * @param {string} fallback
+ */
 const send = async (apiFetch, path, options, fallback) => {
   const response = await apiFetch(path, options);
   const data = await response.json().catch(() => ({}));
@@ -23,10 +33,14 @@ const send = async (apiFetch, path, options, fallback) => {
  * What Settings shows: `{ available, connected, athleteName, lastSyncedAt,
  * lastSyncError, needsReconnect }`, with `available` false when the server
  * has no Strava settings.
+ * @param {ApiFetch} apiFetch
  */
 export const fetchStravaState = (apiFetch) => send(apiFetch, BASE, undefined, STATE_FAILED);
 
-/** The Strava page to send the visitor to, to grant access. */
+/**
+ * The Strava page to send the visitor to, to grant access.
+ * @param {ApiFetch} apiFetch
+ */
 export const startStravaConnect = async (apiFetch) =>
   (await send(apiFetch, `${BASE}/connect`, { method: "POST" }, CONNECT_FAILED)).url;
 
@@ -34,6 +48,8 @@ export const startStravaConnect = async (apiFetch) =>
  * Runs the catch-up sync. It answers `{ skipped: true }` inside the throttle,
  * `{ error }` when it did not finish, and otherwise the counts `{ imported,
  * updated, removed, lastSyncedAt }`. `manual` is Sync now, which waits less.
+ * @param {ApiFetch} apiFetch
+ * @param {{ manual: boolean }} options
  */
 export const syncStrava = (apiFetch, { manual }) =>
   send(
@@ -51,16 +67,21 @@ export const syncStrava = (apiFetch, { manual }) =>
  * Whether a sync's answer imported, updated or removed a workout, so the
  * dashboard's copy is stale. A skipped or unfinished sync carries no counts:
  * their sum is NaN, which is not above 0.
+ * @param {any} answer syncStrava's answer, not typed yet (D1 phase 3 spec, decision 2).
  */
 export const syncChangedWorkouts = (answer) =>
   answer.imported + answer.updated + answer.removed > 0;
 
-/** Disconnects Strava; the server deletes the tokens and every import. */
+/**
+ * Disconnects Strava; the server deletes the tokens and every import.
+ * @param {ApiFetch} apiFetch
+ */
 export const disconnectStrava = (apiFetch) =>
   send(apiFetch, BASE, { method: "DELETE" }, DISCONNECT_FAILED);
 
 /**
  * The result Strava's return left in the query (`?strava=connected`), or ""
  * without one. The server sends the visitor to Settings with it.
+ * @param {string} search
  */
 export const readStravaResult = (search) => new URLSearchParams(search).get("strava") || "";

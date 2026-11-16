@@ -1,6 +1,7 @@
 /**
  * How old a saved copy is, in words, for App's offline notice ("2 h ago").
  */
+// @ts-check
 
 const MINUTE_MS = 60 * 1000;
 
@@ -8,6 +9,8 @@ const MINUTE_MS = 60 * 1000;
  * The time from `then` to `now` (both milliseconds since the epoch) as "just
  * now", "5 min ago", "2 h ago" or "3 days ago"; null when `then` is not a
  * finite number or is later than `now`, so the notice leaves the age out.
+ * @param {number} then
+ * @param {number} now
  */
 export const describeAge = (then, now) => {
   if (!Number.isFinite(then) || then > now) return null;

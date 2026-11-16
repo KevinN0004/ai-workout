@@ -4,11 +4,20 @@
  * storage failure is swallowed, reaching window.localStorage included, since a
  * cache that cannot be used only costs a page its head start.
  */
+// @ts-check
+
+/**
+ * An account as the cache keys read it: the two fields that scope a key, or
+ * nothing while no one is signed in.
+ * @typedef {{ userId?: string, email?: string } | null | undefined} CacheUser
+ */
 
 /**
  * The storage key for one account's copy of a cache, `prefix:scope`, scoped by
  * `userId`, else `email`, else "anonymous". The server's auth responses carry
  * `id` rather than `userId`, so for a signed-in user the scope is the email.
+ * @param {string} prefix
+ * @param {CacheUser} user
  */
 export const buildScopedCacheKey = (prefix, user) => {
   const scope = user?.userId || user?.email || "anonymous";
@@ -18,6 +27,7 @@ export const buildScopedCacheKey = (prefix, user) => {
 /**
  * The parsed entry under `key`, or null when there is no key, no storage, no
  * entry, no valid JSON, or storage throws.
+ * @param {string | null | undefined} key
  */
 export const readJsonCache = (key) => {
   if (!key || typeof window === "undefined") return null;
@@ -32,7 +42,11 @@ export const readJsonCache = (key) => {
   }
 };
 
-/** Stores `value` as JSON under `key`; does nothing without a key or usable storage. */
+/**
+ * Stores `value` as JSON under `key`; does nothing without a key or usable storage.
+ * @param {string | null | undefined} key
+ * @param {unknown} value
+ */
 export const writeJsonCache = (key, value) => {
   if (!key || typeof window === "undefined") return;
   try {
@@ -42,7 +56,10 @@ export const writeJsonCache = (key, value) => {
   }
 };
 
-/** Deletes the entry under `key`, if storage is there to delete it from. */
+/**
+ * Deletes the entry under `key`, if storage is there to delete it from.
+ * @param {string | null | undefined} key
+ */
 export const removeJsonCache = (key) => {
   if (!key || typeof window === "undefined") return;
   try {
@@ -58,6 +75,7 @@ export const removeJsonCache = (key) => {
  * The value of cookie `name`, URI-decoded (raw when it does not decode), or ""
  * when it is not set. Only cookies without HttpOnly are visible here; the CSRF
  * cookie is one, the session cookie is not.
+ * @param {string} name
  */
 export const readCookie = (name) => {
   if (!name || typeof document === "undefined") return "";

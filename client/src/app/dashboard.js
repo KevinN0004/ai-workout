@@ -2,6 +2,13 @@
  * The dashboard as App renders it: the loaded dashboard with the optimistic log
  * entries from useOptimisticLogs laid over it.
  */
+// @ts-check
+
+/**
+ * The dashboard the server answers with. Not typed yet: it comes from the
+ * server's read side, which is unchecked (D1 phase 3 spec, decision 2).
+ * @typedef {any} Dashboard
+ */
 
 /**
  * A fresh empty dashboard, every list empty and the goals at the server's
@@ -28,6 +35,8 @@ export const defaultDashboardData = () => ({
  * goes into both `workoutSessions` and `workouts`, a calorie or meal entry into
  * its own list. Returns null when there is neither a dashboard nor an entry, and
  * never mutates the dashboard it is given.
+ * @param {Dashboard | null} dashboard
+ * @param {Array<{ type: string, item: unknown, createdAt?: number }>} optimisticLogEntries
  */
 export const mergeOptimisticDashboard = (dashboard, optimisticLogEntries) => {
   if (!dashboard && !optimisticLogEntries.length) return null;
