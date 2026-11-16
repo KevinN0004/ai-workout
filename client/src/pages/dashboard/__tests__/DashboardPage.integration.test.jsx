@@ -132,6 +132,13 @@ function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
   );
 }
 
+// The views are lazy, so a wait for one covers React's 300 ms reveal throttle
+// (FALLBACK_THROTTLE_MS in React 19.3), the first import, and findByRole
+// re-scanning the whole dashboard, about 150 ms a scan under the full coverage
+// run. That came to 1,027 ms at worst, past the 1 s default, so these waits
+// allow 3 s.
+const LAZY_VIEW = { timeout: 3000 };
+
 describe("Dashboard integration flows", () => {
   test("opens the dashboard drawer from header button", async () => {
     const user = userEvent.setup();
@@ -151,7 +158,7 @@ describe("Dashboard integration flows", () => {
     const drawer = drawerTitle.closest(".drawer");
     await user.click(within(drawer).getByRole("button", { name: /^logs$/i }));
 
-    expect(await screen.findByRole("heading", { name: /^logs$/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^logs$/i }, LAZY_VIEW)).toBeInTheDocument();
   });
 
   test("closes workout modal with cancel", async () => {
@@ -206,7 +213,9 @@ describe("Dashboard integration flows", () => {
 
     await user.click(screen.getByRole("button", { name: "Set a target weight" }));
 
-    expect(await screen.findByRole("heading", { name: "Overall goal" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Overall goal" }, LAZY_VIEW)
+    ).toBeInTheDocument();
   });
 
   test("shows the newest plan's week on the summary", () => {
