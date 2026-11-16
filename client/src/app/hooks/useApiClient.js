@@ -3,6 +3,7 @@
  * cookie, adds the CSRF token and gives up at a deadline. Called once, by App,
  * which passes `apiFetch` to createAppEventHandlers and DashboardPage.
  */
+// @ts-check
 import { useCallback } from "react";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../constants";
 import { readCookie } from "../cache";
@@ -59,6 +60,10 @@ export default function useApiClient() {
 
   // ---- Requests -------------------------------------------------------------
   const apiFetch = useCallback(
+    /**
+     * @param {string} url
+     * @param {RequestInit & { timeoutMs?: number }} [options]
+     */
     async (url, options = {}) => {
       const { timeoutMs = API_TIMEOUT_MS, ...requestOptions } = options;
       const method = String(requestOptions.method || "GET").toUpperCase();
