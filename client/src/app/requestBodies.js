@@ -26,6 +26,19 @@ import { toCmFromFeetInches, toKg } from "./units";
 /** @typedef {{ email: string, password: string }} AuthForm */
 
 /**
+ * The planner form as App holds it: the generate body, with the fields zod
+ * coerces (and so types as `unknown`) given the types the form keeps them in,
+ * and the environment, which the form always has, required.
+ * @typedef {GeneratePlanBody & {
+ *   equipment: string[],
+ *   focuses: string[],
+ *   duration: string,
+ *   days: string,
+ *   environment: string
+ * }} PlannerForm
+ */
+
+/**
  * The sign-up body: the auth form, and the profile in centimetres and
  * kilograms, converted from the form's units. The rest of the profile form
  * travels as it is.
@@ -166,7 +179,7 @@ export const blankProgressForm = (date) => ({
  * is the fallback for a visitor with no goal on file, signed in or not. The
  * health answers start as no, and a fresh object is built each time.
  * @param {string | null | undefined} [goal]
- * @returns {GeneratePlanBody}
+ * @returns {PlannerForm}
  */
 export const createDefaultPlannerForm = (goal) => ({
   goal: goal || goalOptions[0],

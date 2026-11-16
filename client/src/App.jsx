@@ -2,6 +2,7 @@
  * The app shell: owns the route, the signed-in user and the form state the
  * pages share, and renders the page for the current path. Rendered by main.jsx.
  */
+// @ts-check
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
@@ -51,6 +52,8 @@ import {
 } from "./app/units";
 import "./styles/app.css";
 
+/** @typedef {import("./app/workoutSession.js").WorkoutSession} WorkoutSession */
+
 // The planner modal is its own chunk, fetched when App first renders it rather
 // than shipped in the main one: it and its inlined thumbnails are about 29 kB.
 const PlannerSetupModal = lazy(() => import("./app/components/PlannerSetupModal"));
@@ -84,7 +87,8 @@ export default function App() {
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerStep, setPlannerStep] = useState(1);
   const [route, setRoute] = useState(window.location.pathname);
-  const [user, setUser] = useState(null);
+  // The server's user, not typed yet (D1 phase 3 spec, decision 2).
+  const [user, setUser] = useState(/** @type {any} */ (null));
   // True while the session check has had no answer from the server it can trust.
   const [sessionUnchecked, setSessionUnchecked] = useState(false);
   // True after a sign-out the server could not complete, until dismissed.
@@ -93,7 +97,7 @@ export default function App() {
   // SignOutConfirm asks.
   const [signOutConfirmCount, setSignOutConfirmCount] = useState(0);
   // A new in-gym session waiting while StartSessionConfirm asks about the open one.
-  const [pendingSession, setPendingSession] = useState(null);
+  const [pendingSession, setPendingSession] = useState(/** @type {WorkoutSession | null} */ (null));
   const [authMode, setAuthMode] = useState("login");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -223,7 +227,7 @@ export default function App() {
     }),
     []
   );
-  const go = useCallback((path) => {
+  const go = useCallback((/** @type {string} */ path) => {
     const normalizedPath = path === "/dashboard/" ? "/dashboard" : path;
     window.history.pushState({}, "", normalizedPath);
     setRoute(normalizedPath);
@@ -234,6 +238,7 @@ export default function App() {
     [dashboard, optimisticLogEntries]
   );
 
+  /** @param {import("react").ChangeEvent<HTMLInputElement | HTMLSelectElement>} e */
   const onPersonalChange = (e) => {
     setPersonal((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -261,10 +266,12 @@ export default function App() {
     resetPlannerFlow();
   }, [resetPlannerFlow]);
 
+  /** @param {import("react").ChangeEvent<HTMLSelectElement>} e */
   const onChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  /** @param {string} item */
   const toggleEquipment = (item) => {
     setForm((prev) => {
       const options = equipmentOptionsByEnv[prev.environment] || [];
@@ -327,6 +334,7 @@ export default function App() {
     });
   };
 
+  /** @param {string} nextEnv */
   const onEnvironmentChange = (nextEnv) => {
     const nextOptions = equipmentOptionsByEnv[nextEnv] || [];
     setForm((prev) => {
@@ -339,6 +347,7 @@ export default function App() {
     });
   };
 
+  /** @param {string} item */
   const toggleFocus = (item) => {
     setForm((prev) => {
       const exists = prev.focuses.includes(item);
@@ -349,7 +358,11 @@ export default function App() {
     });
   };
 
-  // One answer of the planner's health check, yes or no; the others stay.
+  /**
+   * One answer of the planner's health check, yes or no; the others stay.
+   * @param {string} question
+   * @param {boolean} yes
+   */
   const setHealthAnswer = (question, yes) => {
     setForm((prev) => ({ ...prev, health: { ...prev.health, [question]: yes } }));
   };
@@ -513,9 +526,12 @@ export default function App() {
   // its way stays.
   useEffect(() => {
     let cancelled = false;
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let retryTimer = null;
     let attempt = 0;
-    // The user signed in from the device, read once, at the first no-answer.
+    // The user signed in from the device, read once, at the first no-answer: the
+    // server's user, not typed yet (D1 phase 3 spec, decision 2).
+    /** @type {any} */
     let restored;
     const loadSession = async () => {
       let answered = false;
@@ -528,7 +544,7 @@ export default function App() {
         } else if (res.status === 401) {
           answered = true;
           removeJsonCache(SESSION_CACHE_KEY);
-          setUser((current) => (current === restored ? null : current));
+          setUser((/** @type {any} */ current) => (current === restored ? null : current));
         }
       } catch {
         // No answer: a network error, a timeout or a body that is not JSON.
@@ -538,7 +554,7 @@ export default function App() {
       if (answered) return;
       if (!restored) {
         restored = readJsonCache(SESSION_CACHE_KEY)?.user;
-        if (restored) setUser((current) => current ?? restored);
+        if (restored) setUser((/** @type {any} */ current) => current ?? restored);
       }
       const delay = SESSION_RETRY_DELAYS_MS[Math.min(attempt, SESSION_RETRY_DELAYS_MS.length - 1)];
       attempt += 1;
@@ -547,7 +563,8 @@ export default function App() {
     loadSession();
     return () => {
       cancelled = true;
-      clearTimeout(retryTimer);
+      // clearTimeout ignores null, which the timer is until the first retry is set.
+      clearTimeout(/** @type {ReturnType<typeof setTimeout>} */ (retryTimer));
     };
   }, []);
 
@@ -627,6 +644,7 @@ export default function App() {
         onAction={reloadForUpdate}
       />
     ) : null;
+  /** @param {import("react").ReactNode} page */
   const withNotice = (page) => (
     <>
       {page}

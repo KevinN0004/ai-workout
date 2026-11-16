@@ -849,7 +849,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 64;
+  const TYPE_CHECKED_FILES = 67;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -895,6 +895,18 @@ describe("type-checked files", () => {
       checked.length,
       "raise TYPE_CHECKED_FILES with each file you check; lower it only in a PR that says why"
     ).toBe(TYPE_CHECKED_FILES);
+  });
+
+  // D1 phase 3: the client's data layer is checked whole, so a file added there is
+  // checked from its first commit (docs/specs/2026-11-16-client-data-layer-types-design.md).
+  const DATA_LAYER = /^client\/src\/(?:(?:app|hooks|components)\/|(?:App|main)\.jsx$)/;
+  const isTest = (file) => /(?:^|\/)__tests__\/|\.test\.[cm]?jsx?$/.test(file);
+
+  test("every source file in the client's data layer is checked", () => {
+    const layer = sources.filter(({ file }) => DATA_LAYER.test(file) && !isTest(file));
+    expect(layer.length, "the sweep found too few data-layer files").toBeGreaterThanOrEqual(43);
+    const unchecked = layer.filter((source) => !checked.includes(source)).map(({ file }) => file);
+    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
 
   test.each(WORKSPACES)("%s/tsconfig.json keeps strict on and checkJs off", (workspace) => {
