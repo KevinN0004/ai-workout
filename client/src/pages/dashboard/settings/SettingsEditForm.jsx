@@ -159,10 +159,10 @@ export default function SettingsEditForm({
       {error && <p className="error">{error}</p>}
 
       <div className="settings-edit-actions">
-        <button type="button" onClick={onCancel} disabled={saving}>
+        <button type="button" className="ghost" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
-        <button type="submit" disabled={saving || offline}>
+        <button type="submit" className="cta" disabled={saving || offline}>
           {saving ? "Saving..." : "Save"}
         </button>
         <OfflineHint />

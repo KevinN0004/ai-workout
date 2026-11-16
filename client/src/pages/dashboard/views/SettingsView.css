@@ -1,6 +1,6 @@
 /* SettingsView, the dashboard's Settings view: the tab list beside the active tab's body,
-   and the label-and-value rows the tabs show. Imported by the view, so it loads in the
-   view's lazy chunk; theme.css restyles the tabs and rows for the dark theme. */
+   the label-and-value rows the tabs show, and the edit form's buttons. Imported by the
+   view, so it loads in the view's lazy chunk; theme.css restyles the tabs and rows. */
 
 /* ---- View and layout ----------------------------------------------------- */
 .settings-view {
@@ -100,6 +100,15 @@
 
 .settings-list-row .muted {
   margin-top: 0;
+}
+
+/* ---- Edit form actions --------------------------------------------------- */
+/* Cancel and Save, spaced as the Account tab's buttons are, and apart from the last field. */
+.settings-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 /* ---- Medium screens ------------------------------------------------------ */

@@ -190,6 +190,26 @@ describe("connected", () => {
     await userEvent.click(reconnect);
     await waitFor(() => expect(assign).toHaveBeenCalledWith(AUTHORIZE_URL));
   });
+
+  // Syncing, or reconnecting in its place, is the panel's main action, so it
+  // alone is white; Disconnect and both confirm steps are outlined.
+  test("Sync now is the white button, and Disconnect and its confirm are outlined", async () => {
+    renderPanel(fakeApi(stateRoute(CONNECTED)));
+
+    expect(await screen.findByRole("button", { name: "Sync now" })).toHaveClass("cta");
+    expect(screen.getByRole("button", { name: "Disconnect" })).toHaveClass("ghost");
+
+    await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("ghost");
+    expect(screen.getByRole("button", { name: "Confirm disconnect" })).toHaveClass("ghost");
+  });
+
+  test("Reconnect Strava is the white button", async () => {
+    renderPanel(fakeApi(stateRoute({ ...CONNECTED, needsReconnect: true })));
+
+    expect(await screen.findByRole("button", { name: "Reconnect Strava" })).toHaveClass("cta");
+  });
 });
 
 describe("Sync now", () => {
