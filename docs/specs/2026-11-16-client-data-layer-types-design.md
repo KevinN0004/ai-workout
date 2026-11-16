@@ -18,6 +18,11 @@ builder declares, not what an unchecked caller passes in. Phase 3 checks the cal
    at runtime. Response types come later, from the server, once its read side is checked, as
    phase 2's rule has it: types come from the server, not from hand-written copies. Not
    chosen: hand-written client typedefs for responses; `unknown` narrowed by runtime checks.
+3. **The tooling's types, as dev dependencies.** `client/tsconfig.json` lists `vite/client`
+   and `vite-plugin-pwa/react` in `types`, and `@types/react` and `@types/react-dom` become
+   client devDependencies, installed under the 14-days-old rule and audited. Nothing reaches
+   the bundle. Not chosen: the tsconfig types alone, with the two `react-dom` imports cast and
+   JSX resting on the `@types/react` that Testing Library happens to bring in.
 
 ## What was found
 
@@ -60,6 +65,21 @@ with `--checkJs true`. Nothing was changed.
    phase 3 sets how props are typed.
 7. **`CLAUDE.md` is at 39,598 of its 40,000-byte cap**, so this phase's record goes in decision
    record 0017 and the readability SOP, not in `CLAUDE.md`.
+8. **The tooling's types are not loaded.** The client tsconfig's `types` is `[]`, so a CSS
+   import (4 files), an SVG import (15, in `PlannerSetupModal.jsx`), `import.meta.env` and
+   `virtual:pwa-register/react` are errors: 21 in all. With `types` set to `vite/client` and
+   `vite-plugin-pwa/react`, both already installed, all 21 clear (probed). `@types/react`
+   19.3.0 is installed only as a dependency of `@testing-library/react`, and
+   `@types/react-dom` not at all, so `react-dom` and `react-dom/client` are untyped (TS7016).
+9. **State that starts empty reads as `never` or `null`.** `useState(null)` and
+   `useState([])` make the checker infer `null` and `never[]`, which accounts for most of the
+   non-parameter errors in `useOptimisticLogs.js`, `useDashboardData.js`, `SwapStep.jsx` and
+   `App.jsx`.
+10. **The planner form is typed as the server's body,** since phase 2 gave
+    `createDefaultPlannerForm` the `@returns` `GeneratePlanBody`, whose coerced fields read as
+    `unknown`. `App.jsx`'s toggles spread `prev.equipment` and `prev.focuses`, 9 errors.
+11. **A caught error is `unknown`** under `strict`, so a `catch` that reads `err.message` or
+    `err.code` is an error: 10 in `events.js`, more in the hooks.
 
 ## Design
 
@@ -109,12 +129,24 @@ asks for. Nothing else changes:
   and imported elsewhere with a JSDoc `import()` type: for example the optimistic log entry
   (`useOptimisticLogs.js`) and the outbox item (`outbox.js`). Where a shape is built from a
   response, its fields are typed as far as the client's own code fixes them, and the rest is
-  `any` with the note above.
+  `any` with the note above. A response the client passes around whole, the dashboard, gets a
+  name, `@typedef {any} Dashboard` in `app/dashboard.js` with the note, so a later phase
+  replaces one line.
+- **State and refs that start empty are typed at their initial value**:
+  `useState(/** @type {Toast | null} */ (null))`, `useRef(/** @type {number | null} */ (null))`.
+  This declares the state's type, so it needs no comment, unlike a cast.
+- **A caught error is cast to what the code already assumes**, with a comment naming what
+  throws there: `/** @type {Error & { status?: number }} */ (err)` after a send, whose throwers
+  all raise an `Error`. No `instanceof` check is added: that would change behaviour.
+- **The planner form gets its own type**, `PlannerForm` in `requestBodies.js`:
+  `GeneratePlanBody` intersected with the fields as the form holds them (`equipment` and
+  `focuses` are `string[]`). It stays assignable to the body, so phase 2's check still holds,
+  and `createDefaultPlannerForm` returns it.
 
 ### Guard
 
 In `scripts/__tests__/repo-invariants.test.mjs`, a test that every non-test `.js` and `.jsx`
-file in the data layer (the four folders and two files of decision 1) carries `// @ts-check`.
+file in the data layer (the three folders and two files of decision 1) carries `// @ts-check`.
 A new file there is then checked from its first commit, which is what `checkJs` would give
 these folders, without turning it on for the pages. It is written test-first and
 mutation-tested: a data-layer file with its pragma removed, and a new unchecked file added to
@@ -133,8 +165,9 @@ phase 2.
 ### Recorded
 
 Decision record 0017 gains a section on the data layer: what it covers, the guard, that
-responses stay `any` until the server's read side is checked, and the props convention. The
-readability SOP's rule 2 gains the props convention.
+responses stay `any` until the server's read side is checked, the props convention, and the
+client tsconfig's `types` with the two `@types` packages (its "`types` to `[]`" line no longer
+holds for the client). The readability SOP's rule 2 gains the props convention.
 
 ## Testing
 
@@ -144,12 +177,14 @@ readability SOP's rule 2 gains the props convention.
   `--coverage.reporter=json-summary`, and the built `index-*.js` size are the same as on
   `main`. JSDoc comments do not reach the bundle.
 - **E2E** runs on each PR, as each one touches the client.
-- **Gates:** format:check, lint, knip, build, `npm test`, `test:scripts`.
+- **Gates:** format:check, lint, knip, build, `npm test`, `test:scripts`. PR 2 also runs
+  audit-ci against `security/audit-ci.json` and checks each added version's publish date.
 
 ## PRs
 
 1. This spec and its plan.
-2. The 16 small modules in `src/app/`: `activeSession`, `cache`, `classifySendFailure`,
+2. The tooling's types (decision 3), then the 16 small modules in `src/app/`: `activeSession`,
+   `cache`, `classifySendFailure`,
    `connection`, `constants`, `dashboard`, `describeAge`, `errorTracking`, `errorTrackingSdk`,
    `linePath`, `network`, `outbox`, `planSwaps`, `routing`, `sendLog`, `strava`. About 73 errors.
 3. Shared hooks and components: `src/hooks/` (4), `src/components/` (3), and
