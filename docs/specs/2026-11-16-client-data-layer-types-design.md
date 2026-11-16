@@ -88,8 +88,8 @@ with `--checkJs true`. Nothing was changed.
 Each of the 37 files gets `// @ts-check` below its header, and the JSDoc types its checker
 asks for. Nothing else changes:
 
-- **No runtime change.** The built bundle, the test count and the coverage figures are the
-  same before and after each PR, and each PR measures all three.
+- **No runtime change.** Each PR's built JavaScript is byte-identical to `main`'s, and its
+  test count and coverage are the same (lines may move only by a line Prettier splits).
 - **A real defect is reported, not fixed in passing.** Where checking exposes code that
   behaves wrongly, the annotation PR leaves it as it is, and it goes to the owner. Its fix is a
   PR of its own, test first.
@@ -173,9 +173,11 @@ holds for the client). The readability SOP's rule 2 gains the props convention.
 
 - **Typecheck** passes on each PR, with `TYPE_CHECKED_FILES` raised by the files it checks.
 - **Mutations** as in "Guard" and "Proof that each file is checked".
-- **No runtime change, measured:** the client suite's count, the exact coverage counts from
-  `--coverage.reporter=json-summary`, and the built `index-*.js` size are the same as on
-  `main`. JSDoc comments do not reach the bundle.
+- **No runtime change, measured:** every built JS file's hash matches `main`'s, since JSDoc
+  and a cast's parentheses do not reach the minified bundle. The client suite's count and the
+  exact covered and total statements, branches and functions match too. Lines may move by a
+  line Prettier splits or joins around an annotation (+1 covered, +1 total in phase 1), and
+  each such move is accounted for in the PR.
 - **E2E** runs on each PR, as each one touches the client.
 - **Gates:** format:check, lint, knip, build, `npm test`, `test:scripts`. PR 2 also runs
   audit-ci against `security/audit-ci.json` and checks each added version's publish date.

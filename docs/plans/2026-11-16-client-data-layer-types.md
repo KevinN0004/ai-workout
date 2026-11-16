@@ -30,14 +30,17 @@ Vitest 5 with v8 coverage, Playwright, gh CLI.
   `npm run format:check`, `npm run knip`, `npm run build`, `npm run test:scripts`, then
   `npm run test:e2e` (Postgres on 55432 first).
 - **The no-runtime-change check**, run on `main` before the PR's first edit and again on the
-  finished branch; every figure must match:
-  1. `npm -w client run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary`:
-     the `Tests` count, and the covered and total counts of statements, branches, functions
-     and lines.
-  2. `npm -w client run build`, then the size of every file in `client/dist/assets/*.js`
-     (`ls -l client/dist/assets/*.js | awk '{print $5, $9}'`). JSDoc does not reach the
-     bundle, so the sizes match byte for byte. PR 2 alone may differ in no file: its new
-     packages are types only.
+  finished branch:
+  1. **The build, byte for byte.** `npm -w client run build`, then
+     `sha256sum client/dist/assets/*.js` saved to the scratchpad. Every file's name and hash
+     must match: JSDoc and the parentheses of a cast do not reach the minified bundle. This
+     is the proof that nothing runs differently. If a hash differs, stop and find why.
+  2. **The suite and coverage.**
+     `npm -w client run test:coverage -- --coverage.reporter=json-summary --coverage.reporter=text-summary`:
+     the `Tests` count, and the covered and total counts of statements, branches and
+     functions, must match. Lines may move by the lines Prettier splits or joins around a new
+     annotation (phase 1 saw +1 covered, +1 total from one split); account for each such move
+     in the PR, and treat any other change as a failure.
 - **Mutations** are written to a JSON file with the Write tool and run by the scratchpad's
   `tools/mutate-types.mjs`, which confirms each applied. A type mutation uses the
   `typecheck` suite: `"suites": { "typecheck": ["client"] }`. KILLED means typecheck failed.
@@ -248,7 +251,8 @@ patterns A to D.
 
 ### 2e. Measure and ship
 
-- [ ] The no-runtime-change check on the branch: every figure matches `pr2-before.txt`.
+- [ ] The no-runtime-change check on the branch against `pr2-before.txt`: every JS file's hash
+      matches, and the suite and coverage as the check describes.
 - [ ] The gates. Commit, push, open the PR with the figures, report, wait for the OK.
 
 ## Task 3: Shared hooks and components (PR 3, `feat/d1p3-shared-ui`)
