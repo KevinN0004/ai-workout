@@ -49,6 +49,13 @@ const renderForm = (overrides = {}) =>
   );
 
 describe("SettingsEditForm", () => {
+  test("Save is the white button and Cancel is outlined", () => {
+    renderForm();
+
+    expect(screen.getByRole("button", { name: "Save" })).toHaveClass("cta");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("ghost");
+  });
+
   test("renders a labelled control per field", () => {
     renderForm();
 

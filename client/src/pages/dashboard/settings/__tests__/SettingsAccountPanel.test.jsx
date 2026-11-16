@@ -22,6 +22,21 @@ describe("SettingsAccountPanel", () => {
     expect(screen.queryByLabelText("Password")).toBeNull();
   });
 
+  // Changing the password is the panel's main action, so it alone is white; the
+  // delete steps are outlined, so nothing destructive is the loudest button.
+  test("Change password is the white button, and every delete step is outlined", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "Change password" })).toHaveClass("cta");
+    expect(screen.getByRole("button", { name: "Delete account" })).toHaveClass("ghost");
+
+    await user.click(screen.getByRole("button", { name: "Delete account" }));
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("ghost");
+    expect(screen.getByRole("button", { name: "Confirm deletion" })).toHaveClass("ghost");
+  });
+
   test("marks the password inputs with the autocomplete tokens password managers expect", async () => {
     const user = userEvent.setup();
     renderPanel();

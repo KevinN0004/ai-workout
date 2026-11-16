@@ -261,7 +261,11 @@ export default function SettingsView({
           <div className="settings-body-header">
             <h3>{activeTabData.label}</h3>
             {canEdit && !isEditing && (
-              <button type="button" onClick={() => setEditingTab(activeTabData.id)}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setEditingTab(activeTabData.id)}
+              >
                 Edit
               </button>
             )}

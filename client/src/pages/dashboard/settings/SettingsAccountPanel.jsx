@@ -109,7 +109,7 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
             {passwordError}
           </p>
         )}
-        <button type="submit" disabled={passwordSaving || offline}>
+        <button type="submit" className="cta" disabled={passwordSaving || offline}>
           {passwordSaving ? "Changing..." : "Change password"}
         </button>
         <OfflineHint />
@@ -122,7 +122,7 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
           plan you have logged. This cannot be undone.
         </p>
         {!deleteRevealed ? (
-          <button type="button" onClick={handleRevealDelete}>
+          <button type="button" className="ghost" onClick={handleRevealDelete}>
             Delete account
           </button>
         ) : (
@@ -143,10 +143,15 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
               </p>
             )}
             <div className="settings-account-actions">
-              <button type="button" onClick={handleCancelDelete} disabled={deleteSaving}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={handleCancelDelete}
+                disabled={deleteSaving}
+              >
                 Cancel
               </button>
-              <button type="submit" disabled={deleteSaving || offline}>
+              <button type="submit" className="ghost" disabled={deleteSaving || offline}>
                 {deleteSaving ? "Deleting..." : "Confirm deletion"}
               </button>
               <OfflineHint />

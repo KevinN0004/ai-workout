@@ -306,6 +306,12 @@ describe("editing a tab", () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
   });
 
+  // Edit opens a form rather than changing anything, so it is the outlined button.
+  test("Edit is an outlined button", () => {
+    renderEditable();
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveClass("ghost");
+  });
+
   test("offers no Edit on a placeholder tab", () => {
     renderEditable();
 

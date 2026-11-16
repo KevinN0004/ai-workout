@@ -162,12 +162,13 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
             <button
               ref={cancelRef}
               type="button"
+              className="ghost"
               onClick={() => setConfirming(false)}
               disabled={busy === "disconnect"}
             >
               Cancel
             </button>
-            <button type="button" onClick={disconnect} disabled={blocked}>
+            <button type="button" className="ghost" onClick={disconnect} disabled={blocked}>
               {busy === "disconnect" ? "Disconnecting..." : "Confirm disconnect"}
             </button>
             <OfflineHint />
@@ -176,15 +177,20 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
       ) : (
         <div className="settings-strava-actions">
           {state.needsReconnect ? (
-            <button type="button" onClick={connect} disabled={blocked}>
+            <button type="button" className="cta" onClick={connect} disabled={blocked}>
               Reconnect Strava
             </button>
           ) : (
-            <button type="button" onClick={sync} disabled={blocked}>
+            <button type="button" className="cta" onClick={sync} disabled={blocked}>
               {busy === "sync" ? "Syncing..." : "Sync now"}
             </button>
           )}
-          <button type="button" onClick={() => setConfirming(true)} disabled={blocked}>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setConfirming(true)}
+            disabled={blocked}
+          >
             Disconnect
           </button>
           <OfflineHint />
