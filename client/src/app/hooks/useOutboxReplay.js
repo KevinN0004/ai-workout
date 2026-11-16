@@ -2,6 +2,7 @@
  * Sends the outbox: the workout, meal and calorie entries kept on the device
  * because their first send failed. Called once, by App.
  */
+// @ts-check
 import { useCallback, useEffect, useRef } from "react";
 import useConnection from "../../hooks/useConnection";
 import { classifySendFailure } from "../classifySendFailure";
@@ -14,6 +15,18 @@ const REPLAY_INTERVAL_MS = 30000;
 const OUTBOX_LOCK = "ai-workout-outbox";
 
 /**
+ * @typedef {object} OutboxReplayOptions
+ * @property {import("../cache.js").CacheUser} user
+ * @property {import("../network.js").ApiFetch} apiFetch
+ * @property {import("../sendLog.js").EnsureCsrfToken} ensureCsrfToken
+ * @property {() => () => boolean} captureAccount
+ * @property {(dashboard: import("../dashboard.js").Dashboard) => void} setDashboard
+ * @property {(message: string) => void} setDashError
+ * @property {(message: string) => void} showDashboardToast
+ * @property {(operationId: string) => void} removeQueuedEntry
+ */
+
+/**
  * Sends `user`'s kept entries, oldest first and one at a time, when a user is
  * set, whenever the connection comes back, and every 30 seconds while online
  * (docs/specs/2026-11-06-offline-ready-pwa-design.md). A run stops at the
@@ -23,6 +36,7 @@ const OUTBOX_LOCK = "ai-workout-outbox";
  * dashboard goes to `setDashboard`, and a run that saved any ends with one
  * toast. An answer that arrives after `captureAccount`'s account has gone
  * touches nothing.
+ * @param {OutboxReplayOptions} options
  */
 export default function useOutboxReplay({
   user,

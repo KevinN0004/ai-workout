@@ -3,6 +3,7 @@
  * them per account, and keeping a stale response from overwriting a newer one.
  * Called once, by App.
  */
+// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonCache, writeJsonCache } from "../cache";
 import { fetchWithTimeout } from "../network";
@@ -14,11 +15,19 @@ import { toNumberOrNull } from "../units";
 // the same forecast grid cell, with temperatures moved only by its elevation
 // adjustment (a tenth of a degree), and the shift is a small fraction of the
 // radius the air-quality route searches for a station.
+/** @param {number} value */
 const roundCoordinate = (value) => Math.round(value * 100) / 100;
+
+/** @typedef {import("../dashboard.js").Dashboard} Dashboard */
+/** @typedef {(form: import("../requestBodies.js").GoalsBody) => void} SetGoalForm */
 
 // A target weight the user never saved fills the form blank, not with a
 // default: the server leaves a blank target unset, so saving only the calories
 // cannot save a target with them.
+/**
+ * @param {Dashboard | null | undefined} dashboardValue
+ * @param {SetGoalForm} setGoalForm
+ */
 const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
   if (!dashboardValue?.goals) return;
   const targetWeight = toNumberOrNull(dashboardValue.goals.targetWeight);
@@ -28,6 +37,17 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
     weeklyWorkouts: String(dashboardValue.goals.weeklyWorkouts || 3)
   });
 };
+
+/**
+ * @typedef {object} DashboardDataOptions
+ * @property {import("../cache.js").CacheUser} user
+ * @property {boolean} isDashboardRoute
+ * @property {boolean} shouldLoadAmbientData
+ * @property {string} dashboardCacheKey
+ * @property {string} weatherCacheKey
+ * @property {string} airCacheKey
+ * @property {SetGoalForm} setGoalForm
+ */
 
 /**
  * Owns the dashboard, weather and air-quality state, each with its loading flag
@@ -42,6 +62,7 @@ const applyGoalFormFromDashboard = (dashboardValue, setGoalForm) => {
  * the three cache keys (empty while signed out), `isDashboardRoute`,
  * `shouldLoadAmbientData` (true on the summary view) and `setGoalForm`, which
  * each dashboard it loads, cached or fetched, seeds the goals form through.
+ * @param {DashboardDataOptions} options
  */
 export default function useDashboardData({
   user,
@@ -53,25 +74,31 @@ export default function useDashboardData({
   setGoalForm
 }) {
   // ---- State and refs -------------------------------------------------------
-  const [dashboard, setDashboard] = useState(null);
+  // The dashboard, its pagination and the two readings are the server's
+  // answers, not typed yet (D1 phase 3 spec, decision 2).
+  const [dashboard, setDashboard] = useState(/** @type {Dashboard | null} */ (null));
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
-  const [dashboardPagination, setDashboardPagination] = useState(null);
+  const [dashboardPagination, setDashboardPagination] = useState(/** @type {any} */ (null));
   // Raised by reloadDashboard; the load effect depends on it, so it runs again.
   const [reloadCount, setReloadCount] = useState(0);
-  const [weatherData, setWeatherData] = useState(null);
+  const [weatherData, setWeatherData] = useState(/** @type {any} */ (null));
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
   // "location" when the browser gave no position, so nothing was requested;
   // "lookup" when the request failed. Empty while there is no error.
   const [weatherErrorKind, setWeatherErrorKind] = useState("");
-  const [weatherLastUpdatedAt, setWeatherLastUpdatedAt] = useState(null);
-  const [airQualityData, setAirQualityData] = useState(null);
+  const [weatherLastUpdatedAt, setWeatherLastUpdatedAt] = useState(
+    /** @type {number | null} */ (null)
+  );
+  const [airQualityData, setAirQualityData] = useState(/** @type {any} */ (null));
   const [airQualityLoading, setAirQualityLoading] = useState(false);
   const [airQualityError, setAirQualityError] = useState("");
   // The same two kinds as weatherErrorKind, for the air-quality load.
   const [airQualityErrorKind, setAirQualityErrorKind] = useState("");
-  const [airQualityLastUpdatedAt, setAirQualityLastUpdatedAt] = useState(null);
+  const [airQualityLastUpdatedAt, setAirQualityLastUpdatedAt] = useState(
+    /** @type {number | null} */ (null)
+  );
 
   const weatherDataRef = useRef(null);
   const airQualityDataRef = useRef(null);
@@ -99,7 +126,10 @@ export default function useDashboardData({
 
   const getCurrentCoordinates = useCallback(async () => {
     if (!navigator?.geolocation) {
-      const err = new Error("Location is not available in this browser.");
+      // The code lets loadAirQuality name this failure rather than a lookup's.
+      const err = /** @type {Error & { code?: string }} */ (
+        new Error("Location is not available in this browser.")
+      );
       err.code = "GEO_NOT_AVAILABLE";
       throw err;
     }
@@ -155,7 +185,10 @@ export default function useDashboardData({
         data: data || null,
         updatedAt: now
       });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+      // `err` is a GeolocationPositionError, with a numeric code;
+      // getCurrentCoordinates' GEO_NOT_AVAILABLE Error; or an Error from the
+      // request. It is typed any: a catch variable takes no narrower type.
       if (weatherRequestRef.current !== requestId) return;
       setWeatherErrorKind(located ? "lookup" : "location");
       // A numeric code is a GeolocationPositionError. Every other failure,
@@ -221,7 +254,8 @@ export default function useDashboardData({
         data: data || null,
         updatedAt: now
       });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+      // `err` is one of the three the weather loader's can be, typed any too.
       if (airRequestRef.current !== requestId) return;
       setAirQualityErrorKind(located ? "lookup" : "location");
       // A numeric code is a GeolocationPositionError, and GEO_NOT_AVAILABLE is
@@ -264,7 +298,7 @@ export default function useDashboardData({
     const cachedDashboard = cached?.dashboard;
     if (!cachedDashboard) return;
     restoredDashboardsRef.current.add(cachedDashboard);
-    setDashboard((current) => current || cachedDashboard);
+    setDashboard((/** @type {Dashboard | null} */ current) => current || cachedDashboard);
     applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
   }, [dashboardCacheKey, setGoalForm, user]);
 
@@ -275,7 +309,7 @@ export default function useDashboardData({
     if (!user || !weatherCacheKey) return;
     const cached = readJsonCache(weatherCacheKey);
     if (!cached?.data) return;
-    setWeatherData((current) => current || cached.data);
+    setWeatherData((/** @type {any} */ current) => current || cached.data);
     if (cached.updatedAt) {
       setWeatherLastUpdatedAt((current) => current || cached.updatedAt);
     }
@@ -286,7 +320,7 @@ export default function useDashboardData({
     if (!user || !airCacheKey) return;
     const cached = readJsonCache(airCacheKey);
     if (!cached?.data) return;
-    setAirQualityData((current) => current || cached.data);
+    setAirQualityData((/** @type {any} */ current) => current || cached.data);
     if (cached.updatedAt) {
       setAirQualityLastUpdatedAt((current) => current || cached.updatedAt);
     }
@@ -322,7 +356,7 @@ export default function useDashboardData({
       const hasCachedFallback = Boolean(cachedDashboard);
       if (cachedDashboard) {
         restoredDashboardsRef.current.add(cachedDashboard);
-        setDashboard((current) => current || cachedDashboard);
+        setDashboard((/** @type {Dashboard | null} */ current) => current || cachedDashboard);
         applyGoalFormFromDashboard(cachedDashboard, setGoalForm);
       }
 
@@ -344,7 +378,9 @@ export default function useDashboardData({
         setDashError("");
       } catch (err) {
         if (cancelled || dashboardRequestRef.current !== requestId) return;
-        const message = err?.message || "Unable to load dashboard.";
+        // Everything the load throws is an Error: fetch's DOMException or
+        // TypeError, a body that is not JSON, or the refusal thrown above.
+        const message = /** @type {Error} */ (err)?.message || "Unable to load dashboard.";
         setDashError(
           hasCachedFallback ? "Unable to refresh dashboard right now. Showing saved data." : message
         );

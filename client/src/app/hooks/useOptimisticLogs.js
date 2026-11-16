@@ -3,6 +3,7 @@
  * meal entry shows at once, waits out an undo window, and only then is sent.
  * Called once, by App.
  */
+// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { classifySendFailure } from "../classifySendFailure";
 import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";
@@ -11,7 +12,68 @@ import { sendLog } from "../sendLog";
 
 const KEPT_MESSAGE = "Saved on this device. It will be sent when you're back online.";
 
+/** @typedef {import("../dashboard.js").Dashboard} Dashboard */
+
+/**
+ * The dashboard's toast: its text and tone, and an action button when
+ * `onAction` is set.
+ * @typedef {object} Toast
+ * @property {string} id
+ * @property {string} tone
+ * @property {string} message
+ * @property {string} actionLabel
+ * @property {(() => void) | null} onAction
+ */
+
+/**
+ * A log entry on screen before the server has it. `item` is the entry as the
+ * dashboard's rows hold it, not typed yet (D1 phase 3 spec, decision 2).
+ * @typedef {object} OptimisticEntry
+ * @property {string} operationId
+ * @property {string} type
+ * @property {any} item
+ * @property {number} createdAt
+ */
+
+/**
+ * A queued entry's send: its undo-window timer, whether it has started, and the
+ * started send, which the flush waits on.
+ * @typedef {object} Operation
+ * @property {string} type
+ * @property {ReturnType<typeof setTimeout> | null} timerId
+ * @property {boolean} committing
+ * @property {string | undefined} undoMessage
+ * @property {Promise<void> | null} sending
+ * @property {() => Promise<void>} [send]
+ * @property {string} [undoToastId]
+ */
+
+/**
+ * A log handed to queueOptimisticLogCommit. `request` resolves to the server's
+ * answer, and `item`, the entry as shown, is not typed yet either.
+ * @typedef {object} LogCommit
+ * @property {string} type
+ * @property {any} item
+ * @property {() => Promise<any>} request
+ * @property {{ clientId: string, url: string, body: unknown }} [outbox]
+ * @property {string} [pendingMessage]
+ * @property {string} [successMessage]
+ * @property {string} [undoMessage]
+ */
+
+/**
+ * @typedef {object} OptimisticLogsOptions
+ * @property {(dashboard: Dashboard) => void} setDashboard
+ * @property {(message: string) => void} setDashError
+ * @property {import("../cache.js").CacheUser} user
+ * @property {import("../sendLog.js").EnsureCsrfToken} ensureCsrfToken
+ */
+
 // An outbox entry as the dashboard shows it: pending, and marked not sent yet.
+/**
+ * @param {import("../outbox.js").OutboxEntry} entry
+ * @returns {OptimisticEntry}
+ */
 const toKeptEntry = ({ type, item, queuedAt }) => ({
   operationId: item.id,
   type,
@@ -40,13 +102,18 @@ const toKeptEntry = ({ type, item, queuedAt }) => ({
  * (docs/specs/2026-11-06-offline-ready-pwa-design.md). `user`'s kept entries
  * are on screen from the start, and `removeQueuedEntry` takes one off once
  * useOutboxReplay has sent it.
+ * @param {OptimisticLogsOptions} options
  */
 export default function useOptimisticLogs({ setDashboard, setDashError, user, ensureCsrfToken }) {
   // ---- State and refs -------------------------------------------------------
-  const [optimisticLogEntries, setOptimisticLogEntries] = useState([]);
-  const [dashboardToast, setDashboardToast] = useState(null);
-  const dashboardToastTimeoutRef = useRef(null);
-  const optimisticOpRef = useRef(new Map());
+  const [optimisticLogEntries, setOptimisticLogEntries] = useState(
+    /** @type {OptimisticEntry[]} */ ([])
+  );
+  const [dashboardToast, setDashboardToast] = useState(/** @type {Toast | null} */ (null));
+  const dashboardToastTimeoutRef = useRef(
+    /** @type {ReturnType<typeof setTimeout> | null} */ (null)
+  );
+  const optimisticOpRef = useRef(/** @type {Map<string, Operation>} */ (new Map()));
   // Bumped by clearOptimisticOperations, which logout, account deletion and
   // unmount all run. A request sent before the bump answers for an account
   // that is no longer on screen.
@@ -54,7 +121,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
   // The id of the toast on screen while it offers Undo, else null. A send's
   // answer does not replace that toast: it is the only way to call its entry
   // off, so it stays until that entry's own send starts.
-  const undoToastIdRef = useRef(null);
+  const undoToastIdRef = useRef(/** @type {string | null} */ (null));
 
   // ---- Toast ----------------------------------------------------------------
   const clearDashboardToast = useCallback(() => {
@@ -68,34 +135,42 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
 
   // Returns the new toast's id, which a queued entry keeps so that its send
   // can tell whether the toast on screen is still its own.
-  const showDashboardToast = useCallback((message, tone = "success", options = {}) => {
-    if (!message) return;
-    if (dashboardToastTimeoutRef.current) {
-      clearTimeout(dashboardToastTimeoutRef.current);
-    }
-    const nextToast = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      tone,
-      message,
-      actionLabel: options?.actionLabel || "",
-      onAction: typeof options?.onAction === "function" ? options.onAction : null
-    };
-    // Milliseconds. A toast with an action stays longer, so there is time to
-    // reach its button; a positive `durationMs` overrides both.
-    const timeoutMs =
-      Number(options?.durationMs) > 0
-        ? Number(options.durationMs)
-        : nextToast.onAction
-          ? 5200
-          : 3200;
-    undoToastIdRef.current = nextToast.onAction ? nextToast.id : null;
-    setDashboardToast(nextToast);
-    dashboardToastTimeoutRef.current = setTimeout(() => {
-      setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
-      dashboardToastTimeoutRef.current = null;
-    }, timeoutMs);
-    return nextToast.id;
-  }, []);
+  const showDashboardToast = useCallback(
+    /**
+     * @param {string} message
+     * @param {string} [tone]
+     * @param {{ actionLabel?: string, onAction?: () => void, durationMs?: number }} [options]
+     */
+    (message, tone = "success", options = {}) => {
+      if (!message) return;
+      if (dashboardToastTimeoutRef.current) {
+        clearTimeout(dashboardToastTimeoutRef.current);
+      }
+      const nextToast = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        tone,
+        message,
+        actionLabel: options?.actionLabel || "",
+        onAction: typeof options?.onAction === "function" ? options.onAction : null
+      };
+      // Milliseconds. A toast with an action stays longer, so there is time to
+      // reach its button; a positive `durationMs` overrides both.
+      const timeoutMs =
+        Number(options?.durationMs) > 0
+          ? Number(options.durationMs)
+          : nextToast.onAction
+            ? 5200
+            : 3200;
+      undoToastIdRef.current = nextToast.onAction ? nextToast.id : null;
+      setDashboardToast(nextToast);
+      dashboardToastTimeoutRef.current = setTimeout(() => {
+        setDashboardToast((current) => (current?.id === nextToast.id ? null : current));
+        dashboardToastTimeoutRef.current = null;
+      }, timeoutMs);
+      return nextToast.id;
+    },
+    []
+  );
 
   // On unmount only: a toast timer still pending is cleared, not left to fire.
   useEffect(() => {
@@ -113,14 +188,14 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
   }, []);
 
   // ---- Optimistic log entries -----------------------------------------------
-  const removeOptimisticEntry = useCallback((operationId) => {
+  const removeOptimisticEntry = useCallback((/** @type {string} */ operationId) => {
     setOptimisticLogEntries((current) =>
       current.filter((entry) => entry.operationId !== operationId)
     );
   }, []);
 
   // Marks an entry not sent yet, once it is kept on the device.
-  const markKept = useCallback((operationId) => {
+  const markKept = useCallback((/** @type {string} */ operationId) => {
     setOptimisticLogEntries((current) =>
       current.map((entry) =>
         entry.operationId === operationId
@@ -143,11 +218,14 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
 
   // Never rejects: each send catches and reports its own failure.
   const flushOptimisticOperations = useCallback(async () => {
+    /** @type {Array<Promise<void> | null>} */
     const sends = [];
     optimisticOpRef.current.forEach((operation) => {
       if (!operation.committing) {
-        clearTimeout(operation.timerId);
-        operation.send();
+        // queueOptimisticLogCommit sets the timer and `send` before it stores
+        // an operation, so every stored one has both.
+        clearTimeout(/** @type {ReturnType<typeof setTimeout>} */ (operation.timerId));
+        /** @type {() => Promise<void>} */ (operation.send)();
       }
       sends.push(operation.sending);
     });
@@ -155,6 +233,10 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
   }, []);
 
   const undoOptimisticOperation = useCallback(
+    /**
+     * @param {string} operationId
+     * @param {{ showToast?: boolean }} [options]
+     */
     (operationId, { showToast = true } = {}) => {
       const operation = optimisticOpRef.current.get(operationId);
       if (!operation || operation.committing) return false;
@@ -172,6 +254,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
   );
 
   const queueOptimisticLogCommit = useCallback(
+    /** @param {LogCommit} log */
     ({ type, item, request, outbox, pendingMessage, successMessage, undoMessage }) => {
       const operationId = item.id;
       // The account the entry is kept for, if it has to be: the one signed in
@@ -204,9 +287,16 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
         // entry's Undo is left. Its id stays, so its own timer still clears it.
         operation.committing = true;
         if (undoToastIdRef.current === operation.undoToastId) undoToastIdRef.current = null;
+        // The ids match only when a toast is up: an entry's undoToastId is
+        // always a toast's, since its pending message is never empty.
         setDashboardToast((current) =>
           current?.id === operation.undoToastId
-            ? { ...current, message: "Saving...", actionLabel: "", onAction: null }
+            ? {
+                .../** @type {Toast} */ (current),
+                message: "Saving...",
+                actionLabel: "",
+                onAction: null
+              }
             : current
         );
         const { data, error } = await sendLog(request, ensureCsrfToken);
@@ -242,6 +332,7 @@ export default function useOptimisticLogs({ setDashboard, setDashError, user, en
       // Start the undo window, and offer Undo in a toast that outlasts it. The
       // timer runs `send`, and flushOptimisticOperations can run it sooner;
       // `sending` keeps the started send for the flush to wait on.
+      /** @type {Operation} */
       const queued = { type, timerId: null, committing: false, undoMessage, sending: null };
       queued.send = () => {
         queued.sending = commit();

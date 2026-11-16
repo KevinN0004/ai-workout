@@ -3,9 +3,18 @@
  * docs/specs/2026-11-12-strava-import-design.md, "The client"). Called once, by
  * App.
  */
+// @ts-check
 import { useEffect, useRef } from "react";
 import useConnection from "../../hooks/useConnection";
 import { syncChangedWorkouts, syncStrava } from "../strava";
+
+/**
+ * @typedef {object} StravaSyncOptions
+ * @property {string} accountKey
+ * @property {boolean} isDashboardRoute
+ * @property {import("../network.js").ApiFetch} apiFetch
+ * @property {() => void} reloadDashboard
+ */
 
 /**
  * Asks the server to catch up with Strava once each time a signed-in visitor
@@ -15,6 +24,7 @@ import { syncChangedWorkouts, syncStrava } from "../strava";
  * replaces the user, does not sync again. Offline it waits for the connection.
  * A refused or failed sync is dropped without a word: without Strava on the
  * server it is expected, and the server records its own failures.
+ * @param {StravaSyncOptions} options
  */
 export default function useStravaSync({ accountKey, isDashboardRoute, apiFetch, reloadDashboard }) {
   const offline = useConnection() === "offline";
