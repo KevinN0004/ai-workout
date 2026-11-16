@@ -65,6 +65,7 @@ export const cardioOptions = [
   "Mixed"
 ];
 
+/** @type {Record<string, string[]>} */
 export const equipmentOptionsByEnv = {
   Home: [
     "Bodyweight only",

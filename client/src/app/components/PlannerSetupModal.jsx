@@ -3,6 +3,7 @@
  * equipment; schedule, level and injuries; focus; then a short health check.
  * App builds it; HomePage and DashboardPage render it.
  */
+// @ts-check
 import ModalPortal from "../../components/ModalPortal";
 import OfflineHint from "../../components/OfflineHint";
 import useConnection from "../../hooks/useConnection";
@@ -23,6 +24,7 @@ import thumbCommercialPool from "../assets/planner-thumbs/commercial-pool.svg";
 import thumbCommercialCourt from "../assets/planner-thumbs/commercial-court.svg";
 import thumbCommercialRecovery from "../assets/planner-thumbs/commercial-recovery.svg";
 
+/** @type {Record<number, string>} */
 const plannerHeaderTitleByStep = {
   1: "Environment",
   2: "Schedule",
@@ -35,6 +37,7 @@ const LAST_STEP = 4;
 // The health check's questions, in the app's own words (the PAR-Q+ licence
 // permits no edits), after ACSM's 2015 screening and the pregnancy guidelines
 // (docs/specs/2026-11-03-rule-based-plans-design.md, "The health screen").
+/** @type {Array<[keyof NonNullable<import("../requestBodies.js").PlannerForm["health"]>, string]>} */
 const HEALTH_QUESTIONS = [
   [
     "condition",
@@ -51,6 +54,7 @@ const HEALTH_QUESTIONS = [
   ["pregnant", "Are you pregnant, or have you given birth in the last six months?"]
 ];
 
+/** @type {Record<string, { image: string, tone: string }>} */
 const equipmentThumbByLabel = {
   "bodyweight only": { image: thumbHomeBodyweight, tone: "tone-mobility" },
   dumbbells: { image: thumbHomeDumbbells, tone: "tone-strength" },
@@ -76,6 +80,7 @@ const equipmentThumbByLabel = {
   "free weights": { image: thumbCommercialStrengthFloor, tone: "tone-strength" }
 };
 
+/** @param {string} label */
 const resolveEquipmentThumb = (label) => {
   const key = String(label || "")
     .trim()
@@ -89,10 +94,27 @@ const resolveEquipmentThumb = (label) => {
 };
 
 /**
+ * @typedef {object} PlannerSetupModalProps
+ * @property {boolean} plannerOpen
+ * @property {number} plannerStep
+ * @property {import("react").Dispatch<import("react").SetStateAction<number>>} setPlannerStep
+ * @property {() => void} closePlanner
+ * @property {import("../requestBodies.js").PlannerForm} form
+ * @property {(environment: string) => void} onEnvironmentChange
+ * @property {(item: string) => void} toggleEquipment
+ * @property {import("react").ChangeEventHandler<HTMLSelectElement>} onChange
+ * @property {(item: string) => void} toggleFocus
+ * @property {(question: string, yes: boolean) => void} setHealthAnswer
+ * @property {boolean} loading
+ * @property {import("react").MouseEventHandler<HTMLButtonElement>} onSubmit
+ */
+
+/**
  * Renders while `plannerOpen` is set, on step `plannerStep` (1 to 4). Every
  * choice it shows is App's `form`, changed through the handlers passed in; the
  * last step's button calls `onSubmit`, which generates the plan; it is
  * disabled offline, because the server builds the plan.
+ * @param {PlannerSetupModalProps} props
  */
 export default function PlannerSetupModal({
   plannerOpen,
