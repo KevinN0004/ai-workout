@@ -2,7 +2,9 @@
   // Type-checks the client's JavaScript (roadmap lane D1, decision record 0017).
   // A file is checked when `// @ts-check` sits below its header; every other
   // file is read for its types and reports nothing. Nothing is built from this
-  // file: Vite and Vitest transform the sources themselves.
+  // file: Vite and Vitest transform the sources themselves. `types` loads Vite's
+  // own declarations (CSS and asset imports, import.meta.env) and the PWA
+  // plugin's virtual module.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -14,7 +16,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["esnext", "dom", "dom.iterable"],
-    "types": []
+    "types": ["vite/client", "vite-plugin-pwa/react"]
   },
   "include": ["src"]
 }

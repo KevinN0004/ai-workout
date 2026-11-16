@@ -2,6 +2,7 @@
  * Whether the page can reach the server, fed by every request (network.js)
  * and read by useConnection, which disables the writes that cannot wait.
  */
+// @ts-check
 
 // While offline, how often to ask the server whether it is back, and how long
 // one ask waits for an answer, in milliseconds.
@@ -9,7 +10,9 @@ const PROBE_INTERVAL_MS = 30000;
 const PROBE_TIMEOUT_MS = 10000;
 
 let lastRequestUnanswered = false;
+/** @type {ReturnType<typeof setInterval> | null} */
 let probeTimer = null;
+/** @type {Set<() => void>} */
 const listeners = new Set();
 
 /**
@@ -79,6 +82,7 @@ const onBrowserOnline = () => {
  * Calls `listener` whenever the connection may have changed, until the
  * returned function is called. The browser's online and offline events are
  * listened to only while someone subscribes.
+ * @param {() => void} listener
  */
 export const subscribeConnection = (listener) => {
   if (!listeners.size) {

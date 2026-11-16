@@ -3,6 +3,7 @@
  * chapter draw their series with. useDashboardMetrics hands it to the
  * dashboard's views; PreviewDashboardChapter imports it directly.
  */
+// @ts-check
 
 /**
  * An SVG path ("M x,y L x,y ...") through `values`, one point per value, spread
@@ -10,6 +11,10 @@
  * the size of the charts' viewBox. The vertical scale always spans 0 and at
  * least 1, so an empty or all-zero series runs along the bottom, and an empty
  * one draws a single point.
+ * @param {number[]} values
+ * @param {number} [width]
+ * @param {number} [height]
+ * @param {number} [padding]
  */
 export const buildLinePath = (values, width = 260, height = 110, padding = 10) => {
   const safeValues = values.length ? values : [0];

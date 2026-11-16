@@ -2,6 +2,7 @@
  * Maps a URL path to the dashboard view it names. App uses it to pick the view
  * on load and on every route change.
  */
+// @ts-check
 import { DASHBOARD_ROUTE_VIEW_MAP } from "./constants";
 
 /**
@@ -10,6 +11,7 @@ import { DASHBOARD_ROUTE_VIEW_MAP } from "./constants";
  * Null for any path outside /dashboard, and for a slug that is not one of the
  * map's own keys, so /dashboard/constructor is null rather than the member
  * every object inherits.
+ * @param {string} path
  */
 export const resolveDashViewFromPath = (path) => {
   if (path === "/dashboard" || path === "/dashboard/") {

@@ -3,6 +3,7 @@
  * VITE_SENTRY_DSN. main.jsx starts it before the first render; the SDK is in
  * errorTrackingSdk.js, fetched only when a DSN is set.
  */
+// @ts-check
 
 // Enough to report a crash on mount. A render loop failing every frame would
 // otherwise queue hundreds of copies of one error.
@@ -36,11 +37,15 @@ export const initErrorTracking = async (dsn = import.meta.env.VITE_SENTRY_DSN, l
   // that matters -- are held here and reported once it has. The listeners are
   // registered before the first await, so they are in place before main.jsx
   // renders anything.
+  /** @type {unknown[]} */
   const early = [];
+  /** @param {unknown} error */
   const hold = (error) => {
     if (early.length < MAX_EARLY_ERRORS) early.push(error);
   };
+  /** @param {ErrorEvent} event */
   const holdError = (event) => hold(event.error ?? event.message);
+  /** @param {PromiseRejectionEvent} event */
   const holdRejection = (event) => hold(event.reason);
   window.addEventListener("error", holdError);
   window.addEventListener("unhandledrejection", holdRejection);
