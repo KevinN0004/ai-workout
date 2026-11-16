@@ -30,7 +30,7 @@ const KEPT_MESSAGE = "Saved on this device. It will be sent when you're back onl
  * dashboard's rows hold it, not typed yet (D1 phase 3 spec, decision 2).
  * @typedef {object} OptimisticEntry
  * @property {string} operationId
- * @property {string} type
+ * @property {import("../outbox.js").LogType} type
  * @property {any} item
  * @property {number} createdAt
  */
@@ -52,7 +52,7 @@ const KEPT_MESSAGE = "Saved on this device. It will be sent when you're back onl
  * A log handed to queueOptimisticLogCommit. `request` resolves to the server's
  * answer, and `item`, the entry as shown, is not typed yet either.
  * @typedef {object} LogCommit
- * @property {string} type
+ * @property {import("../outbox.js").LogType} type
  * @property {any} item
  * @property {() => Promise<any>} request
  * @property {{ clientId: string, url: string, body: unknown }} [outbox]

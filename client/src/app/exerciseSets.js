@@ -78,8 +78,23 @@ export const newCard = ({
 });
 
 /**
+ * The Log workout form. A plan day's log fills in its link; `planDayLabel`
+ * names the day in the modal and is never sent.
+ * @typedef {object} WorkoutForm
+ * @property {string} date
+ * @property {string} focus
+ * @property {string} duration
+ * @property {ExerciseCard[]} exerciseSets
+ * @property {string} notes
+ * @property {string | null} planId
+ * @property {number | null} planDayIndex
+ * @property {string} planDayLabel
+ */
+
+/**
  * The Log workout form as it opens: dated today, one empty exercise card, and
  * no plan-day link. App starts with it, and submitWorkout resets to it.
+ * @returns {WorkoutForm}
  */
 export const newWorkoutForm = () => ({
   date: getLocalDateKey(),
