@@ -216,6 +216,41 @@ describe("App", () => {
     });
   });
 
+  // Each is submitted whole, so its first state is the body a save sends until
+  // the dashboard's goals replace it (requestBodies.js).
+  describe("the forms the dashboard starts with", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("the goals form starts with no target weight, 2,200 calories and 3 workouts", () => {
+      setPath("/dashboard/calories");
+      render(<App />);
+
+      expect(dash.props.goalForm).toEqual({
+        targetWeight: "",
+        targetCalories: "2200",
+        weeklyWorkouts: "3"
+      });
+    });
+
+    test("the progress form starts blank, dated today", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 2, 1, 12, 0, 0));
+      setPath("/dashboard/calories");
+      render(<App />);
+
+      expect(dash.props.progressForm).toEqual({
+        date: "2026-03-01",
+        weightLb: "",
+        bodyFatPct: "",
+        waistCm: "",
+        restingHr: "",
+        notes: ""
+      });
+    });
+  });
+
   describe("picking up the session on arrival", () => {
     test("signs in the user the server returns", async () => {
       stubSession(sessionResponse({ user: { email: "ada@example.com" } }));
