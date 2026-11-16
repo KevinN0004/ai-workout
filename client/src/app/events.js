@@ -3,6 +3,7 @@
  * logout, the dashboard's logs, goals and saved exercises, and the account
  * settings. App rebuilds them from its current state on every render.
  */
+// @ts-check
 import { clearActiveSession, readActiveSession, writeActiveSession } from "./activeSession";
 import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {
@@ -43,7 +44,12 @@ const GENERATE_TIMEOUT_MS = 20000;
 
 // Settles when `promise` does or after `ms`, whichever comes first, and clears
 // its timer either way, so a quick promise leaves no timer behind.
+/**
+ * @param {Promise<unknown>} promise
+ * @param {number} ms
+ */
 const settleWithin = (promise, ms) => {
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timerId;
   const cap = new Promise((resolve) => {
     timerId = setTimeout(resolve, ms);
@@ -57,12 +63,14 @@ const settleWithin = (promise, ms) => {
 // key as the entry's id, so a resent entry updates its row instead of adding
 // one, and hands it back as the entry's id, which must not start "optimistic-"
 // (useProgression reads those as not yet saved).
+/** @param {string} type */
 const buildOptimisticId = (type) =>
   `optimistic-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 // jspdf is one of the largest chunks in the build, for a path most sessions
 // never take. Importing it on demand keeps it out of the initial download; the
 // plan page's Download PDF button is its only caller and can await it.
+/** @param {string} planText */
 const downloadPlanPdfFromText = async (planText) => {
   if (!planText) return;
   const { jsPDF } = await import("jspdf");
@@ -74,7 +82,8 @@ const downloadPlanPdfFromText = async (planText) => {
   const lines = doc.splitTextToSize(planText, pageWidth - margin * 2);
 
   let y = margin;
-  lines.forEach((line) => {
+  // jspdf types the split as any; it is the text's lines.
+  lines.forEach((/** @type {string} */ line) => {
     if (y > pageHeight - margin) {
       doc.addPage();
       y = margin;
@@ -85,6 +94,88 @@ const downloadPlanPdfFromText = async (planText) => {
 
   doc.save("ai-workout-plan.pdf");
 };
+
+/**
+ * A React state setter, which takes a value or an update from the last one.
+ * @template T
+ * @typedef {import("react").Dispatch<import("react").SetStateAction<T>>} SetState
+ */
+
+/** @typedef {ReturnType<typeof import("./hooks/useOptimisticLogs.js").default>} OptimisticLogs */
+/** @typedef {ReturnType<typeof import("./hooks/useDashboardData.js").default>} DashboardData */
+/** @typedef {import("./workoutSession.js").WorkoutSession} WorkoutSession */
+/** @typedef {import("./requestBodies.js").AuthForm} AuthForm */
+/** @typedef {typeof import("./constants.js").defaultSignupProfileForm} SignupProfileForm */
+/** @typedef {import("./exerciseSets.js").WorkoutForm} WorkoutForm */
+/** @typedef {import("./requestBodies.js").MealLogForm} MealLogForm */
+/** @typedef {import("./requestBodies.js").ProgressMetricBody} ProgressForm */
+/** @typedef {import("./requestBodies.js").GoalsBody} GoalsForm */
+
+/**
+ * What App passes createAppEventHandlers: its state, its setters, and what
+ * useApiClient, useDashboardData and useOptimisticLogs return. The server's
+ * user, plan and answers are not typed yet (D1 phase 3 spec, decision 2): every
+ * `res.json()` below reads one as any.
+ * @typedef {object} AppEventDeps
+ * @property {import("./network.js").ApiFetch} apiFetch
+ * @property {import("./cache.js").CacheUser} user
+ * @property {import("./requestBodies.js").GeneratePlanBody} form
+ * @property {SetState<boolean>} setLoading
+ * @property {SetState<string>} setError
+ * @property {SetState<string>} setResult
+ * @property {SetState<any>} setResultPayload
+ * @property {DashboardData["setDashboard"]} setDashboard
+ * @property {() => void} closePlanner
+ * @property {boolean} isDashboardRoute
+ * @property {SetState<string>} setDashView
+ * @property {(path: string) => void} go
+ * @property {typeof import("./constants.js").defaultPersonalForm} personal
+ * @property {string} heightUnit
+ * @property {string} weightUnit
+ * @property {SetState<AuthForm>} setAuthForm
+ * @property {SetState<string>} setAuthMode
+ * @property {SetState<string>} setAuthError
+ * @property {SetState<boolean>} setShowPassword
+ * @property {SetState<boolean>} setAuthAutoSignIn
+ * @property {SetState<string>} setSignupHeightUnit
+ * @property {SetState<string>} setSignupWeightUnit
+ * @property {SetState<SignupProfileForm>} setSignupProfileForm
+ * @property {typeof import("./units.js").toCmFromFeetInches} toCmFromFeetInches
+ * @property {typeof import("./units.js").toFeetInchesFromCm} toFeetInchesFromCm
+ * @property {typeof import("./units.js").toKg} toKg
+ * @property {string} result
+ * @property {string} authMode
+ * @property {SetState<boolean>} setAuthLoading
+ * @property {SignupProfileForm} signupProfileForm
+ * @property {string} signupHeightUnit
+ * @property {string} signupWeightUnit
+ * @property {AuthForm} authForm
+ * @property {SetState<any>} setUser
+ * @property {SetState<boolean>} setSignOutUnfinished
+ * @property {SetState<number>} setSignOutConfirmCount
+ * @property {WorkoutSession | null} pendingSession
+ * @property {SetState<WorkoutSession | null>} setPendingSession
+ * @property {boolean} authAutoSignIn
+ * @property {OptimisticLogs["clearOptimisticOperations"]} clearOptimisticOperations
+ * @property {OptimisticLogs["flushOptimisticOperations"]} flushOptimisticOperations
+ * @property {OptimisticLogs["captureAccount"]} captureAccount
+ * @property {DashboardData["clearDashboardDataState"]} clearDashboardDataState
+ * @property {OptimisticLogs["clearDashboardToast"]} clearDashboardToast
+ * @property {() => void} resetPersonalFlow
+ * @property {OptimisticLogs["queueOptimisticLogCommit"]} queueOptimisticLogCommit
+ * @property {WorkoutForm} workoutForm
+ * @property {SetState<WorkoutForm>} setWorkoutForm
+ * @property {SetState<boolean>} setWorkoutModalOpen
+ * @property {{ calories: string }} calorieForm
+ * @property {SetState<{ calories: string }>} setCalorieForm
+ * @property {GoalsForm} goalForm
+ * @property {DashboardData["setDashError"]} setDashError
+ * @property {OptimisticLogs["showDashboardToast"]} showDashboardToast
+ * @property {MealLogForm} mealLogForm
+ * @property {SetState<MealLogForm>} setMealLogForm
+ * @property {ProgressForm} progressForm
+ * @property {SetState<ProgressForm>} setProgressForm
+ */
 
 /**
  * Builds the handlers from App's state and setters, all passed in one object.
@@ -103,6 +194,7 @@ const downloadPlanPdfFromText = async (planText) => {
  * `setSignOutConfirmCount`, which logout sets to the number of entries kept on
  * the device and still unsent, for SignOutConfirm to ask about, and
  * `confirmSignOut` sets back to 0.
+ * @param {AppEventDeps} deps
  */
 export const createAppEventHandlers = ({
   apiFetch,
@@ -164,6 +256,7 @@ export const createAppEventHandlers = ({
   progressForm,
   setProgressForm
 }) => {
+  /** @param {import("react").FormEvent} event */
   const onSubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -197,7 +290,7 @@ export const createAppEventHandlers = ({
       setResult(data.plan);
       setResultPayload(data.payload ?? null);
       if (data.savedPlan) {
-        setDashboard((prev) =>
+        setDashboard((/** @type {any} */ prev) =>
           prev ? { ...prev, plans: [data.savedPlan, ...(prev.plans || [])] } : prev
         );
       }
@@ -213,7 +306,8 @@ export const createAppEventHandlers = ({
         go("/plan");
       }
     } catch (err) {
-      setError(err.message || "Unable to generate plan.");
+      // Everything the request above throws is an Error.
+      setError(/** @type {Error} */ (err).message || "Unable to generate plan.");
     } finally {
       setLoading(false);
     }
@@ -274,10 +368,14 @@ export const createAppEventHandlers = ({
       setError(err?.message || "Could not prepare the PDF. Please try again.");
     });
 
+  /** @param {import("react").ChangeEvent<HTMLInputElement>} event */
   const onAuthChange = (event) => {
     setAuthForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
+  /**
+   * @param {import("react").ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>} event
+   */
   const onSignupProfileChange = (event) => {
     setSignupProfileForm((prev) => ({
       ...prev,
@@ -285,6 +383,7 @@ export const createAppEventHandlers = ({
     }));
   };
 
+  /** @param {string} mode */
   const onAuthModeChange = (mode) => {
     const isSwitchingMode = mode !== authMode;
     setAuthMode(mode);
@@ -298,6 +397,7 @@ export const createAppEventHandlers = ({
     setShowPassword(false);
   };
 
+  /** @param {import("react").FormEvent} event */
   const onAuthSubmit = async (event) => {
     event.preventDefault();
     setAuthLoading(true);
@@ -348,7 +448,8 @@ export const createAppEventHandlers = ({
       setAuthForm({ ...defaultAuthForm });
       go("/dashboard");
     } catch (err) {
-      setAuthError(err.message || "Unable to authenticate.");
+      // Everything the request above throws is an Error.
+      setAuthError(/** @type {Error} */ (err).message || "Unable to authenticate.");
     } finally {
       setAuthLoading(false);
     }
@@ -422,6 +523,7 @@ export const createAppEventHandlers = ({
   // (roadmap B6): `id` is the replay key, and `exerciseSets` are in the API's
   // shape, in kg. A workout logged from a plan day carries its link; an ordinary
   // one leaves it out, since the server takes an absent planId, never a null one.
+  /** @param {Parameters<typeof workoutSessionBody>[0]} workout */
   const queueWorkout = ({
     id,
     date,
@@ -478,6 +580,7 @@ export const createAppEventHandlers = ({
     });
   };
 
+  /** @param {import("react").FormEvent} event */
   const submitWorkout = async (event) => {
     event.preventDefault();
     // The modal has already checked the cards, so this only reads them: the
@@ -506,6 +609,7 @@ export const createAppEventHandlers = ({
   // Finish in the in-gym session: the session is saved like the form's
   // workout, under its own replay key, then leaves the device, and the Logs
   // open (roadmap B6).
+  /** @param {WorkoutSession} session */
   const finishSession = (session) => {
     queueWorkout(toWorkoutSave(session, Date.now()));
     clearActiveSession(user);
@@ -515,6 +619,7 @@ export const createAppEventHandlers = ({
   // Start workout and Start a blank workout: the new session is kept on the
   // device and opened. With one already open, App asks first
   // (StartSessionConfirm), holding the new one as `pendingSession`.
+  /** @param {WorkoutSession} session */
   const startSession = (session) => {
     if (readActiveSession(user)) {
       setPendingSession(session);
@@ -529,8 +634,12 @@ export const createAppEventHandlers = ({
 
   // StartSessionConfirm's answer: "resume" opens the session already open, and
   // "replace" discards it for the one waiting.
+  /** @param {"resume" | "replace"} choice */
   const resolveSessionConflict = (choice) => {
-    if (choice === "replace") writeActiveSession(user, pendingSession);
+    // StartSessionConfirm is open, and offers this choice, only while a session
+    // waits, so `pendingSession` is set.
+    if (choice === "replace")
+      writeActiveSession(user, /** @type {WorkoutSession} */ (pendingSession));
     setPendingSession(null);
     go("/workout");
   };
@@ -541,6 +650,7 @@ export const createAppEventHandlers = ({
     go("/dashboard/workouts");
   };
 
+  /** @param {import("react").FormEvent} event */
   const submitCalories = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("calories");
@@ -569,6 +679,7 @@ export const createAppEventHandlers = ({
     setCalorieForm({ calories: "" });
   };
 
+  /** @param {import("react").FormEvent} event */
   const submitGoals = async (event) => {
     event.preventDefault();
     setDashError("");
@@ -590,7 +701,8 @@ export const createAppEventHandlers = ({
       setDashboard(data.dashboard);
       showDashboardToast("Goals updated.");
     } catch (err) {
-      const message = err.message || "Unable to save goals.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to save goals.";
       setDashError(message);
       showDashboardToast(message, "error");
     }
@@ -602,6 +714,10 @@ export const createAppEventHandlers = ({
   // app-level ones here would convert a locale-imperial form with a metric unit
   // and store 170 lb as 170 kg. The app-level values remain the default for any
   // caller that does not pass units.
+  /**
+   * @param {Record<string, any>} draft
+   * @param {{ heightUnit?: string, weightUnit?: string }} [units]
+   */
   const submitProfile = async (draft, units = { heightUnit, weightUnit }) => {
     const isSameAccount = captureAccount();
     try {
@@ -627,16 +743,18 @@ export const createAppEventHandlers = ({
       // hydrates `personal` on load -- so it would be correct right after a save
       // and blank on the next page load. Half-synced state is worse than
       // unsynced.
-      setUser((prev) => (prev ? { ...prev, profile: data.profile } : prev));
+      setUser((/** @type {any} */ prev) => (prev ? { ...prev, profile: data.profile } : prev));
       showDashboardToast("Profile updated.");
       return { ok: true };
     } catch (err) {
-      const message = err.message || "Unable to save profile.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to save profile.";
       showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
   };
 
+  /** @param {Parameters<typeof passwordChangeBody>[0]} passwords */
   const changePassword = async ({ currentPassword, newPassword }) => {
     try {
       const res = await apiFetch("/api/auth/password", {
@@ -657,11 +775,13 @@ export const createAppEventHandlers = ({
       // both would announce every failure twice, at two politeness levels. The
       // inline region is the one that survives: it is tied to the field that
       // needs correcting, and it stays put instead of timing out.
-      const message = err.message || "Unable to change password.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to change password.";
       return { ok: false, error: message };
     }
   };
 
+  /** @param {string} password */
   const deleteAccount = async (password) => {
     try {
       const res = await apiFetch("/api/auth/me", {
@@ -676,7 +796,8 @@ export const createAppEventHandlers = ({
     } catch (err) {
       // Announced inline by the panel's role="alert" region, not by a toast --
       // see the note in changePassword above.
-      const message = err.message || "Unable to delete account.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to delete account.";
       return { ok: false, error: message };
     }
     // Only past the request. Unlike onLogout, this must NOT clear local state
@@ -717,6 +838,7 @@ export const createAppEventHandlers = ({
     return { ok: true };
   };
 
+  /** @param {import("react").FormEvent} event */
   const submitMealLog = async (event) => {
     event.preventDefault();
     const operationId = buildOptimisticId("meal");
@@ -762,6 +884,7 @@ export const createAppEventHandlers = ({
     });
   };
 
+  /** @param {import("react").FormEvent} event */
   const submitProgressMetric = async (event) => {
     event.preventDefault();
     setDashError("");
@@ -784,12 +907,14 @@ export const createAppEventHandlers = ({
       setProgressForm(blankProgressForm(getLocalDateKey()));
       showDashboardToast("Progress metric saved.");
     } catch (err) {
-      const message = err.message || "Unable to save progress metric.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to save progress metric.";
       setDashError(message);
       showDashboardToast(message, "error");
     }
   };
 
+  /** @param {import("./requestBodies.js").SavedExerciseBody} exercisePayload */
   const saveExerciseToPlan = async (exercisePayload) => {
     setDashError("");
     const isSameAccount = captureAccount();
@@ -810,13 +935,15 @@ export const createAppEventHandlers = ({
       showDashboardToast("Exercise saved to your plan.");
       return { ok: true, data };
     } catch (err) {
-      const message = err.message || "Unable to save exercise.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to save exercise.";
       setDashError(message);
       showDashboardToast(message, "error");
       return { ok: false, error: message };
     }
   };
 
+  /** @param {string} entryId */
   const removeSavedExercise = async (entryId) => {
     setDashError("");
     const isSameAccount = captureAccount();
@@ -835,7 +962,8 @@ export const createAppEventHandlers = ({
       showDashboardToast("Saved exercise removed.");
       return { ok: true, data };
     } catch (err) {
-      const message = err.message || "Unable to remove saved exercise.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to remove saved exercise.";
       setDashError(message);
       showDashboardToast(message, "error");
       return { ok: false, error: message };
@@ -845,6 +973,7 @@ export const createAppEventHandlers = ({
   // Roadmap C2: deletes a workout imported from Strava, which the server
   // remembers so no sync brings it back. The route refuses a workout logged in
   // the app, and answers the dashboard without the deleted one.
+  /** @param {string} workoutId */
   const deleteImportedWorkout = async (workoutId) => {
     setDashError("");
     const isSameAccount = captureAccount();
@@ -863,7 +992,8 @@ export const createAppEventHandlers = ({
       showDashboardToast("Workout deleted.");
       return { ok: true, data };
     } catch (err) {
-      const message = err.message || "Unable to delete that workout.";
+      // Everything the request above throws is an Error.
+      const message = /** @type {Error} */ (err).message || "Unable to delete that workout.";
       setDashError(message);
       showDashboardToast(message, "error");
       return { ok: false, error: message };
@@ -872,12 +1002,15 @@ export const createAppEventHandlers = ({
 
   // Roadmap C4: the plan a swap or an undo answers, in place of the plan with
   // its id. The swap's own request is made where the swap is chosen.
+  /** @param {any} plan the server's, not typed yet (D1 phase 3 spec, decision 2) */
   const replacePlan = (plan) =>
-    setDashboard((prev) =>
+    setDashboard((/** @type {any} */ prev) =>
       prev
         ? {
             ...prev,
-            plans: (prev.plans || []).map((entry) => (entry.id === plan.id ? plan : entry))
+            plans: (prev.plans || []).map((/** @type {any} */ entry) =>
+              entry.id === plan.id ? plan : entry
+            )
           }
         : prev
     );

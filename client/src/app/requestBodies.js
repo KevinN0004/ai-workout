@@ -86,7 +86,7 @@ export const accountDeleteBody = (password) => ({ password });
  *   planId?: string | null,
  *   planDayIndex?: number | null
  * }} workout
- * @returns {WorkoutSessionBody}
+ * @returns {WorkoutSessionBody & { id: string }}
  */
 export const workoutSessionBody = ({
   id,
@@ -116,7 +116,7 @@ export const workoutSessionBody = ({
  * @param {{ calories: string }} calorieForm
  * @param {string} id
  * @param {string} date
- * @returns {CaloriesBody}
+ * @returns {CaloriesBody & { id: string }}
  */
 export const caloriesBody = (calorieForm, id, date) => ({ ...calorieForm, id, date });
 
@@ -138,7 +138,7 @@ export const caloriesBody = (calorieForm, id, date) => ({ ...calorieForm, id, da
  * A meal's body: the form and its replay key.
  * @param {MealLogForm} mealLogForm
  * @param {string} id
- * @returns {MealLogBody}
+ * @returns {MealLogBody & { id: string }}
  */
 export const mealLogBody = (mealLogForm, id) => ({ ...mealLogForm, id });
 
