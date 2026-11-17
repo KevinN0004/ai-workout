@@ -18,7 +18,9 @@ phase: "Response types come later, from the server, once its read side is checke
    It is a recorded exception to "types live in JSDoc": it declares types only, and nothing
    runs from it. Not chosen: the packages with an `AppRequest` typedef and a cast in each
    handler that reads those fields (about 130 casts); Express left `any`, with no new
-   packages.
+   packages. _Added when the plan was written, for the owner's review:_ `@types/pg` joins
+   them as a direct devDependency (finding 13), for the reason phase 3 gave `@types/react`
+   its own entry.
 3. **Response types are server-only, and named.** Each answer the client reads gets a named
    typedef beside the route that sends it, and no client file changes. The pages phase then
    swaps the client's `Dashboard = any` and its `.json()` reads for those names. Not chosen:
@@ -97,6 +99,15 @@ Measured on `c8116ec`, TypeScript 7.0.2, by running the server's `tsc -p tsconfi
     A `.d.ts` must be held to the header rule and must not move a coverage figure.
 12. **`CLAUDE.md` is at 39,598 of its 40,000-byte cap.** Phase 4's record goes in decision
     record 0017, with one short line in `CLAUDE.md` naming `server/src/types/`.
+13. **`pg` is typed only by accident** (this and 14 were found when the plan was written).
+    `db/postgres.js` imports `pg` 8.23.1, which ships no types. The `@types/pg` 8.23.1 that
+    types it is installed because `@prisma/adapter-pg` depends on it, the position phase 3's
+    decision 3 declined to leave `@types/react` in.
+14. **CI type-checks without a generated Prisma client.** The `quality` job runs
+    `npm run typecheck` straight after `npm ci`, and `prisma generate` runs only in the
+    test and E2E jobs. `@prisma/client` 7.10.1 has no install script, and its types re-export
+    `.prisma/client/default`, which only `prisma generate` writes. So decision 4's types
+    exist locally and not in that job. What `tsc` reports there without them was not measured.
 
 ## Design
 
@@ -147,8 +158,12 @@ interface Request { ... } } }`:
   its rows are Prisma's generated payload types. The two Strava repositories change from
   `prisma: any` to the same, and their hand-written row typedefs become the generated ones
   where the shapes agree.
-- **A query constant whose literals widen** (`orderBy: { createdAt: "asc" }`) is marked
-  `/** @type {const} */`.
+- **A query constant whose literals widen** (`orderBy: { createdAt: "asc" }`) is declared
+  with the Prisma input type it is passed as
+  (`Prisma.GeneratedPlanOrderByWithRelationInput[]`), or checked against it with
+  `@satisfies` where its literal type is read back (an `include` that a payload type names).
+  `/** @type {const} */` is for an object only: it makes an array readonly, which Prisma's
+  array inputs do not accept.
 - **A value the schema requires but the code holds as nullable** is cast in place with the
   reason it is set there, or, if the code does not guarantee it, reported as a defect.
 
@@ -158,8 +173,9 @@ interface Request { ... } } }`:
   runtime behaviour. The parameter is typed as what the source callers pass: a builder's
   input is the phase 2 body typedef it builds from (`WorkoutSessionBody` and the rest), a
   mapper's row is the Prisma payload. Where the code handles missing fields itself, the type
-  is `Partial<…>`. The default is cast to that type in place,
-  `(row = /** @type {Row} */ ({}))`, with a comment naming who leaves the argument out.
+  is `Partial<…>`. Where `{}` is not assignable to that type, the default is cast to it in
+  place, `(row = /** @type {Row} */ ({}))`, with a comment naming who leaves the argument
+  out.
 - **No-op placeholders** are declared with the type of the function that replaces them, so
   a call with arguments checks:
   `/** @type {(error: unknown, context?: object) => void} */ let reportServerError = () => {};`
@@ -226,8 +242,9 @@ gains one line for `server/src/types/`, inside its byte cap.
 ## PRs
 
 1. This spec and its plan.
-2. The tooling (decision 2: the packages, `express.d.ts`, the `AuthUser` typedef, the header
-   test widened to `.ts`), then `db/`, `middleware/`, `services/http/` and
+2. The tooling (decision 2: the three packages, `express.d.ts`, the `AuthUser` typedef, the
+   header test widened to `.ts`; finding 14: `prisma generate` before CI's typecheck, with a
+   repo-invariant test that keeps it there), then `db/`, `middleware/`, `services/http/` and
    `services/platform/`: 14 files, about 106 errors.
 3. `repositories/`: 10 files, about 245 errors, and the two Strava repositories moved to
    `PrismaClient`.
