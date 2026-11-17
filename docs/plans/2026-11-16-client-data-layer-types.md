@@ -13,7 +13,36 @@ dependencies) are not repeated here.
 **Tech Stack:** TypeScript 7.0.2 over JSDoc, React 19.3, Vite 8 and vite-plugin-pwa 2,
 Vitest 5 with v8 coverage, Playwright, gh CLI.
 
-**Status: not started.** Every file, line and count below was read or measured on `84acc55`.
+**Status: done 2026-11-16** (#416, #417 and #419 to #422, all live; main `15b10ad`). Every
+file, line and count below was read or measured on `84acc55`. The build was byte-identical to
+`main`'s after every PR, and every client coverage figure still truncates to its floor, so
+there was no floor PR. These are the places the work departs from the text below.
+
+- **#417, tooling and the 16 app modules.** As planned. Lines moved +1 covered, +1 total
+  where Prettier split an `if` in `sendLog.js`; nothing else moved.
+- **#419, the shared hooks and components.** 42 errors against the 45 measured. `useFocusTrap`
+  casts to `HTMLElement | SVGElement`, not `HTMLElement`, because the element focused before a
+  modal opens, and the focusable ones inside it, can be SVG. `StartSessionConfirm` casts `openSession` in place twice, because `Boolean()` does
+  not narrow and a variable to hold the cast would change the build.
+- **#420, the app hooks.** 87 errors against 90. A catch whose error is read more than once
+  types the variable `catch (/** @type {any} */ err)`, with a comment naming what throws: the
+  owner's choice, since TS1196 allows a catch variable no other type. Pattern C's renaming
+  form below is not used.
+- **#421, `events.js`.** 110 errors against 111. All ten catches read their error once, so
+  each is cast in place. The server's answers carry one note, in `AppEventDeps`' description,
+  instead of one at each of the 20 `res.json()` calls. `LogType` is
+  `"workout" | "calorie" | "meal"`: the table below said `"calories"`, which no writer passes.
+  It narrows `OutboxEntry`, `OptimisticEntry` and `LogCommit`. Two checked files gained an
+  annotation: the three log builders return their body `& { id: string }`, and
+  `exerciseSets.js` declares `WorkoutForm`. Lines moved +1, +1, from one Prettier split.
+- **#422, the modal, `App.jsx`, `main.jsx` and the guard.** 55 errors against 75, measured
+  before the neighbours were checked. `PlannerForm` also makes `duration` and `days` strings and
+  `environment` required, the fields the new errors named. `equipmentOptionsByEnv` is a
+  `Record<string, string[]>`. A mutation passing a number to `initErrorTracking` survived,
+  because its default comes from `import.meta.env`, which Vite types `any`; a misspelled
+  `render` replaced it.
+- **Task 7.** The tsconfig item's "`types` to `[]`" holding for the server only was wrong:
+  the server's `types` names `node`. Decision record 0017 says what each names.
 
 ---
 
@@ -117,18 +146,18 @@ No `@ts-ignore` and no `@ts-expect-error` anywhere.
 Declared once, in the module that owns the shape, and imported elsewhere with
 `import("<path>").<Name>`:
 
-| Typedef           | Declared in                      | Shape                                                                                                                                 |
-| ----------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `CacheUser`       | `app/cache.js`                   | `{ userId?: string, email?: string } \| null \| undefined`: the fields `buildScopedCacheKey` reads                                    |
-| `ApiFetch`        | `app/network.js`                 | `(url: string, options?: RequestInit & { timeoutMs?: number }) => Promise<Response>`                                                  |
-| `SendError`       | `app/sendLog.js`                 | `Error & { status?: number }`                                                                                                         |
-| `EnsureCsrfToken` | `app/sendLog.js`                 | `(options?: { refresh?: boolean }) => Promise<string>`                                                                                |
-| `LogType`         | `app/outbox.js`                  | `"workout" \| "calories" \| "meal"`, checked against the three call sites in `events.js` (Task 5) before it is narrowed from `string` |
-| `OutboxEntry`     | `app/outbox.js`                  | `{ clientId: string, type: string, url: string, body: unknown, item: any, queuedAt: number }`                                         |
-| `Dashboard`       | `app/dashboard.js`               | `any`, with the note: the server's dashboard, typed once its read side is                                                             |
-| `Toast`           | `app/hooks/useOptimisticLogs.js` | `{ id: string, tone: string, message: string, actionLabel: string, onAction: (() => void) \| null }`                                  |
-| `OptimisticEntry` | `app/hooks/useOptimisticLogs.js` | `{ operationId: string, type: string, item: any, createdAt: number }`                                                                 |
-| `PlannerForm`     | `app/requestBodies.js`           | `GeneratePlanBody & { equipment: string[], focuses: string[] }`, plus any other field App's errors show as `unknown`                  |
+| Typedef           | Declared in                      | Shape                                                                                                                                |
+| ----------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `CacheUser`       | `app/cache.js`                   | `{ userId?: string, email?: string } \| null \| undefined`: the fields `buildScopedCacheKey` reads                                   |
+| `ApiFetch`        | `app/network.js`                 | `(url: string, options?: RequestInit & { timeoutMs?: number }) => Promise<Response>`                                                 |
+| `SendError`       | `app/sendLog.js`                 | `Error & { status?: number }`                                                                                                        |
+| `EnsureCsrfToken` | `app/sendLog.js`                 | `(options?: { refresh?: boolean }) => Promise<string>`                                                                               |
+| `LogType`         | `app/outbox.js`                  | `"workout" \| "calorie" \| "meal"`, checked against the three call sites in `events.js` (Task 5) before it is narrowed from `string` |
+| `OutboxEntry`     | `app/outbox.js`                  | `{ clientId: string, type: string, url: string, body: unknown, item: any, queuedAt: number }`                                        |
+| `Dashboard`       | `app/dashboard.js`               | `any`, with the note: the server's dashboard, typed once its read side is                                                            |
+| `Toast`           | `app/hooks/useOptimisticLogs.js` | `{ id: string, tone: string, message: string, actionLabel: string, onAction: (() => void) \| null }`                                 |
+| `OptimisticEntry` | `app/hooks/useOptimisticLogs.js` | `{ operationId: string, type: string, item: any, createdAt: number }`                                                                |
+| `PlannerForm`     | `app/requestBodies.js`           | `GeneratePlanBody & { equipment: string[], focuses: string[] }`, plus any other field App's errors show as `unknown`                 |
 
 `LogType`: keep `type: string` in `OutboxEntry` unless every writer passes one of the three
 literals; check `events.js`'s three `queueOptimisticLogCommit` calls in Task 5 and narrow only

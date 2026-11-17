@@ -81,3 +81,35 @@ misspelled or mistyped field fails `npm run typecheck`.
 
 `repo-invariants.test.mjs` holds it: every exported `…BodySchema` in the two schema files has
 a `DeclaredBody` typedef, and every such typedef is named by a checked client file.
+
+## The client's data layer (phase 3)
+
+Decided 2026-11-16, `docs/specs/2026-11-16-client-data-layer-types-design.md`. Every source
+file in `client/src/app/` (its `hooks/` and `components/` included), `client/src/hooks/`,
+`client/src/components/`, `App.jsx` and `main.jsx` is checked: 37 files over five PRs, each
+proved annotation only by a build byte-identical to `main`'s.
+
+- **The guard.** "every source file in the client's data layer is checked", in
+  `repo-invariants.test.mjs`, fails on a source file there without the pragma, so a new one
+  is checked from its first commit. It also fails if its sweep finds fewer than 43 files, so a
+  moved folder cannot leave it checking nothing.
+- **The server's answers stay `any`** until the server's read side is checked: each
+  `res.json()` and the signed-in user. Where one is passed around whole it has a name,
+  `Dashboard` in `app/dashboard.js`, so typing it later changes one typedef.
+- **Props.** A component with up to three props types them inline in its `@param`; one with
+  more gets a `<Name>Props` typedef.
+- **State or a ref that starts empty** is typed at its initial value,
+  `useState(/** @type {Toast | null} */ (null))`, which declares it and needs no comment. An
+  update callback on state typed `any` gets its parameter typed inline, since the setter gives
+  it no type.
+- **A caught error** can be typed only `any` or `unknown` (TS1196). Read once, it is cast in
+  place, `/** @type {Error} */ (err).message`. Read more than once, the catch types the
+  variable, `catch (/** @type {any} */ err)`, with a comment naming what throws (the owner's
+  choice, 2026-11-16). Neither adds a variable to hold the cast: a new statement changes the
+  bundle and the coverage figures.
+- **The tooling's types.** The client tsconfig's `types` names `vite/client` and
+  `vite-plugin-pwa/react`, for CSS and asset imports, `import.meta.env` and the PWA plugin's
+  virtual module; the server's names `node`. `@types/react` and `@types/react-dom` are client
+  dev dependencies, because React's types reached the client only through Testing Library and
+  React DOM's not at all. Vite types an `import.meta.env` key it does not declare as `any`, so
+  a parameter defaulted from one accepts anything.

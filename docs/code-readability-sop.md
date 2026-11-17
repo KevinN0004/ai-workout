@@ -48,6 +48,10 @@ prose: what it is for, what it returns, and anything it assumes.
   prose, and add a `@returns {Type}` only where the inferred return is wider than the truth.
   The pragma goes on its own line below the header, before the first statement
   ([decision record 0017](adr/0017-type-checking-through-jsdoc.md)).
+- A checked component's props are typed by its `@param`: inline for up to three props,
+  `@param {{ open: boolean, onClose: () => void }} props`, and as a `<Name>Props` typedef,
+  one `@property` per prop, for more. The typedef goes directly above the component's own
+  comment, so that comment stays prose.
 - An export may go without one only when its name and signature already say all of that.
   If you leave one bare, say which in the PR.
 
