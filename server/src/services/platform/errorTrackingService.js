@@ -3,6 +3,28 @@
  * at startup, the error middleware and sendErrorResponse report 5xx errors
  * through it, and the shutdown handler flushes it.
  */
+// @ts-check
+
+/**
+ * The request a 5xx came from, as captureException tags it.
+ * @typedef {object} ErrorContext
+ * @property {string} [requestId] The id requestContext gave the request.
+ * @property {string} [method] The HTTP method.
+ * @property {string} [path] The path, without its query.
+ * @property {number} [status] The status the app answered.
+ */
+
+/**
+ * What initErrorTracking returns, and the app calls.
+ * @typedef {object} ErrorTracker
+ * @property {boolean} enabled Whether errors are sent.
+ * @property {boolean} configured Whether a DSN was set.
+ * @property {(error: unknown, context?: ErrorContext) => void} captureException
+ *   Reports one error, tagged with its request.
+ * @property {(timeoutMs?: number) => Promise<void>} flush Sends what is queued.
+ */
+
+/** @returns {ErrorTracker} The tracker with both calls doing nothing. */
 const disabledTracker = () => ({
   enabled: false,
   configured: false,
@@ -14,6 +36,10 @@ const disabledTracker = () => ({
 // `> 0` and port-range checks reject the accidental 0 for free, 0 is a valid
 // sample rate here -- so `Number(null)` and `Number("")` would land on a real
 // "trace nothing" rather than on the caller's default.
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ */
 const toRate = (value, fallback = 0) => {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
@@ -60,6 +86,9 @@ const DATA_COLLECTION = {
  * tracker the app calls: `captureException(error, context)` and
  * `flush(timeoutMs)`. With no DSN, or when the SDK fails to load or initialise,
  * both calls do nothing, and `configured` says whether a DSN was set.
+ *
+ * @param {{ logger: import("pino").Logger, toShortText: (value: unknown, maxLen?: number) => string }} deps
+ * @returns {Promise<ErrorTracker>}
  */
 export const initErrorTracking = async ({ logger, toShortText }) => {
   const dsn = toShortText(process.env.SENTRY_DSN || "", 500);
@@ -112,8 +141,9 @@ export const initErrorTracking = async ({ logger, toShortText }) => {
         }
       }
     };
-  } catch (err) {
-    // The SDK is missing or failed to initialise: say so, and track nothing.
+  } catch (/** @type {any} */ err) {
+    // The SDK is missing or failed to initialise: say so, and track nothing. The
+    // import or Sentry.init threw it, and either can throw a non-Error.
     logger.warn(
       {
         event: "sentry_init_failed",

@@ -3,12 +3,14 @@
  * transaction, and records it in `schema_migrations`. Called by
  * server/scripts/apply-postgres-migrations.js.
  */
+// @ts-check
 import nodeFs from "fs/promises";
 import path from "path";
 
 // process.stdout rather than console.log, which the no-console lint rule bars
 // in server code. Callers that want the progress lines elsewhere -- the tests
 // do -- inject `log`.
+/** @param {string} message */
 const logToStdout = (message) => {
   process.stdout.write(`${message}\n`);
 };
@@ -18,6 +20,12 @@ const logToStdout = (message) => {
  *
  * `fs` is injectable so the transaction sequence can be tested without touching
  * the filesystem. Returns the filenames applied during this run.
+ *
+ * @param {object} deps
+ * @param {import("pg").Pool} deps.pool
+ * @param {string} deps.migrationsDir
+ * @param {(message: string) => void} [deps.log]
+ * @param {Pick<typeof nodeFs, "readdir" | "readFile">} [deps.fs]
  */
 export const applyMigrations = async ({ pool, migrationsDir, log = logToStdout, fs = nodeFs }) => {
   await pool.query(`
@@ -34,7 +42,9 @@ export const applyMigrations = async ({ pool, migrationsDir, log = logToStdout, 
     const existing = await pool.query("select 1 from schema_migrations where filename = $1", [
       file
     ]);
-    if (existing.rowCount > 0) {
+    // pg leaves rowCount null only for a command that reports no count; a select
+    // always reports one.
+    if (/** @type {number} */ (existing.rowCount) > 0) {
       log(`[postgres:migrate] skipped ${file}`);
       continue;
     }

@@ -2,15 +2,25 @@
  * The store behind index.js's rate limiters: counts in Redis when the session
  * store's client is ready, and in memory otherwise.
  */
+// @ts-check
 import { MemoryStore } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 
+/** @typedef {() => ReturnType<typeof import("redis").createClient> | null} GetRedisClient */
+
+/**
+ * @param {{ getClient: GetRedisClient, prefix: string }} deps
+ * @returns {RedisStore}
+ */
 const defaultCreateRedisStore = ({ getClient, prefix }) =>
   new RedisStore({
     prefix,
     // Resolved per command rather than captured, so a reconnect that swaps the
     // client object is picked up without rebuilding the store.
-    sendCommand: (...args) => getClient().sendCommand(args)
+    // activeStore builds this store, and routes each call to it, only after it
+    // has seen a ready client.
+    sendCommand: (...args) =>
+      /** @type {NonNullable<ReturnType<GetRedisClient>>} */ (getClient()).sendCommand(args)
   });
 
 /**
@@ -22,6 +32,12 @@ const defaultCreateRedisStore = ({ getClient, prefix }) =>
  * construction time. It resolves one per call through `getClient` instead, and
  * keeps counting in memory whenever there is none -- otherwise a Redis outage
  * would turn every `/api` request into a 500.
+ *
+ * @param {object} deps
+ * @param {GetRedisClient} deps.getClient
+ * @param {typeof defaultCreateRedisStore} [deps.createRedisStore]
+ * @param {string} [deps.prefix]
+ * @param {import("pino").Logger | null} [deps.logger]
  */
 export const createRateLimitStore = ({
   getClient,
@@ -30,7 +46,9 @@ export const createRateLimitStore = ({
   logger = null
 }) => {
   const memoryStore = new MemoryStore();
+  /** @type {RedisStore | null} */
   let redisStore = null;
+  /** @type {import("express-rate-limit").Options | null} */
   let initOptions = null;
   let outageReported = false;
 
@@ -45,6 +63,10 @@ export const createRateLimitStore = ({
 
   // A Redis failure must never reach the caller: express-rate-limit would turn a
   // rejected store call into a 500 on a request that should simply be counted.
+  /**
+   * @param {"increment" | "decrement" | "resetKey"} method
+   * @param {string} key
+   */
   const runWithFallback = async (method, key) => {
     const store = activeStore();
     if (store === memoryStore) return memoryStore[method](key);
@@ -53,8 +75,8 @@ export const createRateLimitStore = ({
       // Re-arm, so a later outage is reported rather than silently swallowed.
       outageReported = false;
       return result;
-    } catch (err) {
-      // Once per outage, not once per request: while Redis is failing, every
+    } catch (/** @type {any} */ err) {
+      // The Redis command threw it, possibly a non-Error. Once per outage, not once per request: while Redis is failing, every
       // request lands here, and logging each one would flood the log.
       if (!outageReported) {
         outageReported = true;
@@ -77,16 +99,20 @@ export const createRateLimitStore = ({
     // same store, and a request through two limiters is reported as counted
     // twice when it was not.
     prefix,
+    /** @param {import("express-rate-limit").Options} options */
     init(options) {
       initOptions = options;
       memoryStore.init(options);
     },
+    /** @param {string} key */
     async increment(key) {
       return runWithFallback("increment", key);
     },
+    /** @param {string} key */
     async decrement(key) {
       return runWithFallback("decrement", key);
     },
+    /** @param {string} key */
     async resetKey(key) {
       return runWithFallback("resetKey", key);
     }

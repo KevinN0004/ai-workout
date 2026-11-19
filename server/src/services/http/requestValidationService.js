@@ -3,14 +3,22 @@
  * answering the request, so the caller decides the response. Used by the
  * dashboard and external routes.
  */
+// @ts-check
 import { validationMessage } from "./validationMessages.js";
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortError = (value, maxLen = 240) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
 /**
  * The first issue in a zod error as `path: message`, cut to 240 characters. An
  * issue with no path is labelled with `fallbackPath`.
+ *
+ * @param {import("zod").ZodError | undefined} error
+ * @param {string} [fallbackPath]
  */
 export const getSchemaValidationMessage = (error, fallbackPath = "request") => {
   const issue = error?.issues?.[0];
@@ -25,6 +33,11 @@ export const getSchemaValidationMessage = (error, fallbackPath = "request") => {
  * Parses `input` with `schema`, in zod 3's wording (validationMessages.js).
  * Returns `{ data, error: "" }` on success, and `{ data: null, error }` with
  * the first issue's message on failure.
+ *
+ * @template {import("zod").ZodType} Schema
+ * @param {Schema} schema
+ * @param {unknown} input
+ * @param {string} [fallbackPath]
  */
 export const validateSchemaInput = (schema, input, fallbackPath = "request") => {
   const result = schema.safeParse(input, { error: validationMessage });

@@ -3,6 +3,7 @@
  * (outside the test suites) before its own module-scope reads of process.env,
  * and exits on any error. Imported modules such as prisma.js read it earlier.
  */
+// @ts-check
 import { parseSubscriptionId } from "../integrations/stravaConfig.js";
 import { parseTokenKey } from "../integrations/tokenCipher.js";
 
@@ -71,6 +72,7 @@ const URL_VARS = [
 // would show Connect and then fail every exchange.
 const STRAVA_REQUIRED = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_TOKEN_KEY"];
 
+/** @param {unknown} value */
 const isBlank = (value) => value === undefined || value === null || String(value).trim() === "";
 
 /**
@@ -79,6 +81,8 @@ const isBlank = (value) => value === undefined || value === null || String(value
  * This validates and reports; it does NOT capture or freeze values. Callers keep
  * reading process.env live, because index.test.js mutates GEMINI_API_KEY at
  * runtime and generateRoutes.js reads it per request.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
  */
 export const validateEnv = (env = {}) => {
   const errors = [];
