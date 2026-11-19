@@ -4,7 +4,9 @@
  * (outside production, only when it is loopback). index.cors.test.js exercises
  * it through the running app, and corsPolicy.test.js the rest.
  */
+// @ts-check
 
+/** @param {string} origin */
 const isLoopbackOrigin = (origin) => {
   try {
     const { hostname } = new URL(origin);
@@ -21,6 +23,8 @@ const isLoopbackOrigin = (origin) => {
  * equal this, short of rebinding its own name to our address, which
  * createCorsPolicy answers. With no Host there is no own origin to match. The
  * Strava routes build their OAuth callback URL from it.
+ *
+ * @param {import("express").Request} req
  */
 export const requestOrigin = (req) => {
   const host = req.get("host");
@@ -47,18 +51,27 @@ export const requestOrigin = (req) => {
  * Returns `corsOptionsDelegate`, which cors calls per request so the check can
  * see the request's own origin, and `isEmpty`, so the caller can report an
  * unset list without reaching back into the Set.
+ *
+ * @param {string[]} [allowedOrigins]
+ * @param {{ development?: boolean }} [options]
  */
 export const createCorsPolicy = (allowedOrigins = [], { development = true } = {}) => {
   const allowedCorsOrigins = new Set(allowedOrigins);
 
+  /** @param {string} ownOrigin */
   const isTrustedOwnOrigin = (ownOrigin) => !development || isLoopbackOrigin(ownOrigin);
 
+  /**
+   * @param {string} origin
+   * @param {string | null} ownOrigin
+   */
   const isAllowedCorsOrigin = (origin, ownOrigin) => {
     if (origin === ownOrigin && isTrustedOwnOrigin(ownOrigin)) return true;
     if (allowedCorsOrigins.has(origin)) return true;
     return development && allowedCorsOrigins.size === 0 && isLoopbackOrigin(origin);
   };
 
+  /** @type {import("cors").CorsOptionsDelegate<import("express").Request>} */
   const corsOptionsDelegate = (req, callback) => {
     callback(null, {
       origin(origin, done) {
@@ -67,7 +80,10 @@ export const createCorsPolicy = (allowedOrigins = [], { development = true } = {
         if (!origin) return done(null, true);
         if (isAllowedCorsOrigin(origin, requestOrigin(req))) return done(null, true);
         // Tag as 4xx so a blocked origin is a client error, not a captured 5xx.
-        const corsError = new Error("Origin not allowed by CORS.");
+        // An Error that carries the status the error middleware answers with.
+        const corsError = /** @type {Error & { status?: number }} */ (
+          new Error("Origin not allowed by CORS.")
+        );
         corsError.status = 403;
         return done(corsError);
       },

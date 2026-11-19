@@ -106,15 +106,20 @@ export const createRateLimitStore = ({
     },
     /** @param {string} key */
     async increment(key) {
-      return runWithFallback("increment", key);
+      // Both stores' increment resolves to the key's count.
+      return /** @type {Promise<import("express-rate-limit").ClientRateLimitInfo>} */ (
+        runWithFallback("increment", key)
+      );
     },
     /** @param {string} key */
     async decrement(key) {
-      return runWithFallback("decrement", key);
+      // Both stores' decrement resolves to nothing.
+      return /** @type {Promise<void>} */ (runWithFallback("decrement", key));
     },
     /** @param {string} key */
     async resetKey(key) {
-      return runWithFallback("resetKey", key);
+      // Both stores' resetKey resolves to nothing.
+      return /** @type {Promise<void>} */ (runWithFallback("resetKey", key));
     }
   };
 };

@@ -3,6 +3,7 @@
  * origin. index.js mounts it after the API routes and before the error handler.
  * Same origin is a constraint here, not a convenience: see registerClientStatic.
  */
+// @ts-check
 import path from "path";
 import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
@@ -10,12 +11,27 @@ import { requestLogPath } from "./services/http/requestLogPath.js";
 
 const DEFAULT_CLIENT_DIST = fileURLToPath(new URL("../../client/dist", import.meta.url));
 
+/**
+ * What index.js hands registerClientStatic.
+ * @typedef {object} RegisterClientStaticOptions
+ * @property {typeof import("express")} express
+ * @property {(path: string) => boolean} existsSync
+ * @property {string} distPath
+ * @property {import("./services/platform/metricsService.js").Metrics} metrics
+ * @property {import("pino").Logger | null} [logger]
+ * @property {((indexPath: string) => void) | null} [onMissing] Told the shell's path when it is missing.
+ * @property {{ windowMs?: number, limit?: number, store?: import("express-rate-limit").Store }} [shellRateLimit]
+ */
+
+/** @param {import("express").Request} req */
 const isApiPath = (req) => req.path === "/api" || req.path.startsWith("/api/");
 
 /**
  * The directory the client bundle is served from: `override` resolved against
  * the working directory when it is set (index.js passes CLIENT_DIST_PATH),
  * otherwise the repository's client/dist.
+ *
+ * @param {string} [override]
  */
 export const resolveClientDistPath = (override = "") =>
   override ? path.resolve(override) : DEFAULT_CLIENT_DIST;
@@ -33,6 +49,7 @@ export const resolveClientDistPath = (override = "") =>
  * on a Windows dev box and in the Linux image. A plain `includes("assets")`
  * would also match a project checked out under, say, `D:\assets\ai-workout`.
  */
+/** @param {string} filePath */
 const cacheControlFor = (filePath) => {
   const segments = String(filePath).split(path.sep);
   return segments.includes("assets") ? "public, max-age=31536000, immutable" : "no-cache";
@@ -69,6 +86,9 @@ const cacheControlFor = (filePath) => {
  * The fallback has a rate limiter of its own. `shellRateLimit` is its
  * `{ windowMs, limit, store }`, which index.js builds from the SPA_RATE_LIMIT_*
  * settings, and each request it refuses is counted in `metrics.rateLimited`.
+ *
+ * @param {import("express").Express} app
+ * @param {RegisterClientStaticOptions} [options]
  */
 export const registerClientStatic = (
   app,
@@ -80,7 +100,8 @@ export const registerClientStatic = (
     onMissing = null,
     metrics,
     shellRateLimit = {}
-  } = {}
+    // Its one caller, index.js, passes every option; the default guards a bare call.
+  } = /** @type {RegisterClientStaticOptions} */ ({})
 ) => {
   const indexPath = path.join(distPath, "index.html");
 
