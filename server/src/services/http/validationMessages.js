@@ -2,9 +2,11 @@
  * Validation messages in the wording zod 3 gave them, which the client shows
  * users verbatim. Both request formatters pass validationMessage to safeParse.
  */
+// @ts-check
 
 // JSON only ever delivers these shapes. zod 3 named NaN "nan", which is what a
 // coerced non-numeric query value becomes.
+/** @param {unknown} input */
 const receivedType = (input) => {
   if (Array.isArray(input)) return "array";
   if (input === null) return "null";
@@ -12,14 +14,17 @@ const receivedType = (input) => {
   return typeof input;
 };
 
+/** @param {unknown} value */
 const quote = (value) => (typeof value === "string" ? `'${value}'` : String(value));
 
+/** @type {Record<string, (bound: number | bigint) => string>} */
 const tooSmall = {
   string: (min) => `String must contain at least ${min} character(s)`,
   number: (min) => `Number must be greater than or equal to ${min}`,
   array: (min) => `Array must contain at least ${min} element(s)`
 };
 
+/** @type {Record<string, (bound: number | bigint) => string>} */
 const tooBig = {
   string: (max) => `String must contain at most ${max} character(s)`,
   number: (max) => `Number must be less than or equal to ${max}`,
@@ -34,6 +39,8 @@ const tooBig = {
  * Only wording recorded from zod 3.25.76 against these schemas is reproduced.
  * Anything else returns undefined, which falls through to zod's own message
  * rather than guessing at what zod 3 would have said.
+ *
+ * @type {import("zod").core.$ZodErrorMap}
  */
 export const validationMessage = (issue) => {
   switch (issue.code) {
@@ -50,8 +57,11 @@ export const validationMessage = (issue) => {
     case "too_big":
       return issue.inclusive && !issue.exact ? tooBig[issue.origin]?.(issue.maximum) : undefined;
     // invalid_value also covers z.literal, which zod 3 worded differently.
+    // A schema or a check raises it, and only a schema's def has a type (a
+    // mime-type check's reads undefined), so inst is read as either.
     case "invalid_value":
-      return issue.inst?._zod?.def?.type === "enum"
+      return /** @type {{ _zod?: { def?: { type?: string } } } | undefined} */ (issue.inst)?._zod
+        ?.def?.type === "enum"
         ? `Invalid enum value. Expected ${issue.values.map(quote).join(" | ")}, received '${issue.input}'`
         : undefined;
     case "unrecognized_keys":

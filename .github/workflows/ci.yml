@@ -54,6 +54,11 @@ jobs:
       - name: Knip
         run: npm run knip
 
+      # The repositories are typed from Prisma's generated client, which only
+      # `prisma generate` writes (decision record 0017).
+      - name: Generate Prisma Client
+        run: npm -w server run prisma:generate
+
       # Checks each workspace's `// @ts-check` files; every other file reports
       # nothing until roadmap milestone M4 turns checkJs on (decision record 0017).
       - name: Typecheck

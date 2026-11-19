@@ -75,7 +75,9 @@ describe("qs stays on a patched release", () => {
   test("every resolved qs in the lockfile is at or above 6.16.0", () => {
     const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
     const resolved = Object.entries(lock.packages)
-      .filter(([name]) => /(^|\/)qs$/.test(name))
+      // The qs package itself, at any depth. @types/qs, which @types/express
+      // brings in, is declarations only and versioned on its own line.
+      .filter(([name]) => /(^|\/)node_modules\/qs$/.test(name))
       .map(([name, entry]) => ({ name, version: entry.version }));
 
     // A lockfile with no qs at all would pass vacuously; express pulls it in.
@@ -493,7 +495,7 @@ describe("every source file opens with a header comment", () => {
 
   const IN_SCOPE_DIRS = ["client/src", "server/src", "server/scripts", "scripts", "e2e"];
   const isInScope = (file) =>
-    /\.(js|jsx|mjs|cjs|css)$/.test(file) &&
+    /\.(js|jsx|mjs|cjs|css|ts)$/.test(file) &&
     !/\.(test|spec)\.|(^|\/)__tests__\/|^client\/src\/test\/setup\.js$/.test(file) &&
     (IN_SCOPE_DIRS.some((dir) => file.startsWith(`${dir}/`)) ||
       /(^|\/)[^/]+\.config\.js$/.test(file));
@@ -849,7 +851,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 67;
+  const TYPE_CHECKED_FILES = 81;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -920,6 +922,19 @@ describe("type-checked files", () => {
   test("CI runs npm run typecheck", () => {
     const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
     expect(ci).toMatch(/^\s*run: npm run typecheck\s*$/m);
+  });
+
+  // Decision 4 types the repositories from Prisma's generated client, which only
+  // `prisma generate` writes, so the job that type-checks must generate it first
+  // (docs/specs/2026-11-17-server-source-types-design.md, finding 14).
+  test("CI generates the Prisma client before it type-checks", () => {
+    const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+    const quality = ci.slice(ci.indexOf("  quality:"), ci.indexOf("  secrets:"));
+    const generate = quality.indexOf("run: npm -w server run prisma:generate");
+    expect(generate, "the quality job must run prisma:generate").toBeGreaterThan(-1);
+    expect(generate, "and before npm run typecheck").toBeLessThan(
+      quality.indexOf("run: npm run typecheck")
+    );
   });
 
   // D1 phase 2: each body schema has a typedef of its declared fields, which

@@ -2,6 +2,7 @@
  * The app's last-resort error middleware, mounted last in index.js. It answers
  * any error a handler throws or passes to `next(err)` instead of answering itself.
  */
+// @ts-check
 import { requestLogPath } from "../services/http/requestLogPath.js";
 
 /**
@@ -10,6 +11,12 @@ import { requestLogPath } from "../services/http/requestLogPath.js";
  * response. A 5xx answers "Server error." whatever the error says, since that
  * text can carry database detail, while a 4xx keeps its message. An error that
  * arrives after the headers are sent goes on to Express's default handler.
+ *
+ * @param {object} deps
+ * @param {import("pino").Logger} deps.logger
+ * @param {(value: unknown, maxLen?: number) => string} deps.toShortText
+ * @param {import("../services/platform/errorTrackingService.js").ErrorTracker["captureException"]} [deps.captureException]
+ * @returns {import("express").ErrorRequestHandler}
  */
 export const createErrorHandler =
   ({ logger, toShortText, captureException = () => {} }) =>

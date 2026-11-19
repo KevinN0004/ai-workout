@@ -2,6 +2,7 @@
  * The app's one Prisma client, over the pg driver adapter. index.js injects it
  * into every repository, connects it at startup and disconnects it on shutdown.
  */
+// @ts-check
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import dotenv from "dotenv";
@@ -10,9 +11,14 @@ dotenv.config({ quiet: true });
 
 // Queries are deliberately not logged, in any environment: they carry user
 // data and, on the server, would defeat the logger's redaction.
+/** @type {import("@prisma/client").Prisma.LogLevel[]} */
 const prismaLog = ["warn", "error"];
 
-const globalPrisma = globalThis.__aiWorkoutPrismaClient;
+/**
+ * globalThis with the cache key this module sets outside production, below.
+ * @typedef {typeof globalThis & { __aiWorkoutPrismaClient?: import("@prisma/client").PrismaClient }} PrismaGlobal
+ */
+const globalPrisma = /** @type {PrismaGlobal} */ (globalThis).__aiWorkoutPrismaClient;
 // The session timezone is UTC, and it is set by the DATABASE rather than here
 // -- see server/db/postgres/003_utc_timezone.sql.
 //
@@ -39,7 +45,7 @@ export const prisma =
 // Cached outside production, so a test that re-imports this module reuses the
 // client rather than opening a second one.
 if (process.env.NODE_ENV !== "production") {
-  globalThis.__aiWorkoutPrismaClient = prisma;
+  /** @type {PrismaGlobal} */ (globalThis).__aiWorkoutPrismaClient = prisma;
 }
 
 /**

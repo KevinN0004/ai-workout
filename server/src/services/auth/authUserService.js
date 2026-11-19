@@ -10,6 +10,12 @@ import { promisify } from "util";
 const pbkdf2Async = promisify(crypto.pbkdf2);
 
 /**
+ * The signed-in user the session middleware puts on `req.user`: what findUserById
+ * resolves to, less its null.
+ * @typedef {NonNullable<Awaited<ReturnType<ReturnType<typeof createAuthUserService>["findUserById"]>>>} AuthUser
+ */
+
+/**
  * Builds the service. Returns the user lookups and creation the routes and
  * sessionService call, mapDbDocToUser, which the routes apply to a user they
  * re-read after a write, and the hashing, verification and legacy-hash upgrade

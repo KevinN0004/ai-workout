@@ -19,11 +19,12 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.js"],
     coverage: {
       provider: "v8",
-      // Everything under src is measured. Only the tests themselves and the
-      // Prisma client output are excluded -- narrowing this further would
-      // report a better number rather than a truer one.
+      // Everything under src is measured. Only the tests themselves, the
+      // Prisma client output and declaration files, which hold no code to run,
+      // are excluded -- narrowing this further would report a better number
+      // rather than a truer one.
       include: ["src/**"],
-      exclude: ["**/*.test.js", "src/generated/**"],
+      exclude: ["**/*.test.js", "src/generated/**", "**/*.d.ts"],
       reporter: ["text", "html"],
       // A ratchet, not a target -- see the note in client/vite.config.js.
       // Measured 2026-11-13 (97.39 / 93.41 / 98.03 / 97.93), after Strava

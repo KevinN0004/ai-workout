@@ -3,11 +3,21 @@
  * schema through the pool; index.js opens it at startup as a probe, and the
  * readiness route reports its status. Prisma keeps its own connection (prisma.js).
  */
+// @ts-check
+/** @type {import("pg").Pool | null} */
 let postgresPool = null;
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const cleanText = (value, maxLen = 500) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+/**
+ * @param {unknown} value
+ * @param {boolean} [fallback]
+ */
 const parseBoolean = (value, fallback = false) => {
   if (value === undefined || value === null || value === "") return fallback;
   const normalized = String(value).trim().toLowerCase();
@@ -16,6 +26,7 @@ const parseBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+/** @param {string} value */
 const redactDatabaseUrl = (value) => {
   const raw = cleanText(value, 1000);
   if (!raw) return "";
@@ -41,6 +52,8 @@ let postgresStatus = {
  * POSTGRES_URL), a copy with the credentials redacted for logs and status, and
  * the SSL flags. SSL is off unless POSTGRES_SSL is true; with it on, the server
  * certificate is verified unless POSTGRES_SSL_REJECT_UNAUTHORIZED is false.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
  */
 export const resolvePostgresConfig = (env = process.env) => {
   const databaseUrl = cleanText(env.DATABASE_URL || env.POSTGRES_URL || "", 1000);
@@ -69,6 +82,11 @@ export const getPostgresPool = () => postgresPool;
  * the status, ends the half-open pool and rethrows. An idle connection that
  * fails later is logged to `logger` and counted in `metrics.postgresPoolErrors`
  * when they are given (index.js gives both; the migration script neither).
+ *
+ * @param {object} [deps]
+ * @param {NodeJS.ProcessEnv} [deps.env]
+ * @param {import("pino").Logger | null} [deps.logger]
+ * @param {import("../services/platform/metricsService.js").Metrics | null} [deps.metrics]
  */
 export const connectPostgres = async ({
   env = process.env,
@@ -127,7 +145,9 @@ export const connectPostgres = async ({
       lastError: ""
     };
     return getPostgresStatus();
-  } catch (err) {
+  } catch (/** @type {any} */ err) {
+    // Loading pg, opening the pool or the probe query threw it, and the error is
+    // read and rethrown.
     postgresStatus = {
       ...postgresStatus,
       connected: false,

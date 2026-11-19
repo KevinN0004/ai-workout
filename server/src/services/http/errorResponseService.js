@@ -3,12 +3,14 @@
  * unmasked message is logged (no stack), a 5xx is reported to error tracking,
  * and the response carries a masked message and the request id.
  */
+// @ts-check
 import { requestLogPath } from "./requestLogPath.js";
 
 const GENERIC_SERVER_ERROR = "Server error.";
 
 // Replaced once by index.js through setErrorResponseTracker. Until then, as in
 // every suite that never imports index.js, a 5xx is logged and not reported.
+/** @type {import("../platform/errorTrackingService.js").ErrorTracker["captureException"]} */
 let reportServerError = () => {};
 
 /**
@@ -19,6 +21,9 @@ let reportServerError = () => {};
  * externalDataService keeps an upstream 4xx's status, so the external routes
  * pass that API's own error text, or the service's fixed fallback, through to
  * the browser.
+ *
+ * @param {any} err Whatever the handler caught; only its message is read.
+ * @param {number} [status]
  */
 const safeErrorMessage = (err, status = 500) => {
   if (status >= 500) return GENERIC_SERVER_ERROR;
@@ -31,6 +36,8 @@ const safeErrorMessage = (err, status = 500) => {
  * `capture(error, { requestId, method, path, status })`, where `path` has no
  * query string. index.js passes the same forwarder it gives the error
  * middleware, so both reach one tracker.
+ *
+ * @param {import("../platform/errorTrackingService.js").ErrorTracker["captureException"]} capture
  */
 export const setErrorResponseTracker = (capture) => {
   reportServerError = capture;
@@ -41,6 +48,11 @@ export const setErrorResponseTracker = (capture) => {
  * responds with the masked payload. Returns the response so handlers can
  * `return sendErrorResponse(...)`. Reported once: it answers the request
  * itself and never calls `next(err)`, so the error middleware does not see it.
+ *
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @param {any} err Whatever the handler caught; only its message is read.
+ * @param {number} [status]
  */
 export const sendErrorResponse = (req, res, err, status = 500) => {
   const resolvedStatus = Number.isInteger(status) ? status : 500;
