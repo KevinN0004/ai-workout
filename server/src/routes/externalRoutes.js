@@ -2,6 +2,7 @@
  * Groups the routes that serve third-party data, which live in routes/external/.
  * Called by registerApiRoutes.
  */
+// @ts-check
 import { registerAirQualityRoutes } from "./external/registerAirQualityRoutes.js";
 import { registerMealDbRoutes } from "./external/registerMealDbRoutes.js";
 import { registerWeatherRoutes } from "./external/registerWeatherRoutes.js";
@@ -13,6 +14,10 @@ import { registerWgerRoutes } from "./external/registerWgerRoutes.js";
  * ways: an outage (an upstream 5xx, a timeout, a missing OpenAQ key, or an
  * error with no status) answers 200 with a fallback payload, and an upstream
  * 4xx, such as a 429, is answered as that error.
+ *
+ * @param {import("express").Express} app
+ * @param {Parameters<typeof registerWeatherRoutes>[1] & Parameters<typeof registerAirQualityRoutes>[1] & Parameters<typeof registerWgerRoutes>[1] & Parameters<typeof registerMealDbRoutes>[1]} deps
+ *   What each of the four reads.
  */
 export const registerExternalRoutes = (app, deps) => {
   registerWeatherRoutes(app, deps);

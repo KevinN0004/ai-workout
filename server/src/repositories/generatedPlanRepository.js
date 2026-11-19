@@ -166,6 +166,7 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
    * @param {string} args.userId
    * @param {string} args.planId
    * @param {(plan: ReturnType<typeof mapGeneratedPlan>) => PlanRewrite | null | Promise<PlanRewrite | null>} args.rewrite
+   * @returns {Promise<{ plan: ReturnType<typeof mapGeneratedPlan>, conflict?: undefined } | { conflict: true, plan?: undefined } | null>}
    */
   const rewritePlan = async ({ userId, planId, rewrite }) => {
     const userPk = await getUserPk(prisma, userId);

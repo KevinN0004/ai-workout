@@ -129,6 +129,7 @@
 /**
  * An OpenAQ sensor, as a station lists it.
  * @typedef {object} OpenAqSensor
+ * @property {unknown} [id]
  * @property {OpenAqParameter} [parameter]
  */
 
@@ -161,8 +162,14 @@
  */
 
 /**
- * A station from OpenAQ's /locations answer, as the ranking reads it.
+ * A station from OpenAQ's /locations answer, as the ranking and the air-quality
+ * route read it, and as projectOpenAqStations keeps it.
  * @typedef {object} OpenAqStation
+ * @property {unknown} [id]
+ * @property {unknown} [name]
+ * @property {unknown} [city]
+ * @property {unknown} [locality]
+ * @property {{ name?: unknown, code?: unknown }} [country]
  * @property {OpenAqTime} [datetimeLast]
  * @property {OpenAqSensor[]} [sensors]
  * @property {unknown} [distance]

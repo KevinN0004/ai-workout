@@ -3,9 +3,67 @@
  * password change, account deletion and logout. Registered by registerApiRoutes;
  * the rate limiters and CSRF check in front of them are mounted in index.js.
  */
+// @ts-check
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { sessionErrorStatus } from "../services/auth/sessionService.js";
+
+/** @typedef {import("../services/auth/authUserService.js").AuthUser} AuthUser */
+
+/**
+ * What index.js hands the account routes; one property per member they read.
+ * @typedef {object} AuthDeps
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["getSessionUser"]} getSessionUser
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").defaultProfile} defaultProfile
+ * @property {import("express").RequestHandler} requireAuth Rejects a request with no session.
+ * @property {typeof import("../services/http/apiSchemaService.js").validateBody} validateBody
+ * @property {typeof import("../services/http/apiSchemaService.js").profileBodySchema} profileBodySchema
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").buildProfile} buildProfile
+ * @property {ReturnType<typeof import("../repositories/userReadRepository.js").createUserReadRepository>["findUserWithDashboard"]} findUserWithDashboard
+ * @property {ReturnType<typeof import("../repositories/userRepository.js").createUserRepository>["updateProfile"]} updateProfile
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["mapDbDocToUser"]} mapDbDocToUser
+ * @property {typeof import("../services/http/apiSchemaService.js").signupBodySchema} signupBodySchema
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").cleanText} cleanText
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["findUserByEmail"]} findUserByEmail
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").isCompleteSignupProfile} isCompleteSignupProfile
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["hashPassword"]} hashPassword
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").defaultDashboard} defaultDashboard
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["createUser"]} createUser
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["createSession"]} createSession
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["setSessionCookie"]} setSessionCookie
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["setCsrfCookie"]} setCsrfCookie
+ * @property {typeof import("../services/http/apiSchemaService.js").loginBodySchema} loginBodySchema
+ * @property {typeof import("../services/http/apiSchemaService.js").passwordChangeBodySchema} passwordChangeBodySchema
+ * @property {typeof import("../services/http/apiSchemaService.js").accountDeleteBodySchema} accountDeleteBodySchema
+ * @property {ReturnType<typeof import("../repositories/userRepository.js").createUserRepository>["updatePasswordHash"]} updatePasswordHash
+ * @property {ReturnType<typeof import("../services/integrations/stravaService.js").createStravaService>["revokeAccess"]} revokeStravaAccess
+ * @property {ReturnType<typeof import("../repositories/userRepository.js").createUserRepository>["deleteUser"]} deleteUser
+ * @property {import("../services/platform/metricsService.js").Metrics} metrics
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["getDummyPasswordRecord"]} getDummyPasswordRecord
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["verifyPassword"]} verifyPassword
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["shouldUpgradePasswordToArgon2id"]} shouldUpgradePasswordToArgon2id
+ * @property {ReturnType<typeof import("../services/auth/authUserService.js").createAuthUserService>["upgradeUserPasswordToArgon2id"]} upgradeUserPasswordToArgon2id
+ * @property {(value: unknown, maxLen?: number) => string} toShortText
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["parseCookies"]} parseCookies
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["deleteSession"]} deleteSession
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["clearSessionCookie"]} clearSessionCookie
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["clearCsrfCookie"]} clearCsrfCookie
+ */
+
+/**
+ * The signed-in user as GET /api/auth/me, the login and the signup answer it:
+ * the id, the email and the profile, never the password hash.
+ * @typedef {{ user: { id: string, email: string, profile: object } }} SignedInResponse
+ */
+
+/** What GET /api/auth/me answers. @typedef {SignedInResponse} AuthMeResponse */
+/** What POST /api/auth/login answers. @typedef {SignedInResponse} LoginResponse */
+/** What POST /api/auth/signup answers. @typedef {SignedInResponse} SignupResponse */
+
+/**
+ * What POST /api/profile answers: the profile as saved.
+ * @typedef {{ profile: object }} ProfileSavedResponse
+ */
 
 /**
  * Registers the account routes on `app`, taking the session helpers, user
@@ -14,7 +72,11 @@ import { sessionErrorStatus } from "../services/auth/sessionService.js";
  * /api/metrics reports. Signup and login both start a session that defaults to
  * "remember me". A route that reads or writes a session answers 503 when the
  * session store is unavailable (see sessionErrorStatus), and 500 otherwise.
+ *
+ * @param {import("express").Express} app
+ * @param {AuthDeps} deps
  */
+// A handler behind requireAuth reads req.user, which requireAuth has set.
 export const registerAuthRoutes = (app, deps) => {
   const {
     getSessionUser,
@@ -58,20 +120,22 @@ export const registerAuthRoutes = (app, deps) => {
     try {
       const user = await getSessionUser(req);
       if (!user) return res.status(401).json({ error: "Not signed in." });
-      res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          profile: user.profile || defaultProfile()
-        }
-      });
+      res.json(
+        /** @satisfies {AuthMeResponse} */ ({
+          user: {
+            id: user.id,
+            email: user.email,
+            profile: user.profile || defaultProfile()
+          }
+        })
+      );
     } catch (err) {
       sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
   });
 
   app.get("/api/profile", requireAuth, (req, res) => {
-    res.json({ profile: req.user.profile || defaultProfile() });
+    res.json({ profile: /** @type {AuthUser} */ (req.user).profile || defaultProfile() });
   });
 
   app.post("/api/profile", requireAuth, async (req, res) => {
@@ -80,16 +144,19 @@ export const registerAuthRoutes = (app, deps) => {
       if (!profileInput) return;
 
       const nextProfile = buildProfile({
-        ...(req.user.profile || defaultProfile()),
+        // The stored profile, or a blank one, with the update spread over it.
+        .../** @type {object} */ (/** @type {AuthUser} */ (req.user).profile || defaultProfile()),
         ...profileInput
       });
-      await updateProfile({ userId: req.user.id, profile: nextProfile });
+      await updateProfile({ userId: /** @type {AuthUser} */ (req.user).id, profile: nextProfile });
 
-      const updatedDoc = await findUserWithDashboard(req.user.id);
+      const updatedDoc = await findUserWithDashboard(/** @type {AuthUser} */ (req.user).id);
       if (!updatedDoc) return res.status(404).json({ error: "User not found." });
 
       const updated = mapDbDocToUser(updatedDoc);
-      res.json({ profile: updated?.profile || defaultProfile() });
+      res.json(
+        /** @satisfies {ProfileSavedResponse} */ ({ profile: updated?.profile || defaultProfile() })
+      );
     } catch (err) {
       sendErrorResponse(req, res, err, 500);
     }
@@ -153,13 +220,15 @@ export const registerAuthRoutes = (app, deps) => {
       // useApiClient reads this cookie before every write, so the client's
       // next request sends the new token.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
-      res.json({
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          profile: newUser.profile || defaultProfile()
-        }
-      });
+      res.json(
+        /** @satisfies {SignupResponse} */ ({
+          user: {
+            id: newUser.id,
+            email: newUser.email,
+            profile: newUser.profile || defaultProfile()
+          }
+        })
+      );
     } catch (err) {
       sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
@@ -193,7 +262,8 @@ export const registerAuthRoutes = (app, deps) => {
       if (shouldUpgradePasswordToArgon2id(user)) {
         try {
           await upgradeUserPasswordToArgon2id(user.id, password);
-        } catch (upgradeErr) {
+        } catch (/** @type {any} */ upgradeErr) {
+          // The rehash or its write threw it, possibly with a non-Error.
           req.log?.error(
             {
               event: "password_upgrade_failed",
@@ -210,13 +280,15 @@ export const registerAuthRoutes = (app, deps) => {
       setSessionCookie(res, token, rememberMe);
       // Replaces the signed-out CSRF token, as signup does.
       setCsrfCookie(res, crypto.randomBytes(24).toString("hex"));
-      res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          profile: user.profile || defaultProfile()
-        }
-      });
+      res.json(
+        /** @satisfies {LoginResponse} */ ({
+          user: {
+            id: user.id,
+            email: user.email,
+            profile: user.profile || defaultProfile()
+          }
+        })
+      );
     } catch (err) {
       sendErrorResponse(req, res, err, sessionErrorStatus(err));
     }
@@ -230,7 +302,7 @@ export const registerAuthRoutes = (app, deps) => {
       const { currentPassword, newPassword } = body;
       // requireAuth has already put the mapped user on req.user, hash and all,
       // so there is no second lookup to do here.
-      const correct = await verifyPassword(currentPassword, req.user);
+      const correct = await verifyPassword(currentPassword, /** @type {AuthUser} */ (req.user));
       if (!correct) {
         metrics.authFailures += 1;
         return res.status(401).json({ error: "Current password is incorrect." });
@@ -240,7 +312,7 @@ export const registerAuthRoutes = (app, deps) => {
       // A stamp intent, not a timestamp: the repository owns the clock, so no
       // caller can supply an absent, invalid or backwards one.
       const stored = await updatePasswordHash({
-        userId: req.user.id,
+        userId: /** @type {AuthUser} */ (req.user).id,
         salt,
         hash,
         passwordAlgo,
@@ -285,7 +357,7 @@ export const registerAuthRoutes = (app, deps) => {
           );
         }
       }
-      const token = await createSession(req.user.id);
+      const token = await createSession(/** @type {AuthUser} */ (req.user).id);
       // rememberMe is not recoverable from the old session, which stores only
       // userId and createdAt. Defaulting to true matches signup and login.
       setSessionCookie(res, token, true);
@@ -301,7 +373,7 @@ export const registerAuthRoutes = (app, deps) => {
       const body = validateBody(req, res, accountDeleteBodySchema);
       if (!body) return;
 
-      const correct = await verifyPassword(body.password, req.user);
+      const correct = await verifyPassword(body.password, /** @type {AuthUser} */ (req.user));
       if (!correct) {
         metrics.authFailures += 1;
         return res.status(401).json({ error: "Password is incorrect." });
@@ -309,7 +381,7 @@ export const registerAuthRoutes = (app, deps) => {
 
       // Strava access is revoked while its tokens can still be read, as a best
       // effort that never throws: a refusal must not keep the account.
-      const revokeError = await revokeStravaAccess(req.user.id);
+      const revokeError = await revokeStravaAccess(/** @type {AuthUser} */ (req.user).id);
       if (revokeError) {
         req.log.warn(
           { event: "strava_revoke_failed", kind: revokeError },
@@ -319,7 +391,7 @@ export const registerAuthRoutes = (app, deps) => {
 
       // Every AppUser relation cascades on delete (see schema.prisma), so this
       // removes every row the user owns along with the account.
-      await deleteUser({ userId: req.user.id });
+      await deleteUser({ userId: /** @type {AuthUser} */ (req.user).id });
 
       // The cookies are cleared before the session delete, as in logout, so a
       // browser whose account is gone is signed out even when that delete

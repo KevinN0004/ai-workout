@@ -2,6 +2,7 @@
  * Query and params schemas for the external-data routes (weather, air quality,
  * wger and TheMealDB), and the helpers that validate a request against them.
  */
+// @ts-check
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 
@@ -59,10 +60,23 @@ export const mealDbSearchQuerySchema = z
   });
 
 /**
+ * How a validator answers a failure: the field to name when the issue carries
+ * no path, and a fixed message in place of the issue's.
+ * @typedef {{ fallbackPath?: string, message?: string }} ValidationOptions
+ */
+
+/**
  * Validates `req.query` against `schema` and returns the parsed data. On failure
  * it answers 400 and returns null, so the route stops on a null. The error is
  * the first schema issue unless `options.message` gives a fixed one instead;
  * `options.fallbackPath` names the field when that issue carries no path.
+ *
+ * @template {import("zod").ZodType} S
+ * @param {{ query?: unknown }} req
+ * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
+ * @param {S} schema
+ * @param {ValidationOptions} [options]
+ * @returns {import("zod").output<S> | null}
  */
 export const validateQuery = (req, res, schema, options = {}) => {
   const { fallbackPath = "query", message = "" } = options;
@@ -72,7 +86,16 @@ export const validateQuery = (req, res, schema, options = {}) => {
   return null;
 };
 
-/** The same as validateQuery, for `req.params`. */
+/**
+ * The same as validateQuery, for `req.params`.
+ *
+ * @template {import("zod").ZodType} S
+ * @param {{ params?: unknown }} req
+ * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
+ * @param {S} schema
+ * @param {ValidationOptions} [options]
+ * @returns {import("zod").output<S> | null}
+ */
 export const validateParams = (req, res, schema, options = {}) => {
   const { fallbackPath = "params", message = "" } = options;
   const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);

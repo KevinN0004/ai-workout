@@ -3,6 +3,7 @@
  * current, its latest readings, and the EPA NowCast of its PM2.5 hourly means scored
  * as a US AQI with a training recommendation. Registered by externalRoutes.js.
  */
+// @ts-check
 import { airQualityQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 
@@ -17,10 +18,65 @@ const STATION_PAGE_LIMIT = 1000;
 // lookups a minute stay inside OpenAQ's 60 requests a minute.
 const MAX_LATEST_ATTEMPTS = 3;
 
+/** @typedef {ReturnType<typeof import("../../services/external/externalDataService.js").createExternalDataService>} ExternalDataService */
+
+/**
+ * What index.js hands the air-quality route; one property per member they read.
+ * @typedef {object} AirQualityDeps
+ * @property {typeof import("../../services/dashboard/dashboardDataBuildersService.js").toNullableNumber} toNullableNumber
+ * @property {ExternalDataService["openAqRequest"]} openAqRequest
+ * @property {ExternalDataService["toFiniteNumber"]} toFiniteNumber
+ * @property {typeof import("../../services/dashboard/dashboardDataBuildersService.js").cleanText} cleanText
+ * @property {import("pino").Logger} logger
+ * @property {ExternalDataService["extractOpenAqMeasurement"]} extractOpenAqMeasurement
+ * @property {ExternalDataService["pm25ToUsAqi"]} pm25ToUsAqi
+ * @property {ExternalDataService["pm25NowCast"]} pm25NowCast
+ * @property {ExternalDataService["nowCastHoursQuery"]} nowCastHoursQuery
+ * @property {ExternalDataService["rankFreshPm25Stations"]} rankFreshPm25Stations
+ * @property {ExternalDataService["isFreshReading"]} isFreshReading
+ * @property {ExternalDataService["openAqResultsTruncated"]} openAqResultsTruncated
+ * @property {ExternalDataService["projectOpenAqStations"]} projectOpenAqStations
+ * @property {ExternalDataService["openAqReturnedCount"]} openAqReturnedCount
+ * @property {ExternalDataService["isPm25Code"]} isPm25Code
+ * @property {ExternalDataService["aqiBand"]} aqiBand
+ * @property {ReturnType<typeof import("../../services/external/httpCacheService.js").createHttpCacheService>["mergeCacheStatuses"]} mergeCacheStatuses
+ * @property {ExternalDataService["openAqParameterLabel"]} openAqParameterLabel
+ * @property {typeof import("../../services/platform/platformHealthService.js").isUpstreamFailureStatus} isUpstreamFailureStatus
+ */
+
+/**
+ * One OpenAQ answer through the cache whose `results` the route reads, each
+ * field possibly absent.
+ * @typedef {import("../../services/external/externalDataService.js").CachedRead & { data: { results?: unknown } | null | undefined }} OpenAqRead
+ */
+
+/** @typedef {ReturnType<AirQualityDeps["extractOpenAqMeasurement"]>} Measurement */
+/** @typedef {ReturnType<AirQualityDeps["aqiBand"]>} AqiBand */
+/** @typedef {import("../../services/external/externalDataService.js").CachedRead["cache"]} CacheStatus */
+
+/**
+ * What GET /api/air-quality/current answers: the nearest station reporting PM2.5
+ * now, its readings and the advice for its NowCast AQI; with no such station,
+ * the coordinates asked for and an "Unknown" reading; or with `fallback` the
+ * same when OpenAQ is out.
+ * @typedef {object} AirQualityResponse
+ * @property {{ status: string, locations: CacheStatus, latest: CacheStatus | null, hours: CacheStatus | null }} [cache]
+ *   How the cache answered each request; absent on a fallback.
+ * @property {true} [fallback]
+ * @property {string} [service]
+ * @property {string} [error]
+ * @property {{ id: number | null, name: string, city: string, country: string, latitude: number | null, longitude: number | null, distanceM?: number | null }} location
+ * @property {{ level: AqiBand["level"], workoutType: AqiBand["workoutType"], guidance: AqiBand["guidance"], primaryPollutant?: string, pm25: number | null, pm25NowCast: number | null, aqiUs: number | null }} summary
+ * @property {{ code: Measurement["code"], label: string, value: Measurement["value"], unit: Measurement["unit"], measuredAt: Measurement["measuredAt"] }[]} pollutants
+ */
+
 /**
  * Registers the air-quality route. `deps` supplies the OpenAQ client
  * (`openAqRequest`) and its parsing, station-ranking and scoring helpers, the
  * NowCast among them, from externalDataService.js, and the server's `logger`.
+ *
+ * @param {import("express").Express} app
+ * @param {AirQualityDeps} deps
  */
 export const registerAirQualityRoutes = (app, deps) => {
   const {
@@ -50,6 +106,10 @@ export const registerAirQualityRoutes = (app, deps) => {
   // what that sensor is). Readings with no pollutant or no value are dropped,
   // the first reading for each pollutant wins and keeps its sensor id and its
   // own UTC time, and the list is capped at twelve.
+  /**
+   * @param {import("../../services/external/externalDataService.js").OpenAqStation | undefined} station
+   * @param {OpenAqRead} latestResponse
+   */
   const readPollutants = (station, latestResponse) => {
     const latestData = latestResponse?.data;
     const rawReadings = Array.isArray(latestData?.results) ? latestData.results : [];
@@ -98,16 +158,29 @@ export const registerAirQualityRoutes = (app, deps) => {
       // here, so a list cached whole, or uncapped, before the trim answers the
       // same.
       const origin = { latitude, longitude };
-      const locationResponse = await openAqRequest(
-        "locations",
-        {
-          coordinates: `${latitude},${longitude}`,
-          radius: Math.round(radiusKm * 1000),
-          parameters_id: PM25_PARAMETER_ID,
-          limit: STATION_PAGE_LIMIT
-        },
-        { project: (data) => projectOpenAqStations(data, origin) }
-      );
+      // OpenAQ's /locations answer, as projectOpenAqStations cached it.
+      const locationResponse =
+        /** @type {import("../../services/external/externalDataService.js").CachedRead & { data: import("../../services/external/externalDataService.js").OpenAqLocations }} */ (
+          await openAqRequest(
+            "locations",
+            {
+              coordinates: `${latitude},${longitude}`,
+              radius: Math.round(radiusKm * 1000),
+              parameters_id: PM25_PARAMETER_ID,
+              limit: STATION_PAGE_LIMIT
+            },
+            // The cache hands its project step OpenAQ's /locations answer.
+            {
+              project: (data) =>
+                projectOpenAqStations(
+                  /** @type {import("../../services/external/externalDataService.js").OpenAqLocations} */ (
+                    data
+                  ),
+                  origin
+                )
+            }
+          )
+        );
       const locationData = locationResponse.data;
       const candidates = Array.isArray(locationData?.results) ? locationData.results : [];
       // The cached list has the stations the route could not read already
@@ -124,7 +197,11 @@ export const registerAirQualityRoutes = (app, deps) => {
       ) {
         logger.warn({
           event: "openaq_locations_truncated",
-          found: locationData.meta.found,
+          // openAqResultsTruncated is true only when meta carries found.
+          found:
+            /** @type {import("../../services/external/externalDataService.js").OpenAqMeta} */ (
+              locationData.meta
+            ).found,
           returned: returnedCount,
           message: "OpenAQ holds more PM2.5 stations within the radius than one page returned."
         });
@@ -146,9 +223,13 @@ export const registerAirQualityRoutes = (app, deps) => {
         const stationId = toNullableNumber(candidate.station?.id, 1, 1000000000);
         if (stationId === null) continue;
         attempts += 1;
+        /** @type {OpenAqRead} */
         let latestResponse;
         try {
-          latestResponse = await openAqRequest(`locations/${Math.trunc(stationId)}/latest`);
+          // A station's /latest answer, its fields each possibly absent.
+          latestResponse = /** @type {OpenAqRead} */ (
+            await openAqRequest(`locations/${Math.trunc(stationId)}/latest`)
+          );
         } catch (err) {
           lastFailure = err;
           continue;
@@ -176,33 +257,35 @@ export const registerAirQualityRoutes = (app, deps) => {
       // the outage fallback's does.
       if (!chosen) {
         const recommendation = aqiBand(null);
-        return res.json({
-          cache: {
-            status: mergeCacheStatuses(locationResponse.cache),
-            locations: locationResponse.cache,
-            latest: null,
-            hours: null
-          },
-          location: {
-            id: null,
-            name: "",
-            city: "",
-            country: "",
-            latitude,
-            longitude,
-            distanceM: null
-          },
-          summary: {
-            level: recommendation.level,
-            workoutType: recommendation.workoutType,
-            guidance: recommendation.guidance,
-            primaryPollutant: "Unknown",
-            pm25: null,
-            pm25NowCast: null,
-            aqiUs: null
-          },
-          pollutants: []
-        });
+        return res.json(
+          /** @satisfies {AirQualityResponse} */ ({
+            cache: {
+              status: mergeCacheStatuses(locationResponse.cache),
+              locations: locationResponse.cache,
+              latest: null,
+              hours: null
+            },
+            location: {
+              id: null,
+              name: "",
+              city: "",
+              country: "",
+              latitude,
+              longitude,
+              distanceM: null
+            },
+            summary: {
+              level: recommendation.level,
+              workoutType: recommendation.workoutType,
+              guidance: recommendation.guidance,
+              primaryPollutant: "Unknown",
+              pm25: null,
+              pm25NowCast: null,
+              aqiUs: null
+            },
+            pollutants: []
+          })
+        );
       }
       const { station: location, latestResponse, pollutants, pm25Reading } = chosen;
 
@@ -212,83 +295,91 @@ export const registerAirQualityRoutes = (app, deps) => {
       // reported.
       const pm25 = pm25Reading.value;
       const pm25SensorId = toNullableNumber(pm25Reading.sensorsId, 1, 1000000000);
-      const hoursResponse =
+      // A sensor's /hours answer, its fields each possibly absent, or null.
+      const hoursResponse = /** @type {OpenAqRead | null} */ (
         pm25SensorId === null
           ? null
           : await openAqRequest(
               `sensors/${Math.trunc(pm25SensorId)}/hours`,
               nowCastHoursQuery()
-            ).catch(() => null);
+            ).catch(() => null)
+      );
       const pm25NowCastValue = pm25NowCast(hoursResponse?.data?.results);
       const aqiUs = pm25ToUsAqi(pm25NowCastValue);
       const recommendation = aqiBand(aqiUs);
 
-      res.json({
-        cache: {
-          status: mergeCacheStatuses(
-            locationResponse.cache,
-            latestResponse.cache,
-            hoursResponse?.cache
-          ),
-          locations: locationResponse.cache,
-          latest: latestResponse.cache,
-          hours: hoursResponse?.cache ?? null
-        },
-        location: {
-          id: toFiniteNumber(location?.id),
-          name: cleanText(location?.name, 120),
-          city: cleanText(location?.city || location?.locality, 120),
-          country: cleanText(location?.country?.name || location?.country?.code || "", 80),
-          latitude: toFiniteNumber(location?.coordinates?.latitude),
-          longitude: toFiniteNumber(location?.coordinates?.longitude),
-          distanceM: chosen.distanceM
-        },
-        summary: {
-          level: recommendation.level,
-          workoutType: recommendation.workoutType,
-          guidance: recommendation.guidance,
-          // Always PM2.5's: a station is read only for its PM2.5 reading.
-          primaryPollutant: pm25Reading.label,
-          pm25,
-          pm25NowCast: pm25NowCastValue,
-          aqiUs
-        },
-        pollutants: pollutants.map((item) => ({
-          code: item.code,
-          label: item.label || openAqParameterLabel(item.code),
-          value: item.value,
-          unit: item.unit,
-          measuredAt: item.measuredAt
-        }))
-      });
-    } catch (err) {
+      res.json(
+        /** @satisfies {AirQualityResponse} */ ({
+          cache: {
+            status: mergeCacheStatuses(
+              locationResponse.cache,
+              latestResponse.cache,
+              hoursResponse?.cache
+            ),
+            locations: locationResponse.cache,
+            latest: latestResponse.cache,
+            hours: hoursResponse?.cache ?? null
+          },
+          location: {
+            id: toFiniteNumber(location?.id),
+            name: cleanText(location?.name, 120),
+            city: cleanText(location?.city || location?.locality, 120),
+            country: cleanText(location?.country?.name || location?.country?.code || "", 80),
+            latitude: toFiniteNumber(location?.coordinates?.latitude),
+            longitude: toFiniteNumber(location?.coordinates?.longitude),
+            distanceM: chosen.distanceM
+          },
+          summary: {
+            level: recommendation.level,
+            workoutType: recommendation.workoutType,
+            guidance: recommendation.guidance,
+            // Always PM2.5's: a station is read only for its PM2.5 reading.
+            primaryPollutant: pm25Reading.label,
+            pm25,
+            pm25NowCast: pm25NowCastValue,
+            aqiUs
+          },
+          pollutants: pollutants.map((item) => ({
+            code: item.code,
+            label: item.label || openAqParameterLabel(item.code),
+            value: item.value,
+            unit: item.unit,
+            measuredAt: item.measuredAt
+          }))
+        })
+      );
+    } catch (/** @type {any} */ err) {
       // An outage (any status isUpstreamFailureStatus accepts, which covers the
       // one a missing OPENAQ_API_KEY raises; an error with no status counts as
       // 500) answers 200 with an "Unknown" reading that advises indoor training.
+      // The external data service threw it: an Error carrying the upstream's
+      // status (502 for its 5xx, 504 on a timeout), or none.
       const status = Number.isInteger(err?.status) ? err.status : 500;
       if (isUpstreamFailureStatus(status)) {
-        return res.json({
-          fallback: true,
-          service: "openaq",
-          error: "Air quality service unavailable.",
-          location: {
-            id: null,
-            name: "",
-            city: "",
-            country: "",
-            latitude: toNullableNumber(req.query.latitude, -90, 90),
-            longitude: toNullableNumber(req.query.longitude, -180, 180)
-          },
-          summary: {
-            aqiUs: null,
-            pm25: null,
-            pm25NowCast: null,
-            level: "Unknown",
-            workoutType: "indoor",
-            guidance: "Air quality data is unavailable. Prefer indoor training."
-          },
-          pollutants: []
-        });
+        return res.json(
+          /** @satisfies {AirQualityResponse} */ ({
+            fallback: true,
+            service: "openaq",
+            error: "Air quality service unavailable.",
+            location: {
+              id: null,
+              name: "",
+              city: "",
+              country: "",
+              latitude: toNullableNumber(req.query.latitude, -90, 90),
+              longitude: toNullableNumber(req.query.longitude, -180, 180)
+            },
+            summary: {
+              aqiUs: null,
+              pm25: null,
+              pm25NowCast: null,
+              level: "Unknown",
+              workoutType: "indoor",
+              guidance: "Air quality data is unavailable. Prefer indoor training."
+            },
+            pollutants: []
+          })
+        );
       }
       return sendErrorResponse(req, res, err, status);
     }

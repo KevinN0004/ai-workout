@@ -3,6 +3,7 @@
  * its exercises, the swap, and the undo, each under the rules the plan was built
  * with (services/planning/swaps.js). Registered by dashboardRoutes.js.
  */
+// @ts-check
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {
   SWAP_AREAS,
@@ -20,6 +21,36 @@ import {
   validateQuery
 } from "./validation.js";
 
+/** @typedef {import("../../services/auth/authUserService.js").AuthUser} AuthUser */
+/** @typedef {ReturnType<typeof import("../../repositories/generatedPlanRepository.js").createGeneratedPlanRepository>} GeneratedPlanRepository */
+/** @typedef {ReturnType<typeof import("../../repositories/generatedPlanRepository.js").mapGeneratedPlan>} MappedPlan */
+
+/**
+ * What index.js hands the swap routes; one property per member they read.
+ * @typedef {object} PlanSwapDeps
+ * @property {import("express").RequestHandler} requireAuth Rejects a request with no session.
+ * @property {typeof import("../../services/http/apiSchemaService.js").validateBody} validateBody
+ * @property {GeneratedPlanRepository["findPlanForUser"]} findPlanForUser
+ * @property {GeneratedPlanRepository["rewritePlan"]} rewritePlan
+ */
+
+/**
+ * What GET /api/dashboard/plans/:planId/swaps answers: the exercise asked
+ * about, the area it was asked for, every area a swap can name, and the
+ * alternatives under the plan's rules.
+ * @typedef {object} PlanSwapOptionsResponse
+ * @property {string} exercise
+ * @property {string | null} area
+ * @property {typeof SWAP_AREAS} areas
+ * @property {NonNullable<ReturnType<typeof swapOptions>>} alternatives
+ */
+
+/**
+ * What a swap or an undo (POST on /swaps and /swaps/undo) answers: the plan as
+ * the dashboard maps it, as written.
+ * @typedef {{ plan: MappedPlan }} PlanSwappedResponse
+ */
+
 const NO_PLAN = "That plan was not found.";
 const NO_STRUCTURE = "That plan has no saved structure to swap in.";
 const NOT_IN_PLAN = "That exercise is not in this plan.";
@@ -29,6 +60,8 @@ const NOTHING_SWAPPED = "That exercise has no swap to undo.";
 /**
  * The profile's age, which shapes a plan's doses as it does when one is
  * generated, or null when the profile has none.
+ *
+ * @param {{ user?: { profile?: { age?: unknown } } | null }} req
  */
 const ageOf = (req) => (typeof req.user?.profile?.age === "number" ? req.user.profile.age : null);
 
@@ -38,7 +71,11 @@ const ageOf = (req) => (typeof req.user?.profile?.age === "number" ? req.user.pr
  * knows it. The GET answers `{ exercise, area, areas, alternatives }`, and each
  * POST `{ plan }`, the plan as the dashboard maps it. From `deps`,
  * `findPlanForUser` and `rewritePlan` come from generatedPlanRepository.js.
+ *
+ * @param {import("express").Express} app
+ * @param {PlanSwapDeps} deps
  */
+// Every handler here runs behind requireAuth, which sets req.user.
 export const registerPlanSwapRoutes = (app, deps) => {
   const { requireAuth, validateBody, findPlanForUser, rewritePlan } = deps;
   const path = "/api/dashboard/plans/:planId/swaps";
@@ -53,14 +90,24 @@ export const registerPlanSwapRoutes = (app, deps) => {
       const query = validateQuery(req, res, planSwapQuerySchema);
       if (!query) return;
 
-      const plan = await findPlanForUser({ userId: req.user.id, planId: params.planId });
+      const plan = await findPlanForUser({
+        userId: /** @type {AuthUser} */ (req.user).id,
+        planId: params.planId
+      });
       if (!plan) return res.status(404).json({ error: NO_PLAN });
       if (!plan.payload) return res.status(404).json({ error: NO_STRUCTURE });
       const area = query.area ?? null;
       const rules = rulesForPlan(plan, { age: ageOf(req), area });
       const alternatives = swapOptions(plan, query.exercise, rules);
       if (!alternatives) return res.status(400).json({ error: NOT_IN_PLAN });
-      return res.json({ exercise: query.exercise, area, areas: SWAP_AREAS, alternatives });
+      return res.json(
+        /** @satisfies {PlanSwapOptionsResponse} */ ({
+          exercise: query.exercise,
+          area,
+          areas: SWAP_AREAS,
+          alternatives
+        })
+      );
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
     }
@@ -71,6 +118,13 @@ export const registerPlanSwapRoutes = (app, deps) => {
   // worked out again there and the client's list is never trusted. A change the
   // stored plan cannot take is a 409 with `conflict`, since the plan has moved
   // under the client.
+  /**
+   * @template {typeof planSwapBodySchema | typeof planUndoBodySchema} S
+   * @param {S} bodySchema
+   * @param {string} conflict The 409's message.
+   * @param {(plan: MappedPlan, body: import("zod").output<S>, age: number | null) => import("../../services/planning/swaps.js").SwapResult | null} change
+   * @returns {import("express").RequestHandler}
+   */
   const write = (bodySchema, conflict, change) => async (req, res) => {
     try {
       const params = validateParams(req, res, planSwapParamsSchema);
@@ -80,7 +134,7 @@ export const registerPlanSwapRoutes = (app, deps) => {
 
       let unstructured = false;
       const result = await rewritePlan({
-        userId: req.user.id,
+        userId: /** @type {AuthUser} */ (req.user).id,
         planId: params.planId,
         rewrite: (plan) => {
           if (plan.payload) return change(plan, body, ageOf(req));
@@ -91,7 +145,7 @@ export const registerPlanSwapRoutes = (app, deps) => {
       if (!result) return res.status(404).json({ error: NO_PLAN });
       if (unstructured) return res.status(404).json({ error: NO_STRUCTURE });
       if (result.conflict) return res.status(409).json({ error: conflict });
-      return res.json({ plan: result.plan });
+      return res.json(/** @satisfies {PlanSwappedResponse} */ ({ plan: result.plan }));
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
     }

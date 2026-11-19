@@ -281,7 +281,7 @@ export const createHttpCacheService = ({
     }
   };
 
-  /** @param {...string} statuses */
+  /** @param {...(string | undefined)} statuses A request not made has no status. */
   const mergeCacheStatuses = (...statuses) => {
     const clean = statuses
       .map((status) => (typeof status === "string" ? status.trim().slice(0, 20).toLowerCase() : ""))
