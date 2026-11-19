@@ -3,6 +3,7 @@
  * reports whether it matched a user; a route that answers with the updated data
  * then re-reads the user through findUserWithDashboard for the response body.
  */
+// @ts-check
 import { DERIVED_CALORIE_SOURCE, lockUserCalorieWrites } from "./mealLogRepository.js";
 import { dateOnlyToDate, toJsonObject } from "./rowValues.js";
 import { getUserPk, userIdWhere } from "./userLookup.js";
@@ -10,9 +11,14 @@ import { getUserPk, userIdWhere } from "./userLookup.js";
 /**
  * Builds the user writers over `prisma`: the profile, goals and password hash,
  * a calorie entry, and the account itself.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createUserRepository = ({ prisma }) => {
-  /** Replaces the profile JSON wholesale. Callers merge before calling. */
+  /**
+   * Replaces the profile JSON wholesale. Callers merge before calling.
+   * @param {{ userId: string, profile: import("@prisma/client").Prisma.InputJsonObject }} args
+   */
   const updateProfile = async ({ userId, profile }) => {
     const { count } = await prisma.appUser.updateMany({
       where: userIdWhere(userId),
@@ -29,6 +35,8 @@ export const createUserRepository = ({ prisma }) => {
    * that sends one goal and checks the rest survive.
    *
    * An empty patch is a no-op rather than a write of `{}`.
+   *
+   * @param {{ userId: string, goals?: Record<string, number | undefined> }} args
    */
   const updateGoals = async ({ userId, goals = {} }) => {
     const patch = Object.fromEntries(
@@ -71,8 +79,16 @@ export const createUserRepository = ({ prisma }) => {
    * than never stamping at all. Owning the clock here also means two
    * password changes racing each other resolve to whichever write lands
    * last, never to whichever caller happened to read an earlier clock value.
+   *
+   * @param {object} args
+   * @param {string} args.userId
+   * @param {string} [args.salt] Empty for an argon2id hash, which carries its own.
+   * @param {string} args.hash
+   * @param {string} [args.passwordAlgo]
+   * @param {boolean} [args.stampPasswordChange]
    */
   const updatePasswordHash = async ({ userId, salt, hash, passwordAlgo, stampPasswordChange }) => {
+    /** @type {import("@prisma/client").Prisma.AppUserUpdateManyMutationInput} */
     const data = {
       passwordSalt: salt || "",
       passwordHash: hash,
@@ -99,6 +115,8 @@ export const createUserRepository = ({ prisma }) => {
    * would count the day twice. It runs in one transaction under
    * lockUserCalorieWrites, the lock that sync takes, so a meal saved at the
    * same moment either sees this entry or has its derived entry removed here.
+   *
+   * @param {{ userId: string, entry?: { id?: string, date?: string, calories?: number, source?: string } }} args
    */
   const saveCalorieEntry = ({ userId, entry = {} }) =>
     prisma.$transaction(async (tx) => {
@@ -116,7 +134,8 @@ export const createUserRepository = ({ prisma }) => {
       const data = {
         userId: userPk,
         legacyId: entry.id || null,
-        calorieDate: dateOnlyToDate(entry.date),
+        // The calories route answers 400 on an empty date before it calls this.
+        calorieDate: /** @type {Date} */ (dateOnlyToDate(entry.date)),
         calories: Math.round(Number(entry.calories) || 0),
         source: entry.source || "manual"
       };
@@ -139,6 +158,8 @@ export const createUserRepository = ({ prisma }) => {
    *
    * Goes through userIdWhere because a caller may hold either the UUID primary
    * key or the legacy string id.
+   *
+   * @param {{ userId: string }} args
    */
   const deleteUser = async ({ userId }) => {
     const { count } = await prisma.appUser.deleteMany({ where: userIdWhere(userId) });

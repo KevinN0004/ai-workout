@@ -4,8 +4,14 @@
  * calorie entry derived from each day's meals, whose source marker and lock
  * userRepository's manual calorie save shares.
  */
+// @ts-check
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
+
+/**
+ * A meal as the meal-log route builds it.
+ * @typedef {ReturnType<typeof import("../services/dashboard/dashboardDataBuildersService.js").buildMealLogEntry>} MealLogEntry
+ */
 
 /**
  * Marks a calorie entry as derived from meal logs rather than typed by the
@@ -19,15 +25,22 @@ const DERIVED_CALORIE_SOURCE_PREFIX = "meal-logs-";
  * writes: the derived sync below and userRepository's manual save. It holds
  * until the caller's transaction ends, so `prisma` must be a transaction
  * client. `select 1` because $queryRaw cannot deserialize the lock's void.
+ *
+ * @param {import("@prisma/client").Prisma.TransactionClient} prisma
+ * @param {string} userPk
  */
 export const lockUserCalorieWrites = (prisma, userPk) =>
   prisma.$queryRaw`select 1 as locked from pg_advisory_xact_lock(hashtextextended(${`meal-log-day:${userPk}`}, 0))`;
 
+// Every caller passes a row (the repository, mapUser and the collection
+// reader); the default guards a bare call.
 /**
  * Maps a meal_logs row to the meal the API returns. The macro columns are
  * Decimals, read through toNumberOrNull, so an unrecorded macro is null, not 0.
+ *
+ * @param {import("@prisma/client").MealLog} [row]
  */
-export const mapMealLog = (row = {}) => ({
+export const mapMealLog = (row = /** @type {import("@prisma/client").MealLog} */ ({})) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.mealDate),
   mealType: row.mealType || "other",
@@ -55,10 +68,13 @@ const MAX_DERIVED_DAILY_CALORIES = 10000;
  * `syncDerivedCalorieEntry` inside one transaction; `sumCaloriesForDate` is the
  * total the sync derives its entry from. The three building blocks are returned
  * too, bound to the root client.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createMealLogRepository = ({ prisma: rootPrisma }) => {
   // Binds the three operations to one client, so the same code runs on the root
   // client and on a transaction client.
+  /** @param {import("@prisma/client").Prisma.TransactionClient} prisma */
   const build = (prisma) => {
     /**
      * Inserts a meal, or updates the existing row carrying the same legacy id for
@@ -67,6 +83,8 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
      * which schema.prisma cannot express.
      *
      * Returns null when the user cannot be resolved.
+     *
+     * @param {{ userId: string, mealLog?: Partial<MealLogEntry> }} args
      */
     const saveMealLog = async ({ userId, mealLog = {} }) => {
       const userPk = await getUserPk(prisma, userId);
@@ -106,6 +124,8 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
      *
      * `_sum` is null when no row has calories, so it is turned into 0 here: an
      * empty day's total is zero, not absent.
+     *
+     * @param {{ userId: string, date: string }} args
      */
     const sumCaloriesForDate = async ({ userId, date }) => {
       const userPk = await getUserPk(prisma, userId);
@@ -144,6 +164,8 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
      * entry, or its removal sees this derived one. Not a lock on the user's row:
      * each save's meal insert already holds a key-share lock on that row through
      * the foreign key, so two saves asking for FOR UPDATE deadlock.
+     *
+     * @param {{ userId: string, date: string }} args
      */
     const syncDerivedCalorieEntry = async ({ userId, date }) => {
       const userPk = await getUserPk(prisma, userId);
@@ -193,6 +215,8 @@ export const createMealLogRepository = ({ prisma: rootPrisma }) => {
    * a failure in the derived write cannot leave a persisted meal behind an
    * error response (which the client answers by retrying and duplicating it).
    * Returns null when the user cannot be resolved.
+   *
+   * @param {{ userId: string, mealLog: MealLogEntry }} args
    */
   const saveMealLogWithDailySync = ({ userId, mealLog }) =>
     rootPrisma.$transaction(async (tx) => {

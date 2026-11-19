@@ -41,7 +41,7 @@ const tenth = (value) => (value === null ? null : Math.round(value * 10) / 10);
 
 /**
  * Whether the stored import `row` already holds `workout`, field by field.
- * @param {any} row
+ * @param {Pick<import("@prisma/client").WorkoutSession, keyof typeof COMPARED>} row
  * @param {ImportedWorkout} workout
  */
 const sameImport = (row, workout) =>
@@ -58,7 +58,7 @@ const sameImport = (row, workout) =>
  * removes through it, and the delete route deletes through it. Every function
  * finds nothing for an unknown user, and none touches a workout logged in the
  * app: each one filters on the source.
- * @param {{ prisma: any }} deps
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createStravaImportRepository = ({ prisma }) => {
   /**
@@ -139,11 +139,16 @@ export const createStravaImportRepository = ({ prisma }) => {
     const userPk = await getUserPk(prisma, userId);
     if (!userPk) return [];
     const rows = await prisma.workoutSession.findMany({
-      where: { userId: userPk, source: SOURCE, workoutDate: { gte: dateOnlyToDate(since) } },
+      // The sync passes a YYYY-MM-DD it computed, so the date is never null.
+      where: {
+        userId: userPk,
+        source: SOURCE,
+        workoutDate: { gte: /** @type {Date} */ (dateOnlyToDate(since)) }
+      },
       select: { id: true, externalId: true, workoutDate: true },
       orderBy: { workoutDate: "asc" }
     });
-    return rows.map((/** @type {any} */ row) => ({
+    return rows.map((row) => ({
       id: row.id,
       externalId: row.externalId,
       date: toDateOnly(row.workoutDate)
@@ -178,11 +183,15 @@ export const createStravaImportRepository = ({ prisma }) => {
       select: { id: true, externalId: true }
     });
     if (!row) return false;
+    // A row with a source always has an external id
+    // (workout_sessions_external_source_check, migration 008).
     await prisma.$transaction([
       prisma.workoutSession.delete({ where: { id: row.id } }),
       prisma.stravaDeletedActivity.upsert({
-        where: { userId_externalId: { userId: userPk, externalId: row.externalId } },
-        create: { userId: userPk, externalId: row.externalId },
+        where: {
+          userId_externalId: { userId: userPk, externalId: /** @type {string} */ (row.externalId) }
+        },
+        create: { userId: userPk, externalId: /** @type {string} */ (row.externalId) },
         update: {}
       })
     ]);

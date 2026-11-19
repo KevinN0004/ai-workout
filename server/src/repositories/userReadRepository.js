@@ -4,6 +4,7 @@
  * dashboard collection, each capped on read by COLLECTION_LIMITS
  * (findUserWithDashboard). Only generated plans are pruned, after each save.
  */
+// @ts-check
 import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";
@@ -16,12 +17,40 @@ import {
   mapGeneratedPlan
 } from "./generatedPlanRepository.js";
 
+/**
+ * A new account as authUserService's mapUserToDbDoc builds it for
+ * createUserWithDashboard.
+ * @typedef {object} NewUserDoc
+ * @property {string} [userId] The legacy id; `id` is read when it is absent.
+ * @property {string} [id]
+ * @property {string} [email]
+ * @property {string} [salt]
+ * @property {string} hash
+ * @property {string} [passwordAlgo]
+ * @property {import("@prisma/client").Prisma.InputJsonObject} [profile]
+ * @property {{ goals?: import("@prisma/client").Prisma.InputJsonObject }} [dashboard]
+ */
+
+/**
+ * The relation lists mapUser reads, each loaded by loadWithCollections.
+ * @typedef {object} UserRelations
+ * @property {import("./workoutSessionRepository.js").WorkoutSessionRow[]} [workoutSessions]
+ * @property {import("@prisma/client").CalorieEntry[]} [calorieEntries]
+ * @property {import("@prisma/client").MealLog[]} [mealLogs]
+ * @property {import("@prisma/client").ProgressMetric[]} [progressMetrics]
+ * @property {import("@prisma/client").GeneratedPlan[]} [generatedPlans]
+ * @property {import("@prisma/client").SavedExercise[]} [savedExercises]
+ */
+
+/** @param {unknown} value */
 const lower = (value) =>
   String(value || "")
     .trim()
     .toLowerCase();
 
-const mapCalorieEntry = (row = {}) => ({
+// Its one caller, mapUser, passes a row; the default guards a bare call.
+/** @param {import("@prisma/client").CalorieEntry} [row] */
+const mapCalorieEntry = (row = /** @type {import("@prisma/client").CalorieEntry} */ ({})) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.calorieDate),
   calories: row.calories ?? null,
@@ -47,6 +76,7 @@ const COLLECTION_LIMITS = {
 // The user row's own fields, as both mapUser and the row lookups return them.
 // There is no `dashboard` key at all, because buildDashboard turns a missing
 // dashboard into an empty one, and an empty one would pass for a real account.
+/** @param {import("@prisma/client").AppUser | null} row */
 const mapUserRow = (row) => {
   if (!row) return null;
   return {
@@ -68,6 +98,9 @@ const mapUserRow = (row) => {
  * Maps a user row and its loaded collections to the user document that
  * authUserService.mapDbDocToUser reads, or null when there is no row. It
  * carries the password hash and salt, which authUserService verifies against.
+ *
+ * @param {import("@prisma/client").AppUser | null} row
+ * @param {UserRelations} [related]
  */
 export const mapUser = (row, related = {}) => {
   if (!row) return null;
@@ -93,9 +126,14 @@ export const mapUser = (row, related = {}) => {
  * or by email ignoring case, the user with every collection by id, each
  * returning the mapped user or null, and create, which returns the new user
  * with its collections.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createUserReadRepository = ({ prisma }) => {
-  /** One user and every collection, or null only when no user row matches. */
+  /**
+   * One user and every collection, or null only when no user row matches.
+   * @param {unknown} userId
+   */
   const loadWithCollections = async (userId) => {
     // The user row first: its primary key scopes every collection query.
     const user = await prisma.appUser.findFirst({ where: userIdWhere(userId) });
@@ -155,18 +193,26 @@ export const createUserReadRepository = ({ prisma }) => {
     });
   };
 
-  /** Accepts either the UUID primary key or the legacy id. */
+  /**
+   * Accepts either the UUID primary key or the legacy id.
+   * @param {unknown} userId
+   */
   const findUserWithDashboard = (userId) =>
     userId ? loadWithCollections(userId) : Promise.resolve(null);
 
   /**
    * The user row alone, or null when no row matches. One query, whatever the
    * account holds. Accepts either the UUID primary key or the legacy id.
+   *
+   * @param {unknown} userId
    */
   const findUserRow = async (userId) =>
     userId ? mapUserRow(await prisma.appUser.findFirst({ where: userIdWhere(userId) })) : null;
 
-  /** The user row alone for an email, matched ignoring case, or null. */
+  /**
+   * The user row alone for an email, matched ignoring case, or null.
+   * @param {unknown} email
+   */
   const findUserRowByEmail = async (email) => {
     if (!email) return null;
     const row = await prisma.appUser.findFirst({
@@ -175,7 +221,10 @@ export const createUserReadRepository = ({ prisma }) => {
     return mapUserRow(row);
   };
 
-  const createUserWithDashboard = async (doc = {}) => {
+  // Its one caller, authUserService's createUser, passes a document; the
+  // default guards a bare call.
+  /** @param {NewUserDoc} [doc] */
+  const createUserWithDashboard = async (doc = /** @type {NewUserDoc} */ ({})) => {
     const row = await prisma.appUser.create({
       data: {
         legacyUserId: doc.userId || doc.id,

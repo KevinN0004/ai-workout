@@ -3,14 +3,20 @@
  * has -- the same external exercise id, or the same name ignoring case --
  * updates that row instead of adding a second.
  */
+// @ts-check
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
+// Both callers pass a row (the repository and mapUser); the default guards a bare call.
 /**
  * Maps a saved_exercises row to the entry the API returns. `exerciseId` is the
  * wger exercise id, or null for an exercise that has none.
+ *
+ * @param {import("@prisma/client").SavedExercise} [row]
  */
-export const mapSavedExercise = (row = {}) => ({
+export const mapSavedExercise = (
+  row = /** @type {import("@prisma/client").SavedExercise} */ ({})
+) => ({
   id: row.legacyId || row.id,
   exerciseId: row.externalExerciseId ?? null,
   name: row.name || "",
@@ -27,6 +33,8 @@ export const mapSavedExercise = (row = {}) => ({
 /**
  * Builds the saved-exercise writer over `prisma`. Returns `saveExercise` and
  * `removeExercise`, which the saved-exercise POST and DELETE routes call.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createSavedExerciseRepository = ({ prisma }) => {
   /**
@@ -37,6 +45,8 @@ export const createSavedExerciseRepository = ({ prisma }) => {
    * API or as free text, and either match makes it a duplicate.
    *
    * Returns null when the user cannot be resolved.
+   *
+   * @param {{ userId: string, entry?: Partial<ReturnType<typeof import("../services/dashboard/dashboardDataBuildersService.js").buildSavedExerciseEntry>> }} args
    */
   const saveExercise = async ({ userId, entry = {} }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -81,6 +91,8 @@ export const createSavedExerciseRepository = ({ prisma }) => {
    * Removes one saved exercise belonging to this user. Scoped by user so an id
    * from another account cannot delete a row. Deleting an unknown id is a
    * no-op rather than an error, and the route still answers ok.
+   *
+   * @param {{ userId: string, entryId: string }} args
    */
   const removeExercise = async ({ userId, entryId }) => {
     const userPk = await getUserPk(prisma, userId);
