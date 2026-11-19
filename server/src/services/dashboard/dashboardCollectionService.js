@@ -4,6 +4,7 @@
  * rest of the stored dashboard. Built once in index.js over
  * dashboardCollectionRepository's reader.
  */
+// @ts-check
 
 // The three collections, and the field each one's pages are ordered by.
 const COLLECTION_SORT_FIELDS = {
@@ -12,6 +13,19 @@ const COLLECTION_SORT_FIELDS = {
   progressMetrics: "loggedAt"
 };
 
+/** @typedef {keyof typeof COLLECTION_SORT_FIELDS} CollectionName */
+
+/**
+ * A page's size and start, either of which a caller may leave out.
+ * @typedef {{ limit?: number, offset?: number }} Pagination
+ */
+
+/**
+ * A user as the service reads one: the id, and for the full dashboard the
+ * stored dashboard.
+ * @typedef {{ id?: unknown, dashboard?: import("./dashboardDataBuildersService.js").StoredDashboard } | null | undefined} DashboardUser
+ */
+
 const emptyPage = () => ({ items: [], total: 0, limit: 0, offset: 0, source: "collection" });
 
 /**
@@ -19,10 +33,16 @@ const emptyPage = () => ({ items: [], total: 0, limit: 0, offset: 0, source: "co
  * loader the paginated read routes use, and `buildDashboardResponse`, which the
  * read and write routes both answer with.
  *
- * @param deps `defaultLimit` is a page's size when the caller names none, and a
+ * @param {object} deps `defaultLimit` is a page's size when the caller names none, and a
  *   requested size above `maxLimit` falls back to it; index.js reads both from
  *   the environment. `loadCollectionPage` is the repository reader,
  *   and `buildDashboard` normalises the stored dashboard.
+ * @param {typeof import("./dashboardDataBuildersService.js").cleanText} deps.cleanText
+ * @param {typeof import("./dashboardDataBuildersService.js").toNullableNumber} deps.toNullableNumber
+ * @param {number} deps.defaultLimit
+ * @param {number} deps.maxLimit
+ * @param {ReturnType<typeof import("../../repositories/dashboardCollectionRepository.js").createDashboardCollectionRepository>["loadCollectionPage"]} deps.loadCollectionPage
+ * @param {typeof import("./dashboardDataBuildersService.js").buildDashboard} deps.buildDashboard
  */
 export const createDashboardCollectionService = ({
   cleanText,
@@ -32,6 +52,10 @@ export const createDashboardCollectionService = ({
   loadCollectionPage,
   buildDashboard
 }) => {
+  /**
+   * @param {{ limit?: unknown, offset?: unknown }} [query]
+   * @param {number} [fallbackLimit]
+   */
   const parseDashboardPagination = (query = {}, fallbackLimit = defaultLimit) => {
     const parsedLimit = toNullableNumber(query?.limit, 1, maxLimit) ?? fallbackLimit;
     const parsedOffset = toNullableNumber(query?.offset, 0, 100000) ?? 0;
@@ -43,6 +67,9 @@ export const createDashboardCollectionService = ({
 
   // Shape the repository page into the response envelope the routes expect. The
   // items are the repository's row mappers' output, which carries no owner id.
+  /**
+   * @param {{ collection: CollectionName, userId: string, sortField: string, limit: number, offset: number }} args
+   */
   const toCollectionPage = async ({ collection, userId, sortField, limit, offset }) => {
     const { items, total } = await loadCollectionPage({
       collection,
@@ -62,6 +89,11 @@ export const createDashboardCollectionService = ({
 
   // One page of one collection: the caller's pagination for it, else the
   // default first page.
+  /**
+   * @param {CollectionName} collection
+   * @param {string} userId
+   * @param {Pagination} [pagination]
+   */
   const loadPage = (collection, userId, pagination = {}) => {
     const { limit, offset } = { ...parseDashboardPagination({}, defaultLimit), ...pagination };
     return toCollectionPage({
@@ -75,6 +107,11 @@ export const createDashboardCollectionService = ({
 
   // One collection, for the paginated routes. No user id: an empty page,
   // without a query.
+  /**
+   * @param {DashboardUser} user
+   * @param {CollectionName} collection
+   * @param {Pagination} [pagination]
+   */
   const getDashboardCollection = async (user, collection, pagination) => {
     const userId = cleanText(user?.id, 120);
     if (!userId) return emptyPage();
@@ -83,6 +120,10 @@ export const createDashboardCollectionService = ({
 
   // All three, for the full dashboard. No user id: an empty page of each,
   // without a query.
+  /**
+   * @param {DashboardUser} user
+   * @param {Partial<Record<CollectionName, Pagination>>} [pagination]
+   */
   const getDashboardCollections = async (user, pagination = {}) => {
     const userId = cleanText(user?.id, 120);
     if (!userId) {
@@ -102,6 +143,10 @@ export const createDashboardCollectionService = ({
     };
   };
 
+  /**
+   * @param {DashboardUser} user
+   * @param {Partial<Record<CollectionName, Pagination>>} [pagination]
+   */
   const buildDashboardResponse = async (user, pagination = {}) => {
     const baseDashboard = buildDashboard(user?.dashboard);
     const collections = await getDashboardCollections(user, pagination);
