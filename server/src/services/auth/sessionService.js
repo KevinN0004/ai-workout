@@ -4,6 +4,7 @@
  * is a 503, never a fallback to memory), the session and CSRF cookies, and the
  * middleware requiring a signed-in user or a matching CSRF token. Built in index.js.
  */
+// @ts-check
 import crypto from "crypto";
 import { createClient } from "redis";
 import { sendErrorResponse } from "../http/errorResponseService.js";
@@ -25,11 +26,19 @@ const REDIS_COMMAND_TIMEOUT_MS = 1500;
 // the client reconnects.
 const REDIS_SESSION_REPLY_TIMEOUT_MS = 2000;
 
+/** @typedef {ReturnType<typeof createClient>} RedisClient */
+
+/**
+ * A session as the store keeps it: whose it is, and when it began, in ms.
+ * @typedef {{ userId: string, createdAt: number }} StoredSession
+ */
+
 /**
  * Thrown by a session operation when Redis is the store and a command on it
  * failed. It carries status 503, and the Redis error as its `cause`.
  */
 export class SessionStoreUnavailableError extends Error {
+  /** @param {unknown} cause */
   constructor(cause) {
     super("Session store unavailable.", { cause });
     this.name = "SessionStoreUnavailableError";
@@ -41,6 +50,8 @@ export class SessionStoreUnavailableError extends Error {
  * The status a route answers for an error from a session operation: 503 when
  * the session store was unavailable, because the server could not check the
  * session, where a 401 would say there is none; 500 for anything else.
+ *
+ * @param {unknown} err
  */
 export const sessionErrorStatus = (err) =>
   err instanceof SessionStoreUnavailableError ? 503 : 500;
@@ -48,6 +59,8 @@ export const sessionErrorStatus = (err) =>
 /**
  * Parses a Cookie header into a name-to-value object. A value that is not valid
  * percent-encoding is kept raw rather than dropped.
+ *
+ * @param {string} [cookieHeader]
  */
 export const parseCookies = (cookieHeader = "") =>
   cookieHeader.split(";").reduce((acc, pair) => {
@@ -60,11 +73,12 @@ export const parseCookies = (cookieHeader = "") =>
       acc[key] = rawValue;
     }
     return acc;
-  }, {});
+  }, /** @type {Record<string, string>} */ ({}));
 
 // Guards before it coerces. The 1..65535 range would also reject the 0 that
 // `Number(null)` and `Number("")` produce, but only by accident of the range;
 // see the note on `toPositiveInt` in index.js.
+/** @param {unknown} value */
 export const parseRedisPort = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -76,6 +90,9 @@ export const parseRedisPort = (value) => {
 /**
  * Reads an on/off environment flag: true, 1, yes or on, and false, 0, no or
  * off, in any case. Anything else, including an absent value, is `fallback`.
+ *
+ * @param {unknown} value
+ * @param {boolean} [fallback]
  */
 export const parseEnvBoolean = (value, fallback = false) => {
   const normalized = typeof value === "string" ? value.trim().slice(0, 12).toLowerCase() : "";
@@ -85,8 +102,13 @@ export const parseEnvBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+/**
+ * @param {import("express").Response} res
+ * @param {string} cookieValue
+ */
 const appendSetCookieHeader = (res, cookieValue) => {
-  const current = res.getHeader("Set-Cookie");
+  // The app sets Set-Cookie only as text, here and through res.append.
+  const current = /** @type {string | string[] | undefined} */ (res.getHeader("Set-Cookie"));
   if (!current) {
     res.setHeader("Set-Cookie", cookieValue);
     return;
@@ -98,9 +120,17 @@ const appendSetCookieHeader = (res, cookieValue) => {
 /**
  * Rejects with `message` if `promise` has not settled within `timeoutMs`.
  * The timer is always cleared so a resolved promise cannot hold the event loop open.
+ *
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} timeoutMs
+ * @param {string} message
+ * @returns {Promise<T>}
  */
 export const withTimeout = (promise, timeoutMs, message) => {
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null;
+  /** @type {Promise<never>} */
   const timeout = new Promise((_resolve, reject) => {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
@@ -115,6 +145,9 @@ export const withTimeout = (promise, timeoutMs, message) => {
  * check relies on this to refuse a write that carries neither cookie nor
  * header. The Strava routes use it for the OAuth state and the webhook's
  * verify token.
+ *
+ * @param {unknown} a
+ * @param {unknown} b
  */
 export const tokensMatch = (a, b) => {
   const left = Buffer.from(String(a || ""), "utf8");
@@ -129,11 +162,22 @@ export const tokensMatch = (a, b) => {
  * connects Redis when it is configured and falls back to memory when it is not
  * or cannot connect.
  *
- * @param deps `findUserById` (from authUserService) loads a session's user, the
+ * @param {object} deps `findUserById` (from authUserService) loads a session's user, the
  *   user row alone.
  *   `cookieSecure` is "; Secure" or "", appended to every cookie.
  *   `csrfUnsafeMethods` is the set of methods `requireCsrfToken` checks, and
  *   `redisSessionKeyPrefix` namespaces the session keys in Redis.
+ * @param {typeof import("../dashboard/dashboardDataBuildersService.js").cleanText} deps.cleanText
+ * @param {import("pino").Logger} deps.logger
+ * @param {(value: unknown, maxLen?: number) => string} deps.toShortText
+ * @param {ReturnType<typeof import("./authUserService.js").createAuthUserService>["findUserById"]} deps.findUserById
+ * @param {number} deps.sessionTtlMs
+ * @param {string} deps.cookieSecure
+ * @param {string} deps.csrfCookieName
+ * @param {string} deps.csrfHeaderName
+ * @param {Set<string>} deps.csrfUnsafeMethods
+ * @param {string} deps.redisSessionKeyPrefix
+ * @param {number} [deps.redisConnectTimeoutMs]
  */
 export const createSessionService = ({
   cleanText,
@@ -148,13 +192,16 @@ export const createSessionService = ({
   redisSessionKeyPrefix,
   redisConnectTimeoutMs = 10000
 }) => {
+  /** @type {Map<string, StoredSession>} */
   const inMemorySessions = new Map();
+  /** @type {RedisClient | null} */
   let redisClient = null;
   let redisSessionsEnabled = false;
   let redisConfigured = false;
   let redisLastError = "";
   // The text kept and logged for a Redis failure. node-redis's TimeoutError
   // has no message, so an Error without one is named by its class.
+  /** @param {unknown} err */
   const redisErrorText = (err) =>
     cleanText(err instanceof Error ? err.message || err.constructor.name : String(err), 260);
   // node-redis retries a failed connection forever by default, which leaves the
@@ -167,6 +214,7 @@ export const createSessionService = ({
   let redisStartupSettled = false;
   const maxStartupReconnectAttempts = 5;
 
+  /** @param {number} retries */
   const redisReconnectStrategy = (retries) => {
     if (redisStartupSettled) return Math.min(500 * 2 ** Math.min(retries, 6), 30000);
     if (retries >= maxStartupReconnectAttempts) {
@@ -175,6 +223,7 @@ export const createSessionService = ({
     return Math.min(100 * 2 ** retries, 1000);
   };
 
+  /** @param {RedisClient | null} client */
   const closeRedisClientQuietly = async (client) => {
     if (!client) return;
     try {
@@ -194,6 +243,7 @@ export const createSessionService = ({
     lastError: redisLastError
   });
 
+  /** @param {string} token */
   const sessionRedisKey = (token) => `${redisSessionKeyPrefix}${token}`;
 
   const pruneExpiredInMemorySessions = () => {
@@ -209,6 +259,12 @@ export const createSessionService = ({
   // REDIS_SESSION_REPLY_TIMEOUT_MS. A failure or a missed deadline is logged and
   // kept as the store's last error, then thrown as SessionStoreUnavailableError:
   // reads consult only Redis, so a fallback would hide the failure, not fix it.
+  /**
+   * @template T
+   * @param {string} event
+   * @param {string} message
+   * @param {() => Promise<T>} command
+   */
   const runSessionCommand = async (event, message, command) => {
     try {
       const result = await withTimeout(
@@ -226,6 +282,10 @@ export const createSessionService = ({
   };
 
   // A stored value that is not JSON, or names no user, is not a session.
+  /**
+   * @param {string} raw
+   * @returns {StoredSession | null}
+   */
   const parseStoredSession = (raw) => {
     try {
       const parsed = JSON.parse(raw);
@@ -235,6 +295,7 @@ export const createSessionService = ({
     }
   };
 
+  /** @param {NodeJS.ProcessEnv} [env] */
   const initSessionStore = async (env = process.env) => {
     const redisUrl = cleanText(env.REDIS_URL || "", 500);
     const redisHost = cleanText(env.REDIS_HOST || "", 255);
@@ -257,6 +318,7 @@ export const createSessionService = ({
     }
 
     redisStartupSettled = false;
+    /** @type {RedisClient | null} */
     let client = null;
     try {
       const socketOptions = {
@@ -266,21 +328,24 @@ export const createSessionService = ({
       // RESP2, pinned: node-redis 6 defaults to RESP3, which this app gains
       // nothing from, and Upstash's docs do not say it speaks RESP3. A failed
       // handshake there would drop every session to memory.
-      const clientOptions = {
+      const clientOptions = /** @type {const} */ ({
         RESP: 2,
         commandOptions: { timeout: REDIS_COMMAND_TIMEOUT_MS }
-      };
+      });
       client = hasSocketConfig
         ? createClient({
             ...clientOptions,
             username: redisUsername,
             password: redisPassword || undefined,
-            socket: {
+            // tls is the boolean the environment sets; redis's type splits it by
+            // literal.
+            socket: /** @type {import("redis").RedisClientOptions["socket"]} */ ({
               ...socketOptions,
               host: redisHost,
-              port: redisPort,
+              // hasSocketConfig is true only when redisPort parsed.
+              port: /** @type {number} */ (redisPort),
               tls: redisTls
-            }
+            })
           })
         : createClient({ ...clientOptions, url: redisUrl, socket: socketOptions });
 
@@ -322,6 +387,11 @@ export const createSessionService = ({
     return getSessionStoreStatus();
   };
 
+  /**
+   * @param {import("express").Response} res
+   * @param {string} token
+   * @param {boolean} [persistent]
+   */
   const setSessionCookie = (res, token, persistent = true) => {
     const maxAge = Math.floor(sessionTtlMs / 1000);
     const maxAgePart = persistent ? `; Max-Age=${maxAge}` : "";
@@ -331,10 +401,15 @@ export const createSessionService = ({
     );
   };
 
+  /** @param {import("express").Response} res */
   const clearSessionCookie = (res) => {
     appendSetCookieHeader(res, `sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${cookieSecure}`);
   };
 
+  /**
+   * @param {import("express").Response} res
+   * @param {string} token
+   */
   const setCsrfCookie = (res, token) => {
     appendSetCookieHeader(
       res,
@@ -342,6 +417,7 @@ export const createSessionService = ({
     );
   };
 
+  /** @param {import("express").Response} res */
   const clearCsrfCookie = (res) => {
     appendSetCookieHeader(
       res,
@@ -349,14 +425,20 @@ export const createSessionService = ({
     );
   };
 
+  /** @param {string} userId */
   const createSession = async (userId) => {
     const token = crypto.randomBytes(24).toString("hex");
     const session = { userId, createdAt: Date.now() };
     if (redisSessionsEnabled && redisClient) {
       await runSessionCommand("redis_session_create_failed", "Redis create session failed.", () =>
-        redisClient.set(sessionRedisKey(token), JSON.stringify(session), {
-          EX: Math.floor(sessionTtlMs / 1000)
-        })
+        // Checked just above, and the command runs at once.
+        /** @type {RedisClient} */ (redisClient).set(
+          sessionRedisKey(token),
+          JSON.stringify(session),
+          {
+            EX: Math.floor(sessionTtlMs / 1000)
+          }
+        )
       );
       return token;
     }
@@ -365,6 +447,7 @@ export const createSessionService = ({
     return token;
   };
 
+  /** @param {string | undefined} token */
   const getSessionByToken = async (token) => {
     if (!token) return null;
     if (redisSessionsEnabled && redisClient) {
@@ -372,7 +455,8 @@ export const createSessionService = ({
       const raw = await runSessionCommand(
         "redis_session_get_failed",
         "Redis get session failed.",
-        () => redisClient.get(key)
+        // Checked just above, and the command runs at once.
+        () => /** @type {RedisClient} */ (redisClient).get(key)
       );
       if (!raw) return null;
       const session = parseStoredSession(raw);
@@ -380,7 +464,8 @@ export const createSessionService = ({
       // request.
       if (!session) {
         await runSessionCommand("redis_session_delete_failed", "Redis delete session failed.", () =>
-          redisClient.del(key)
+          // Checked above, and the command runs at once.
+          /** @type {RedisClient} */ (redisClient).del(key)
         );
       }
       return session;
@@ -389,17 +474,20 @@ export const createSessionService = ({
     return inMemorySessions.get(token) || null;
   };
 
+  /** @param {string | undefined} token */
   const deleteSession = async (token) => {
     if (!token) return;
     if (redisSessionsEnabled && redisClient) {
       await runSessionCommand("redis_session_delete_failed", "Redis delete session failed.", () =>
-        redisClient.del(sessionRedisKey(token))
+        // Checked just above, and the command runs at once.
+        /** @type {RedisClient} */ (redisClient).del(sessionRedisKey(token))
       );
       return;
     }
     inMemorySessions.delete(token);
   };
 
+  /** @param {import("express").Request} req */
   const getSessionUser = async (req) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const token = cookies.sid;
@@ -436,6 +524,7 @@ export const createSessionService = ({
     return user;
   };
 
+  /** @type {import("express").RequestHandler} */
   const requireAuth = async (req, res, next) => {
     try {
       const user = await getSessionUser(req);
@@ -453,11 +542,13 @@ export const createSessionService = ({
    * session cookie the unavailable store cannot read answers 503, as
    * requireAuth does: going on as anonymous would charge the anonymous quota and
    * save nothing. Any other lookup failure goes on as anonymous.
+   * @type {import("express").RequestHandler}
    */
   const attachOptionalUser = async (req, res, next) => {
     try {
       req.user = (await getSessionUser(req)) || null;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+      // The session read or the user lookup threw it, possibly with a non-Error.
       if (err instanceof SessionStoreUnavailableError) {
         return sendErrorResponse(req, res, err, 503);
       }
@@ -484,6 +575,7 @@ export const createSessionService = ({
     await closeRedisClientQuietly(client);
   };
 
+  /** @type {import("express").RequestHandler} */
   const ensureCsrfTokenCookie = (req, res, next) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const current = cleanText(cookies[csrfCookieName], 128);
@@ -497,6 +589,7 @@ export const createSessionService = ({
     next();
   };
 
+  /** @type {import("express").RequestHandler} */
   const requireCsrfToken = (req, res, next) => {
     const method = String(req.method || "GET").toUpperCase();
     if (!csrfUnsafeMethods.has(method)) return next();

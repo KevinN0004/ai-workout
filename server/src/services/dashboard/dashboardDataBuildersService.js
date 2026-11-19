@@ -4,9 +4,28 @@
  * workout, meal, metric, saved-exercise and profile bodies. index.js hands
  * these to the routes; apiSchemaService reads the lists.
  */
+// @ts-check
 import crypto from "crypto";
 
-/** Trims a string and cuts it to `maxLen`; anything that is not a string is "". */
+/**
+ * A stored dashboard as buildDashboard reads it: a list that is not an array
+ * reads as empty, and each goal is checked against its range.
+ * @typedef {object} StoredDashboard
+ * @property {unknown} [workouts]
+ * @property {unknown} [workoutSessions]
+ * @property {unknown} [calories]
+ * @property {unknown} [mealLogs]
+ * @property {unknown} [progressMetrics]
+ * @property {unknown} [plans]
+ * @property {unknown} [savedExercises]
+ * @property {{ targetWeight?: unknown, targetCalories?: unknown, weeklyWorkouts?: unknown }} [goals]
+ */
+
+/**
+ * Trims a string and cuts it to `maxLen`; anything that is not a string is "".
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 export const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
@@ -15,6 +34,8 @@ export const cleanText = (value, maxLen = 120) =>
  * every run of whitespace, newlines included, becomes one space, and the ends
  * are trimmed, so the value cannot start a line of its own. Anything that is
  * not a string is "".
+ *
+ * @param {unknown} value
  */
 export const collapseWhitespace = (value) =>
   typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -22,6 +43,10 @@ export const collapseWhitespace = (value) =>
 /**
  * A finite number within [min, max], or null. Absent input (null, undefined,
  * "") is null rather than the 0 `Number()` would make it.
+ *
+ * @param {unknown} value
+ * @param {number} min
+ * @param {number} max
  */
 export const toNullableNumber = (value, min, max) => {
   if (value === null || value === undefined || value === "") return null;
@@ -34,6 +59,10 @@ export const toNullableNumber = (value, min, max) => {
 /**
  * Cleans a list of strings, or a single string, with cleanText: empties are
  * dropped and the first `maxItems` kept.
+ *
+ * @param {unknown} value
+ * @param {number} [maxItems]
+ * @param {number} [maxLen]
  */
 export const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
   (Array.isArray(value) ? value : [value])
@@ -44,6 +73,10 @@ export const toCleanArray = (value, maxItems = 8, maxLen = 60) =>
 /**
  * Like toCleanArray, but each item may be a string or an object carrying a
  * `name`, and anything that is not an array gives [].
+ *
+ * @param {unknown} value
+ * @param {number} [maxItems]
+ * @param {number} [maxLen]
  */
 export const toCleanNameArray = (value, maxItems = 10, maxLen = 120) =>
   (Array.isArray(value) ? value : [])
@@ -100,13 +133,22 @@ export const allowedTrainingDayValues = [
 ];
 const allowedMealTypeValues = ["breakfast", "lunch", "dinner", "snack", "drink", "other"];
 
+// Asked about whatever a body or a stored profile holds, so typed to take anything.
+/** @type {Set<unknown>} */
 const allowedSexes = new Set(allowedSexValues);
+/** @type {Set<unknown>} */
 const allowedActivities = new Set(allowedActivityValues);
+/** @type {Set<unknown>} */
 const allowedGoals = new Set(allowedGoalValues);
+/** @type {Set<unknown>} */
 const allowedSleeps = new Set(allowedSleepValues);
+/** @type {Set<unknown>} */
 const allowedExperiences = new Set(allowedExperienceValues);
+/** @type {Set<unknown>} */
 const allowedNutritions = new Set(allowedNutritionValues);
+/** @type {Set<unknown>} */
 const allowedCardios = new Set(allowedCardioValues);
+/** @type {Set<unknown>} */
 const allowedMealTypes = new Set(allowedMealTypeValues);
 
 /**
@@ -160,6 +202,8 @@ export const defaultDashboard = () => ({
  * Normalises a stored dashboard for a response: each list becomes an array,
  * most of them capped, and each goal falls back to its default when absent or
  * out of range. The target weight has no default, so it is null then.
+ *
+ * @param {StoredDashboard} [input]
  */
 export const buildDashboard = (input = {}) => {
   const base = defaultDashboard();
@@ -189,6 +233,7 @@ export const buildDashboard = (input = {}) => {
 // A workout's exercises and their sets, cleaned and range-checked as the
 // table holds them, or undefined when none were sent: the repository keeps a
 // session's stored sets for undefined, and clears them for an empty list.
+/** @param {import("../http/apiSchemaService.js").WorkoutSessionBody["exerciseSets"]} value */
 const toExerciseSets = (value) =>
   Array.isArray(value)
     ? value.slice(0, 18).map((exercise) => ({
@@ -210,6 +255,8 @@ const toExerciseSets = (value) =>
  * are null; the index is a whole number, and 0, the first day, is kept.
  * `exerciseSets` is carried through cleaned, and names the exercises when the
  * body sent no `exercises` of its own.
+ *
+ * @param {Partial<import("../http/apiSchemaService.js").WorkoutSessionBody>} [input]
  */
 export const buildWorkoutSessionEntry = (input = {}) => {
   const planDayIndex = toNullableNumber(input.planDayIndex, 0, 31);
@@ -239,6 +286,8 @@ export const buildWorkoutSessionEntry = (input = {}) => {
  * The meal the meal-log route saves, built from a validated body. An unknown
  * `mealType` becomes "other", an id is minted when the body has none, and
  * `loggedAt` is now.
+ *
+ * @param {Partial<import("../http/apiSchemaService.js").MealLogBody>} [input]
  */
 export const buildMealLogEntry = (input = {}) => {
   const mealTypeRaw = cleanText(input.mealType, 40).toLowerCase();
@@ -260,6 +309,8 @@ export const buildMealLogEntry = (input = {}) => {
  * The metric the progress-metrics route saves, built from a validated body.
  * A reading out of range becomes null, an id is minted when the body has none,
  * and `loggedAt` is now.
+ *
+ * @param {Partial<import("../http/apiSchemaService.js").ProgressMetricBody>} [input]
  */
 export const buildProgressMetricEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
@@ -276,6 +327,8 @@ export const buildProgressMetricEntry = (input = {}) => ({
  * The exercise the saved-exercise route saves, built from a validated body.
  * Muscles and equipment may arrive as names or as objects carrying one,
  * `source` is always "wger", and `savedAt` is now.
+ *
+ * @param {Partial<import("../http/apiSchemaService.js").SavedExerciseBody>} [input]
  */
 export const buildSavedExerciseEntry = (input = {}) => ({
   id: cleanText(input.id, 64) || crypto.randomUUID(),
@@ -296,6 +349,8 @@ export const buildSavedExerciseEntry = (input = {}) => ({
  * update the stored profile with the update spread over it. A full name is
  * split into first and last when they are not given, an option outside its list
  * falls back to its default, and `updatedAt` is now.
+ *
+ * @param {Partial<import("../http/apiSchemaService.js").ProfileBody>} [input]
  */
 export const buildProfile = (input = {}) => {
   const base = defaultProfile();
@@ -343,6 +398,8 @@ export const buildProfile = (input = {}) => {
 /**
  * Whether a built profile has what signup requires: first and last name, age,
  * height, weight and sex.
+ *
+ * @param {ReturnType<typeof buildProfile>} profile
  */
 export const isCompleteSignupProfile = (profile) =>
   Boolean(
