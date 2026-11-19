@@ -3,6 +3,7 @@
  * wires every repository and service into the routes. Exports `app` for the
  * test suites; the guard at the bottom runs `startServer` only outside them.
  */
+// @ts-check
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";
@@ -116,9 +117,14 @@ const port = process.env.PORT || 5000;
 const serverBootAtMs = Date.now();
 let postgresLastError = "";
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+/** @param {unknown} value */
 const parseCsvEnv = (value) =>
   String(value || "")
     .split(",")
@@ -168,6 +174,7 @@ if (corsAllowlistIsEmpty) {
 }
 
 const metrics = createMetrics();
+/** @type {import("./services/platform/errorTrackingService.js").ErrorTracker} */
 let errorTracker = {
   enabled: false,
   configured: false,
@@ -274,6 +281,10 @@ const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
 // the 0 that `Number(null)` and `Number("")` produce, but only by accident of the
 // range; a copy of this shape for a range that includes 0 needs the guard to be
 // right.
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ */
 const toPositiveInt = (value, fallback) => {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
@@ -397,6 +408,7 @@ const stravaService = createStravaService({
 // The cache is built here but sessionService, which owns the Redis client, is not
 // created until further down. This indirection is set once that happens; reaching
 // for `sessionService` directly from here would be a temporal dead zone hazard.
+/** @type {import("./services/platform/rateLimitStore.js").GetRedisClient} */
 let getSessionRedisClient = () => null;
 
 const {
@@ -543,6 +555,7 @@ const { parseDashboardPagination, getDashboardCollection, buildDashboardResponse
 // tier's 15-minute idle spin-down -- which is also why sessions are kept there.
 // Each limiter gets its own store and prefix so their counts stay separate, and
 // each falls back to memory on its own if Redis is unavailable.
+/** @param {string} scope The limiter's name, in its key prefix. */
 const rateLimitStore = (scope) =>
   createRateLimitStore({
     getClient: sessionService.getRedisClient,
@@ -875,6 +888,10 @@ registerClientStatic(app, {
 // The one path to error tracking, for the error middleware and for routes that
 // answer their own 5xx through sendErrorResponse. It reads errorTracker when
 // called, because startServer replaces it after this module has run.
+/**
+ * @param {unknown} error
+ * @param {import("./services/platform/errorTrackingService.js").ErrorContext} [context]
+ */
 const reportToErrorTracker = (error, context = {}) => {
   errorTracker.captureException(error, context);
 };
@@ -906,7 +923,8 @@ const startServer = async () => {
           "Postgres connected."
         );
       }
-    } catch (postgresErr) {
+    } catch (/** @type {any} */ postgresErr) {
+      // connectPostgres threw it, a pg or URL error, possibly a non-Error.
       postgresLastError = toShortText(postgresErr?.message || String(postgresErr), 300);
       if (postgresStartupRequired) throw postgresErr;
       logger.warn(
@@ -948,7 +966,8 @@ const startServer = async () => {
     // does not attach process-wide handlers.
     process.on("SIGTERM", () => handleShutdown("SIGTERM"));
     process.on("SIGINT", () => handleShutdown("SIGINT"));
-  } catch (err) {
+  } catch (/** @type {any} */ err) {
+    // A startup step threw it: Redis, Postgres, Prisma or listen, possibly a non-Error.
     logger.fatal(
       { event: "server_start_failed", error: toShortText(err?.message || String(err), 300) },
       "Failed to start server."

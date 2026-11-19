@@ -4,6 +4,23 @@
  * injected so the sequence can be tested by direct call: Windows does not
  * deliver POSIX signals to Node the way the Linux CI runner does.
  */
+// @ts-check
+
+/**
+ * Returns the handler index.js runs on SIGTERM and SIGINT. A second signal
+ * while one is running does nothing.
+ *
+ * @param {object} deps
+ * @param {import("pino").Logger} deps.logger
+ * @param {(value: unknown, maxLen?: number) => string} deps.toShortText
+ * @param {() => import("node:http").Server | null | undefined} deps.getHttpServer
+ * @param {() => Promise<void>} deps.closeSessionStore
+ * @param {() => Promise<void>} deps.disconnectPrisma
+ * @param {() => Promise<void>} deps.closePostgres
+ * @param {() => Promise<void>} deps.flushErrorTracker
+ * @param {number} [deps.shutdownTimeoutMs]
+ * @param {(code: number) => void} [deps.exit]
+ */
 export const createShutdownHandler = ({
   logger,
   toShortText,
@@ -17,7 +34,7 @@ export const createShutdownHandler = ({
 }) => {
   let shuttingDown = false;
 
-  return async (signal) => {
+  return async (/** @type {string} */ signal) => {
     if (shuttingDown) return;
     shuttingDown = true;
 
@@ -36,11 +53,14 @@ export const createShutdownHandler = ({
     try {
       const httpServer = getHttpServer();
       if (httpServer) {
-        await new Promise((resolve) => {
-          httpServer.close(() => resolve());
-          // close() waits on idle keep-alive sockets; drop them so it can finish.
-          httpServer.closeIdleConnections?.();
-        });
+        // It resolves with nothing once the server has closed.
+        await /** @type {Promise<void>} */ (
+          new Promise((resolve) => {
+            httpServer.close(() => resolve());
+            // close() waits on idle keep-alive sockets; drop them so it can finish.
+            httpServer.closeIdleConnections?.();
+          })
+        );
       }
       await closeSessionStore();
       await disconnectPrisma();
@@ -50,7 +70,8 @@ export const createShutdownHandler = ({
       clearTimeout(forceExit);
       logger.info({ event: "shutdown_complete", signal }, "Shutdown complete.");
       exit(0);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+      // A close or flush step threw it, possibly a non-Error.
       clearTimeout(forceExit);
       logger.error(
         {

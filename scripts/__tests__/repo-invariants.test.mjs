@@ -851,7 +851,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 116;
+  const TYPE_CHECKED_FILES = 120;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -908,6 +908,15 @@ describe("type-checked files", () => {
     const layer = sources.filter(({ file }) => DATA_LAYER.test(file) && !isTest(file));
     expect(layer.length, "the sweep found too few data-layer files").toBeGreaterThanOrEqual(43);
     const unchecked = layer.filter((source) => !checked.includes(source)).map(({ file }) => file);
+    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
+  });
+
+  // D1 phase 4: the server's source is checked whole, so a file added there is
+  // checked from its first commit (docs/specs/2026-11-17-server-source-types-design.md).
+  test("every source file in the server is checked", () => {
+    const server = sources.filter(({ file }) => file.startsWith("server/src/") && !isTest(file));
+    expect(server.length, "the sweep found too few server files").toBeGreaterThanOrEqual(75);
+    const unchecked = server.filter((source) => !checked.includes(source)).map(({ file }) => file);
     expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
 
