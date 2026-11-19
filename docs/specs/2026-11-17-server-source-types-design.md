@@ -1,7 +1,9 @@
 # Type-checking the server's source (roadmap lane D1, phase 4), design
 
-Status: **decided 2026-11-17** with the owner, measured. The plan is
-`docs/plans/2026-11-17-server-source-types.md`. Phase 3 is
+Status: **decided 2026-11-17** with the owner, measured; **applied 2026-11-19**, in #426
+to #431, all live, with no floor PR. The plan is
+`docs/plans/2026-11-17-server-source-types.md`, whose status says where the work went past
+this text. Phase 3 is
 `docs/specs/2026-11-16-client-data-layer-types-design.md`, which left response types to this
 phase: "Response types come later, from the server, once its read side is checked".
 

@@ -13,8 +13,52 @@ here except where a task needs the exact form.
 **Tech Stack:** TypeScript 7.0.2 over JSDoc, Express 5.3, Prisma 7.10 (`prisma-client-js`),
 pino 10, zod 4, Vitest with v8 coverage, acorn, Playwright, gh CLI.
 
-**Status: planned 2026-11-17.** Every file, line and count below was read or measured on
-`c8116ec`.
+**Status: done 2026-11-19** (#424 to #431, all live; main `59ebe6c`). Every file, line and
+count below was read or measured on `c8116ec`. Each PR's syntax trees matched `main`'s and
+its server coverage matched figure for figure (lines aside where noted), so there was no floor
+PR. Every server source file is checked: `TYPE_CHECKED_FILES` is 120. These are the places
+the work departs from the text below.
+
+- **#425, outside the plan.** A new picomatch advisory, GHSA-fc5q-39xc-vjpf, failed every
+  PR's audit, so it was allowlisted with a review (dev tooling only), by the owner's choice.
+  GitHub withdrew the advisory on 2026-11-18, so the entry is stale; removing it is the
+  owner's call.
+- **#426, tooling and the 14 files.** Error counts matched exactly (106).
+  - Server coverage excludes `**/*.d.ts` (the owner's decision): `express.d.ts` showed as an
+    84th file at 0 of 0.
+  - The qs guard's pattern names the runtime package only, `/(^|\/)node_modules\/qs$/`,
+    because `@types/qs` 6.15.1 (the newest) tripped it.
+  - `prisma generate` needs no `DATABASE_URL`, so the CI step has no `env`.
+- **#427, the repositories.** Error counts matched (245).
+  - `generatedPlanRepository.js` shipped with its JSDoc but no pragma, by the owner's
+    decision, because typing it showed a defect (pattern F). `rewritePlan` passed a
+    possibly-null re-read to `mapGeneratedPlan`, so a plan deleted mid-lock answered 500,
+    not 404.
+  - `dashboardCollectionRepository` names a model by string, so it got `CollectionSpec` and
+    a `CollectionModel` cast.
+  - A mutation found that a misspelled Prisma `data` key escapes the excess-property check
+    when `data` is built in a variable or spreads another object. That is reported to the
+    owner as an open choice.
+- **#428, the defect's fix**, test first, against a race staged in Postgres. It added the
+  guard and the pragma, bringing `TYPE_CHECKED_FILES` to Task 3's 91.
+- **#429, the services.** Error counts matched (246). The client program checks
+  `dashboardDataBuildersService.js` through `apiSchemaService.js`, and its `crypto` import
+  failed there, so the client tsconfig's `types` gained `node`, by the owner's decision.
+  The builders take `Partial<…Body>`, and `PasswordRecord` is never null.
+- **#430, the routes.** Error counts matched (209), so it was one PR.
+  - Each of the 34 `req.user` reads behind `requireAuth` is cast in place, with one comment
+    per file, by the owner's decision, and `express.d.ts` is unchanged.
+  - Upstream answers are cast once where they are awaited.
+  - Types-only fixes beside the routes:
+    - the dashboard and external validators are generic over the schema;
+    - `mapUser`'s spread is cast to non-null;
+    - `rewritePlan`'s result is discriminated;
+    - `OpenAqStation` names the fields read;
+    - `mergeCacheStatuses` takes `undefined`.
+  - A route whose body no client file reads gets no typedef. The PR lists each one, with why.
+- **#431, the bootstrap and the guard.** `index.js` had 21 errors, not 19, and the predicted
+  `readThroughExternalCache` mismatch never appeared. `rateLimitStore`'s public methods cast
+  `runWithFallback`'s union result, so the limiters take them as a `Store`.
 
 ---
 
