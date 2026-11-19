@@ -3,12 +3,23 @@
  * "The webhook"): the subscription's setup check, and each event, answered at
  * once and handled after. Mounted by index.js ahead of the /api CSRF check.
  */
+// @ts-check
 import { tokensMatch } from "../../services/auth/sessionService.js";
 
 const PATH = "/webhooks/strava";
 const NOT_AVAILABLE = "Strava's webhook is not available.";
 
+/** @param {unknown} value */
 const queryText = (value) => (typeof value === "string" ? value.trim().slice(0, 300) : "");
+
+/**
+ * What index.js hands the webhook; one property per member it reads.
+ * @typedef {object} StravaWebhookDeps
+ * @property {() => ReturnType<typeof import("../../services/integrations/stravaConfig.js").readStravaConfig>} getStravaConfig
+ * @property {ReturnType<typeof import("../../services/integrations/stravaService.js").createStravaService>} stravaService
+ * @property {import("express").RequestHandler} stravaWebhookLimiter
+ * @property {(task: () => unknown) => unknown} scheduleStravaEvent Runs the task after the response.
+ */
 
 /**
  * Registers the two routes, each behind `stravaWebhookLimiter`. The setup check
@@ -17,6 +28,9 @@ const queryText = (value) => (typeof value === "string" ? value.trim().slice(0, 
  * waits two seconds for a 200 and does not sign events, so an event is answered
  * first and handed to `scheduleStravaEvent`, and the service checks it with
  * Strava before anything changes.
+ *
+ * @param {import("express").Express} app
+ * @param {StravaWebhookDeps} deps
  */
 export const registerStravaWebhook = (app, deps) => {
   const { getStravaConfig, stravaService, stravaWebhookLimiter, scheduleStravaEvent } = deps;

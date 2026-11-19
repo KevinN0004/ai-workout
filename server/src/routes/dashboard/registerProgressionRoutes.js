@@ -3,6 +3,7 @@
  * change, settle an asked step up or train a deload week normally. Registered
  * by dashboardRoutes.js.
  */
+// @ts-check
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {
   allowedWeekStarts,
@@ -21,6 +22,42 @@ import {
   weekDecisionBodySchema
 } from "./validation.js";
 
+/** @typedef {import("../../services/auth/authUserService.js").AuthUser} AuthUser */
+/** @typedef {ReturnType<typeof import("../../repositories/progressionDecisionRepository.js").createProgressionDecisionRepository>} ProgressionDecisionRepository */
+
+/**
+ * What index.js hands the progression routes; one property per member they read.
+ * @typedef {object} ProgressionDeps
+ * @property {import("express").RequestHandler} requireAuth Rejects a request with no session.
+ * @property {typeof import("../../services/http/apiSchemaService.js").validateBody} validateBody
+ * @property {ReturnType<typeof import("../../repositories/userReadRepository.js").createUserReadRepository>["findUserWithDashboard"]} findUserWithDashboard
+ * @property {ReturnType<typeof import("../../services/auth/authUserService.js").createAuthUserService>["mapDbDocToUser"]} mapDbDocToUser
+ * @property {ProgressionDecisionRepository["listWeekDecisions"]} listWeekDecisions
+ * @property {ProgressionDecisionRepository["saveDecision"]} saveDecision
+ * @property {ProgressionDecisionRepository["removeDecision"]} removeDecision
+ */
+
+/** @typedef {NonNullable<ReturnType<ProgressionDeps["mapDbDocToUser"]>>} MappedUser */
+
+/**
+ * The user loadWeek reads: found, so mapped, and loaded with its collections,
+ * so it has its dashboard.
+ * @typedef {MappedUser & { dashboard: NonNullable<MappedUser["dashboard"]>, profile: { notes?: unknown } }} LoadedUser
+ */
+
+/**
+ * What GET /api/dashboard/progression answers: the week's progression, null
+ * when the plan has no saved structure.
+ * @typedef {{ progression: ReturnType<typeof buildProgression> }} ProgressionResponse
+ */
+
+/**
+ * What a PUT or DELETE answer on the progression returns: the week as it now
+ * reads. The key is left out only when the account was deleted between the
+ * answer's two reads.
+ * @typedef {{ progression?: ReturnType<typeof buildProgression> }} ProgressionAnsweredResponse
+ */
+
 const NO_USER = "User not found.";
 const NO_PLAN = "There is no plan with a saved structure to answer for.";
 const NO_LIFT = "That lift is not one of this week's lifts.";
@@ -33,7 +70,11 @@ const CLOSED_WEEK = "Answers can only be given for this week.";
  * answers `{ progression }`. From `deps`, `findUserWithDashboard` and
  * `mapDbDocToUser` load the user as the dashboard read does, and the three
  * answer functions come from progressionDecisionRepository.js.
+ *
+ * @param {import("express").Express} app
+ * @param {ProgressionDeps} deps
  */
+// Every handler here runs behind requireAuth, which sets req.user.
 export const registerProgressionRoutes = (app, deps) => {
   const {
     requireAuth,
@@ -48,10 +89,15 @@ export const registerProgressionRoutes = (app, deps) => {
   // The week of `today` for the user: the newest plan, every session the
   // dashboard read holds, the profile note and the week's answers. Undefined
   // when the user row is gone, and null when the plan has no saved structure.
+  /**
+   * @param {string} userId
+   * @param {string} today
+   */
   const loadWeek = async (userId, today) => {
     const userDoc = await findUserWithDashboard(userId);
     if (!userDoc) return undefined;
-    const { dashboard, profile } = mapDbDocToUser(userDoc);
+    // userDoc was found with its collections, so it maps to a user with a dashboard.
+    const { dashboard, profile } = /** @type {LoadedUser} */ (mapDbDocToUser(userDoc));
     const decisions = await listWeekDecisions({ userId, weekStart: weekStartOf(today) });
     return buildProgression({
       plan: dashboard.plans[0] ?? null,
@@ -68,9 +114,12 @@ export const registerProgressionRoutes = (app, deps) => {
     try {
       const query = validateQuery(req, res, progressionQuerySchema);
       if (!query) return;
-      const progression = await loadWeek(req.user.id, clientToday(query.today, new Date()));
+      const progression = await loadWeek(
+        /** @type {AuthUser} */ (req.user).id,
+        clientToday(query.today, new Date())
+      );
       if (progression === undefined) return res.status(404).json({ error: NO_USER });
-      return res.json({ progression });
+      return res.json(/** @satisfies {ProgressionResponse} */ ({ progression }));
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
     }
@@ -80,17 +129,25 @@ export const registerProgressionRoutes = (app, deps) => {
   // within a day of the server's is a 400, so an old link cannot rewrite
   // history, and a lift the week does not hold is a 404, so no row is stored
   // for it. A body schema saves its decision; without one the answer is removed.
+  /**
+   * @param {typeof progressionLiftParamsSchema | typeof progressionWeekParamsSchema} paramsSchema
+   * @param {typeof liftDecisionBodySchema | typeof weekDecisionBodySchema} [bodySchema]
+   * @returns {import("express").RequestHandler}
+   */
   const answer = (paramsSchema, bodySchema) => async (req, res) => {
     try {
       const params = validateParams(req, res, paramsSchema);
       if (!params) return;
-      const body = bodySchema ? validateBody(req, res, bodySchema) : {};
+      // An answer without a body removes the decision.
+      const body = bodySchema
+        ? validateBody(req, res, bodySchema)
+        : /** @type {{ decision?: undefined }} */ ({});
       if (!body) return;
       if (!allowedWeekStarts(new Date()).includes(params.weekStart)) {
         return res.status(400).json({ error: CLOSED_WEEK });
       }
 
-      const userId = req.user.id;
+      const userId = /** @type {AuthUser} */ (req.user).id;
       const { weekStart } = params;
       const week = await loadWeek(userId, weekStart);
       if (week === undefined) return res.status(404).json({ error: NO_USER });
@@ -105,7 +162,11 @@ export const registerProgressionRoutes = (app, deps) => {
       if (body.decision)
         await saveDecision({ userId, weekStart, liftKey, decision: body.decision });
       else await removeDecision({ userId, weekStart, liftKey });
-      return res.json({ progression: await loadWeek(userId, weekStart) });
+      return res.json(
+        /** @satisfies {ProgressionAnsweredResponse} */ ({
+          progression: await loadWeek(userId, weekStart)
+        })
+      );
     } catch (err) {
       return sendErrorResponse(req, res, err, 500);
     }

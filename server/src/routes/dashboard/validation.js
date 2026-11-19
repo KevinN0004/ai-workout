@@ -51,9 +51,12 @@ export const weekDecisionBodySchema = z.object({ decision: z.literal("normal") }
  * Validates `req.query` against `schema` and returns the parsed data. On failure
  * it answers 400 with the first issue and returns null, so the route stops on a
  * null.
+ * @template {import("zod").ZodType} S
  * @param {{ query?: unknown }} req
  * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
- * @param {import("zod").ZodType} schema
+ * @param {S} schema
+ * @param {string} [fallbackPath]
+ * @returns {import("zod").output<S> | null}
  */
 export const validateQuery = (req, res, schema, fallbackPath = "query") => {
   const { data, error } = validateSchemaInput(schema, req.query || {}, fallbackPath);
@@ -64,9 +67,12 @@ export const validateQuery = (req, res, schema, fallbackPath = "query") => {
 
 /**
  * The same as validateQuery, for `req.params`.
+ * @template {import("zod").ZodType} S
  * @param {{ params?: unknown }} req
  * @param {import("../../services/http/apiSchemaService.js").JsonResponse} res
- * @param {import("zod").ZodType} schema
+ * @param {S} schema
+ * @param {string} [fallbackPath]
+ * @returns {import("zod").output<S> | null}
  */
 export const validateParams = (req, res, schema, fallbackPath = "params") => {
   const { data, error } = validateSchemaInput(schema, req.params || {}, fallbackPath);

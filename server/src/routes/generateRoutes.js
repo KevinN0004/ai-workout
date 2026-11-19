@@ -3,6 +3,7 @@
  * rule-based generator, asks Gemini for its coach notes (rule-written notes stand
  * in when it cannot), and saves the plan for a signed-in caller.
  */
+// @ts-check
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { collapseWhitespace } from "../services/dashboard/dashboardDataBuildersService.js";
@@ -30,9 +31,41 @@ const NOTES_LABEL = /^coach\s*notes?\s*:?\s*/i;
 // from a failure of the call itself.
 class NotesTimeoutError extends Error {}
 
+/** @typedef {(value: unknown, fallback: number) => number} PositiveIntReader */
+
+/**
+ * What index.js hands the generate route; one property per member it reads.
+ * @typedef {object} GenerateDeps
+ * @property {import("@google/genai").GoogleGenAI | null} gemini
+ * @property {typeof import("../services/http/apiSchemaService.js").validateBody} validateBody
+ * @property {typeof import("../services/http/apiSchemaService.js").generatePlanBodySchema} generatePlanBodySchema
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").cleanText} cleanText
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").toCleanArray} toCleanArray
+ * @property {typeof import("../services/dashboard/dashboardDataBuildersService.js").toNullableNumber} toNullableNumber
+ * @property {PositiveIntReader} toPositiveInt
+ * @property {ReturnType<typeof import("../repositories/generatedPlanRepository.js").createGeneratedPlanRepository>["saveGeneratedPlan"]} saveGeneratedPlan
+ * @property {ReturnType<typeof import("../repositories/generatedPlanRepository.js").createGeneratedPlanRepository>["pruneGeneratedPlans"]} pruneGeneratedPlans
+ */
+
+/**
+ * What POST /api/generate answers: the plan's text and structure, and for a
+ * signed-in caller the plan as saved (or as built, when the user could not be
+ * resolved); null for an anonymous one.
+ * @typedef {object} GenerateResponse
+ * @property {string} plan
+ * @property {ReturnType<typeof withPrescriptions>} payload
+ * @property {ReturnType<typeof import("../repositories/generatedPlanRepository.js").mapGeneratedPlan> | (import("../repositories/generatedPlanRepository.js").GeneratedPlanEntry & { createdAt: string }) | null} savedPlan
+ */
+
 /**
  * Gemini's notes for `planText`, trimmed, or the reason they cannot be used:
  * no client, a failed call, the deadline, a cut-off answer, or no text.
+ *
+ * @param {object} args
+ * @param {GenerateDeps["gemini"]} args.gemini
+ * @param {Parameters<typeof buildNotesPrompt>[0]} args.fields
+ * @param {string} args.planText
+ * @param {PositiveIntReader} args.toPositiveInt
  */
 const askForNotes = async ({ gemini, fields, planText, toPositiveInt }) => {
   // `gemini` is null when no key was configured at boot; see index.js.
@@ -84,17 +117,20 @@ const askForNotes = async ({ gemini, fields, planText, toPositiveInt }) => {
   if (result?.candidates?.[0]?.finishReason === "MAX_TOKENS") return { reason: "truncated" };
   const lines = (typeof result?.text === "string" ? result.text : "")
     .split(/\r?\n/)
-    .map((line, index) => (index === 0 ? line.replace(NOTES_LABEL, "") : line).trim())
+    .map((/** @type {string} */ line, /** @type {number} */ index) =>
+      (index === 0 ? line.replace(NOTES_LABEL, "") : line).trim()
+    )
     .filter(Boolean)
     .slice(0, MAX_NOTES)
-    .map((line) => line.slice(0, MAX_NOTE_CHARS));
+    .map((/** @type {string} */ line) => line.slice(0, MAX_NOTE_CHARS));
   return lines.length ? { lines } : { reason: "empty" };
 };
 
 /**
  * Registers POST /api/generate.
  *
- * @param deps `gemini` is the Gemini client, or null when GEMINI_API_KEY is
+ * @param {import("express").Express} app
+ * @param {GenerateDeps} deps `gemini` is the Gemini client, or null when GEMINI_API_KEY is
  *   unset. `toPositiveInt` is index.js's reader for a positive integer
  *   setting, which the two GEMINI_* limits go through.
  */
@@ -121,7 +157,12 @@ export const registerGenerateRoutes = (app, deps) => {
       const body = validateBody(req, res, generatePlanBodySchema);
       if (!body) return;
 
+      /**
+       * @param {unknown} value
+       * @param {number} maxLen
+       */
       const inline = (value, maxLen) => collapseWhitespace(cleanText(value, maxLen));
+      /** @param {string[]} items */
       const inlineList = (items) => items.map(collapseWhitespace).filter(Boolean);
 
       const goal = inline(body.goal, 120) || "Build strength and energy";
@@ -136,7 +177,9 @@ export const registerGenerateRoutes = (app, deps) => {
 
       // The health answers and the profile's age shape this plan only; neither
       // is saved with it.
-      const age = req.user?.profile?.age;
+      // The stored profile is a JSON object; its age is checked to be a number below.
+      const age = /** @type {{ profile?: { age?: unknown } } | null | undefined} */ (req.user)
+        ?.profile?.age;
       const plan = generatePlan({
         ...fields,
         health: body.health || {},
@@ -183,7 +226,8 @@ export const registerGenerateRoutes = (app, deps) => {
         // would cost the caller this plan, and the next save prunes again.
         try {
           await pruneGeneratedPlans({ userId: sessionUser.id });
-        } catch (pruneErr) {
+        } catch (/** @type {any} */ pruneErr) {
+          // pruneGeneratedPlans threw it, a database error, possibly a non-Error.
           req.log?.warn(
             {
               event: "generated_plan_prune_failed",
@@ -194,7 +238,7 @@ export const registerGenerateRoutes = (app, deps) => {
         }
       }
 
-      res.json({ plan: text, payload, savedPlan });
+      res.json(/** @satisfies {GenerateResponse} */ ({ plan: text, payload, savedPlan }));
     } catch (err) {
       sendErrorResponse(req, res, err, 500);
     }

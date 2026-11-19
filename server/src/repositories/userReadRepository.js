@@ -107,7 +107,8 @@ export const mapUser = (row, related = {}) => {
   const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
 
   return {
-    ...mapUserRow(row),
+    // row was checked above, so mapUserRow returns its fields, not null.
+    .../** @type {NonNullable<ReturnType<typeof mapUserRow>>} */ (mapUserRow(row)),
     dashboard: {
       workouts: workoutSessions.slice(0, COLLECTION_LIMITS.workoutSessions),
       workoutSessions,

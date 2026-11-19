@@ -4,12 +4,17 @@
  * see metricsGuard), and the CSRF token for a client with no cookie to read it
  * from. Registered by registerApiRoutes.
  */
+// @ts-check
 import crypto from "crypto";
 
 /**
  * Constant-time comparison, so a wrong token cannot be narrowed by timing.
  * Length is compared first because timingSafeEqual throws on a mismatch, and
  * the length of a secret is not the part worth protecting.
+ */
+/**
+ * @param {unknown} provided
+ * @param {unknown} expected
  */
 const tokenMatches = (provided, expected) => {
   const a = Buffer.from(String(provided || ""), "utf8");
@@ -19,9 +24,31 @@ const tokenMatches = (provided, expected) => {
 };
 
 /**
+ * What index.js hands the system routes; one property per member they read.
+ * @typedef {object} SystemDeps
+ * @property {import("../services/platform/metricsService.js").Metrics} metrics
+ * @property {number} serverBootAtMs
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["isRedisConfigured"]} redisConfigured
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["isRedisSessionsEnabled"]} redisSessionsEnabled
+ * @property {ReturnType<typeof import("../services/auth/sessionService.js").createSessionService>["getRedisClient"]} redisClient
+ * @property {typeof import("../db/postgres.js").getPostgresStatus} postgresStatusRef
+ * @property {() => boolean} errorTrackingConfigured
+ * @property {() => boolean} errorTrackingEnabled
+ * @property {string} [metricsToken]
+ * @property {boolean} [isProduction]
+ */
+
+/**
+ * What GET /api/csrf-token answers: this session's CSRF token, for a client
+ * with no cookie to read it from.
+ * @typedef {{ csrfToken: string }} CsrfTokenResponse
+ */
+
+/**
  * Registers GET /api/health, /api/ready, /api/metrics and /api/csrf-token.
  *
- * @param deps `metrics` and `serverBootAtMs` come from index.js. `redisConfigured`,
+ * @param {import("express").Express} app
+ * @param {SystemDeps} deps `metrics` and `serverBootAtMs` come from index.js. `redisConfigured`,
  *   `redisSessionsEnabled`, `redisClient`, `postgresStatusRef`,
  *   `errorTrackingConfigured` and `errorTrackingEnabled` are functions called
  *   per request: the Redis and Postgres state, and whether error tracking is
@@ -42,7 +69,12 @@ export const registerSystemRoutes = (app, deps) => {
     metricsToken = "",
     isProduction = false
   } = deps;
+  /**
+   * @param {number} totalMs
+   * @param {number} count
+   */
   const toAvg = (totalMs, count) => (count > 0 ? Number((totalMs / count).toFixed(2)) : 0);
+  /** @param {Partial<import("../services/platform/metricsService.js").LatencyStats>} [bucket] */
   const summarizeLatencyBucket = (bucket = {}) => ({
     count: bucket.count || 0,
     avgMs: toAvg(bucket.totalMs || 0, bucket.count || 0),
@@ -130,6 +162,7 @@ export const registerSystemRoutes = (app, deps) => {
   //
   // 404 rather than 401, so an unconfigured deployment does not advertise that
   // the endpoint exists and is merely locked.
+  /** @type {import("express").RequestHandler} */
   const metricsGuard = (req, res, next) => {
     if (metricsToken) {
       if (tokenMatches(req.get("x-metrics-token"), metricsToken)) return next();
@@ -181,6 +214,6 @@ export const registerSystemRoutes = (app, deps) => {
   });
 
   app.get("/api/csrf-token", (req, res) => {
-    res.json({ csrfToken: req.csrfToken || "" });
+    res.json(/** @satisfies {CsrfTokenResponse} */ ({ csrfToken: req.csrfToken || "" }));
   });
 };
