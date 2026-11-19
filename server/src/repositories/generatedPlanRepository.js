@@ -4,6 +4,7 @@
  * dashboard reads (userReadRepository.js), and a swap's read and locked rewrite.
  * A foreign key to a plan must be ON DELETE SET NULL, so a prune never blocks.
  */
+// @ts-check
 import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
@@ -177,6 +178,9 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
       if (!found) return null;
       await tx.$queryRaw`select id from generated_plans where id = ${found.id}::uuid for update`;
       const row = await tx.generatedPlan.findUnique({ where: { id: found.id } });
+      // Gone if a prune or an account deletion committed while this waited for
+      // the lock: no such plan now.
+      if (!row) return null;
       const next = await rewrite(mapGeneratedPlan(row));
       if (!next) return { conflict: true };
       const updated = await tx.generatedPlan.update({

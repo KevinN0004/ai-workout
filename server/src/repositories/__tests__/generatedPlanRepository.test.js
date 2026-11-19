@@ -234,4 +234,50 @@ describe("findPlanForUser and rewritePlan", () => {
 
     expect(await textOf(row.id)).toBe(`${realAnswer}+x+y`);
   });
+
+  // The plan goes while a rewrite waits for its lock, as when the prune after a
+  // new plan or an account deletion commits in between. The rewrite then finds
+  // no plan, as for an unknown one, rather than mapping a row that is not there.
+  // Each step waits until Postgres shows the expected sessions blocked on a lock.
+  test("finds no plan when the plan is deleted while it waits for the lock", async () => {
+    const { user, row } = await seedPlan("rewrite-deleted@example.com");
+    const blockedOnLocks = async (count) => {
+      for (;;) {
+        const [{ blocked }] = await prisma.$queryRaw`
+          select count(*)::int as blocked from pg_stat_activity
+          where datname = current_database() and wait_event_type = 'Lock'`;
+        if (blocked >= count) return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    };
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    let firstRead;
+    const firstHasRead = new Promise((resolve) => (firstRead = resolve));
+
+    const first = rewritePlan({
+      userId: user.id,
+      planId: row.id,
+      rewrite: async () => {
+        firstRead();
+        await held;
+        return null;
+      }
+    });
+    await firstHasRead;
+    // A Prisma query runs only once something calls its then, so start it here.
+    const deleted = prisma.generatedPlan.delete({ where: { id: row.id } }).then((gone) => gone);
+    await blockedOnLocks(1);
+    const second = rewritePlan({
+      userId: user.id,
+      planId: row.id,
+      rewrite: () => ({ payload, planText: "never" })
+    });
+    await blockedOnLocks(2);
+    release();
+
+    expect(await first).toEqual({ conflict: true });
+    await deleted;
+    expect(await second).toBeNull();
+  });
 });
