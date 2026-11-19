@@ -46,6 +46,7 @@
 - [2026-11-12 — Strava import](plans/2026-11-12-strava-import.md)
 - [2026-11-14 — Request body types from the zod schemas, D1 phase 2](plans/2026-11-14-api-body-types.md)
 - [2026-11-16 — Type-checking the client's data layer, D1 phase 3](plans/2026-11-16-client-data-layer-types.md)
+- [2026-11-17 — Type-checking the server's source, D1 phase 4](plans/2026-11-17-server-source-types.md)
 
 ## Specs
 
@@ -73,3 +74,4 @@
 - [2026-11-12 — Strava import](specs/2026-11-12-strava-import-design.md)
 - [2026-11-14 — Request body types from the zod schemas, D1 phase 2](specs/2026-11-14-api-body-types-design.md)
 - [2026-11-16 — Type-checking the client's data layer, D1 phase 3](specs/2026-11-16-client-data-layer-types-design.md)
+- [2026-11-17 — Type-checking the server's source, D1 phase 4](specs/2026-11-17-server-source-types-design.md)
