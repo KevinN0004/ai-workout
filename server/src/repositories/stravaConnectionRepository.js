@@ -23,7 +23,7 @@ import { getUserPk } from "./userLookup.js";
 /**
  * The connection as the service reads it. The tokens stay sealed here; only the
  * service opens them, and nothing a route returns carries them.
- * @param {any} row
+ * @param {import("@prisma/client").StravaConnection} row
  * @returns {StravaConnectionRow}
  */
 const mapConnection = (row) => ({
@@ -44,7 +44,7 @@ const mapConnection = (row) => ({
  * disconnect paths of services/integrations/stravaService.js call it. Every
  * function takes the user's id in either form and finds nothing for an unknown
  * user.
- * @param {{ prisma: any }} deps
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createStravaConnectionRepository = ({ prisma }) => {
   /**
@@ -116,14 +116,14 @@ export const createStravaConnectionRepository = ({ prisma }) => {
    * covers Strava's answer, which arrives inside the transaction.
    * @template T
    * @param {{ userId: string }} args
-   * @param {(tx: any, connection: StravaConnectionRow) => Promise<T>} fn
+   * @param {(tx: import("@prisma/client").Prisma.TransactionClient, connection: StravaConnectionRow) => Promise<T>} fn
    * @returns {Promise<T | null>}
    */
   const withRefreshLock = async ({ userId }, fn) => {
     const userPk = await getUserPk(prisma, userId);
     if (!userPk) return null;
     return prisma.$transaction(
-      async (/** @type {any} */ tx) => {
+      async (tx) => {
         await tx.$queryRaw`select 1 as locked from pg_advisory_xact_lock(hashtextextended(${`strava-refresh:${userPk}`}, 0))`;
         const row = await tx.stravaConnection.findUnique({ where: { userId: userPk } });
         return row ? fn(tx, mapConnection(row)) : null;
@@ -135,7 +135,7 @@ export const createStravaConnectionRepository = ({ prisma }) => {
   /**
    * Stores refreshed tokens, sealed, inside `withRefreshLock`'s transaction, and
    * clears reconnect.
-   * @param {any} tx
+   * @param {import("@prisma/client").Prisma.TransactionClient} tx
    * @param {{ userPk: string, accessToken: string, refreshToken: string, expiresAt: Date }} args
    */
   const updateTokens = (tx, { userPk, accessToken, refreshToken, expiresAt }) =>

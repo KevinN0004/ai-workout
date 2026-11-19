@@ -2,14 +2,21 @@
  * Prisma-native persistence for progress metrics: the row mapper the API
  * returns, and the save.
  */
+// @ts-check
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
+// Every caller passes a row (the repository, mapUser and the collection
+// reader); the default guards a bare call.
 /**
  * Maps a progress_metrics row to the metric the API returns. The Decimal
  * columns read through toNumberOrNull, so an unrecorded reading is null, not 0.
+ *
+ * @param {import("@prisma/client").ProgressMetric} [row]
  */
-export const mapProgressMetric = (row = {}) => ({
+export const mapProgressMetric = (
+  row = /** @type {import("@prisma/client").ProgressMetric} */ ({})
+) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.metricDate),
   weightLb: toNumberOrNull(row.weightLb),
@@ -23,6 +30,8 @@ export const mapProgressMetric = (row = {}) => ({
 /**
  * Builds the progress-metric writer over `prisma`. Returns `saveProgressMetric`,
  * which the progress-metrics route calls.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createProgressMetricRepository = ({ prisma }) => {
   /**
@@ -37,6 +46,8 @@ export const createProgressMetricRepository = ({ prisma }) => {
    * Returns null when the user cannot be resolved, as the workout, meal,
    * saved-exercise and plan saves do. The route does not read it: its own
    * re-read is what answers 404.
+   *
+   * @param {{ userId: string, metric?: Partial<ReturnType<typeof import("../services/dashboard/dashboardDataBuildersService.js").buildProgressMetricEntry>> }} args
    */
   const saveProgressMetric = async ({ userId, metric = {} }) => {
     const userPk = await getUserPk(prisma, userId);

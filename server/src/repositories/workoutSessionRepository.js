@@ -3,6 +3,7 @@
  * returns, what every session read selects with it, and the save, which keeps
  * a link to a plan day only when that day exists in one of the user's plans.
  */
+// @ts-check
 import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { EXERCISES } from "../services/planning/exerciseLibrary.js";
 import { dateOnlyToDate, toDateOnly, toIso, toJsonArray, toNumberOrNull } from "./rowValues.js";
@@ -19,17 +20,30 @@ const PATTERN_BY_NAME = new Map(
  * a linked session its plan's id as the client knows it, and its sets in the
  * order they were logged.
  */
-export const WORKOUT_SESSION_INCLUDE = {
-  generatedPlan: { select: { id: true, legacyId: true } },
-  exerciseSets: { orderBy: [{ exerciseOrder: "asc" }, { setNumber: "asc" }] }
-};
+export const WORKOUT_SESSION_INCLUDE =
+  /** @satisfies {import("@prisma/client").Prisma.WorkoutSessionInclude} */ ({
+    generatedPlan: { select: { id: true, legacyId: true } },
+    exerciseSets: { orderBy: [{ exerciseOrder: "asc" }, { setNumber: "asc" }] }
+  });
+
+/**
+ * A workout session row as every read loads it, with WORKOUT_SESSION_INCLUDE.
+ * @typedef {import("@prisma/client").Prisma.WorkoutSessionGetPayload<{ include: typeof WORKOUT_SESSION_INCLUDE }>} WorkoutSessionRow
+ */
+
+/**
+ * A session as the workout route builds it.
+ * @typedef {ReturnType<typeof import("../services/dashboard/dashboardDataBuildersService.js").buildWorkoutSessionEntry>} WorkoutSessionEntry
+ */
 
 // A session's set rows, already in order, grouped into one entry per
 // exercise as the API takes and returns them. Every number reads through
 // toNumberOrNull (`loadKg` and `rpe` are Decimal columns), so a missing one is
 // null and a measured 0, a failed set or a bodyweight load, stays 0. Each
 // exercise carries its library pattern, or null for a name typed by hand.
+/** @param {import("@prisma/client").ExerciseSet[]} rows */
 const groupExerciseSets = (rows) => {
+  /** @type {{ order: number, name: string, sets: { reps: number | null, seconds: number | null, loadKg: number | null, rpe: number | null }[] }[]} */
   const exercises = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     const set = {
@@ -51,6 +65,11 @@ const groupExerciseSets = (rows) => {
 
 // The rows for `exerciseSets`, numbered from 1 within each exercise, each
 // carrying the session's own user.
+/**
+ * @param {string} sessionId
+ * @param {string} userPk
+ * @param {{ name: string, sets: { reps?: number | null, seconds?: number | null, loadKg?: number | null, rpe?: number | null }[] }[]} exerciseSets
+ */
 const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
   exerciseSets.flatMap((exercise, exerciseOrder) =>
     exercise.sets.map((set, index) => ({
@@ -66,6 +85,8 @@ const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
     }))
   );
 
+// Every caller passes a row (the repository, mapUser and the collection
+// reader); the default guards a bare call.
 /**
  * Maps a workout_sessions row to the session the API returns. `intensityRpe`
  * is a Decimal column, read through toNumberOrNull, so an unrecorded RPE is
@@ -79,8 +100,10 @@ const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
  * `externalId` and `sport`, and its distance and average heart rate, each null
  * when Strava had none (008_strava_import.sql). All five are null for a
  * session logged in the app.
+ *
+ * @param {WorkoutSessionRow} [row]
  */
-export const mapWorkoutSession = (row = {}) => ({
+export const mapWorkoutSession = (row = /** @type {WorkoutSessionRow} */ ({})) => ({
   id: row.legacyId || row.id,
   date: toDateOnly(row.workoutDate),
   focus: row.focus || "General",
@@ -104,11 +127,18 @@ export const mapWorkoutSession = (row = {}) => ({
 /**
  * Builds the workout-session writer over `prisma`. Returns `saveWorkoutSession`,
  * which the workout route calls.
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createWorkoutSessionRepository = ({ prisma }) => {
   // The plan's primary key when `planId` names one of this user's plans whose
   // saved structure has a day at `planDayIndex`, and otherwise null. Scoped to
   // the user, so another user's plan reads exactly as an unknown one.
+  /**
+   * @param {string} userPk
+   * @param {unknown} planId
+   * @param {number | null | undefined} planDayIndex
+   */
   const resolvePlanDay = async (userPk, planId, planDayIndex) => {
     if (!planId || planDayIndex === null || planDayIndex === undefined) return null;
     const plan = await prisma.generatedPlan.findFirst({
@@ -116,7 +146,10 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
       select: { id: true, planPayload: true }
     });
     const payload = toPlanPayload(plan?.planPayload);
-    return payload && planDayIndex < payload.days.length ? plan.id : null;
+    // A payload came from the plan, so the plan was found.
+    return payload && planDayIndex < payload.days.length
+      ? /** @type {NonNullable<typeof plan>} */ (plan).id
+      : null;
   };
 
   /**
@@ -135,6 +168,8 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
    * table refuses leaves no session behind. The sets are replaced only when
    * `exerciseSets` is a list: an update without one, which is all a client on
    * the old bundle can send, keeps the sets already stored.
+   *
+   * @param {{ userId: string, session?: Partial<WorkoutSessionEntry> }} args
    */
   const saveWorkoutSession = async ({ userId, session = {} }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -187,7 +222,8 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
       });
     });
 
-    return mapWorkoutSession(row);
+    // The transaction re-read the row it had just written, so it was found.
+    return mapWorkoutSession(/** @type {WorkoutSessionRow} */ (row));
   };
 
   return { saveWorkoutSession };

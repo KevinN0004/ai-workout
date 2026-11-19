@@ -8,6 +8,27 @@ import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
 
+/**
+ * A plan as the generate route builds it; every field is read with a fallback.
+ * @typedef {object} GeneratedPlanEntry
+ * @property {string} [id]
+ * @property {string} [goal]
+ * @property {unknown} [equipment]
+ * @property {number | null} [duration]
+ * @property {string} [level]
+ * @property {string} [injuries]
+ * @property {number | null} [days]
+ * @property {string} [environment]
+ * @property {unknown} [focuses]
+ * @property {string} [plan]
+ * @property {unknown} [payload]
+ */
+
+/**
+ * What a swap's rewrite returns to be written.
+ * @typedef {{ payload: import("../services/dashboard/planPayloadService.js").PlanPayload, planText: string }} PlanRewrite
+ */
+
 /** How many plans each user keeps, and how many the dashboard reads. */
 export const GENERATED_PLAN_LIMIT = 200;
 
@@ -15,14 +36,21 @@ export const GENERATED_PLAN_LIMIT = 200;
  * Newest first, with ties broken by id. The dashboard reads in this order and
  * the prune deletes past the limit in it, so the plans kept are the plans read.
  */
+/** @type {import("@prisma/client").Prisma.GeneratedPlanOrderByWithRelationInput[]} */
 export const GENERATED_PLAN_ORDER = [{ createdAt: "desc" }, { id: "desc" }];
 
+// Every caller passes a row (the repository and mapUser); the default guards a
+// bare call.
 /**
  * Maps a generated_plans row to the plan the API returns. `id` is the legacy id
  * when the row has one, the JSON list columns always read as arrays, and
  * `payload` is the plan's stored structure, or null for a row that has none.
+ *
+ * @param {import("@prisma/client").GeneratedPlan} [row]
  */
-export const mapGeneratedPlan = (row = {}) => ({
+export const mapGeneratedPlan = (
+  row = /** @type {import("@prisma/client").GeneratedPlan} */ ({})
+) => ({
   id: row.legacyId || row.id,
   createdAt: toIso(row.createdAt),
   goal: row.goal || "",
@@ -42,9 +70,14 @@ export const mapGeneratedPlan = (row = {}) => ({
  * generate route calls once it has a plan for a signed-in user, and
  * `pruneGeneratedPlans`, which it calls straight after; and `findPlanForUser`
  * and `rewritePlan`, which the plan swap routes call (roadmap C4).
+ *
+ * @param {{ prisma: import("@prisma/client").PrismaClient }} deps
  */
 export const createGeneratedPlanRepository = ({ prisma }) => {
-  /** Returns null when the user cannot be resolved, matching the other repositories. */
+  /**
+   * Returns null when the user cannot be resolved, matching the other repositories.
+   * @param {{ userId: string, entry?: GeneratedPlanEntry }} args
+   */
   const saveGeneratedPlan = async ({ userId, entry = {} }) => {
     const userPk = await getUserPk(prisma, userId);
     if (!userPk) return null;
@@ -75,6 +108,8 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
    * route can read, and returns how many went. 0 when the user cannot be
    * resolved. It needs no lock: the route prunes after its own insert has
    * committed, so whichever prune runs last sees every plan saved before it.
+   *
+   * @param {{ userId: string }} args
    */
   const pruneGeneratedPlans = async ({ userId }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -96,6 +131,10 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
   };
 
   // The where for the user's plan the client knows as `planId` (legacyId || id).
+  /**
+   * @param {string} userPk
+   * @param {unknown} planId
+   */
   const planWhere = (userPk, planId) => ({
     userId: userPk,
     ...legacyOrIdWhere(planId, "legacyId")
@@ -104,6 +143,8 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
   /**
    * The user's plan the client knows as `planId` (`legacyId || id`), mapped, or
    * null when the user or that plan of theirs cannot be found (roadmap C4).
+   *
+   * @param {{ userId: string, planId: string }} args
    */
   const findPlanForUser = async ({ userId, planId }) => {
     const userPk = await getUserPk(prisma, userId);
@@ -119,6 +160,11 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
    * rewrites at once take turns and the second reads the first's plan; neither
    * is lost. Only that one row is locked. Returns `{ plan }` as written,
    * `{ conflict: true }` when `rewrite` declined, or null for no such plan.
+   *
+   * @param {object} args
+   * @param {string} args.userId
+   * @param {string} args.planId
+   * @param {(plan: ReturnType<typeof mapGeneratedPlan>) => PlanRewrite | null | Promise<PlanRewrite | null>} args.rewrite
    */
   const rewritePlan = async ({ userId, planId, rewrite }) => {
     const userPk = await getUserPk(prisma, userId);
