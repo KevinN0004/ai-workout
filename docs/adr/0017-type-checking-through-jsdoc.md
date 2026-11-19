@@ -113,3 +113,46 @@ proved annotation only by a build byte-identical to `main`'s.
   dev dependencies, because React's types reached the client only through Testing Library and
   React DOM's not at all. Vite types an `import.meta.env` key it does not declare as `any`, so
   a parameter defaulted from one accepts anything.
+
+## The server's source (phase 4)
+
+Decided 2026-11-17, `docs/specs/2026-11-17-server-source-types-design.md`. Every source
+file in `server/src` is checked: 53 files over six PRs (#426 to #431), each proved annotation
+only by syntax trees identical to `main`'s and the same coverage figures. #428 fixed the
+one defect the types showed.
+
+- **The guard.** "every source file in the server is checked", in `repo-invariants.test.mjs`,
+  fails on a tracked server source file without the pragma, so a new one is checked from its
+  first commit. It also fails if its sweep finds fewer than 75 files.
+- **One declaration file, `server/src/types/express.d.ts`,** adds the app's own fields to
+  Express's `Request`: `requestId`, `log`, `user` and `csrfToken`. JSDoc cannot do this,
+  because only a `.d.ts` can merge into a global namespace's interface. Nothing imports or runs
+  it, the header test covers `.ts`, and server coverage excludes `**/*.d.ts`. `user` stays
+  `AuthUser | null` and optional; a read behind `requireAuth` casts it in place, one comment
+  per file (the owner's choice, 2026-11-19).
+- **The tooling's types.** `@types/express`, `@types/cors` and `@types/pg` are server dev
+  dependencies; `pg`'s types had come only through `@prisma/adapter-pg`. The client
+  tsconfig's `types` also names `node`, because the client program checks the server files a
+  client JSDoc type reaches, and one of them imports `crypto` (the owner's choice).
+- **Prisma is typed as `PrismaClient`,** with each row from Prisma's model or
+  `<Model>GetPayload` types, and a transaction as `Prisma.TransactionClient`. CI's quality
+  job runs `prisma generate` before Typecheck, since only it writes those types, and a
+  repo-invariant test holds the step there. A misspelled key in a `data` object built before
+  the call, or spreading another, escapes the excess-property check. That is an open choice
+  for the owner.
+- **Each answer a client file reads has a `<Name>Response` typedef,** derived from the
+  functions that build it and checked with `/** @satisfies {…} */` on its `res.json(...)`, so
+  a missing or misspelled field fails the typecheck. A route whose body no client file reads
+  gets none. The client takes these types up in the pages phase.
+- **Patterns.**
+  - G: a route module's `app` and a `<Name>Deps` typedef, each member typed by `typeof` or
+    `ReturnType`; a grouping file takes the intersection of its registrars'
+    `Parameters<…>[1]`.
+  - H: the Prisma types above.
+  - I: a defaulted parameter typed as its callers pass it, cast only where `{}` does not fit.
+  - J: a no-op placeholder typed as what replaces it.
+  - K: a value another check guarantees, cast in place with that check named.
+  - L: state declared at its first value.
+- **What the proof caught.** Wrapping `a?.b` in a cast splits the optional chain, so the cast
+  goes on `a`. Prettier can move a cast's comment out of `...(x || y)`, so a cast is re-read
+  after formatting. An untyped `@param deps` line shadows a typed one written after it.

@@ -85,6 +85,7 @@ Before responding, check if the prompt matches any of these patterns and invoke 
 - `server/src/db` — the Postgres pool, the Prisma client and the migration runner
 - `server/src/repositories` — **all Prisma data access lives here.** Routes and services
   call these; nothing else should touch `prisma.*` directly
+- `server/src/types` — declaration files only: `express.d.ts` adds the app's `Request` fields
 - `server/prisma` — the Prisma schema
 - `server/db/postgres` — the SQL migrations, applied in order by `migrate:postgres`
 - `server/scripts` — server operational scripts (local Postgres, migrations)
