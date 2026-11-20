@@ -3,15 +3,25 @@
  * digits, −15 s, +15 s and Skip rest, and "Rest over" once it ends. The digits
  * are not announced; the page's live region says when a rest starts and ends.
  */
+// @ts-check
 import clockText from "../clockText";
 import useRestTimer from "../hooks/useRestTimer";
 
 const STEP_SECONDS = 15;
 
 /**
+ * @typedef {object} RestTimerProps
+ * @property {number} restEndsAt ms since the epoch
+ * @property {(deltaSeconds: number) => void} onAdjust
+ * @property {() => void} onSkip
+ * @property {() => void} onEnd
+ */
+
+/**
  * The rest that ends at `restEndsAt`. −15 s and +15 s call `onAdjust` with the
  * change in seconds, Skip rest calls `onSkip`, and `onEnd` runs when the rest
  * is seen to end in time (useRestTimer).
+ * @param {RestTimerProps} props
  */
 export default function RestTimer({ restEndsAt, onAdjust, onSkip, onEnd }) {
   const { remaining, over } = useRestTimer(restEndsAt, onEnd);

@@ -2,6 +2,7 @@
  * The current time for the session page's clocks (roadmap B6), read again
  * every second and whenever the page is shown or hidden.
  */
+// @ts-check
 import { useEffect, useState } from "react";
 
 const SECOND_MS = 1000;
@@ -11,6 +12,7 @@ const SECOND_MS = 1000;
  * built on it catches up at once after a locked phone or a background tab,
  * whose timers the browser slows or stops. A new `since` reads it at once, so a
  * clock restarted between ticks starts from the true time.
+ * @param {number | null} since
  */
 export default function useNow(since) {
   const [now, setNow] = useState(() => Date.now());

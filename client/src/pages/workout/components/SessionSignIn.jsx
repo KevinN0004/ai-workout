@@ -2,9 +2,13 @@
  * What /workout shows with nobody signed in (roadmap B6): a session is kept per
  * account, so there is none to open until someone signs in. Rendered by App.
  */
+// @ts-check
 import "../SessionPage.css";
 
-/** Asks to sign in, and `onSignIn` opens the sign-in page. */
+/**
+ * Asks to sign in, and `onSignIn` opens the sign-in page.
+ * @param {{ onSignIn: () => void }} props
+ */
 export default function SessionSignIn({ onSignIn }) {
   return (
     <main className="session-page">

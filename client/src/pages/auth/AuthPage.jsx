@@ -2,8 +2,41 @@
  * The /auth page: one form for logging in and for signing up, the sign-up mode
  * revealing the profile fields above the email and password. Rendered by App.
  */
+// @ts-check
 import { APP_BRAND_EXPANSION, APP_BRAND_NAME } from "../../app/constants";
 import "./AuthPage.css";
+
+/** @typedef {import("../../app/events.js").AppEventDeps} AppEventDeps */
+/** @typedef {ReturnType<typeof import("../../app/events.js").createAppEventHandlers>} AppEventHandlers */
+
+/**
+ * What App passes AuthPage: its auth and sign-up state, their setters and
+ * handlers, and its unit converters.
+ * @typedef {object} AuthPageProps
+ * @property {import("react").CSSProperties} gradient
+ * @property {AppEventDeps["authMode"]} authMode
+ * @property {AppEventHandlers["onAuthModeChange"]} onAuthModeChange
+ * @property {(path: string) => void} go
+ * @property {AppEventHandlers["onAuthSubmit"]} onAuthSubmit
+ * @property {AppEventDeps["authForm"]} authForm
+ * @property {AppEventHandlers["onAuthChange"]} onAuthChange
+ * @property {AppEventDeps["signupProfileForm"]} signupProfileForm
+ * @property {AppEventHandlers["onSignupProfileChange"]} onSignupProfileChange
+ * @property {AppEventDeps["signupHeightUnit"]} signupHeightUnit
+ * @property {AppEventDeps["setSignupHeightUnit"]} setSignupHeightUnit
+ * @property {AppEventDeps["signupWeightUnit"]} signupWeightUnit
+ * @property {AppEventDeps["setSignupWeightUnit"]} setSignupWeightUnit
+ * @property {AppEventDeps["toCmFromFeetInches"]} toCmFromFeetInches
+ * @property {typeof import("../../app/units.js").toFeetInchesFromCm} toFeetInchesFromCm
+ * @property {AppEventDeps["toKg"]} toKg
+ * @property {typeof import("../../app/units.js").toLb} toLb
+ * @property {boolean} showPassword
+ * @property {AppEventDeps["setShowPassword"]} setShowPassword
+ * @property {AppEventDeps["authAutoSignIn"]} authAutoSignIn
+ * @property {AppEventDeps["setAuthAutoSignIn"]} setAuthAutoSignIn
+ * @property {boolean} authLoading
+ * @property {string} authError
+ */
 
 /**
  * Renders App's auth and sign-up state and calls back into App for every
@@ -15,6 +48,7 @@ import "./AuthPage.css";
  * to convert from; the lb and kg buttons convert the weight from the unit in
  * use. All four use App's converters from app/units.js. `gradient` is App's
  * page background, and the close button goes home through `go`.
+ * @param {AuthPageProps} props
  */
 export default function AuthPage({
   gradient,
@@ -42,9 +76,16 @@ export default function AuthPage({
   authError
 }) {
   // Writes one sign-up field through App's change handler, shaped as the
-  // change event it expects.
+  // change event it expects: the handler reads only its target's name and value.
+  // The unit converters hand back a number or a string.
+  /**
+   * @param {string} name
+   * @param {string | number} value
+   */
   const setSignupField = (name, value) => {
-    onSignupProfileChange({ target: { name, value } });
+    onSignupProfileChange(
+      /** @type {import("react").ChangeEvent<HTMLInputElement>} */ ({ target: { name, value } })
+    );
   };
   const isSignupMode = authMode === "signup";
 
@@ -309,7 +350,7 @@ export default function AuthPage({
                       value={signupProfileForm.notes}
                       onChange={onSignupProfileChange}
                       placeholder="Optional training context"
-                      rows="3"
+                      rows={3}
                     />
                   </label>
                 </fieldset>

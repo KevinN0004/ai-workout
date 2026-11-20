@@ -311,6 +311,14 @@ describe("AuthPage", () => {
     });
   });
 
+  describe("the sign-up notes field", () => {
+    // React's types want a number for rows; the DOM gets the string either way.
+    test("is three rows tall", () => {
+      render(<AuthPage {...baseProps} authMode="signup" />);
+      expect(screen.getByRole("textbox", { name: /notes/i })).toHaveAttribute("rows", "3");
+    });
+  });
+
   describe("reporting a failure", () => {
     test("shows the error it is given", () => {
       render(<AuthPage {...baseProps} authError="Those details did not match." />);

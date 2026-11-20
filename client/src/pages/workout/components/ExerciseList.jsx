@@ -3,9 +3,19 @@
  * and add one by name (roadmap B6, C4). Folded away until opened, except while
  * the session has no exercises.
  */
+// @ts-check
 import { useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
+
+/**
+ * @typedef {object} ExerciseListProps
+ * @property {import("../../../app/workoutSession.js").WorkoutSession} session
+ * @property {(index: number) => void} onGoTo
+ * @property {(index: number) => void} onSkip
+ * @property {(exercise: { name: string, kind: "reps" | "seconds" }) => void} onAdd
+ * @property {(index: number) => void} onSwap
+ */
 
 /**
  * Lists `session`'s exercises, the current one marked. `onGoTo(index)` jumps
@@ -13,12 +23,14 @@ import useConnection from "../../../hooks/useConnection";
  * adds one. `onSwap(index)` swaps an exercise from the plan with no sets logged
  * (roadmap C4); only a plan session has one, and it needs the server, so Swap is
  * disabled offline.
+ * @param {ExerciseListProps} props
  */
 export default function ExerciseList({ session, onGoTo, onSkip, onAdd, onSwap }) {
   const [name, setName] = useState("");
-  const [kind, setKind] = useState("reps");
+  const [kind, setKind] = useState(/** @type {"reps" | "seconds"} */ ("reps"));
   const offline = useConnection() === "offline";
 
+  /** @param {import("react").FormEvent} event */
   const add = (event) => {
     event.preventDefault();
     if (!name.trim()) return;
