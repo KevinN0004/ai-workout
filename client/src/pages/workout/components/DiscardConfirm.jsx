@@ -2,11 +2,13 @@
  * Asks before Cancel workout discards logged sets (roadmap B6). Rendered by the
  * session page.
  */
+// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 
 /**
  * Open while `count`, the sets logged, is above 0. Discard runs `onDiscard`;
  * Keep training, Escape and the backdrop run `onKeep`.
+ * @param {{ count: number, onDiscard: () => void, onKeep: () => void }} props
  */
 export default function DiscardConfirm({ count, onDiscard, onKeep }) {
   return (

@@ -2,6 +2,7 @@
  * Keeps the screen awake while the session page is open (roadmap B6), where
  * the browser offers a Screen Wake Lock and allows it.
  */
+// @ts-check
 import { useEffect } from "react";
 
 const ignore = () => {};
@@ -17,6 +18,7 @@ export default function useWakeLock() {
   useEffect(() => {
     const wakeLock = navigator.wakeLock;
     if (!wakeLock) return undefined;
+    /** @type {WakeLockSentinel | null} */
     let held = null;
     let closed = false;
 

@@ -2,6 +2,7 @@
  * The alert at the end of a rest on the session page (roadmap B6): a short
  * beep through Web Audio, unlocked by a tap, and a buzz where the phone can.
  */
+// @ts-check
 
 const BEEP_HZ = 880;
 const BEEP_SECONDS = 0.2;
@@ -9,6 +10,7 @@ const BEEP_VOLUME = 0.25;
 const BUZZ_PATTERN = [200, 100, 200];
 
 // The page's one AudioContext, made by the first unlockAudio.
+/** @type {AudioContext | null} */
 let context = null;
 
 const ignore = () => {};

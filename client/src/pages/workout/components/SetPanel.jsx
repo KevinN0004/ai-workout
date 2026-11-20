@@ -2,6 +2,7 @@
  * The set being logged on the session page: steppers for the reps (or seconds)
  * and the load, the optional RPE, and Done (roadmap B6).
  */
+// @ts-check
 import { useState } from "react";
 import { fromLoadKg } from "../../../app/exerciseSets";
 import { draftFor, stepAmount, stepLoad } from "../../../app/workoutSession";
@@ -14,6 +15,7 @@ const LOAD_STEP_TEXT = { metric: "2.5 kg", imperial: "5 lb" };
  * Opens with `exercise`'s next set (draftFor) and calls `onDone(set)` with the
  * set as shown. Another exercise, or a set logged or undone, starts it from the
  * new draft. Loads show in `system`'s unit and stay in kg.
+ * @param {{ exercise: import("../../../app/workoutSession.js").SessionExercise, system: "metric" | "imperial", onDone: (set: import("../../../app/workoutSession.js").SessionSet) => void }} props
  */
 export default function SetPanel({ exercise, system, onDone }) {
   const [set, setSet] = useState(() => draftFor(exercise));
@@ -29,14 +31,17 @@ export default function SetPanel({ exercise, system, onDone }) {
   const loadText =
     set.loadKg === null ? "Bodyweight" : `${fromLoadKg(set.loadKg, system)} ${UNIT[system]}`;
 
+  /** @param {1 | -1} direction */
   const stepAmountBy = (direction) =>
     setSet((current) => ({
       ...current,
       amount: stepAmount(current.amount, direction, exercise.kind)
     }));
+  /** @param {1 | -1} direction */
   const stepLoadBy = (direction) =>
     setSet((current) => ({ ...current, loadKg: stepLoad(current.loadKg, direction, system) }));
   // A second tap on the chosen RPE clears it: an RPE is never assumed.
+  /** @param {number} rpe */
   const chooseRpe = (rpe) =>
     setSet((current) => ({ ...current, rpe: current.rpe === rpe ? null : rpe }));
 

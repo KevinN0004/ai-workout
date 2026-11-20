@@ -3,9 +3,25 @@
  * visitor can turn between a vertical and a horizontal layout, with its coach
  * notes and a PDF download. Rendered by App.
  */
+// @ts-check
 import { useMemo, useState } from "react";
 import { APP_BRAND_NAME } from "../../app/constants";
 import "./WorkoutResultPage.css";
+
+/** @typedef {ReturnType<typeof import("../../app/events.js").createAppEventHandlers>} AppEventHandlers */
+
+/**
+ * What App passes WorkoutResultPage: its page background, the signed-in user,
+ * whose presence alone is read, the parsed plan and the two buttons' handlers.
+ * @typedef {object} WorkoutResultPageProps
+ * @property {import("react").CSSProperties} gradient
+ * @property {import("../../app/cache.js").CacheUser} user
+ * @property {(path: string) => void} go
+ * @property {import("../../app/plans.js").PlanSections} planSections
+ * @property {boolean} hasResult
+ * @property {AppEventHandlers["downloadPlanPdf"]} onDownloadPlanPdf
+ * @property {AppEventHandlers["openSignupWithPrefilledProfile"]} onSignupWithPrefilledProfile
+ */
 
 /**
  * `planSections` is App's parse of the generated plan, and `hasResult` says
@@ -19,6 +35,7 @@ import "./WorkoutResultPage.css";
  * signed-out visitor also gets Signup, which opens sign-up with the home flow's
  * profile filled in, and the last button goes to the dashboard when signed in
  * and home otherwise.
+ * @param {WorkoutResultPageProps} props
  */
 export default function WorkoutResultPage({
   gradient,
@@ -48,12 +65,17 @@ export default function WorkoutResultPage({
     [days]
   );
   const verticalLineColumnCount = maxLineCount >= 10 ? 3 : maxLineCount >= 6 ? 2 : 1;
+  /** @type {import("react").CSSProperties & Record<`--${string}`, string>} */
   const tableDensityStyle = {
     "--plan-day-count": String(dayCount),
     "--plan-vertical-line-cols": String(verticalLineColumnCount)
   };
   // ---- The horizontal layout's rows: a line position across every day -------
   const horizontalRows = useMemo(() => {
+    /**
+     * @param {string[]} values
+     * @param {number} rowIndex
+     */
     const getTaskLabelFromRow = (values, rowIndex) => {
       const firstLine = values.find((value) => String(value || "").trim());
       const normalizedLine = String(firstLine || "").trim();

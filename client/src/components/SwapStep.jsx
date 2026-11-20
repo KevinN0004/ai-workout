@@ -8,19 +8,21 @@ import { useEffect, useState } from "react";
 import "./SwapStep.css";
 import { fetchSwapOptions, swapExercise } from "../app/planSwaps";
 
+/** @typedef {import("../app/network.js").Wire<import("../../../server/src/routes/dashboard/registerPlanSwapRoutes.js").PlanSwapOptionsResponse>} SwapOptions */
+/** @typedef {import("../app/network.js").Wire<import("../../../server/src/routes/dashboard/registerPlanSwapRoutes.js").PlanSwappedResponse>["plan"]} SwappedPlan */
+
 /** @param {string} text */
 const capitalised = (text) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 /** @param {string[]} needs */
 const needsText = (needs) => (needs.length ? `Needs ${needs.join(", ")}` : "No equipment");
 
 /**
- * The plan `onSwapped` receives is the server's answer, not typed yet (D1 phase
- * 3 spec, decision 2).
+ * The plan `onSwapped` receives is the server's answer, the plan as swapped.
  * @typedef {object} SwapStepProps
  * @property {import("../app/network.js").ApiFetch} apiFetch
  * @property {string} planId
  * @property {string} exercise
- * @property {(plan: any, name: string) => void} onSwapped
+ * @property {(plan: SwappedPlan, name: string) => void} onSwapped
  * @property {() => void} onBack
  */
 
@@ -34,8 +36,7 @@ const needsText = (needs) => (needs.length ? `Needs ${needs.join(", ")}` : "No e
 export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack }) {
   const [area, setArea] = useState(/** @type {string | null} */ (null));
   // What the server answered for the area asked about, null while it is asked.
-  // The answer is not typed yet (D1 phase 3 spec, decision 2).
-  const [answer, setAnswer] = useState(/** @type {any} */ (null));
+  const [answer, setAnswer] = useState(/** @type {SwapOptions | null} */ (null));
   // The areas a swap can name, kept once known, so the buttons stay put (and
   // keep focus) while the alternatives for a new area are asked for.
   const [areas, setAreas] = useState(/** @type {string[]} */ ([]));
@@ -78,8 +79,8 @@ export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack
     }
   };
 
-  // As the server answers them, not typed yet (D1 phase 3 spec, decision 2).
-  /** @type {any[]} */
+  // An alternative carries a cue only with the area it answers (candidatesFor in
+  // the server's generatePlan.js), so each cue shown below has its area.
   const alternatives = answer?.alternatives ?? [];
   return (
     <section className="swap-step" aria-labelledby="swap-step-title">
@@ -120,7 +121,7 @@ export default function SwapStep({ apiFetch, planId, exercise, onSwapped, onBack
                 <span className="muted">{needsText(option.needs)}</span>
                 {option.cue ? (
                   <span className="muted">
-                    {capitalised(option.area)}: {option.cue}
+                    {capitalised(/** @type {string} */ (option.area))}: {option.cue}
                   </span>
                 ) : null}
               </button>

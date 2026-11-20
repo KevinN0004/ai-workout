@@ -3,6 +3,7 @@
  * its next set logged with Done, a rest timer that buzzes and beeps, the sets
  * done with Undo, the exercise list, and Finish or Cancel. Kept on the device.
  */
+// @ts-check
 import { useState } from "react";
 import "./SessionPage.css";
 import { readJsonCache, writeJsonCache } from "../../app/cache";
@@ -28,18 +29,45 @@ import useSessionState from "./hooks/useSessionState";
 import useWakeLock from "./hooks/useWakeLock";
 import { beep, buzz, unlockAudio } from "./restAlert";
 
+/** @typedef {import("../../app/workoutSession.js").WorkoutSession} WorkoutSession */
+/** @typedef {import("../../app/workoutSession.js").SessionExercise} SessionExercise */
+/** @typedef {import("../../app/workoutSession.js").SessionSet} SessionSet */
+/** @typedef {"metric" | "imperial"} MeasurementSystem */
+
+/**
+ * @typedef {object} SessionPageProps
+ * @property {import("../../app/cache.js").CacheUser} user
+ * @property {WorkoutSession} initialSession
+ * @property {MeasurementSystem} system
+ * @property {(session: WorkoutSession) => void} onFinish
+ * @property {() => void} onDiscard
+ * @property {() => void} onLeave
+ * @property {import("../../app/network.js").ApiFetch} apiFetch
+ * @property {(plan: import("../../components/SwapStep.jsx").SwappedPlan) => void} onPlanChanged
+ */
+
 const UNIT = { metric: "kg", imperial: "lb" };
 // The Sound switch, kept for the device rather than the account, and on until
 // turned off.
 const SOUND_KEY = "ai-workout-session-sound-v1";
 
-/** A load in kg as the region shows it, with its unit, or null for none. */
+/**
+ * A load in kg as the region shows it, with its unit, or null for none.
+ * @param {number | null} loadKg
+ * @param {MeasurementSystem} system
+ */
 const loadText = (loadKg, system) => {
   const shown = fromLoadKg(loadKg, system);
   return shown ? `${shown} ${UNIT[system]}` : null;
 };
 
-/** One logged set as the Sets done list reads it. */
+/**
+ * One logged set as the Sets done list reads it.
+ * @param {SessionExercise} exercise
+ * @param {SessionSet} set
+ * @param {number} index
+ * @param {MeasurementSystem} system
+ */
 const setText = (exercise, set, index, system) => {
   const amount = exercise.kind === "seconds" ? `${set.amount} seconds` : `${set.amount} reps`;
   const parts = [amount, loadText(set.loadKg, system) ?? "bodyweight"];
@@ -53,6 +81,7 @@ const setText = (exercise, set, index, system) => {
  * and Dashboard runs `onLeave`, which keeps the session for later. In a session
  * from a plan, an exercise can be swapped over `apiFetch` (roadmap C4): the plan
  * the server answers goes to `onPlanChanged`, and the session takes the new one.
+ * @param {SessionPageProps} props
  */
 export default function SessionPage({
   user,
@@ -67,18 +96,26 @@ export default function SessionPage({
   const { session, update, kept } = useSessionState(user, initialSession);
   const [confirming, setConfirming] = useState(false);
   // The index of the exercise being swapped, or null.
-  const [swapping, setSwapping] = useState(null);
+  const [swapping, setSwapping] = useState(/** @type {number | null} */ (null));
 
   // The plan as swapped goes to the dashboard, and the session takes the new
   // exercise's prescription from the session's plan day. A plan that no longer
   // holds it there, as after a change on another device, leaves the session.
+  // Only a plan session's exercises offer Swap, so while one is swapped the
+  // session has its plan's id and `swapping` is set, and the swap route answers
+  // only for a plan with a structure, so the plan has its payload.
+  /**
+   * @param {import("../../components/SwapStep.jsx").SwappedPlan} plan
+   * @param {string} name
+   */
   const swapped = (plan, name) => {
     onPlanChanged(plan);
-    const prescription = plan.payload.days
+    const prescription = /** @type {NonNullable<typeof plan.payload>} */ (plan.payload).days
       .filter((day) => day.index === session.planDayIndex)
       .flatMap((day) => day.prescriptions ?? [])
       .find((entry) => entry.name === name);
-    if (prescription) update(replaceExercise(session, swapping, prescription));
+    if (prescription)
+      update(replaceExercise(session, /** @type {number} */ (swapping), prescription));
     setSwapping(null);
   };
   const [sound, setSound] = useState(() => readJsonCache(SOUND_KEY) !== false);
@@ -101,6 +138,7 @@ export default function SessionPage({
   };
 
   // Done is a tap, so it also unlocks the audio the rest's end will beep with.
+  /** @param {SessionSet} set */
   const logDone = (set) => {
     unlockAudio();
     update(logSet(session, set, Date.now()));
@@ -230,7 +268,7 @@ export default function SessionPage({
       ) : (
         <SwapStep
           apiFetch={apiFetch}
-          planId={session.planId}
+          planId={/** @type {string} */ (session.planId)}
           exercise={session.exercises[swapping].name}
           onSwapped={swapped}
           onBack={() => setSwapping(null)}
