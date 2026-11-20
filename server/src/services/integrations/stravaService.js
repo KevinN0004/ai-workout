@@ -29,7 +29,7 @@ const DELETE_MARGIN_DAYS = 2;
  * index.js) is read on every call, so a server whose settings are cleared stops
  * at once. `fetchImpl` and `now` are the boundaries tests stub.
  * @typedef {ReturnType<typeof import("./stravaConfig.js").readStravaConfig>} StravaConfig
- * @param {{ connections: any, imports: any, getConfig: () => StravaConfig, fetchImpl?: typeof fetch, now: () => Date }} deps
+ * @param {{ connections: ReturnType<typeof import("../../repositories/stravaConnectionRepository.js").createStravaConnectionRepository>, imports: ReturnType<typeof import("../../repositories/stravaImportRepository.js").createStravaImportRepository>, getConfig: () => StravaConfig, fetchImpl?: typeof fetch, now: () => Date }} deps
  */
 export const createStravaService = ({
   connections,

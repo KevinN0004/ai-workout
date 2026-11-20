@@ -5,7 +5,8 @@
   // file: Vite and Vitest transform the sources themselves. `types` loads Vite's
   // own declarations (CSS and asset imports, import.meta.env) and the PWA
   // plugin's virtual module, and Node's, for the checked server files a client
-  // JSDoc type reaches (dashboardDataBuildersService.js imports crypto).
+  // JSDoc type reaches (dashboardDataBuildersService.js imports crypto). It also
+  // loads the server's Request fields, for the route modules a client type names.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -19,5 +20,5 @@
     "lib": ["esnext", "dom", "dom.iterable"],
     "types": ["vite/client", "vite-plugin-pwa/react", "node"]
   },
-  "include": ["src"]
+  "include": ["src", "../server/src/types/express.d.ts"]
 }

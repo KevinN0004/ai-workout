@@ -51,7 +51,10 @@ export const toNumberOrNull = (value) => {
 /**
  * Any value as an array: one that is not an array reads as empty. Used on JSON
  * list columns both ways, and by userReadRepository on loaded relation lists.
+ * The items are `unknown`: a caller that knows what the column or list holds
+ * casts the result to it.
  * @param {unknown} value
+ * @returns {unknown[]}
  */
 export const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 

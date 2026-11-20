@@ -5,6 +5,18 @@
 // @ts-check
 import { classifySendFailure } from "./classifySendFailure";
 
+/** @typedef {import("../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/**
+ * @template T
+ * @typedef {import("./network.js").Wire<T>} Wire
+ */
+
+/**
+ * What the three logs postLog sends answer with: the dashboard, and the
+ * workout, calorie entry or meal as saved.
+ * @typedef {import("../../../server/src/routes/dashboard/write/registerWorkoutAndGoalRoutes.js").WorkoutSessionSavedResponse | import("../../../server/src/routes/dashboard/write/registerWorkoutAndGoalRoutes.js").CaloriesSavedResponse | import("../../../server/src/routes/dashboard/write/registerMealAndMetricRoutes.js").MealLogSavedResponse} LogSavedResponse
+ */
+
 /**
  * What a send throws: an Error, with the answer's `status` when one came.
  * @typedef {Error & { status?: number }} SendError
@@ -30,9 +42,8 @@ export const postLog = async (apiFetch, { url, body }, fallbackMessage) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  // The server's answer is not typed yet (D1 phase 3 spec, decision 2).
-  if (res.ok) return res.json();
-  const payload = await res.json().catch(() => ({}));
+  if (res.ok) return /** @type {Promise<Wire<LogSavedResponse>>} */ (res.json());
+  const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
   throw Object.assign(new Error(payload?.error || fallbackMessage), { status: res.status });
 };
 
@@ -42,9 +53,9 @@ export const postLog = async (apiFetch, { url, body }, fallbackMessage) => {
  * runs `send` once more; that second outcome, or a token that could not be
  * fetched, is the answer. Everything either one throws is an Error: postLog's,
  * apiFetch's or fetch's, so `error` is a SendError.
- * @param {() => Promise<any>} send Resolves to the server's answer, not typed yet.
+ * @param {() => Promise<Wire<LogSavedResponse>>} send Resolves to the server's answer, postLog's.
  * @param {EnsureCsrfToken} ensureCsrfToken
- * @returns {Promise<{ data?: any, error?: SendError }>}
+ * @returns {Promise<{ data: Wire<LogSavedResponse>, error?: undefined } | { data?: undefined, error: SendError }>}
  */
 export const sendLog = async (send, ensureCsrfToken) => {
   try {

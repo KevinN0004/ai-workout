@@ -971,6 +971,36 @@ describe("type-checked files", () => {
     expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
 
+  // D1 phase 5: each answer the client reads is cast in place, the answer through
+  // Wire (which fails the typecheck on a field JSON would not deliver as typed) and
+  // a refusal to ErrorBody (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).
+  // The page reads are cast as each page is checked; Task 7 of the plan empties this.
+  const UNCAST_PAGE_READS = [
+    "client/src/pages/dashboard/hooks/useOlderLogPages.js",
+    "client/src/pages/dashboard/hooks/useProgression.js",
+    "client/src/pages/dashboard/meal/useMealDbSearch.js",
+    "client/src/pages/dashboard/views/TipsView.jsx"
+  ];
+
+  test("every .json() read in the client is cast", () => {
+    const reads = sources
+      .filter(({ file }) => file.startsWith("client/src/") && !isTest(file))
+      .flatMap(({ file, lines }) => {
+        const text = lines.join("\n");
+        return [...text.matchAll(/\.json\(\)/g)].map((match) => {
+          const before = text.slice(Math.max(0, match.index - 240), match.index);
+          const cast = before.slice(before.lastIndexOf(";") + 1).match(/@type \{([^}]*)\}/);
+          return { file, cast: cast?.[1] ?? null };
+        });
+      });
+    expect(reads.length, "the sweep found too few reads").toBeGreaterThanOrEqual(35);
+    const bad = reads
+      .filter(({ file }) => !UNCAST_PAGE_READS.includes(file))
+      .filter(({ cast }) => !cast || !(cast === "ErrorBody" || cast.includes("Wire<")))
+      .map(({ file, cast }) => `${file}: ${cast ?? "no cast"}`);
+    expect(bad, "cast each answer to Wire<XResponse> and each refusal to ErrorBody").toEqual([]);
+  });
+
   test.each(WORKSPACES)("%s/tsconfig.json keeps strict on and checkJs off", (workspace) => {
     const file = path.join(repoRoot, workspace, "tsconfig.json");
     expect(existsSync(file), `${workspace}/tsconfig.json is missing`).toBe(true);

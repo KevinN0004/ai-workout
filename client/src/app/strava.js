@@ -12,19 +12,29 @@ const SYNC_FAILED = "Could not sync with Strava. Try again.";
 const DISCONNECT_FAILED = "Could not disconnect Strava. Try again.";
 
 /** @typedef {import("./network.js").ApiFetch} ApiFetch */
+/** @typedef {import("../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/**
+ * @template T
+ * @typedef {import("./network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../server/src/routes/integrations/registerStravaRoutes.js").StravaStateResponse} StravaStateResponse */
+/** @typedef {import("../../../server/src/routes/integrations/registerStravaRoutes.js").StravaConnectResponse} StravaConnectResponse */
+/** @typedef {import("../../../server/src/routes/integrations/registerStravaRoutes.js").StravaSyncResponse} StravaSyncResponse */
+/** @typedef {import("../../../server/src/routes/integrations/registerStravaRoutes.js").StravaDisconnectedResponse} StravaDisconnectedResponse */
 
 /**
  * The parsed answer, or an Error with the server's message, or `fallback` when
- * the refusal says nothing it can read. The answer is not typed yet (D1 phase 3
- * spec, decision 2).
+ * the refusal says nothing it can read. The read holds either, so it is typed
+ * as the refusal; each request below casts what it returns to its route's answer.
  * @param {ApiFetch} apiFetch
  * @param {string} path
  * @param {RequestInit | undefined} options
  * @param {string} fallback
+ * @returns {Promise<unknown>}
  */
 const send = async (apiFetch, path, options, fallback) => {
   const response = await apiFetch(path, options);
-  const data = await response.json().catch(() => ({}));
+  const data = /** @type {ErrorBody} */ (await response.json().catch(() => ({})));
   if (!response.ok) throw new Error(data?.error || fallback);
   return data;
 };
@@ -35,14 +45,17 @@ const send = async (apiFetch, path, options, fallback) => {
  * has no Strava settings.
  * @param {ApiFetch} apiFetch
  */
-export const fetchStravaState = (apiFetch) => send(apiFetch, BASE, undefined, STATE_FAILED);
+export const fetchStravaState = (apiFetch) =>
+  /** @type {Promise<Wire<StravaStateResponse>>} */ (send(apiFetch, BASE, undefined, STATE_FAILED));
 
 /**
  * The Strava page to send the visitor to, to grant access.
  * @param {ApiFetch} apiFetch
  */
 export const startStravaConnect = async (apiFetch) =>
-  (await send(apiFetch, `${BASE}/connect`, { method: "POST" }, CONNECT_FAILED)).url;
+  /** @type {Wire<StravaConnectResponse>} */ (
+    await send(apiFetch, `${BASE}/connect`, { method: "POST" }, CONNECT_FAILED)
+  ).url;
 
 /**
  * Runs the catch-up sync. It answers `{ skipped: true }` inside the throttle,
@@ -52,22 +65,26 @@ export const startStravaConnect = async (apiFetch) =>
  * @param {{ manual: boolean }} options
  */
 export const syncStrava = (apiFetch, { manual }) =>
-  send(
-    apiFetch,
-    `${BASE}/sync`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ manual })
-    },
-    SYNC_FAILED
+  /** @type {Promise<Wire<StravaSyncResponse>>} */ (
+    send(
+      apiFetch,
+      `${BASE}/sync`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manual })
+      },
+      SYNC_FAILED
+    )
   );
 
 /**
  * Whether a sync's answer imported, updated or removed a workout, so the
  * dashboard's copy is stale. A skipped or unfinished sync carries no counts:
  * their sum is NaN, which is not above 0.
- * @param {any} answer syncStrava's answer, not typed yet (D1 phase 3 spec, decision 2).
+ * @param {any} answer syncStrava's answer, any of StravaSyncResponse's shapes. It
+ *   stays untyped because a shape without counts must sum to NaN, which only an
+ *   untyped read allows.
  */
 export const syncChangedWorkouts = (answer) =>
   answer.imported + answer.updated + answer.removed > 0;
@@ -77,7 +94,9 @@ export const syncChangedWorkouts = (answer) =>
  * @param {ApiFetch} apiFetch
  */
 export const disconnectStrava = (apiFetch) =>
-  send(apiFetch, BASE, { method: "DELETE" }, DISCONNECT_FAILED);
+  /** @type {Promise<Wire<StravaDisconnectedResponse>>} */ (
+    send(apiFetch, BASE, { method: "DELETE" }, DISCONNECT_FAILED)
+  );
 
 /**
  * The result Strava's return left in the query (`?strava=connected`), or ""

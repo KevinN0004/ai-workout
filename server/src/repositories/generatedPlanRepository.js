@@ -42,6 +42,8 @@ export const GENERATED_PLAN_ORDER = [{ createdAt: "desc" }, { id: "desc" }];
 
 // Every caller passes a row (the repository and mapUser); the default guards a
 // bare call.
+// The equipment and focus columns hold the string lists the generate route
+// wrote (toCleanArray), and are written back as JSON.
 /**
  * Maps a generated_plans row to the plan the API returns. `id` is the legacy id
  * when the row has one, the JSON list columns always read as arrays, and
@@ -55,13 +57,13 @@ export const mapGeneratedPlan = (
   id: row.legacyId || row.id,
   createdAt: toIso(row.createdAt),
   goal: row.goal || "",
-  equipment: toJsonArray(row.equipment),
+  equipment: /** @type {string[]} */ (toJsonArray(row.equipment)),
   duration: row.durationMinutes ?? null,
   level: row.level || "",
   injuries: row.injuries || "",
   days: row.days ?? null,
   environment: row.environment || "",
-  focuses: toJsonArray(row.focuses),
+  focuses: /** @type {string[]} */ (toJsonArray(row.focuses)),
   plan: row.planText || "",
   payload: toPlanPayload(row.planPayload)
 });
@@ -88,13 +90,17 @@ export const createGeneratedPlanRepository = ({ prisma }) => {
         userId: userPk,
         legacyId: entry.id || null,
         goal: entry.goal || "",
-        equipment: toJsonArray(entry.equipment),
+        equipment: /** @type {import("@prisma/client").Prisma.InputJsonArray} */ (
+          toJsonArray(entry.equipment)
+        ),
         durationMinutes: entry.duration ?? null,
         level: entry.level || "",
         injuries: entry.injuries || "",
         days: entry.days ?? null,
         environment: entry.environment || "",
-        focuses: toJsonArray(entry.focuses),
+        focuses: /** @type {import("@prisma/client").Prisma.InputJsonArray} */ (
+          toJsonArray(entry.focuses)
+        ),
         planText: entry.plan || "",
         // `{}` is how a row says it has no structure, as every older plan's does.
         planPayload: toPlanPayload(entry.payload) ?? {}

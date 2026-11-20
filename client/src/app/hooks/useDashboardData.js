@@ -19,6 +19,14 @@ import { toNumberOrNull } from "../units";
 const roundCoordinate = (value) => Math.round(value * 100) / 100;
 
 /** @typedef {import("../dashboard.js").Dashboard} Dashboard */
+/** @typedef {import("../../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/**
+ * @template T
+ * @typedef {import("../network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../../server/src/routes/external/registerWeatherRoutes.js").WeatherRecommendationResponse} WeatherRecommendationResponse */
+/** @typedef {import("../../../../server/src/routes/external/registerAirQualityRoutes.js").AirQualityResponse} AirQualityResponse */
+/** @typedef {import("../../../../server/src/routes/dashboard/registerDashboardReadRoutes.js").DashboardResponse} DashboardResponse */
 /** @typedef {(form: import("../requestBodies.js").GoalsBody) => void} SetGoalForm */
 
 // A target weight the user never saved fills the form blank, not with a
@@ -173,10 +181,10 @@ export default function useDashboardData({
         12000
       );
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to load weather recommendation.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<WeatherRecommendationResponse>} */ (await res.json());
       if (weatherRequestRef.current !== requestId) return;
       setWeatherData(data || null);
       const now = Date.now();
@@ -242,10 +250,10 @@ export default function useDashboardData({
         12000
       );
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to load air quality.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<AirQualityResponse>} */ (await res.json());
       if (airRequestRef.current !== requestId) return;
       setAirQualityData(data || null);
       const now = Date.now();
@@ -367,10 +375,10 @@ export default function useDashboardData({
       try {
         const res = await fetchWithTimeout("/api/dashboard", { credentials: "include" }, 12000);
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
+          const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
           throw new Error(payload?.error || "Unable to load dashboard.");
         }
-        const data = await res.json();
+        const data = /** @type {Wire<DashboardResponse>} */ (await res.json());
         if (cancelled || dashboardRequestRef.current !== requestId) return;
         setDashboard(data.dashboard);
         setDashboardPagination(data.pagination || null);

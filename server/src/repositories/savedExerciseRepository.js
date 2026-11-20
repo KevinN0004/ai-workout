@@ -8,6 +8,8 @@ import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 
 // Both callers pass a row (the repository and mapUser); the default guards a bare call.
+// The muscles and equipment columns hold the string lists the saved-exercise
+// builder wrote (toCleanNameArray), and are written back as JSON.
 /**
  * Maps a saved_exercises row to the entry the API returns. `exerciseId` is the
  * wger exercise id, or null for an exercise that has none.
@@ -21,8 +23,8 @@ export const mapSavedExercise = (
   exerciseId: row.externalExerciseId ?? null,
   name: row.name || "",
   category: row.category || "",
-  muscles: toJsonArray(row.muscles),
-  equipment: toJsonArray(row.equipment),
+  muscles: /** @type {string[]} */ (toJsonArray(row.muscles)),
+  equipment: /** @type {string[]} */ (toJsonArray(row.equipment)),
   imageUrl: row.imageUrl || "",
   videoUrl: row.videoUrl || "",
   reason: row.reason || "",
@@ -71,8 +73,12 @@ export const createSavedExerciseRepository = ({ prisma }) => {
       externalExerciseId: entry.exerciseId ?? null,
       name: entry.name || "",
       category: entry.category || "",
-      muscles: toJsonArray(entry.muscles),
-      equipment: toJsonArray(entry.equipment),
+      muscles: /** @type {import("@prisma/client").Prisma.InputJsonArray} */ (
+        toJsonArray(entry.muscles)
+      ),
+      equipment: /** @type {import("@prisma/client").Prisma.InputJsonArray} */ (
+        toJsonArray(entry.equipment)
+      ),
       imageUrl: entry.imageUrl || "",
       videoUrl: entry.videoUrl || "",
       reason: entry.reason || "",

@@ -9,6 +9,12 @@ import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../constants";
 import { readCookie } from "../cache";
 import { fetchWithTimeout } from "../network";
 
+/**
+ * @template T
+ * @typedef {import("../network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../../server/src/routes/systemRoutes.js").CsrfTokenResponse} CsrfTokenResponse */
+
 // How long a request waits for an answer, in milliseconds, unless its caller
 // names `timeoutMs`: network.js's own default, which the dashboard's reads use.
 const API_TIMEOUT_MS = 15000;
@@ -51,7 +57,9 @@ export default function useApiClient() {
     if (!response.ok) {
       throw new Error("Unable to initialize security token.");
     }
-    const payload = await response.json().catch(() => ({}));
+    const payload = /** @type {Partial<Wire<CsrfTokenResponse>>} */ (
+      await response.json().catch(() => ({}))
+    );
     const issuedToken =
       readCookie(CSRF_COOKIE_NAME) ||
       (typeof payload?.csrfToken === "string" ? payload.csrfToken.trim() : "");
