@@ -53,6 +53,11 @@ import {
 import "./styles/app.css";
 
 /** @typedef {import("./app/workoutSession.js").WorkoutSession} WorkoutSession */
+/**
+ * @template T
+ * @typedef {import("./app/network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../server/src/routes/authRoutes.js").AuthMeResponse} AuthMeResponse */
 
 // The planner modal is its own chunk, fetched when App first renders it rather
 // than shipped in the main one: it and its inlined thumbnails are about 29 kB.
@@ -538,7 +543,7 @@ export default function App() {
       try {
         const res = await fetchWithTimeout("/api/auth/me", { credentials: "include" });
         if (res.ok) {
-          const data = await res.json();
+          const data = /** @type {Wire<AuthMeResponse>} */ (await res.json());
           setUser(data.user || null);
           answered = true;
         } else if (res.status === 401) {

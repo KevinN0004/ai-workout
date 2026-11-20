@@ -110,12 +110,26 @@ const downloadPlanPdfFromText = async (planText) => {
 /** @typedef {import("./requestBodies.js").MealLogForm} MealLogForm */
 /** @typedef {import("./requestBodies.js").ProgressMetricBody} ProgressForm */
 /** @typedef {import("./requestBodies.js").GoalsBody} GoalsForm */
+/** @typedef {import("../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/**
+ * @template T
+ * @typedef {import("./network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../server/src/routes/generateRoutes.js").GenerateResponse} GenerateResponse */
+/** @typedef {import("../../../server/src/routes/authRoutes.js").SignupResponse} SignupResponse */
+/** @typedef {import("../../../server/src/routes/authRoutes.js").LoginResponse} LoginResponse */
+/** @typedef {import("../../../server/src/routes/authRoutes.js").ProfileSavedResponse} ProfileSavedResponse */
+/** @typedef {import("../../../server/src/routes/dashboard/write/registerWorkoutAndGoalRoutes.js").GoalsSavedResponse} GoalsSavedResponse */
+/** @typedef {import("../../../server/src/routes/dashboard/write/registerWorkoutAndGoalRoutes.js").WorkoutDeletedResponse} WorkoutDeletedResponse */
+/** @typedef {import("../../../server/src/routes/dashboard/write/registerMealAndMetricRoutes.js").ProgressMetricSavedResponse} ProgressMetricSavedResponse */
+/** @typedef {import("../../../server/src/routes/dashboard/write/registerSavedExerciseRoutes.js").SavedExerciseSavedResponse} SavedExerciseSavedResponse */
+/** @typedef {import("../../../server/src/routes/dashboard/write/registerSavedExerciseRoutes.js").SavedExerciseRemovedResponse} SavedExerciseRemovedResponse */
 
 /**
  * What App passes createAppEventHandlers: its state, its setters, and what
- * useApiClient, useDashboardData and useOptimisticLogs return. The server's
- * user, plan and answers are not typed yet (D1 phase 3 spec, decision 2): every
- * `res.json()` below reads one as any.
+ * useApiClient, useDashboardData and useOptimisticLogs return. Each answer
+ * below is read through its route's response type, and each refusal as an
+ * ErrorBody.
  * @typedef {object} AppEventDeps
  * @property {import("./network.js").ApiFetch} apiFetch
  * @property {import("./cache.js").CacheUser} user
@@ -278,11 +292,11 @@ export const createAppEventHandlers = ({
       });
 
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Something went wrong.");
       }
 
-      const data = await res.json();
+      const data = /** @type {Wire<GenerateResponse>} */ (await res.json());
       // Generation can outlast a logout. A plan asked for by an account that is
       // no longer signed in is dropped: not shown, not added to the dashboard,
       // and no trip to /plan.
@@ -419,10 +433,10 @@ export const createAppEventHandlers = ({
           )
         });
         if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
+          const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
           throw new Error(payload?.error || "Unable to create account.");
         }
-        const data = await res.json();
+        const data = /** @type {Wire<SignupResponse>} */ (await res.json());
         setUser(data.user || null);
         setAuthForm({ ...defaultAuthForm });
         setSignupProfileForm({ ...defaultSignupProfileForm });
@@ -439,10 +453,10 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(loginBody(authForm, authAutoSignIn))
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to authenticate.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<LoginResponse>} */ (await res.json());
       setUser(data.user || null);
 
       setAuthForm({ ...defaultAuthForm });
@@ -691,10 +705,10 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(goalForm)
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to save goals.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<GoalsSavedResponse>} */ (await res.json());
       // The account that sent this has signed out since: its dashboard must not
       // reach whoever is signed in now.
       if (!isSameAccount()) return;
@@ -727,10 +741,10 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(personalToProfile(draft, units))
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to save profile.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<ProfileSavedResponse>} */ (await res.json());
       // Saved, but for an account that has signed out since: its profile must
       // not land on whoever is signed in now.
       if (!isSameAccount()) return { ok: true };
@@ -763,7 +777,7 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(passwordChangeBody({ currentPassword, newPassword }))
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to change password.");
       }
       showDashboardToast("Password changed.");
@@ -790,7 +804,7 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(accountDeleteBody(password))
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to delete account.");
       }
     } catch (err) {
@@ -896,10 +910,10 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(progressForm)
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to save progress metric.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<ProgressMetricSavedResponse>} */ (await res.json());
       // As in submitGoals: an answer for an account that has signed out since
       // is dropped.
       if (!isSameAccount()) return;
@@ -925,10 +939,10 @@ export const createAppEventHandlers = ({
         body: JSON.stringify(exercisePayload || {})
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to save exercise.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<SavedExerciseSavedResponse>} */ (await res.json());
       // As in submitGoals. The caller still hears that the save went through.
       if (!isSameAccount()) return { ok: true, data };
       setDashboard(data.dashboard);
@@ -952,10 +966,10 @@ export const createAppEventHandlers = ({
         method: "DELETE"
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to remove saved exercise.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<SavedExerciseRemovedResponse>} */ (await res.json());
       // As in submitGoals. The caller still hears that the removal went through.
       if (!isSameAccount()) return { ok: true, data };
       setDashboard(data.dashboard);
@@ -982,10 +996,10 @@ export const createAppEventHandlers = ({
         method: "DELETE"
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
+        const payload = /** @type {ErrorBody} */ (await res.json().catch(() => ({})));
         throw new Error(payload?.error || "Unable to delete that workout.");
       }
-      const data = await res.json();
+      const data = /** @type {Wire<WorkoutDeletedResponse>} */ (await res.json());
       // As in submitGoals. The caller still hears that the delete went through.
       if (!isSameAccount()) return { ok: true, data };
       setDashboard(data.dashboard);

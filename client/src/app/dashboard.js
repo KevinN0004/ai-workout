@@ -5,9 +5,14 @@
 // @ts-check
 
 /**
- * The dashboard the server answers with. Not typed yet: it comes from the
- * server's read side, which is unchecked (D1 phase 3 spec, decision 2).
- * @typedef {any} Dashboard
+ * The dashboard the server answers with, as `GET /api/dashboard` sends it.
+ * @typedef {import("../../../server/src/routes/dashboard/registerDashboardReadRoutes.js").DashboardResponse["dashboard"]} Dashboard
+ */
+
+/**
+ * Each paginated collection's page of the dashboard: its total, size, offset
+ * and source.
+ * @typedef {import("../../../server/src/routes/dashboard/registerDashboardReadRoutes.js").DashboardResponse["pagination"]} DashboardPagination
  */
 
 /**

@@ -7,17 +7,20 @@
 // @ts-check
 import crypto from "crypto";
 
+/** @typedef {NonNullable<ReturnType<typeof import("../../repositories/userReadRepository.js").mapUser>>["dashboard"]} MappedDashboard */
+
 /**
- * A stored dashboard as buildDashboard reads it: a list that is not an array
- * reads as empty, and each goal is checked against its range.
+ * A stored dashboard as buildDashboard reads it: the lists mapUser loads, each
+ * optional (a list that is not an array reads as empty), and the goals as
+ * saved, each checked against its range.
  * @typedef {object} StoredDashboard
- * @property {unknown} [workouts]
- * @property {unknown} [workoutSessions]
- * @property {unknown} [calories]
- * @property {unknown} [mealLogs]
- * @property {unknown} [progressMetrics]
- * @property {unknown} [plans]
- * @property {unknown} [savedExercises]
+ * @property {MappedDashboard["workouts"]} [workouts]
+ * @property {MappedDashboard["workoutSessions"]} [workoutSessions]
+ * @property {MappedDashboard["calories"]} [calories]
+ * @property {MappedDashboard["mealLogs"]} [mealLogs]
+ * @property {MappedDashboard["progressMetrics"]} [progressMetrics]
+ * @property {MappedDashboard["plans"]} [plans]
+ * @property {MappedDashboard["savedExercises"]} [savedExercises]
  * @property {{ targetWeight?: unknown, targetCalories?: unknown, weeklyWorkouts?: unknown }} [goals]
  */
 

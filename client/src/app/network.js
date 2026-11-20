@@ -13,6 +13,25 @@ import { markAnswered, markUnanswered } from "./connection";
  */
 
 /**
+ * The first field of `T` that JSON would not deliver as typed, as a dotted path
+ * ("dashboard.calories.any"): an `any`, a `Date`, which arrives as a string, or a
+ * Prisma `Decimal`. `never` when there is none. `D` counts the depth, so a type
+ * that refers to itself stops.
+ * @template T
+ * @template {unknown[]} [D=[]]
+ * @typedef {D["length"] extends 8 ? never : 0 extends (1 & T) ? "any" : T extends Date ? "Date" : T extends { toDecimalPlaces: Function } ? "Decimal" : T extends readonly (infer U)[] ? NotWireSafe<U, [...D, 0]> : T extends Function ? never : T extends object ? { [K in keyof T]-?: NotWireSafe<T[K], [...D, 0]> extends never ? never : `${K & string}.${NotWireSafe<T[K], [...D, 0]> & string}` }[keyof T] : never} NotWireSafe
+ */
+
+/**
+ * A server answer's type as the client may trust it: `T` when every field arrives
+ * as typed, else an object whose one field names the field that would not, so a
+ * read through it fails the typecheck. Each answer the client reads is cast
+ * through it.
+ * @template T
+ * @typedef {[NotWireSafe<T>] extends [never] ? T : { notWireSafe: NotWireSafe<T> }} Wire
+ */
+
+/**
  * fetch that aborts after `timeoutMs` and then rejects with a message fit to
  * show the visitor instead of an AbortError. It sets its own `signal`,
  * replacing any in `options`. Any answer, an error status included, marks the

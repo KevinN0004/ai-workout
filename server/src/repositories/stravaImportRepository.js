@@ -10,8 +10,8 @@ import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
 /**
  * @typedef {object} ImportedWorkout
  * @property {string} externalId
- * @property {string} sport
- * @property {string} workoutDate YYYY-MM-DD
+ * @property {string | null} sport Null when Strava names no sport.
+ * @property {string | null} workoutDate YYYY-MM-DD, or null when Strava's start date is unreadable.
  * @property {string} focus
  * @property {number | null} durationMinutes
  * @property {string} notes
@@ -150,7 +150,9 @@ export const createStravaImportRepository = ({ prisma }) => {
     });
     return rows.map((row) => ({
       id: row.id,
-      externalId: row.externalId,
+      // Every row read has source "strava", and 008's workout_sessions_external_source_check
+      // gives each such row its external id.
+      externalId: /** @type {string} */ (row.externalId),
       date: toDateOnly(row.workoutDate)
     }));
   };

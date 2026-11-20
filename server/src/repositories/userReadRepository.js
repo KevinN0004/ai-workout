@@ -104,7 +104,10 @@ const mapUserRow = (row) => {
  */
 export const mapUser = (row, related = {}) => {
   if (!row) return null;
-  const workoutSessions = toJsonArray(related.workoutSessions).map(mapWorkoutSession);
+  // related holds the rows Prisma loaded with the user, or nothing.
+  const workoutSessions = /** @type {NonNullable<UserRelations["workoutSessions"]>} */ (
+    toJsonArray(related.workoutSessions)
+  ).map(mapWorkoutSession);
 
   return {
     // row was checked above, so mapUserRow returns its fields, not null.
@@ -112,11 +115,21 @@ export const mapUser = (row, related = {}) => {
     dashboard: {
       workouts: workoutSessions.slice(0, COLLECTION_LIMITS.workoutSessions),
       workoutSessions,
-      calories: toJsonArray(related.calorieEntries).map(mapCalorieEntry),
-      mealLogs: toJsonArray(related.mealLogs).map(mapMealLog),
-      progressMetrics: toJsonArray(related.progressMetrics).map(mapProgressMetric),
-      plans: toJsonArray(related.generatedPlans).map(mapGeneratedPlan),
-      savedExercises: toJsonArray(related.savedExercises).map(mapSavedExercise),
+      calories: /** @type {NonNullable<UserRelations["calorieEntries"]>} */ (
+        toJsonArray(related.calorieEntries)
+      ).map(mapCalorieEntry),
+      mealLogs: /** @type {NonNullable<UserRelations["mealLogs"]>} */ (
+        toJsonArray(related.mealLogs)
+      ).map(mapMealLog),
+      progressMetrics: /** @type {NonNullable<UserRelations["progressMetrics"]>} */ (
+        toJsonArray(related.progressMetrics)
+      ).map(mapProgressMetric),
+      plans: /** @type {NonNullable<UserRelations["generatedPlans"]>} */ (
+        toJsonArray(related.generatedPlans)
+      ).map(mapGeneratedPlan),
+      savedExercises: /** @type {NonNullable<UserRelations["savedExercises"]>} */ (
+        toJsonArray(related.savedExercises)
+      ).map(mapSavedExercise),
       goals: toJsonObject(row.goals)
     }
   };

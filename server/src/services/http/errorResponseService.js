@@ -6,6 +6,13 @@
 // @ts-check
 import { requestLogPath } from "./requestLogPath.js";
 
+/**
+ * What the server answers a failed request with: the message, and on a 5xx the
+ * request's id for the logs. The client reads it from a `!res.ok` answer, which
+ * may also be no JSON at all, so both fields are optional.
+ * @typedef {{ error?: string, requestId?: string }} ErrorBody
+ */
+
 const GENERIC_SERVER_ERROR = "Server error.";
 
 // Replaced once by index.js through setErrorResponseTracker. Until then, as in

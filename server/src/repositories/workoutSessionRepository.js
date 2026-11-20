@@ -87,6 +87,8 @@ const toExerciseSetRows = (sessionId, userPk, exerciseSets) =>
 
 // Every caller passes a row (the repository, mapUser and the collection
 // reader); the default guards a bare call.
+// The exercises column holds the string list the workout builder wrote
+// (toCleanArray), and is written back as JSON.
 /**
  * Maps a workout_sessions row to the session the API returns. `intensityRpe`
  * is a Decimal column, read through toNumberOrNull, so an unrecorded RPE is
@@ -108,7 +110,7 @@ export const mapWorkoutSession = (row = /** @type {WorkoutSessionRow} */ ({})) =
   date: toDateOnly(row.workoutDate),
   focus: row.focus || "General",
   duration: row.durationMinutes ?? null,
-  exercises: toJsonArray(row.exercises),
+  exercises: /** @type {string[]} */ (toJsonArray(row.exercises)),
   sets: row.sets ?? null,
   reps: row.reps ?? null,
   intensityRpe: toNumberOrNull(row.intensityRpe),
@@ -190,7 +192,9 @@ export const createWorkoutSessionRepository = ({ prisma }) => {
       workoutDate: dateOnlyToDate(session.date),
       focus: session.focus || "General",
       durationMinutes: session.duration ?? null,
-      exercises: toJsonArray(session.exercises),
+      exercises: /** @type {import("@prisma/client").Prisma.InputJsonArray} */ (
+        toJsonArray(session.exercises)
+      ),
       sets: session.sets ?? null,
       reps: session.reps ?? null,
       intensityRpe: session.intensityRpe ?? null,
