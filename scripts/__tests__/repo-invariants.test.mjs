@@ -88,6 +88,57 @@ describe("qs stays on a patched release", () => {
   });
 });
 
+describe("effect stays on a patched release", () => {
+  // GHSA-7589-6fvf-x4pw is a ReDoS in effect's Schema.TemplateLiteral, fixed in
+  // 3.22.1. effect reaches the repository only through the prisma CLI, whose
+  // @prisma/config pins it exactly (3.20.0 in 7.10.1), and no Prisma release
+  // moves that pin, so package.json overrides it. The override is a workaround
+  // that should not outlive its reason: once @prisma/config asks for a fixed
+  // effect itself, the second test fails until the override is removed.
+  const MINIMUM = [3, 22, 1];
+
+  const atLeastMinimum = (version) => {
+    const parts = version
+      .replace(/^[\^~]/, "")
+      .split(".")
+      .map(Number);
+    for (let i = 0; i < MINIMUM.length; i += 1) {
+      if (parts[i] > MINIMUM[i]) return true;
+      if (parts[i] < MINIMUM[i]) return false;
+    }
+    return true;
+  };
+  const lock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
+
+  test("every resolved effect in the lockfile is at or above 3.22.1", () => {
+    const resolved = Object.entries(lock.packages)
+      .filter(([name]) => /(^|\/)node_modules\/effect$/.test(name))
+      .map(([name, entry]) => ({ name, version: entry.version }));
+
+    // A lockfile with no effect at all would pass vacuously; prisma pulls it in.
+    expect(resolved.length).toBeGreaterThan(0);
+    expect(resolved.filter((entry) => !atLeastMinimum(entry.version))).toEqual([]);
+  });
+
+  test("the override stays only while @prisma/config pins a vulnerable effect", () => {
+    const pinned = lock.packages["node_modules/@prisma/config"]?.dependencies?.effect;
+    expect(pinned, "@prisma/config no longer depends on effect: remove the override").toBeTypeOf(
+      "string"
+    );
+    const override = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")).overrides
+      ?.effect;
+    if (atLeastMinimum(pinned)) {
+      expect(override, `@prisma/config now asks for effect ${pinned}: remove the override`).toBe(
+        undefined
+      );
+    } else {
+      expect(override, `@prisma/config pins effect ${pinned}: keep the override`).toBeTypeOf(
+        "string"
+      );
+    }
+  });
+});
+
 const readSourceFiles = (dir) => {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
