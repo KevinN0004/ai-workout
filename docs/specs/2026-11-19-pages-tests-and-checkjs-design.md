@@ -28,8 +28,9 @@ of the server's response typedefs to this phase.
    `// @ts-nocheck` on each failing file (about 200 suppression markers, against the rule
    that bans `@ts-ignore`); the tests before the pages, which would type a test against a page
    whose props are still `any`.
-5. _Added when the spec was written, for the owner's review:_ **`@types/supertest` becomes a
-   server devDependency** (finding 9), installed under the 14-days-old rule and audited.
+5. **`@types/supertest` becomes a server devDependency** (finding 9), installed under the
+   14-days-old rule and audited, so each `supertest` call and the answer it reads are checked.
+   Not chosen: leaving `supertest` `any`, which the relaxed rule allows.
 
 ## What was found
 
@@ -78,18 +79,25 @@ removed.
    Typing the pages changes what their tests see, so each test PR is re-measured first.
 
 4. **Today's checked client files pass with `noImplicitAny` off; 21 server places do not.**
-   Each is a variable declared `null` or `[]` that strict mode widens as it is assigned
-   (`registerAirQualityRoutes.js` has most of them). With `noImplicitAny` off TypeScript does
-   not widen it, so it stays `null` and every later read is an error. A test program checks
-   each source file a test imports under its own options, so these 21 fail it.
+   Each is a variable declared `null` or `[]` that strict mode widens as it is assigned: 17
+   in `registerAirQualityRoutes.js`, 3 in `externalDataService.js` and 1 in
+   `generateRoutes.js`. With `noImplicitAny` off TypeScript does not widen it, so it stays
+   `null` (or `never[]`) and every later read is an error. A test program checks each source
+   file a test imports under its own options, so these 21 fail it.
 5. **No `Date` or `Decimal` reaches the client.** A probe over the server's response typedefs
    found neither in any of them: the mappers already return strings and numbers, which is what
    JSON delivers.
-6. **Five response typedefs contain an `any`.** `DashboardResponse["dashboard"]`'s
-   `calories`, `plans`, `savedExercises` and `workouts` (`StoredDashboard`'s lists are
-   `unknown` and are re-read loosely), `WorkoutSessionSavedResponse`'s `exercises` (an
-   untyped `const exercises = []` in the workout-session mapper), and every field of
-   `StravaStateResponse`. Every response built on `DashboardResponse` inherits the first.
+6. **12 of the 31 response typedefs contain an `any`, from three roots** (swept when the
+   plan was written):
+   - `StoredDashboard`'s lists are `unknown`, and `buildDashboard`'s `Array.isArray` turns
+     each into `any[]`: `dashboard.calories`, `plans`, `savedExercises` and `workouts`, in
+     `DashboardResponse` and the eight responses built on it;
+   - `toJsonArray` in `rowValues.js` returns `any[]`, so a JSON list column reads as `any`:
+     a plan's `equipment` and `focuses` (`GenerateResponse`, `PlanSwappedResponse`), a saved
+     exercise's `muscles` and `equipment` (`SavedExerciseSavedResponse`) and a workout's
+     `exercises` (`WorkoutSessionSavedResponse`);
+   - `stravaService`'s `connections` dependency is `any`, so every field of
+     `StravaStateResponse` read from its row is `any`.
 7. **The client program cannot read a route module's types yet.** It does not include
    `server/src/types/express.d.ts`, so a client file that names a type from
    `authRoutes.js` or `registerDashboardReadRoutes.js` makes the client's typecheck fail on
@@ -99,8 +107,9 @@ removed.
    `planSwaps.js`, `useApiClient.js` and four page files. Each `!res.ok` branch reads
    `payload?.error` from `await res.json().catch(() => ({}))`; the server answers every error
    as `{ error: string }`, once with a `requestId` beside it.
-9. **`supertest` has no types.** The server tests import `supertest` 7.3.1, which ships none,
-   so each import is TS7016 (32 of them). `@types/supertest` 7.2.1 was published 2026-07-14.
+9. **`supertest` has no types.** 32 server test files import `supertest` 7.3.1, which ships
+   none. Under full strict each import is TS7016; with `noImplicitAny` off it is not an error,
+   and `supertest` reads as `any`. `@types/supertest` 7.2.1 was published 2026-07-14.
 10. **The guards assume pragmas.** `repo-invariants.test.mjs` checks where each `// @ts-check`
     sits, that `TYPE_CHECKED_FILES` equals the number of checked files, that both configs keep
     `checkJs` false, and that every data-layer and server source file carries a pragma.
@@ -137,20 +146,26 @@ The first implementation PR, before any page:
 - **`Dashboard` is the server's type.** In `app/dashboard.js`, `@typedef {any} Dashboard`
   becomes `DashboardResponse["dashboard"]`, with the pagination named beside it, and
   `events.js`'s note that every `res.json()` reads as `any` goes.
-- **Each success read is cast in place to its named response**,
-  `const data = /** @type {SignedInResponse} */ (await res.json());`. That cast is where the
-  client trusts the network, so it is the one place each type is asserted. Acorn drops the
+- **Each success read is cast in place to its named response, through `Wire`**,
+  `const data = /** @type {Wire<SignedInResponse>} */ (await res.json());`. That cast is where
+  the client trusts the network, so it is the one place each type is asserted. Acorn drops the
   parentheses and the build drops the comment, so neither the syntax tree nor the bundle
   changes.
 - **Each error read is cast to `ErrorBody`,** a new `{ error?: string, requestId?: string }`
   typedef beside the server's error sender in `services/http/errorResponseService.js`.
 - **`sendLog` is generic,** `@template T` with `data?: T`, so each caller names its answer.
 - **No `any` is left in a response typedef the client reads** (finding 6). The server's
-  annotations are tightened, type only: `StoredDashboard`'s lists, the mapper's `exercises`,
-  and the Strava state get their real types. A repo-invariant test runs the probe that found
-  them, over every `<Name>Response` typedef a client file names, and fails on an `any`, a
-  `Date` or a `Decimal`, so a later field that would arrive as something else over JSON is
-  caught.
+  annotations are tightened, type only, at the three roots: `StoredDashboard`'s lists,
+  `toJsonArray`'s callers, and `stravaService`'s `connections`.
+- **The guard is a type, `Wire<T>`,** in the checked fetch module, `app/network.js`,
+  beside `ApiFetch` (a new module of types alone would add a file to the coverage report).
+  `Wire<T>` is `T` itself when no field of it is `any`, `Date` or `Decimal`, else
+  `{ notWireSafe: <path> }`, so every read through the cast fails the typecheck and the error
+  names the field (`"dashboard.calories.any"`). It is the probe that found finding 6, made
+  permanent, and it holds a later field that JSON would deliver as something else. A
+  repo-invariant test holds the rule that every `.json()` success cast in `client/src` goes
+  through `Wire<`. This replaces a test that would run `tsc` itself, as the spec first had
+  it.
 
 ### Pages
 
@@ -204,7 +219,8 @@ One PR, after every file carries a pragma:
   control, the same mutation in a file still unchecked, survives. In M4 the control becomes a
   type error in a file that never carried a pragma, which must now be caught.
 - **The response-type guard** fails on an `any` and on a `Date` written into a response
-  typedef, and each response cast fails on a misspelled field read through it.
+  typedef, the `Wire<` rule fails on a cast written without it, and each response cast fails
+  on a misspelled field read through it.
 
 ### Recorded
 

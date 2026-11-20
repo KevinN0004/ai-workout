@@ -47,6 +47,7 @@
 - [2026-11-14 — Request body types from the zod schemas, D1 phase 2](plans/2026-11-14-api-body-types.md)
 - [2026-11-16 — Type-checking the client's data layer, D1 phase 3](plans/2026-11-16-client-data-layer-types.md)
 - [2026-11-17 — Type-checking the server's source, D1 phase 4](plans/2026-11-17-server-source-types.md)
+- [2026-11-19 — Type-checking the pages and the tests, then checkJs on, D1 phase 5 and M4](plans/2026-11-19-pages-tests-and-checkjs.md)
 
 ## Specs
 
