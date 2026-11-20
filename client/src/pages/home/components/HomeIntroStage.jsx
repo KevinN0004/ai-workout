@@ -2,7 +2,10 @@
  * The home page's opening stage: the brand tagline and the Get Started button.
  * Rendered by HomePage while its stage is "intro".
  */
+// @ts-check
 import { APP_BRAND_TAGLINE } from "../../../app/constants";
+
+/** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
 
 /**
  * The three refs are useHomeStageFlow's: onGetStarted grows the button into a
@@ -10,6 +13,7 @@ import { APP_BRAND_TAGLINE } from "../../../app/constants";
  * to the personal stage. Unlike the other stages this is not inside
  * HomePage's keyed stage wrapper, so the panel carries the `home-stage`
  * direction class itself.
+ * @param {Pick<HomeStageFlow, "introPanelRef" | "introTitleRef" | "introButtonRef" | "stageDirection" | "isIntroTransitioning" | "isStageTransitioning" | "onGetStarted">} props
  */
 export default function HomeIntroStage({
   introPanelRef,

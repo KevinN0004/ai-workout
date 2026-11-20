@@ -140,11 +140,14 @@ export const toFeetInchesFromCm = (cmValue) => {
  * unchanged.
  * @param {string | number | null | undefined} value
  * @param {string} fromUnit
+ * @returns {string}
  */
 export const toKg = (value, fromUnit) => {
   if (!value) return "";
   const num = Number(value);
-  if (Number.isNaN(num)) return value;
+  // Only a string gets here not a number: NaN, the one number that is not one,
+  // is falsy and returned above.
+  if (Number.isNaN(num)) return /** @type {string} */ (value);
   return fromUnit === "lb" ? String(Math.round(num * 0.453592)) : String(num);
 };
 
@@ -153,11 +156,14 @@ export const toKg = (value, fromUnit) => {
  * handled the same way.
  * @param {string | number | null | undefined} value
  * @param {string} fromUnit
+ * @returns {string}
  */
 export const toLb = (value, fromUnit) => {
   if (!value) return "";
   const num = Number(value);
-  if (Number.isNaN(num)) return value;
+  // Only a string gets here not a number: NaN, the one number that is not one,
+  // is falsy and returned above.
+  if (Number.isNaN(num)) return /** @type {string} */ (value);
   return fromUnit === "kg" ? String(Math.round(num / 0.453592)) : String(num);
 };
 

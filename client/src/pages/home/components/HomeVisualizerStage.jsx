@@ -3,8 +3,12 @@
  * measurements, with Back and Continue. Rendered by HomePage while its stage is
  * "visualizer".
  */
+// @ts-check
 import { useEffect } from "react";
 import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "./PhysiqueSilhouette2D";
+
+/** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
+/** @typedef {ReturnType<typeof import("../hooks/useBodyModel.js").default>} BodyModel */
 
 /**
  * `visualPanelRef` is the panel useHomeStageFlow's morph measures, to and from
@@ -12,6 +16,7 @@ import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "./PhysiqueSilhoue
  * `silhouetteRenderSignature` is part of the silhouette's key, so a changed
  * shape remounts it. `visualLabel` names the silhouette for assistive
  * technology.
+ * @param {Pick<HomeStageFlow, "visualPanelRef" | "isIntroTransitioning" | "isStageTransitioning"> & Pick<BodyModel, "silhouetteShape" | "silhouetteRenderSignature"> & { visualLabel: string, onBack: () => void, onContinue: () => void }} props
  */
 export default function HomeVisualizerStage({
   visualPanelRef,

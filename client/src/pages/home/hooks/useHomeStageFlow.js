@@ -3,8 +3,13 @@
  * entered, and the animations between stages -- the intro's button growing into
  * a panel, and a morph from one stage's panel to the next. Called by HomePage.
  */
+// @ts-check
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
+
+/** @typedef {"intro" | "preview" | "personal" | "visualizer" | "workout"} HomeStage */
+/** @typedef {ReturnType<typeof createTimeline>} Timeline */
+/** @typedef {{ width: number, height: number, centerX: number, centerY: number }} StageMetrics */
 
 // Each stage's position, intro first and workout last, with the preview
 // (reached only from the nav) after the intro. goToStage compares positions to
@@ -43,35 +48,38 @@ const STAGE_CROSSFADE_MS = 220;
  * entrance and pulse (the first effect) do not run, and the stage shows as its
  * stylesheet draws it. `samplePlanLength` and `personalMode` are read only to
  * re-measure a panel whose size they change.
+ * @param {{ onResetPersonalFlow?: () => void, samplePlanLength: number, personalMode: string }} input
  */
 export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength, personalMode }) {
   // ---- Refs: DOM handles, animations, pending timers and measurements -------
-  const visualPanelRef = useRef(null);
-  const visualIntroTimelineRef = useRef(null);
-  const stagePulseRef = useRef(null);
-  const introExitTimelineRef = useRef(null);
-  const introTransitionTimeoutRef = useRef(null);
-  const stageSwapTimelineRef = useRef(null);
-  const stageSwapRafRef = useRef(null);
-  const stageSwapRevealTimeoutRef = useRef(null);
-  const stageSwapTimeoutRef = useRef(null);
-  const stageMorphCloneRef = useRef(null);
+  const visualPanelRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const visualIntroTimelineRef = useRef(/** @type {Timeline | null} */ (null));
+  const stagePulseRef = useRef(/** @type {ReturnType<typeof animate> | null} */ (null));
+  const introExitTimelineRef = useRef(/** @type {Timeline | null} */ (null));
+  const introTransitionTimeoutRef = useRef(/** @type {number | null} */ (null));
+  const stageSwapTimelineRef = useRef(/** @type {Timeline | null} */ (null));
+  const stageSwapRafRef = useRef(/** @type {number | null} */ (null));
+  const stageSwapRevealTimeoutRef = useRef(/** @type {number | null} */ (null));
+  const stageSwapTimeoutRef = useRef(/** @type {number | null} */ (null));
+  const stageMorphCloneRef = useRef(/** @type {HTMLElement | null} */ (null));
   const suppressResetPendingRef = useRef(false);
-  const stageMetricsRef = useRef({});
-  const introPanelRef = useRef(null);
-  const personalPanelRef = useRef(null);
-  const introTitleRef = useRef(null);
-  const introButtonRef = useRef(null);
-  const workoutPanelRef = useRef(null);
-  const workoutShellRef = useRef(null);
-  const workoutMeasureRef = useRef(null);
-  const workoutMeasureShellRef = useRef(null);
+  const stageMetricsRef = useRef(/** @type {Partial<Record<HomeStage, StageMetrics>>} */ ({}));
+  const introPanelRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const personalPanelRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const introTitleRef = useRef(/** @type {HTMLHeadingElement | null} */ (null));
+  const introButtonRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const workoutPanelRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const workoutShellRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const workoutMeasureRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const workoutMeasureShellRef = useRef(/** @type {HTMLDivElement | null} */ (null));
 
   // ---- State ----------------------------------------------------------------
   // `suppressStageEnter` puts `stage-snap` on the stage, which turns its enter
   // animation off.
-  const [homeStage, setHomeStage] = useState("intro");
-  const [stageDirection, setStageDirection] = useState("forward");
+  const [homeStage, setHomeStage] = useState(/** @type {HomeStage} */ ("intro"));
+  const [stageDirection, setStageDirection] = useState(
+    /** @type {"forward" | "backward"} */ ("forward")
+  );
   const [isIntroTransitioning, setIsIntroTransitioning] = useState(false);
   const [isStageTransitioning, setIsStageTransitioning] = useState(false);
   const [suppressStageEnter, setSuppressStageEnter] = useState(false);
@@ -103,6 +111,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   // ---- Plain stage switch ---------------------------------------------------
   // The direction drives the stage's enter animation: forward when the next
   // stage is at or after this one in `STAGE_ORDER`.
+  /** @param {HomeStage} nextStage */
   const goToStage = (nextStage) => {
     if (nextStage === homeStage) return;
     if (nextStage === "intro") {
@@ -115,6 +124,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   };
 
   // The panel the morph measures for each stage. The preview has none.
+  /** @param {HomeStage} stage */
   const getMorphStageElement = (stage) => {
     if (stage === "intro") return introPanelRef.current;
     if (stage === "personal") return personalPanelRef.current;
@@ -124,6 +134,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
   };
 
   // ---- The morph between stages ---------------------------------------------
+  /** @param {HomeStage} nextStage */
   const transitionToStageFromTrigger = (nextStage) => {
     // ---- Guards, and the paths that skip the animation ----------------------
     if (nextStage === homeStage || isIntroTransitioning || isStageTransitioning) return;
@@ -154,6 +165,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       : 48;
     const stageWidth = Math.min(1200, Math.max(320, window.innerWidth - pagePaddingX));
 
+    // personal is the fallback, so it is always there.
+    /** @type {Record<"personal", { width: number, height: number }> & Partial<Record<HomeStage, { width: number, height: number }>>} */
     const presets = {
       intro: { width: Math.min(560, stageWidth), height: 320 },
       personal: { width: Math.min(980, stageWidth), height: 620 },
@@ -236,6 +249,7 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     // ---- Anchors ------------------------------------------------------------
     // Every preset, like the default, anchors both ends at the centre, so the
     // anchor terms below cancel and the clone lands on the target's box.
+    /** @type {Record<string, { source?: { x: number, y: number }, target?: { x: number, y: number } }>} */
     const transitionAnchors = {
       "personal->visualizer": {
         source: { x: 0.5, y: 0.5 },
@@ -250,9 +264,14 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
       source: { x: 0.5, y: 0.5 },
       target: { x: 0.5, y: 0.5 }
     };
+    /**
+     * @param {number | undefined} value
+     * @param {number} fallback
+     */
     const clampAnchor = (value, fallback) => {
       if (!Number.isFinite(value)) return fallback;
-      return Math.min(1, Math.max(0, value));
+      // Number.isFinite is no type guard; it has just ruled out undefined.
+      return Math.min(1, Math.max(0, /** @type {number} */ (value)));
     };
     const sourceAnchorX = clampAnchor(anchorPreset.source?.x, 0.5);
     const sourceAnchorY = clampAnchor(anchorPreset.source?.y, 0.5);
@@ -262,7 +281,8 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
     // ---- The clone ----------------------------------------------------------
     // Fixed over the current panel and appended to body, outside React, so it
     // survives the stage switch below.
-    const morphClone = sourceMorphEl.cloneNode(true);
+    // A deep clone of an element is an element of the same kind.
+    const morphClone = /** @type {HTMLElement} */ (sourceMorphEl.cloneNode(true));
     morphClone.style.position = "fixed";
     morphClone.style.left = `${sourceRect.left}px`;
     morphClone.style.top = `${sourceRect.top}px`;
@@ -309,12 +329,17 @@ export default function useHomeStageFlow({ onResetPersonalFlow, samplePlanLength
         return;
       }
 
+      // hasLiveTargetRect says the rect is there, which Boolean() does not narrow.
       const liveTarget = hasLiveTargetRect
         ? {
-            width: liveTargetRect.width,
-            height: liveTargetRect.height,
-            centerX: liveTargetRect.left + liveTargetRect.width / 2,
-            centerY: liveTargetRect.top + liveTargetRect.height / 2
+            width: /** @type {DOMRect} */ (liveTargetRect).width,
+            height: /** @type {DOMRect} */ (liveTargetRect).height,
+            centerX:
+              /** @type {DOMRect} */ (liveTargetRect).left +
+              /** @type {DOMRect} */ (liveTargetRect).width / 2,
+            centerY:
+              /** @type {DOMRect} */ (liveTargetRect).top +
+              /** @type {DOMRect} */ (liveTargetRect).height / 2
           }
         : null;
 
