@@ -3,11 +3,16 @@
  * planner, and the sample weekly plan. Rendered by HomePage while its stage is
  * "workout".
  */
+// @ts-check
+
+/** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
+/** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */
 
 /**
  * `workoutShellRef` is what useHomeStageFlow's morph measures for this stage,
  * with `workoutPanelRef` as its fallback. `error` is App's error from
  * generating a plan or preparing its PDF, shown under the button.
+ * @param {Pick<HomeStageFlow, "workoutShellRef" | "workoutPanelRef" | "isIntroTransitioning" | "isStageTransitioning"> & Pick<HomePageProps, "openPlannerFromProfile" | "error" | "samplePlan"> & { onBack: () => void }} props
  */
 export default function HomeWorkoutStage({
   workoutShellRef,

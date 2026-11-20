@@ -77,10 +77,9 @@ export default function AuthPage({
 }) {
   // Writes one sign-up field through App's change handler, shaped as the
   // change event it expects: the handler reads only its target's name and value.
-  // The unit converters hand back a number or a string.
   /**
    * @param {string} name
-   * @param {string | number} value
+   * @param {string} value
    */
   const setSignupField = (name, value) => {
     onSignupProfileChange(

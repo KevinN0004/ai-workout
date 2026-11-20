@@ -2,7 +2,19 @@
  * The skeleton and muscle guide segments of the physique silhouette, added by
  * geometry.js once it has placed the landmarks they join.
  */
+// @ts-check
 import { clamp } from "./math";
+
+/**
+ * geometry.js's pushGuide and pushMirrorGuide: a segment from (x1, y1) to
+ * (x2, y2), a bone or a muscle.
+ * @typedef {(id: string, x1: number, y1: number, x2: number, y2: number, kind?: string) => void} PushGuide
+ */
+
+/**
+ * The landmark positions and sizes appendDefaultGuides joins, in view-box units.
+ * @typedef {"centerX" | "neckBaseY" | "chestY" | "waistY" | "pelvisY" | "groinY" | "neckHalf" | "headRadiusY" | "shoulderX" | "shoulderY" | "elbowX" | "elbowY" | "wristX" | "wristY" | "palmX" | "handTipX" | "handCenterY" | "hipX" | "hipY" | "kneeX" | "kneeY" | "ankleX" | "ankleY" | "toeX" | "footY" | "heelX" | "soleY" | "chestX" | "waistX" | "underarmX" | "underarmY" | "trapCurveX" | "trapCurveY" | "shoulderCapX" | "shoulderCapY" | "shoulderLowerX" | "shoulderLowerY" | "upperArmMidX" | "upperArmMidY" | "forearmMidX" | "forearmMidY" | "thighX" | "thighY" | "calfX" | "calfY"} GuideLandmark
+ */
 
 /**
  * Pushes each guide through the two push functions geometry.js passes in: the
@@ -10,6 +22,7 @@ import { clamp } from "./math";
  * sides through `pushMirrorGuide`. The rest of the argument is geometry.js's
  * landmark positions and sizes, in view-box units. geometry.js returns the
  * result as `guides`, which PhysiqueSilhouette2D does not draw.
+ * @param {{ pushGuide: PushGuide, pushMirrorGuide: PushGuide } & Record<GuideLandmark, number>} layout
  */
 export const appendDefaultGuides = ({
   pushGuide,

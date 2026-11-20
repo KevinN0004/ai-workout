@@ -4,20 +4,44 @@
  * complete, and the silhouette shape PhysiqueSilhouette2D draws. Called by
  * HomePage.
  */
+// @ts-check
 import { useMemo } from "react";
 import { toNumberOrNull } from "../../../app/units";
 
+/**
+ * What HomePage hands useBodyModel: App's personal form, its units and
+ * converters, and where the silhouette's view box puts the floor.
+ * @typedef {object} BodyModelInput
+ * @property {import("../../../app/events.js").AppEventDeps["personal"]} personal
+ * @property {string} heightUnit
+ * @property {string} weightUnit
+ * @property {typeof import("../../../app/units.js").toCmFromFeetInches} toCmFromFeetInches
+ * @property {typeof import("../../../app/units.js").toKg} toKg
+ * @property {number} silhouetteViewHeight
+ * @property {number} silhouetteFloorInset
+ */
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ */
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 // The form stores each option's label verbatim ("Moderate", "HIIT",
 // "High-protein") and the five option score tables are keyed in lower case, so
 // this is what joins them. Without it every capitalised label would miss and
 // fall to its default; only the two sleep bands that start with a digit would
 // still match.
+/** @param {unknown} value */
 const toLowerText = (value) =>
   String(value || "")
     .trim()
     .toLowerCase();
 
+/**
+ * @param {number} value
+ * @param {number} [decimals]
+ */
 const roundTo = (value, decimals = 1) => {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -63,17 +87,20 @@ const MEDICAL_REGION_PROFILES = {
 // Scores from 0 to 1 for the Advanced fields' answers, keyed by the option
 // label lower-cased (see toLowerText). An answer not listed takes the default
 // its lookup in useBodyModel gives.
+/** @type {Record<string, number>} */
 const ACTIVITY_LEVEL_SCORES = {
   light: 0.28,
   moderate: 0.5,
   high: 0.72,
   "very high": 0.9
 };
+/** @type {Record<string, number>} */
 const TRAINING_EXPERIENCE_SCORES = {
   beginner: 0.3,
   intermediate: 0.58,
   advanced: 0.84
 };
+/** @type {Record<string, number>} */
 const CARDIO_PREFERENCE_SCORES = {
   none: 0.2,
   walking: 0.45,
@@ -84,6 +111,7 @@ const CARDIO_PREFERENCE_SCORES = {
   hiit: 0.86,
   mixed: 0.7
 };
+/** @type {Record<string, number>} */
 const NUTRITION_PREFERENCE_SCORES = {
   "no preference": 0.5,
   "high-protein": 0.74,
@@ -92,6 +120,7 @@ const NUTRITION_PREFERENCE_SCORES = {
   vegetarian: 0.54,
   vegan: 0.52
 };
+/** @type {Record<string, number>} */
 const SLEEP_HOURS_SCORES = {
   "less than 4": 0.16,
   "4 - 6 hours": 0.42,
@@ -113,6 +142,7 @@ const TRAINING_DAY_COUNT_SCORES = [0.35, 0.26, 0.38, 0.52, 0.66, 0.78, 0.88, 0.9
  * `toCmFromFeetInches` and `toKg` are app/units.js's converters, passed down
  * from App. `silhouetteViewHeight` and `silhouetteFloorInset` place the model's
  * landmarks vertically in the view box (see HomePage).
+ * @param {BodyModelInput} input
  */
 export default function useBodyModel({
   personal,
@@ -351,6 +381,7 @@ export default function useBodyModel({
     const headTopY = ankleY - statureSpan;
     const headCenterY = headTopY + headRadius;
 
+    /** @param {number} heightRatioFromFloor */
     const yFromHeightRatio = (heightRatioFromFloor) => {
       const progressFromTop = (1 - heightRatioFromFloor) / (1 - anthropometry.ankleHeight);
       return headTopY + statureSpan * clamp(progressFromTop, 0, 1);

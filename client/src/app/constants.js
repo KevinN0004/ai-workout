@@ -166,7 +166,8 @@ export const defaultPersonalForm = {
   sleep: "",
   timeline: "",
   experience: "",
-  trainingDays: [],
+  // The names of the days chosen (TRAINING_DAY_OPTIONS in pages/home/preview).
+  trainingDays: /** @type {string[]} */ ([]),
   nutrition: "",
   cardio: "",
   notes: ""

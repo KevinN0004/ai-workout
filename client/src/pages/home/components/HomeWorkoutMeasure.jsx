@@ -3,12 +3,17 @@
  * so useHomeStageFlow can measure the workout panel's size before that stage is
  * mounted.
  */
+// @ts-check
+
+/** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
+/** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */
 
 /**
  * Mirrors HomeWorkoutStage's markup and `samplePlan` without its handlers,
  * back-button style or error line. `.stage-measure` (layout.css) hides it, it
  * is hidden from assistive technology, and its buttons are out of the tab
  * order.
+ * @param {Pick<HomeStageFlow, "workoutMeasureShellRef" | "workoutMeasureRef"> & Pick<HomePageProps, "samplePlan">} props
  */
 export default function HomeWorkoutMeasure({
   workoutMeasureShellRef,

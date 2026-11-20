@@ -3,6 +3,7 @@
  * physique silhouette and the workout stage, one at a time, with the planner
  * modal App builds. Rendered by App for any path it does not route elsewhere.
  */
+// @ts-check
 // First on purpose, ahead of PreviewStage: imported after it, this sheet would
 // follow PreviewStage.css in the built stylesheet and reorder the cascade.
 import "./HomePage.css";
@@ -16,6 +17,42 @@ import HomePersonalStage from "./components/HomePersonalStage";
 import HomeVisualizerStage from "./components/HomeVisualizerStage";
 import HomeWorkoutStage from "./components/HomeWorkoutStage";
 import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
+
+/** @typedef {import("../../app/events.js").AppEventDeps} AppEventDeps */
+/**
+ * @template T
+ * @typedef {import("react").Dispatch<import("react").SetStateAction<T>>} SetState
+ */
+
+/**
+ * What App passes HomePage: its page background and session, the planner form,
+ * the personal form with its setters and units, the converters, and the
+ * planner's opener, error, sample plan and modal.
+ * @typedef {object} HomePageProps
+ * @property {import("react").CSSProperties} gradient
+ * @property {import("../../app/cache.js").CacheUser & { email?: string }} user
+ * @property {ReturnType<typeof import("../../app/events.js").createAppEventHandlers>["onLogout"]} onLogout
+ * @property {(path: string) => void} go
+ * @property {AppEventDeps["form"]} form
+ * @property {string} personalMode
+ * @property {SetState<string>} setPersonalMode
+ * @property {AppEventDeps["personal"]} personal
+ * @property {(event: import("react").ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void} onPersonalChange
+ * @property {() => void} onResetPersonalFlow
+ * @property {string} heightUnit
+ * @property {SetState<string>} setHeightUnit
+ * @property {typeof import("../../app/units.js").toCmFromFeetInches} toCmFromFeetInches
+ * @property {typeof import("../../app/units.js").toFeetInchesFromCm} toFeetInchesFromCm
+ * @property {SetState<AppEventDeps["personal"]>} setPersonal
+ * @property {string} weightUnit
+ * @property {SetState<string>} setWeightUnit
+ * @property {typeof import("../../app/units.js").toKg} toKg
+ * @property {typeof import("../../app/units.js").toLb} toLb
+ * @property {() => void} openPlannerFromProfile
+ * @property {string} error
+ * @property {typeof import("../../app/constants.js").samplePlan} samplePlan
+ * @property {import("react").ReactNode} plannerModal
+ */
 
 // useBodyModel lays out the model's landmarks with these, in view-box units:
 // the view box's height, the same as VIEWBOX_HEIGHT in physique/geometry.js,
@@ -39,6 +76,7 @@ const VISUAL_LABEL =
  * App's element, rendered here whatever the stage.
  * The hidden workout copy is always rendered too, so the workout panel can be
  * measured before its stage exists.
+ * @param {HomePageProps} props
  */
 export default function HomePage({
   gradient,
@@ -66,6 +104,7 @@ export default function HomePage({
   plannerModal
 }) {
   // ---- Training days --------------------------------------------------------
+  /** @param {string} day */
   const toggleTrainingDay = (day) => {
     setPersonal((prev) => {
       const selectedDays = Array.isArray(prev.trainingDays) ? prev.trainingDays : [];
@@ -123,6 +162,7 @@ export default function HomePage({
   // ---- Personal stage submit ------------------------------------------------
   // Continue on the personal stage moves to the physique stage through the
   // morph, once the profile is complete and nothing is animating.
+  /** @param {import("react").FormEvent} event */
   const onPersonalSubmit = (event) => {
     event.preventDefault();
     if (!isPersonalComplete || isIntroTransitioning || isStageTransitioning) return;

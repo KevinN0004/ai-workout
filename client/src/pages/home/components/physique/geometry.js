@@ -3,11 +3,25 @@
  * colours and debug anchors PhysiqueSilhouette2D draws. Every position and size
  * is in SVG user units of the fixed view box below, with y measured down.
  */
+// @ts-check
 import { clamp, mirrorX, toFiniteNumber, interpolateBandWidth } from "./math";
 import { buildSymmetricOutline } from "./outlineGeometry";
 import { appendDefaultGuides } from "./guideLayout";
 import { buildPhysiquePalette } from "./palette";
 import { buildTemplateOutline } from "./templateOutline";
+
+/**
+ * A labelled point the debug overlay draws: its id, place, kind (its size) and
+ * group (surface, skeletal or joint).
+ * @typedef {{ id: string, x: number, y: number, kind: string, group: string }} PhysiqueAnchor
+ */
+
+/**
+ * A bone or muscle segment.
+ * @typedef {{ id: string, x1: number, y1: number, x2: number, y2: number, kind: string }} PhysiqueGuide
+ */
+
+/** @typedef {(id: string, x: number, y: number, kind?: string, group?: string) => void} PushAnchor */
 
 export const VIEWBOX_WIDTH = 430;
 const CENTER_X = VIEWBOX_WIDTH / 2;
@@ -66,6 +80,7 @@ const MEDICAL_RATIOS = {
  * draws; `guides`, bone and muscle segments PhysiqueSilhouette2D does not
  * draw; and `outlineTransform`, read from a `transform` buildTemplateOutline
  * does not return, so it is undefined.
+ * @param {import("./math.js").PhysiqueShape} [shape]
  */
 export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   // ---- Fallback model and clamped inputs ------------------------------------
@@ -211,6 +226,7 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     { y: calfY, w: calfHalf },
     { y: ankleY, w: ankleHalf }
   ];
+  /** @param {number} y */
   const widthAt = (y) => interpolateBandWidth(widthBands, y);
   const torsoSideBulge = clamp(sideFat * 8.8 + shoulderFat * 1.2, 0, 13.2);
   const upperTorsoBulge = torsoSideBulge * 0.36;
@@ -329,27 +345,43 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   const fingerBaseX = palmX;
   const fingerJointBaseX = palmX + fingerJointReach;
   const fingerTipBaseX = palmX + fingerTipReach;
+  /** @type {number[]} */
   const handTipXValues = [];
 
   // ---- Anchor and guide collectors ------------------------------------------
   // Each mirrored helper pushes a right-side point (`-r`) and its reflection
   // (`-l`); outlineGeometry.js reads the right-side ids back by name.
+  /** @type {PhysiqueAnchor[]} */
   const anchors = [];
+  /** @type {PhysiqueGuide[]} */
   const guides = [];
+  /** @type {PushAnchor} */
   const pushAnchor = (id, x, y, kind = "minor", group = "surface") => {
     anchors.push({ id, x, y, kind, group });
   };
+  /** @type {PushAnchor} */
   const pushMirrorAnchor = (id, x, y, kind = "minor", group = "surface") => {
     pushAnchor(`${id}-r`, x, y, kind, group);
     pushAnchor(`${id}-l`, mirrorX(x, CENTER_X), y, kind, group);
   };
+  /** @type {import("./guideLayout.js").PushGuide} */
   const pushGuide = (id, x1, y1, x2, y2, kind = "muscle") => {
     guides.push({ id, x1, y1, x2, y2, kind });
   };
+  /** @type {import("./guideLayout.js").PushGuide} */
   const pushMirrorGuide = (id, x1, y1, x2, y2, kind = "muscle") => {
     pushGuide(`${id}-r`, x1, y1, x2, y2, kind);
     pushGuide(`${id}-l`, mirrorX(x1, CENTER_X), y1, mirrorX(x2, CENTER_X), y2, kind);
   };
+  /**
+   * @param {string} id
+   * @param {number} x
+   * @param {number} y
+   * @param {number} offset
+   * @param {string} [centerKind]
+   * @param {"vertical" | "horizontal"} [orientation]
+   * @param {string} [group]
+   */
   const pushMirrorJointTriplet = (
     id,
     x,
@@ -369,6 +401,15 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     pushMirrorAnchor(`${id}-top`, x, y - safeOffset, "minor", group);
     pushMirrorAnchor(`${id}-bottom`, x, y + safeOffset, "minor", group);
   };
+  /**
+   * @param {string} id
+   * @param {number} startX
+   * @param {number} startY
+   * @param {number} endX
+   * @param {number} endY
+   * @param {string} [kind]
+   * @param {string} [group]
+   */
   const pushMirrorLimbCenter = (
     id,
     startX,
@@ -380,6 +421,15 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   ) => {
     pushMirrorAnchor(id, (startX + endX) / 2, (startY + endY) / 2, kind, group);
   };
+  /**
+   * @param {string} id
+   * @param {number} x
+   * @param {number} y
+   * @param {number} radius
+   * @param {string} [kind]
+   * @param {{ angles?: number[] }} [options]
+   * @param {string} [group]
+   */
   const pushMirrorJointCircle = (
     id,
     x,
@@ -405,6 +455,18 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
   // the half-width tapering from `startHalfWidth` to `endHalfWidth`, as
   // `<id>-<n>-top` and `<id>-<n>-bottom` (the one higher up is `top`).
   // outlineGeometry.js reads these pairs back as the limb's edges.
+  /**
+   * @param {string} id
+   * @param {number} startX
+   * @param {number} startY
+   * @param {number} endX
+   * @param {number} endY
+   * @param {number} startHalfWidth
+   * @param {number} endHalfWidth
+   * @param {string} [kind]
+   * @param {{ samples?: number[], taperPower?: number, centerBulge?: number, contourSweep?: number, startSquare?: number, endSquare?: number, offsetScale?: number }} [options]
+   * @param {string} [group]
+   */
   const pushMirrorLimbTrapezoidAnchors = (
     id,
     startX,
@@ -996,7 +1058,8 @@ export const buildPhysiqueSilhouetteGeometry = (shape = {}) => {
     guides,
     outlineMarkers: templateOutline?.outlineMarkers || outlineMarkers,
     outlinePath: templateOutline?.path || outlinePath,
-    outlineTransform: templateOutline?.transform,
+    // buildTemplateOutline returns no transform, as the summary above says.
+    outlineTransform: /** @type {{ transform?: undefined } | null} */ (templateOutline)?.transform,
     palette
   };
 };
