@@ -340,6 +340,7 @@ export const createExternalDataService = ({
 
   /** @param {OpenMeteoCurrent} [current] */
   const buildWorkoutRecommendation = (current = {}) => {
+    /** @type {string[]} */
     const reasons = [];
     const weatherCode = toFiniteNumber(current.weather_code);
     const weatherText = weatherCode === null ? "Unknown" : weatherCodeToText(weatherCode);
@@ -394,6 +395,7 @@ export const createExternalDataService = ({
    */
   const runExternalRequestWithRetry = async (serviceName, requestFn) => {
     let attempt = 0;
+    /** @type {unknown} */
     let lastError = null;
     while (attempt <= externalApiRetries) {
       const startedAt = Date.now();
@@ -988,6 +990,7 @@ export const createExternalDataService = ({
       const lastMs = Date.parse(/** @type {string} */ (station.datetimeLast.utc));
       const given = toFiniteNumber(station?.distance);
       const at = toPosition(station?.coordinates);
+      /** @type {number | null} */
       let distanceM = null;
       if (given !== null && given >= 0) distanceM = given;
       else if (from && at) distanceM = Math.round(haversineM(from, at));
@@ -1245,6 +1248,7 @@ export const createExternalDataService = ({
 
   /** @param {MealDbMeal | null} [meal] */
   const mapMealDbIngredients = (meal = {}) => {
+    /** @type {string[]} */
     const ingredients = [];
     for (let i = 1; i <= 20; i += 1) {
       const ingredient = cleanText(meal?.[`strIngredient${i}`], 100);
@@ -1267,6 +1271,7 @@ export const createExternalDataService = ({
       instructions.slice(0, 180) || metaLine || "Recipe from TheMealDB.",
       260
     );
+    /** @type {Array<{ label: string, url: string }>} */
     const recipes = [];
     if (source) recipes.push({ label: "Source", url: source });
     if (youtube) recipes.push({ label: "YouTube", url: youtube });

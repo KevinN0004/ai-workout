@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { resolvePostgresConfig } from "../postgres.js";
 
@@ -6,6 +7,20 @@ import { resolvePostgresConfig } from "../postgres.js";
 // failure path of connectPostgres, which has to leave no half-open pool behind
 // and must not swallow the error that caused it.
 
+/**
+ * The fake pg's state: what each Pool was built with, and the functions each
+ * test sets for it.
+ * @typedef {object} FakePg
+ * @property {import("pg").PoolConfig[]} poolArgs
+ * @property {Error | null} poolThrows
+ * @property {import("vitest").Mock<() => Promise<unknown>> | null} connect
+ * @property {import("vitest").Mock<() => Promise<void>> | null} end
+ * @property {import("vitest").Mock | null} query
+ * @property {number} releases
+ * @property {Record<string, (err: unknown) => void>} listeners
+ */
+
+/** @type {FakePg} */
 const pg = vi.hoisted(() => ({
   poolArgs: [],
   poolThrows: null,
@@ -17,6 +32,7 @@ const pg = vi.hoisted(() => ({
 }));
 
 vi.mock("pg", () => {
+  // beforeEach sets connect and end before any test builds a Pool.
   class Pool {
     constructor(args) {
       if (pg.poolThrows) throw pg.poolThrows;
@@ -24,11 +40,11 @@ vi.mock("pg", () => {
     }
 
     connect() {
-      return pg.connect();
+      return /** @type {NonNullable<FakePg["connect"]>} */ (pg.connect)();
     }
 
     end() {
-      return pg.end();
+      return /** @type {NonNullable<FakePg["end"]>} */ (pg.end)();
     }
 
     // Only 'error' matters here; the test emits it by calling the listener.
@@ -127,8 +143,11 @@ describe("resolvePostgresConfig", () => {
     ["a boolean", true]
   ])("%s is not accepted as a URL", (_label, DATABASE_URL) => {
     // Coercing instead of type-checking would turn 5432 into the string
-    // "5432" and report a configured database that cannot exist.
-    const config = resolvePostgresConfig({ DATABASE_URL });
+    // "5432" and report a configured database that cannot exist. A value no
+    // environment holds, so it is cast through unknown.
+    const config = resolvePostgresConfig(
+      /** @type {NodeJS.ProcessEnv} */ (/** @type {unknown} */ ({ DATABASE_URL }))
+    );
 
     expect(config.configured).toBe(false);
     expect(config.databaseUrl).toBe("");

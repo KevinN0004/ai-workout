@@ -16,16 +16,37 @@ const logToStdout = (message) => {
 };
 
 /**
+ * The calls the runner makes on a pool's connection: a pg PoolClient has them.
+ * @typedef {object} MigrationClient
+ * @property {(sql: string, values?: unknown[]) => Promise<unknown>} query
+ * @property {() => void} release
+ */
+
+/**
+ * The calls the runner makes on its pool: a pg Pool has them.
+ * @typedef {object} MigrationPool
+ * @property {(sql: string, values?: unknown[]) => Promise<{ rowCount: number | null }>} query
+ * @property {() => Promise<MigrationClient>} connect
+ */
+
+/**
+ * The two file reads the runner makes: fs/promises has them.
+ * @typedef {object} MigrationFs
+ * @property {(dir: string) => Promise<string[]>} readdir
+ * @property {(file: string, encoding: "utf8") => Promise<string>} readFile
+ */
+
+/**
  * Applies every unapplied .sql file in `migrationsDir`, in filename order.
  *
  * `fs` is injectable so the transaction sequence can be tested without touching
  * the filesystem. Returns the filenames applied during this run.
  *
  * @param {object} deps
- * @param {import("pg").Pool} deps.pool
+ * @param {MigrationPool} deps.pool
  * @param {string} deps.migrationsDir
  * @param {(message: string) => void} [deps.log]
- * @param {Pick<typeof nodeFs, "readdir" | "readFile">} [deps.fs]
+ * @param {MigrationFs} [deps.fs]
  */
 export const applyMigrations = async ({ pool, migrationsDir, log = logToStdout, fs = nodeFs }) => {
   await pool.query(`

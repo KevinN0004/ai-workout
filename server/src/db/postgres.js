@@ -85,8 +85,8 @@ export const getPostgresPool = () => postgresPool;
  *
  * @param {object} [deps]
  * @param {NodeJS.ProcessEnv} [deps.env]
- * @param {import("pino").Logger | null} [deps.logger]
- * @param {import("../services/platform/metricsService.js").Metrics | null} [deps.metrics]
+ * @param {Pick<import("pino").Logger, "error"> | null} [deps.logger]
+ * @param {Pick<import("../services/platform/metricsService.js").Metrics, "postgresPoolErrors"> | null} [deps.metrics]
  */
 export const connectPostgres = async ({
   env = process.env,

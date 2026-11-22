@@ -204,6 +204,7 @@ export const registerGenerateRoutes = (app, deps) => {
 
       // Save the plan for a signed-in caller; an anonymous one gets the text only.
       const sessionUser = req.user;
+      /** @type {GenerateResponse["savedPlan"]} */
       let savedPlan = null;
 
       if (sessionUser) {

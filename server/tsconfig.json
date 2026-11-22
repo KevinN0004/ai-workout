@@ -5,6 +5,7 @@
   // they are, so nothing is built from this file. `lib` leaves out the DOM, and
   // `types` loads Node's from @types/node, held at the major of the oldest Node
   // that `engines` allows, so a checked file cannot use an API that Node lacks.
+  // The tests are checked by `tsconfig.test.json`.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -17,5 +18,6 @@
     "lib": ["esnext"],
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.js", "src/**/__tests__/**"]
 }

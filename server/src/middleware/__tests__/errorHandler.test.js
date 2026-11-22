@@ -1,3 +1,4 @@
+// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createErrorHandler } from "../errorHandler.js";
 
@@ -19,37 +20,55 @@ let captureException;
 const build = (overrides = {}) =>
   createErrorHandler({ logger, toShortText, captureException, ...overrides });
 
+// statusCode and body start null, and status() and json() set them before any
+// test reads them. The handler touches nothing else on a Response, so the fake
+// is cast through unknown.
 const buildRes = ({ headersSent = false } = {}) => {
-  const res = {
-    headersSent,
-    statusCode: null,
-    body: null,
-    status: vi.fn((code) => {
-      res.statusCode = code;
-      return res;
-    }),
-    json: vi.fn((payload) => {
-      res.body = payload;
-      return res;
-    })
-  };
+  const res =
+    /** @type {import("express").Response & { body: import("../../services/http/errorResponseService.js").ErrorBody }} */ (
+      /** @type {unknown} */ ({
+        headersSent,
+        statusCode: null,
+        body: null,
+        status: vi.fn((code) => {
+          res.statusCode = code;
+          return res;
+        }),
+        json: vi.fn((payload) => {
+          res.body = payload;
+          return res;
+        })
+      })
+    );
   return res;
 };
 
-const buildReq = (overrides = {}) => ({
-  requestId: "req-1",
-  method: "POST",
-  originalUrl: "/api/dashboard/workout-sessions",
-  ...overrides
-});
+// Each request here holds only the fields the handler reads.
+/** @param {Partial<import("express").Request>} [overrides] */
+const buildReq = (overrides = {}) =>
+  /** @type {import("express").Request} */ ({
+    requestId: "req-1",
+    method: "POST",
+    originalUrl: "/api/dashboard/workout-sessions",
+    ...overrides
+  });
 
+/**
+ * @param {string} message
+ * @param {unknown} [status]
+ */
 const errorWith = (message, status) => {
+  /** @type {Error & { status?: unknown }} */
   const err = new Error(message);
   if (status !== undefined) err.status = status;
   return err;
 };
 
-// Runs the middleware and hands back everything worth asserting on.
+/**
+ * Runs the middleware and hands back everything worth asserting on.
+ * @param {unknown} err
+ * @param {{ req?: import("express").Request, res?: ReturnType<typeof buildRes>, handler?: ReturnType<typeof build> }} [options]
+ */
 const handle = (err, { req = buildReq(), res = buildRes(), handler = build() } = {}) => {
   const next = vi.fn();
   handler(err, req, res, next);
@@ -128,6 +147,7 @@ describe("createErrorHandler", () => {
       ["fractional", 500.5],
       ["null", null]
     ])("defaults to a masked 500 when the status is %s", (_label, status) => {
+      /** @type {Error & { status?: unknown }} */
       const err = new Error("connection terminated unexpectedly");
       err.status = status;
 
@@ -231,7 +251,11 @@ describe("createErrorHandler", () => {
 
     test("prefers originalUrl but falls back to url", () => {
       handle(errorWith("boom", 500), {
-        req: { requestId: "r", method: "GET", url: "/fallback" }
+        req: /** @type {import("express").Request} */ ({
+          requestId: "r",
+          method: "GET",
+          url: "/fallback"
+        })
       });
 
       expect(logEntry().path).toBe("/fallback");
@@ -244,7 +268,9 @@ describe("createErrorHandler", () => {
     });
 
     test("sends an empty string rather than undefined when there is none", () => {
-      const { res } = handle(errorWith("boom", 500), { req: { method: "GET", url: "/x" } });
+      const { res } = handle(errorWith("boom", 500), {
+        req: /** @type {import("express").Request} */ ({ method: "GET", url: "/x" })
+      });
 
       expect(res.body.requestId).toBe("");
     });
@@ -278,7 +304,15 @@ describe("createErrorHandler", () => {
     test("survives an undefined request", () => {
       const res = buildRes();
 
-      expect(() => build()(errorWith("boom", 500), undefined, res, vi.fn())).not.toThrow();
+      // A request Express never passes, so it is cast through unknown.
+      expect(() =>
+        build()(
+          errorWith("boom", 500),
+          /** @type {import("express").Request} */ (/** @type {unknown} */ (undefined)),
+          res,
+          vi.fn()
+        )
+      ).not.toThrow();
       expect(res.statusCode).toBe(500);
       expect(res.body.requestId).toBe("");
     });

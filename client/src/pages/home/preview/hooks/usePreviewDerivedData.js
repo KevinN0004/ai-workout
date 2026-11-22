@@ -315,6 +315,7 @@ export default function usePreviewDerivedData({
       .slice(0, 3);
     const todayDuration = todayPlan.meta.split(" - ")[0].trim();
 
+    /** @type {(typeof previewWeekPlan)[number] | null} */
     let nextTrainingPlan = null;
     for (let offset = 1; offset <= PREVIEW_WEEK_DAY_ORDER.length; offset += 1) {
       const nextIndex = (todayIndex + offset) % PREVIEW_WEEK_DAY_ORDER.length;
