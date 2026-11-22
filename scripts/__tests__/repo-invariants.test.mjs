@@ -902,7 +902,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 178;
+  const TYPE_CHECKED_FILES = 202;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -971,16 +971,20 @@ describe("type-checked files", () => {
     expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
 
+  // D1 phase 5: the client's pages are checked whole, so a page file added there
+  // is checked from its first commit (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).
+  test("every page file is checked", () => {
+    const pages = sources.filter(
+      ({ file }) => file.startsWith("client/src/pages/") && !isTest(file)
+    );
+    expect(pages.length, "the sweep found too few page files").toBeGreaterThanOrEqual(84);
+    const unchecked = pages.filter((source) => !checked.includes(source)).map(({ file }) => file);
+    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
+  });
+
   // D1 phase 5: each answer the client reads is cast in place, the answer through
   // Wire (which fails the typecheck on a field JSON would not deliver as typed) and
   // a refusal to ErrorBody (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).
-  // The page reads are cast as each page is checked; Task 7 of the plan empties this.
-  const UNCAST_PAGE_READS = [
-    "client/src/pages/dashboard/hooks/useOlderLogPages.js",
-    "client/src/pages/dashboard/hooks/useProgression.js",
-    "client/src/pages/dashboard/meal/useMealDbSearch.js"
-  ];
-
   test("every .json() read in the client is cast", () => {
     const reads = sources
       .filter(({ file }) => file.startsWith("client/src/") && !isTest(file))
@@ -994,7 +998,6 @@ describe("type-checked files", () => {
       });
     expect(reads.length, "the sweep found too few reads").toBeGreaterThanOrEqual(35);
     const bad = reads
-      .filter(({ file }) => !UNCAST_PAGE_READS.includes(file))
       .filter(({ cast }) => !cast || !(cast === "ErrorBody" || cast.includes("Wire<")))
       .map(({ file, cast }) => `${file}: ${cast ?? "no cast"}`);
     expect(bad, "cast each answer to Wire<XResponse> and each refusal to ErrorBody").toEqual([]);

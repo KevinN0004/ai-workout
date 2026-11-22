@@ -2,6 +2,7 @@
  * The meal log: a form for one meal's date, type, name, calories, macros and
  * notes, with the latest entries beneath it. Rendered by MealView.
  */
+// @ts-check
 import { getLocalDateKey } from "../../../app/units";
 
 /**
@@ -11,6 +12,7 @@ import { getLocalDateKey } from "../../../app/units";
  * today's local date (getLocalDateKey, as the other log forms do) and a meal
  * type where the form has none, then focuses the name field through
  * `mealLogNameInputRef`.
+ * @param {{ safeMealLogForm: import("../DashboardPage.jsx").DashboardPageProps["mealLogForm"], safeMealLogs: import("../DashboardPage.jsx").DashboardMetrics["mealLogs"], updateMealLogForm: import("../DashboardPage.jsx").DashboardPageProps["setMealLogForm"], onSubmitMealLog: (event: import("react").FormEvent<HTMLFormElement>) => void, mealLogNameInputRef: import("react").RefObject<HTMLInputElement | null> }} props
  */
 export default function MealLogPanel({
   safeMealLogForm,

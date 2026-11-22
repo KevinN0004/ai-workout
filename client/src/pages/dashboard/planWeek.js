@@ -3,9 +3,13 @@
  * which of its training days are done, missed, today's or still to come.
  * Called by useDashboardMetrics for the summary's weekly card.
  */
+// @ts-check
 import { weekDays } from "../../app/constants";
 import { isRestDay, readPlan } from "../../app/plans";
 
+/** @typedef {import("../../app/dashboard.js").Dashboard} Dashboard */
+
+/** @param {Date} date */
 const toDateKey = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -14,6 +18,7 @@ const toDateKey = (date) => {
 };
 
 // The local date a plan was saved on, or "" when its timestamp does not parse.
+/** @param {string} createdAt */
 const savedOnKey = (createdAt) => {
   const saved = new Date(createdAt);
   return Number.isNaN(saved.getTime()) ? "" : toDateKey(saved);
@@ -33,6 +38,7 @@ const savedOnKey = (createdAt) => {
  *
  * Returns the days with the `planned`, `done` and `missed` counts, or null with
  * no plan.
+ * @param {{ plan: Pick<Dashboard["plans"][number], "id" | "payload" | "plan" | "createdAt"> | undefined, workouts: Array<Pick<Dashboard["workouts"][number], "date" | "planId" | "planDayIndex">>, today: Date }} week
  */
 export const buildPlanWeek = ({ plan, workouts, today }) => {
   if (!plan) return null;
@@ -65,6 +71,7 @@ export const buildPlanWeek = ({ plan, workouts, today }) => {
     }
   }
 
+  /** @param {{ key: string, date: string }} day */
   const stateOf = ({ key, date }) => {
     if (!trainingDays.some((day) => day.weekday === key)) return "rest";
     if (date < savedOn) return "unplanned";
@@ -73,6 +80,7 @@ export const buildPlanWeek = ({ plan, workouts, today }) => {
     return date === todayKey ? "today" : "upcoming";
   };
   const days = week.map((day) => ({ ...day, state: stateOf(day) }));
+  /** @param {...string} states */
   const count = (...states) => days.filter((day) => states.includes(day.state)).length;
 
   return {

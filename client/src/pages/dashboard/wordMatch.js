@@ -3,12 +3,15 @@
  * injury flags and the categories today's plan favours. Used by planUtils.js and
  * tips/recommendationUtils.js.
  */
+// @ts-check
 
 /**
  * True when lower-cased `text` holds any of `forms` as a whole word, never
  * inside a longer one, so "cut" is not found in "execute". `forms` are
  * lower-case words or phrases of letters and spaces; each spelling to accept, a
  * plural included, is listed.
+ * @param {string} text
+ * @param {string[]} forms
  */
 export const hasWord = (text, forms) =>
   new RegExp(String.raw`\b(?:${forms.join("|")})\b`).test(text);

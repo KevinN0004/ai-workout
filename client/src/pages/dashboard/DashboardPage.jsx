@@ -3,6 +3,7 @@
  * with the toast, the workout modal and App's planner modal. Rendered by App
  * on /dashboard and every path under it.
  */
+// @ts-check
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import SummaryView from "./views/SummaryView";
 import DashboardHeader from "./components/DashboardHeader";
@@ -103,6 +104,7 @@ const TipsView = lazy(() => import("./views/TipsView"));
 const SettingsView = lazy(() => import("./views/SettingsView"));
 const DashboardHomeView = lazy(() => import("./views/DashboardHomeView"));
 
+/** @type {Record<string, string>} */
 const DASH_VIEW_TO_ROUTE = {
   summary: "/dashboard",
   workouts: "/dashboard/workouts",
@@ -147,6 +149,7 @@ const DASH_VIEW_ORDER = [
  * and Logs views, which start an in-gym session, and `onPlanChanged` the Plans
  * view, which swaps a plan's exercises. Signed out, it renders the header alone,
  * which offers sign-in.
+ * @param {DashboardPageProps} props
  */
 export default function DashboardPage({
   user,
@@ -209,7 +212,7 @@ export default function DashboardPage({
 }) {
   // ---- Profile menu, metrics and the next workout ---------------------------
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const profileMenuRef = useRef(null);
+  const profileMenuRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const {
     calories,
     mealLogs,
@@ -253,6 +256,7 @@ export default function DashboardPage({
   // dated today is today's in every time zone. A missing or unparseable date
   // is 0, long past.
   const nextWorkout = useMemo(() => {
+    /** @param {string} value */
     const parseDateAsTime = (value) => parseDateValue(value)?.getTime() || 0;
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -283,11 +287,14 @@ export default function DashboardPage({
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
 
+    /** @param {MouseEvent} event */
     const closeProfileMenuOnOutsideClick = (event) => {
-      if (!profileMenuRef.current?.contains(event.target)) {
+      // A mousedown's target is a node of the document.
+      if (!profileMenuRef.current?.contains(/** @type {Node} */ (event.target))) {
         setProfileMenuOpen(false);
       }
     };
+    /** @param {KeyboardEvent} event */
     const closeProfileMenuOnEscape = (event) => {
       if (event.key === "Escape") {
         setProfileMenuOpen(false);
@@ -315,6 +322,10 @@ export default function DashboardPage({
 
   // The links between views go through here, so the view and the URL move
   // together.
+  /**
+   * @param {string} nextView
+   * @param {{ closeDrawer?: boolean }} [options]
+   */
   const navigateDashView = (nextView, { closeDrawer = false } = {}) => {
     setDashView(nextView);
     go(DASH_VIEW_TO_ROUTE[nextView] || "/dashboard");
@@ -326,6 +337,7 @@ export default function DashboardPage({
   const weatherRecommendation = weatherData?.recommendation || null;
   const airSummary = airQualityData?.summary || null;
   const caloriesGap = Math.round(calorieGoal - avgCalories);
+  /** @param {number | null} timestamp */
   const formatRelativeUpdatedAt = (timestamp) => {
     if (!timestamp) return "Not updated yet";
     const diffMs = Math.max(Date.now() - Number(timestamp), 0);
@@ -631,7 +643,8 @@ export default function DashboardPage({
                 onClick={() => {
                   // Cleared before the action runs, so a toast the action shows
                   // (a successful Undo shows one) is not cleared with it.
-                  const action = dashboardToast.onAction;
+                  // The button shows only for a toast whose onAction is a function.
+                  const action = /** @type {() => void} */ (dashboardToast.onAction);
                   clearDashboardToast();
                   action();
                 }}

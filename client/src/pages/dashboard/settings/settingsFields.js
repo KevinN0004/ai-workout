@@ -3,6 +3,7 @@
  * options or bounds. Read by SettingsView, which renders them through
  * SettingsEditForm.
  */
+// @ts-check
 import {
   activityOptions,
   cardioOptions,
@@ -18,8 +19,24 @@ import {
 // are the keys, so the multiselect offers those rather than the objects.
 const trainingDayOptions = weekDays.map((day) => day.key);
 
+/** @typedef {typeof import("../../../app/constants.js").defaultPersonalForm} PersonalForm */
+
+/**
+ * One field of a settings tab, by its input type: a text field's length, a
+ * number's bounds (per unit for height and weight), or a select's options.
+ * @typedef {{ name: keyof PersonalForm, label: string } & (
+ *   | { type: "text" | "textarea", maxLength: number }
+ *   | { type: "number", bounds: [number, number] }
+ *   | { type: "select", options: string[] }
+ *   | { type: "multiselect", name: "trainingDays", options: string[] }
+ *   | { type: "height", bounds: { cm: [number, number], ft: [number, number], in: [number, number] } }
+ *   | { type: "weight", bounds: { kg: [number, number], lb: [number, number] } }
+ * )} SettingsField
+ */
+
 export const EDITABLE_TABS = ["profile", "training", "lifestyle"];
 
+/** @type {Record<"profile" | "training" | "lifestyle", SettingsField[]>} */
 const FIELDS_BY_TAB = {
   profile: [
     { name: "name", label: "Name", type: "text", maxLength: 80 },
@@ -59,5 +76,10 @@ const FIELDS_BY_TAB = {
   ]
 };
 
-/** The fields of a settings tab, or none for a tab that is not editable. */
-export const fieldsForTab = (tabId) => FIELDS_BY_TAB[tabId] || [];
+/**
+ * The fields of a settings tab, or none for a tab that is not editable: any
+ * other tab id reads undefined from the table, which `|| []` turns into none.
+ * @param {string} tabId
+ */
+export const fieldsForTab = (tabId) =>
+  FIELDS_BY_TAB[/** @type {keyof typeof FIELDS_BY_TAB} */ (tabId)] || [];

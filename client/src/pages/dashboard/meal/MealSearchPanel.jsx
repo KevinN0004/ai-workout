@@ -3,11 +3,13 @@
  * and the no-results state. Rendered by MealView, which shows the results
  * themselves as the first course in MealSections.
  */
+// @ts-check
 
 /**
  * Driven by useMealDbSearch, through MealView. Submitting a query starts the
  * search and empties the box; "Try chicken" (`onTryDefaultSearch`) runs that
  * search and leaves the word in the box.
+ * @param {Pick<ReturnType<typeof import("./useMealDbSearch.js").default>, "mealDbInput" | "setMealDbInput" | "mealDbLoading" | "mealDbError" | "mealDbQuery" | "mealDbMeals"> & { onSubmitMealDbSearch: (event: import("react").FormEvent<HTMLFormElement>) => void, onTryDefaultSearch: () => void }} props
  */
 export default function MealSearchPanel({
   mealDbInput,

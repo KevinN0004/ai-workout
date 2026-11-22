@@ -37,9 +37,9 @@ export default function MealView({
   mealLogs
 }) {
   // ---- State ----------------------------------------------------------------
-  const [activeMealId, setActiveMealId] = useState(null);
+  const [activeMealId, setActiveMealId] = useState(/** @type {string | null} */ (null));
   const [activeCourseKey, setActiveCourseKey] = useState(COURSE_ALL_KEY);
-  const mealLogNameInputRef = useRef(null);
+  const mealLogNameInputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
 
   // ---- Meal log props, with stand-ins ---------------------------------------
   const safeMealLogs = Array.isArray(mealLogs) ? mealLogs : [];

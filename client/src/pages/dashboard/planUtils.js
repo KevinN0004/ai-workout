@@ -3,6 +3,7 @@
  * week of meals (meal, plans and tips views, useDashboardMetrics), and the
  * workout form's pre-fill from a plan day, shaped by the week's progression.
  */
+// @ts-check
 import { newCard } from "../../app/exerciseSets";
 import { isRestDay } from "../../app/plans";
 import { hasWord } from "./wordMatch";
@@ -97,7 +98,11 @@ const WEEKLY_MEAL_TEMPLATES = {
 
 // The words that put a goal on each track, tried in this order. Each is matched
 // as a whole word, with the forms a goal might use listed.
-/** @type {Array<[string, string[]]>} */
+/**
+ * A goal's track.
+ * @typedef {"lean_strength" | "fat_loss" | "endurance" | "recovery"} Track
+ */
+/** @type {Array<[Track, string[]]>} */
 const TRACK_WORDS = [
   ["fat_loss", ["fat loss", "cut", "cuts", "cutting", "conditioning"]],
   [
@@ -136,6 +141,9 @@ export const detectTrack = (goalText = "") => {
  * or gains a little on endurance. A rest day keeps it on endurance and
  * otherwise gets a little less, but never less than a floor, even when that
  * floor is above the base.
+ * @param {Track} track
+ * @param {unknown} baseCalories
+ * @param {boolean} trainingDay
  */
 export const getDailyCalories = (track, baseCalories, trainingDay) => {
   const base = Number(baseCalories) || 2200;
@@ -199,6 +207,7 @@ const PREFILL_MAX_NOTES = 500;
 // (a rest, a ramp-up of the lift after it, a cool-down) or a name longer than
 // an exercise can hold. A comma in a name stays: each name is its own card.
 const NOT_AN_EXERCISE = /^(rest|ramp-up|easy breathing|easy cooldown)\b/i;
+/** @param {string} line */
 const exerciseNameOf = (line) => {
   if (!line.startsWith("- ")) return "";
   const name = line
@@ -213,12 +222,14 @@ const exerciseNameOf = (line) => {
 
 // A prescribed range as a placeholder reads it: "8-10", or "6" when it is one
 // value; "" for none.
+/** @param {{ min: number, max: number } | null} range */
 const rangeText = (range) =>
   range ? (range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`) : "";
 
 /**
  * A lift's key, as the server keys the week's progression (roadmap B4): its
  * name trimmed and lower-cased.
+ * @param {unknown} name
  */
 export const liftKeyOf = (name) =>
   String(name ?? "")
@@ -228,12 +239,17 @@ export const liftKeyOf = (name) =>
 /**
  * An exercise's sets in a deload week: half, rounded up, and at least one, as
  * the server's progression rules prescribe them.
+ * @param {number} sets
  */
 export const deloadSets = (sets) => Math.max(1, Math.ceil(sets / 2));
 
 // The load a lift's card offers as its placeholder: the week's target, or the
 // load it is at while an asked step up waits for its answer; null for a lift
 // with no load to set.
+/**
+ * @param {NonNullable<import("../../app/network.js").Wire<import("../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"]>["lifts"][number] | undefined} lift
+ * @param {"kg" | "lb"} unit
+ */
 const weekLoadOf = (lift, unit) => {
   const load = lift?.[unit];
   if (!load) return null;
@@ -244,11 +260,19 @@ const weekLoadOf = (lift, unit) => {
 // its targets as placeholders. Every row opens empty. With the week's
 // progression, a lift opens with the week's sets and load, and in a deload
 // week every other exercise at half its sets.
+/**
+ * @param {import("../../app/plans.js").Prescription} prescription
+ * @param {import("../../app/network.js").Wire<import("../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null} week
+ * @param {"kg" | "lb"} unit
+ */
 const cardFromPrescription = (prescription, week, unit) => {
   const lift = prescription.reps
     ? week?.lifts.find((entry) => entry.key === liftKeyOf(prescription.name))
     : undefined;
-  const lightWeek = Boolean(week?.deloadWeek?.active) && week.deloadWeek.decision === null;
+  // Boolean() does not narrow: the left side has already found the week.
+  const lightWeek =
+    Boolean(week?.deloadWeek?.active) &&
+    /** @type {NonNullable<typeof week>} */ (week).deloadWeek.decision === null;
   const load = weekLoadOf(lift, unit);
   return newCard({
     name: prescription.name,

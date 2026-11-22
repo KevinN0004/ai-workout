@@ -3,6 +3,7 @@
  * docs/specs/2026-11-12-strava-import-design.md): connect with Strava's own
  * button, the connection and its last sync, Sync now, and the disconnect.
  */
+// @ts-check
 import { useEffect, useRef, useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
@@ -20,6 +21,7 @@ import "./SettingsStravaPanel.css";
 
 // One line per result the server's redirect from Strava can carry
 // (registerStravaRoutes.js, the callback).
+/** @type {Record<string, string>} */
 const RESULT_MESSAGES = {
   connected: "Strava is connected. New activities will arrive here.",
   cancelled: "Connecting Strava was cancelled.",
@@ -38,16 +40,20 @@ const resultMessage = (result) =>
 
 // What a sync answered, in words: skipped inside the throttle, not finished,
 // or the counts.
+/** @param {Awaited<ReturnType<typeof syncStrava>>} answer */
 const syncMessage = (answer) => {
   if (answer.skipped) return "Synced a moment ago. Try again in a minute.";
   if (answer.error) return "The sync didn't finish. Try again later.";
   if (!syncChangedWorkouts(answer)) return "Sync finished. Nothing new.";
-  const { imported, updated, removed } = answer;
+  // A sync neither skipped nor failed answers its counts.
+  const { imported, updated, removed } =
+    /** @type {Extract<typeof answer, { imported: number }>} */ (answer);
   return `Sync finished: ${imported} new, ${updated} updated, ${removed} removed.`;
 };
 
 // A sync time later than this device's clock reads as just now: the server's
 // clock can run ahead.
+/** @param {string | null | undefined} iso */
 const lastSyncedText = (iso) =>
   iso ? `Last synced ${describeAge(Date.parse(iso), Date.now()) || "just now"}` : "Not synced yet";
 
@@ -59,10 +65,13 @@ const lastSyncedText = (iso) =>
  * visitor back with a result, which shows once. A sync that changed workouts,
  * and a disconnect, call `onImportsChange` (App's reloadDashboard), since the
  * dashboard's copy is then stale. Offline, every action is disabled.
+ * @param {Pick<import("../DashboardPage.jsx").DashboardPageProps, "apiFetch"> & { onImportsChange: () => void }} props
  */
 export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
   const offline = useConnection() === "offline";
-  const [state, setState] = useState(null);
+  const [state, setState] = useState(
+    /** @type {Awaited<ReturnType<typeof fetchStravaState>> | null} */ (null)
+  );
   const [loadError, setLoadError] = useState("");
   // The action running: "connect", "sync" or "disconnect", or "".
   const [busy, setBusy] = useState("");
@@ -71,7 +80,7 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
   );
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
-  const cancelRef = useRef(null);
+  const cancelRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
   const blocked = Boolean(busy) || offline;
 
   // Loads the connection on opening the tab.
@@ -95,7 +104,8 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
   // Revealing the confirm unmounts Disconnect, which had focus; Cancel takes
   // it, the choice that changes nothing (as SettingsAccountPanel does).
   useEffect(() => {
-    if (confirming) cancelRef.current.focus();
+    // Confirming renders Cancel, which holds the ref.
+    if (confirming) /** @type {HTMLButtonElement} */ (cancelRef.current).focus();
   }, [confirming]);
 
   // After a sync or a disconnect, the state is read again for its new time,
@@ -108,7 +118,7 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
     try {
       window.location.assign(await startStravaConnect(apiFetch));
     } catch (err) {
-      setError(err.message);
+      setError(/** @type {Error} */ (err).message);
       setBusy("");
     }
   };
@@ -123,7 +133,7 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
       if (syncChangedWorkouts(answer)) onImportsChange();
       await reload();
     } catch (err) {
-      setError(err.message);
+      setError(/** @type {Error} */ (err).message);
     }
     setBusy("");
   };
@@ -139,22 +149,35 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
       onImportsChange();
       await reload();
     } catch (err) {
-      setError(err.message);
+      setError(/** @type {Error} */ (err).message);
     }
     setBusy("");
   };
 
+  // Rendered only once the state has loaded, and connected.
   const renderConnected = () => (
     <>
-      <p>{state.athleteName ? `Connected as ${state.athleteName}` : "Connected to Strava"}</p>
-      <p className="muted">{lastSyncedText(state.lastSyncedAt)}</p>
-      {state.needsReconnect ? (
-        <p>Strava needs you to connect again before it can sync.</p>
-      ) : (
-        state.lastSyncError && (
-          <p className="muted">The last sync didn&apos;t finish. It will try again.</p>
+      <p>
+        {
+          /** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).athleteName
+            ? `Connected as ${/** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).athleteName}`
+            : "Connected to Strava"
+        }
+      </p>
+      <p className="muted">
+        {lastSyncedText(
+          /** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).lastSyncedAt
+        )}
+      </p>
+      {
+        /** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).needsReconnect ? (
+          <p>Strava needs you to connect again before it can sync.</p>
+        ) : (
+          /** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).lastSyncError && (
+            <p className="muted">The last sync didn&apos;t finish. It will try again.</p>
+          )
         )
-      )}
+      }
       {confirming ? (
         <div className="settings-strava-confirm">
           <p>Your workouts imported from Strava will be removed.</p>
@@ -176,15 +199,17 @@ export default function SettingsStravaPanel({ apiFetch, onImportsChange }) {
         </div>
       ) : (
         <div className="settings-strava-actions">
-          {state.needsReconnect ? (
-            <button type="button" className="cta" onClick={connect} disabled={blocked}>
-              Reconnect Strava
-            </button>
-          ) : (
-            <button type="button" className="cta" onClick={sync} disabled={blocked}>
-              {busy === "sync" ? "Syncing..." : "Sync now"}
-            </button>
-          )}
+          {
+            /** @type {Awaited<ReturnType<typeof fetchStravaState>>} */ (state).needsReconnect ? (
+              <button type="button" className="cta" onClick={connect} disabled={blocked}>
+                Reconnect Strava
+              </button>
+            ) : (
+              <button type="button" className="cta" onClick={sync} disabled={blocked}>
+                {busy === "sync" ? "Syncing..." : "Sync now"}
+              </button>
+            )
+          }
           <button
             type="button"
             className="ghost"

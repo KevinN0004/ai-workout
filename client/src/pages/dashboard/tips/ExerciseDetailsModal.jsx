@@ -3,6 +3,7 @@
  * description, why it was recommended and its videos, with a Save button.
  * Rendered by TipsView.
  */
+// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
@@ -13,6 +14,7 @@ import { getExerciseImage, resolveMediaUrl } from "./recommendationUtils";
  * `recommendation` attached by ExerciseTile, and its reasons are listed;
  * `onSave` receives the exercise and that recommendation. Offline, Save is
  * disabled: a saved exercise cannot be kept for later.
+ * @param {{ selectedExercise: (import("../views/TipsView.jsx").LibraryItem & { recommendation?: { reasons?: string[] } }) | null, onClose: () => void, onSave: (exercise: import("../views/TipsView.jsx").LibraryItem, recommendation?: { reasons?: string[] }) => unknown, isSaved: boolean, isSaving: boolean }} props
  */
 export default function ExerciseDetailsModal({
   selectedExercise,
