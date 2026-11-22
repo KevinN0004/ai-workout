@@ -2,11 +2,24 @@
  * Helpers for the meal view: the calorie band, the broken-photo fallback, and
  * shaping and deduplicating MealDB meals. Used by MealView and useMealDbSearch.
  */
+// @ts-check
 import { FALLBACK_IMAGE } from "./data";
+
+/**
+ * A meal as the meal view shows it: normalized, with the portion note for the
+ * day's calorie band.
+ * @typedef {ReturnType<typeof normalizeMealDbMeal> & { portionNote: string }} MealCard
+ */
+
+/**
+ * The search results, or one course of suggestions.
+ * @typedef {{ key: string, title: string, subtitle: string, meals: MealCard[] }} MealSection
+ */
 
 /**
  * Buckets a daily calorie target as "light", "balanced" or "high", the keys a
  * meal's `portionByCalorie` is read with. MealView always passes a number.
+ * @param {number} targetCalories
  */
 export const getCalorieBand = (targetCalories) => {
   if (targetCalories < 2000) return "light";
@@ -18,6 +31,7 @@ export const getCalorieBand = (targetCalories) => {
  * An `onError` handler for a meal photo: swaps in FALLBACK_IMAGE. What keeps it
  * from looping is that the fallback is inline and loads; clearing `onerror`
  * does not detach React's handler, which React attaches with addEventListener.
+ * @param {import("react").SyntheticEvent<HTMLImageElement>} event
  */
 export const handleImageError = (event) => {
   event.currentTarget.onerror = null;
@@ -31,6 +45,7 @@ export const handleImageError = (event) => {
  * `calories` null when absent, and the ingredient and recipe-link lists kept to
  * usable entries and capped. Every other field passes through untouched.
  * Callers drop a meal left without an id or a title.
+ * @param {import("../../../../../server/src/services/external/externalDataService.js").MealDbMeal} [meal]
  */
 export const normalizeMealDbMeal = (meal = {}) => {
   const id = typeof meal?.id === "string" ? meal.id.trim() : "";
@@ -69,6 +84,10 @@ export const normalizeMealDbMeal = (meal = {}) => {
  * Drops repeats by id, or by title for a meal without one, and drops a meal
  * with neither. Sharing one `seenKeys` across calls dedupes across them, which
  * is how useMealDbSearch keeps a meal to the first suggestion section with it.
+ * @template {{ id?: unknown, title?: unknown }} T
+ * @param {T[]} items
+ * @param {Set<unknown>} [seenKeys]
+ * @returns {T[]}
  */
 export const dedupeMeals = (items, seenKeys = new Set()) => {
   const unique = [];

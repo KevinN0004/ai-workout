@@ -3,17 +3,21 @@
  * averages and goal progress, the week and month trend series, today's planned
  * workout and meals, and this week of the plan. Called by DashboardPage.
  */
+// @ts-check
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
 import { buildPlanWeek } from "../planWeek";
 import { buildLinePath } from "../../../app/linePath";
 import { toNumberOrNull } from "../../../app/units";
 
+/** @typedef {import("../../../app/dashboard.js").Dashboard} Dashboard */
+
 /**
  * A date value as a Date, or null when it is missing or does not parse. A bare
  * YYYY-MM-DD is read as local midnight: `new Date` would read it as UTC
  * midnight, which west of UTC falls on the previous local day. DashboardPage
  * reads the next workout's date through it too.
+ * @param {string | number | Date | null | undefined} value
  */
 export const parseDateValue = (value) => {
   if (!value) return null;
@@ -25,6 +29,7 @@ export const parseDateValue = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+/** @param {Date} date */
 const toDateKey = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -32,8 +37,14 @@ const toDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ */
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+/** @param {unknown} value */
 const toText = (value) => (value === null || value === undefined ? "" : String(value).trim());
 
 // One coercion for every reading that gets summed, so the accumulation loops
@@ -46,6 +57,7 @@ const toText = (value) => (value === null || value === undefined ? "" : String(v
 // Such a row contributes 0. A measured 0 is untouched: it is a real reading and
 // still counts in the average's divisor, so it must keep pulling the average
 // down.
+/** @param {unknown} value */
 const toMetricNumber = (value) => {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -53,6 +65,12 @@ const toMetricNumber = (value) => {
 
 // Keeps the first row for each id, or for each content key when a row has no
 // id. A row with neither is kept.
+/**
+ * @template {{ id?: unknown }} T
+ * @param {T[]} items
+ * @param {(item: T) => string} fallbackKeyBuilder
+ * @returns {T[]}
+ */
 const buildDedupedList = (items, fallbackKeyBuilder) => {
   const source = Array.isArray(items) ? items : [];
   const seen = new Set();
@@ -68,6 +86,7 @@ const buildDedupedList = (items, fallbackKeyBuilder) => {
   return deduped;
 };
 
+/** @param {Dashboard["workouts"][number]} item */
 const workoutFallbackKey = (item) => {
   const exercises = Array.isArray(item?.exercises) ? item.exercises.join("|") : "";
   return [
@@ -85,11 +104,14 @@ const workoutFallbackKey = (item) => {
     .join("::");
 };
 
+// A pending calorie entry carries createdAt (events.js); a saved one does not.
+/** @param {Dashboard["calories"][number] & { createdAt?: string }} item */
 const calorieFallbackKey = (item) =>
   [toText(item?.date), toText(item?.calories), toText(item?.source), toText(item?.createdAt)]
     .filter(Boolean)
     .join("::");
 
+/** @param {Dashboard["mealLogs"][number]} item */
 const mealFallbackKey = (item) =>
   [
     toText(item?.date),
@@ -104,6 +126,7 @@ const mealFallbackKey = (item) =>
     .filter(Boolean)
     .join("::");
 
+/** @param {Dashboard["progressMetrics"][number]} item */
 const progressFallbackKey = (item) =>
   [
     toText(item?.date),
@@ -124,6 +147,7 @@ const progressFallbackKey = (item) =>
  * training days. Returns the deduplicated lists, `goals`, app/linePath.js's
  * `buildLinePath` for the charts, and the metrics, all recomputed only when
  * their inputs change.
+ * @param {{ dashboard: Dashboard | null, goalForm: import("../../../app/requestBodies.js").GoalsForm, formGoal: string | undefined, weekDays: typeof import("../../../app/constants.js").weekDays, latestPlanByWeekday: ReturnType<typeof import("../../../app/plans.js").extractLatestPlanByWeekday> }} input
  */
 export default function useDashboardMetrics({
   dashboard,
@@ -197,13 +221,15 @@ export default function useDashboardMetrics({
     previous7Start.setDate(previous7Start.getDate() - 7);
     const previous7End = new Date(last7Cutoff);
     previous7End.setDate(previous7End.getDate() - 1);
+    /** @param {Date | null} value */
     const inLast7Days = (value) => Boolean(value && value >= last7Cutoff && value <= todayDate);
+    /** @param {Date | null} value */
     const inPrevious7Days = (value) =>
       Boolean(value && value >= previous7Start && value <= previous7End);
 
     // Per-day totals for the trend series, and each log split into this week
     // and last week. A row whose date does not parse is skipped.
-    const caloriesByDate = {};
+    const caloriesByDate = /** @type {Record<string, number>} */ ({});
     const last7Calories = [];
     const previous7Calories = [];
     for (const item of calories) {
@@ -218,8 +244,8 @@ export default function useDashboardMetrics({
       }
     }
 
-    const workoutsByDate = {};
-    const workoutMinutesByDate = {};
+    const workoutsByDate = /** @type {Record<string, number>} */ ({});
+    const workoutMinutesByDate = /** @type {Record<string, number>} */ ({});
     const last7Workouts = [];
     const previous7Workouts = [];
     for (const item of workouts) {
@@ -249,6 +275,7 @@ export default function useDashboardMetrics({
     const calorieProgress = Math.min(100, Math.round((avgCalories / calorieGoal) * 100));
 
     // Trend series for the week and month charts, one point per day.
+    /** @param {number} days */
     const buildRangeKeys = (days) =>
       Array.from({ length: days }, (_, index) => {
         const date = new Date(todayDate);
@@ -256,6 +283,7 @@ export default function useDashboardMetrics({
         return toDateKey(date);
       });
 
+    /** @param {string} key */
     const formatRangeLabel = (key) => {
       const parsedDate = parseDateValue(key);
       return parsedDate
@@ -267,6 +295,7 @@ export default function useDashboardMetrics({
     // distance from the calorie goal and its training minutes each cost points,
     // each up to a cap; a rest day earns a few; and the result is clamped. A day
     // with no calorie entry counts as on goal.
+    /** @param {string} key */
     const buildRecoveryScore = (key) => {
       const dailyCalories = caloriesByDate[key] || calorieGoal;
       const caloriePenalty = Math.min(
@@ -279,6 +308,7 @@ export default function useDashboardMetrics({
       return Math.round(clamp(78 - caloriePenalty - loadPenalty + restBonus, 30, 95));
     };
 
+    /** @param {string[]} keys */
     const buildTrendSet = (keys) => {
       const caloriesSeries = keys.map((key) => caloriesByDate[key] || 0);
       const workoutSeries = keys.map((key) => workoutsByDate[key] || 0);
@@ -351,8 +381,17 @@ export default function useDashboardMetrics({
     // latest, for losing or gaining. The target is absent until the user saves
     // one, and toNumberOrNull keeps an absent one from reading as 0 lb.
     const targetWeight = toNumberOrNull(goals?.targetWeight);
-    const firstWeight =
-      weightTrendCandidates.length > 0 ? Number(weightTrendCandidates.at(-1).weightLb) : null;
+    // at(-1) of a list that is not empty is its last row. firstWeight is null
+    // only when no weight is logged, and weightProgress returns before reading it
+    // then, so it is typed a number.
+    const firstWeight = /** @type {number} */ (
+      weightTrendCandidates.length > 0
+        ? Number(
+            /** @type {Dashboard["progressMetrics"][number]} */ (weightTrendCandidates.at(-1))
+              .weightLb
+          )
+        : null
+    );
     const weightProgress = (() => {
       if (targetWeight === null) return { state: "no-target", target: null };
       if (latestWeight === null) return { state: "no-weight", target: targetWeight };
@@ -378,7 +417,12 @@ export default function useDashboardMetrics({
     const weeklyMealPlan = buildWeeklyMealPlan({
       weekDays,
       latestPlanByWeekday,
-      goalText: latestPlan?.goal || goals?.goalType || formGoal || "Build lean strength and energy",
+      goalText:
+        latestPlan?.goal ||
+        // The server's goals carry no goalType; neither does the goals form.
+        /** @type {typeof goals & { goalType?: string }} */ (goals)?.goalType ||
+        formGoal ||
+        "Build lean strength and energy",
       targetCalories: goals.targetCalories
     });
     const todayWeekday = todayDate.toLocaleDateString("en-US", {

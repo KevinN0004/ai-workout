@@ -29,10 +29,12 @@ export const defaultDashboardData = () => ({
   progressMetrics: [],
   plans: [],
   savedExercises: [],
-  goals: {
+  // No targetWeight: each read takes it through toNumberOrNull, which reads an
+  // absent one as no target.
+  goals: /** @type {Dashboard["goals"]} */ ({
     targetCalories: 2200,
     weeklyWorkouts: 3
-  }
+  })
 });
 
 /**
@@ -58,16 +60,19 @@ export const mergeOptimisticDashboard = (dashboard, optimisticLogEntries) => {
   // the front one at a time would reverse it, and several entries logged in
   // quick succession would render oldest-first.
   const ordered = [...optimisticLogEntries].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  const pendingWorkouts = [];
-  const pendingCalories = [];
-  const pendingMealLogs = [];
+  // A pending entry is drawn as a row of its list until the saved row replaces
+  // it: it holds the log its form built, and a field only the server sets reads
+  // as absent.
+  const pendingWorkouts = /** @type {Dashboard["workouts"]} */ ([]);
+  const pendingCalories = /** @type {Dashboard["calories"]} */ ([]);
+  const pendingMealLogs = /** @type {Dashboard["mealLogs"]} */ ([]);
   for (const entry of ordered) {
     if (entry.type === "workout") {
-      pendingWorkouts.push(entry.item);
+      pendingWorkouts.push(/** @type {Dashboard["workouts"][number]} */ (entry.item));
     } else if (entry.type === "calorie") {
-      pendingCalories.push(entry.item);
+      pendingCalories.push(/** @type {Dashboard["calories"][number]} */ (entry.item));
     } else if (entry.type === "meal") {
-      pendingMealLogs.push(entry.item);
+      pendingMealLogs.push(/** @type {Dashboard["mealLogs"][number]} */ (entry.item));
     }
   }
 

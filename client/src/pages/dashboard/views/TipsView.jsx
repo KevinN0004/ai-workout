@@ -80,7 +80,7 @@ export default function TipsView({
   const [metaError, setMetaError] = useState("");
   const [exercises, setExercises] = useState(/** @type {LibraryItem[]} */ ([]));
   const [selectedExercise, setSelectedExercise] = useState(
-    /** @type {(LibraryExercise & { recommendation?: Recommendation }) | null} */ (null)
+    /** @type {(LibraryItem & { recommendation?: Recommendation }) | null} */ (null)
   );
   const [refreshTick, setRefreshTick] = useState(0);
   const [saveFeedback, setSaveFeedback] = useState("");
@@ -335,7 +335,7 @@ export default function TipsView({
     }
   };
 
-  /** @param {LibraryExercise & { recommendation?: Recommendation }} payload */
+  /** @param {LibraryItem & { recommendation?: Recommendation }} payload */
   const openExerciseModal = (payload) => {
     setSelectedExercise(payload);
   };

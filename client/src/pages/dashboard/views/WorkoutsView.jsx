@@ -93,7 +93,7 @@ const mergeById = (held, older) => {
  * offers Delete behind a confirm, which calls `onDeleteImportedWorkout` with its
  * id (deleteImportedWorkout in events.js, `{ ok }` or `{ ok: false, error }`).
  * Delete needs the server, so it is disabled offline.
- * @param {Pick<DashboardMetrics, "calories" | "mealLogs" | "progressMetrics"> & Pick<DashboardPageProps, "setWorkoutForm" | "setWorkoutModalOpen" | "onStartSession" | "onDeleteImportedWorkout"> & { workouts: DashboardMetrics["recentWorkouts"], pagination: DashboardPageProps["dashboardPagination"], onOpenCalories: () => void, onOpenMeal: () => void }} props
+ * @param {Pick<DashboardMetrics, "mealLogs" | "progressMetrics"> & Pick<DashboardPageProps, "setWorkoutForm" | "setWorkoutModalOpen" | "onStartSession" | "onDeleteImportedWorkout"> & { workouts: Array<DashboardMetrics["recentWorkouts"][number] & { isQueued?: boolean }>, calories: Array<DashboardMetrics["calories"][number] & { isQueued?: boolean }>, pagination: DashboardPageProps["dashboardPagination"], onOpenCalories: () => void, onOpenMeal: () => void }} props
  */
 export default function WorkoutsView({
   workouts,
@@ -335,7 +335,8 @@ export default function WorkoutsView({
                           <div className="workout-import-actions">
                             <a
                               className="workout-strava-link"
-                              href={`https://www.strava.com/activities/${encodeURIComponent(item.externalId)}`}
+                              // A Strava row always has its activity id (migration 008's check).
+                              href={`https://www.strava.com/activities/${encodeURIComponent(/** @type {string} */ (item.externalId))}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

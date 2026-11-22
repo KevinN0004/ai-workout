@@ -3,9 +3,25 @@
  * newest plan, read from the server and answered there. Called by
  * DashboardPage, above its signed-out return.
  */
+// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liftDecisionBody, weekDecisionBody } from "../../../app/requestBodies";
 import { getLocalDateKey } from "../../../app/units";
+
+/**
+ * @template T
+ * @typedef {import("../../../app/network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse} ProgressionResponse */
+/** @typedef {import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionAnsweredResponse} ProgressionAnsweredResponse */
+/** @typedef {import("../../../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/** @typedef {import("../../../app/requestBodies.js").LiftDecisionBody["decision"]} LiftDecision */
+
+/**
+ * An answer to the week: a lift's, with its `liftKey`, or the week's own
+ * ("normal", the deload declined) without one. A null decision takes it back.
+ * @typedef {{ liftKey?: string, decision: LiftDecision | import("../../../app/requestBodies.js").WeekDecisionBody["decision"] | null }} ProgressionAnswer
+ */
 
 const PROGRESSION_PATH = "/api/dashboard/progression";
 const ANSWER_FAILED = "Could not save that answer. Try again.";
@@ -19,12 +35,11 @@ const ANSWER_FAILED = "Could not save that answer. Try again.";
  * `progression`, null without a plan; `answer({ liftKey, decision })`, which
  * puts a lift's answer, or the week's when there is no `liftKey`, and takes it
  * back when `decision` is null; and `error`, why the last answer failed.
+ * @param {{ dashboard: import("../../../app/dashboard.js").Dashboard | null, notes: unknown, apiFetch: import("../../../app/network.js").ApiFetch }} input
  */
 export default function useProgression({ dashboard, notes, apiFetch }) {
   const [progression, setProgression] = useState(
-    /** @type {import("../../../app/network.js").Wire<import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null} */ (
-      null
-    )
+    /** @type {Wire<ProgressionResponse>["progression"] | null} */ (null)
   );
   const [error, setError] = useState("");
   const requestRef = useRef(0);
@@ -50,7 +65,7 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
       try {
         const response = await apiFetch(`${PROGRESSION_PATH}?today=${getLocalDateKey()}`);
         if (!response.ok) throw new Error(ANSWER_FAILED);
-        const data = await response.json();
+        const data = /** @type {Wire<ProgressionResponse>} */ (await response.json());
         if (requestRef.current !== requestId) return;
         setProgression(data.progression ?? null);
         setError("");
@@ -63,7 +78,7 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
 
   const weekStart = progression?.weekStart;
   const answer = useCallback(
-    async (/** @type {{ liftKey?: string, decision: string | null }} */ { liftKey, decision }) => {
+    async (/** @type {ProgressionAnswer} */ { liftKey, decision }) => {
       if (!weekStart) return;
       const path = liftKey
         ? `${PROGRESSION_PATH}/${weekStart}/lifts/${encodeURIComponent(liftKey)}`
@@ -72,7 +87,12 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
         ? {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(liftKey ? liftDecisionBody(decision) : weekDecisionBody(decision))
+            // A lift's answer is accept, decline or undo, and the week's is normal.
+            body: JSON.stringify(
+              liftKey
+                ? liftDecisionBody(/** @type {LiftDecision} */ (decision))
+                : weekDecisionBody(/** @type {"normal"} */ (decision))
+            )
           }
         : { method: "DELETE" };
       // The answer's week is newer than any read still in flight.
@@ -80,13 +100,18 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
       requestRef.current = requestId;
       try {
         const response = await apiFetch(path, options);
-        const data = await response.json().catch(() => ({}));
+        // One read for both outcomes: a refusal's ErrorBody or the answered
+        // week, each of whose fields is optional.
+        const data = /** @type {Wire<ProgressionAnsweredResponse> & ErrorBody} */ (
+          await response.json().catch(() => ({}))
+        );
         if (!response.ok) throw new Error(data?.error || ANSWER_FAILED);
         if (requestRef.current !== requestId) return;
         setProgression(data.progression ?? null);
         setError("");
       } catch (err) {
-        if (requestRef.current === requestId) setError(err?.message || ANSWER_FAILED);
+        if (requestRef.current === requestId)
+          setError(/** @type {Error} */ (err)?.message || ANSWER_FAILED);
       }
     },
     [apiFetch, weekStart]

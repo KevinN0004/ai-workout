@@ -2,6 +2,7 @@
  * The meal view's suggestion sections: one card per meal, grouped by course.
  * Rendered by MealView.
  */
+// @ts-check
 
 /**
  * Renders `displayedSections`, already narrowed by MealView to the chosen
@@ -9,6 +10,7 @@
  * details. A course with no meals says so, and so does an empty list. MealDB
  * meals carry no calories (mapMealDbMeal on the server sets them to null), so
  * in the app every card reads "Calories not provided".
+ * @param {{ displayedSections: import("./utils.js").MealSection[], onSelectMeal: (id: string) => void, handleImageError: typeof import("./utils.js").handleImageError }} props
  */
 export default function MealSections({ displayedSections, onSelectMeal, handleImageError }) {
   return (

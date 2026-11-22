@@ -2,6 +2,7 @@
  * The Account tab's forms: change the password, and delete the account behind
  * a confirmation step. Rendered by SettingsView on that tab.
  */
+// @ts-check
 import { useEffect, useRef, useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
@@ -13,6 +14,7 @@ import "./SettingsAccountPanel.css";
  * `{ ok: true }` or `{ ok: false, error }` rather than throwing a failure, so
  * every branch here is driven by the resolved value. Offline, both submits are
  * disabled: each needs the server.
+ * @param {Pick<import("../DashboardPage.jsx").DashboardPageProps, "onChangePassword" | "onDeleteAccount">} props
  */
 export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount }) {
   const offline = useConnection() === "offline";
@@ -33,11 +35,12 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
   // cannot see the difference -- it audits a static tree, and the a11y spec
   // scans the revealed state without asking where focus went -- so
   // SettingsAccountPanel.test.jsx is what guards it.
-  const deletePasswordRef = useRef(null);
+  const deletePasswordRef = useRef(/** @type {HTMLInputElement | null} */ (null));
   useEffect(() => {
     if (deleteRevealed) deletePasswordRef.current?.focus();
   }, [deleteRevealed]);
 
+  /** @param {import("react").FormEvent<HTMLFormElement>} event */
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
     setPasswordSaving(true);
@@ -66,6 +69,7 @@ export default function SettingsAccountPanel({ onChangePassword, onDeleteAccount
     setDeleteError("");
   };
 
+  /** @param {import("react").FormEvent<HTMLFormElement>} event */
   const handleDeleteSubmit = async (event) => {
     event.preventDefault();
     setDeleteSaving(true);

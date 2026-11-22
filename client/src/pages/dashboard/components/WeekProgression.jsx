@@ -19,7 +19,7 @@ const CHANGE_TEXT = {
 
 // The answers each change offers before it is answered: the visible label, the
 // rest of the button's name, and the decision it sends.
-/** @type {Record<string, Array<{ label: string, rest: string, decision: string }>>} */
+/** @type {Record<string, Array<{ label: string, rest: string, decision: import("../hooks/useProgression.js").LiftDecision }>>} */
 const CHANGE_ANSWERS = {
   up: [{ label: "Undo", rest: "the step up for", decision: "undo" }],
   deload: [{ label: "Undo", rest: "the lighter load for", decision: "undo" }],
@@ -47,7 +47,7 @@ const AnswerButton = ({ label, rest, onClick, disabled }) => (
  * Offline, every answer is disabled: the server keeps them.
  * `error` is why the last answer failed. Nothing renders without a week, or
  * when the day holds none of its lifts outside a deload week.
- * @param {{ week: import("../../../app/network.js").Wire<import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null, prescriptions: import("../../../app/plans.js").Prescription[], system: "metric" | "imperial", onAnswer: (answer: { liftKey?: string, decision: string | null }) => void, error: string }} props
+ * @param {{ week: import("../../../app/network.js").Wire<import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null, prescriptions: import("../../../app/plans.js").Prescription[], system: "metric" | "imperial", onAnswer: (answer: import("../hooks/useProgression.js").ProgressionAnswer) => void, error: string }} props
  */
 export default function WeekProgression({ week, prescriptions, system, onAnswer, error }) {
   const offline = useConnection() === "offline";

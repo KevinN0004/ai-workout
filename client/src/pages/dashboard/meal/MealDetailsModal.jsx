@@ -2,12 +2,14 @@
  * The meal details modal: one meal's photo, summary, ingredients and recipe
  * links. Rendered by MealView, and open while a meal card is selected.
  */
+// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 
 /**
  * Renders nothing without `activeMeal`. MealView passes the meal's ingredients
  * and recipe links already narrowed to arrays, and `handleImageError` swaps a
  * photo that fails to load for the fallback image.
+ * @param {{ activeMeal: import("./utils.js").MealCard | null, activeMealIngredients: string[], activeMealRecipes: Array<{ label: string, url: string }>, onClose: () => void, handleImageError: typeof import("./utils.js").handleImageError }} props
  */
 export default function MealDetailsModal({
   activeMeal,

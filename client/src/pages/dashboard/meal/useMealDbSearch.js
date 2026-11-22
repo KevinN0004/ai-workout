@@ -2,9 +2,16 @@
  * MealDB state for the meal view: the visitor's own recipe search, and the
  * suggestion sections for their goal track. Called by MealView.
  */
+// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { MEALDB_RECOMMENDATION_QUERIES } from "./data";
 import { dedupeMeals, normalizeMealDbMeal } from "./utils";
+
+/**
+ * @template T
+ * @typedef {import("../../../app/network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../../../server/src/routes/external/registerMealDbRoutes.js").MealDbSearchResponse} MealDbSearchResponse */
 
 /**
  * Takes the goal track, as detectTrack names it; a track with no sections gets
@@ -13,6 +20,7 @@ import { dedupeMeals, normalizeMealDbMeal } from "./utils";
  * ways to search: `submitMealDbSearch` for the form, and `runMealDbSearch` for
  * a query chosen in code. Each load aborts its request when superseded or
  * unmounted.
+ * @param {import("../planUtils.js").Track} mealTrack
  */
 export default function useMealDbSearch(mealTrack) {
   // ---- State ----------------------------------------------------------------
@@ -59,7 +67,7 @@ export default function useMealDbSearch(mealTrack) {
             if (!res.ok) {
               throw new Error("Couldn't load meal suggestions right now.");
             }
-            const data = await res.json();
+            const data = /** @type {Wire<MealDbSearchResponse>} */ (await res.json());
             const meals = (Array.isArray(data?.meals) ? data.meals : [])
               .map((item) => normalizeMealDbMeal(item))
               .filter((item) => item.id && item.title);
@@ -79,7 +87,9 @@ export default function useMealDbSearch(mealTrack) {
           meals: dedupeMeals(section.meals, seen).slice(0, 6)
         }));
         setMealDbRecommendations(deduped);
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        // `err` is fetch's AbortError when the load is superseded, or the Error
+        // thrown above.
         if (cancelled || err?.name === "AbortError") return;
         setMealDbRecommendations([]);
         setMealDbRecommendationsError(err?.message || "Couldn't load meal suggestions right now.");
@@ -128,13 +138,15 @@ export default function useMealDbSearch(mealTrack) {
         if (!res.ok) {
           throw new Error("Couldn't load recipes right now.");
         }
-        const data = await res.json();
+        const data = /** @type {Wire<MealDbSearchResponse>} */ (await res.json());
         if (cancelled) return;
         const normalized = (Array.isArray(data?.meals) ? data.meals : [])
           .map((item) => normalizeMealDbMeal(item))
           .filter((item) => item.id && item.title);
         setMealDbMeals(normalized);
-      } catch (err) {
+      } catch (/** @type {any} */ err) {
+        // `err` is fetch's AbortError when the load is superseded, or the Error
+        // thrown above.
         if (cancelled || err?.name === "AbortError") return;
         setMealDbMeals([]);
         setMealDbError(err?.message || "Couldn't load recipes right now.");
@@ -154,6 +166,7 @@ export default function useMealDbSearch(mealTrack) {
 
   // The form's submit: an empty box clears the search, and anything else
   // becomes the query and empties the box.
+  /** @param {import("react").FormEvent} event */
   const submitMealDbSearch = (event) => {
     event.preventDefault();
     const nextQuery = mealDbInput.trim();
@@ -168,6 +181,7 @@ export default function useMealDbSearch(mealTrack) {
   };
 
   // Searches for `query` and leaves it in the box.
+  /** @param {unknown} query */
   const runMealDbSearch = (query) => {
     const nextQuery = String(query || "").trim();
     if (!nextQuery) return;

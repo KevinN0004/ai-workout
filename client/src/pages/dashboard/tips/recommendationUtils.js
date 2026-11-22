@@ -3,7 +3,27 @@
  * equipment, the weather and an injury note score a wger exercise, and the
  * training-guide cards. Used by TipsView and the tips components.
  */
+// @ts-check
 import { hasWord } from "../wordMatch.js";
+
+/** @typedef {import("../planUtils.js").Track} Track */
+
+/**
+ * An injury named in the note: its risky keywords and what a conflict costs.
+ * @typedef {{ injury: string, keywords: string[], penalty: number }} InjuryFlag
+ */
+
+/**
+ * What TipsView scores each exercise against.
+ * @typedef {object} RecommendationContext
+ * @property {string[]} preferredCategories
+ * @property {string[]} equipmentKeywords
+ * @property {string[]} goalTokens
+ * @property {string[]} todayTokens
+ * @property {InjuryFlag[]} injuryFlags
+ * @property {string} weatherMode
+ * @property {boolean} homeMode
+ */
 
 // wger category names each goal track favours.
 const trackCategoryMap = {
@@ -54,6 +74,7 @@ const keywordCategoryMap = [
 
 // The wger equipment-name fragments each planner equipment label stands for,
 // keyed by the label lower-cased.
+/** @type {Record<string, string[]>} */
 const equipmentKeywordMap = {
   "bodyweight only": ["bodyweight", "none (bodyweight exercise)"],
   dumbbells: ["dumbbell", "kettlebell"],
@@ -105,6 +126,7 @@ const injuryKeywordRules = {
 
 // The words naming each injury, matched whole: the plurals, and the compounds
 // that name it. "lowerback" and "upperback", written as one word, are back.
+/** @type {Record<string, string[]>} */
 const injuryNameForms = {
   "lower back": ["lower back", "lower backache", "lower backaches"],
   back: ["back", "backs", "backache", "backaches", "lowerback", "upperback"],
@@ -119,23 +141,33 @@ const injuryNameForms = {
 // conflict costs double, so a lower-back note weighs as two injuries do
 // (client/README.md, "Exercise Recommendations").
 const INJURY_PENALTY = 7;
+/** @type {Record<string, number>} */
 const injuryPenalty = { "lower back": 14 };
 
 // A rule a broader flag already covers: once the lower back is flagged, a
 // further back mention adds no flag, so a note naming the back twice still
 // weighs 14.
+/** @type {Record<string, string>} */
 const coveredBy = { back: "lower back" };
 
-/** `value` lower-cased and trimmed, or "" for anything that is not a string. */
+/**
+ * `value` lower-cased and trimmed, or "" for anything that is not a string.
+ * @param {unknown} value
+ */
 export const normalizeText = (value) =>
   typeof value === "string" ? value.toLowerCase().trim() : "";
 
-/** `items` without falsy entries or repeats, in first-seen order. */
+/**
+ * `items` without falsy entries or repeats, in first-seen order.
+ * @template T
+ * @param {T[]} items
+ */
 export const uniqueList = (items) => [...new Set(items.filter(Boolean))];
 
 /**
  * A wger media URL made absolute: a root-relative path gets wger's origin, any
  * other value comes back as given, and a missing one as "".
+ * @param {string | undefined} url
  */
 export const resolveMediaUrl = (url) => {
   if (!url) return "";
@@ -147,6 +179,7 @@ export const resolveMediaUrl = (url) => {
 /**
  * The exercise's main image, else its first, else a placehold.co image with
  * its name on it.
+ * @param {{ name?: string, images?: Array<{ url: string, isMain: boolean }> } | null | undefined} exercise
  */
 export const getExerciseImage = (exercise) => {
   const images = Array.isArray(exercise?.images) ? exercise.images : [];
@@ -161,6 +194,7 @@ export const getExerciseImage = (exercise) => {
  * The categories to favour: the track's own (lean_strength's for an unknown
  * track), plus those of each keyword in the goal text or today's plan lines,
  * without repeats. A keyword matches as a whole word.
+ * @param {{ track: Track, goalText: string, todayLines: string[] }} context
  */
 export const buildContextCategories = ({ track, goalText, todayLines }) => {
   const categories = [...(trackCategoryMap[track] || trackCategoryMap.lean_strength)];
@@ -176,6 +210,7 @@ export const buildContextCategories = ({ track, goalText, todayLines }) => {
  * selected in the planner form, a label the map lacks adding none. When that
  * yields nothing and the environment is Home, a bodyweight-friendly set stands
  * in.
+ * @param {{ form: Pick<import("../../../app/requestBodies.js").PlannerForm, "equipment" | "environment"> | null | undefined }} planner
  */
 export const buildEquipmentKeywords = ({ form }) => {
   const selected = Array.isArray(form?.equipment) ? form.equipment : [];
@@ -195,10 +230,11 @@ export const buildEquipmentKeywords = ({ form }) => {
  * costs. Names match as whole words, lower back before back, and a back
  * mention beside a flagged lower back adds no flag (coveredBy), so "lower
  * back" is one flag, not two.
+ * @param {string} injuryText
  */
 export const detectInjuryFlags = (injuryText) => {
   const source = normalizeText(injuryText);
-  const active = [];
+  const active = /** @type {InjuryFlag[]} */ ([]);
   for (const [injury, keywords] of Object.entries(injuryKeywordRules)) {
     if (!hasWord(source, injuryNameForms[injury])) continue;
     if (active.some((flag) => flag.injury === coveredBy[injury])) continue;
@@ -217,6 +253,7 @@ const NO_INJURY_ANSWER =
 
 // Lower-cased, with runs of spaces collapsed and closing . ! dropped, so
 // "No  injuries." reads as "no injuries".
+/** @param {string} value */
 const isNoInjuryAnswer = (value) =>
   NO_INJURY_ANSWER.test(
     value
@@ -229,6 +266,8 @@ const isNoInjuryAnswer = (value) =>
  * The injury note the guide reads: the planner's injuries answer and the
  * profile's notes, trimmed and joined with a space, each left out when it is
  * empty or is a whole answer meaning none (NO_INJURY_ANSWER).
+ * @param {unknown} injuries
+ * @param {unknown} notes
  */
 export const buildInjuryText = (injuries, notes) =>
   [injuries, notes]
@@ -243,6 +282,9 @@ export const buildInjuryText = (injuries, notes) =>
  * of today's lines in the exercise; each injury conflict costs more than any
  * single match earns (7, or the flag's own penalty). A score of 0 or below gets a generic reason. Returns the
  * exercise with its score and reasons.
+ * @template {import("../../../app/requestBodies.js").LibraryExercise & { description?: string }} T
+ * @param {T} exercise
+ * @param {RecommendationContext} context
  */
 export const scoreExercise = (exercise, context) => {
   // ---- What to match against ------------------------------------------------
@@ -342,6 +384,7 @@ export const scoreExercise = (exercise, context) => {
  * weather and injuries. Each card's text depends on one setting: weekly
  * workouts, track, activity level, session minutes, weather mode and whether
  * there is an injury note.
+ * @param {{ track: Track, weeklyWorkouts: number, duration: number, activity: unknown, weatherMode: string, injuryText: string }} settings
  */
 export const buildGuideCards = ({
   track,

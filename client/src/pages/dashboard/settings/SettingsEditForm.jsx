@@ -2,10 +2,15 @@
  * The edit form for one settings tab, built from that tab's descriptors in
  * settingsFields.js. Rendered by SettingsView while the tab is being edited.
  */
+// @ts-check
 import { useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 
+/**
+ * @param {string} measurementSystem
+ * @returns {{ heightUnit: "ft" | "cm", weightUnit: "lb" | "kg" }}
+ */
 const unitsFor = (measurementSystem) =>
   measurementSystem === "imperial"
     ? { heightUnit: "ft", weightUnit: "lb" }
@@ -17,6 +22,7 @@ const unitsFor = (measurementSystem) =>
  * and weight render in `measurementSystem`'s units, which go to `onSave` with
  * the draft. `error` and `saving` belong to SettingsView's save. Offline, Save
  * is disabled: a profile edit cannot be kept for later.
+ * @param {{ fields: import("./settingsFields.js").SettingsField[], values: import("./settingsFields.js").PersonalForm, measurementSystem: string, onSave: (draft: import("./settingsFields.js").PersonalForm, units: ReturnType<typeof unitsFor>) => void, onCancel: () => void, error: string, saving: boolean }} props
  */
 export default function SettingsEditForm({
   fields,
@@ -31,8 +37,16 @@ export default function SettingsEditForm({
   const units = unitsFor(measurementSystem);
   const offline = useConnection() === "offline";
 
+  /**
+   * @param {keyof import("./settingsFields.js").PersonalForm} name
+   * @param {string} value
+   */
   const setField = (name, value) => setDraft((prev) => ({ ...prev, [name]: value }));
 
+  /**
+   * @param {"trainingDays"} name
+   * @param {string} option
+   */
   const toggleInList = (name, option) =>
     setDraft((prev) => {
       const list = Array.isArray(prev[name]) ? prev[name] : [];
@@ -42,6 +56,11 @@ export default function SettingsEditForm({
       };
     });
 
+  /**
+   * @param {keyof import("./settingsFields.js").PersonalForm} name
+   * @param {string} label
+   * @param {[number, number]} bounds
+   */
   const numberInput = (name, label, [min, max]) => (
     <label>
       {label}
@@ -55,6 +74,7 @@ export default function SettingsEditForm({
     </label>
   );
 
+  /** @param {import("./settingsFields.js").SettingsField} field */
   const renderField = (field) => {
     // Height and weight: inputs in the visitor's units, with that unit's bounds.
     if (field.type === "height") {
@@ -140,6 +160,7 @@ export default function SettingsEditForm({
     );
   };
 
+  /** @param {import("react").FormEvent<HTMLFormElement>} event */
   const handleSubmit = (event) => {
     event.preventDefault();
     // The units go with the draft: the caller must convert with the same ones

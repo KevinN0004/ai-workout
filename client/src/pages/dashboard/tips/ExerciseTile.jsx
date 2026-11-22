@@ -3,6 +3,7 @@
  * category, name, equipment and the top reason, with a Save button. Rendered by
  * TipsView.
  */
+// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import { getExerciseImage } from "./recommendationUtils";
@@ -13,7 +14,7 @@ import { getExerciseImage } from "./recommendationUtils";
  * with that entry attached, so the details modal can list its reasons; `onSave`
  * receives the exercise and the entry. Offline, Save is disabled: a saved
  * exercise cannot be kept for later.
- * @param {{ exercise: import("../../../app/requestBodies.js").LibraryExercise, recommendation?: { reasons?: string[] }, onOpen: (payload: import("../../../app/requestBodies.js").LibraryExercise & { recommendation?: { reasons?: string[] } }) => void, onSave: (exercise: import("../../../app/requestBodies.js").LibraryExercise, recommendation?: { reasons?: string[] }) => unknown, saved: boolean, isSaving: boolean }} props
+ * @param {{ exercise: import("../views/TipsView.jsx").LibraryItem, recommendation?: { reasons?: string[] }, onOpen: (payload: import("../views/TipsView.jsx").LibraryItem & { recommendation?: { reasons?: string[] } }) => void, onSave: (exercise: import("../../../app/requestBodies.js").LibraryExercise, recommendation?: { reasons?: string[] }) => unknown, saved: boolean, isSaving: boolean }} props
  */
 export default function ExerciseTile({
   exercise,
