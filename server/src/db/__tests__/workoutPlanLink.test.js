@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
 
@@ -26,8 +27,10 @@ const insertSession = (userId, planId, dayIndex) =>
     values (${userId}::uuid, ${planId}::uuid, ${dayIndex})
   `;
 
+// $queryRaw takes its row type only as a type argument, which JavaScript cannot
+// pass, so each result here is cast to the columns its query selects.
 const linkOf = async (userId) =>
-  (
+  /** @type {Array<{ plan_id: string | null, plan_day_index: number | null }>} */ (
     await prisma.$queryRaw`
       select generated_plan_id::text as plan_id, plan_day_index
       from workout_sessions
@@ -73,11 +76,13 @@ describe("the plan-day link on workout_sessions", () => {
       { conname: "workout_sessions_plan_link_check", contype: "c", confdeltype: " " }
     ]);
 
-    const indexes = await prisma.$queryRaw`
+    const indexes = /** @type {Array<{ indexdef: string }>} */ (
+      await prisma.$queryRaw`
       select indexdef
       from pg_indexes
       where indexname = 'workout_sessions_plan_day_idx'
-    `;
+    `
+    );
     expect(indexes).toHaveLength(1);
     expect(indexes[0].indexdef).toMatch(/\(generated_plan_id, plan_day_index\)/);
   });

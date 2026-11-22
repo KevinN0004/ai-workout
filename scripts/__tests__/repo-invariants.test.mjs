@@ -902,7 +902,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 202;
+  const TYPE_CHECKED_FILES = 210;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -1003,13 +1003,35 @@ describe("type-checked files", () => {
     expect(bad, "cast each answer to Wire<XResponse> and each refusal to ErrorBody").toEqual([]);
   });
 
+  // The source program keeps strict on, and leaves the tests to their own program
+  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, decision 2).
   test.each(WORKSPACES)("%s/tsconfig.json keeps strict on and checkJs off", (workspace) => {
     const file = path.join(repoRoot, workspace, "tsconfig.json");
     expect(existsSync(file), `${workspace}/tsconfig.json is missing`).toBe(true);
-    const { compilerOptions = {} } = JSON.parse(stripJsonComments(readFileSync(file, "utf8")));
+    const config = JSON.parse(stripJsonComments(readFileSync(file, "utf8")));
+    const { compilerOptions = {} } = config;
     expect(compilerOptions.strict, "strict is what makes the check worth having").toBe(true);
     expect(compilerOptions.checkJs, "files opt in one at a time until milestone M4").toBe(false);
+    expect(config.exclude, "the tests are the test program's").toEqual(
+      expect.arrayContaining(["src/**/*.test.js", "src/**/__tests__/**"])
+    );
   });
+
+  // Tests are checked as strictly as source, except that a mock's untyped parameter
+  // may stay any: the test program differs from the source program by that one option.
+  test.each(WORKSPACES)(
+    "%s/tsconfig.test.json is the source program, implicit any allowed",
+    (workspace) => {
+      const file = path.join(repoRoot, workspace, "tsconfig.test.json");
+      expect(existsSync(file), `${workspace}/tsconfig.test.json is missing`).toBe(true);
+      const config = JSON.parse(stripJsonComments(readFileSync(file, "utf8")));
+      expect(config.extends).toBe("./tsconfig.json");
+      expect(config.compilerOptions).toEqual({ noImplicitAny: false });
+      expect(config.exclude, "an inherited exclude would drop every test").toEqual([]);
+      const pkg = JSON.parse(readFileSync(path.join(repoRoot, workspace, "package.json"), "utf8"));
+      expect(pkg.scripts.typecheck).toBe("tsc -p tsconfig.json && tsc -p tsconfig.test.json");
+    }
+  );
 
   test("CI runs npm run typecheck", () => {
     const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");

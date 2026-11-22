@@ -214,9 +214,11 @@ export const registerAirQualityRoutes = (app, deps) => {
       // /latest, or one with no fresh PM2.5 reading, is a miss. At most
       // MAX_LATEST_ATTEMPTS are asked.
       const ranked = rankFreshPm25Stations(candidates, origin);
+      /** @type {(ReturnType<typeof rankFreshPm25Stations>[number] & { latestResponse: OpenAqRead, pollutants: ReturnType<typeof readPollutants>, pm25Reading: ReturnType<typeof readPollutants>[number] }) | null} */
       let chosen = null;
       let attempts = 0;
       let answered = 0;
+      /** @type {unknown} */
       let lastFailure = null;
       for (const candidate of ranked) {
         if (attempts >= MAX_LATEST_ATTEMPTS) break;

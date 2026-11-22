@@ -1,3 +1,4 @@
+// @ts-check
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
@@ -22,8 +23,11 @@ const createUser = async (name, goalsJson) => {
   `;
 };
 
+// Each test creates the user it reads, and fails at once if the row is missing.
 const goalsOf = async (name) =>
-  (await prisma.appUser.findFirst({ where: { email: name + EMAIL_SUFFIX } })).goals;
+  /** @type {import("@prisma/client").AppUser} */ (
+    await prisma.appUser.findFirst({ where: { email: name + EMAIL_SUFFIX } })
+  ).goals;
 
 const cleanUp = () => prisma.appUser.deleteMany({ where: { email: { endsWith: EMAIL_SUFFIX } } });
 

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { prisma } from "../prisma.js";
 
@@ -36,12 +37,16 @@ const INDEXES_PRISMA_CANNOT_SEE = [
 ];
 
 describe("unique indexes Prisma cannot express", () => {
+  // $queryRaw takes its row type only as a type argument, which JavaScript cannot
+  // pass, so each result here is cast to the columns its query selects.
   test("every one of them exists in the live database", async () => {
-    const rows = await prisma.$queryRaw`
+    const rows = /** @type {Array<{ indexname: string }>} */ (
+      await prisma.$queryRaw`
       select indexname
       from pg_indexes
       where schemaname = 'public'
-    `;
+    `
+    );
     const present = new Set(rows.map((row) => row.indexname));
 
     // Guard against a vacuous pass on an empty or unmigrated database.
@@ -55,11 +60,13 @@ describe("unique indexes Prisma cannot express", () => {
     // If one of these ever became a plain unique index, Prisma *could* express
     // it -- and it should then move into schema.prisma rather than staying
     // here. This is what tells us that happened.
-    const rows = await prisma.$queryRaw`
+    const rows = /** @type {Array<{ indexname: string, indexdef: string }>} */ (
+      await prisma.$queryRaw`
       select indexname, indexdef
       from pg_indexes
       where schemaname = 'public'
-    `;
+    `
+    );
     const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
 
     const plain = INDEXES_PRISMA_CANNOT_SEE.filter((name) => {

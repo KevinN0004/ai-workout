@@ -7,6 +7,7 @@
   // plugin's virtual module, and Node's, for the checked server files a client
   // JSDoc type reaches (dashboardDataBuildersService.js imports crypto). It also
   // loads the server's Request fields, for the route modules a client type names.
+  // The tests are checked by `tsconfig.test.json`.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,
@@ -20,5 +21,6 @@
     "lib": ["esnext", "dom", "dom.iterable"],
     "types": ["vite/client", "vite-plugin-pwa/react", "node"]
   },
-  "include": ["src", "../server/src/types/express.d.ts"]
+  "include": ["src", "../server/src/types/express.d.ts"],
+  "exclude": ["src/**/*.test.js", "src/**/*.test.jsx", "src/**/__tests__/**", "src/test/**"]
 }

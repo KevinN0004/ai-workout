@@ -1,11 +1,17 @@
+// @ts-check
 import express from "express";
 import request from "supertest";
 import { describe, expect, test, vi } from "vitest";
 import { createRequestContextMiddleware } from "../requestContext.js";
 
+// Each fixture here holds only the fields the middleware reads. The loggers are
+// cast through unknown, because a vi.fn() is not one of pino's log functions,
+// and so is the request whose x-request-id is a plain string, where Node's
+// header type also allows a list.
+
 const createResponseHarness = () => {
   const listeners = {};
-  return {
+  return /** @type {import("express").Response & { headers: Record<string, unknown>, finish: () => void }} */ ({
     statusCode: 200,
     headers: {},
     setHeader(name, value) {
@@ -17,35 +23,39 @@ const createResponseHarness = () => {
     finish() {
       if (listeners.finish) listeners.finish();
     }
-  };
+  });
 };
 
 describe("requestContext middleware", () => {
   test("uses incoming request id, tracks latency, and logs on finish", () => {
-    const metrics = {
+    const metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
       requestsTotal: 0,
       requestLatencyMs: {},
       routeLatencyMs: {}
-    };
+    });
     const requestLogger = {
       info: vi.fn()
     };
-    const logger = {
-      child: vi.fn(() => requestLogger)
-    };
+    const logger = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({
+        child: vi.fn(() => requestLogger)
+      })
+    );
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
       toShortText: (value) => String(value || "")
     });
 
-    const req = {
-      headers: { "x-request-id": "req-123" },
-      method: "GET",
-      path: "/api/health",
-      originalUrl: "/api/health",
-      route: { path: "/api/health" }
-    };
+    const req = /** @type {import("express").Request} */ (
+      /** @type {unknown} */ ({
+        headers: { "x-request-id": "req-123" },
+        method: "GET",
+        path: "/api/health",
+        originalUrl: "/api/health",
+        route: { path: "/api/health" }
+      })
+    );
     const res = createResponseHarness();
     const next = vi.fn();
 
@@ -63,25 +73,27 @@ describe("requestContext middleware", () => {
   });
 
   test("generates request id when incoming header is missing", () => {
-    const metrics = {
+    const metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
       requestsTotal: 0,
       requestLatencyMs: {},
       routeLatencyMs: {}
-    };
-    const logger = {
-      child: vi.fn(() => ({ info: vi.fn() }))
-    };
+    });
+    const logger = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({
+        child: vi.fn(() => ({ info: vi.fn() }))
+      })
+    );
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
       toShortText: () => ""
     });
-    const req = {
+    const req = /** @type {import("express").Request} */ ({
       headers: {},
       method: "POST",
       path: "/api/auth/login",
       originalUrl: "/api/auth/login"
-    };
+    });
     const res = createResponseHarness();
     const next = vi.fn();
 
@@ -94,14 +106,16 @@ describe("requestContext middleware", () => {
   });
 
   test("collapses unrouted requests into one bucket so metrics stay bounded", () => {
-    const metrics = {
+    const metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
       requestsTotal: 0,
       requestLatencyMs: {},
       routeLatencyMs: {}
-    };
-    const logger = {
-      child: vi.fn(() => ({ info: vi.fn() }))
-    };
+    });
+    const logger = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({
+        child: vi.fn(() => ({ info: vi.fn() }))
+      })
+    );
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
@@ -111,7 +125,12 @@ describe("requestContext middleware", () => {
     // 404s and middleware rejections (CSRF, rate limit) arrive with no req.route
     // and a caller-supplied path. Each must not mint its own metric key.
     for (const path of ["/api/random-a", "/api/random-b", "/api/random-c"]) {
-      const req = { headers: {}, method: "GET", path, originalUrl: path };
+      const req = /** @type {import("express").Request} */ ({
+        headers: {},
+        method: "GET",
+        path,
+        originalUrl: path
+      });
       const res = createResponseHarness();
       middleware(req, res, vi.fn());
       res.finish();
@@ -122,27 +141,29 @@ describe("requestContext middleware", () => {
   });
 
   test("still records a key per matched route", () => {
-    const metrics = {
+    const metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
       requestsTotal: 0,
       requestLatencyMs: {},
       routeLatencyMs: {}
-    };
-    const logger = {
-      child: vi.fn(() => ({ info: vi.fn() }))
-    };
+    });
+    const logger = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({
+        child: vi.fn(() => ({ info: vi.fn() }))
+      })
+    );
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
       toShortText: () => ""
     });
 
-    const req = {
+    const req = /** @type {import("express").Request} */ ({
       headers: {},
       method: "GET",
       path: "/api/wger/exercises/999",
       originalUrl: "/api/wger/exercises/999",
       route: { path: "/api/wger/exercises/:id" }
-    };
+    });
     const res = createResponseHarness();
     middleware(req, res, vi.fn());
     res.finish();
@@ -155,13 +176,19 @@ describe("requestContext middleware", () => {
   // query would keep a location history per visitor. Driven through real
   // express so `originalUrl` is the one Express builds, not a hand-made one.
   test("logs a weather request's path without its query string", async () => {
-    const metrics = { requestsTotal: 0, requestLatencyMs: {}, routeLatencyMs: {} };
+    const metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
+      requestsTotal: 0,
+      requestLatencyMs: {},
+      routeLatencyMs: {}
+    });
     const requestLogger = { info: vi.fn() };
     const app = express();
     app.use(
       createRequestContextMiddleware({
         metrics,
-        logger: { child: () => requestLogger },
+        logger: /** @type {import("pino").Logger} */ (
+          /** @type {unknown} */ ({ child: () => requestLogger })
+        ),
         toShortText: () => ""
       })
     );

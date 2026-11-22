@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { applyMigrations } from "../postgresMigrations.js";
 
@@ -8,6 +9,7 @@ const firstWord = (sql) => String(sql).trim().split(/\s+/)[0].toLowerCase();
  * "pool"; each `pool.connect()` hands back a distinctly tagged client. That
  * distinction is the point: a transaction split across "pool" calls is exactly
  * the defect under test.
+ * @param {{ failOnSqlContaining?: string | null }} [options]
  */
 const createFakePool = ({ failOnSqlContaining = null } = {}) => {
   const calls = [];
@@ -17,6 +19,10 @@ const createFakePool = ({ failOnSqlContaining = null } = {}) => {
   const makeClient = (tag) => ({
     tag,
     released: false,
+    /**
+     * @param {unknown} sql
+     * @returns {Promise<{ rowCount: number, rows: object[] }>}
+     */
     query: async (sql) => {
       const text = String(sql);
       calls.push({ tag, verb: firstWord(text), text });

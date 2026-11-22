@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, describe, expect, test } from "vitest";
 import { disconnectPrisma, prisma } from "../prisma.js";
 
@@ -25,15 +26,21 @@ describe("prisma client", () => {
   // and in CI it can only ever pass. Read the skew assertion below as the one
   // that does the work locally.
   test("pins the session timezone to UTC", async () => {
-    const rows = await prisma.$queryRaw`select current_setting('TIMEZONE') as tz`;
+    // $queryRaw takes its row type only as a type argument, which JavaScript
+    // cannot pass, so each result here is cast to the columns its query selects.
+    const rows = /** @type {Array<{ tz: string }>} */ (
+      await prisma.$queryRaw`select current_setting('TIMEZONE') as tz`
+    );
     expect(rows[0].tz).toBe("UTC");
   });
 
   test("stores a JS Date at the instant it actually represents", async () => {
     const instant = new Date();
-    const rows = await prisma.$queryRaw`
+    const rows = /** @type {Array<{ epoch_seconds: unknown }>} */ (
+      await prisma.$queryRaw`
       select extract(epoch from ${instant}::timestamptz) as epoch_seconds
-    `;
+    `
+    );
     const storedMs = Math.round(Number(rows[0].epoch_seconds) * 1000);
 
     // Unpinned on a UTC-7 host this is 25_200_000. A second of slack covers

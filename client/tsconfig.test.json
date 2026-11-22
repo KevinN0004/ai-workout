@@ -1,0 +1,16 @@
+{
+  // The client's test program (roadmap lane D1, decision record 0017): the source
+  // program's options with noImplicitAny off, so a mock's untyped parameter is any
+  // while every fixture and call is still checked. It checks each source file a test
+  // imports under these options too, so source must pass both programs.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noImplicitAny": false },
+  "include": [
+    "src/**/*.test.js",
+    "src/**/*.test.jsx",
+    "src/**/__tests__/**/*",
+    "src/test/**/*",
+    "../server/src/types/express.d.ts"
+  ],
+  "exclude": []
+}
