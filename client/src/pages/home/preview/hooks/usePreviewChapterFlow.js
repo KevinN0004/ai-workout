@@ -4,6 +4,7 @@
  * state, and Personal Info and Generate then move on to the next chapter by
  * themselves. Called by PreviewStage.
  */
+// @ts-check
 import { useCallback, useEffect } from "react";
 import {
   PREVIEW_INSTANT_FIELDS,
@@ -54,6 +55,37 @@ const PREVIEW_FILL_STEP_MS = 220;
  * on `previewFillTimeoutsRef`, and `clearPreviewFillTimers`, returned for
  * PreviewStage's unmount, cancels them all, the particle animation's included.
  */
+/** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
+/**
+ * @template T
+ * @typedef {import("../PreviewStage.jsx").SetState<T>} SetState
+ */
+
+/**
+ * What PreviewStage hands usePreviewChapterFlow: the chapter showing and two
+ * chapters' places, the profile to type and its order, the timer list, the
+ * chapter switch, and the setters for each chapter's state.
+ * @typedef {object} PreviewChapterFlowInput
+ * @property {string} activePreviewChapterId
+ * @property {number} generateChapterIndex
+ * @property {number} workoutWeekChapterIndex
+ * @property {PreviewDerivedData["previewInitialTargetsRef"]} previewInitialTargetsRef
+ * @property {PreviewDerivedData["previewInitialFillOrderRef"]} previewInitialFillOrderRef
+ * @property {PreviewDerivedData["previewPersonalTargets"]} previewPersonalTargets
+ * @property {PreviewDerivedData["previewFillOrder"]} previewFillOrder
+ * @property {import("react").RefObject<number[]>} previewFillTimeoutsRef
+ * @property {(targetIndex: number) => void} scrollToChapter
+ * @property {SetState<import("../PreviewStage.jsx").PreviewFilledFields>} setPreviewFilledFields
+ * @property {SetState<boolean>} setPreviewPersonalCollapsed
+ * @property {SetState<boolean>} setPreviewPersonalShifted
+ * @property {SetState<number>} setPreviewBuilderStage
+ * @property {SetState<number>} setPreviewWeekStage
+ * @property {SetState<number>} setPreviewDashboardStage
+ * @property {SetState<number>} setPreviewWeekHeaderTypingProgress
+ * @property {SetState<number>} setPreviewWeekTypingProgress
+ */
+
+/** @param {PreviewChapterFlowInput} input */
 export default function usePreviewChapterFlow({
   activePreviewChapterId,
   generateChapterIndex,
@@ -89,6 +121,7 @@ export default function usePreviewChapterFlow({
     const fillOrder = previewInitialFillOrderRef.current || previewFillOrder;
 
     const markAllFilled = () => {
+      /** @type {import("../PreviewStage.jsx").PreviewFilledFields} */
       const nextFilled = {};
       fillOrder.forEach((fieldKey) => {
         if (fieldKey === "trainingDays") {

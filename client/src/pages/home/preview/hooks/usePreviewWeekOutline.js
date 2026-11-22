@@ -2,6 +2,7 @@
  * Measures the preview's week table so the outline its chapter draws sits on
  * the table's real row and column edges. Called by PreviewStage.
  */
+// @ts-check
 import { useEffect } from "react";
 import { clamp } from "../utils";
 
@@ -15,6 +16,7 @@ import { clamp } from "../utils";
  * position changed. A wrap or table with no size, or a table with no rows,
  * leaves the offsets in state as they are. It subscribes afresh when the
  * chapter or the plan changes.
+ * @param {{ activePreviewChapterId: string, previewWeekPlan: import("../PreviewStage.jsx").PreviewDerivedData["previewWeekPlan"], previewWeekTableWrapRef: import("react").RefObject<HTMLDivElement | null>, setPreviewWeekLineOffsets: import("../PreviewStage.jsx").SetState<import("../PreviewStage.jsx").PreviewWeekLineOffsets> }} input
  */
 export default function usePreviewWeekOutline({
   activePreviewChapterId,
@@ -31,6 +33,10 @@ export default function usePreviewWeekOutline({
 
     let frameId = 0;
 
+    /**
+     * @param {import("../PreviewStage.jsx").PreviewWeekLineOffsets} currentOffsets
+     * @param {import("../PreviewStage.jsx").PreviewWeekLineOffsets} nextOffsets
+     */
     const areOffsetsEqual = (currentOffsets, nextOffsets) =>
       currentOffsets.horizontal.length === nextOffsets.horizontal.length &&
       currentOffsets.vertical.length === nextOffsets.vertical.length &&
@@ -62,6 +68,10 @@ export default function usePreviewWeekOutline({
         verticalPx.push(cellEl.getBoundingClientRect().right - wrapRect.left);
       });
 
+      /**
+       * @param {number} pixelValue
+       * @param {number} containerSize
+       */
       const toPercent = (pixelValue, containerSize) =>
         `${clamp((pixelValue / Math.max(containerSize, 1)) * 100, 0, 100).toFixed(3)}%`;
 

@@ -2,12 +2,16 @@
  * The preview walkthrough's table of contents: a chip per chapter, the current
  * one widened to show its title. Rendered by PreviewStage.
  */
+// @ts-check
+
+/** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
 
 /**
  * `previewTocExpandingIndex` and `previewTocContractingIndex` are the chips
  * PreviewStage is switching to and from, which keep their animation classes
  * for PREVIEW_TOC_SWITCH_MS. A click goes to `onSelectChapter` with the chip's
  * index.
+ * @param {Pick<PreviewDerivedData, "previewTocStyle"> & { chapters: PreviewDerivedData["previewChapters"], previewStepIndex: number, previewTocExpandingIndex: number | null, previewTocContractingIndex: number | null, onSelectChapter: (index: number) => void }} props
  */
 export default function PreviewToc({
   chapters,

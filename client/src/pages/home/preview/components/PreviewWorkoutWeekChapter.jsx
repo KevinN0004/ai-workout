@@ -3,7 +3,26 @@
  * as a table that draws its outline, types in its headers and then its cells,
  * and breaks apart into particles. Rendered by PreviewStage.
  */
+// @ts-check
 import { PREVIEW_WEEK_LINE_STAGGER_MS, PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../constants";
+
+/** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
+/** @typedef {import("react").CSSProperties & Record<`--${string}`, string>} CssVars */
+
+/**
+ * What PreviewStage passes the week chapter: the outline's line positions, the
+ * week's stage and typing progress, the plan, the two elements the dissolve
+ * uses, and the typed-text helpers.
+ * @typedef {object} PreviewWorkoutWeekChapterProps
+ * @property {import("../PreviewStage.jsx").PreviewWeekLineOffsets} previewWeekLineOffsets
+ * @property {number} previewWeekStage
+ * @property {number} previewWeekTypingProgress
+ * @property {PreviewDerivedData["previewWeekPlan"]} previewWeekPlan
+ * @property {import("react").RefObject<HTMLDivElement | null>} previewWeekTableWrapRef
+ * @property {import("react").RefObject<HTMLDivElement | null>} previewWeekParticleLayerRef
+ * @property {PreviewDerivedData["getPreviewWeekHeaderTypedText"]} getPreviewWeekHeaderTypedText
+ * @property {PreviewDerivedData["getPreviewWeekTypedText"]} getPreviewWeekTypedText
+ */
 
 /**
  * Each `previewWeekStage` from 1 adds classes: 1 draws the outline, 2 shows the
@@ -17,6 +36,7 @@ import { PREVIEW_WEEK_LINE_STAGGER_MS, PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../c
  * usePreviewWeekOutline measures from this table, and start one after another,
  * horizontals first. The two refs are the table's wrap, which the outline and
  * the particle animation measure, and the layer the particles are drawn into.
+ * @param {PreviewWorkoutWeekChapterProps} props
  */
 export default function PreviewWorkoutWeekChapter({
   previewWeekLineOffsets,
@@ -51,10 +71,12 @@ export default function PreviewWorkoutWeekChapter({
               className={`preview-week-outline-line horizontal ${
                 index === 0 ? "is-top-edge" : ""
               } ${index === horizontalLineOffsets.length - 1 ? "is-bottom-edge" : ""}`}
-              style={{
-                "--preview-line-offset": offset,
-                "--preview-line-delay": `${index * PREVIEW_WEEK_LINE_STAGGER_MS}ms`
-              }}
+              style={
+                /** @type {CssVars} */ ({
+                  "--preview-line-offset": offset,
+                  "--preview-line-delay": `${index * PREVIEW_WEEK_LINE_STAGGER_MS}ms`
+                })
+              }
             />
           ))}
           {verticalLineOffsets.map((offset, index) => (
@@ -63,39 +85,49 @@ export default function PreviewWorkoutWeekChapter({
               className={`preview-week-outline-line vertical ${index === 0 ? "is-left-edge" : ""} ${
                 index === verticalLineOffsets.length - 1 ? "is-right-edge" : ""
               }`}
-              style={{
-                "--preview-line-offset": offset,
-                "--preview-line-delay": `${
-                  (horizontalLineOffsets.length + index) * PREVIEW_WEEK_LINE_STAGGER_MS
-                }ms`
-              }}
+              style={
+                /** @type {CssVars} */ ({
+                  "--preview-line-offset": offset,
+                  "--preview-line-delay": `${
+                    (horizontalLineOffsets.length + index) * PREVIEW_WEEK_LINE_STAGGER_MS
+                  }ms`
+                })
+              }
             />
           ))}
           <span
             className="preview-week-outline-corner top-left"
-            style={{ "--preview-line-delay": "0ms" }}
+            style={/** @type {CssVars} */ ({ "--preview-line-delay": "0ms" })}
           />
           <span
             className="preview-week-outline-corner top-right"
-            style={{ "--preview-line-delay": `${PREVIEW_WEEK_LINE_STAGGER_MS}ms` }}
+            style={
+              /** @type {CssVars} */ ({
+                "--preview-line-delay": `${PREVIEW_WEEK_LINE_STAGGER_MS}ms`
+              })
+            }
           />
           <span
             className="preview-week-outline-corner bottom-right"
-            style={{
-              "--preview-line-delay": `${
-                (horizontalLineOffsets.length + verticalLineOffsets.length - 2) *
-                PREVIEW_WEEK_LINE_STAGGER_MS
-              }ms`
-            }}
+            style={
+              /** @type {CssVars} */ ({
+                "--preview-line-delay": `${
+                  (horizontalLineOffsets.length + verticalLineOffsets.length - 2) *
+                  PREVIEW_WEEK_LINE_STAGGER_MS
+                }ms`
+              })
+            }
           />
           <span
             className="preview-week-outline-corner bottom-left"
-            style={{
-              "--preview-line-delay": `${
-                (horizontalLineOffsets.length + verticalLineOffsets.length - 1) *
-                PREVIEW_WEEK_LINE_STAGGER_MS
-              }ms`
-            }}
+            style={
+              /** @type {CssVars} */ ({
+                "--preview-line-delay": `${
+                  (horizontalLineOffsets.length + verticalLineOffsets.length - 1) *
+                  PREVIEW_WEEK_LINE_STAGGER_MS
+                }ms`
+              })
+            }
           />
         </div>
         {/* ---- The table: the header row, then the body ---- */}

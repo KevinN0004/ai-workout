@@ -3,6 +3,7 @@
  * played chapter by chapter, from Personal Info to the dashboard, beside a
  * table of contents for jumping between them. Rendered by HomePage.
  */
+// @ts-check
 import { useEffect, useRef, useState } from "react";
 import { createDefaultPreviewWeekLineOffsets, PREVIEW_TOC_SWITCH_MS } from "./constants";
 import PreviewToc from "./components/PreviewToc";
@@ -16,6 +17,26 @@ import usePreviewDerivedData from "./hooks/usePreviewDerivedData";
 import "./PreviewStage.css";
 
 /**
+ * @template T
+ * @typedef {import("react").Dispatch<import("react").SetStateAction<T>>} SetState
+ */
+/** @typedef {ReturnType<typeof usePreviewDerivedData>} PreviewDerivedData */
+/** @typedef {ReturnType<typeof createDefaultPreviewWeekLineOffsets>} PreviewWeekLineOffsets */
+/** @typedef {ReturnType<typeof import("animejs").createTimeline>} Timeline */
+
+/**
+ * What the walkthrough has typed into each preview field so far: text, or, for
+ * the training days, the days lit up.
+ * @typedef {Record<string, string | string[]>} PreviewFilledFields
+ */
+
+/**
+ * What HomePage passes the walkthrough: App's profile, planner form, units and
+ * two converters, and useBodyModel's body figures.
+ * @typedef {Pick<import("../HomePage.jsx").HomePageProps, "personal" | "form" | "heightUnit" | "weightUnit" | "toFeetInchesFromCm" | "toLb"> & Pick<ReturnType<typeof import("../hooks/useBodyModel.js").default>, "resolvedHeightCm" | "resolvedWeightKg">} PreviewStageProps
+ */
+
+/**
  * Owns the walkthrough's state: the current chapter, the table of contents'
  * switch, each chapter's stage, the fields filled so far and the form's
  * collapsed and shifted flags, the week outline's line positions and the typing
@@ -25,6 +46,7 @@ import "./PreviewStage.css";
  * app/units.js's, and the body figures useBodyModel's, both passed down by
  * HomePage. HomePage mounts it afresh each time the stage opens, so the
  * walkthrough always starts at Personal Info.
+ * @param {PreviewStageProps} props
  */
 export default function PreviewStage({
   personal,
@@ -37,18 +59,24 @@ export default function PreviewStage({
   resolvedWeightKg
 }) {
   // ---- Refs and state -------------------------------------------------------
-  const previewFillTimeoutsRef = useRef([]);
-  const previewStageRef = useRef(null);
-  const previewWeekTableWrapRef = useRef(null);
-  const previewWeekParticleLayerRef = useRef(null);
-  const previewWeekParticlePlayersRef = useRef([]);
-  const previewWeekParticleTargetsRef = useRef([]);
-  const previewTocSwitchTimeoutRef = useRef(null);
+  const previewFillTimeoutsRef = useRef(/** @type {number[]} */ ([]));
+  const previewStageRef = useRef(/** @type {HTMLElement | null} */ (null));
+  const previewWeekTableWrapRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const previewWeekParticleLayerRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const previewWeekParticlePlayersRef = useRef(/** @type {Timeline[]} */ ([]));
+  const previewWeekParticleTargetsRef = useRef(/** @type {HTMLElement[]} */ ([]));
+  const previewTocSwitchTimeoutRef = useRef(/** @type {number | null} */ (null));
   const previewStepIndexRef = useRef(0);
   const [previewStepIndex, setPreviewStepIndex] = useState(0);
-  const [previewTocExpandingIndex, setPreviewTocExpandingIndex] = useState(null);
-  const [previewTocContractingIndex, setPreviewTocContractingIndex] = useState(null);
-  const [previewFilledFields, setPreviewFilledFields] = useState({});
+  const [previewTocExpandingIndex, setPreviewTocExpandingIndex] = useState(
+    /** @type {number | null} */ (null)
+  );
+  const [previewTocContractingIndex, setPreviewTocContractingIndex] = useState(
+    /** @type {number | null} */ (null)
+  );
+  const [previewFilledFields, setPreviewFilledFields] = useState(
+    /** @type {PreviewFilledFields} */ ({})
+  );
   const [previewPersonalCollapsed, setPreviewPersonalCollapsed] = useState(false);
   const [previewPersonalShifted, setPreviewPersonalShifted] = useState(false);
   const [previewBuilderStage, setPreviewBuilderStage] = useState(0);
@@ -100,6 +128,7 @@ export default function PreviewStage({
   };
 
   // Personal Info and Generate are one component, Generate in its builder view.
+  /** @param {PreviewDerivedData["previewChapters"][number]} chapter */
   const renderPreviewChapterBody = (chapter) =>
     chapter.id === "personal-info" ? (
       <PreviewPersonalChapter
@@ -153,6 +182,7 @@ export default function PreviewStage({
   // table of contents and the chapter hooks both move on through this, and the
   // chips keep their expanding and contracting classes for PREVIEW_TOC_SWITCH_MS.
   // Despite the name it does not scroll; only the mount effect does.
+  /** @param {number} targetIndex */
   const scrollToChapter = (targetIndex) => {
     const boundedIndex = Math.max(0, Math.min(targetIndex, previewChapters.length - 1));
     const currentIndex = previewStepIndexRef.current;

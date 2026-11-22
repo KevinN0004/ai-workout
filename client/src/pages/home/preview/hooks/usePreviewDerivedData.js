@@ -4,6 +4,7 @@
  * figures, the values to type, the chapters, and layout widths. Called by
  * PreviewStage.
  */
+// @ts-check
 import { useMemo, useRef } from "react";
 import {
   JOHN_DOE_PREVIEW_PROFILE,
@@ -33,6 +34,12 @@ const TRAINING_EXERCISE_TEMPLATES = [
 ];
 
 /**
+ * What PreviewStage hands usePreviewDerivedData: its props but heightUnit, and
+ * the chapter, stage and typing progress it holds.
+ * @typedef {Omit<import("../PreviewStage.jsx").PreviewStageProps, "heightUnit"> & { previewStepIndex: number, previewWeekStage: number, previewWeekHeaderTypingProgress: number, previewWeekTypingProgress: number }} PreviewDerivedInput
+ */
+
+/**
  * Derives the walkthrough's content from the visitor's `personal` profile and
  * planner `form`, with JOHN_DOE_PREVIEW_PROFILE filling what they leave empty,
  * and from the chapter state PreviewStage passes in. `resolvedHeightCm` and
@@ -41,6 +48,7 @@ const TRAINING_EXERCISE_TEMPLATES = [
  * derived values; refs holding the values to type and their order as they were
  * on the first render; and helpers that size a textarea and cut the week's text
  * down to what has been typed so far.
+ * @param {PreviewDerivedInput} input
  */
 export default function usePreviewDerivedData({
   personal,
@@ -471,47 +479,52 @@ export default function usePreviewDerivedData({
 
   // Which height fields are typed follows usesImperialUnits. PreviewPersonalChapter
   // shows the ones for App's heightUnit.
+  // Each a field of previewPersonalTargets, which the walkthrough types in order.
   const previewFillOrder = useMemo(
     () =>
-      usesImperialUnits
-        ? [
-            "name",
-            "age",
-            "heightFeet",
-            "heightInches",
-            "weight",
-            "sex",
-            "activity",
-            "sleep",
-            "timeline",
-            "experience",
-            "nutrition",
-            "cardio",
-            "trainingDays",
-            "notes"
-          ]
-        : [
-            "name",
-            "age",
-            "heightCm",
-            "weight",
-            "sex",
-            "activity",
-            "sleep",
-            "timeline",
-            "experience",
-            "nutrition",
-            "cardio",
-            "trainingDays",
-            "notes"
-          ],
+      /** @satisfies {Array<keyof typeof previewPersonalTargets>} */ (
+        usesImperialUnits
+          ? [
+              "name",
+              "age",
+              "heightFeet",
+              "heightInches",
+              "weight",
+              "sex",
+              "activity",
+              "sleep",
+              "timeline",
+              "experience",
+              "nutrition",
+              "cardio",
+              "trainingDays",
+              "notes"
+            ]
+          : [
+              "name",
+              "age",
+              "heightCm",
+              "weight",
+              "sex",
+              "activity",
+              "sleep",
+              "timeline",
+              "experience",
+              "nutrition",
+              "cardio",
+              "trainingDays",
+              "notes"
+            ]
+      ),
     [usesImperialUnits]
   );
 
   // Kept from the first render, so usePreviewChapterFlow types the profile as it
   // was when the walkthrough opened, whatever changes after.
-  const previewInitialTargetsRef = useRef(null);
-  const previewInitialFillOrderRef = useRef(null);
+  const previewInitialTargetsRef = useRef(
+    /** @type {typeof previewPersonalTargets | null} */ (null)
+  );
+  const previewInitialFillOrderRef = useRef(/** @type {typeof previewFillOrder | null} */ (null));
   if (!previewInitialTargetsRef.current) {
     previewInitialTargetsRef.current = previewPersonalTargets;
   }
@@ -557,6 +570,7 @@ export default function usePreviewDerivedData({
   );
   const previewChipExpandedWidth = `calc(${Math.max(14, previewMaxChapterTitleLength)}ch + 2rem)`;
   const previewTitleWidth = `calc(${Math.max(16, previewMaxChapterTitleLength)}ch + 3.8rem)`;
+  /** @type {import("react").CSSProperties & Record<`--${string}`, string>} */
   const previewStageStyle = {
     "--preview-body-width": "clamp(1480px, 99vw, 2140px)",
     "--preview-chip-expanded": previewChipExpandedWidth,
@@ -568,6 +582,7 @@ export default function usePreviewDerivedData({
     "--preview-step-card-width-scale": "1.18",
     "--preview-step-toc-reserve-scale": "1"
   };
+  /** @type {import("react").CSSProperties & Record<`--${string}`, string>} */
   const previewTocStyle = {
     "--preview-chip-expanded": previewChipExpandedWidth,
     "--preview-chip-collapsed": "44px"
@@ -575,6 +590,11 @@ export default function usePreviewDerivedData({
 
   // ---- Helpers for the chapters ---------------------------------------------
   // A textarea's rows: one per 30 characters, between minRows and maxRows.
+  /**
+   * @param {unknown} value
+   * @param {number} [minRows]
+   * @param {number} [maxRows]
+   */
   const getPreviewTextRows = (value, minRows = 1, maxRows = 4) => {
     const text = String(value ?? "").trim();
     if (!text) return minRows;
@@ -585,6 +605,7 @@ export default function usePreviewDerivedData({
   // How much of a week header has been typed: none before stage 2, all of it
   // from stage 3, and in between the share the header progress gives, rounded
   // up. A cell's text works the same way from stage 3, by the row progress.
+  /** @param {unknown} value */
   const getPreviewWeekHeaderTypedText = (value) => {
     const text = String(value ?? "");
     if (previewWeekStage < 2) return "";
@@ -593,6 +614,7 @@ export default function usePreviewDerivedData({
     const typedLength = Math.max(0, Math.ceil(text.length * progress));
     return text.slice(0, typedLength);
   };
+  /** @param {unknown} value */
   const getPreviewWeekTypedText = (value) => {
     const text = String(value ?? "");
     if (previewWeekStage < 3) return "";

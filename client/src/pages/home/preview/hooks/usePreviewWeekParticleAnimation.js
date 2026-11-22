@@ -3,6 +3,7 @@
  * and chunks that drift up and fade, played as one animejs timeline, after
  * which the walkthrough moves on to the dashboard. Called by PreviewStage.
  */
+// @ts-check
 import { createTimeline } from "animejs";
 import { useCallback, useEffect } from "react";
 import {
@@ -21,6 +22,34 @@ import {
   PREVIEW_DASHBOARD_AUTO_ADVANCE_MS
 } from "../constants";
 import { clamp, randomBetween } from "../utils";
+
+/**
+ * What PreviewStage hands the dissolve: the chapter and the week's stage, the
+ * table and the layer it plays over, the lists it keeps its timeline, styled
+ * elements and timers on, two chapters' places, the current chapter, and the
+ * chapter switch and the week's stage setter.
+ * @typedef {object} PreviewWeekParticleInput
+ * @property {string} activePreviewChapterId
+ * @property {number} previewWeekStage
+ * @property {import("react").RefObject<HTMLDivElement | null>} previewWeekTableWrapRef
+ * @property {import("react").RefObject<HTMLDivElement | null>} previewWeekParticleLayerRef
+ * @property {import("react").RefObject<import("../PreviewStage.jsx").Timeline[]>} previewWeekParticlePlayersRef
+ * @property {import("react").RefObject<HTMLElement[]>} previewWeekParticleTargetsRef
+ * @property {import("react").RefObject<number[]>} previewFillTimeoutsRef
+ * @property {number} dashboardPreviewChapterIndex
+ * @property {number} workoutWeekChapterIndex
+ * @property {import("react").RefObject<number>} previewStepIndexRef
+ * @property {(targetIndex: number) => void} scrollToChapter
+ * @property {import("../PreviewStage.jsx").SetState<number>} setPreviewWeekStage
+ */
+
+/**
+ * One measured element of the table: where it sits in the wrap, how far down
+ * and across, and its text colour.
+ * @typedef {{ targetEl: HTMLElement, rect: DOMRect, relativeLeft: number, relativeTop: number, rowProgress: number, colProgress: number, particleColor: string }} ContentEntry
+ */
+
+/** @typedef {{ delay: number, duration: number, driftX: number, driftY: number, rotate: number, scale: number }} DriftMeta */
 
 /**
  * Plays the dissolve when the week chapter reaches stage 6, unless the visitor
@@ -42,6 +71,7 @@ import { clamp, randomBetween } from "../utils";
  * usePreviewChapterFlow clears on every chapter change. Leaving the chapter, or
  * a stage below 6, cancels the timeline, strips the inline styles it set and
  * empties the layer. Returns that clear function, for PreviewStage's unmount.
+ * @param {PreviewWeekParticleInput} input
  */
 export default function usePreviewWeekParticleAnimation({
   activePreviewChapterId,
@@ -102,7 +132,10 @@ export default function usePreviewWeekParticleAnimation({
 
     const wrapEl = previewWeekTableWrapRef.current;
     const layerEl = previewWeekParticleLayerRef.current;
-    const tableEl = wrapEl?.querySelector(".preview-week-table");
+    // The table and the cells, text and headings in it are HTML elements.
+    const tableEl = /** @type {HTMLElement | null | undefined} */ (
+      wrapEl?.querySelector(".preview-week-table")
+    );
     if (!wrapEl || !layerEl || !tableEl) return undefined;
 
     clearPreviewWeekParticleAnimation();
@@ -114,44 +147,55 @@ export default function usePreviewWeekParticleAnimation({
     // Every element with a size that overlaps the wrap, placed relative to it.
     // Its row and column progress, 0 at the top or left edge and 1 at the
     // other, are what stagger the dissolve.
-    const contentEntries = Array.from(tableEl.querySelectorAll("th, td, p, li, h3"))
-      .map((targetEl) => {
-        const rect = targetEl.getBoundingClientRect();
-        if (!rect.width || !rect.height) return null;
+    // filter(Boolean) drops the elements left out, which TypeScript does not narrow.
+    const contentEntries = /** @type {ContentEntry[]} */ (
+      Array.from(
+        /** @type {NodeListOf<HTMLElement>} */ (tableEl.querySelectorAll("th, td, p, li, h3"))
+      )
+        .map((targetEl) => {
+          const rect = targetEl.getBoundingClientRect();
+          if (!rect.width || !rect.height) return null;
 
-        const relativeLeft = rect.left - wrapRect.left;
-        const relativeTop = rect.top - wrapRect.top;
-        if (relativeLeft > wrapRect.width || relativeTop > wrapRect.height) return null;
-        if (relativeLeft + rect.width < 0 || relativeTop + rect.height < 0) return null;
+          const relativeLeft = rect.left - wrapRect.left;
+          const relativeTop = rect.top - wrapRect.top;
+          if (relativeLeft > wrapRect.width || relativeTop > wrapRect.height) return null;
+          if (relativeLeft + rect.width < 0 || relativeTop + rect.height < 0) return null;
 
-        const centerX = relativeLeft + rect.width / 2;
-        const centerY = relativeTop + rect.height / 2;
-        const rowProgress = clamp(centerY / Math.max(wrapRect.height, 1), 0, 1);
-        const colProgress = clamp(centerX / Math.max(wrapRect.width, 1), 0, 1);
-        const targetStyle = window.getComputedStyle(targetEl);
+          const centerX = relativeLeft + rect.width / 2;
+          const centerY = relativeTop + rect.height / 2;
+          const rowProgress = clamp(centerY / Math.max(wrapRect.height, 1), 0, 1);
+          const colProgress = clamp(centerX / Math.max(wrapRect.width, 1), 0, 1);
+          const targetStyle = window.getComputedStyle(targetEl);
 
-        return {
-          targetEl,
-          rect,
-          relativeLeft,
-          relativeTop,
-          rowProgress,
-          colProgress,
-          particleColor: targetStyle.color || "rgba(255, 255, 255, 0.9)"
-        };
-      })
-      .filter(Boolean);
+          return {
+            targetEl,
+            rect,
+            relativeLeft,
+            relativeTop,
+            rowProgress,
+            colProgress,
+            particleColor: targetStyle.color || "rgba(255, 255, 255, 0.9)"
+          };
+        })
+        .filter(Boolean)
+    );
     const cellEntries = contentEntries.filter((entry) => entry.targetEl.matches("th, td"));
     const textEntries = contentEntries.filter((entry) => !entry.targetEl.matches("th, td"));
     const contentTargets = contentEntries.map((entry) => entry.targetEl);
     const cellTargets = cellEntries.map((entry) => entry.targetEl);
     const textTargets = textEntries.map((entry) => entry.targetEl);
     const sourceTargets = [tableEl, ...contentTargets];
+    /** @type {HTMLSpanElement[]} */
     const particles = [];
+    /** @type {DriftMeta[]} */
     const particleMeta = [];
+    /** @type {HTMLSpanElement[]} */
     const chunks = [];
+    /** @type {DriftMeta[]} */
     const chunkMeta = [];
+    /** @type {Array<DriftMeta & { clipTop: number, clipBottom: number, clipSide: number }>} */
     const cellMeta = [];
+    /** @type {{ delay: number, rise: number }[]} */
     const textMeta = [];
     const fragment = document.createDocumentFragment();
 
@@ -310,6 +354,8 @@ export default function usePreviewWeekParticleAnimation({
     if (!particles.length && !chunks.length) return undefined;
 
     // ---- Play ---------------------------------------------------------------
+    // anime calls each function value below with the target's index, which its
+    // type leaves optional, so each read casts it.
     // The elements the timeline styles are recorded first, so that a clear can
     // strip those styles again.
     layerEl.appendChild(fragment);
@@ -359,14 +405,14 @@ export default function usePreviewWeekParticleAnimation({
         cellTargets,
         {
           opacity: [1, 0],
-          translateY: (_, index) => cellMeta[index]?.driftY ?? -18,
-          translateX: (_, index) => cellMeta[index]?.driftX ?? 0,
-          rotate: (_, index) => cellMeta[index]?.rotate ?? 0,
-          scale: (_, index) => cellMeta[index]?.scale ?? 0.95,
+          translateY: (_, index) => cellMeta[/** @type {number} */ (index)]?.driftY ?? -18,
+          translateX: (_, index) => cellMeta[/** @type {number} */ (index)]?.driftX ?? 0,
+          rotate: (_, index) => cellMeta[/** @type {number} */ (index)]?.rotate ?? 0,
+          scale: (_, index) => cellMeta[/** @type {number} */ (index)]?.scale ?? 0.95,
           clipPath: (_, index) =>
-            `inset(${(cellMeta[index]?.clipTop ?? 26).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}% ${(cellMeta[index]?.clipBottom ?? 48).toFixed(1)}% ${(cellMeta[index]?.clipSide ?? 12).toFixed(1)}%)`,
-          duration: (_, index) => cellMeta[index]?.duration ?? 1500,
-          delay: (_, index) => cellMeta[index]?.delay ?? 0,
+            `inset(${(cellMeta[/** @type {number} */ (index)]?.clipTop ?? 26).toFixed(1)}% ${(cellMeta[/** @type {number} */ (index)]?.clipSide ?? 12).toFixed(1)}% ${(cellMeta[/** @type {number} */ (index)]?.clipBottom ?? 48).toFixed(1)}% ${(cellMeta[/** @type {number} */ (index)]?.clipSide ?? 12).toFixed(1)}%)`,
+          duration: (_, index) => cellMeta[/** @type {number} */ (index)]?.duration ?? 1500,
+          delay: (_, index) => cellMeta[/** @type {number} */ (index)]?.delay ?? 0,
           ease: "outSine"
         },
         0
@@ -375,9 +421,9 @@ export default function usePreviewWeekParticleAnimation({
         textTargets,
         {
           opacity: [1, 0],
-          translateY: (_, index) => textMeta[index]?.rise ?? -20,
+          translateY: (_, index) => textMeta[/** @type {number} */ (index)]?.rise ?? -20,
           duration: PREVIEW_WEEK_PARTICLE_TOTAL_DURATION_MS - 680,
-          delay: (_, index) => textMeta[index]?.delay ?? 0,
+          delay: (_, index) => textMeta[/** @type {number} */ (index)]?.delay ?? 0,
           ease: "inOutSine"
         },
         0
@@ -385,13 +431,13 @@ export default function usePreviewWeekParticleAnimation({
       .add(
         chunks,
         {
-          translateX: (_, index) => chunkMeta[index].driftX,
-          translateY: (_, index) => chunkMeta[index].driftY,
-          rotate: (_, index) => chunkMeta[index].rotate,
-          scale: [1, (_, index) => chunkMeta[index].scale],
+          translateX: (_, index) => chunkMeta[/** @type {number} */ (index)].driftX,
+          translateY: (_, index) => chunkMeta[/** @type {number} */ (index)].driftY,
+          rotate: (_, index) => chunkMeta[/** @type {number} */ (index)].rotate,
+          scale: [1, (_, index) => chunkMeta[/** @type {number} */ (index)].scale],
           opacity: [1, 0],
-          delay: (_, index) => chunkMeta[index].delay,
-          duration: (_, index) => chunkMeta[index].duration,
+          delay: (_, index) => chunkMeta[/** @type {number} */ (index)].delay,
+          duration: (_, index) => chunkMeta[/** @type {number} */ (index)].duration,
           ease: "outSine"
         },
         0
@@ -399,13 +445,13 @@ export default function usePreviewWeekParticleAnimation({
       .add(
         particles,
         {
-          translateX: (_, index) => particleMeta[index].driftX,
-          translateY: (_, index) => particleMeta[index].driftY,
-          rotate: (_, index) => particleMeta[index].rotate,
-          scale: [1, (_, index) => particleMeta[index].scale],
+          translateX: (_, index) => particleMeta[/** @type {number} */ (index)].driftX,
+          translateY: (_, index) => particleMeta[/** @type {number} */ (index)].driftY,
+          rotate: (_, index) => particleMeta[/** @type {number} */ (index)].rotate,
+          scale: [1, (_, index) => particleMeta[/** @type {number} */ (index)].scale],
           opacity: [1, 0],
-          delay: (_, index) => particleMeta[index].delay,
-          duration: (_, index) => particleMeta[index].duration,
+          delay: (_, index) => particleMeta[/** @type {number} */ (index)].delay,
+          duration: (_, index) => particleMeta[/** @type {number} */ (index)].duration,
           ease: "outSine"
         },
         0

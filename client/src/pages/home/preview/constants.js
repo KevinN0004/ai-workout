@@ -4,6 +4,7 @@
  * it is paced by. Read throughout the walkthrough, and by HomePage for the
  * personal stage's training days.
  */
+// @ts-check
 // The days the Training days toggles offer, Monday first. HomePage's personal
 // stage stores the picked ones as they are in `personal.trainingDays`; the
 // walkthrough's personal chapter shows the same toggles, which do nothing
@@ -73,6 +74,8 @@ export const PREVIEW_GENERATING_HOLD_MS = 2400;
 
 // ---- The week table's shape -------------------------------------------------
 export const PREVIEW_WEEK_DAY_ORDER = [...TRAINING_DAY_OPTIONS];
+// Each row's valueKey names the field of a week plan day it shows.
+/** @type {Array<{ id: string, label: string, valueKey: "session" | "meta" | "workout", textClass: string }>} */
 export const PREVIEW_WEEK_TEXT_ROW_CONFIG = [
   { id: "session", label: "Session", valueKey: "session", textClass: "preview-week-session" },
   { id: "duration", label: "Duration", valueKey: "meta", textClass: "preview-week-meta" },
@@ -156,6 +159,7 @@ export const PREVIEW_TOC_SWITCH_MS = 760;
 // The fewest training days the week shows; the visitor's are topped up to it.
 export const PREVIEW_WEEK_MIN_WORKOUT_DAYS = 5;
 // Lower-case day names and short forms, for normalizePreviewTrainingDay.
+/** @type {Record<string, string>} */
 export const PREVIEW_WEEK_DAY_NORMALIZATION = {
   mon: "Monday",
   monday: "Monday",
