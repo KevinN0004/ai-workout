@@ -1,8 +1,12 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
 import { createUserRepository } from "../userRepository.js";
 
 const { deleteUser, updatePasswordHash } = createUserRepository({ prisma });
+
+// Each read below follows the write that creates its row, so its result is cast
+// to the columns it selects.
 
 const createUser = async (overrides = {}) =>
   prisma.appUser.create({
@@ -85,10 +89,12 @@ describe("updatePasswordHash", () => {
 
     await updatePasswordHash({ userId: user.id, hash: "rehashed-only" });
 
-    const after = await prisma.appUser.findUnique({
-      where: { id: user.id },
-      select: { passwordChangedAt: true }
-    });
+    const after = /** @type {{ passwordChangedAt: Date | null }} */ (
+      await prisma.appUser.findUnique({
+        where: { id: user.id },
+        select: { passwordChangedAt: true }
+      })
+    );
     expect(after.passwordChangedAt).toBeNull();
   });
 
@@ -110,10 +116,12 @@ describe("updatePasswordHash", () => {
 
     await updatePasswordHash({ userId: user.id, hash: "rehashed-again" });
 
-    const after = await prisma.appUser.findUnique({
-      where: { id: user.id },
-      select: { passwordChangedAt: true }
-    });
+    const after = /** @type {{ passwordChangedAt: Date | null }} */ (
+      await prisma.appUser.findUnique({
+        where: { id: user.id },
+        select: { passwordChangedAt: true }
+      })
+    );
     expect(after.passwordChangedAt).toEqual(original);
   });
 
@@ -131,10 +139,13 @@ describe("updatePasswordHash", () => {
       stampPasswordChange: true
     });
 
-    const after = await prisma.appUser.findUnique({
-      where: { id: user.id },
-      select: { passwordChangedAt: true }
-    });
+    // The write above stamps the change, so the column holds a time.
+    const after = /** @type {{ passwordChangedAt: Date }} */ (
+      await prisma.appUser.findUnique({
+        where: { id: user.id },
+        select: { passwordChangedAt: true }
+      })
+    );
     expect(after.passwordChangedAt).toBeInstanceOf(Date);
     expect(after.passwordChangedAt.getTime()).toBeGreaterThan(before.getTime());
   });

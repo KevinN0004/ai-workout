@@ -1,3 +1,4 @@
+// @ts-check
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -25,6 +26,9 @@ const paginatedPaths = [
 
 // requireAuth hands the routes the user row alone, as the real one does; the
 // full user comes from findUserWithDashboard.
+// The user stands in for requireAuth's, holding the id the routes read, and the
+// mapper keeps the two fields they read, so it is cast through unknown.
+/** @param {{ user?: object }} [options] */
 const buildApp = ({ user = { id: "u-1" } } = {}) => {
   const service = createDashboardCollectionService({
     cleanText,
@@ -38,9 +42,12 @@ const buildApp = ({ user = { id: "u-1" } } = {}) => {
   registerDashboardReadRoutes(app, {
     ...service,
     findUserWithDashboard,
-    mapDbDocToUser: (doc) => ({ id: doc.userId, dashboard: doc.dashboard }),
+    mapDbDocToUser:
+      /** @type {Parameters<typeof registerDashboardReadRoutes>[1]["mapDbDocToUser"]} */ (
+        /** @type {unknown} */ ((doc) => ({ id: doc.userId, dashboard: doc.dashboard }))
+      ),
     requireAuth: (req, _res, next) => {
-      req.user = user;
+      req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ (user);
       next();
     }
   });

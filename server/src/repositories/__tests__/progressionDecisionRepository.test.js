@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
 import { createProgressionDecisionRepository } from "../progressionDecisionRepository.js";
@@ -14,6 +15,10 @@ const EMAILS = ["progression-a@example.com", "progression-b@example.com"];
 const WEEK = "2026-11-09";
 const NEXT_WEEK = "2026-11-16";
 
+/**
+ * @param {string} email
+ * @param {string | null} [legacyUserId]
+ */
 const createUser = (email, legacyUserId = null) =>
   prisma.appUser.create({ data: { email, passwordHash: "x", legacyUserId } });
 

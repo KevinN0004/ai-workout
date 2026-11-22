@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -17,19 +18,23 @@ import {
 // dependency is the real injected function, so the recommendation under test is
 // the one that runs in production.
 
+// The stubs stand in for what these routes never reach, so the service built
+// from them is cast through unknown to its deps.
 const { toFiniteNumber, weatherCodeToText, buildWorkoutRecommendation } = createExternalDataService(
-  {
-    cleanText,
-    toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-    readThroughExternalCache: async () => ({}),
-    buildExternalCacheKey: () => "",
-    metrics: { externalApiFailures: {}, externalApiRetries: {} },
-    logger: { info() {}, warn() {}, error() {} },
-    toShortText: (value) => String(value ?? ""),
-    recordExternalApiLatency: () => {},
-    externalApiRetries: 0,
-    externalApiRetryBaseDelayMs: 0
-  }
+  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
+    /** @type {unknown} */ ({
+      cleanText,
+      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+      readThroughExternalCache: async () => ({}),
+      buildExternalCacheKey: () => "",
+      metrics: { externalApiFailures: {}, externalApiRetries: {} },
+      logger: { info() {}, warn() {}, error() {} },
+      toShortText: (value) => String(value ?? ""),
+      recordExternalApiLatency: () => {},
+      externalApiRetries: 0,
+      externalApiRetryBaseDelayMs: 0
+    })
+  )
 );
 
 const buildApp = (fetchOpenMeteo) => {
@@ -46,7 +51,12 @@ const buildApp = (fetchOpenMeteo) => {
   return app;
 };
 
-const upstream = (data, cache = "miss") => vi.fn(async () => ({ data, cache }));
+// A test reads what the route asked for, so the fake is cast to the Mock of the
+// call it stands in for, whose query the route passes on every call.
+const upstream = (data, cache = "miss") =>
+  /** @type {import("vitest").Mock<(query: Record<string, unknown>) => ReturnType<ReturnType<typeof createExternalDataService>["fetchOpenMeteo"]>>} */ (
+    vi.fn(async () => ({ data, cache }))
+  );
 
 // Open-Meteo's own key names. camelCase would silently read undefined and skip
 // every gate, so the snake_case here is load-bearing.
@@ -84,6 +94,7 @@ const withDaily = (currentOverrides = {}, dailyOverrides = {}) => ({
 });
 
 const upstreamError = (status) => {
+  /** @type {Error & { status?: number }} */
   const err = new Error("open-meteo exploded");
   if (status !== undefined) err.status = status;
   return err;

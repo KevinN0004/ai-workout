@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 // What the app's real logger writes for a weather request that carries the
@@ -8,10 +9,13 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 // The coordinates are out of range, so the route answers 400 from validation
 // and never reaches Open-Meteo; the log lines are written either way.
 
-const { lines } = vi.hoisted(() => ({ lines: [] }));
+// The lines start empty, so the list is cast to the parsed lines pushed into it.
+const { lines } = vi.hoisted(() => ({ lines: /** @type {Array<Record<string, unknown>>} */ ([]) }));
 
 vi.mock("pino", async (importOriginal) => {
-  const actual = await importOriginal();
+  // importOriginal takes the module's type only as a type argument, which
+  // JavaScript cannot pass, so it is cast to pino's.
+  const actual = /** @type {typeof import("pino")} */ (await importOriginal());
   const realPino = actual.default;
   const sink = { write: (line) => lines.push(JSON.parse(line)) };
   const capturing = (options) => realPino(options, sink);
@@ -50,7 +54,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise((resolve) => server.close(() => resolve()));
+  // A server's close answers with no value.
+  await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
 });
 
 describe("request logging in index.js", () => {

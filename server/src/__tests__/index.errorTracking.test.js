@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 
 // index.js wires one forwarder to the error tracker into both 5xx paths: the
@@ -12,14 +13,20 @@ const { setErrorResponseTracker, createErrorHandler } = vi.hoisted(() => ({
   createErrorHandler: vi.fn()
 }));
 
+// importOriginal takes the module's type only as a type argument, which
+// JavaScript cannot pass, so each is cast to the module it imports.
 vi.mock("../services/http/errorResponseService.js", async (importOriginal) => {
-  const original = await importOriginal();
+  const original = /** @type {typeof import("../services/http/errorResponseService.js")} */ (
+    await importOriginal()
+  );
   setErrorResponseTracker.mockImplementation(original.setErrorResponseTracker);
   return { ...original, setErrorResponseTracker };
 });
 
 vi.mock("../middleware/errorHandler.js", async (importOriginal) => {
-  const original = await importOriginal();
+  const original = /** @type {typeof import("../middleware/errorHandler.js")} */ (
+    await importOriginal()
+  );
   createErrorHandler.mockImplementation(original.createErrorHandler);
   return { ...original, createErrorHandler };
 });

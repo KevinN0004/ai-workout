@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
 import { createUserReadRepository, mapUser } from "../userReadRepository.js";
@@ -21,6 +22,16 @@ const { updateProfile, updateGoals, updatePasswordHash, saveCalorieEntry } = cre
 });
 const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 
+// Each read below follows the write that creates its row, so its result is cast
+// to the row. mapUser's fixtures hold only the columns it reads, and
+// loadCollectionPage returns its entries as object, so a test reading their
+// fields casts them to the collection's entry.
+/** @typedef {NonNullable<ReturnType<typeof mapUser>>} LoadedUser */
+/** @typedef {NonNullable<Awaited<ReturnType<typeof findUserRow>>>} UserRow */
+/** @typedef {import("@prisma/client").AppUser} AppUser */
+/** @typedef {ReturnType<typeof import("../workoutSessionRepository.js").mapWorkoutSession>} SessionEntry */
+/** @typedef {ReturnType<typeof import("../progressMetricRepository.js").mapProgressMetric>} MetricEntry */
+
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
   email: overrides.email ?? `shim-${crypto.randomUUID().slice(0, 8)}@example.com`,
@@ -41,14 +52,14 @@ afterAll(async () => {
 describe("userReadRepository", () => {
   test("create round-trips through findOne by userId", async () => {
     const doc = baseUserDoc({ profile: { firstName: "Ada" } });
-    const created = await createUserWithDashboard(doc);
+    const created = /** @type {LoadedUser} */ (await createUserWithDashboard(doc));
 
     expect(created.userId).toBe(doc.userId);
     expect(created.email).toBe(doc.email);
     expect(created.profile).toEqual({ firstName: "Ada" });
     expect(created.dashboard.workoutSessions).toEqual([]);
 
-    const found = await findUserWithDashboard(doc.userId);
+    const found = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(found.userId).toBe(doc.userId);
     expect(found.hash).toBe(doc.hash);
   });
@@ -57,7 +68,7 @@ describe("userReadRepository", () => {
     const doc = baseUserDoc({ email: "Mixed.Case@Example.com" });
     await createUserWithDashboard(doc);
 
-    const found = await findUserRowByEmail("mixed.case@example.com");
+    const found = /** @type {UserRow} */ (await findUserRowByEmail("mixed.case@example.com"));
     expect(found).not.toBeNull();
     expect(found.email).toBe("mixed.case@example.com");
   });
@@ -79,10 +90,12 @@ describe("userReadRepository", () => {
     const doc = baseUserDoc({ profile: { firstName: "Ada" } });
     await createUserWithDashboard(doc);
     await saveGeneratedPlan({ userId: doc.userId, entry: { goal: "Strength", plan: "squat" } });
-    const pk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
+    const pk = /** @type {AppUser} */ (
+      await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })
+    ).id;
 
     for (const id of [doc.userId, pk]) {
-      const found = await findUserRow(id);
+      const found = /** @type {UserRow} */ (await findUserRow(id));
       expect(found.userId).toBe(doc.userId);
       expect(found.hash).toBe(doc.hash);
       expect(found.profile).toEqual({ firstName: "Ada" });
@@ -94,13 +107,18 @@ describe("userReadRepository", () => {
   test("findUserRow reads passwordChangedAt exactly as the full load does", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
-    expect((await findUserRow(doc.userId)).passwordChangedAt).toBeNull();
+    expect(/** @type {UserRow} */ (await findUserRow(doc.userId)).passwordChangedAt).toBeNull();
 
     await updatePasswordHash({ userId: doc.userId, hash: "h2", stampPasswordChange: true });
 
-    const changed = (await findUserRow(doc.userId)).passwordChangedAt;
+    // The update above stamps the change, so the row holds its time.
+    const changed = /** @type {string} */ (
+      /** @type {UserRow} */ (await findUserRow(doc.userId)).passwordChangedAt
+    );
     expect(Number.isFinite(Date.parse(changed))).toBe(true);
-    expect(changed).toBe((await findUserWithDashboard(doc.userId)).passwordChangedAt);
+    expect(changed).toBe(
+      /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId)).passwordChangedAt
+    );
   });
 
   // Goals live in one JSON column, so a partial write must patch rather than
@@ -112,7 +130,7 @@ describe("userReadRepository", () => {
     await updateGoals({ userId: doc.userId, goals: { calories: 2200 } });
     await updateGoals({ userId: doc.userId, goals: { protein: 160 } });
 
-    const updated = await findUserWithDashboard(doc.userId);
+    const updated = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(updated.dashboard.goals).toEqual({ calories: 2200, protein: 160 });
   });
 
@@ -123,7 +141,7 @@ describe("userReadRepository", () => {
 
     expect(await updateGoals({ userId: doc.userId, goals: {} })).toBe(true);
 
-    const updated = await findUserWithDashboard(doc.userId);
+    const updated = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(updated.dashboard.goals).toEqual({ calories: 2200 });
   });
 
@@ -133,7 +151,7 @@ describe("userReadRepository", () => {
 
     expect(await updateProfile({ userId: doc.userId, profile: { firstName: "Grace" } })).toBe(true);
 
-    const updated = await findUserWithDashboard(doc.userId);
+    const updated = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(updated.profile).toEqual({ firstName: "Grace" });
   });
 
@@ -145,7 +163,7 @@ describe("userReadRepository", () => {
     await saveCalorieEntry({ userId: doc.userId, entry });
     await saveCalorieEntry({ userId: doc.userId, entry: { ...entry, calories: 2000 } });
 
-    const after = await findUserWithDashboard(doc.userId);
+    const after = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(after.dashboard.calories).toHaveLength(1);
     expect(after.dashboard.calories[0].calories).toBe(2000);
   });
@@ -160,7 +178,7 @@ describe("userReadRepository", () => {
       entry: { id: "p-2", goal: "Second", plan: "b" }
     });
 
-    const after = await findUserWithDashboard(doc.userId);
+    const after = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(after.dashboard.plans).toHaveLength(2);
     expect(after.dashboard.plans[0].goal).toBe("Second");
   });
@@ -171,7 +189,9 @@ describe("userReadRepository", () => {
   test("the 200 plan limit is applied on read, whatever is stored", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
-    const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
+    const userPk = /** @type {AppUser} */ (
+      await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })
+    ).id;
 
     await prisma.generatedPlan.createMany({
       data: Array.from({ length: 205 }, (_, index) => ({
@@ -185,7 +205,7 @@ describe("userReadRepository", () => {
 
     expect(await prisma.generatedPlan.count()).toBe(205);
 
-    const after = await findUserWithDashboard(doc.userId);
+    const after = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(after.dashboard.plans).toHaveLength(200);
     expect(after.dashboard.plans[0].goal).toBe("G204");
   });
@@ -203,14 +223,16 @@ describe("userReadRepository", () => {
   test("removing a saved exercise clears it from the user's dashboard", async () => {
     const doc = baseUserDoc();
     await createUserWithDashboard(doc);
-    const userPk = (await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })).id;
+    const userPk = /** @type {AppUser} */ (
+      await prisma.appUser.findFirst({ where: { legacyUserId: doc.userId } })
+    ).id;
     await prisma.savedExercise.create({
       data: { userId: userPk, legacyId: "saved-1", name: "Squat" }
     });
 
     expect(await removeExercise({ userId: doc.userId, entryId: "saved-1" })).toBe(1);
 
-    const after = await findUserWithDashboard(doc.userId);
+    const after = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(after.dashboard.savedExercises).toEqual([]);
   });
 
@@ -221,7 +243,7 @@ describe("userReadRepository", () => {
     await saveExercise({ userId: doc.userId, entry: { name: "Squat", reason: "first" } });
     await saveExercise({ userId: doc.userId, entry: { name: "squat", reason: "second" } });
 
-    const after = await findUserWithDashboard(doc.userId);
+    const after = /** @type {LoadedUser} */ (await findUserWithDashboard(doc.userId));
     expect(after.dashboard.savedExercises).toHaveLength(1);
     expect(after.dashboard.savedExercises[0].reason).toBe("second");
   });
@@ -239,28 +261,36 @@ describe("userReadRepository", () => {
 // mapping concern, not a storage one.
 describe("passwordChangedAt", () => {
   test("is carried through as an ISO string when set", () => {
-    const mapped = mapUser({
-      id: "00000000-0000-0000-0000-000000000001",
-      email: "person@example.com",
-      passwordHash: "$argon2id$hash",
-      passwordAlgo: "argon2id",
-      passwordChangedAt: new Date("2026-09-18T10:00:00.000Z"),
-      profile: {},
-      goals: {}
-    });
+    const mapped = /** @type {LoadedUser} */ (
+      mapUser(
+        /** @type {AppUser} */ ({
+          id: "00000000-0000-0000-0000-000000000001",
+          email: "person@example.com",
+          passwordHash: "$argon2id$hash",
+          passwordAlgo: "argon2id",
+          passwordChangedAt: new Date("2026-09-18T10:00:00.000Z"),
+          profile: {},
+          goals: {}
+        })
+      )
+    );
     expect(mapped.passwordChangedAt).toBe("2026-09-18T10:00:00.000Z");
   });
 
   test("is null when the column has never been written", () => {
-    const mapped = mapUser({
-      id: "00000000-0000-0000-0000-000000000001",
-      email: "person@example.com",
-      passwordHash: "$argon2id$hash",
-      passwordAlgo: "argon2id",
-      passwordChangedAt: null,
-      profile: {},
-      goals: {}
-    });
+    const mapped = /** @type {LoadedUser} */ (
+      mapUser(
+        /** @type {AppUser} */ ({
+          id: "00000000-0000-0000-0000-000000000001",
+          email: "person@example.com",
+          passwordHash: "$argon2id$hash",
+          passwordAlgo: "argon2id",
+          passwordChangedAt: null,
+          profile: {},
+          goals: {}
+        })
+      )
+    );
     expect(mapped.passwordChangedAt).toBeNull();
   });
 });
@@ -278,17 +308,21 @@ describe("dashboard collection repositories", () => {
   test("workout save creates then updates the same legacy id", async () => {
     const userId = await seedUser();
 
-    const created = await saveWorkoutSession({
-      userId,
-      session: { id: "w-1", date: "2026-03-02", focus: "Push", duration: 45, sets: 4, reps: 8 }
-    });
+    const created = /** @type {SessionEntry} */ (
+      await saveWorkoutSession({
+        userId,
+        session: { id: "w-1", date: "2026-03-02", focus: "Push", duration: 45, sets: 4, reps: 8 }
+      })
+    );
     expect(created.focus).toBe("Push");
     expect(created.date).toBe("2026-03-02");
 
-    const updated = await saveWorkoutSession({
-      userId,
-      session: { id: "w-1", date: "2026-03-02", focus: "Pull", duration: 50 }
-    });
+    const updated = /** @type {SessionEntry} */ (
+      await saveWorkoutSession({
+        userId,
+        session: { id: "w-1", date: "2026-03-02", focus: "Pull", duration: 50 }
+      })
+    );
     expect(updated.focus).toBe("Pull");
     expect((await page("workoutSessions", userId, "createdAt")).total).toBe(1);
   });
@@ -308,10 +342,14 @@ describe("dashboard collection repositories", () => {
     }
 
     const newestFirst = await page("workoutSessions", userId, "createdAt");
-    expect(newestFirst.items.map((row) => row.focus)).toEqual(["C", "B", "A"]);
+    expect(/** @type {SessionEntry[]} */ (newestFirst.items).map((row) => row.focus)).toEqual([
+      "C",
+      "B",
+      "A"
+    ]);
 
     const paged = await page("workoutSessions", userId, "createdAt", 1, 1);
-    expect(paged.items.map((row) => row.focus)).toEqual(["B"]);
+    expect(/** @type {SessionEntry[]} */ (paged.items).map((row) => row.focus)).toEqual(["B"]);
     expect(paged.total).toBe(3);
   });
 
@@ -331,7 +369,7 @@ describe("dashboard collection repositories", () => {
 
     expect(result.total).toBe(1);
     expect(result.items).toHaveLength(result.total);
-    expect(result.items[0].focus).toBe("Legs");
+    expect(/** @type {SessionEntry[]} */ (result.items)[0].focus).toBe("Legs");
   });
 
   // loadCollectionPage breaks ties on the sort field by id, so paging over tied
@@ -349,7 +387,7 @@ describe("dashboard collection repositories", () => {
     const seen = [];
     for (let offset = 0; offset < 6; offset += 2) {
       const result = await page("workoutSessions", userId, "createdAt", 2, offset);
-      seen.push(...result.items.map((row) => row.id));
+      seen.push(.../** @type {SessionEntry[]} */ (result.items).map((row) => row.id));
     }
 
     expect(seen).toHaveLength(6);
@@ -407,7 +445,9 @@ describe("dashboard collection repositories", () => {
       metric: { id: "p-1", date: "2026-03-02", weightLb: 181.5, bodyFatPct: 17.25, restingHr: 54 }
     });
 
-    const [metric] = (await page("progressMetrics", userId, "loggedAt")).items;
+    const [metric] = /** @type {MetricEntry[]} */ (
+      (await page("progressMetrics", userId, "loggedAt")).items
+    );
     expect(metric.weightLb).toBe(181.5);
     expect(metric.bodyFatPct).toBe(17.25);
     expect(metric.restingHr).toBe(54);

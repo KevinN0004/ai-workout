@@ -1,3 +1,4 @@
+// @ts-check
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -36,14 +37,21 @@ afterAll(() => {
 // which pass their own, ever meet the shell's limit.
 const OUT_OF_THE_WAY = 1000;
 
+// The loggers hold only the calls the static client makes, and a vi.fn() is not
+// one of pino's log functions, so each is cast through unknown; the metrics hold
+// the one counter it moves.
+/** @typedef {import("pino").Logger} Logger */
+
 const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
   const app = express();
-  const metrics = { rateLimited: 0 };
+  const metrics = /** @type {import("../services/platform/metricsService.js").Metrics} */ ({
+    rateLimited: 0
+  });
   const requestLog = { warn: vi.fn() };
 
   // Stands in for requestContext.js, which attaches the per-request logger.
   app.use((req, _res, next) => {
-    req.log = requestLog;
+    req.log = /** @type {Logger} */ (/** @type {unknown} */ (requestLog));
     next();
   });
 
@@ -55,7 +63,7 @@ const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
     express,
     existsSync: fs.existsSync,
     distPath,
-    logger: { warn: vi.fn(), info: vi.fn() },
+    logger: /** @type {Logger} */ (/** @type {unknown} */ ({ warn: vi.fn(), info: vi.fn() })),
     metrics,
     shellRateLimit: { windowMs: 60_000, limit }
   });
@@ -106,13 +114,20 @@ describe("registerClientStatic", () => {
 
   test("declines, without throwing, when the bundle has not been built", () => {
     const onMissing = vi.fn();
-    const mounted = registerClientStatic(express(), {
-      express,
-      existsSync: () => false,
-      distPath: "/nowhere",
-      logger: { warn: vi.fn(), info: vi.fn() },
-      onMissing
-    });
+    // It declines before it reads the metrics, so this call passes none, and its
+    // stubs are narrower than the options: they are cast through unknown.
+    const mounted = registerClientStatic(
+      express(),
+      /** @type {NonNullable<Parameters<typeof registerClientStatic>[1]>} */ (
+        /** @type {unknown} */ ({
+          express,
+          existsSync: () => false,
+          distPath: "/nowhere",
+          logger: /** @type {Logger} */ (/** @type {unknown} */ ({ warn: vi.fn(), info: vi.fn() })),
+          onMissing
+        })
+      )
+    );
 
     // `npm run dev:server` never builds the client. Refusing to start would
     // break the ordinary development path, so this warns rather than crashing.

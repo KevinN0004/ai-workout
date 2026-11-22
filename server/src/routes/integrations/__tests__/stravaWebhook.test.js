@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -11,19 +12,31 @@ import { registerStravaWebhook } from "../registerStravaWebhook.js";
 const PATH = "/webhooks/strava";
 const CONFIG = { verifyToken: "verify-me", subscriptionId: 77 };
 
+// The config holds the two fields the webhook reads; a logger of vi.fn()s is not
+// pino's, and the stub service holds the one call the webhook makes, so each is
+// cast through unknown.
+/**
+ * @param {{ config?: { verifyToken: string | null, subscriptionId: number | null } | null, handleEvent?: import("vitest").Mock }} [options]
+ */
 const buildApp = ({ config = CONFIG, handleEvent = vi.fn(async () => "create") } = {}) => {
   const app = express();
   app.use(express.json());
   const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
   app.use((req, _res, next) => {
-    req.log = log;
+    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (log));
     next();
   });
   const scheduled = [];
   const limiterCalls = [];
   registerStravaWebhook(app, {
-    getStravaConfig: () => config,
-    stravaService: { handleEvent },
+    getStravaConfig: () =>
+      /** @type {NonNullable<ReturnType<typeof import("../../../services/integrations/stravaConfig.js").readStravaConfig>> | null} */ (
+        config
+      ),
+    stravaService:
+      /** @type {ReturnType<typeof import("../../../services/integrations/stravaService.js").createStravaService>} */ (
+        /** @type {unknown} */ ({ handleEvent })
+      ),
     stravaWebhookLimiter: (_req, _res, next) => {
       limiterCalls.push(1);
       next();

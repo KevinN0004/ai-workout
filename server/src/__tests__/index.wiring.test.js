@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 // /api/generate needs a Gemini client to get past its first check, and index.js
@@ -15,6 +16,10 @@ vi.mock("@google/genai", () => ({
 import { app } from "../index.js";
 import { prisma } from "../db/prisma.js";
 import { GENERATED_PLAN_LIMIT } from "../repositories/generatedPlanRepository.js";
+
+// Each response read is cast to what its route answers, and each read of a row
+// follows the sign-up that creates it.
+/** @typedef {import("../services/http/errorResponseService.js").ErrorBody} ErrorBody */
 
 // authRoutes.test.js and generateRoutes.equipment.test.js build their routes
 // from dependencies passed by hand, which proves nothing about the real app:
@@ -66,12 +71,19 @@ const fetchCsrf = async (sidCookie) => {
   const response = await fetch(`${baseUrl}/api/csrf-token`, {
     headers: sidCookie ? { Cookie: sidCookie } : {}
   });
-  const payload = await response.json();
+  const payload = /** @type {import("../routes/systemRoutes.js").CsrfTokenResponse} */ (
+    await response.json()
+  );
   const csrfToken = String(payload?.csrfToken || "");
   const csrfCookie = extractCookieFromHeader(response.headers.get("set-cookie"), "csrfToken");
   return { csrfToken, csrfCookie };
 };
 
+/**
+ * @param {string} path
+ * @param {string} method
+ * @param {{ sidCookie?: string, body?: object }} [options]
+ */
 const withCsrf = async (path, method, { sidCookie, body } = {}) => {
   const { csrfToken, csrfCookie } = await fetchCsrf(sidCookie);
   const cookie = [sidCookie, csrfCookie].filter(Boolean).join("; ");
@@ -122,12 +134,15 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.appUser.deleteMany({ where: { email: { in: WIRING_TEST_EMAILS } } });
   if (!server) return;
-  await new Promise((resolve, reject) => {
-    server.close((error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
+  // A server's close answers with no value.
+  await /** @type {Promise<void>} */ (
+    new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    })
+  );
 });
 
 describe("account management routes are wired into the real app", () => {
@@ -140,7 +155,7 @@ describe("account management routes are wired into the real app", () => {
     // for that.
     expect(response.status).not.toBe(404);
     expect(response.status).toBe(401);
-    const body = await response.json();
+    const body = /** @type {ErrorBody} */ (await response.json());
     expect(body.error).toMatch(/not signed in/i);
   });
 
@@ -153,7 +168,7 @@ describe("account management routes are wired into the real app", () => {
     // that.
     expect(response.status).not.toBe(404);
     expect(response.status).toBe(401);
-    const body = await response.json();
+    const body = /** @type {ErrorBody} */ (await response.json());
     expect(body.error).toMatch(/not signed in/i);
   });
 
@@ -288,7 +303,9 @@ describe("plan generation is wired into the real app", () => {
   test("POST /api/generate prunes the signed-in user's plans to the read cap", async () => {
     const email = "wiring-plan-prune@example.test";
     const sidCookie = await signUp(email, "PrunePlans123!");
-    const owner = await prisma.appUser.findFirst({ where: { email } });
+    const owner = /** @type {import("@prisma/client").AppUser} */ (
+      await prisma.appUser.findFirst({ where: { email } })
+    );
     await prisma.generatedPlan.createMany({
       data: Array.from({ length: GENERATED_PLAN_LIMIT }, (_, index) => ({
         userId: owner.id,

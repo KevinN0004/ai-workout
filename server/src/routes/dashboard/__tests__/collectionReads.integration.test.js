@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
@@ -223,9 +224,12 @@ describe("dashboard collection reads", () => {
       .send({ exerciseId: 192, name: "Barbell bench press", category: "Chest" });
     expect(saved.status).toBe(200);
     // No route saves a plan without a live Gemini call, so the row goes in directly.
-    const owner = await prisma.appUser.findFirst({
-      where: { email: "collection-reads@example.com" }
-    });
+    // The sign-up in beforeEach created the row.
+    const owner = /** @type {import("@prisma/client").AppUser} */ (
+      await prisma.appUser.findFirst({
+        where: { email: "collection-reads@example.com" }
+      })
+    );
     await prisma.generatedPlan.create({
       data: { userId: owner.id, goal: "Build muscle", planText: "Monday: bench press 4x8" }
     });

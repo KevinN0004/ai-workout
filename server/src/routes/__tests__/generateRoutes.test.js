@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -27,18 +28,29 @@ import { __testables as indexTestables } from "../../index.js";
 
 const NOTES = "Progress one rep at a time.\nSleep well.\nWalk on rest days.";
 const generateContent = vi.fn();
-const gemini = { models: { generateContent } };
+// The client holds only the call the route makes, so it is cast through unknown.
+const gemini = /** @type {import("@google/genai").GoogleGenAI} */ (
+  /** @type {unknown} */ ({ models: { generateContent } })
+);
 
 let saveGeneratedPlan;
 let pruneGeneratedPlans;
 
+/**
+ * @param {object} [overrides]
+ * @param {{ user?: object, requestId?: string, log?: object }} [context]
+ */
 const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    if (user) req.user = user;
+    // A test's user holds the fields the route reads, and its logger the calls.
+    if (user)
+      req.user = /** @type {import("../../services/auth/authUserService.js").AuthUser} */ (user);
     if (requestId) req.requestId = requestId;
-    req.log = log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+    req.log = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ (log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() })
+    );
     next();
   });
   registerGenerateRoutes(app, {
@@ -67,6 +79,10 @@ const body = (overrides = {}) => ({
   focuses: [],
   ...overrides
 });
+/**
+ * @param {import("express").Express} app
+ * @param {object} [payload]
+ */
 const post = (app, payload = body()) => request(app).post("/api/generate").send(payload);
 
 // The notes request sent to the model, and the notes section of an answer.

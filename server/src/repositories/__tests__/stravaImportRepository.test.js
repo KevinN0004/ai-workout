@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
 import { createStravaImportRepository } from "../stravaImportRepository.js";

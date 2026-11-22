@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createShutdownHandler } from "../shutdown.js";
 
@@ -19,26 +20,30 @@ const buildDeps = (overrides = {}) => {
   return {
     order,
     httpServer,
-    deps: {
-      logger: createLogger(),
-      toShortText: (value) => String(value || ""),
-      getHttpServer: () => httpServer,
-      closeSessionStore: vi.fn(async () => {
-        order.push("session");
-      }),
-      disconnectPrisma: vi.fn(async () => {
-        order.push("prisma");
-      }),
-      closePostgres: vi.fn(async () => {
-        order.push("postgres");
-      }),
-      flushErrorTracker: vi.fn(async () => {
-        order.push("flush");
-      }),
-      shutdownTimeoutMs: 5000,
-      exit: vi.fn(),
-      ...overrides
-    }
+    // The logger and HTTP server fakes hold only the calls shutdown makes, so the
+    // deps are cast through unknown.
+    deps: /** @type {Parameters<typeof createShutdownHandler>[0]} */ (
+      /** @type {unknown} */ ({
+        logger: createLogger(),
+        toShortText: (value) => String(value || ""),
+        getHttpServer: () => httpServer,
+        closeSessionStore: vi.fn(async () => {
+          order.push("session");
+        }),
+        disconnectPrisma: vi.fn(async () => {
+          order.push("prisma");
+        }),
+        closePostgres: vi.fn(async () => {
+          order.push("postgres");
+        }),
+        flushErrorTracker: vi.fn(async () => {
+          order.push("flush");
+        }),
+        shutdownTimeoutMs: 5000,
+        exit: vi.fn(),
+        ...overrides
+      })
+    )
   };
 };
 

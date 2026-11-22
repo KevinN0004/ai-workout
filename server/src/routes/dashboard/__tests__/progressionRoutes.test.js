@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -11,19 +12,28 @@ import { validateBody } from "../../../services/http/apiSchemaService.js";
 
 const NOW = new Date("2026-11-09T12:00:00Z");
 
+// The user holds the id the routes read; a logger of vi.fn()s is not pino's, and
+// the stub mapper hands the doc back as is, so each is cast through unknown.
 const buildApp = (overrides = {}) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.user = { id: "u-1" };
-    req.log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+    req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ ({
+      id: "u-1"
+    });
+    req.log = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() })
+    );
     next();
   });
   registerProgressionRoutes(app, {
     requireAuth: (_req, _res, next) => next(),
     validateBody,
     findUserWithDashboard: async () => null,
-    mapDbDocToUser: (doc) => doc,
+    mapDbDocToUser:
+      /** @type {Parameters<typeof registerProgressionRoutes>[1]["mapDbDocToUser"]} */ (
+        /** @type {unknown} */ ((doc) => doc)
+      ),
     listWeekDecisions: async () => ({}),
     saveDecision: vi.fn(),
     removeDecision: vi.fn(),

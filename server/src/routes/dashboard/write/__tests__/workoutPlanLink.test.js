@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -12,25 +13,36 @@ import { buildWorkoutSessionEntry } from "../../../../services/dashboard/dashboa
 // logs. The repository, which decides whether a link is kept, is stubbed here;
 // workoutSessions.integration.test.js runs it against real Postgres.
 
+// The user holds the id the route reads; a logger of vi.fn()s is not pino's, and
+// the deps cover the workout route alone, with stubs holding what it reads of
+// their answers, so each is cast through unknown.
+/** @typedef {Parameters<typeof registerWorkoutAndGoalRoutes>[1]} Deps */
 const buildApp = ({ saveWorkoutSession }) => {
   const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.user = { id: "u-1" };
-    req.log = log;
+    req.user = /** @type {import("../../../../services/auth/authUserService.js").AuthUser} */ ({
+      id: "u-1"
+    });
+    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (log));
     next();
   });
-  registerWorkoutAndGoalRoutes(app, {
-    requireAuth: (_req, _res, next) => next(),
-    validateBody,
-    workoutSessionBodySchema,
-    buildWorkoutSessionEntry,
-    saveWorkoutSession,
-    findUserWithDashboard: async () => ({ id: "u-1" }),
-    mapDbDocToUser: (doc) => doc,
-    buildDashboardResponse: async () => ({ dashboard: {} })
-  });
+  registerWorkoutAndGoalRoutes(
+    app,
+    /** @type {Deps} */ (
+      /** @type {unknown} */ ({
+        requireAuth: (_req, _res, next) => next(),
+        validateBody,
+        workoutSessionBodySchema,
+        buildWorkoutSessionEntry,
+        saveWorkoutSession,
+        findUserWithDashboard: async () => ({ id: "u-1" }),
+        mapDbDocToUser: (doc) => doc,
+        buildDashboardResponse: async () => ({ dashboard: {} })
+      })
+    )
+  );
   return { app, log };
 };
 
@@ -87,7 +99,10 @@ describe("the workout route and a plan-day link", () => {
   });
 
   test("hands the repository the link it was sent", async () => {
-    const saveWorkoutSession = vi.fn(async () => null);
+    // The test reads what the route saved, so the fake is the Mock of the save.
+    const saveWorkoutSession = /** @type {import("vitest").Mock<Deps["saveWorkoutSession"]>} */ (
+      vi.fn(async () => null)
+    );
     const { app } = buildApp({ saveWorkoutSession });
 
     await post(app, { planId: "plan-1", planDayIndex: 0 });

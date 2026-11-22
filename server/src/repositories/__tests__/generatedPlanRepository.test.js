@@ -1,3 +1,4 @@
+// @ts-check
 import { readFileSync } from "node:fs";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
@@ -27,6 +28,14 @@ const realAnswer = readFileSync(
 );
 const { findUserWithDashboard } = createUserReadRepository({ prisma });
 
+// Each read below follows the write that creates its row, so its result is cast
+// to the row. mapGeneratedPlan's fixtures hold only the column it reads, and
+// $queryRaw takes its row type only as a type argument, which JavaScript cannot
+// pass, so its result is cast to the columns its query selects.
+/** @typedef {NonNullable<Awaited<ReturnType<typeof findUserWithDashboard>>>} LoadedUser */
+/** @typedef {NonNullable<Awaited<ReturnType<typeof saveGeneratedPlan>>>} SavedPlan */
+/** @typedef {import("@prisma/client").GeneratedPlan} GeneratedPlan */
+
 const createUser = (email, legacyUserId) =>
   prisma.appUser.create({ data: { email, passwordHash: "x", legacyUserId } });
 
@@ -48,7 +57,9 @@ const plansOf = async (userId) =>
 
 // The plans the dashboard reads for this user, through the real read.
 const readSetOf = async (userId) =>
-  (await findUserWithDashboard(userId)).dashboard.plans.map((plan) => plan.id).sort();
+  /** @type {LoadedUser} */ (await findUserWithDashboard(userId)).dashboard.plans
+    .map((plan) => plan.id)
+    .sort();
 
 beforeEach(async () => {
   await prisma.appUser.deleteMany({});
@@ -60,17 +71,20 @@ afterAll(async () => {
 
 describe("the plan's structure", () => {
   const storedPayloadOf = async (userId) =>
-    (await prisma.generatedPlan.findFirst({ where: { userId }, select: { planPayload: true } }))
-      .planPayload;
+    /** @type {Pick<GeneratedPlan, "planPayload">} */ (
+      await prisma.generatedPlan.findFirst({ where: { userId }, select: { planPayload: true } })
+    ).planPayload;
 
   test("is stored with the plan and returned as its payload", async () => {
     const user = await createUser("payload-saved@example.com");
     const payload = buildPlanPayload(realAnswer);
 
-    const saved = await saveGeneratedPlan({
-      userId: user.id,
-      entry: { plan: realAnswer, payload }
-    });
+    const saved = /** @type {SavedPlan} */ (
+      await saveGeneratedPlan({
+        userId: user.id,
+        entry: { plan: realAnswer, payload }
+      })
+    );
 
     expect(saved.payload).toEqual(payload);
     expect(await storedPayloadOf(user.id)).toEqual(payload);
@@ -80,22 +94,38 @@ describe("the plan's structure", () => {
   test.each([
     ["no structure", {}],
     ["a malformed structure", { payload: { version: 2, days: [], notes: [] } }]
-  ])("stores {} for an entry with %s, and returns null", async (_label, extra) => {
-    const user = await createUser(`payload-none-${extra.payload ? "bad" : "absent"}@example.com`);
+  ])(
+    "stores {} for an entry with %s, and returns null",
+    async (_label, /** @type {{ payload?: unknown }} */ extra) => {
+      const user = await createUser(`payload-none-${extra.payload ? "bad" : "absent"}@example.com`);
 
-    const saved = await saveGeneratedPlan({ userId: user.id, entry: { plan: "x", ...extra } });
+      const saved = /** @type {SavedPlan} */ (
+        await saveGeneratedPlan({ userId: user.id, entry: { plan: "x", ...extra } })
+      );
 
-    expect(saved.payload).toBeNull();
-    expect(await storedPayloadOf(user.id)).toEqual({});
-  });
+      expect(saved.payload).toBeNull();
+      expect(await storedPayloadOf(user.id)).toEqual({});
+    }
+  );
 
   test("reads a valid stored structure back, and anything else as null", () => {
     const payload = buildPlanPayload(realAnswer);
 
-    expect(mapGeneratedPlan({ planPayload: payload }).payload).toEqual(payload);
-    expect(mapGeneratedPlan({ planPayload: {} }).payload).toBeNull();
+    // A plan's structure is JSON, but neither PlanPayload nor the malformed one
+    // below has the index signature Prisma's JsonValue needs, so each fixture is
+    // cast through unknown.
     expect(
-      mapGeneratedPlan({ planPayload: { version: 1, days: "x", notes: [] } }).payload
+      mapGeneratedPlan(
+        /** @type {GeneratedPlan} */ (/** @type {unknown} */ ({ planPayload: payload }))
+      ).payload
+    ).toEqual(payload);
+    expect(mapGeneratedPlan(/** @type {GeneratedPlan} */ ({ planPayload: {} })).payload).toBeNull();
+    expect(
+      mapGeneratedPlan(
+        /** @type {GeneratedPlan} */ (
+          /** @type {unknown} */ ({ planPayload: { version: 1, days: "x", notes: [] } })
+        )
+      ).payload
     ).toBeNull();
   });
 });
@@ -159,6 +189,10 @@ describe("pruneGeneratedPlans", () => {
 // Roadmap C4: a plan read for a swap, and rewritten under its row's lock.
 describe("findPlanForUser and rewritePlan", () => {
   const payload = buildPlanPayload(realAnswer);
+  /**
+   * @param {string} email
+   * @param {string | null} [legacyId]
+   */
   const seedPlan = async (email, legacyId = null) => {
     const user = await createUser(email);
     const row = await prisma.generatedPlan.create({
@@ -167,7 +201,9 @@ describe("findPlanForUser and rewritePlan", () => {
     return { user, row };
   };
   const textOf = async (id) =>
-    (await prisma.generatedPlan.findUnique({ where: { id }, select: { planText: true } })).planText;
+    /** @type {Pick<GeneratedPlan, "planText">} */ (
+      await prisma.generatedPlan.findUnique({ where: { id }, select: { planText: true } })
+    ).planText;
 
   test("finds the user's plan by its legacy id or its id, and no one else's", async () => {
     const { user, row } = await seedPlan("find-plan@example.com", "plan-legacy");
@@ -184,11 +220,13 @@ describe("findPlanForUser and rewritePlan", () => {
     const { user, row } = await seedPlan("rewrite-plan@example.com");
     const next = { ...payload, notes: ["A new note."] };
 
-    const result = await rewritePlan({
-      userId: user.id,
-      planId: row.id,
-      rewrite: (plan) => ({ payload: next, planText: `${plan.plan}\nchanged` })
-    });
+    const result = /** @type {NonNullable<Awaited<ReturnType<typeof rewritePlan>>>} */ (
+      await rewritePlan({
+        userId: user.id,
+        planId: row.id,
+        rewrite: (plan) => ({ payload: next, planText: `${plan.plan}\nchanged` })
+      })
+    );
 
     expect(result.plan).toMatchObject({ id: row.id, payload: next });
     expect(await textOf(row.id)).toBe(`${realAnswer}\nchanged`);
@@ -243,9 +281,11 @@ describe("findPlanForUser and rewritePlan", () => {
     const { user, row } = await seedPlan("rewrite-deleted@example.com");
     const blockedOnLocks = async (count) => {
       for (;;) {
-        const [{ blocked }] = await prisma.$queryRaw`
+        const [{ blocked }] = /** @type {Array<{ blocked: number }>} */ (
+          await prisma.$queryRaw`
           select count(*)::int as blocked from pg_stat_activity
-          where datname = current_database() and wait_event_type = 'Lock'`;
+          where datname = current_database() and wait_event_type = 'Lock'`
+        );
         if (blocked >= count) return;
         await new Promise((resolve) => setTimeout(resolve, 20));
       }

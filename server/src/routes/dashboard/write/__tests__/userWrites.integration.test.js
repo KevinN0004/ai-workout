@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../../index.js";
@@ -70,8 +71,12 @@ describe("remaining user write paths", () => {
       expect(response.status).toBe(200);
       expect(response.body.profile).toMatchObject({ firstName: "Dominique", weightKg: 80 });
 
-      const row = await prisma.appUser.findFirst();
-      expect(row.profile.firstName).toBe("Dominique");
+      // The sign-up in beforeEach created the row, and its profile column holds an
+      // object.
+      const row = /** @type {import("@prisma/client").AppUser} */ (
+        await prisma.appUser.findFirst()
+      );
+      expect(/** @type {Record<string, unknown>} */ (row.profile).firstName).toBe("Dominique");
     });
 
     test("merges into the existing profile rather than replacing it", async () => {
@@ -102,7 +107,10 @@ describe("remaining user write paths", () => {
   // 160 and the default indistinguishable.
   describe("a new account's target weight", () => {
     test("is not stored, and the dashboard answers null", async () => {
-      const row = await prisma.appUser.findFirst();
+      // The sign-up in beforeEach created the row.
+      const row = /** @type {import("@prisma/client").AppUser} */ (
+        await prisma.appUser.findFirst()
+      );
       expect(row.goals).toEqual({ targetCalories: 2200, weeklyWorkouts: 3 });
 
       const response = await agent.get("/api/dashboard");
@@ -375,7 +383,14 @@ describe("remaining user write paths", () => {
       const results = await Promise.allSettled([
         saveMealLogWithDailySync({
           userId: user.id,
-          mealLog: { id: "race-meal", date: "2026-08-09", name: "Oats", calories: 400 }
+          // The meal holds only the fields the save reads.
+          mealLog:
+            /** @type {import("../../../../repositories/mealLogRepository.js").MealLogEntry} */ ({
+              id: "race-meal",
+              date: "2026-08-09",
+              name: "Oats",
+              calories: 400
+            })
         }),
         saveCalorieEntry({
           userId: user.id,

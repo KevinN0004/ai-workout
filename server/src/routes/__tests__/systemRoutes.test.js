@@ -1,3 +1,4 @@
+// @ts-check
 import express from "express";
 import request from "supertest";
 import { describe, expect, test } from "vitest";
@@ -9,10 +10,12 @@ import { registerSystemRoutes } from "../systemRoutes.js";
 // is easy to get backwards: an unconfigured PRODUCTION deployment must be
 // closed, not open.
 
+// The metrics hold the counters the route reads, and the Postgres status the
+// fields it reports.
 const buildApp = (overrides = {}) => {
   const app = express();
   registerSystemRoutes(app, {
-    metrics: {
+    metrics: /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
       requestsTotal: 7,
       rateLimited: 0,
       authFailures: 3,
@@ -21,12 +24,17 @@ const buildApp = (overrides = {}) => {
       routeLatencyMs: {},
       externalCache: { hits: 1, misses: 1 },
       externalApiLatencyMs: {}
-    },
+    }),
     serverBootAtMs: Date.now(),
     redisConfigured: () => false,
     redisSessionsEnabled: () => false,
     redisClient: () => null,
-    postgresStatusRef: () => ({ configured: true, connected: true, lastError: "" }),
+    postgresStatusRef: () =>
+      /** @type {ReturnType<typeof import("../../db/postgres.js").getPostgresStatus>} */ ({
+        configured: true,
+        connected: true,
+        lastError: ""
+      }),
     errorTrackingConfigured: () => false,
     errorTrackingEnabled: () => false,
     ...overrides
@@ -211,12 +219,22 @@ describe("registerSystemRoutes defaults", () => {
     // are tests and local tooling.
     const app = express();
     registerSystemRoutes(app, {
-      metrics: { requestsTotal: 1, rateLimited: 0, externalCache: {}, externalApiLatencyMs: {} },
+      metrics: /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
+        requestsTotal: 1,
+        rateLimited: 0,
+        externalCache: {},
+        externalApiLatencyMs: {}
+      }),
       serverBootAtMs: Date.now(),
       redisConfigured: () => false,
       redisSessionsEnabled: () => false,
       redisClient: () => null,
-      postgresStatusRef: () => ({ configured: true, connected: true, lastError: "" }),
+      postgresStatusRef: () =>
+        /** @type {ReturnType<typeof import("../../db/postgres.js").getPostgresStatus>} */ ({
+          configured: true,
+          connected: true,
+          lastError: ""
+        }),
       errorTrackingConfigured: () => false,
       errorTrackingEnabled: () => false
     });

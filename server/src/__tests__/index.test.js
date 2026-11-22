@@ -1,6 +1,16 @@
+// @ts-check
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { app, __testables } from "../index.js";
 import { prisma } from "../db/prisma.js";
+
+// Each response read is cast to what its route answers: the named response type
+// where the route declares one, else the fields the test reads.
+/** @typedef {import("../services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/** @typedef {import("../routes/systemRoutes.js").CsrfTokenResponse} CsrfTokenResponse */
+/** @typedef {import("../routes/generateRoutes.js").GenerateResponse} GenerateResponse */
+/** @typedef {import("../routes/authRoutes.js").AuthMeResponse} AuthMeResponse */
+/** @typedef {import("../routes/dashboard/write/registerWorkoutAndGoalRoutes.js").WorkoutSessionSavedResponse} WorkoutSessionSavedResponse */
+/** @typedef {{ fallback?: boolean, service: string, cache: string }} CurrentWeatherBody */
 
 const {
   buildDashboard,
@@ -56,12 +66,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!server) return;
-  await new Promise((resolve, reject) => {
-    server.close((error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
+  // A server's close answers with no value.
+  await /** @type {Promise<void>} */ (
+    new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    })
+  );
 });
 
 describe("server utilities", () => {
@@ -135,7 +148,10 @@ describe("server utilities", () => {
   });
 
   test("buildDashboard limits list sizes and normalizes goals", () => {
-    const workouts = Array.from({ length: 600 }, (_, index) => ({ id: String(index) }));
+    // The dashboard only counts these, so each holds just an id.
+    const workouts = /** @type {NonNullable<Parameters<typeof buildDashboard>[0]>["workouts"]} */ (
+      Array.from({ length: 600 }, (_, index) => ({ id: String(index) }))
+    );
     const dashboard = buildDashboard({
       workouts,
       goals: {
@@ -194,7 +210,7 @@ describe("server utilities", () => {
 describe("server routes", () => {
   test("GET /api/health returns ok", async () => {
     const response = await fetch(`${baseUrl}/api/health`);
-    const body = await response.json();
+    const body = /** @type {{ status: string, requestId: string }} */ (await response.json());
 
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
@@ -204,7 +220,7 @@ describe("server routes", () => {
 
   test("GET /api/dashboard returns 401 when unauthenticated", async () => {
     const response = await fetch(`${baseUrl}/api/dashboard`);
-    const body = await response.json();
+    const body = /** @type {ErrorBody} */ (await response.json());
 
     expect(response.status).toBe(401);
     expect(body.error).toMatch(/not signed in/i);
@@ -212,7 +228,7 @@ describe("server routes", () => {
 
   test("GET /api/weather/current validates coordinates", async () => {
     const response = await fetch(`${baseUrl}/api/weather/current?latitude=200&longitude=10`);
-    const body = await response.json();
+    const body = /** @type {ErrorBody} */ (await response.json());
 
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/latitude and longitude/i);
@@ -222,7 +238,7 @@ describe("server routes", () => {
     const response = await fetch(`${baseUrl}/api/auth/logout`, {
       method: "POST"
     });
-    const body = await response.json();
+    const body = /** @type {ErrorBody} */ (await response.json());
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/csrf/i);
@@ -230,7 +246,10 @@ describe("server routes", () => {
 
   test("GET /api/ready reports redis fallback mode", async () => {
     const response = await fetch(`${baseUrl}/api/ready`);
-    const body = await response.json();
+    const body =
+      /** @type {{ dependencies: { redis: { mode: string, connected: boolean }, errorTracking: { provider: string } } }} */ (
+        await response.json()
+      );
 
     expect([200, 503]).toContain(response.status);
     expect(body.dependencies.redis.mode).toBe("in_memory_fallback");
@@ -242,7 +261,7 @@ describe("server routes", () => {
   // they are asserted together rather than in two order-dependent tests.
   test("POST /api/generate serves anonymous callers until the free quota runs out", async () => {
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
-    const csrfPayload = await csrfResponse.json();
+    const csrfPayload = /** @type {CsrfTokenResponse} */ (await csrfResponse.json());
     const csrfToken = String(csrfPayload?.csrfToken || "");
     const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
 
@@ -264,11 +283,12 @@ describe("server routes", () => {
       // No session and no key: the request still reaches the handler, which
       // builds the plan by rule rather than rejecting the caller as unauthenticated.
       const firstResponse = await callGenerate();
-      const firstBody = await firstResponse.json();
+      const firstBody = /** @type {GenerateResponse} */ (await firstResponse.json());
       expect(firstResponse.status).toBe(200);
       expect(firstBody.plan).toMatch(/^Monday - /);
       expect(firstBody.savedPlan).toBeNull();
 
+      /** @type {Response | null} */
       let quotaResponse = null;
       for (let attempt = 0; attempt < 10 && !quotaResponse; attempt += 1) {
         const response = await callGenerate();
@@ -277,7 +297,10 @@ describe("server routes", () => {
       }
 
       expect(quotaResponse).not.toBeNull();
-      const quotaBody = await quotaResponse.json();
+      // The loop above stops on the 429, which the assertion above has seen.
+      const quotaBody = /** @type {ErrorBody & { requiresAuth: boolean }} */ (
+        await /** @type {Response} */ (quotaResponse).json()
+      );
       expect(quotaBody.requiresAuth).toBe(true);
       expect(quotaBody.error).toMatch(/sign in/i);
     } finally {
@@ -291,7 +314,7 @@ describe("server routes", () => {
 
   test("auth flow supports signup -> session me -> logout", async () => {
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
-    const csrfPayload = await csrfResponse.json();
+    const csrfPayload = /** @type {CsrfTokenResponse} */ (await csrfResponse.json());
     const csrfToken = String(csrfPayload?.csrfToken || "");
     const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
 
@@ -326,14 +349,14 @@ describe("server routes", () => {
     const meResponse = await fetch(`${baseUrl}/api/auth/me`, {
       headers: { Cookie: sidCookie }
     });
-    const meBody = await meResponse.json();
+    const meBody = /** @type {AuthMeResponse} */ (await meResponse.json());
     expect(meResponse.status).toBe(200);
     expect(meBody.user.email).toBe("integration-auth@example.com");
 
     const logoutCsrfResponse = await fetch(`${baseUrl}/api/csrf-token`, {
       headers: { Cookie: sidCookie }
     });
-    const logoutCsrfPayload = await logoutCsrfResponse.json();
+    const logoutCsrfPayload = /** @type {CsrfTokenResponse} */ (await logoutCsrfResponse.json());
     const logoutCsrfToken = String(logoutCsrfPayload?.csrfToken || "");
     const logoutCsrfCookie = extractCookieFromHeader(
       logoutCsrfResponse.headers.get("set-cookie"),
@@ -357,7 +380,7 @@ describe("server routes", () => {
 
   test("dashboard workout mutation returns updated payload for signed-in user", async () => {
     const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
-    const csrfPayload = await csrfResponse.json();
+    const csrfPayload = /** @type {CsrfTokenResponse} */ (await csrfResponse.json());
     const csrfToken = String(csrfPayload?.csrfToken || "");
     const csrfCookie = extractCookieFromHeader(csrfResponse.headers.get("set-cookie"), "csrfToken");
 
@@ -390,7 +413,7 @@ describe("server routes", () => {
     const csrfAuthedResponse = await fetch(`${baseUrl}/api/csrf-token`, {
       headers: { Cookie: sidCookie }
     });
-    const csrfAuthedPayload = await csrfAuthedResponse.json();
+    const csrfAuthedPayload = /** @type {CsrfTokenResponse} */ (await csrfAuthedResponse.json());
     const csrfAuthedToken = String(csrfAuthedPayload?.csrfToken || "");
     const csrfAuthedCookie = extractCookieFromHeader(
       csrfAuthedResponse.headers.get("set-cookie"),
@@ -415,7 +438,7 @@ describe("server routes", () => {
         intensityRpe: 7
       })
     });
-    const workoutBody = await workoutResponse.json();
+    const workoutBody = /** @type {WorkoutSessionSavedResponse} */ (await workoutResponse.json());
 
     expect(workoutResponse.status).toBe(200);
     expect(workoutBody.workoutSession.focus).toBe("Lower Body");
@@ -443,7 +466,7 @@ describe("server routes", () => {
     const response = await fetch(
       `${baseUrl}/api/weather/current?latitude=38.1111&longitude=-122.5555`
     );
-    const body = await response.json();
+    const body = /** @type {CurrentWeatherBody} */ (await response.json());
 
     expect(response.status).toBe(200);
     expect(body.fallback).toBe(true);
@@ -498,7 +521,7 @@ describe("server routes", () => {
     const firstResponse = await fetch(
       `${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`
     );
-    const firstBody = await firstResponse.json();
+    const firstBody = /** @type {CurrentWeatherBody} */ (await firstResponse.json());
     expect(firstResponse.status).toBe(200);
     expect(firstBody.cache).toBe("miss");
 
@@ -506,7 +529,7 @@ describe("server routes", () => {
     const staleResponse = await fetch(
       `${baseUrl}/api/weather/current?latitude=37.7749&longitude=-122.4194`
     );
-    const staleBody = await staleResponse.json();
+    const staleBody = /** @type {CurrentWeatherBody} */ (await staleResponse.json());
     expect(staleResponse.status).toBe(200);
     expect(staleBody.cache).toBe("stale");
     expect(staleBody.fallback).not.toBe(true);
@@ -517,7 +540,7 @@ describe("server routes", () => {
     process.env.GEMINI_API_KEY = "";
     try {
       const csrfResponse = await fetch(`${baseUrl}/api/csrf-token`);
-      const csrfPayload = await csrfResponse.json();
+      const csrfPayload = /** @type {CsrfTokenResponse} */ (await csrfResponse.json());
       const csrfToken = String(csrfPayload?.csrfToken || "");
       const csrfCookie = extractCookieFromHeader(
         csrfResponse.headers.get("set-cookie"),
@@ -553,7 +576,10 @@ describe("server routes", () => {
 
   test("GET /api/metrics exposes latency and cache ratio fields", async () => {
     const response = await fetch(`${baseUrl}/api/metrics`);
-    const body = await response.json();
+    const body =
+      /** @type {{ requestLatencyMs: { avgMs: number, byRoute: object }, externalCache: object, externalApiLatencyMs: object }} */ (
+        await response.json()
+      );
 
     expect(response.status).toBe(200);
     expect(typeof body.requestLatencyMs.avgMs).toBe("number");

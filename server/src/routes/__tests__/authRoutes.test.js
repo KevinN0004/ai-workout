@@ -1,3 +1,4 @@
+// @ts-check
 import crypto from "crypto";
 import express from "express";
 import request from "supertest";
@@ -61,7 +62,10 @@ const buildApp = (overrides = {}) => {
   // Every handler reads req.log optionally; give it one so the log assertions
   // have something to see.
   app.use((req, _res, next) => {
-    req.log = { error: logError, warn: logWarn, info: vi.fn() };
+    // A logger of vi.fn()s is not pino's, so each is cast through unknown.
+    req.log = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({ error: logError, warn: logWarn, info: vi.fn() })
+    );
     next();
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
@@ -77,7 +81,9 @@ const realCookieWriters = () => {
   const { setSessionCookie, setCsrfCookie, clearSessionCookie, clearCsrfCookie } =
     createSessionService({
       cleanText,
-      logger: { info() {}, warn() {}, error() {} },
+      logger: /** @type {import("pino").Logger} */ (
+        /** @type {unknown} */ ({ info() {}, warn() {}, error() {} })
+      ),
       toShortText: (value) => String(value ?? ""),
       findUserById: async () => null,
       sessionTtlMs: 60000,
@@ -125,10 +131,17 @@ beforeEach(() => {
   const authUserService = createAuthUserService({
     cleanText,
     argon2Options,
-    updatePasswordHash: vi.fn(async ({ userId, salt, hash, passwordAlgo }) => {
-      const row = rows.find((item) => item.userId === userId);
-      if (row) Object.assign(row, { salt, hash, passwordAlgo });
-    }),
+    // The service ignores what the write answers, so the fake answers nothing,
+    // cast through unknown.
+    updatePasswordHash:
+      /** @type {Parameters<typeof createAuthUserService>[0]["updatePasswordHash"]} */ (
+        /** @type {unknown} */ (
+          vi.fn(async ({ userId, salt, hash, passwordAlgo }) => {
+            const row = rows.find((item) => item.userId === userId);
+            if (row) Object.assign(row, { salt, hash, passwordAlgo });
+          })
+        )
+      ),
     findUserRow,
     findUserRowByEmail,
     createUserWithDashboard
@@ -1519,7 +1532,10 @@ describe("POST /api/auth/logout", () => {
 
     expect(response.status).toBe(503);
     expect(deleteSession).toHaveBeenCalledTimes(2);
-    const cookies = response.headers["set-cookie"].join("\n");
+    // superagent types each header as a string, but Set-Cookie arrives as a list.
+    const cookies = /** @type {string[]} */ (
+      /** @type {unknown} */ (response.headers["set-cookie"])
+    ).join("\n");
     expect(cookies).toMatch(/^sid=;/m);
     expect(cookies).toMatch(/^csrfToken=;/m);
   });
