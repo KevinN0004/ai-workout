@@ -3,8 +3,15 @@
  * outlineGeometry.js (the outline built from geometry.js's anchors) and
  * templateOutline.js (the outline morphed from the SVG template).
  */
+// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 
+/** @typedef {import("./math.js").PhysiquePoint} PhysiquePoint */
+
+/**
+ * @param {PhysiquePoint[]} collection
+ * @param {PhysiquePoint | null | undefined} point
+ */
 const appendPointIfDistinct = (collection, point) => {
   if (!point) return;
   const previous = collection[collection.length - 1];
@@ -20,6 +27,8 @@ const appendPointIfDistinct = (collection, point) => {
  * points dropped in a row, the next is kept regardless. Each option is clamped
  * to a working range (`maxStride` only to at least 1). A run of two points or
  * fewer comes back as it is.
+ * @param {PhysiquePoint[]} points
+ * @param {{ minSpacing?: number, minDeviation?: number, minTurn?: number, maxStride?: number }} [options]
  */
 export const selectImportantSegmentPoints = (points, options = {}) => {
   if (!Array.isArray(points) || points.length <= 2) return Array.isArray(points) ? points : [];
@@ -66,6 +75,8 @@ export const selectImportantSegmentPoints = (points, options = {}) => {
  * that a point whose id is one of the landmarks `criticalPattern` names always
  * survives, wherever it falls. A run of four points or fewer comes back as it
  * is.
+ * @param {PhysiquePoint[]} points
+ * @param {{ minSpacing?: number, minDeviation?: number, minTurn?: number, maxStride?: number }} [options]
  */
 export const simplifyPerimeterByImportance = (points, options = {}) => {
   if (!Array.isArray(points) || points.length <= 4) return Array.isArray(points) ? points : [];
@@ -80,6 +91,11 @@ export const simplifyPerimeterByImportance = (points, options = {}) => {
   const criticalPattern =
     /^(head-top|jaw-r|neck-curve-upper-r|neck-curve-mid-r|neck-curve-lower-r|trap-curve-r|trap-shoulder-r|shoulder-cap-r|shoulder-crest-r|shoulder-top-flow-r|shoulder-bridge-r|shoulder-arm-top-r|thumb-tip-r|index-tip-r|middle-tip-r|ring-tip-r|pinky-tip-r|shoulder-arm-bottom-r|shoulder-lower-r|shoulder-rear-r|armpit-rear-r|armpit-apex-r|armpit-front-r|lat-upper-side-r|pectoral-side-r|upper-chest-side-r|chest-side-r|serratus-side-r|waist-pinch-side-r|waist-side-r|oblique-side-r|hip-crest-r|hip-leg-blend-r|glute-upper-side-r|quad-outer-high-r|toe-r|foot-arch-r|instep-r|heel-r|ankle-joint-left-r|inner-calf-upper-r|inner-knee-soft-r|inner-thigh-root-r|pelvis-inner-bridge-r|pelvis-base-center)$/;
 
+  /**
+   * @param {PhysiquePoint} point
+   * @param {number} index
+   * @param {number} total
+   */
   const isCritical = (point, index, total) =>
     index === 0 ||
     index === total - 1 ||
@@ -136,6 +152,8 @@ export const simplifyPerimeterByImportance = (points, options = {}) => {
  * length, and a segment touching one has its handles capped at a small
  * fraction of its length. One or two points give a closed path with no
  * curves, and none gives "".
+ * @param {PhysiquePoint[]} points
+ * @param {{ smoothness?: number, maxHandleRatio?: number, minCornerFactor?: number }} [options]
  */
 export const buildSmoothClosedPath = (points, options = {}) => {
   // ---- Degenerate inputs ----------------------------------------------------
@@ -152,7 +170,15 @@ export const buildSmoothClosedPath = (points, options = {}) => {
   const hardPointPattern =
     /^(head-top|pelvis-base-center|pelvis-inner-bridge-[rl]|trap-shoulder-[rl]|shoulder-bridge-[rl])$/;
   const epsilon = 1e-6;
+  /** @param {PhysiquePoint} point */
   const isHardPoint = (point) => typeof point?.id === "string" && hardPointPattern.test(point.id);
+  /**
+   * @param {number} anchorX
+   * @param {number} anchorY
+   * @param {number} handleX
+   * @param {number} handleY
+   * @param {number} maxLength
+   */
   const clampHandle = (anchorX, anchorY, handleX, handleY, maxLength) => {
     const dx = handleX - anchorX;
     const dy = handleY - anchorY;
@@ -163,6 +189,12 @@ export const buildSmoothClosedPath = (points, options = {}) => {
     const scale = maxLength / length;
     return { x: anchorX + dx * scale, y: anchorY + dy * scale };
   };
+  /**
+   * @param {number} ax
+   * @param {number} ay
+   * @param {number} bx
+   * @param {number} by
+   */
   const cornerFactor = (ax, ay, bx, by) => {
     const lenA = Math.hypot(ax, ay);
     const lenB = Math.hypot(bx, by);

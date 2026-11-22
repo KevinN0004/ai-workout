@@ -3,12 +3,31 @@
  * traced, thinned and mirrored into one closed path. geometry.js falls back to
  * it when templateOutline.js builds no path.
  */
+// @ts-check
 import { mirrorX } from "./math";
 import {
   selectImportantSegmentPoints,
   simplifyPerimeterByImportance,
   buildSmoothClosedPath
 } from "./outlineUtils";
+
+/** @typedef {import("./math.js").PhysiquePoint} PhysiquePoint */
+/** @typedef {PhysiquePoint & { id: string }} NamedPoint */
+/** @typedef {(top: PhysiquePoint | null, bottom: PhysiquePoint | null) => PhysiquePoint | null} EdgeChooser */
+
+/**
+ * What geometry.js hands buildSymmetricOutline: its anchors, the head's right
+ * arc, the finger list, and the landmarks the trace starts, bends and ends at.
+ * @typedef {object} SymmetricOutlineInput
+ * @property {NamedPoint[]} anchors
+ * @property {{ x: number, y: number }[]} rightHeadArc
+ * @property {{ id: string }[]} fingerConfigs
+ * @property {number} centerX
+ * @property {number} headTopY
+ * @property {number} shoulderArmTopX
+ * @property {number} quadOuterUpperX
+ * @property {number} pelvisBaseCenterY
+ */
 
 /**
  * Traces the right half from the head top down the top of the arm, round the
@@ -21,6 +40,7 @@ import {
  * Returns the closed run of points, its smoothed path, and `outlineMarkers` for
  * the debug overlay: every point and every segment's midpoint, with any two
  * that round to the same tenth of a unit kept once.
+ * @param {SymmetricOutlineInput} input
  */
 export const buildSymmetricOutline = ({
   anchors,
@@ -34,8 +54,14 @@ export const buildSymmetricOutline = ({
 }) => {
   // ---- Anchor lookup and pickers --------------------------------------------
   const anchorLookup = new Map(anchors.map((point) => [point.id, point]));
+  /** @param {PhysiquePoint | null | undefined} point */
   const toPoint = (point) => (point ? { id: point.id, x: point.x, y: point.y } : null);
+  /** @param {string} id */
   const getAnchorPoint = (id) => toPoint(anchorLookup.get(id));
+  /**
+   * @param {PhysiquePoint[]} collection
+   * @param {PhysiquePoint | null | undefined} point
+   */
   const appendPoint = (collection, point) => {
     if (!point) return;
     const previous = collection[collection.length - 1];
@@ -46,38 +72,52 @@ export const buildSymmetricOutline = ({
   // pushMirrorLimbTrapezoidAnchors in geometry.js always pushes both, so the
   // one-sided fallbacks are insurance for an uneven anchor set rather than a
   // path geometry.js takes.
+  /** @type {EdgeChooser} */
   const chooseYUpper = (top, bottom) => {
     if (top && bottom) return top.y <= bottom.y ? top : bottom;
     return top || bottom || null;
   };
+  /** @type {EdgeChooser} */
   const chooseYLower = (top, bottom) => {
     if (top && bottom) return top.y >= bottom.y ? top : bottom;
     return top || bottom || null;
   };
+  /** @type {EdgeChooser} */
   const chooseXOuter = (top, bottom) => {
     if (top && bottom) return top.x >= bottom.x ? top : bottom;
     return top || bottom || null;
   };
+  /** @type {EdgeChooser} */
   const chooseXInner = (top, bottom) => {
     if (top && bottom) return top.x <= bottom.x ? top : bottom;
     return top || bottom || null;
   };
+  /**
+   * @param {string} prefix
+   * @param {string} side
+   * @param {EdgeChooser} chooser
+   */
   const extractCurvePoints = (prefix, side, chooser) => {
     const matcher = new RegExp(`^${prefix}-(\\d+)-(top|bottom)-${side}$`);
+    /** @type {Map<number, { top: PhysiquePoint | null, bottom: PhysiquePoint | null }>} */
     const pairs = new Map();
     anchors.forEach((point) => {
       const match = point.id.match(matcher);
       if (!match) return;
       const index = Number(match[1]);
       const pair = pairs.get(index) || { top: null, bottom: null };
-      pair[match[2]] = point;
+      // The matcher's second group is "top" or "bottom".
+      pair[/** @type {"top" | "bottom"} */ (match[2])] = point;
       pairs.set(index, pair);
     });
 
-    return [...pairs.entries()]
-      .sort((left, right) => left[0] - right[0])
-      .map(([, pair]) => toPoint(chooser(pair.top, pair.bottom) || pair.top || pair.bottom))
-      .filter(Boolean);
+    // filter(Boolean) drops the nulls toPoint gives, which TypeScript does not narrow.
+    return /** @type {PhysiquePoint[]} */ (
+      [...pairs.entries()]
+        .sort((left, right) => left[0] - right[0])
+        .map(([, pair]) => toPoint(chooser(pair.top, pair.bottom) || pair.top || pair.bottom))
+        .filter(Boolean)
+    );
   };
 
   // ---- Limb edges from the trapezoid samples, thinned -----------------------
@@ -119,12 +159,13 @@ export const buildSymmetricOutline = ({
   const thighOuterOutline = thighOuter.filter(
     (point, index) => index === 0 || point.x >= quadOuterUpperX - 0.45
   );
-  const fingerTips = fingerConfigs
-    .map((finger) => getAnchorPoint(`${finger.id}-tip-r`))
-    .filter(Boolean)
-    .sort((left, right) => left.y - right.y);
+  // As above: filter(Boolean) drops the fingers with no tip anchor.
+  const fingerTips = /** @type {PhysiquePoint[]} */ (
+    fingerConfigs.map((finger) => getAnchorPoint(`${finger.id}-tip-r`)).filter(Boolean)
+  ).sort((left, right) => left.y - right.y);
 
   // ---- The right half, head top to crotch -----------------------------------
+  /** @type {PhysiquePoint[]} */
   const rightPerimeter = [];
   appendPoint(rightPerimeter, { id: "head-top", x: centerX, y: headTopY });
   rightHeadArc.forEach((point, index) =>
@@ -236,8 +277,13 @@ export const buildSymmetricOutline = ({
   });
 
   // ---- Debug markers --------------------------------------------------------
+  /** @type {PhysiquePoint[]} */
   const outlineMarkers = [];
   const outlineMarkerKeys = new Set();
+  /**
+   * @param {number} x
+   * @param {number} y
+   */
   const pushOutlineMarker = (x, y) => {
     const key = `${Math.round(x * 10)}:${Math.round(y * 10)}`;
     if (outlineMarkerKeys.has(key)) return;

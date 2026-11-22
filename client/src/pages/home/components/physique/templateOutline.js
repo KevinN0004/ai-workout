@@ -4,10 +4,20 @@
  * match the model. geometry.js prefers it to the anchor outline whenever it
  * builds.
  */
+// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 import { buildSmoothClosedPath, selectImportantSegmentPoints } from "./outlineUtils";
 import templateSvgRaw from "./assets/template-outline.svg?raw";
 
+/** @typedef {import("./math.js").PhysiquePoint} PhysiquePoint */
+/** @typedef {import("./math.js").PhysiqueShape} PhysiqueShape */
+/** @typedef {import("./math.js").PhysiqueFallback} PhysiqueFallback */
+
+/**
+ * @param {number} edge0
+ * @param {number} edge1
+ * @param {number} value
+ */
 const smoothstep = (edge0, edge1, value) => {
   if (value <= edge0) return 0;
   if (value >= edge1) return 1;
@@ -15,6 +25,11 @@ const smoothstep = (edge0, edge1, value) => {
   return t * t * (3 - 2 * t);
 };
 
+/**
+ * @param {number} value
+ * @param {number} center
+ * @param {number} spread
+ */
 const bellCurve = (value, center, spread) => {
   const normalized = Math.abs(value - center) / Math.max(1, spread);
   if (normalized >= 1) return 0;
@@ -22,6 +37,10 @@ const bellCurve = (value, center, spread) => {
   return t * t * (3 - 2 * t);
 };
 
+/**
+ * @param {{ y: number, s: number }[]} bands
+ * @param {number} yValue
+ */
 const interpolateScale = (bands, yValue) => {
   if (!Array.isArray(bands) || !bands.length) return 1;
   if (yValue <= bands[0].y) return bands[0].s;
@@ -39,6 +58,10 @@ const interpolateScale = (bands, yValue) => {
 // Chaikin corner cutting: each pass replaces every edge with two points `ratio`
 // of the way in from either end, doubling the count, and a pass that would take
 // it past `maxPoints` is skipped.
+/**
+ * @param {PhysiquePoint[]} points
+ * @param {{ iterations?: number, ratio?: number, maxPoints?: number }} [options]
+ */
 const smoothClosedContour = (points, options = {}) => {
   if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
   const iterations = Math.max(0, Math.min(2, Math.round(toFiniteNumber(options.iterations, 1))));
@@ -74,6 +97,9 @@ const smoothClosedContour = (points, options = {}) => {
   return current;
 };
 
+/**
+ * @param {PhysiquePoint[]} points
+ */
 const buildCurvedPath = (points) => {
   // Too few points to curve through, so there is no path to draw, and
   // buildTemplateOutline returns null in its place.
@@ -100,6 +126,10 @@ const buildCurvedPath = (points) => {
 // Relaxes the points at the hand end of each arm toward the midpoint of their
 // neighbours, more in y than in x, fading in around `handStart` and out past
 // `armSpan` beyond it. Points outside the arm's height band are untouched.
+/**
+ * @param {PhysiquePoint[]} points
+ * @param {{ centerX?: number, armZoneTop?: number, armZoneBottom?: number, handStart?: number, armSpan?: number }} [options]
+ */
 const softenDistalArmTips = (points, options = {}) => {
   if (!Array.isArray(points) || points.length < 3) return Array.isArray(points) ? points : [];
 
@@ -134,6 +164,9 @@ const softenDistalArmTips = (points, options = {}) => {
   });
 };
 
+/**
+ * @param {PhysiquePoint[]} points
+ */
 const getPointBounds = (points) => {
   if (!Array.isArray(points) || !points.length) {
     return {
@@ -171,6 +204,10 @@ const getPointBounds = (points) => {
 // Squeezes the outline horizontally about `centerX` when it is wider than the
 // view box less its padding, then shifts it sideways if it still overhangs an
 // edge. The vertical extent is left alone.
+/**
+ * @param {PhysiquePoint[]} points
+ * @param {{ viewboxWidth: number, paddingX?: number, centerX: number }} options
+ */
 const fitPointsInsideViewbox = (points, { viewboxWidth, paddingX = 8, centerX }) => {
   if (!Array.isArray(points) || points.length < 3) return points;
 
@@ -206,19 +243,24 @@ const fitPointsInsideViewbox = (points, { viewboxWidth, paddingX = 8, centerX })
   return adjusted;
 };
 
+/** @param {string} rawPoints */
 const parsePolygonPoints = (rawPoints) => {
-  return String(rawPoints || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .map((token) => {
-      const [xValue, yValue] = token.split(",");
-      const x = Number(xValue);
-      const y = Number(yValue);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-      return { x, y };
-    })
-    .filter(Boolean);
+  // filter(Boolean) drops each token that is not a point, which TypeScript does
+  // not narrow from the nulls.
+  return /** @type {PhysiquePoint[]} */ (
+    String(rawPoints || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(" ")
+      .map((token) => {
+        const [xValue, yValue] = token.split(",");
+        const x = Number(xValue);
+        const y = Number(yValue);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { x, y };
+      })
+      .filter(Boolean)
+  );
 };
 
 // The template's body polygon as points, with its bounds. Fewer than three
@@ -293,6 +335,12 @@ const MEDICAL_REGION_CURVE_WEIGHTS = {
 // and arm width relative to the fallback's, scaled by its arm span and side
 // fat, and a height from its stature relative to the fallback's, each kept to a
 // share of the view box.
+/**
+ * @param {PhysiqueShape} model
+ * @param {PhysiqueFallback} fallback
+ * @param {number} viewboxWidth
+ * @param {number} viewboxHeight
+ */
 const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
   // ---- Width scale ----------------------------------------------------------
   // Each part reads the raw model value, not geometry.js's clamped local, so
@@ -347,6 +395,11 @@ const buildTemplateSizing = (model, fallback, viewboxWidth, viewboxHeight) => {
 // ranges (wider than geometry.js's for the half-widths), with the head, neck,
 // groin and knee points derived from them. buildTemplateOutline runs it on the
 // model and on the fallback, and morphs by how the two compare.
+/**
+ * @param {PhysiqueShape} shape
+ * @param {PhysiqueFallback} fallback
+ * @param {number} viewboxHeight
+ */
 const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
   // ---- Half-widths ----------------------------------------------------------
   const shoulderHalf = clamp(toFiniteNumber(shape?.shoulderHalf, fallback.shoulderHalf), 20, 90);
@@ -444,8 +497,19 @@ const buildDerivedMetrics = (shape, fallback, viewboxHeight) => {
 // size there over the fallback's, clamped per band, then sorted by height, with
 // a band level with the one before it moved a hundredth of a unit lower.
 // interpolateScale reads between them.
+/**
+ * @param {ReturnType<typeof buildDerivedMetrics>} metrics
+ * @param {ReturnType<typeof buildDerivedMetrics>} fallbackMetrics
+ */
 const buildScaleBands = (metrics, fallbackMetrics) => {
   // ---- One band per landmark ------------------------------------------------
+  /**
+   * @param {number} y
+   * @param {number} value
+   * @param {number} fallbackValue
+   * @param {number} [min]
+   * @param {number} [max]
+   */
   const withScale = (y, value, fallbackValue, min = 0.78, max = 1.24) => ({
     y,
     s: clamp(value / Math.max(1, fallbackValue), min, max)
@@ -525,6 +589,7 @@ const buildScaleBands = (metrics, fallbackMetrics) => {
  *
  * Returns `{ path, outlineMarkers }`, the markers being every morphed point, or
  * null when the template has fewer than three points or no path results.
+ * @param {{ model: PhysiqueShape, fallback: PhysiqueFallback, viewboxWidth: number, viewboxHeight: number }} input
  */
 export const buildTemplateOutline = ({ model, fallback, viewboxWidth, viewboxHeight }) => {
   if (!Array.isArray(TEMPLATE.points) || TEMPLATE.points.length < 3) return null;

@@ -6,6 +6,27 @@
 // @ts-check
 
 /**
+ * A point in the silhouette's view box. An outline's points carry the id of
+ * the landmark they stand for, which the thinning and smoothing read.
+ * @typedef {{ x: number, y: number, id?: string }} PhysiquePoint
+ */
+
+/**
+ * The fields geometry.js's fallback model holds: sizes and heights in view-box
+ * units, and the fill colour as an HSL hue, saturation and lightness.
+ * @typedef {"shoulderHalf" | "chestHalf" | "waistHalf" | "hipHalf" | "thighHalf" | "calfHalf" | "armWidth" | "armHeight" | "headRadius" | "shoulderY" | "chestY" | "waistY" | "hipY" | "thighY" | "calfY" | "ankleY" | "headCenterY" | "fillHue" | "fillSaturation" | "fillLightness"} PhysiqueFallbackField
+ */
+
+/** @typedef {Record<PhysiqueFallbackField, number>} PhysiqueFallback */
+
+/**
+ * useBodyModel's model of the body as the geometry reads it: the fallback's
+ * fields and its fat and proportion channels, each optional and each read
+ * through toFiniteNumber, so any value is tolerated.
+ * @typedef {Partial<Record<PhysiqueFallbackField | "sideFat" | "shoulderFat" | "chestFat" | "armFat" | "calfFat" | "lowerLegAdiposity" | "armSpanRatio", unknown>>} PhysiqueShape
+ */
+
+/**
  * `value` bounded to [min, max]. A NaN stays NaN, which is why the geometry
  * reads its inputs through toFiniteNumber before clamping them.
  * @param {number} value

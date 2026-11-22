@@ -2,6 +2,17 @@
  * The home page's profile form, in Basic and Advanced modes, with the account
  * controls. Rendered by HomePage while its stage is "personal".
  */
+// @ts-check
+
+/** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
+/** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */
+
+/**
+ * What HomePage passes the personal stage: App's personal form and its setters,
+ * units and converters, the stage flow's panel ref, switch and flags, and the
+ * training-day toggle, submit and completeness HomePage derives.
+ * @typedef {Pick<HomePageProps, "personalMode" | "setPersonalMode" | "user" | "onLogout" | "go" | "personal" | "onPersonalChange" | "heightUnit" | "setHeightUnit" | "toFeetInchesFromCm" | "toCmFromFeetInches" | "setPersonal" | "weightUnit" | "setWeightUnit" | "toLb" | "toKg"> & Pick<HomeStageFlow, "personalPanelRef" | "goToStage" | "isIntroTransitioning" | "isStageTransitioning"> & { onPersonalSubmit: (event: import("react").FormEvent) => void, trainingDayOptions: string[], toggleTrainingDay: (day: string) => void, isPersonalComplete: boolean }} HomePersonalStageProps
+ */
 
 /**
  * The fields edit App's `personal`. Continue submits to HomePage's
@@ -12,6 +23,7 @@
  * ones (all but Goal timeline and Additional Info) still feed the silhouette.
  * `personalPanelRef` is the panel useHomeStageFlow's morph measures for this
  * stage.
+ * @param {HomePersonalStageProps} props
  */
 export default function HomePersonalStage({
   personalPanelRef,

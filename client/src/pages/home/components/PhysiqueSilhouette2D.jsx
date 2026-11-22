@@ -3,6 +3,7 @@
  * anchor and outline points when VITE_SHOW_PHYSIQUE_POINTS is "1". Rendered by
  * HomeVisualizerStage.
  */
+// @ts-check
 import { useMemo } from "react";
 import {
   VIEWBOX_WIDTH,
@@ -18,6 +19,7 @@ export { SILHOUETTE_GEOMETRY_REV } from "./physique/geometry";
  * `silhouetteShape`, coloured through CSS custom properties set from its
  * palette. The svg is hidden from assistive technology: the `role="img"`
  * element HomeVisualizerStage wraps it in carries the label.
+ * @param {{ shape: import("./physique/math.js").PhysiqueShape }} props
  */
 export default function PhysiqueSilhouette2D({ shape }) {
   // Depends on a JSON signature of `shape` rather than on the object, so an
@@ -34,6 +36,7 @@ export default function PhysiqueSilhouette2D({ shape }) {
   );
   const showDebugPoints = import.meta.env.DEV && import.meta.env.VITE_SHOW_PHYSIQUE_POINTS === "1";
 
+  /** @type {import("react").CSSProperties & Record<`--${string}`, string>} */
   const anchorStyle = {
     "--anchor-major": palette.major,
     "--anchor-minor": palette.minor,

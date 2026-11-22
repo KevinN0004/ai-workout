@@ -2,6 +2,7 @@
  * The silhouette's colours, built by geometry.js and set by
  * PhysiqueSilhouette2D as CSS custom properties on its svg.
  */
+// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 
 /**
@@ -14,6 +15,8 @@ import { clamp, toFiniteNumber } from "./math";
  * forms-and-motion.css reads the outline pair for the visible outline and the
  * anchor colours for the debug points. No stylesheet reads `major`, `minor`,
  * `bone`, `muscle`, `boneGlow` or `muscleGlow`.
+ * @param {import("./math.js").PhysiqueShape} model
+ * @param {import("./math.js").PhysiqueFallback} fallback
  */
 export const buildPhysiquePalette = (model, fallback) => {
   const fillHue = clamp(toFiniteNumber(model.fillHue, fallback.fillHue), 0, 360);
