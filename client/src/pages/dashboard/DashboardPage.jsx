@@ -15,6 +15,83 @@ import { getLocalDateKey } from "../../app/units";
 import { NO_PLAN_LINK } from "../../app/plans";
 import "./DashboardPage.css";
 
+/** @typedef {import("../../app/events.js").AppEventDeps} AppEventDeps */
+/** @typedef {ReturnType<typeof import("../../app/events.js").createAppEventHandlers>} AppEventHandlers */
+/** @typedef {ReturnType<typeof import("../../app/hooks/useDashboardData.js").default>} DashboardData */
+/** @typedef {ReturnType<typeof import("../../app/hooks/useOptimisticLogs.js").default>} OptimisticLogs */
+/**
+ * @template T
+ * @typedef {import("react").Dispatch<import("react").SetStateAction<T>>} SetState
+ */
+
+/** @typedef {ReturnType<typeof useDashboardMetrics>} DashboardMetrics */
+/** @typedef {ReturnType<typeof useProgression>} DashboardProgression */
+
+/**
+ * What App passes DashboardPage: its session and navigation, the dashboard and
+ * its forms with their setters and submit handlers, the weather and air-quality
+ * readings, and the modals, toast and requests. Each is named from where App
+ * gets it; the views take a Pick of these.
+ * @typedef {object} DashboardPageProps
+ * @property {import("../../app/network.js").Wire<import("../../../../server/src/routes/authRoutes.js").AuthMeResponse>["user"] | null} user
+ * @property {AppEventDeps["go"]} go
+ * @property {AppEventHandlers["onLogout"]} onLogout
+ * @property {import("../../app/dashboard.js").Dashboard | null} dashboard
+ * @property {AppEventDeps["goalForm"]} goalForm
+ * @property {SetState<AppEventDeps["goalForm"]>} setGoalForm
+ * @property {string} dashView
+ * @property {AppEventDeps["setDashView"]} setDashView
+ * @property {boolean} dashNavOpen
+ * @property {SetState<boolean>} setDashNavOpen
+ * @property {DashboardData["dashLoading"]} dashLoading
+ * @property {DashboardData["dashError"]} dashError
+ * @property {DashboardData["dashboardPagination"]} dashboardPagination
+ * @property {boolean} workoutModalOpen
+ * @property {AppEventDeps["setWorkoutModalOpen"]} setWorkoutModalOpen
+ * @property {AppEventDeps["workoutForm"]} workoutForm
+ * @property {AppEventDeps["setWorkoutForm"]} setWorkoutForm
+ * @property {AppEventHandlers["submitWorkout"]} submitWorkout
+ * @property {import("../../app/requestBodies.js").PlannerForm} form
+ * @property {() => void} openPlannerFromProfile
+ * @property {AppEventDeps["calorieForm"]} calorieForm
+ * @property {SetState<AppEventDeps["calorieForm"]>} setCalorieForm
+ * @property {AppEventHandlers["submitCalories"]} submitCalories
+ * @property {AppEventDeps["mealLogForm"]} mealLogForm
+ * @property {AppEventDeps["setMealLogForm"]} setMealLogForm
+ * @property {AppEventHandlers["submitMealLog"]} submitMealLog
+ * @property {AppEventDeps["progressForm"]} progressForm
+ * @property {AppEventDeps["setProgressForm"]} setProgressForm
+ * @property {AppEventHandlers["submitProgressMetric"]} submitProgressMetric
+ * @property {AppEventHandlers["submitGoals"]} submitGoals
+ * @property {AppEventHandlers["submitProfile"]} onSaveProfile
+ * @property {AppEventHandlers["changePassword"]} onChangePassword
+ * @property {AppEventHandlers["deleteAccount"]} onDeleteAccount
+ * @property {typeof import("../../app/constants.js").weekDays} weekDays
+ * @property {ReturnType<typeof import("../../app/plans.js").extractLatestPlanByWeekday>} latestPlanByWeekday
+ * @property {DashboardData["weatherData"]} weatherData
+ * @property {DashboardData["weatherLoading"]} weatherLoading
+ * @property {DashboardData["weatherError"]} weatherError
+ * @property {DashboardData["weatherErrorKind"]} weatherErrorKind
+ * @property {DashboardData["weatherLastUpdatedAt"]} weatherLastUpdatedAt
+ * @property {DashboardData["loadWeatherRecommendation"]} refreshWeatherRecommendation
+ * @property {DashboardData["airQualityData"]} airQualityData
+ * @property {DashboardData["airQualityLoading"]} airQualityLoading
+ * @property {DashboardData["airQualityError"]} airQualityError
+ * @property {DashboardData["airQualityErrorKind"]} airQualityErrorKind
+ * @property {DashboardData["airQualityLastUpdatedAt"]} airQualityLastUpdatedAt
+ * @property {DashboardData["loadAirQuality"]} refreshAirQuality
+ * @property {AppEventHandlers["saveExerciseToPlan"]} onSaveExerciseToPlan
+ * @property {AppEventHandlers["removeSavedExercise"]} onRemoveSavedExercise
+ * @property {AppEventHandlers["deleteImportedWorkout"]} onDeleteImportedWorkout
+ * @property {DashboardData["reloadDashboard"]} reloadDashboard
+ * @property {import("react").ReactNode} plannerModal
+ * @property {OptimisticLogs["dashboardToast"]} dashboardToast
+ * @property {OptimisticLogs["clearDashboardToast"]} clearDashboardToast
+ * @property {AppEventDeps["apiFetch"]} apiFetch
+ * @property {AppEventHandlers["startSession"]} onStartSession
+ * @property {AppEventHandlers["replacePlan"]} onPlanChanged
+ */
+
 // The Log workout modal is its own chunk too, fetched when the page first
 // renders it, so it is ready long before anyone opens it.
 const DashboardWorkoutModal = lazy(() => import("./components/DashboardWorkoutModal"));

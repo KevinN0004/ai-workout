@@ -902,7 +902,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 161;
+  const TYPE_CHECKED_FILES = 178;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -978,8 +978,7 @@ describe("type-checked files", () => {
   const UNCAST_PAGE_READS = [
     "client/src/pages/dashboard/hooks/useOlderLogPages.js",
     "client/src/pages/dashboard/hooks/useProgression.js",
-    "client/src/pages/dashboard/meal/useMealDbSearch.js",
-    "client/src/pages/dashboard/views/TipsView.jsx"
+    "client/src/pages/dashboard/meal/useMealDbSearch.js"
   ];
 
   test("every .json() read in the client is cast", () => {

@@ -97,6 +97,7 @@ const WEEKLY_MEAL_TEMPLATES = {
 
 // The words that put a goal on each track, tried in this order. Each is matched
 // as a whole word, with the forms a goal might use listed.
+/** @type {Array<[string, string[]]>} */
 const TRACK_WORDS = [
   ["fat_loss", ["fat loss", "cut", "cuts", "cutting", "conditioning"]],
   [
@@ -151,6 +152,7 @@ export const getDailyCalories = (track, baseCalories, trainingDay) => {
  * weekday, has lines for it that are not a rest day's (isRestDay). Returns the
  * goal text and target it used, after their defaults, with the track and the
  * days.
+ * @param {{ weekDays: typeof import("../../app/constants.js").weekDays, latestPlanByWeekday: ReturnType<typeof import("../../app/plans.js").extractLatestPlanByWeekday> | null | undefined, goalText: string, targetCalories: unknown }} input
  */
 export const buildWeeklyMealPlan = ({
   weekDays,
@@ -269,6 +271,9 @@ const cardFromPrescription = (prescription, week, unit) => {
  * week's progression when there is one, with loads in `system`'s unit; any
  * other day's are a card with one empty row for each name its bullets
  * prescribe. The sets themselves are left to the person logging.
+ * @param {import("../../app/plans.js").PlanDay} day
+ * @param {import("../../app/network.js").Wire<import("../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null} [week]
+ * @param {"metric" | "imperial"} [system]
  */
 export const buildPlanDayPrefill = (day, week = null, system = "metric") => ({
   focus: day.title,

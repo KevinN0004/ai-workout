@@ -2,9 +2,14 @@
  * The dashboard's Goal view: calories and progress metrics, each with its form
  * and log, and the goals form. Rendered by DashboardPage, which loads it lazily.
  */
+// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import "./CaloriesView.css";
+
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
 
 /**
  * The calorie, goals and progress-metric forms are controlled by App's state
@@ -12,6 +17,7 @@ import "./CaloriesView.css";
  * button submits the goals form by its id. The averages, chart series, day keys
  * and pace text come from useDashboardMetrics. Offline, Save goals and Save
  * metric are disabled: neither can be kept for later, as a calorie entry is.
+ * @param {Pick<DashboardPageProps, "goalForm" | "setGoalForm" | "submitCalories" | "calorieForm" | "setCalorieForm" | "submitGoals" | "progressForm" | "setProgressForm" | "submitProgressMetric"> & Pick<DashboardMetrics, "avgCalories" | "calorieGoal" | "calorieDelta" | "buildLinePath" | "calorieSeries" | "workoutSeries" | "last7Keys" | "calories" | "goalPaceText" | "progressMetrics">} props
  */
 export default function CaloriesView({
   goalForm,

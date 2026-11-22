@@ -2,6 +2,36 @@
  * The dashboard's "Today at a glance" panel: four status cards and three
  * shortcuts. DashboardPage renders it above the active view, on every view.
  */
+// @ts-check
+
+/** @typedef {ReturnType<typeof import("../../../app/hooks/useDashboardData.js").default>} DashboardData */
+
+/**
+ * What DashboardPage passes the at-a-glance cards: the next workout, the
+ * calorie figures, the weather and air-quality readings with their states and
+ * refreshers, the time formatter, and three shortcuts.
+ * @typedef {object} DashboardAtAGlanceProps
+ * @property {(import("../../../app/dashboard.js").Dashboard["workouts"][number] & { context: string, parsedDate?: Date }) | null} nextWorkout
+ * @property {number} caloriesGap
+ * @property {number} avgCalories
+ * @property {number} calorieGoal
+ * @property {DashboardData["weatherLoading"]} weatherLoading
+ * @property {NonNullable<DashboardData["weatherData"]>["recommendation"] | null} weatherRecommendation
+ * @property {DashboardData["weatherError"]} weatherError
+ * @property {DashboardData["weatherErrorKind"]} weatherErrorKind
+ * @property {DashboardData["weatherLastUpdatedAt"]} weatherLastUpdatedAt
+ * @property {DashboardData["loadWeatherRecommendation"]} refreshWeatherRecommendation
+ * @property {DashboardData["airQualityLoading"]} airQualityLoading
+ * @property {NonNullable<DashboardData["airQualityData"]>["summary"] | null} airSummary
+ * @property {DashboardData["airQualityError"]} airQualityError
+ * @property {DashboardData["airQualityErrorKind"]} airQualityErrorKind
+ * @property {DashboardData["airQualityLastUpdatedAt"]} airQualityLastUpdatedAt
+ * @property {DashboardData["loadAirQuality"]} refreshAirQuality
+ * @property {(timestamp: number | null) => string} formatRelativeUpdatedAt
+ * @property {() => void} onAddWorkout
+ * @property {() => void} onOpenMeal
+ * @property {() => void} onOpenTips
+ */
 
 /**
  * Shows the next or latest workout, the calorie gap, and the weather and air
@@ -16,6 +46,7 @@
  * "Unavailable" when the browser gave no position (`*ErrorKind` is
  * "location"), so nothing was requested, and "Not checked yet" before the
  * summary view's first load.
+ * @param {DashboardAtAGlanceProps} props
  */
 export default function DashboardAtAGlance({
   nextWorkout,

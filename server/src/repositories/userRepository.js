@@ -58,7 +58,13 @@ export const createUserRepository = ({ prisma }) => {
 
     const { count } = await prisma.appUser.updateMany({
       where: userIdWhere(userId),
-      data: { goals: { ...toJsonObject(existing.goals), ...patch } }
+      // The stored goals are JSON read back, and go back as JSON.
+      data: {
+        goals: /** @type {import("@prisma/client").Prisma.InputJsonObject} */ ({
+          ...toJsonObject(existing.goals),
+          ...patch
+        })
+      }
     });
     return count > 0;
   };

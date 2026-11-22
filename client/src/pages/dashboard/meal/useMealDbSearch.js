@@ -18,10 +18,14 @@ export default function useMealDbSearch(mealTrack) {
   // ---- State ----------------------------------------------------------------
   const [mealDbInput, setMealDbInput] = useState("");
   const [mealDbQuery, setMealDbQuery] = useState("");
-  const [mealDbMeals, setMealDbMeals] = useState([]);
+  const [mealDbMeals, setMealDbMeals] = useState(
+    /** @type {ReturnType<typeof normalizeMealDbMeal>[]} */ ([])
+  );
   const [mealDbLoading, setMealDbLoading] = useState(false);
   const [mealDbError, setMealDbError] = useState("");
-  const [mealDbRecommendations, setMealDbRecommendations] = useState([]);
+  const [mealDbRecommendations, setMealDbRecommendations] = useState(
+    /** @type {Array<{ key: string, title: string, subtitle: string, meals: ReturnType<typeof normalizeMealDbMeal>[] }>} */ ([])
+  );
   const [mealDbRecommendationsLoading, setMealDbRecommendationsLoading] = useState(false);
   const [mealDbRecommendationsError, setMealDbRecommendationsError] = useState("");
 

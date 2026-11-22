@@ -3,6 +3,7 @@
  * against the four weeks before, and each lift's records, from progress.js;
  * and the PR tag a workout row shows for a session that set a record.
  */
+// @ts-check
 import { useId, useMemo, useState } from "react";
 import { fromLoadKg } from "../../../app/exerciseSets";
 import { liftRecords, weeklySets } from "../progress";
@@ -17,9 +18,18 @@ const RECORD_WORDS = { e1rm: "best e1RM", heaviest: "heaviest set", reps: "most 
  * falls, so a change is always up; one too small to show at one decimal is left
  * out rather than read "up 0 kg".
  */
+/**
+ * @param {import("../progress.js").LiftRecord} record
+ * @param {"metric" | "imperial"} system
+ */
 const recordLine = ({ name, e1rm, heaviest, mostReps }, system) => {
   const unit = system === "imperial" ? "lb" : "kg";
+  /** @param {number | null} kg */
   const load = (kg) => `${fromLoadKg(kg, system)} ${unit}`;
+  /**
+   * @param {number | null} change
+   * @param {(value: number) => string} show
+   */
   const up = (change, show) => {
     if (change === null) return "";
     const shown = show(change);
@@ -39,6 +49,7 @@ const recordLine = ({ name, e1rm, heaviest, mostReps }, system) => {
  * The records a session set, in words: "Squat, best e1RM and heaviest set;
  * Pull-up, most reps".
  */
+/** @param {import("../progress.js").PrMark[]} marks */
 const prLabel = (marks) => {
   const byLift = new Map();
   for (const { name, record } of marks) {
@@ -50,6 +61,7 @@ const prLabel = (marks) => {
 /**
  * A workout row's "PR" tag for a session that set a record. The visible "PR"
  * is hidden from screen readers, which read the records it stands for.
+ * @param {{ marks: import("../progress.js").PrMark[] }} props
  */
 export function PrTag({ marks }) {
   return (
@@ -65,6 +77,7 @@ export function PrTag({ marks }) {
  * "YYYY-MM-DD", with loads in `measurementSystem`'s unit. The sets table and
  * the records each show only when they have a row, and a panel with neither
  * says how to fill it. Eight records show at first; the toggle shows the rest.
+ * @param {{ sessions: import("../../../app/dashboard.js").Dashboard["workoutSessions"], today: string, measurementSystem: "metric" | "imperial" }} props
  */
 export default function ProgressPanel({ sessions, today, measurementSystem }) {
   const headingId = useId();

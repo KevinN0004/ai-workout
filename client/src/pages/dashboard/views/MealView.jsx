@@ -3,6 +3,7 @@
  * suggestions for the visitor's goal. Rendered by DashboardPage, which loads it
  * lazily.
  */
+// @ts-check
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectTrack } from "../planUtils";
 import { COURSE_ALL_KEY } from "../meal/data";
@@ -15,12 +16,17 @@ import MealSections from "../meal/MealSections";
 import MealDetailsModal from "../meal/MealDetailsModal";
 import "./MealView.css";
 
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+
 /**
  * Lays out the panels in meal/ around useMealDbSearch. The suggestions follow
  * the goal's track (detectTrack): the latest saved plan's goal, then
  * `goals.goalType`, which the server's goals do not carry, then the planner
  * form's (`fallbackPlan`). Each meal-log prop has a stand-in so the view renders
  * without it, though DashboardPage passes all four.
+ * @param {Pick<DashboardPageProps, "dashboard" | "mealLogForm" | "setMealLogForm" | "submitMealLog"> & { fallbackPlan: DashboardPageProps["form"], mealLogs: DashboardMetrics["mealLogs"] }} props
  */
 export default function MealView({
   dashboard,
@@ -50,13 +56,18 @@ export default function MealView({
 
   const updateMealLogForm = typeof setMealLogForm === "function" ? setMealLogForm : () => {};
   const onSubmitMealLog =
-    typeof submitMealLog === "function" ? submitMealLog : (event) => event.preventDefault();
+    typeof submitMealLog === "function"
+      ? submitMealLog
+      : (/** @type {import("react").FormEvent} */ event) => event.preventDefault();
 
   // ---- Goal track and recipe search -----------------------------------------
   const latestPlan = dashboard?.plans?.[0];
   const goalTextForMeals =
     latestPlan?.goal ||
-    dashboard?.goals?.goalType ||
+    // The server's goals carry no goalType, as the summary above says.
+    /** @type {(NonNullable<DashboardPageProps["dashboard"]> & { goals?: { goalType?: string } }) | null} */ (
+      dashboard
+    )?.goals?.goalType ||
     fallbackPlan?.goal ||
     "Build lean strength and energy";
   const mealTrack = detectTrack(goalTextForMeals);
@@ -87,6 +98,7 @@ export default function MealView({
     // No meal the MealDB route returns carries one, so in the app the note is
     // always empty.
     const calorieBand = getCalorieBand(targetCalories);
+    /** @param {Array<ReturnType<typeof import("../meal/utils.js").normalizeMealDbMeal> & { portionByCalorie?: Record<string, string> }>} items */
     const withPortions = (items) =>
       items.map((meal) => ({
         ...meal,
@@ -167,6 +179,7 @@ export default function MealView({
   // Escape handling already does the same, so this listener is a second copy.
   useEffect(() => {
     if (!activeMeal) return undefined;
+    /** @param {KeyboardEvent} event */
     const onKeyDown = (event) => {
       if (event.key === "Escape") setActiveMealId(null);
     };

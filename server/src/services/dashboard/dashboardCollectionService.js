@@ -154,9 +154,19 @@ export const createDashboardCollectionService = ({
     return {
       dashboard: {
         ...baseDashboard,
-        workoutSessions: collections.workoutSessions.items,
-        mealLogs: collections.mealLogs.items,
-        progressMetrics: collections.progressMetrics.items
+        // Each collection's page holds its own rows, as the paged routes say.
+        workoutSessions:
+          /** @type {ReturnType<typeof import("../../repositories/workoutSessionRepository.js").mapWorkoutSession>[]} */ (
+            collections.workoutSessions.items
+          ),
+        mealLogs:
+          /** @type {ReturnType<typeof import("../../repositories/mealLogRepository.js").mapMealLog>[]} */ (
+            collections.mealLogs.items
+          ),
+        progressMetrics:
+          /** @type {ReturnType<typeof import("../../repositories/progressMetricRepository.js").mapProgressMetric>[]} */ (
+            collections.progressMetrics.items
+          )
       },
       pagination: {
         workoutSessions: {

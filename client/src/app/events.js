@@ -108,8 +108,8 @@ const downloadPlanPdfFromText = async (planText) => {
 /** @typedef {typeof import("./constants.js").defaultSignupProfileForm} SignupProfileForm */
 /** @typedef {import("./exerciseSets.js").WorkoutForm} WorkoutForm */
 /** @typedef {import("./requestBodies.js").MealLogForm} MealLogForm */
-/** @typedef {import("./requestBodies.js").ProgressMetricBody} ProgressForm */
-/** @typedef {import("./requestBodies.js").GoalsBody} GoalsForm */
+/** @typedef {import("./requestBodies.js").ProgressForm} ProgressForm */
+/** @typedef {import("./requestBodies.js").GoalsForm} GoalsForm */
 /** @typedef {import("../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */
 /**
  * @template T

@@ -3,11 +3,13 @@
  * lift's load in the region's unit, its change and why, with Undo, or Go up and
  * Keep, and the deload week's banner with Train normally.
  */
+// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import { liftKeyOf } from "../planUtils";
 
 // What each change reads as, from the load in the unit shown.
+/** @type {Record<string, (load: { from: unknown, target?: unknown }, unit: string) => string>} */
 const CHANGE_TEXT = {
   up: ({ from, target }, unit) => `Up to ${target} ${unit}, from ${from}`,
   ask: ({ from, target }, unit) => `Up to ${target} ${unit}? Now ${from}`,
@@ -17,6 +19,7 @@ const CHANGE_TEXT = {
 
 // The answers each change offers before it is answered: the visible label, the
 // rest of the button's name, and the decision it sends.
+/** @type {Record<string, Array<{ label: string, rest: string, decision: string }>>} */
 const CHANGE_ANSWERS = {
   up: [{ label: "Undo", rest: "the step up for", decision: "undo" }],
   deload: [{ label: "Undo", rest: "the lighter load for", decision: "undo" }],
@@ -29,6 +32,7 @@ const CHANGE_ANSWERS = {
 // A button whose visible label is short and whose full name, read by assistive
 // technology, says what it acts on. The space is its own text node: one at the
 // start of the hidden span is trimmed from the name.
+/** @param {{ label: string, rest: string, onClick: () => void, disabled: boolean }} props */
 const AnswerButton = ({ label, rest, onClick, disabled }) => (
   <button type="button" className="ghost week-lift-answer" onClick={onClick} disabled={disabled}>
     {label} <span className="visually-hidden">{rest}</span>
@@ -43,6 +47,7 @@ const AnswerButton = ({ label, rest, onClick, disabled }) => (
  * Offline, every answer is disabled: the server keeps them.
  * `error` is why the last answer failed. Nothing renders without a week, or
  * when the day holds none of its lifts outside a deload week.
+ * @param {{ week: import("../../../app/network.js").Wire<import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null, prescriptions: import("../../../app/plans.js").Prescription[], system: "metric" | "imperial", onAnswer: (answer: { liftKey?: string, decision: string | null }) => void, error: string }} props
  */
 export default function WeekProgression({ week, prescriptions, system, onAnswer, error }) {
   const offline = useConnection() === "offline";

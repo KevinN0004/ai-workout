@@ -21,7 +21,11 @@ const ANSWER_FAILED = "Could not save that answer. Try again.";
  * back when `decision` is null; and `error`, why the last answer failed.
  */
 export default function useProgression({ dashboard, notes, apiFetch }) {
-  const [progression, setProgression] = useState(null);
+  const [progression, setProgression] = useState(
+    /** @type {import("../../../app/network.js").Wire<import("../../../../../server/src/routes/dashboard/registerProgressionRoutes.js").ProgressionResponse>["progression"] | null} */ (
+      null
+    )
+  );
   const [error, setError] = useState("");
   const requestRef = useRef(0);
 
@@ -59,7 +63,7 @@ export default function useProgression({ dashboard, notes, apiFetch }) {
 
   const weekStart = progression?.weekStart;
   const answer = useCallback(
-    async ({ liftKey, decision }) => {
+    async (/** @type {{ liftKey?: string, decision: string | null }} */ { liftKey, decision }) => {
       if (!weekStart) return;
       const path = liftKey
         ? `${PROGRESSION_PATH}/${weekStart}/lifts/${encodeURIComponent(liftKey)}`

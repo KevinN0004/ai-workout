@@ -16,6 +16,13 @@ import { toCmFromFeetInches, toKg } from "./units";
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").MealLogBody} MealLogBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").ProgressMetricBody} ProgressMetricBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").GoalsBody} GoalsBody */
+
+/**
+ * The progress and goals forms as their inputs hold them: each field's text,
+ * under the body's own keys, the progress form's less the id its submit adds.
+ * @typedef {Record<Exclude<keyof ProgressMetricBody, "id">, string>} ProgressForm
+ */
+/** @typedef {Record<keyof GoalsBody, string>} GoalsForm */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").GeneratePlanBody} GeneratePlanBody */
 /** @typedef {import("../../../server/src/services/http/apiSchemaService.js").SavedExerciseBody} SavedExerciseBody */
 /** @typedef {import("../../../server/src/routes/dashboard/validation.js").PlanSwapBody} PlanSwapBody */
@@ -159,7 +166,7 @@ export const mealLogBody = (mealLogForm, id) => ({ ...mealLogForm, id });
  * The progress form as it starts and after each save: the date given, the rest
  * blank. It is submitted whole, so its keys are the body's.
  * @param {string} date
- * @returns {ProgressMetricBody}
+ * @returns {ProgressForm}
  */
 export const blankProgressForm = (date) => ({
   date,
@@ -197,7 +204,7 @@ export const createDefaultPlannerForm = (goal) => ({
  * The goals form before the dashboard fills it: no target weight, 2,200
  * calories, three workouts a week. It is submitted whole, so its keys are the
  * body's.
- * @returns {GoalsBody}
+ * @returns {GoalsForm}
  */
 export const blankGoalsForm = () => ({
   targetWeight: "",

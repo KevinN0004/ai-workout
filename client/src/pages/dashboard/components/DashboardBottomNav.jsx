@@ -2,6 +2,7 @@
  * The dashboard's bottom navigation bar: shortcuts to five views, which
  * responsive.css shows only on narrow screens. Rendered by DashboardPage.
  */
+// @ts-check
 const MOBILE_NAV_ITEMS = [
   { key: "summary", label: "Home" },
   { key: "workouts", label: "Logs" },
@@ -13,6 +14,7 @@ const MOBILE_NAV_ITEMS = [
 /**
  * One button per MOBILE_NAV_ITEMS entry, the one matching `dashView` marked
  * active. `onNavigate` receives the view key.
+ * @param {{ dashView: string, onNavigate: (view: string) => void }} props
  */
 export default function DashboardBottomNav({ dashView, onNavigate }) {
   return (

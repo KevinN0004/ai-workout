@@ -3,6 +3,7 @@
  * training guide, and the full exercise list, each exercise savable to the
  * plan. Rendered by DashboardPage, which loads it lazily.
  */
+// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { savedExerciseBody } from "../../../app/requestBodies";
 import { detectTrack } from "../planUtils";
@@ -22,6 +23,20 @@ import {
 } from "../tips/recommendationUtils";
 import "./TipsView.css";
 
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+/**
+ * @template T
+ * @typedef {import("../../../app/network.js").Wire<T>} Wire
+ */
+/** @typedef {import("../../../../../server/src/routes/external/registerWgerRoutes.js").WgerMetaResponse} WgerMetaResponse */
+/** @typedef {import("../../../../../server/src/routes/external/registerWgerRoutes.js").WgerExercisesResponse} WgerExercisesResponse */
+/** @typedef {import("../../../app/requestBodies.js").LibraryExercise} LibraryExercise */
+/** @typedef {{ reasons?: string[] }} Recommendation */
+/** @typedef {{ id: number, name: string }} WgerOption */
+/** @typedef {Wire<WgerExercisesResponse>["exercises"][number] & LibraryExercise} LibraryItem */
+
 const DEFAULT_LIMIT = 48;
 const SEARCH_DEBOUNCE_MS = 320;
 const LIBRARY_PAGE_SIZE = 24;
@@ -36,6 +51,7 @@ const LIBRARY_PAGE_SIZE = 24;
  * meaning none, such as "None" or "No injuries" (buildInjuryText).
  * `onSaveExerciseToPlan` is saveExerciseToPlan in events.js, which resolves to
  * `{ ok: true }` or `{ ok: false, error }`.
+ * @param {Pick<DashboardPageProps, "user" | "form" | "dashboard" | "latestPlanByWeekday" | "weatherData" | "onSaveExerciseToPlan">} props
  */
 export default function TipsView({
   user,
@@ -46,7 +62,13 @@ export default function TipsView({
   onSaveExerciseToPlan
 }) {
   // ---- State ----------------------------------------------------------------
-  const [meta, setMeta] = useState({ categories: [], muscles: [], equipment: [] });
+  const [meta, setMeta] = useState(
+    /** @type {{ categories: WgerOption[], muscles: WgerOption[], equipment: WgerOption[] }} */ ({
+      categories: [],
+      muscles: [],
+      equipment: []
+    })
+  );
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -56,12 +78,14 @@ export default function TipsView({
   const [libraryError, setLibraryError] = useState("");
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaError, setMetaError] = useState("");
-  const [exercises, setExercises] = useState([]);
-  const [selectedExercise, setSelectedExercise] = useState(null);
+  const [exercises, setExercises] = useState(/** @type {LibraryItem[]} */ ([]));
+  const [selectedExercise, setSelectedExercise] = useState(
+    /** @type {(LibraryExercise & { recommendation?: Recommendation }) | null} */ (null)
+  );
   const [refreshTick, setRefreshTick] = useState(0);
   const [saveFeedback, setSaveFeedback] = useState("");
   const [saveError, setSaveError] = useState("");
-  const [savingIds, setSavingIds] = useState({});
+  const [savingIds, setSavingIds] = useState(/** @type {Record<string, boolean>} */ ({}));
   const [activeGuideSection, setActiveGuideSection] = useState("smart");
   const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_PAGE_SIZE);
 
@@ -94,16 +118,25 @@ export default function TipsView({
         if (!res.ok) {
           throw new Error("Couldn't load filter options.");
         }
-        const data = await res.json();
+        const data = /** @type {Wire<WgerMetaResponse>} */ (await res.json());
         if (cancelled) return;
+        // wger's ids are numbers; the server passes them on as it reads them,
+        // typed unknown. The exercises below are stored the same way.
         setMeta({
-          categories: Array.isArray(data?.categories) ? data.categories : [],
-          muscles: Array.isArray(data?.muscles) ? data.muscles : [],
-          equipment: Array.isArray(data?.equipment) ? data.equipment : []
+          categories: /** @type {WgerOption[]} */ (
+            Array.isArray(data?.categories) ? data.categories : []
+          ),
+          muscles: /** @type {WgerOption[]} */ (Array.isArray(data?.muscles) ? data.muscles : []),
+          equipment: /** @type {WgerOption[]} */ (
+            Array.isArray(data?.equipment) ? data.equipment : []
+          )
         });
       } catch (err) {
         if (cancelled) return;
-        setMetaError(err?.message || "Couldn't load filter options.");
+        // The fetch, or the refusal thrown above, rejects with an Error.
+        setMetaError(
+          /** @type {Error | undefined} */ (err)?.message || "Couldn't load filter options."
+        );
       } finally {
         if (!cancelled) setMetaLoading(false);
       }
@@ -142,10 +175,14 @@ export default function TipsView({
         if (!res.ok) {
           throw new Error("Couldn't load exercises right now.");
         }
-        const data = await res.json();
+        const data = /** @type {Wire<WgerExercisesResponse>} */ (await res.json());
         if (cancelled) return;
-        setExercises(Array.isArray(data?.exercises) ? data.exercises : []);
-      } catch (err) {
+        setExercises(
+          /** @type {LibraryItem[]} */ (Array.isArray(data?.exercises) ? data.exercises : [])
+        );
+      } catch (/** @type {any} */ err) {
+        // fetch rejects with an AbortError when this effect cleans up, or an Error;
+        // the refusal thrown above is an Error.
         // An abort is this effect's own cleanup, not a failure. A real failure
         // empties the list and shows its error.
         if (err?.name === "AbortError") return;
@@ -173,7 +210,10 @@ export default function TipsView({
   );
   const goalText =
     dashboard?.plans?.[0]?.goal ||
-    dashboard?.goals?.goalType ||
+    // The server's goals carry no goalType, as the summary above says.
+    /** @type {(NonNullable<DashboardPageProps["dashboard"]> & { goals?: { goalType?: string } }) | null} */ (
+      dashboard
+    )?.goals?.goalType ||
     form?.goal ||
     "Build lean strength and energy";
   const injuryText = buildInjuryText(form?.injuries, user?.profile?.notes);
@@ -251,11 +291,17 @@ export default function TipsView({
     );
   }, [savedExercises]);
 
+  /** @param {LibraryExercise | null | undefined} exercise */
   const toExerciseKey = (exercise) =>
     `${exercise?.id !== null && exercise?.id !== undefined ? `id:${exercise.id}` : ""}|${normalizeText(exercise?.name)}`;
 
+  /** @param {LibraryExercise | null | undefined} exercise */
   const isSaved = (exercise) => savedKeys.has(toExerciseKey(exercise));
 
+  /**
+   * @param {LibraryExercise & { videos?: Array<{ url?: string }> }} exercise
+   * @param {Recommendation | null | undefined} recommendation
+   */
   const saveExercise = async (exercise, recommendation) => {
     if (!onSaveExerciseToPlan) return;
     const key = toExerciseKey(exercise);
@@ -280,12 +326,16 @@ export default function TipsView({
       }
       setSaveFeedback(`Saved "${exercise?.name}" to your plan.`);
     } catch (err) {
-      setSaveError(err?.message || "Couldn't save this exercise right now.");
+      // onSaveExerciseToPlan, or the refusal thrown above, rejects with an Error.
+      setSaveError(
+        /** @type {Error | undefined} */ (err)?.message || "Couldn't save this exercise right now."
+      );
     } finally {
       setSavingIds((prev) => ({ ...prev, [key]: false }));
     }
   };
 
+  /** @param {LibraryExercise & { recommendation?: Recommendation }} payload */
   const openExerciseModal = (payload) => {
     setSelectedExercise(payload);
   };

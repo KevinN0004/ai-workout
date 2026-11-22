@@ -52,8 +52,9 @@ import { sessionErrorStatus } from "../services/auth/sessionService.js";
 
 /**
  * The signed-in user as GET /api/auth/me, the login and the signup answer it:
- * the id, the email and the profile, never the password hash.
- * @typedef {{ user: { id: string, email: string, profile: object } }} SignedInResponse
+ * the id, the email and the profile, a JSON object of what was saved, never the
+ * password hash.
+ * @typedef {{ user: { id: string, email: string, profile: Record<string, unknown> } }} SignedInResponse
  */
 
 /** What GET /api/auth/me answers. @typedef {SignedInResponse} AuthMeResponse */

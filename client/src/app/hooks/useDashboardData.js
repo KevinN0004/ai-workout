@@ -27,7 +27,7 @@ const roundCoordinate = (value) => Math.round(value * 100) / 100;
 /** @typedef {import("../../../../server/src/routes/external/registerWeatherRoutes.js").WeatherRecommendationResponse} WeatherRecommendationResponse */
 /** @typedef {import("../../../../server/src/routes/external/registerAirQualityRoutes.js").AirQualityResponse} AirQualityResponse */
 /** @typedef {import("../../../../server/src/routes/dashboard/registerDashboardReadRoutes.js").DashboardResponse} DashboardResponse */
-/** @typedef {(form: import("../requestBodies.js").GoalsBody) => void} SetGoalForm */
+/** @typedef {(form: import("../requestBodies.js").GoalsForm) => void} SetGoalForm */
 
 // A target weight the user never saved fills the form blank, not with a
 // default: the server leaves a blank target unset, so saving only the calories
@@ -82,15 +82,18 @@ export default function useDashboardData({
   setGoalForm
 }) {
   // ---- State and refs -------------------------------------------------------
-  // The dashboard, its pagination and the two readings are the server's
-  // answers, not typed yet (D1 phase 3 spec, decision 2).
+  // The dashboard, its pagination and the two readings, as the server answers them.
   const [dashboard, setDashboard] = useState(/** @type {Dashboard | null} */ (null));
   const [dashLoading, setDashLoading] = useState(false);
   const [dashError, setDashError] = useState("");
-  const [dashboardPagination, setDashboardPagination] = useState(/** @type {any} */ (null));
+  const [dashboardPagination, setDashboardPagination] = useState(
+    /** @type {import("../dashboard.js").DashboardPagination | null} */ (null)
+  );
   // Raised by reloadDashboard; the load effect depends on it, so it runs again.
   const [reloadCount, setReloadCount] = useState(0);
-  const [weatherData, setWeatherData] = useState(/** @type {any} */ (null));
+  const [weatherData, setWeatherData] = useState(
+    /** @type {Wire<WeatherRecommendationResponse> | null} */ (null)
+  );
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
   // "location" when the browser gave no position, so nothing was requested;
@@ -99,7 +102,9 @@ export default function useDashboardData({
   const [weatherLastUpdatedAt, setWeatherLastUpdatedAt] = useState(
     /** @type {number | null} */ (null)
   );
-  const [airQualityData, setAirQualityData] = useState(/** @type {any} */ (null));
+  const [airQualityData, setAirQualityData] = useState(
+    /** @type {Wire<AirQualityResponse> | null} */ (null)
+  );
   const [airQualityLoading, setAirQualityLoading] = useState(false);
   const [airQualityError, setAirQualityError] = useState("");
   // The same two kinds as weatherErrorKind, for the air-quality load.
@@ -108,8 +113,8 @@ export default function useDashboardData({
     /** @type {number | null} */ (null)
   );
 
-  const weatherDataRef = useRef(null);
-  const airQualityDataRef = useRef(null);
+  const weatherDataRef = useRef(/** @type {Wire<WeatherRecommendationResponse> | null} */ (null));
+  const airQualityDataRef = useRef(/** @type {Wire<AirQualityResponse> | null} */ (null));
   const dashboardRequestRef = useRef(0);
   // The dashboards read back from the cache, which the write-through below
   // leaves alone so the cache keeps the time the server's copy arrived.
