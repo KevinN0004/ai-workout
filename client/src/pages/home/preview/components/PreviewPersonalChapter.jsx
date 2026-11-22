@@ -4,7 +4,25 @@
  * in and then collapses into a label beside Environment and Focus. Rendered by
  * PreviewStage for both chapters.
  */
+// @ts-check
 import { TRAINING_DAY_OPTIONS } from "../constants";
+
+/** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
+
+/**
+ * What PreviewStage passes a Personal Info or Generate chapter: which view it
+ * is, the form's collapsed and shifted flags and builder stage, the fields
+ * typed so far, App's units and the textarea sizer.
+ * @typedef {object} PreviewPersonalChapterProps
+ * @property {boolean} [isGenerateView]
+ * @property {boolean} previewPersonalCollapsed
+ * @property {boolean} previewPersonalShifted
+ * @property {number} previewBuilderStage
+ * @property {import("../PreviewStage.jsx").PreviewFilledFields} previewFilledFields
+ * @property {string} heightUnit
+ * @property {string} weightUnit
+ * @property {PreviewDerivedData["getPreviewTextRows"]} getPreviewTextRows
+ */
 
 /**
  * Shows what `previewFilledFields` holds, which usePreviewChapterFlow fills
@@ -18,6 +36,7 @@ import { TRAINING_DAY_OPTIONS } from "../constants";
  * previewFillOrder, which follows the locale instead. The visitor cannot change
  * any of it: the inputs are read-only, a select snaps back to its value, and
  * the buttons have no handlers.
+ * @param {PreviewPersonalChapterProps} props
  */
 export default function PreviewPersonalChapter({
   isGenerateView = false,
@@ -31,6 +50,7 @@ export default function PreviewPersonalChapter({
 }) {
   const showCollapsed = previewPersonalCollapsed || isGenerateView;
   const showBuilder = previewPersonalShifted || isGenerateView;
+  /** @param {string} fieldKey */
   const getFieldValue = (fieldKey) =>
     typeof previewFilledFields[fieldKey] === "string" ? previewFilledFields[fieldKey] : "";
   const previewTrainingDays = Array.isArray(previewFilledFields.trainingDays)

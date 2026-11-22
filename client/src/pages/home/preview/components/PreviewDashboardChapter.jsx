@@ -3,7 +3,10 @@
  * dashboard's summary view, filled from usePreviewDerivedData's figures, whose
  * cards appear one stage at a time. Rendered by PreviewStage.
  */
+// @ts-check
 import { buildLinePath } from "../../../../app/linePath";
+
+/** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
 
 /**
  * Lays `previewDashboardSummary` out as the overview, today's picks, weekly
@@ -11,6 +14,7 @@ import { buildLinePath } from "../../../../app/linePath";
  * side column. Each card shows once `previewDashboardStage` reaches the number
  * it checks, the main column's first, up to PREVIEW_DASHBOARD_FINAL_STAGE. The
  * link chips and range pills are spans, not controls.
+ * @param {Pick<PreviewDerivedData, "previewDashboardSummary"> & { previewDashboardStage: number }} props
  */
 export default function PreviewDashboardChapter({
   previewDashboardSummary,
@@ -63,6 +67,9 @@ export default function PreviewDashboardChapter({
         : `${calorieDelta} kcal vs target`;
 
   // One chart card, shown from `revealStage`.
+  /**
+   * @param {{ title: string, subtitle: string, series: typeof calorieSeries, lineClassName: string, revealStage: number }} chart
+   */
   const renderTrendChart = ({ title, subtitle, series, lineClassName, revealStage }) => (
     <section
       key={`preview-chart-${title}`}
