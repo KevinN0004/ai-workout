@@ -3,6 +3,7 @@
  * exercises, the meals week and the week's tips. Rendered by DashboardPage,
  * which loads it lazily.
  */
+// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
 import { isRestDay, savedPlanDays } from "../../../app/plans";
@@ -15,6 +16,16 @@ import useConnection from "../../../hooks/useConnection";
 import PlanDaySwaps from "../components/PlanDaySwaps";
 import WeekProgression from "../components/WeekProgression";
 import "./PlansView.css";
+
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+
+/**
+ * The day whose details are open: its weekday, the workout or meal side, and
+ * the exercise being swapped, if any.
+ * @typedef {{ dayKey: string, mode: "workout" | "meal", swapping?: string | null }} SelectedDetail
+ */
 
 const SAVED_EXERCISE_PAGE_SIZE = 24;
 
@@ -37,6 +48,7 @@ const SAVED_EXERCISE_PAGE_SIZE = 24;
  * in a step inside the same dialog, over `apiFetch`, and the plan the server
  * answers goes to `onPlanChanged`. Offline, removing a saved exercise is
  * disabled: it cannot be kept for later.
+ * @param {Pick<DashboardPageProps, "weekDays" | "latestPlanByWeekday" | "openPlannerFromProfile" | "dashboard" | "onRemoveSavedExercise" | "setWorkoutForm" | "setWorkoutModalOpen" | "onStartSession" | "apiFetch" | "onPlanChanged"> & { fallbackPlan: DashboardPageProps["form"], onOpenGuides: () => void, progression?: DashboardProgression["progression"], onAnswerProgression: DashboardProgression["answer"], progressionError?: DashboardProgression["error"] }} props
  */
 export default function PlansView({
   weekDays,
@@ -56,7 +68,9 @@ export default function PlansView({
   onPlanChanged
 }) {
   // ---- State, the meals week and the day details ----------------------------
-  const [selectedDetail, setSelectedDetail] = useState(null);
+  // Swap, its step and Back show only in the open details, so each updater
+  // that spreads the detail below has one.
+  const [selectedDetail, setSelectedDetail] = useState(/** @type {SelectedDetail | null} */ (null));
   const [visibleSavedCount, setVisibleSavedCount] = useState(SAVED_EXERCISE_PAGE_SIZE);
   const offline = useConnection() === "offline";
 
@@ -64,7 +78,10 @@ export default function PlansView({
     const latestPlan = dashboard?.plans?.[0];
     const goalText =
       latestPlan?.goal ||
-      dashboard?.goals?.goalType ||
+      // The server's goals carry no goalType, as the summary above says.
+      /** @type {(NonNullable<DashboardPageProps["dashboard"]> & { goals?: { goalType?: string } }) | null} */ (
+        dashboard
+      )?.goals?.goalType ||
       fallbackPlan?.goal ||
       "Build lean strength and energy";
     return buildWeeklyMealPlan({
@@ -77,7 +94,9 @@ export default function PlansView({
 
   const selectedDay = useMemo(() => {
     if (!selectedDetail?.dayKey) return null;
-    const mealDay = weeklyMealPlan.days.find((day) => day.key === selectedDetail.dayKey);
+    const mealDay = weeklyMealPlan.days.find(
+      (/** @type {{ key: string }} */ day) => day.key === selectedDetail.dayKey
+    );
     if (!mealDay) return null;
     return {
       ...mealDay,
@@ -91,6 +110,7 @@ export default function PlansView({
   // Only a training day: a rest day is not a planned session.
   const latestPlan = dashboard?.plans?.[0];
   const savedDays = useMemo(() => savedPlanDays(latestPlan), [latestPlan]);
+  /** @param {string} weekday */
   const savedDayFor = (weekday) =>
     savedDays?.find((day) => day.weekday === weekday && !isRestDay(day.lines)) ?? null;
 
@@ -98,37 +118,45 @@ export default function PlansView({
   // since the dashboard lists an entry still inside its undo window.
   const loggedDayIndexes = useMemo(() => {
     const sessions = Array.isArray(dashboard?.workoutSessions) ? dashboard.workoutSessions : [];
+    // Asked below with a day that may have no index, which has() answers false.
     return new Set(
-      sessions
-        .filter((session) => latestPlan && session.planId === latestPlan.id)
-        .map((session) => session.planDayIndex)
+      /** @type {Array<number | null | undefined>} */ (
+        sessions
+          .filter((session) => latestPlan && session.planId === latestPlan.id)
+          .map((session) => session.planDayIndex)
+      )
     );
   }, [dashboard, latestPlan]);
 
   // The loads show in the region's unit, as the Log workout modal enters them.
   const system = useMemo(() => getPreferredMeasurementSystem(), []);
 
+  // A saved day exists only for the newest plan, so latestPlan is there
+  // wherever a day is logged, started or swapped.
+  /** @param {import("../../../app/plans.js").PlanDay} day */
   const logPlanDay = (day) => {
     setWorkoutForm({
       date: getLocalDateKey(),
       duration: "",
       ...buildPlanDayPrefill(day, progression, system),
-      planId: latestPlan.id,
+      planId: /** @type {NonNullable<typeof latestPlan>} */ (latestPlan).id,
       planDayIndex: day.index,
-      planDayLabel: day.weekday
+      // A saved day is found by its weekday (savedDayFor), so it has one.
+      planDayLabel: /** @type {string} */ (day.weekday)
     });
     setSelectedDetail(null);
     setWorkoutModalOpen(true);
   };
   // The in-gym session for the day (roadmap B6), from the same cards the Log
   // workout form opens with, so both start at the week's sets and loads.
+  /** @param {import("../../../app/plans.js").PlanDay} day */
   const startPlanDay = (day) => {
     setSelectedDetail(null);
     onStartSession(
       sessionFromPlanDay({
         day,
         cards: buildPlanDayPrefill(day, progression, system).exerciseSets,
-        planId: latestPlan.id,
+        planId: /** @type {NonNullable<typeof latestPlan>} */ (latestPlan).id,
         system,
         now: Date.now()
       })
@@ -140,6 +168,7 @@ export default function PlansView({
   // Escape handling already does the same, so this listener is a second copy.
   useEffect(() => {
     if (!selectedDay) return undefined;
+    /** @param {KeyboardEvent} event */
     const onKeyDown = (event) => {
       if (event.key === "Escape") setSelectedDetail(null);
     };
@@ -559,13 +588,21 @@ export default function PlansView({
                 {selectedDetail?.swapping && selectedSavedDay ? (
                   <SwapStep
                     apiFetch={apiFetch}
-                    planId={latestPlan.id}
+                    planId={/** @type {NonNullable<typeof latestPlan>} */ (latestPlan).id}
                     exercise={selectedDetail.swapping}
                     onSwapped={(plan) => {
                       onPlanChanged(plan);
-                      setSelectedDetail((detail) => ({ ...detail, swapping: null }));
+                      setSelectedDetail((detail) => ({
+                        .../** @type {SelectedDetail} */ (detail),
+                        swapping: null
+                      }));
                     }}
-                    onBack={() => setSelectedDetail((detail) => ({ ...detail, swapping: null }))}
+                    onBack={() =>
+                      setSelectedDetail((detail) => ({
+                        .../** @type {SelectedDetail} */ (detail),
+                        swapping: null
+                      }))
+                    }
                   />
                 ) : selectedDetail?.mode === "workout" ? (
                   <section className="plan-day-detail-col">
@@ -591,10 +628,13 @@ export default function PlansView({
                     {selectedSavedDay?.prescriptions?.length ? (
                       <PlanDaySwaps
                         apiFetch={apiFetch}
-                        planId={latestPlan.id}
+                        planId={/** @type {NonNullable<typeof latestPlan>} */ (latestPlan).id}
                         prescriptions={selectedSavedDay.prescriptions}
                         onSwap={(name) =>
-                          setSelectedDetail((detail) => ({ ...detail, swapping: name }))
+                          setSelectedDetail((detail) => ({
+                            .../** @type {SelectedDetail} */ (detail),
+                            swapping: name
+                          }))
                         }
                         onPlanChanged={onPlanChanged}
                       />

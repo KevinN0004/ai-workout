@@ -3,6 +3,7 @@
  * meal and progress-metric logs, newest first. Rendered by DashboardPage, which
  * loads it lazily.
  */
+// @ts-check
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getLocalDateKey,
@@ -20,6 +21,10 @@ import useOlderLogPages from "../hooks/useOlderLogPages";
 import { prSessions } from "../progress";
 import "./WorkoutsView.css";
 
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+
 const INITIAL_VISIBLE_ROWS = 40;
 const ROW_BATCH_SIZE = 40;
 
@@ -28,6 +33,7 @@ const ROW_BATCH_SIZE = 40;
  * 0, last. A bare YYYY-MM-DD reads as UTC midnight, unlike useDashboardMetrics'
  * parseDateValue, which reads it as local midnight, but UTC midnights fall in
  * date order too, so the sort is the same.
+ * @param {string | number | null | undefined} value
  */
 const toSortTime = (value) => {
   if (!value) return 0;
@@ -37,6 +43,10 @@ const toSortTime = (value) => {
 
 // An imported workout's line: where it came from, then its distance and
 // average heart rate, each only when Strava had one.
+/**
+ * @param {{ distanceMeters?: unknown, averageHeartrate?: unknown }} item
+ * @param {string} measurementSystem
+ */
 const importLine = (item, measurementSystem) => {
   const bpm = toNumberOrNull(item.averageHeartrate);
   return [
@@ -48,11 +58,20 @@ const importLine = (item, measurementSystem) => {
     .join(" | ");
 };
 
+/**
+ * @template {{ date?: string | null }} T
+ * @param {T[]} items
+ */
 const sortByDateDesc = (items) =>
   [...items].sort((a, b) => toSortTime(b?.date) - toSortTime(a?.date));
 
 // The dashboard's rows, then each fetched row whose id it does not already
 // hold: useOlderLogPages' list starts with a copy of the dashboard's page.
+/**
+ * @template {{ id?: string }} T
+ * @param {T[]} held
+ * @param {T[]} older
+ */
 const mergeById = (held, older) => {
   const heldIds = new Set(held.map((item) => item?.id));
   return [...held, ...older.filter((item) => !heldIds.has(item?.id))];
@@ -74,6 +93,7 @@ const mergeById = (held, older) => {
  * offers Delete behind a confirm, which calls `onDeleteImportedWorkout` with its
  * id (deleteImportedWorkout in events.js, `{ ok }` or `{ ok: false, error }`).
  * Delete needs the server, so it is disabled offline.
+ * @param {Pick<DashboardMetrics, "calories" | "mealLogs" | "progressMetrics"> & Pick<DashboardPageProps, "setWorkoutForm" | "setWorkoutModalOpen" | "onStartSession" | "onDeleteImportedWorkout"> & { workouts: DashboardMetrics["recentWorkouts"], pagination: DashboardPageProps["dashboardPagination"], onOpenCalories: () => void, onOpenMeal: () => void }} props
  */
 export default function WorkoutsView({
   workouts,
@@ -159,18 +179,20 @@ export default function WorkoutsView({
   // ---- Deleting an imported workout -----------------------------------------
   const offline = useConnection() === "offline";
   // The id of the import whose delete is being confirmed, or null.
-  const [confirmingDelete, setConfirmingDelete] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(/** @type {string | null} */ (null));
   const [deleting, setDeleting] = useState(false);
-  const cancelDeleteRef = useRef(null);
+  const cancelDeleteRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
 
   // Asking unmounts the Delete button that had focus; Cancel takes it, the
   // choice that changes nothing.
   useEffect(() => {
-    if (confirmingDelete) cancelDeleteRef.current.focus();
+    // Cancel is rendered while a delete is being confirmed, before this runs.
+    if (confirmingDelete) /** @type {HTMLButtonElement} */ (cancelDeleteRef.current).focus();
   }, [confirmingDelete]);
 
   // A refused delete leaves the confirm open to try again; the handler shows
   // the error.
+  /** @param {string} id */
   const deleteImport = async (id) => {
     setDeleting(true);
     const result = await onDeleteImportedWorkout(id);
@@ -178,12 +200,18 @@ export default function WorkoutsView({
     if (result.ok) setConfirmingDelete(null);
   };
 
+  /** @param {keyof typeof visibleRows} key */
   const expandRows = (key) => {
     setVisibleRows((prev) => ({ ...prev, [key]: prev[key] + ROW_BATCH_SIZE }));
   };
 
   // The next batch of rows. Once every row held is on screen it fetches the
   // next page as well, and the batch fills in when the page arrives.
+  /**
+   * @param {keyof typeof visibleRows} key
+   * @param {unknown[]} rows
+   * @param {{ loadMore: () => unknown }} older
+   */
   const showMore = (key, rows, older) => {
     if (rows.length <= visibleRows[key]) older.loadMore();
     expandRows(key);
@@ -251,14 +279,19 @@ export default function WorkoutsView({
                     {marks && <PrTag marks={marks} />}
                     <span className="muted">{item.focus ? ` - ${item.focus}` : ""}</span>
                     {item.exerciseSets?.length ? (
-                      item.exerciseSets.map((exercise, exerciseIndex) => (
-                        <p
-                          key={`${exercise.name}-${exerciseIndex}`}
-                          className="muted workout-detail"
-                        >
-                          {formatExerciseLine(exercise, measurementSystem)}
-                        </p>
-                      ))
+                      item.exerciseSets.map(
+                        (
+                          /** @type {{ name: string, sets: import("../../../app/exerciseSets.js").LoggedSet[] }} */ exercise,
+                          /** @type {number} */ exerciseIndex
+                        ) => (
+                          <p
+                            key={`${exercise.name}-${exerciseIndex}`}
+                            className="muted workout-detail"
+                          >
+                            {formatExerciseLine(exercise, measurementSystem)}
+                          </p>
+                        )
+                      )
                     ) : (
                       <>
                         {!!item.exercises?.length && (
@@ -389,27 +422,32 @@ export default function WorkoutsView({
         <section className="log-section">
           <h3>Meal log</h3>
           <div className="log-list">
-            {visibleMealLogs.map((item, index) => (
-              <div
-                key={item.id || `meal-${item.date || "unknown"}-${index}`}
-                className="log-list-row"
-              >
-                <div className="workout-row-copy">
-                  <strong>{item.date || "--"}</strong>
-                  <span className="muted">
-                    {" "}
-                    - {(item.mealType || "other").replace(/^\w/, (value) => value.toUpperCase())}
-                    {item.name ? ` - ${item.name}` : ""}
-                  </span>
-                  <p className="muted workout-detail">
-                    {item.calories ?? "--"} kcal | P {item.proteinG ?? "--"} / C{" "}
-                    {item.carbsG ?? "--"} / F {item.fatG ?? "--"}
-                  </p>
-                  {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
-                  {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
+            {visibleMealLogs.map(
+              (
+                /** @type {import("../../../app/dashboard.js").Dashboard["mealLogs"][number] & { isQueued?: boolean }} */ item,
+                /** @type {number} */ index
+              ) => (
+                <div
+                  key={item.id || `meal-${item.date || "unknown"}-${index}`}
+                  className="log-list-row"
+                >
+                  <div className="workout-row-copy">
+                    <strong>{item.date || "--"}</strong>
+                    <span className="muted">
+                      {" "}
+                      - {(item.mealType || "other").replace(/^\w/, (value) => value.toUpperCase())}
+                      {item.name ? ` - ${item.name}` : ""}
+                    </span>
+                    <p className="muted workout-detail">
+                      {item.calories ?? "--"} kcal | P {item.proteinG ?? "--"} / C{" "}
+                      {item.carbsG ?? "--"} / F {item.fatG ?? "--"}
+                    </p>
+                    {!!item.notes && <p className="muted workout-detail">{item.notes}</p>}
+                    {item.isQueued && <p className="muted workout-detail">Not sent yet</p>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
             {!mealLogItems.length && (
               <div className="log-empty-state">
                 <p className="muted">No meal logs yet.</p>

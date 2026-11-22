@@ -2,6 +2,13 @@
  * The dashboard's header: the drawer's menu button, the "Hub" title and the
  * profile menu. Rendered by DashboardPage, which owns the profile menu's state.
  */
+// @ts-check
+
+/**
+ * What DashboardPage passes the header: the user and navigation, and, when
+ * signed in, the drawer opener and the profile menu's ref, state and actions.
+ * @typedef {Pick<import("../DashboardPage.jsx").DashboardPageProps, "user" | "go"> & { onNavigateSummary: () => void, onOpenMenu?: () => void, profileMenuRef?: import("react").RefObject<HTMLDivElement | null>, profileMenuOpen?: boolean, onToggleProfileMenu?: () => void, onOpenSettings?: () => void, onLogout?: () => void }} DashboardHeaderProps
+ */
 
 /**
  * Signed out, renders the title, a Login / Sign up button and a sign-in prompt.
@@ -11,6 +18,7 @@
  * inside it. The title button has no aria-label: its accessible name is its
  * visible text, "Hub", so a voice-control user can say what they see, and its
  * `title` says where it goes.
+ * @param {DashboardHeaderProps} props
  */
 export default function DashboardHeader({
   user,

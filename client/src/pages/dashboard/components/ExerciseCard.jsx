@@ -3,6 +3,7 @@
  * sets count reps or seconds, and its set rows of reps or seconds, load and
  * RPE, with buttons to add and remove a set and to remove the exercise.
  */
+// @ts-check
 import {
   MAX_SETS,
   addSet,
@@ -17,6 +18,7 @@ import {
  * the card list and returns the next one, so each control names its own card
  * and row by key. `errors` holds the save's messages by key, `unitLabel` is
  * "kg" or "lb", and `position` numbers a card that has no name yet.
+ * @param {{ card: import("../../../app/exerciseSets.js").ExerciseCard, position: number, unitLabel: string, errors: Record<string, string>, onChange: (update: (cards: import("../../../app/exerciseSets.js").ExerciseCard[]) => import("../../../app/exerciseSets.js").ExerciseCard[]) => void }} props
  */
 export default function ExerciseCard({ card, position, unitLabel, errors, onChange }) {
   const label = card.name.trim() || `Exercise ${position}`;
@@ -47,7 +49,12 @@ export default function ExerciseCard({ card, position, unitLabel, errors, onChan
           <select
             value={card.kind}
             onChange={(e) =>
-              onChange((cards) => updateCard(cards, card.key, { kind: e.target.value }))
+              // The select offers only these two.
+              onChange((cards) =>
+                updateCard(cards, card.key, {
+                  kind: /** @type {"reps" | "seconds"} */ (e.target.value)
+                })
+              )
             }
           >
             <option value="reps">Reps</option>
@@ -92,6 +99,7 @@ export default function ExerciseCard({ card, position, unitLabel, errors, onChan
             const number = index + 1;
             const rowError = errors[`${card.key}:${row.key}`];
             const errorId = `${row.key}-error`;
+            /** @param {Partial<import("../../../app/exerciseSets.js").SetRow>} patch */
             const update = (patch) =>
               onChange((cards) => updateSet(cards, card.key, row.key, patch));
             return (

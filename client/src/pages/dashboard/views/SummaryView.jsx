@@ -4,11 +4,17 @@
  * trends. Rendered by DashboardPage, which imports it eagerly, unlike the
  * other views.
  */
+// @ts-check
 import { useState } from "react";
 import "./SummaryView.css";
 
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+
 // How each planned day of the week reads, in words and the trend badge's tone.
 // A rest day, or a training day before the plan was saved, is not listed.
+/** @type {Record<string, { text: string, tone: string }>} */
 const PLAN_DAY_STATES = {
   done: { text: "Done", tone: "trend-up" },
   missed: { text: "Missed", tone: "trend-down" },
@@ -17,6 +23,7 @@ const PLAN_DAY_STATES = {
 };
 
 // The target-weight line for each of useDashboardMetrics' weightProgress states.
+/** @param {{ state: string, target: number | null, remaining?: number }} weightProgress */
 const targetWeightLabel = ({ state, target, remaining }) => {
   if (state === "no-target") return "Target weight: not set";
   if (state === "no-weight") return `Target weight: ${target} lb. Log a weight to see progress.`;
@@ -24,6 +31,9 @@ const targetWeightLabel = ({ state, target, remaining }) => {
   return `Target weight: ${target} lb, ${remaining} lb to go`;
 };
 
+/**
+ * @param {{ title: string, subtitle: string, series: number[], buildLinePath: DashboardMetrics["buildLinePath"], lineClassName: string, startLabel: string, endLabel: string }} props
+ */
 function TrendChart({
   title,
   subtitle,
@@ -62,6 +72,7 @@ function TrendChart({
  * The weekly card lists `planWeek`'s planned days, says when `deloadWeek`, the
  * week's progression, makes this a lighter week, and shows `weightProgress`,
  * whose "Set a target weight" button calls `onOpenGoals`.
+ * @param {Pick<DashboardPageProps, "form" | "openPlannerFromProfile" | "weatherData" | "weatherLoading" | "weatherError" | "refreshWeatherRecommendation" | "airQualityData" | "airQualityLoading" | "airQualityError" | "refreshAirQuality"> & Pick<DashboardMetrics, "last7Workouts" | "avgCalories" | "weeklyGoal" | "workoutProgress" | "calorieGoal" | "calorieProgress" | "buildLinePath" | "trendRanges" | "todayRecommendation" | "weeklyTrends" | "planWeek" | "weightProgress"> & { workouts: DashboardMetrics["recentWorkouts"], deloadWeek: NonNullable<DashboardProgression["progression"]>["deloadWeek"] | null, onOpenGoals: () => void, onOpenPlans: () => void, onOpenMeal: () => void }} props
  */
 export default function SummaryView({
   form,
@@ -93,9 +104,13 @@ export default function SummaryView({
   onOpenMeal
 }) {
   // ---- Derived values -------------------------------------------------------
-  const [trendRange, setTrendRange] = useState("week");
+  const [trendRange, setTrendRange] = useState(
+    /** @type {keyof NonNullable<DashboardMetrics["trendRanges"]>} */ ("week")
+  );
   const activeTrend = trendRanges?.[trendRange] || trendRanges?.week || null;
   const selectedMeal = todayRecommendation?.mealPlan || null;
+  // weightProgress carries a percent in its progress and reached states, the
+  // two the bar below is drawn for.
   const workoutLines = todayRecommendation?.workoutLines || [];
   const weatherCurrent = weatherData?.current || null;
   const weatherRecommendation = weatherData?.recommendation || null;
@@ -120,6 +135,10 @@ export default function SummaryView({
   const airLevelClass = String(airSummary?.level || "unknown")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-");
+  /**
+   * @param {number | null | undefined} value
+   * @param {{ suffix?: string, unit?: string, decimals?: number }} [options]
+   */
   const renderTrendBadge = (value, { suffix, unit = "", decimals = 0 } = {}) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
     const numeric = Number(value);
@@ -218,9 +237,11 @@ export default function SummaryView({
               <div className="card-section-body">
                 {workoutLines.length ? (
                   <ul className="hub-list">
-                    {workoutLines.slice(0, 4).map((line, index) => (
-                      <li key={`today-workout-${index}-${line}`}>{line}</li>
-                    ))}
+                    {workoutLines
+                      .slice(0, 4)
+                      .map((/** @type {string} */ line, /** @type {number} */ index) => (
+                        <li key={`today-workout-${index}-${line}`}>{line}</li>
+                      ))}
                   </ul>
                 ) : (
                   <p className="muted">
@@ -510,7 +531,11 @@ export default function SummaryView({
               ) : null}
               {weightProgress.state === "progress" || weightProgress.state === "reached" ? (
                 <div className="progress-bar">
-                  <span style={{ width: `${weightProgress.percent}%` }} />
+                  <span
+                    style={{
+                      width: `${/** @type {{ percent: number }} */ (weightProgress).percent}%`
+                    }}
+                  />
                 </div>
               ) : null}
             </div>

@@ -3,6 +3,7 @@
  * editing in place for three of them, and the account panel. Rendered by
  * DashboardPage, which loads it lazily.
  */
+// @ts-check
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";
@@ -13,6 +14,14 @@ import { readStravaResult } from "../../../app/strava";
 import { EDITABLE_TABS, fieldsForTab } from "../settings/settingsFields";
 import "./SettingsView.css";
 
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../DashboardPage.jsx").DashboardMetrics} DashboardMetrics */
+/** @typedef {import("../DashboardPage.jsx").DashboardProgression} DashboardProgression */
+
+/**
+ * @param {unknown} heightCm
+ * @param {string} measurementSystem
+ */
 const formatHeightByLocation = (heightCm, measurementSystem) => {
   const cmNum = Number(heightCm);
   if (!cmNum || Number.isNaN(cmNum)) return "Not set";
@@ -27,6 +36,10 @@ const formatHeightByLocation = (heightCm, measurementSystem) => {
   return `${feet} ft ${inches} in`;
 };
 
+/**
+ * @param {unknown} weightKg
+ * @param {string} measurementSystem
+ */
 const formatWeightByLocation = (weightKg, measurementSystem) => {
   const kgNum = Number(weightKg);
   if (!kgNum || Number.isNaN(kgNum)) return "Not set";
@@ -34,6 +47,7 @@ const formatWeightByLocation = (weightKg, measurementSystem) => {
   return `${Math.round(kgNum / 0.453592)} lb`;
 };
 
+/** @param {unknown} value */
 const displayValue = (value) => {
   if (Array.isArray(value)) return value.length ? value.join(", ") : "Not set";
   if (value === null || value === undefined) return "Not set";
@@ -50,6 +64,7 @@ const displayValue = (value) => {
  * `onStravaChange` (App's reloadDashboard) to the Strava panel on the Connected
  * Apps tab, which opens first after Strava's return. The
  * privacy and notifications tabs, and the rest of Connected Apps, show fixed text.
+ * @param {Pick<DashboardPageProps, "user" | "onSaveProfile" | "onChangePassword" | "onDeleteAccount" | "apiFetch"> & { onStravaChange: DashboardPageProps["reloadDashboard"] }} props
  */
 export default function SettingsView({
   user,
@@ -193,6 +208,10 @@ export default function SettingsView({
   // and a guard on the wrong source looks deliberate, which is worse than none.
   const canEdit = EDITABLE_TABS.includes(activeTabData.id) && Boolean(user?.profile);
 
+  /**
+   * @param {Parameters<DashboardPageProps["onSaveProfile"]>[0]} draft
+   * @param {Parameters<DashboardPageProps["onSaveProfile"]>[1]} formUnits
+   */
   const handleSave = async (draft, formUnits) => {
     setSaving(true);
     setSaveError("");

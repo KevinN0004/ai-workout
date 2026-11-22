@@ -3,6 +3,7 @@
  * on each, and on a swapped one what it replaced and why, with an Undo. Both
  * need the server, so both are disabled offline.
  */
+// @ts-check
 import { useState } from "react";
 import { undoExerciseSwap } from "../../../app/planSwaps";
 import OfflineHint from "../../../components/OfflineHint";
@@ -12,17 +13,20 @@ import useConnection from "../../../hooks/useConnection";
  * The day's `prescriptions` of the plan `planId`. Swap hands the exercise's
  * name to `onSwap`; Undo takes the swap back over `apiFetch` and hands the plan
  * the server answers to `onPlanChanged`, and says why in an alert when it fails.
+ * @param {Pick<import("../DashboardPage.jsx").DashboardPageProps, "apiFetch" | "onPlanChanged"> & { planId: string, prescriptions: import("../../../app/plans.js").Prescription[], onSwap: (name: string) => void }} props
  */
 export default function PlanDaySwaps({ apiFetch, planId, prescriptions, onSwap, onPlanChanged }) {
   const offline = useConnection() === "offline";
   const [error, setError] = useState("");
 
+  /** @param {string} name */
   const undo = async (name) => {
     setError("");
     try {
       onPlanChanged(await undoExerciseSwap(apiFetch, planId, name));
     } catch (err) {
-      setError(err.message);
+      // undoExerciseSwap throws an Error with the server's message, or fetch's.
+      setError(/** @type {Error} */ (err).message);
     }
   };
 

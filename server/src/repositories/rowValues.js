@@ -61,6 +61,10 @@ export const toJsonArray = (value) => (Array.isArray(value) ? value : []);
 /**
  * A JSON column read as an object: arrays, null and scalars read as empty.
  * @param {unknown} value
+ * @returns {Record<string, unknown>}
  */
 export const toJsonObject = (value) =>
-  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  // A JSON object that is not an array has string keys.
+  /** @type {Record<string, unknown>} */ (
+    value && typeof value === "object" && !Array.isArray(value) ? value : {}
+  );

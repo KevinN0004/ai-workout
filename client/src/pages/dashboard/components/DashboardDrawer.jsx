@@ -2,6 +2,7 @@
  * The dashboard's slide-in navigation drawer, opened from the header's menu
  * button. Rendered by DashboardPage; whether it is open is App's state.
  */
+// @ts-check
 import { useRef } from "react";
 import useCloseOnEscape from "../../../hooks/useCloseOnEscape";
 import useFocusTrap from "../../../hooks/useFocusTrap";
@@ -11,9 +12,10 @@ import useFocusTrap from "../../../hooks/useFocusTrap";
  * button in the footer. Closes on Escape, on a backdrop click and from its
  * close button, and holds keyboard focus while open; `onNavigate` receives the
  * view key.
+ * @param {{ open: boolean, dashView: string, items: Array<{ key: string, label: string }>, onClose: () => void, onNavigate: (view: string) => void }} props
  */
 export default function DashboardDrawer({ open, dashView, items, onClose, onNavigate }) {
-  const panelRef = useRef(null);
+  const panelRef = useRef(/** @type {HTMLElement | null} */ (null));
   // The drawer is not portalled through ModalPortal, so it needs the same
   // Escape and focus handling directly. Called before the early return to
   // keep the hook count stable across renders.

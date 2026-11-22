@@ -3,6 +3,7 @@
  * Rendered by DashboardPage; opened by the Add workout buttons, which date the form
  * today and clear any plan-day link, and by PlansView's Log this workout.
  */
+// @ts-check
 import { useMemo, useState } from "react";
 import ModalPortal from "../../../components/ModalPortal";
 import { getPreferredMeasurementSystem } from "../../../app/units";
@@ -16,6 +17,7 @@ import ExerciseCard from "./ExerciseCard";
  * in events.js, which queues the entry behind the undo window, then resets the
  * form and closes the modal without waiting for the save. A form filled from a
  * plan day (PlansView) carries `planId` and says which day it is logging.
+ * @param {Pick<import("../DashboardPage.jsx").DashboardPageProps, "workoutForm" | "setWorkoutForm"> & { open: boolean, onClose: () => void, onSubmit: import("../DashboardPage.jsx").DashboardPageProps["submitWorkout"] }} props
  */
 export default function DashboardWorkoutModal({
   open,
@@ -29,6 +31,7 @@ export default function DashboardWorkoutModal({
   if (!open) return null;
 
   const cards = Array.isArray(workoutForm.exerciseSets) ? workoutForm.exerciseSets : [];
+  /** @param {(cards: import("../../../app/exerciseSets.js").ExerciseCard[]) => import("../../../app/exerciseSets.js").ExerciseCard[]} updater */
   const setCards = (updater) =>
     setWorkoutForm((prev) => ({
       ...prev,
@@ -38,6 +41,7 @@ export default function DashboardWorkoutModal({
     setErrors({});
     onClose();
   };
+  /** @param {import("react").FormEvent<HTMLFormElement>} event */
   const submit = (event) => {
     const found = toExerciseSets(cards, system).errors;
     if (Object.keys(found).length) {
