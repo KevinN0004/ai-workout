@@ -29,6 +29,7 @@ const {
   weatherCodeToText
 } = __testables;
 
+/** @type {import("node:http").Server} */
 let server;
 let baseUrl = "";
 
@@ -60,7 +61,8 @@ beforeAll(async () => {
   await new Promise((resolve) => {
     server.once("listening", resolve);
   });
-  const address = server.address();
+  // A server listening on a port reports its address as an AddressInfo.
+  const address = /** @type {import("node:net").AddressInfo} */ (server.address());
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
 

@@ -15,7 +15,9 @@ import {
 // asks the database for. collectionReads.integration.test.js covers the same
 // routes against Postgres.
 
+/** @type {import("vitest").Mock} */
 let loadCollectionPage;
+/** @type {import("vitest").Mock} */
 let findUserWithDashboard;
 
 const paginatedPaths = [

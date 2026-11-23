@@ -114,7 +114,9 @@ const liftPath = (weekStart, key) =>
   `/api/dashboard/progression/${weekStart}/lifts/${encodeURIComponent(key)}`;
 
 describe("the progression routes", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
   const EMAIL = "progression-routes@example.com";
 

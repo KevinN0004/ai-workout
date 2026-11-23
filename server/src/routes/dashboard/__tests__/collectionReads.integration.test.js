@@ -37,7 +37,9 @@ const signUp = async (agent, email) => {
 };
 
 describe("dashboard collection reads", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {

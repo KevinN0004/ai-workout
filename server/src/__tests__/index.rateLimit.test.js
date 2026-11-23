@@ -41,6 +41,7 @@ const LIMIT_KEYS = [
 // app here is pointed at a real one in a temporary folder. With client/dist
 // built, index.js would otherwise serve that, and without it mount nothing.
 const SHELL = "<!doctype html><html><body><div id=root>SPA_SHELL_MARKER</div></body></html>";
+/** @type {string} */
 let distPath;
 
 beforeAll(() => {
@@ -75,6 +76,7 @@ const startApp = async (limited) => {
   // every limiter answers 500 instead of calling the real API.
   process.env.GEMINI_API_KEY = "";
 
+  /** @type {import("express").Express} */
   let app;
   try {
     ({ app } = await import("../index.js"));
@@ -90,7 +92,8 @@ const startApp = async (limited) => {
   const server = app.listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   running.push(server);
-  return `http://127.0.0.1:${server.address().port}`;
+  // A server listening on a port reports its address as an AddressInfo.
+  return `http://127.0.0.1:${/** @type {import("node:net").AddressInfo} */ (server.address()).port}`;
 };
 
 // The limiters are registered before the CSRF middleware, so an unauthenticated

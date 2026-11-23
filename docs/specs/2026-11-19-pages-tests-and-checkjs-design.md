@@ -134,8 +134,16 @@ Phases 3 and 4's rules hold, for source and tests alike:
 - **Phase 4's patterns G to M** apply where they fit: a defaulted parameter typed as its
   callers pass it (I), state declared at its first value (L), a guarded value cast in place
   with its reason (K).
-- **In a test file, a mock's untyped parameter may stay `any`.** That is the one latitude
-  decision 2 gives; everything else a test passes or reads is checked.
+- **In a test file, a mock's untyped parameter may stay `any`.** That is the latitude
+  decision 2 meant to give. `noImplicitAny: false` gives more, found in PR 9 and recorded
+  here:
+  - **A `let` with no initializer is `any`**, so nothing done with it is checked. Each one
+    in a checked test file names its type on the line above (decided 2026-11-23), and a
+    repo-invariant test holds that.
+  - **An empty `[]` and a helper's untyped parameter stay `any`.**
+  - **A field read through a JavaScript function's return type is not checked**, such as
+    `ReturnType<typeof mapUser>`. TypeScript gives a `.js` file's object literals an open
+    type, so a misspelled field reads as `any`.
 
 ### Response types in the client
 

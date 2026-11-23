@@ -43,7 +43,9 @@ const remove = (agent, csrfToken, id) =>
   agent.delete(`/api/dashboard/saved-exercises/${id}`).set("X-CSRF-Token", csrfToken);
 
 describe("saved exercise routes", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {

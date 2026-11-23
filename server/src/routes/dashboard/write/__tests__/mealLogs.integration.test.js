@@ -42,7 +42,9 @@ const postMeal = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/meal-logs").set("X-CSRF-Token", csrfToken).send(body);
 
 describe("POST /api/dashboard/meal-logs", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {
@@ -244,6 +246,7 @@ describe("POST /api/dashboard/meal-logs", () => {
   // The sync clamps the entry to that ceiling, so the route answers 200.
   describe("a day whose meals exceed the calorie_entries ceiling", () => {
     const logBigMeals = async (count) => {
+      /** @type {import("supertest").Response | undefined} */
       let response;
       for (let i = 0; i < count; i += 1) {
         response = await postMeal(agent, csrfToken, {
@@ -253,7 +256,8 @@ describe("POST /api/dashboard/meal-logs", () => {
           calories: 4000
         });
       }
-      return response;
+      // Each caller logs at least one meal, so the loop sets it.
+      return /** @type {import("supertest").Response} */ (response);
     };
 
     test("clamps the derived entry to the column ceiling and keeps every meal", async () => {
@@ -359,6 +363,7 @@ describe("POST /api/dashboard/meal-logs", () => {
   test("two meals saved at once for the same day both count", async () => {
     const [user] = await prisma.appUser.findMany({ select: { id: true } });
     let arrived = 0;
+    /** @type {(value?: unknown) => void} */
     let releaseAll;
     const allArrived = new Promise((resolve) => {
       releaseAll = resolve;

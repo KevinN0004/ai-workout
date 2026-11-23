@@ -30,13 +30,16 @@ const WEATHER_URL = `${WEATHER_PATH}?latitude=140.712776&longitude=-74.005974`;
 // at module scope, and dotenv fills in a key that is absent.
 const ENV = { LOG_LEVEL: "info", API_RATE_LIMIT_MAX: "1" };
 
+/** @type {import("node:http").Server} */
 let server;
+/** @type {string} */
 let baseUrl;
 
 beforeAll(async () => {
   vi.resetModules();
   const previous = Object.fromEntries(Object.keys(ENV).map((key) => [key, process.env[key]]));
   Object.assign(process.env, ENV);
+  /** @type {import("express").Express} */
   let app;
   try {
     ({ app } = await import("../index.js"));
@@ -50,7 +53,8 @@ beforeAll(async () => {
   }
   server = app.listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  // A server listening on a port reports its address as an AddressInfo.
+  baseUrl = `http://127.0.0.1:${/** @type {import("node:net").AddressInfo} */ (server.address()).port}`;
 });
 
 afterAll(async () => {

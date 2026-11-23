@@ -251,8 +251,10 @@ describe("findPlanForUser and rewritePlan", () => {
   // reads the old text, writes, and the first's write then drops it.
   test("a rewrite waits for one in flight, so neither is lost", async () => {
     const { user, row } = await seedPlan("rewrite-race@example.com");
+    /** @type {((value?: unknown) => void) | undefined} */
     let release;
     const held = new Promise((resolve) => (release = resolve));
+    /** @type {(value?: unknown) => void} */
     let firstRead;
     const firstHasRead = new Promise((resolve) => (firstRead = resolve));
     const appending = (suffix, wait) => async (plan) => {
@@ -267,7 +269,8 @@ describe("findPlanForUser and rewritePlan", () => {
     await firstHasRead;
     const second = rewritePlan({ userId: user.id, planId: row.id, rewrite: appending("+y") });
     await Promise.race([second, new Promise((resolve) => setTimeout(resolve, 300))]);
-    release();
+    // The executor runs at once, so release is set.
+    /** @type {(value?: unknown) => void} */ (release)();
     await Promise.all([first, second]);
 
     expect(await textOf(row.id)).toBe(`${realAnswer}+x+y`);
@@ -290,8 +293,10 @@ describe("findPlanForUser and rewritePlan", () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
     };
+    /** @type {((value?: unknown) => void) | undefined} */
     let release;
     const held = new Promise((resolve) => (release = resolve));
+    /** @type {(value?: unknown) => void} */
     let firstRead;
     const firstHasRead = new Promise((resolve) => (firstRead = resolve));
 
@@ -314,7 +319,8 @@ describe("findPlanForUser and rewritePlan", () => {
       rewrite: () => ({ payload, planText: "never" })
     });
     await blockedOnLocks(2);
-    release();
+    // The executor runs at once, so release is set.
+    /** @type {(value?: unknown) => void} */ (release)();
 
     expect(await first).toEqual({ conflict: true });
     await deleted;

@@ -13,8 +13,11 @@ import { createErrorHandler } from "../errorHandler.js";
 // instead, and the tests assert the middleware calls it with the cap it relies
 // on rather than asserting on the stub's own output.
 
+/** @type {import("pino").Logger & { error: import("vitest").Mock }} */
 let logger;
+/** @type {import("vitest").Mock<(value: unknown, maxLen?: number) => string>} */
 let toShortText;
+/** @type {import("vitest").Mock} */
 let captureException;
 
 const build = (overrides = {}) =>
@@ -78,7 +81,10 @@ const handle = (err, { req = buildReq(), res = buildRes(), handler = build() } =
 const logEntry = () => logger.error.mock.calls[0][0];
 
 beforeEach(() => {
-  logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  // A logger of vi.fn()s is not pino's, so it is cast through unknown.
+  logger = /** @type {import("pino").Logger & { error: import("vitest").Mock }} */ (
+    /** @type {unknown} */ ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })
+  );
   toShortText = vi.fn((value, maxLen = 160) =>
     typeof value === "string" ? value.trim().slice(0, maxLen) : ""
   );

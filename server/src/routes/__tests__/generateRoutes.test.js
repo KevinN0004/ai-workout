@@ -33,7 +33,9 @@ const gemini = /** @type {import("@google/genai").GoogleGenAI} */ (
   /** @type {unknown} */ ({ models: { generateContent } })
 );
 
+/** @type {import("vitest").Mock} */
 let saveGeneratedPlan;
+/** @type {import("vitest").Mock} */
 let pruneGeneratedPlans;
 
 /**
