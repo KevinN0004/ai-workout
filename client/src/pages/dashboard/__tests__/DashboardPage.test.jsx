@@ -793,12 +793,10 @@ describe("DashboardPage", () => {
       "weatherData",
       "weatherLoading",
       "weatherError",
-      "weatherLastUpdatedAt",
       "refreshWeatherRecommendation",
       "airQualityData",
       "airQualityLoading",
       "airQualityError",
-      "airQualityLastUpdatedAt",
       "refreshAirQuality",
       "onOpenPlans",
       "onOpenMeal"
@@ -826,10 +824,8 @@ describe("DashboardPage", () => {
         dashView: "summary",
         weatherLoading: true,
         weatherError: "weather is down",
-        weatherLastUpdatedAt: 1000,
         airQualityLoading: false,
-        airQualityError: "air is down",
-        airQualityLastUpdatedAt: 2000
+        airQualityError: "air is down"
       });
       const props = propsOf();
 
@@ -837,8 +833,14 @@ describe("DashboardPage", () => {
       expect(props.airQualityError).toBe("air is down");
       expect(props.weatherLoading).toBe(true);
       expect(props.airQualityLoading).toBe(false);
-      expect(props.weatherLastUpdatedAt).toBe(1000);
-      expect(props.airQualityLastUpdatedAt).toBe(2000);
+    });
+
+    // Only the glance strip shows when each reading was taken.
+    test("the glance strip gets each reading's own update time", () => {
+      renderPage({ weatherLastUpdatedAt: 1000, airQualityLastUpdatedAt: 2000 });
+
+      expect(glance.props.weatherLastUpdatedAt).toBe(1000);
+      expect(glance.props.airQualityLastUpdatedAt).toBe(2000);
     });
 
     test("the glance strip gets each card's own error kind", () => {

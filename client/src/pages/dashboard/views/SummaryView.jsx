@@ -71,9 +71,8 @@ function TrendChart({
  * US AQI a NowCast when the payload carries one, and the latest reading's when not.
  * The weekly card lists `planWeek`'s planned days, says when `deloadWeek`, the
  * week's progression, makes this a lighter week, and shows `weightProgress`,
- * whose "Set a target weight" button calls `onOpenGoals`. DashboardPage also
- * passes the two readings' update times, which this view does not show.
- * @param {Pick<DashboardPageProps, "form" | "openPlannerFromProfile" | "weatherData" | "weatherLoading" | "weatherError" | "weatherLastUpdatedAt" | "refreshWeatherRecommendation" | "airQualityData" | "airQualityLoading" | "airQualityError" | "airQualityLastUpdatedAt" | "refreshAirQuality"> & Pick<DashboardMetrics, "last7Workouts" | "avgCalories" | "weeklyGoal" | "workoutProgress" | "calorieGoal" | "calorieProgress" | "buildLinePath" | "trendRanges" | "todayRecommendation" | "weeklyTrends" | "planWeek" | "weightProgress"> & { workouts: DashboardMetrics["recentWorkouts"], deloadWeek: NonNullable<DashboardProgression["progression"]>["deloadWeek"] | null, onOpenGoals: () => void, onOpenPlans: () => void, onOpenMeal: () => void }} props
+ * whose "Set a target weight" button calls `onOpenGoals`.
+ * @param {Pick<DashboardPageProps, "form" | "openPlannerFromProfile" | "weatherData" | "weatherLoading" | "weatherError" | "refreshWeatherRecommendation" | "airQualityData" | "airQualityLoading" | "airQualityError" | "refreshAirQuality"> & Pick<DashboardMetrics, "last7Workouts" | "avgCalories" | "weeklyGoal" | "workoutProgress" | "calorieGoal" | "calorieProgress" | "buildLinePath" | "trendRanges" | "todayRecommendation" | "weeklyTrends" | "planWeek" | "weightProgress"> & { workouts: DashboardMetrics["recentWorkouts"], deloadWeek: NonNullable<DashboardProgression["progression"]>["deloadWeek"] | null, onOpenGoals: () => void, onOpenPlans: () => void, onOpenMeal: () => void }} props
  */
 export default function SummaryView({
   form,
