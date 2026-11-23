@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -8,11 +9,18 @@ import { registerWorkoutAndGoalRoutes } from "../registerWorkoutAndGoalRoutes.js
 // the store stubbed: only an import is deleted, and the answer is the
 // refreshed dashboard. stravaSync.integration.test.js runs it against Postgres.
 
+/**
+ * @param {object} [overrides]
+ * @param {object | null} [user]
+ */
 const buildApp = (overrides = {}, user = { id: "u-1" }) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    req.log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+    // A logger of vi.fn()s is not pino's, so it is cast through unknown.
+    req.log = /** @type {import("pino").Logger} */ (
+      /** @type {unknown} */ ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() })
+    );
     next();
   });
   const deps = {
@@ -27,7 +35,13 @@ const buildApp = (overrides = {}, user = { id: "u-1" }) => {
     buildDashboardResponse: vi.fn(async () => ({ dashboard: { workoutSessions: [] } })),
     ...overrides
   };
-  registerWorkoutAndGoalRoutes(app, deps);
+  // The stubs cover the delete route alone, so the deps are cast through unknown.
+  registerWorkoutAndGoalRoutes(
+    app,
+    /** @type {Parameters<typeof registerWorkoutAndGoalRoutes>[1]} */ (
+      /** @type {unknown} */ (deps)
+    )
+  );
   return { app, deps };
 };
 

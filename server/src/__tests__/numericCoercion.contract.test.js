@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { toNumberOrNull } from "../repositories/rowValues.js";
 import { toNullableNumber } from "../services/dashboard/dashboardDataBuildersService.js";
@@ -12,26 +13,38 @@ import { readSet } from "../services/planning/progression.js";
 import { parseSubscriptionId } from "../services/integrations/stravaConfig.js";
 import { positiveOrNull } from "../services/integrations/stravaMapping.js";
 
+// mapWorkoutSession's fixtures hold only the column under test, so each is cast
+// to the row it maps.
+/** @typedef {import("../repositories/workoutSessionRepository.js").WorkoutSessionRow} WorkoutSessionRow */
+
 // One set row holding `value` in `field`, read back through the mapper.
 const readSetField = (field, value) =>
-  mapWorkoutSession({
-    exerciseSets: [{ exerciseOrder: 0, exerciseName: "Squat", setNumber: 1, [field]: value }]
-  }).exerciseSets[0].sets[0][field];
+  mapWorkoutSession(
+    /** @type {WorkoutSessionRow} */ ({
+      exerciseSets: [{ exerciseOrder: 0, exerciseName: "Squat", setNumber: 1, [field]: value }]
+    })
+  ).exerciseSets[0].sets[0][field];
 
 // The NowCast is pure, so it is built through the factory with stub
-// dependencies rather than widening index.js's __testables for it.
-const { pm25NowCast } = createExternalDataService({
-  cleanText: (value) => (typeof value === "string" ? value : ""),
-  toNullableNumber,
-  readThroughExternalCache: async () => ({}),
-  buildExternalCacheKey: () => "",
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: { info() {}, warn() {}, error() {} },
-  toShortText: (value) => String(value ?? ""),
-  recordExternalApiLatency: () => {},
-  externalApiRetries: 0,
-  externalApiRetryBaseDelayMs: 0
-});
+// dependencies rather than widening index.js's __testables for it. It reads none
+// of them, so the stubs, narrower than the deps they stand in for, are cast
+// through unknown.
+const { pm25NowCast } = createExternalDataService(
+  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
+    /** @type {unknown} */ ({
+      cleanText: (value) => (typeof value === "string" ? value : ""),
+      toNullableNumber,
+      readThroughExternalCache: async () => ({}),
+      buildExternalCacheKey: () => "",
+      metrics: { externalApiFailures: {}, externalApiRetries: {} },
+      logger: { info() {}, warn() {}, error() {} },
+      toShortText: (value) => String(value ?? ""),
+      recordExternalApiLatency: () => {},
+      externalApiRetries: 0,
+      externalApiRetryBaseDelayMs: 0
+    })
+  )
+);
 
 // Three hourly means of one value, ending in the three hours before `NOW`: the
 // fewest a NowCast needs, so the NowCast of a steady value is that value.
@@ -79,6 +92,7 @@ describe("validateEnv accepts a positive integer setting exactly when toPositive
   );
 });
 
+/** @type {Array<[string, null | "" | undefined]>} */
 const ABSENT = [
   ["null", null],
   ["an empty string", ""],
@@ -166,7 +180,8 @@ const helpers = [
   // before it is saved, but the reader still passes a stored value through.
   ...["distanceMeters", "averageHeartrate"].map((field) => ({
     name: `mapWorkoutSession (an import's ${field})`,
-    call: (value) => mapWorkoutSession({ [field]: value })[field],
+    call: (value) =>
+      mapWorkoutSession(/** @type {WorkoutSessionRow} */ ({ [field]: value }))[field],
     absent: null,
     zeroIsValid: true
   })),

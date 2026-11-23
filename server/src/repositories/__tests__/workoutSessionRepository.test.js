@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";
 import { createWorkoutSessionRepository, mapWorkoutSession } from "../workoutSessionRepository.js";
@@ -8,6 +9,11 @@ import { createWorkoutSessionRepository, mapWorkoutSession } from "../workoutSes
 // are pinned too, because the database is the last guard on every number.
 
 const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
+
+// Each read below follows the write that creates its row, so its result is cast
+// to the row. mapWorkoutSession's fixtures hold only the columns it reads.
+/** @typedef {ReturnType<typeof mapWorkoutSession>} SessionEntry */
+/** @typedef {import("../workoutSessionRepository.js").WorkoutSessionRow} WorkoutSessionRow */
 
 const createUser = (email) =>
   prisma.appUser.create({ data: { email, passwordHash: "x", legacyUserId: email } });
@@ -22,15 +28,22 @@ const bench = {
 const plank = { name: "Plank", sets: [{ reps: null, seconds: 30, loadKg: null, rpe: null }] };
 
 // An exercise as a read returns it: tagged with its library pattern, or null.
+/**
+ * @param {object} exercise
+ * @param {string | null} [pattern]
+ */
 const tagged = (exercise, pattern = null) => ({ ...exercise, pattern });
 const benchRead = tagged(bench, "horizontal-push");
 const plankRead = tagged(plank);
 
+// Each test creates the user it saves for, so every save returns the session.
 const save = (userId, session) =>
-  saveWorkoutSession({
-    userId,
-    session: { id: "w-1", date: "2026-11-05", focus: "Push", duration: 45, ...session }
-  });
+  /** @type {Promise<SessionEntry>} */ (
+    saveWorkoutSession({
+      userId,
+      session: { id: "w-1", date: "2026-11-05", focus: "Push", duration: 45, ...session }
+    })
+  );
 
 const setRowsOf = (userId) =>
   prisma.exerciseSet.findMany({
@@ -68,7 +81,9 @@ describe("a session's sets", () => {
   // puts them back.
   test("read back in exercise and set order, however they were stored", async () => {
     const saved = await save(user.id, {});
-    const sessionId = (await prisma.workoutSession.findFirst({ where: { userId: user.id } })).id;
+    const sessionId = /** @type {import("@prisma/client").WorkoutSession} */ (
+      await prisma.workoutSession.findFirst({ where: { userId: user.id } })
+    ).id;
     const row = (exerciseOrder, setNumber, reps) => ({
       sessionId,
       userId: user.id,
@@ -253,7 +268,9 @@ describe("each exercise's pattern", () => {
       reps: 5
     }));
   const patternsOf = (...names) =>
-    mapWorkoutSession({ exerciseSets: rows(...names) }).exerciseSets.map((e) => e.pattern);
+    mapWorkoutSession(
+      /** @type {WorkoutSessionRow} */ ({ exerciseSets: rows(...names) })
+    ).exerciseSets.map((e) => e.pattern);
 
   test("a library name carries its pattern", () => {
     expect(patternsOf("Dumbbell box squat")).toEqual(["squat"]);
@@ -281,14 +298,20 @@ describe("each exercise's pattern", () => {
 // five as null, and a missing number stays null rather than 0.
 describe("a session's Strava fields", () => {
   test("an import carries them", () => {
+    // The two numbers are Decimal columns, which toNumberOrNull reads as their
+    // text, so strings stand in for them, cast through unknown.
     expect(
-      mapWorkoutSession({
-        source: "strava",
-        externalId: "9001",
-        sport: "Run",
-        distanceMeters: "5012.4",
-        averageHeartrate: "148.2"
-      })
+      mapWorkoutSession(
+        /** @type {WorkoutSessionRow} */ (
+          /** @type {unknown} */ ({
+            source: "strava",
+            externalId: "9001",
+            sport: "Run",
+            distanceMeters: "5012.4",
+            averageHeartrate: "148.2"
+          })
+        )
+      )
     ).toMatchObject({
       source: "strava",
       externalId: "9001",
@@ -300,13 +323,15 @@ describe("a session's Strava fields", () => {
 
   test("a session logged in the app reads them as null", () => {
     expect(
-      mapWorkoutSession({
-        source: null,
-        externalId: null,
-        sport: null,
-        distanceMeters: null,
-        averageHeartrate: null
-      })
+      mapWorkoutSession(
+        /** @type {WorkoutSessionRow} */ ({
+          source: null,
+          externalId: null,
+          sport: null,
+          distanceMeters: null,
+          averageHeartrate: null
+        })
+      )
     ).toMatchObject({
       source: null,
       externalId: null,
@@ -314,6 +339,9 @@ describe("a session's Strava fields", () => {
       distanceMeters: null,
       averageHeartrate: null
     });
-    expect(mapWorkoutSession({})).toMatchObject({ source: null, sport: null });
+    expect(mapWorkoutSession(/** @type {WorkoutSessionRow} */ ({}))).toMatchObject({
+      source: null,
+      sport: null
+    });
   });
 });

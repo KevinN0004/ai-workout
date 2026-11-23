@@ -1,8 +1,14 @@
+// @ts-check
 import fs from "fs";
 import http from "http";
 import os from "os";
 import path from "path";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+
+// Each response read is cast to what the route answers: an error body, or the
+// one counter of /api/metrics these tests compare.
+/** @typedef {import("../services/http/errorResponseService.js").ErrorBody} ErrorBody */
+/** @typedef {Pick<import("../services/platform/metricsService.js").Metrics, "rateLimited">} MetricsRead */
 
 // The six /api limiters are the app's only defence against credential stuffing
 // and against callers burning the Gemini quota, and a seventh bounds the SPA
@@ -142,7 +148,11 @@ const del = (baseUrl, path) =>
 
 afterEach(async () => {
   await Promise.all(
-    running.map((server) => new Promise((resolve) => server.close(() => resolve())))
+    // A server's close answers with no value.
+    running.map(
+      (server) =>
+        /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())))
+    )
   );
   running = [];
 });
@@ -183,7 +193,9 @@ describe("rate limiters", () => {
     const limited = await post(baseUrl, "/api/auth/signup");
 
     expect(limited.status).toBe(429);
-    expect((await limited.json()).error).toBe("Too many sign-in attempts. Please try again later.");
+    expect(/** @type {ErrorBody} */ (await limited.json()).error).toBe(
+      "Too many sign-in attempts. Please try again later."
+    );
   });
 
   // Without the credential limiter, the password-change and account-deletion
@@ -213,7 +225,9 @@ describe("rate limiters", () => {
     const limited = await del(baseUrl, "/api/auth/me");
 
     expect(limited.status).toBe(429);
-    expect((await limited.json()).error).toBe("Too many attempts. Please try again later.");
+    expect(/** @type {ErrorBody} */ (await limited.json()).error).toBe(
+      "Too many attempts. Please try again later."
+    );
   });
 
   // The regression to guard against here: binding the credential limiter to
@@ -322,11 +336,13 @@ describe("rate limiters", () => {
   test("a limited page request leaves /api alone and is counted", async () => {
     const baseUrl = await startApp("SPA_RATE_LIMIT_MAX");
 
-    const before = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const before = /** @type {MetricsRead} */ (
+      await (await fetch(`${baseUrl}/api/metrics`)).json()
+    );
     await fetch(`${baseUrl}/`);
     const limited = await fetch(`${baseUrl}/`);
     const health = await fetch(`${baseUrl}/api/health`);
-    const after = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const after = /** @type {MetricsRead} */ (await (await fetch(`${baseUrl}/api/metrics`)).json());
 
     expect(limited.status).toBe(429);
     expect(health.status).toBe(200);
@@ -336,10 +352,12 @@ describe("rate limiters", () => {
   test("a limited request is counted in the metrics the operator reads", async () => {
     const baseUrl = await startApp("AUTH_RATE_LIMIT_MAX");
 
-    const before = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const before = /** @type {MetricsRead} */ (
+      await (await fetch(`${baseUrl}/api/metrics`)).json()
+    );
     await post(baseUrl, "/api/auth/login");
     await post(baseUrl, "/api/auth/login");
-    const after = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const after = /** @type {MetricsRead} */ (await (await fetch(`${baseUrl}/api/metrics`)).json());
 
     expect(after.rateLimited).toBe(before.rateLimited + 1);
   });
@@ -347,9 +365,11 @@ describe("rate limiters", () => {
   test("a request under the limit is not counted or rejected", async () => {
     const baseUrl = await startApp("AUTH_RATE_LIMIT_MAX");
 
-    const before = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const before = /** @type {MetricsRead} */ (
+      await (await fetch(`${baseUrl}/api/metrics`)).json()
+    );
     const allowed = await post(baseUrl, "/api/auth/login");
-    const after = await (await fetch(`${baseUrl}/api/metrics`)).json();
+    const after = /** @type {MetricsRead} */ (await (await fetch(`${baseUrl}/api/metrics`)).json());
 
     expect(allowed.status).not.toBe(429);
     expect(after.rateLimited).toBe(before.rateLimited);

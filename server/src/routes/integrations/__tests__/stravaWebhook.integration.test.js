@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
@@ -115,7 +116,10 @@ const connectedUser = async () => {
   await agent
     .get(`/api/integrations/strava/callback?code=c&state=${state}&scope=activity:read_all`)
     .expect(302);
-  return prisma.appUser.findFirst({ where: { email: EMAIL } });
+  // The sign-up above created the row.
+  return /** @type {Promise<import("@prisma/client").AppUser>} */ (
+    prisma.appUser.findFirst({ where: { email: EMAIL } })
+  );
 };
 
 const post = (body) => request(app).post("/webhooks/strava").send(body).expect(200);

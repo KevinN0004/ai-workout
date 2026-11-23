@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -17,30 +18,42 @@ import { cleanText } from "../../../services/dashboard/dashboardDataBuildersServ
 // Only wgerRequest and mealDbRequest are stubbed; they are the network
 // boundary. Everything else is the real injected function.
 
+// The stubs stand in for what these routes never reach, so each service built
+// from them is cast through unknown to its deps.
 const stubbed = {
   metrics: { externalApiFailures: {}, externalApiRetries: {} },
   logger: { info() {}, warn() {}, error() {} },
   toShortText: (value) => String(value ?? "")
 };
 
-const service = createExternalDataService({
-  ...stubbed,
-  cleanText,
-  toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-  readThroughExternalCache: async () => ({}),
-  buildExternalCacheKey: () => "",
-  recordExternalApiLatency: () => {},
-  externalApiRetries: 0,
-  externalApiRetryBaseDelayMs: 0,
-  wgerDefaultLanguage: 2
-});
+const service = createExternalDataService(
+  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
+    /** @type {unknown} */ ({
+      ...stubbed,
+      cleanText,
+      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+      readThroughExternalCache: async () => ({}),
+      buildExternalCacheKey: () => "",
+      recordExternalApiLatency: () => {},
+      externalApiRetries: 0,
+      externalApiRetryBaseDelayMs: 0,
+      wgerDefaultLanguage: 2
+    })
+  )
+);
 
-const { mergeCacheStatuses } = createHttpCacheService({
-  ...stubbed,
-  toPositiveInt: (value, fallback) => (Number.isInteger(value) ? value : fallback),
-  maxEntries: 10,
-  defaultStaleTtlSec: 60
-});
+const { mergeCacheStatuses } = createHttpCacheService(
+  /** @type {Parameters<typeof createHttpCacheService>[0]} */ (
+    /** @type {unknown} */ ({
+      ...stubbed,
+      // Number.isInteger has just passed the value.
+      toPositiveInt: (value, fallback) =>
+        Number.isInteger(value) ? /** @type {number} */ (value) : fallback,
+      maxEntries: 10,
+      defaultStaleTtlSec: 60
+    })
+  )
+);
 
 const buildWgerApp = (wgerRequest) => {
   const app = express();
@@ -69,12 +82,16 @@ const buildMealDbApp = (mealDbRequest) => {
 };
 
 const upstreamError = (status) => {
+  /** @type {Error & { status?: number }} */
   const err = new Error("wger exploded");
   if (status !== undefined) err.status = status;
   return err;
 };
 
 const results = (list, cache = "miss") => ({ data: { results: list }, cache });
+
+// The routes pass their options on every call, so the Mock's are required.
+/** @typedef {import("vitest").Mock<(endpoint: string, options: { query: Record<string, unknown> }) => ReturnType<ReturnType<typeof createExternalDataService>["wgerRequest"]>>} WgerRequestMock */
 
 // An exerciseinfo record in the shape mapWgerExercise expects.
 const exercise = (id, name, overrides = {}) => ({
@@ -170,8 +187,12 @@ describe("GET /api/wger/meta", () => {
 });
 
 describe("GET /api/wger/exercises", () => {
+  // A test reads what the route asked for, so each fake whose calls are read is
+  // cast to the Mock of the call it stands in for.
   const listUpstream = (list, extra = {}) =>
-    vi.fn(async () => ({ data: { results: list, count: 120, ...extra }, cache: "miss" }));
+    /** @type {WgerRequestMock} */ (
+      vi.fn(async () => ({ data: { results: list, count: 120, ...extra }, cache: "miss" }))
+    );
 
   const get = (app, query = "") =>
     request(app).get(`/api/wger/exercises${query ? `?${query}` : ""}`);
@@ -368,6 +389,11 @@ describe("GET /api/wger/exercises", () => {
 });
 
 describe("GET /api/wger/exercises/:id", () => {
+  /**
+   * @param {import("express").Express} app
+   * @param {string | number} [id]
+   * @param {string} [query]
+   */
   const get = (app, id = 1, query = "") =>
     request(app).get(`/api/wger/exercises/${id}${query ? `?${query}` : ""}`);
 
@@ -381,7 +407,9 @@ describe("GET /api/wger/exercises/:id", () => {
   });
 
   test("asks for the id in the requested language", async () => {
-    const wgerRequest = vi.fn(async () => results([exercise(1, "Bench Press")]));
+    const wgerRequest = /** @type {WgerRequestMock} */ (
+      vi.fn(async () => results([exercise(1, "Bench Press")]))
+    );
 
     await get(buildWgerApp(wgerRequest), 7, "language=4");
 

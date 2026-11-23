@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
@@ -90,7 +91,11 @@ const connectThrough = async (agent, csrfToken) => {
   return { started, landed };
 };
 
-const userOf = (email) => prisma.appUser.findFirst({ where: { email } });
+// Each test signs the user up and connects before it reads the rows.
+const userOf = (email) =>
+  /** @type {Promise<import("@prisma/client").AppUser>} */ (
+    prisma.appUser.findFirst({ where: { email } })
+  );
 const cleanUp = () => prisma.appUser.deleteMany({ where: { email: { in: EMAILS } } });
 
 beforeAll(async () => {
@@ -128,7 +133,9 @@ describe("connecting Strava", () => {
     expect(new URL(started.body.url).origin).toBe("http://strava.test");
     expect(landed.headers.location).toBe("/dashboard/settings?strava=connected");
     const user = await userOf(EMAILS[0]);
-    const row = await prisma.stravaConnection.findUnique({ where: { userId: user.id } });
+    const row = /** @type {import("@prisma/client").StravaConnection} */ (
+      await prisma.stravaConnection.findUnique({ where: { userId: user.id } })
+    );
     expect(row.accessToken).not.toContain("access-int");
     expect(cipher.open(row.accessToken)).toBe("access-int");
     expect(cipher.open(row.refreshToken)).toBe("refresh-int");

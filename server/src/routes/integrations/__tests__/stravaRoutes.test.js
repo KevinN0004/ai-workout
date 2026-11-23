@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -29,6 +30,12 @@ const stubService = (overrides = {}) => ({
   ...overrides
 });
 
+// The user holds the id the routes read; a logger of vi.fn()s is not pino's, and
+// the stub service holds the calls these routes make, so each is cast through
+// unknown; the config holds the one field these routes read.
+/**
+ * @param {{ service?: ReturnType<typeof stubService>, configured?: boolean, user?: object | null, log?: Record<string, import("vitest").Mock> }} [options]
+ */
 const buildApp = ({
   service = stubService(),
   configured = true,
@@ -39,18 +46,18 @@ const buildApp = ({
   app.use(express.json());
   const logger = log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
   app.use((req, _res, next) => {
-    req.log = logger;
+    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (logger));
     next();
   });
   const signedIn = (req, res, next) => {
     if (!user) return res.status(401).json({ error: "Not signed in." });
-    req.user = user;
+    req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ (user);
     next();
   };
   registerStravaRoutes(app, {
     requireAuth: signedIn,
     attachOptionalUser: (req, _res, next) => {
-      req.user = user;
+      req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ (user);
       next();
     },
     parseCookies: (header) =>
@@ -61,9 +68,17 @@ const buildApp = ({
           .map((part) => part.trim().split("="))
       ),
     cookieSecure: "",
-    getStravaConfig: () => (configured ? { clientId: "12345" } : null),
+    getStravaConfig: () =>
+      configured
+        ? /** @type {NonNullable<ReturnType<typeof import("../../../services/integrations/stravaConfig.js").readStravaConfig>>} */ ({
+            clientId: "12345"
+          })
+        : null,
     requestOrigin: () => "http://app.test",
-    stravaService: service
+    stravaService:
+      /** @type {ReturnType<typeof import("../../../services/integrations/stravaService.js").createStravaService>} */ (
+        /** @type {unknown} */ (service)
+      )
   });
   return { app, service, logger };
 };

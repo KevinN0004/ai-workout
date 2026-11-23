@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
@@ -69,7 +70,12 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
-const userOf = (email) => prisma.appUser.findFirst({ where: { email } });
+// Each test signs the user up before it reads the row, and the profile column
+// holds the object sign-up wrote.
+const userOf = (email) =>
+  /** @type {Promise<import("@prisma/client").AppUser>} */ (
+    prisma.appUser.findFirst({ where: { email } })
+  );
 
 const savePlan = async (email, { names = [ROW, BOX], injuries = "Knee" } = {}) => {
   const user = await userOf(email);
@@ -221,7 +227,7 @@ describe("the progression routes", () => {
     const user = await userOf(EMAIL);
     await prisma.appUser.update({
       where: { id: user.id },
-      data: { profile: { ...user.profile, notes: "sore knee" } }
+      data: { profile: { .../** @type {object} */ (user.profile), notes: "sore knee" } }
     });
 
     const response = await agent.get("/api/dashboard/progression");

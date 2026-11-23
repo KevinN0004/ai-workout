@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../index.js";
@@ -72,7 +73,10 @@ const signUp = async (agent, email) => {
 
 // The plan saved for the user with `email`, as the generate route saves one.
 const savePlan = async (email, { structured = true } = {}) => {
-  const user = await prisma.appUser.findFirst({ where: { email } });
+  // Each test signs the user up before it saves a plan.
+  const user = /** @type {import("@prisma/client").AppUser} */ (
+    await prisma.appUser.findFirst({ where: { email } })
+  );
   const { text, payload } = generated();
   return prisma.generatedPlan.create({
     data: {
@@ -225,7 +229,10 @@ describe("the plan swap routes", () => {
     expect(responses.map((response) => response.status)).toEqual([409, 409]);
     expect(responses[0].body).toEqual({ error: "The plan has changed. Reload it and try again." });
 
-    const stored = await prisma.generatedPlan.findUnique({ where: { id: row.id } });
+    // The 409s left the plan saved in beforeEach in place.
+    const stored = /** @type {import("@prisma/client").GeneratedPlan} */ (
+      await prisma.generatedPlan.findUnique({ where: { id: row.id } })
+    );
     expect(stored.planText).toBe(row.planText);
   });
 
@@ -265,7 +272,10 @@ describe("the plan swap routes", () => {
     const monday = mondayOf(mapGeneratedPlan(row));
     const hinge = monday.prescriptions[2].name;
     const saved = mapGeneratedPlan(row);
-    const [hingeOption] = swapOptions(saved, hinge, rulesForPlan(saved, { age: AGE, area: null }));
+    // Monday's hinge has swaps in this plan.
+    const [hingeOption] = /** @type {NonNullable<ReturnType<typeof swapOptions>>} */ (
+      swapOptions(saved, hinge, rulesForPlan(saved, { age: AGE, area: null }))
+    );
 
     const responses = await Promise.all([
       swap({ from: GOBLET, to: SUMO }),
@@ -273,8 +283,13 @@ describe("the plan swap routes", () => {
     ]);
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
 
+    // Both swaps rewrote the plan saved in beforeEach, which is still there.
     const names = mondayOf(
-      mapGeneratedPlan(await prisma.generatedPlan.findUnique({ where: { id: row.id } }))
+      mapGeneratedPlan(
+        /** @type {import("@prisma/client").GeneratedPlan} */ (
+          await prisma.generatedPlan.findUnique({ where: { id: row.id } })
+        )
+      )
     ).prescriptions.map((p) => p.name);
     expect(names).toEqual(expect.arrayContaining([SUMO, hingeOption.name]));
     expect(names).not.toContain(GOBLET);

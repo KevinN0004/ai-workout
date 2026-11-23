@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../../index.js";
@@ -301,12 +302,24 @@ describe("POST /api/dashboard/meal-logs", () => {
       ...failingOver(prisma),
       $transaction: (callback) => prisma.$transaction((tx) => callback(failingOver(tx)))
     };
-    const { saveMealLogWithDailySync } = createMealLogRepository({ prisma: failingPrisma });
+    // The failing client holds the delegates the save uses, so it is cast through
+    // unknown; each meal below holds only the fields the save reads.
+    const { saveMealLogWithDailySync } = createMealLogRepository({
+      prisma: /** @type {import("@prisma/client").PrismaClient} */ (
+        /** @type {unknown} */ (failingPrisma)
+      )
+    });
 
     await expect(
       saveMealLogWithDailySync({
         userId: user.id,
-        mealLog: { id: "rollback-1", date: "2026-06-17", name: "Lost", calories: 500 }
+        mealLog:
+          /** @type {import("../../../../repositories/mealLogRepository.js").MealLogEntry} */ ({
+            id: "rollback-1",
+            date: "2026-06-17",
+            name: "Lost",
+            calories: 500
+          })
       })
     ).rejects.toThrow("derived write failed");
 
@@ -390,11 +403,23 @@ describe("POST /api/dashboard/meal-logs", () => {
     const results = await Promise.allSettled([
       saveMealLogWithDailySync({
         userId: user.id,
-        mealLog: { id: "race-1", date: "2026-06-21", name: "Oats", calories: 400 }
+        mealLog:
+          /** @type {import("../../../../repositories/mealLogRepository.js").MealLogEntry} */ ({
+            id: "race-1",
+            date: "2026-06-21",
+            name: "Oats",
+            calories: 400
+          })
       }),
       saveMealLogWithDailySync({
         userId: user.id,
-        mealLog: { id: "race-2", date: "2026-06-21", name: "Soup", calories: 300 }
+        mealLog:
+          /** @type {import("../../../../repositories/mealLogRepository.js").MealLogEntry} */ ({
+            id: "race-2",
+            date: "2026-06-21",
+            name: "Soup",
+            calories: 300
+          })
       })
     ]);
 
@@ -408,7 +433,12 @@ describe("POST /api/dashboard/meal-logs", () => {
     const { saveMealLogWithDailySync } = createMealLogRepository({ prisma });
     const result = await saveMealLogWithDailySync({
       userId: "00000000-0000-4000-8000-000000000000",
-      mealLog: { date: "2026-06-18", name: "Ghost", calories: 100 }
+      mealLog:
+        /** @type {import("../../../../repositories/mealLogRepository.js").MealLogEntry} */ ({
+          date: "2026-06-18",
+          name: "Ghost",
+          calories: 100
+        })
     });
     expect(result).toBeNull();
   });

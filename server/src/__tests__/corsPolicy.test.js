@@ -1,3 +1,4 @@
+// @ts-check
 // Unit tests for corsPolicy.js: the production fallback, and trust proxy on, which
 // index.cors.test.js cannot reach because it imports index.js with NODE_ENV=test.
 import cors from "cors";
@@ -8,6 +9,11 @@ import { createCorsPolicy } from "../corsPolicy.js";
 
 // What the cors middleware hands the delegate, reduced to what it reads. The
 // Host goes in a headers object, so a test can leave it out entirely.
+/**
+ * @param {string} origin
+ * @param {Record<string, string>} [headers]
+ * @param {string} [protocol]
+ */
 const fakeRequest = (origin, headers = { host: "api.example.com" }, protocol = "https") => ({
   headers: { ...headers, origin },
   protocol,

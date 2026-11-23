@@ -1,3 +1,4 @@
+// @ts-check
 import request from "supertest";
 import { describe, expect, test, vi } from "vitest";
 import { app } from "../index.js";

@@ -1,3 +1,4 @@
+// @ts-check
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
@@ -211,10 +212,18 @@ describe("POST /api/dashboard/workout-sessions", () => {
       "utf8"
     );
 
-    const userPkOf = async (email) => (await prisma.appUser.findFirst({ where: { email } })).id;
+    // Each test signs the user up before it reads the row.
+    const userPkOf = async (email) =>
+      /** @type {import("@prisma/client").AppUser} */ (
+        await prisma.appUser.findFirst({ where: { email } })
+      ).id;
 
     // A plan saved as the generate route saves one: a legacy id the client
     // knows it by, and its structure.
+    /**
+     * @param {string} userId
+     * @param {{ legacyId?: string | null, payload?: import("@prisma/client").Prisma.InputJsonValue }} [options]
+     */
     const seedPlan = (userId, { legacyId = crypto.randomUUID(), payload } = {}) =>
       prisma.generatedPlan.create({
         data: {

@@ -1,3 +1,4 @@
+// @ts-check
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import request from "supertest";
 import { app } from "../index.js";
