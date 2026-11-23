@@ -44,7 +44,9 @@ const signUp = async (agent, email) => {
 };
 
 describe("remaining user write paths", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {
@@ -334,6 +336,7 @@ describe("remaining user write paths", () => {
     test("a meal and a manual entry saved at once leave only the manual entry", async () => {
       const [user] = await prisma.appUser.findMany({ select: { id: true } });
       let arrived = 0;
+      /** @type {(value?: unknown) => void} */
       let releaseAll;
       const allArrived = new Promise((resolve) => {
         releaseAll = resolve;

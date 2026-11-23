@@ -43,7 +43,9 @@ const postWorkout = (agent, csrfToken, body, path = "/api/dashboard/workout-sess
   agent.post(path).set("X-CSRF-Token", csrfToken).send(body);
 
 describe("POST /api/dashboard/workout-sessions", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {

@@ -26,7 +26,9 @@ const cipher = createTokenCipher(KEY);
 
 // Strava's two OAuth endpoints, as this file needs them; `revokeFails` makes
 // the revoke unreachable.
+/** @type {Array<{ path: string, body: string }>} */
 let stravaCalls;
+/** @type {boolean} */
 let revokeFails;
 const fakeStrava = async (url, init = {}) => {
   const path = new URL(String(url)).pathname;
@@ -192,7 +194,10 @@ describe("disconnecting Strava", () => {
 
     await agent.delete("/api/integrations/strava").set("X-CSRF-Token", csrfToken).expect(200);
 
-    const revoke = stravaCalls.find((call) => call.path === "/oauth/revoke");
+    // The disconnect revokes the grant first, so the call is there.
+    const revoke = /** @type {{ path: string, body: string }} */ (
+      stravaCalls.find((call) => call.path === "/oauth/revoke")
+    );
     expect(new URLSearchParams(revoke.body).get("token")).toBe("refresh-int");
     expect(await prisma.stravaConnection.count({ where: { userId: user.id } })).toBe(0);
     const left = await prisma.workoutSession.findMany({ where: { userId: user.id } });

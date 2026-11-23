@@ -20,6 +20,7 @@ import { registerClientStatic, resolveClientDistPath } from "../staticClient.js"
 const SHELL = "<!doctype html><html><body><div id=root>SPA_SHELL_MARKER</div></body></html>";
 const ASSET = "console.log('bundled asset');";
 
+/** @type {string} */
 let distPath;
 
 beforeAll(() => {

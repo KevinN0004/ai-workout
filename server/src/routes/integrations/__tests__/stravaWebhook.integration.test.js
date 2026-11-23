@@ -32,8 +32,11 @@ const ATHLETE = 778001;
 
 // Strava as this file needs it: the OAuth token endpoint, and activities by id.
 // `refreshRefused` makes a refresh fail as a revoked grant does.
+/** @type {Map<string, object>} */
 let activities;
+/** @type {boolean} */
 let refreshRefused;
+/** @type {string[]} */
 let stravaCalls;
 const fakeStrava = async (url, init = {}) => {
   const { pathname } = new URL(String(url));
@@ -266,11 +269,15 @@ describe("without the webhook's settings", () => {
 // Last, since the limit's window outlasts the file.
 describe("the webhook's own limit", () => {
   test("a flood is cut off at 120 requests a minute", async () => {
+    /** @type {import("supertest").Response | undefined} */
     let last;
     for (let count = 0; count < 121; count += 1) {
       last = await request(app).get("/webhooks/strava?hub.verify_token=x&hub.challenge=c");
     }
-    expect(last.status).toBe(429);
-    expect(last.body).toEqual({ error: "Too many requests." });
+    // The loop runs 121 times, so it is set.
+    expect(/** @type {import("supertest").Response} */ (last).status).toBe(429);
+    expect(/** @type {import("supertest").Response} */ (last).body).toEqual({
+      error: "Too many requests."
+    });
   });
 });

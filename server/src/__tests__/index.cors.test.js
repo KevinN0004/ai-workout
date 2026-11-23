@@ -26,6 +26,7 @@ const startApp = async (clientOrigin) => {
   process.env.CLIENT_ORIGIN = clientOrigin ?? "";
   process.env.CLIENT_ORIGINS = "";
 
+  /** @type {import("express").Express} */
   let app;
   try {
     ({ app } = await import("../index.js"));
@@ -41,7 +42,8 @@ const startApp = async (clientOrigin) => {
   const server = app.listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   running.push(server);
-  return `http://127.0.0.1:${server.address().port}`;
+  // A server listening on a port reports its address as an AddressInfo.
+  return `http://127.0.0.1:${/** @type {import("node:net").AddressInfo} */ (server.address()).port}`;
 };
 
 const get = (baseUrl, origin) =>

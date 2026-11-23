@@ -52,6 +52,7 @@ const setRowsOf = (userId) =>
   });
 
 describe("a session's sets", () => {
+  /** @type {import("@prisma/client").AppUser} */
   let user;
 
   beforeEach(async () => {
@@ -200,7 +201,9 @@ describe("a session's sets", () => {
 // The checks in 006_exercise_sets.sql, one refused value each. Raw inserts,
 // because the repository is not the only thing that could ever write here.
 describe("the exercise_sets checks", () => {
+  /** @type {string} */
   let sessionId;
+  /** @type {string} */
   let userId;
 
   beforeEach(async () => {

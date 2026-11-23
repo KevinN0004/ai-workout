@@ -982,6 +982,24 @@ describe("type-checked files", () => {
     expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
 
+  // D1 phase 5: the test program has noImplicitAny off, which leaves a `let` with
+  // no initializer as any, so nothing done with it is checked. Each one in a
+  // checked test file names its type on the line above
+  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, "Tests").
+  test("every uninitialized let in a checked test file names its type", () => {
+    const tests = checked.filter(({ file }) => isTest(file));
+    expect(tests.length, "the sweep found too few checked tests").toBeGreaterThanOrEqual(53);
+    const untyped = tests.flatMap(({ file, lines }) =>
+      lines.flatMap((line, index) =>
+        /^\s*let [A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)*;\s*$/.test(line) &&
+        !/^\s*\/\*\* @type \{.+\} \*\/\s*$/.test(lines[index - 1] ?? "")
+          ? [`${file}:${index + 1}`]
+          : []
+      )
+    );
+    expect(untyped, "put /** @type {T} */ on the line above each").toEqual([]);
+  });
+
   // D1 phase 5: each answer the client reads is cast in place, the answer through
   // Wire (which fails the typecheck on a field JSON would not deliver as typed) and
   // a refusal to ErrorBody (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).

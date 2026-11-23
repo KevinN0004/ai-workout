@@ -24,6 +24,7 @@ const START = Date.parse("2026-11-13T10:00:00Z");
 const TODAY = "2026-11-13";
 
 // What Strava lists, as the test sets it.
+/** @type {object[]} */
 let listed;
 const fakeStrava = async (url) => {
   const { pathname, searchParams } = new URL(String(url));
@@ -59,8 +60,11 @@ const activityOf = (id, overrides = {}) => ({
 
 const getCsrf = async (agent) => String((await agent.get("/api/csrf-token")).body?.csrfToken || "");
 
+/** @type {ReturnType<typeof request.agent>} */
 let agent;
+/** @type {string} */
 let csrfToken;
+/** @type {import("@prisma/client").AppUser} */
 let user;
 
 const sync = (body = {}) =>
@@ -112,7 +116,10 @@ beforeEach(async () => {
   await agent
     .get(`/api/integrations/strava/callback?code=c&state=${state}&scope=activity:read_all`)
     .expect(302);
-  user = await prisma.appUser.findFirst({ where: { email: EMAIL } });
+  // The sign-up above created the row.
+  user = /** @type {import("@prisma/client").AppUser} */ (
+    await prisma.appUser.findFirst({ where: { email: EMAIL } })
+  );
   // Connected ten days ago, so the window is the last full week.
   await prisma.stravaConnection.update({
     where: { userId: user.id },

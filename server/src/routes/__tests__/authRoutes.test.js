@@ -38,12 +38,23 @@ import {
 // parameters are the lowest argon2 accepts, to keep the file quick.
 const argon2Options = { timeCost: 2, memoryCost: 8192, parallelism: 1, hashLength: 32 };
 
+// The rows are the user docs the routes' reads return, and the deps the routes
+// take, with createSession and deleteSession the vi.fn()s some tests make reject.
+/** @typedef {Parameters<typeof registerAuthRoutes>[1]} AuthDeps */
+/** @typedef {NonNullable<Awaited<ReturnType<AuthDeps["findUserWithDashboard"]>>>} UserDoc */
+/** @type {UserDoc[]} */
 let rows;
+/** @type {Array<{ token: string, userId: string }>} */
 let sessions;
+/** @type {import("../../services/platform/metricsService.js").Metrics} */
 let metrics;
+/** @type {{ session: Array<{ token: string, rememberMe: boolean }>, csrf: string[], clearedSession: number, clearedCsrf: number }} */
 let cookieCalls;
+/** @type {AuthDeps & { createSession: import("vitest").Mock, deleteSession: import("vitest").Mock }} */
 let deps;
+/** @type {import("vitest").Mock} */
 let logError;
+/** @type {import("vitest").Mock} */
 let logWarn;
 
 // The in-memory rows stand in for both reads: the user row the auth lookups
@@ -123,7 +134,10 @@ const signupBody = (overrides = {}) => ({
 beforeEach(() => {
   rows = [];
   sessions = [];
-  metrics = { authFailures: 0 };
+  // The metrics hold the one counter the routes move.
+  metrics = /** @type {import("../../services/platform/metricsService.js").Metrics} */ ({
+    authFailures: 0
+  });
   cookieCalls = { session: [], csrf: [], clearedSession: 0, clearedCsrf: 0 };
   logError = vi.fn();
   logWarn = vi.fn();
@@ -151,17 +165,27 @@ beforeEach(() => {
     getSessionUser: vi.fn(async () => null),
     defaultProfile,
     requireAuth: (req, res, next) => {
-      req.user = { id: "u-1", profile: defaultProfile() };
+      // The user holds the fields the profile route reads, so it is cast through
+      // unknown.
+      req.user = /** @type {import("../../services/auth/authUserService.js").AuthUser} */ (
+        /** @type {unknown} */ ({ id: "u-1", profile: defaultProfile() })
+      );
       next();
     },
     validateBody,
     profileBodySchema,
     buildProfile,
     findUserWithDashboard,
-    updateProfile: vi.fn(async ({ userId, profile }) => {
-      const row = rows.find((item) => item.userId === userId);
-      if (row) row.profile = profile;
-    }),
+    // The route ignores what the write answers, so the fake answers nothing,
+    // cast through unknown.
+    updateProfile: /** @type {AuthDeps["updateProfile"]} */ (
+      /** @type {unknown} */ (
+        vi.fn(async ({ userId, profile }) => {
+          const row = rows.find((item) => item.userId === userId);
+          if (row) row.profile = profile;
+        })
+      )
+    ),
     mapDbDocToUser: authUserService.mapDbDocToUser,
     signupBodySchema,
     cleanText,
@@ -1349,7 +1373,13 @@ describe("profile", () => {
   });
 
   test("POST merges the change over what was there", async () => {
-    rows.push({ userId: "u-1", email: "a@b.com", profile: defaultProfile() });
+    // The profile route reads only these fields of the row, so it is cast through
+    // unknown.
+    rows.push(
+      /** @type {UserDoc} */ (
+        /** @type {unknown} */ ({ userId: "u-1", email: "a@b.com", profile: defaultProfile() })
+      )
+    );
 
     const response = await request(buildApp())
       .post("/api/profile")
@@ -1389,7 +1419,13 @@ describe("profile", () => {
   });
 
   test("accepts and returns the training and lifestyle fields", async () => {
-    rows.push({ userId: "u-1", email: "a@b.com", profile: defaultProfile() });
+    // The profile route reads only these fields of the row, so it is cast through
+    // unknown.
+    rows.push(
+      /** @type {UserDoc} */ (
+        /** @type {unknown} */ ({ userId: "u-1", email: "a@b.com", profile: defaultProfile() })
+      )
+    );
     const app = buildApp();
     const response = await request(app)
       .post("/api/profile")

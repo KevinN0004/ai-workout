@@ -102,8 +102,11 @@ const optionsPath = (planId, exercise, area) =>
 const mondayOf = (plan) => plan.payload.days.find((day) => day.weekday === "Monday");
 
 describe("the plan swap routes", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
+  /** @type {import("@prisma/client").GeneratedPlan} */
   let row;
   const EMAIL = "plan-swaps@example.com";
 
@@ -189,7 +192,8 @@ describe("the plan swap routes", () => {
         userId: other.id,
         legacyId: "their-plan",
         planText: row.planText,
-        planPayload: row.planPayload
+        // The plan saved in beforeEach has a structure, never JSON null.
+        planPayload: /** @type {import("@prisma/client").Prisma.InputJsonValue} */ (row.planPayload)
       }
     });
     await prisma.generatedPlan.update({ where: { id: row.id }, data: { planPayload: {} } });

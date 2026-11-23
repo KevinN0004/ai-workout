@@ -40,7 +40,9 @@ const postMetric = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/progress-metrics").set("X-CSRF-Token", csrfToken).send(body);
 
 describe("POST /api/dashboard/progress-metrics", () => {
+  /** @type {ReturnType<typeof request.agent>} */
   let agent;
+  /** @type {string} */
   let csrfToken;
 
   beforeAll(async () => {
