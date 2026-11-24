@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createSessionService, SessionStoreUnavailableError } from "../sessionService.js";
 
@@ -10,19 +12,37 @@ import { createSessionService, SessionStoreUnavailableError } from "../sessionSe
 // session exists that only one process can read, and a caller whose session
 // could not be checked is never told it does not exist.
 
+// Each fake request and response holds only the fields the service reads and
+// writes, and a response's body is read only after a guard has answered with it.
+/** @typedef {import("express").Response & { body: ErrorBody }} FakeResponse */
+/** @typedef {import("../../http/errorResponseService.js").ErrorBody} ErrorBody */
+/** @typedef {Partial<Parameters<typeof createSessionService>[0]>} ServiceOverrides */
+
 const createClient = vi.fn();
 vi.mock("redis", () => ({ createClient: (...args) => createClient(...args) }));
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const cleanText = (value, maxLen = 500) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+/** @type {import("pino").Logger} */
 let logger;
+/** @type {import("vitest").Mock} */
 let findUserById;
+/** @type {ReturnType<typeof buildFakeRedis>} */
 let fakeRedis;
 
 // A node-redis lookalike with just the surface the service uses.
+/** @param {Record<string, unknown>} [overrides] */
 const buildFakeRedis = (overrides = {}) => {
   const store = new Map();
   const handlers = {};
@@ -47,6 +67,7 @@ const buildFakeRedis = (overrides = {}) => {
   };
 };
 
+/** @param {ServiceOverrides} [overrides] */
 const buildService = (overrides = {}) =>
   createSessionService({
     cleanText,
@@ -64,13 +85,19 @@ const buildService = (overrides = {}) =>
   });
 
 // Brings a service up with Redis connected and ready.
+/**
+ * @param {ServiceOverrides} [serviceOverrides]
+ * @param {NodeJS.ProcessEnv} [env]
+ */
 const connected = async (serviceOverrides = {}, env = { REDIS_URL: "redis://localhost:6379" }) => {
   const service = buildService(serviceOverrides);
   const status = await service.initSessionStore(env);
   return { service, status };
 };
 
-const req = (token) => ({ headers: { cookie: `sid=${token}` } });
+/** @param {string} token */
+const req = (token) =>
+  /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
 // Just enough of an express response for requireAuth.
 const buildRes = () => {
@@ -86,17 +113,20 @@ const buildRes = () => {
       return res;
     })
   };
-  return res;
+  return /** @type {FakeResponse} */ (/** @type {unknown} */ (res));
 };
 
 // Makes one fake command fail the way a dropped connection does.
+/** @param {string} [message] */
 const failing = (message = "redis is on fire") =>
   vi.fn(async () => {
     throw new Error(message);
   });
 
 beforeEach(() => {
-  logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  // A real logger that writes nothing, its error spied on.
+  logger = pino({ level: "silent" });
+  vi.spyOn(logger, "error");
   findUserById = vi.fn(async (userId) => ({ id: userId }));
   fakeRedis = buildFakeRedis();
   createClient.mockReset();
@@ -503,7 +533,7 @@ describe("when Redis fails after connecting", () => {
     const next = vi.fn();
 
     await service.attachOptionalUser(
-      { ...req(token), log: { error: vi.fn(), warn: vi.fn() } },
+      /** @type {import("express").Request} */ ({ ...req(token), log: pino({ level: "silent" }) }),
       res,
       next
     );
@@ -518,7 +548,7 @@ describe("when Redis fails after connecting", () => {
   test("attachOptionalUser still serves a caller with no session cookie", async () => {
     const { service } = await connected();
     fakeRedis.get = failing();
-    const request = { headers: {} };
+    const request = /** @type {import("express").Request} */ ({ headers: {} });
     const next = vi.fn();
 
     await service.attachOptionalUser(request, buildRes(), next);
@@ -535,7 +565,11 @@ describe("when Redis fails after connecting", () => {
     const res = buildRes();
     const next = vi.fn();
 
-    await service.requireAuth({ ...req(token), log: { error: vi.fn() } }, res, next);
+    await service.requireAuth(
+      /** @type {import("express").Request} */ ({ ...req(token), log: pino({ level: "silent" }) }),
+      res,
+      next
+    );
 
     expect(res.statusCode).toBe(503);
     expect(JSON.stringify(res.body)).not.toMatch(/on fire/);

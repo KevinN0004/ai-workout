@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { describe, expect, test, vi } from "vitest";
 import { createStravaService } from "../stravaService.js";
 import { createTokenCipher } from "../tokenCipher.js";
@@ -6,9 +8,14 @@ import { createTokenCipher } from "../tokenCipher.js";
 // docs/specs/2026-11-12-strava-import-design.md, "Tokens", "The import rules").
 // The repositories are in-memory fakes, fetch is stubbed, and the clock is fixed.
 
+/** @typedef {Parameters<typeof createStravaService>[0]} StravaDeps */
+/** @typedef {ReturnType<typeof import("../stravaConfig.js").readStravaConfig>} StravaConfig */
+/** @typedef {import("../../../repositories/stravaConnectionRepository.js").StravaConnectionRow} ConnectionRow */
+
 const NOW = new Date("2026-11-13T10:00:00Z");
 const KEY = Buffer.alloc(32);
 const cipher = createTokenCipher(KEY);
+/** @type {NonNullable<StravaConfig>} */
 const CONFIG = {
   clientId: "12345",
   clientSecret: "test-client-secret",
@@ -17,8 +24,13 @@ const CONFIG = {
   verifyToken: null,
   subscriptionId: null
 };
+/** @param {number} minutes */
 const minutesFromNow = (minutes) => new Date(NOW.getTime() + minutes * 60000);
 
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
 const answer = (status, body = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -41,6 +53,10 @@ const ACTIVITY = {
   has_heartrate: false
 };
 
+/**
+ * @param {Partial<ConnectionRow>} [overrides]
+ * @returns {ConnectionRow}
+ */
 const connectionRow = (overrides = {}) => ({
   userPk: "pk-1",
   athleteId: 4242,
@@ -57,7 +73,12 @@ const connectionRow = (overrides = {}) => ({
 
 // The connection store over one row. `underLock` replaces the row the lock reads,
 // to stage a refresh another request finished first.
+/**
+ * @param {ConnectionRow | null} row
+ * @param {{ underLock?: ConnectionRow | null }} [options]
+ */
 const fakeConnections = (row, { underLock } = {}) => {
+  /** @type {{ row: ConnectionRow | null, locks: number, updates: { tx: unknown, accessToken: string, refreshToken: string, expiresAt: Date }[], reconnects: number, holder?: string, unknownUser?: boolean, saved?: { userId: string, athleteId: number, athleteName: string, accessToken: string, refreshToken: string }, synced?: Date, failed?: string, removedAll?: number }} */
   const state = { row, locks: 0, updates: [], reconnects: 0 };
   return {
     state,
@@ -69,11 +90,19 @@ const fakeConnections = (row, { underLock } = {}) => {
     },
     updateTokens: async (tx, { accessToken, refreshToken, expiresAt }) => {
       state.updates.push({ tx, accessToken, refreshToken, expiresAt });
-      state.row = { ...state.row, accessToken, refreshToken, expiresAt, needsReconnect: false };
+      // A token update follows the read of the row it updates.
+      state.row = /** @type {ConnectionRow} */ ({
+        ...state.row,
+        accessToken,
+        refreshToken,
+        expiresAt,
+        needsReconnect: false
+      });
     },
     markNeedsReconnect: async () => {
       state.reconnects += 1;
-      state.row = { ...state.row, needsReconnect: true };
+      // Marking follows the read of the row it marks.
+      state.row = /** @type {ConnectionRow} */ ({ ...state.row, needsReconnect: true });
       return 1;
     },
     // `holder` is the user another account's link to the same athlete belongs to.
@@ -104,6 +133,7 @@ const fakeConnections = (row, { underLock } = {}) => {
 
 // `unchanged` lists the imports a save finds already up to date, and `held`
 // the imports a listing since a date answers.
+/** @param {{ deleted?: string[], existing?: string[], appDays?: (string | null)[], unchanged?: string[], held?: { id: string, externalId: string, date: string }[] }} [options] */
 const fakeImports = ({
   deleted = [],
   existing = [],
@@ -111,6 +141,7 @@ const fakeImports = ({
   unchanged = [],
   held = []
 } = {}) => {
+  /** @type {{ saved: { externalId: string }[], removed: string[], dayChecks: string[], since: string[] }} */
   const state = { saved: [], removed: [], dayChecks: [], since: [] };
   return {
     state,
@@ -136,6 +167,7 @@ const fakeImports = ({
   };
 };
 
+/** @param {{ row?: ConnectionRow | null, underLock?: ConnectionRow | null, imports?: ReturnType<typeof fakeImports>, responses?: Response[], config?: StravaConfig }} [options] */
 const serviceWith = ({
   row = connectionRow(),
   underLock,
@@ -144,14 +176,17 @@ const serviceWith = ({
   config = CONFIG
 } = {}) => {
   const connections = fakeConnections(row, { underLock });
+  /** @type {import("vitest").Mock} */
   const fetchImpl = vi.fn(async () => {
     const next = responses.shift();
     if (!next) throw new Error("unexpected Strava call");
     return next;
   });
   const service = createStravaService({
-    connections,
-    imports,
+    // Each fake holds every method the service calls, but a write answers what
+    // the service awaits, not the Prisma type, and nothing calls deleteImportById.
+    connections: /** @type {StravaDeps["connections"]} */ (/** @type {unknown} */ (connections)),
+    imports: /** @type {StravaDeps["imports"]} */ (/** @type {unknown} */ (imports)),
     getConfig: () => config,
     fetchImpl,
     now: () => NOW
@@ -321,7 +356,10 @@ describe("confirmRevoked", () => {
 
     expect(await service.confirmRevoked("u-1")).toBe(false);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(cipher.open(connections.state.row.refreshToken)).toBe("refresh-new");
+    // A refresh Strava accepts keeps the connection.
+    expect(cipher.open(/** @type {ConnectionRow} */ (connections.state.row).refreshToken)).toBe(
+      "refresh-new"
+    );
   });
 
   test("it refreshes even a token with hours left, and one marked for reconnecting", async () => {
@@ -470,7 +508,10 @@ describe("connect", () => {
 
     const form = new URLSearchParams(String(fetchImpl.mock.calls[0][1].body));
     expect(form.get("code")).toBe("code-xyz");
-    const saved = connections.state.saved;
+    // connect has just saved the connection.
+    const saved = /** @type {NonNullable<typeof connections.state.saved>} */ (
+      connections.state.saved
+    );
     expect(saved).toMatchObject({ userId: "u-1", athleteId: 4242, athleteName: "Jo S." });
     expect(saved.accessToken).not.toContain("access-new");
     expect(cipher.open(saved.accessToken)).toBe("access-new");
@@ -602,6 +643,7 @@ describe("revokeAccess and disconnect", () => {
 
 describe("handleEvent", () => {
   const SUBSCRIBED = { ...CONFIG, subscriptionId: 77 };
+  /** @param {Record<string, unknown>} [overrides] */
   const eventOf = (overrides = {}) => ({
     object_type: "activity",
     object_id: 9001,
@@ -617,11 +659,22 @@ describe("handleEvent", () => {
     aspect_type: "update",
     updates: { authorized: "false" }
   });
-  const logger = () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() });
+  /**
+   * A real logger that writes nothing, its warn spied on.
+   * @returns {{ logger: import("pino").Logger, warn: import("vitest").MockInstance }}
+   */
+  const logger = () => {
+    const log = pino({ level: "silent" });
+    return { logger: log, warn: vi.spyOn(log, "warn") };
+  };
+  /**
+   * @param {Parameters<typeof serviceWith>[0]} options
+   * @param {unknown} body
+   */
   const handled = (options, body) => {
     const setup = serviceWith({ config: SUBSCRIBED, ...options });
     const log = logger();
-    return { ...setup, log, outcome: setup.service.handleEvent(body, log) };
+    return { ...setup, log, outcome: setup.service.handleEvent(body, log.logger) };
   };
 
   test.each([
@@ -696,7 +749,10 @@ describe("handleEvent", () => {
 
     expect(await outcome).toBe("kept");
     expect(connections.state.removedAll).toBeUndefined();
-    expect(cipher.open(connections.state.row.refreshToken)).toBe("refresh-new");
+    // A refresh Strava accepts keeps the connection.
+    expect(cipher.open(/** @type {ConnectionRow} */ (connections.state.row).refreshToken)).toBe(
+      "refresh-new"
+    );
   });
 
   test("a revoke with a token here that will not open keeps everything", async () => {
@@ -737,7 +793,7 @@ describe("handleEvent", () => {
     };
     const log = logger();
 
-    expect(await setup.service.handleEvent(eventOf(), log)).toBe("failed");
+    expect(await setup.service.handleEvent(eventOf(), log.logger)).toBe("failed");
     expect(log.warn.mock.calls[0][0]).toMatchObject({ kind: "error" });
   });
 });
@@ -746,8 +802,17 @@ describe("sync", () => {
   // NOW is 2026-11-13T10:00Z and the connection dates from 2026-11-01, so the
   // window is the last seven days: after 2026-11-06T10:00Z.
   const AFTER = Math.floor(Date.parse("2026-11-06T10:00:00Z") / 1000);
+  /**
+   * @param {number} id
+   * @param {Record<string, unknown>} [overrides]
+   */
   const run = (id, overrides = {}) => ({ ...ACTIVITY, id, ...overrides });
+  /**
+   * @param {number} count
+   * @param {number} [start]
+   */
   const page = (count, start = 1) => Array.from({ length: count }, (_, i) => run(start + i));
+  /** @param {import("vitest").Mock} fetchImpl */
   const listCalls = (fetchImpl) =>
     fetchImpl.mock.calls
       .map(([url]) => new URL(String(url)))

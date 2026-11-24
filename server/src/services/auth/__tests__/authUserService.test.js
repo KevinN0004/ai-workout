@@ -1,3 +1,4 @@
+// @ts-check
 import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";
@@ -19,11 +20,21 @@ const pbkdf2Async = promisify(crypto.pbkdf2);
 // the suite stays quick; they change the hash, not the branch under test.
 const argon2Options = { timeCost: 2, memoryCost: 8192, parallelism: 1, hashLength: 32 };
 
+// Each row handed to the service holds only the fields its test reads, and each
+// user read back is mapped from a row the test supplied, so it is there.
+/** @typedef {import("../authUserService.js").StoredUser} StoredUser */
+/** @typedef {import("../authUserService.js").AuthUser} AuthUser */
+
+/** @type {import("vitest").Mock} */
 let updatePasswordHash;
+/** @type {import("vitest").Mock} */
 let findUserRow;
+/** @type {import("vitest").Mock} */
 let findUserRowByEmail;
+/** @type {import("vitest").Mock} */
 let createUserWithDashboard;
 
+/** @param {Partial<Parameters<typeof createAuthUserService>[0]> & Record<string, unknown>} [overrides] */
 const build = (overrides = {}) =>
   createAuthUserService({
     cleanText,
@@ -36,6 +47,7 @@ const build = (overrides = {}) =>
   });
 
 // A real legacy record, hashed the way the pre-argon2 code did it.
+/** @param {string} password */
 const legacyPbkdf2User = async (password) => {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = (await pbkdf2Async(password, salt, 120000, 64, "sha512")).toString("hex");
@@ -272,20 +284,27 @@ describe("getDummyPasswordRecord", () => {
 describe("mapDbDocToUser", () => {
   test("returns null for a missing row", () => {
     expect(build().mapDbDocToUser(null)).toBeNull();
-    expect(build().mapDbDocToUser(undefined)).toBeNull();
+    // A row read as undefined, which counts as missing too.
+    expect(
+      build().mapDbDocToUser(/** @type {StoredUser | null} */ (/** @type {unknown} */ (undefined)))
+    ).toBeNull();
   });
 
   test("maps userId onto id and keeps the rest", () => {
-    const user = build().mapDbDocToUser({
-      userId: "u-1",
-      email: "a@b.com",
-      salt: "s",
-      hash: "h",
-      passwordAlgo: "pbkdf2",
-      createdAt: "2026-01-01",
-      profile: { firstName: "Jo" },
-      dashboard: { workouts: [] }
-    });
+    const user = build().mapDbDocToUser(
+      /** @type {StoredUser} */ (
+        /** @type {unknown} */ ({
+          userId: "u-1",
+          email: "a@b.com",
+          salt: "s",
+          hash: "h",
+          passwordAlgo: "pbkdf2",
+          createdAt: "2026-01-01",
+          profile: { firstName: "Jo" },
+          dashboard: { workouts: [] }
+        })
+      )
+    );
 
     expect(user).toMatchObject({
       id: "u-1",
@@ -298,40 +317,60 @@ describe("mapDbDocToUser", () => {
   // A user read by its row alone has no collections. No key, not an empty
   // dashboard, which buildDashboard would serve as a real account's.
   test("keeps the dashboard it is given, and adds none to a row read alone", () => {
-    const full = build().mapDbDocToUser({ userId: "u-1", dashboard: { plans: [] } });
-    const row = build().mapDbDocToUser({ userId: "u-1" });
+    const full = /** @type {AuthUser} */ (
+      build().mapDbDocToUser(
+        /** @type {StoredUser} */ (
+          /** @type {unknown} */ ({ userId: "u-1", dashboard: { plans: [] } })
+        )
+      )
+    );
+    const row = build().mapDbDocToUser(/** @type {StoredUser} */ ({ userId: "u-1" }));
 
     expect(full.dashboard).toEqual({ plans: [] });
     expect(row).not.toHaveProperty("dashboard");
   });
 
   test("infers argon2id from the hash when the column is empty", () => {
-    const user = build().mapDbDocToUser({ userId: "u-1", hash: "$argon2id$v=19$..." });
+    const user = /** @type {AuthUser} */ (
+      build().mapDbDocToUser(
+        /** @type {StoredUser} */ ({ userId: "u-1", hash: "$argon2id$v=19$..." })
+      )
+    );
 
     expect(user.passwordAlgo).toBe("argon2id");
   });
 
   test("infers pbkdf2 when the hash is not argon2", () => {
-    const user = build().mapDbDocToUser({ userId: "u-1", hash: "deadbeef" });
+    const user = /** @type {AuthUser} */ (
+      build().mapDbDocToUser(/** @type {StoredUser} */ ({ userId: "u-1", hash: "deadbeef" }))
+    );
 
     expect(user.passwordAlgo).toBe("pbkdf2");
   });
 
   test("does not call another $-prefixed scheme argon2id", () => {
-    const user = build().mapDbDocToUser({
-      userId: "u-1",
-      hash: "$2b$12$C6UzMDM.H6dfI/f/IKcEe.9v3jYcAG9lZ0kzYQ3sZ0eXAKzS0Lm7q"
-    });
+    const user = /** @type {AuthUser} */ (
+      build().mapDbDocToUser(
+        /** @type {StoredUser} */ ({
+          userId: "u-1",
+          hash: "$2b$12$C6UzMDM.H6dfI/f/IKcEe.9v3jYcAG9lZ0kzYQ3sZ0eXAKzS0Lm7q"
+        })
+      )
+    );
 
     expect(user.passwordAlgo).toBe("pbkdf2");
   });
 
   test("prefers a stored algo over what the hash looks like", () => {
-    const user = build().mapDbDocToUser({
-      userId: "u-1",
-      hash: "deadbeef",
-      passwordAlgo: "argon2id"
-    });
+    const user = /** @type {AuthUser} */ (
+      build().mapDbDocToUser(
+        /** @type {StoredUser} */ ({
+          userId: "u-1",
+          hash: "deadbeef",
+          passwordAlgo: "argon2id"
+        })
+      )
+    );
 
     expect(user.passwordAlgo).toBe("argon2id");
   });
@@ -341,7 +380,7 @@ describe("lookups", () => {
   test("findUserById maps the row it gets back", async () => {
     findUserRow = vi.fn(async () => ({ userId: "u-1", hash: "deadbeef" }));
 
-    const user = await build().findUserById("u-1");
+    const user = /** @type {AuthUser} */ (await build().findUserById("u-1"));
 
     expect(findUserRow).toHaveBeenCalledWith("u-1");
     expect(user.id).toBe("u-1");
@@ -360,8 +399,10 @@ describe("lookups", () => {
       findUserWithDashboardByEmail: loader
     });
 
-    expect((await service.findUserById("u-1")).id).toBe("u-1");
-    expect((await service.findUserByEmail("person@example.com")).id).toBe("u-1");
+    expect(/** @type {AuthUser} */ (await service.findUserById("u-1")).id).toBe("u-1");
+    expect(/** @type {AuthUser} */ (await service.findUserByEmail("person@example.com")).id).toBe(
+      "u-1"
+    );
     expect(loader).not.toHaveBeenCalled();
   });
 
@@ -437,7 +478,10 @@ describe("createUser", () => {
       email: "a@b.com",
       hash: "h",
       profile: { firstName: "Jo" },
-      dashboard: { workouts: [] }
+      // createUser passes on whatever dashboard it is given; signup's holds goals.
+      dashboard: /** @type {import("../authUserService.js").NewUser["dashboard"]} */ ({
+        workouts: []
+      })
     });
 
     expect(doc().profile).toEqual({ firstName: "Jo" });
