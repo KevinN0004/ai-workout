@@ -144,6 +144,11 @@ Phases 3 and 4's rules hold, for source and tests alike:
   - **A field read through a JavaScript function's return type is not checked**, such as
     `ReturnType<typeof mapUser>`. TypeScript gives a `.js` file's object literals an open
     type, so a misspelled field reads as `any`.
+- **A logger in a test is a real one** (decided 2026-11-23): `pino({ level: "silent" })`,
+  which writes nothing, with `vi.spyOn` on each method the test reads, not an object of
+  `vi.fn()`s cast through `unknown`. A child logger inherits its parent's spies. This changes
+  how a test runs, so its PR is proved by the same test count and coverage and a
+  byte-identical build, not by syntax trees, and by a misspelled method caught in each file.
 
 ### Response types in the client
 

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import { registerAuthRoutes } from "../authRoutes.js";
 import { createAuthUserService } from "../../services/auth/authUserService.js";
 import {
@@ -52,9 +53,11 @@ let metrics;
 let cookieCalls;
 /** @type {AuthDeps & { createSession: import("vitest").Mock, deleteSession: import("vitest").Mock }} */
 let deps;
-/** @type {import("vitest").Mock} */
+/** @type {import("pino").Logger} */
+let logger;
+/** @type {import("vitest").MockInstance} */
 let logError;
-/** @type {import("vitest").Mock} */
+/** @type {import("vitest").MockInstance} */
 let logWarn;
 
 // The in-memory rows stand in for both reads: the user row the auth lookups
@@ -70,13 +73,11 @@ const createUserWithDashboard = async (doc) => {
 const buildApp = (overrides = {}) => {
   const app = express();
   app.use(express.json());
-  // Every handler reads req.log optionally; give it one so the log assertions
-  // have something to see.
+  // Every handler reads req.log optionally; give it a real one that writes
+  // nothing, its error and warn calls spied on, so the log assertions have
+  // something to see.
   app.use((req, _res, next) => {
-    // A logger of vi.fn()s is not pino's, so each is cast through unknown.
-    req.log = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({ error: logError, warn: logWarn, info: vi.fn() })
-    );
+    req.log = logger;
     next();
   });
   registerAuthRoutes(app, { ...deps, ...overrides });
@@ -92,9 +93,7 @@ const realCookieWriters = () => {
   const { setSessionCookie, setCsrfCookie, clearSessionCookie, clearCsrfCookie } =
     createSessionService({
       cleanText,
-      logger: /** @type {import("pino").Logger} */ (
-        /** @type {unknown} */ ({ info() {}, warn() {}, error() {} })
-      ),
+      logger: pino({ level: "silent" }),
       toShortText: (value) => String(value ?? ""),
       findUserById: async () => null,
       sessionTtlMs: 60000,
@@ -139,8 +138,9 @@ beforeEach(() => {
     authFailures: 0
   });
   cookieCalls = { session: [], csrf: [], clearedSession: 0, clearedCsrf: 0 };
-  logError = vi.fn();
-  logWarn = vi.fn();
+  logger = pino({ level: "silent" });
+  logError = vi.spyOn(logger, "error");
+  logWarn = vi.spyOn(logger, "warn");
 
   const authUserService = createAuthUserService({
     cleanText,

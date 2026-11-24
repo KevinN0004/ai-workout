@@ -1,5 +1,6 @@
 // @ts-check
 import { describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerWorkoutAndGoalRoutes } from "../registerWorkoutAndGoalRoutes.js";
@@ -17,10 +18,7 @@ const buildApp = (overrides = {}, user = { id: "u-1" }) => {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    // A logger of vi.fn()s is not pino's, so it is cast through unknown.
-    req.log = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() })
-    );
+    req.log = pino({ level: "silent" });
     next();
   });
   const deps = {

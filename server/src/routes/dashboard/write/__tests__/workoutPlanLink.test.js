@@ -1,5 +1,6 @@
 // @ts-check
 import { describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerWorkoutAndGoalRoutes } from "../registerWorkoutAndGoalRoutes.js";
@@ -13,19 +14,21 @@ import { buildWorkoutSessionEntry } from "../../../../services/dashboard/dashboa
 // logs. The repository, which decides whether a link is kept, is stubbed here;
 // workoutSessions.integration.test.js runs it against real Postgres.
 
-// The user holds the id the route reads; a logger of vi.fn()s is not pino's, and
-// the deps cover the workout route alone, with stubs holding what it reads of
-// their answers, so each is cast through unknown.
+// The user holds the id the route reads, and the deps cover the workout route
+// alone, with stubs holding what it reads of their answers, so each is cast
+// through unknown. The logger is a real one that writes nothing, its warn calls
+// spied on.
 /** @typedef {Parameters<typeof registerWorkoutAndGoalRoutes>[1]} Deps */
 const buildApp = ({ saveWorkoutSession }) => {
-  const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
+  const log = pino({ level: "silent" });
+  const warn = vi.spyOn(log, "warn");
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = /** @type {import("../../../../services/auth/authUserService.js").AuthUser} */ ({
       id: "u-1"
     });
-    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (log));
+    req.log = log;
     next();
   });
   registerWorkoutAndGoalRoutes(
@@ -43,7 +46,7 @@ const buildApp = ({ saveWorkoutSession }) => {
       })
     )
   );
-  return { app, log };
+  return { app, warn };
 };
 
 const post = (app, body) =>
@@ -51,8 +54,8 @@ const post = (app, body) =>
     .post("/api/dashboard/workout-sessions")
     .send({ date: "2026-05-12", duration: 30, ...body });
 
-const linkDropped = (log) =>
-  log.warn.mock.calls.some(([entry]) => entry?.event === "workout_plan_link_dropped");
+const linkDropped = (warn) =>
+  warn.mock.calls.some(([entry]) => entry?.event === "workout_plan_link_dropped");
 
 describe("the workout route and a plan-day link", () => {
   test("answers the session as saved, not as sent", async () => {
@@ -65,27 +68,27 @@ describe("the workout route and a plan-day link", () => {
   });
 
   test("logs a link that was asked for and not kept", async () => {
-    const { app, log } = buildApp({
+    const { app, warn } = buildApp({
       saveWorkoutSession: vi.fn(async () => ({ id: "w-1", planId: null, planDayIndex: null }))
     });
 
     const response = await post(app, { planId: "plan-1", planDayIndex: 2 });
 
     expect(response.status).toBe(200);
-    expect(linkDropped(log)).toBe(true);
+    expect(linkDropped(warn)).toBe(true);
   });
 
   test.each([
     ["a link that was kept", { planId: "plan-1", planDayIndex: 2 }, "plan-1"],
     ["no link asked for", {}, null]
   ])("logs nothing for %s", async (_label, body, savedPlanId) => {
-    const { app, log } = buildApp({
+    const { app, warn } = buildApp({
       saveWorkoutSession: vi.fn(async () => ({ id: "w-1", planId: savedPlanId }))
     });
 
     await post(app, body);
 
-    expect(linkDropped(log)).toBe(false);
+    expect(linkDropped(warn)).toBe(false);
   });
 
   // The save returns null when the user cannot be resolved; the caller still

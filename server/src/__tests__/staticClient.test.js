@@ -5,6 +5,7 @@ import path from "path";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import { registerClientStatic, resolveClientDistPath } from "../staticClient.js";
 
 // The client bundle and the API must share an origin -- see the header comment
@@ -38,21 +39,20 @@ afterAll(() => {
 // which pass their own, ever meet the shell's limit.
 const OUT_OF_THE_WAY = 1000;
 
-// The loggers hold only the calls the static client makes, and a vi.fn() is not
-// one of pino's log functions, so each is cast through unknown; the metrics hold
-// the one counter it moves.
-/** @typedef {import("pino").Logger} Logger */
+// Each logger is a real one that writes nothing, the request logger's warn
+// calls spied on; the metrics hold the one counter the static client moves.
 
 const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
   const app = express();
   const metrics = /** @type {import("../services/platform/metricsService.js").Metrics} */ ({
     rateLimited: 0
   });
-  const requestLog = { warn: vi.fn() };
+  const requestLog = pino({ level: "silent" });
+  const requestWarn = vi.spyOn(requestLog, "warn");
 
   // Stands in for requestContext.js, which attaches the per-request logger.
   app.use((req, _res, next) => {
-    req.log = /** @type {Logger} */ (/** @type {unknown} */ (requestLog));
+    req.log = requestLog;
     next();
   });
 
@@ -64,12 +64,12 @@ const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
     express,
     existsSync: fs.existsSync,
     distPath,
-    logger: /** @type {Logger} */ (/** @type {unknown} */ ({ warn: vi.fn(), info: vi.fn() })),
+    logger: pino({ level: "silent" }),
     metrics,
     shellRateLimit: { windowMs: 60_000, limit }
   });
 
-  return { app, mounted, metrics, requestLog };
+  return { app, mounted, metrics, requestWarn };
 };
 
 // Vite's asset filenames are content-addressed, so they can be cached
@@ -124,7 +124,7 @@ describe("registerClientStatic", () => {
           express,
           existsSync: () => false,
           distPath: "/nowhere",
-          logger: /** @type {Logger} */ (/** @type {unknown} */ ({ warn: vi.fn(), info: vi.fn() })),
+          logger: pino({ level: "silent" }),
           onMissing
         })
       )
@@ -221,13 +221,13 @@ describe("the shell's rate limit", () => {
   });
 
   test("logs a limited request without its query string", async () => {
-    const { app, requestLog } = buildApp({ limit: 1 });
+    const { app, requestWarn } = buildApp({ limit: 1 });
 
     await request(app).get("/");
     await request(app).get("/dashboard?latitude=40.712776&longitude=-74.005974");
 
-    expect(requestLog.warn).toHaveBeenCalledTimes(1);
-    expect(requestLog.warn.mock.calls[0][0]).toMatchObject({
+    expect(requestWarn).toHaveBeenCalledTimes(1);
+    expect(requestWarn.mock.calls[0][0]).toMatchObject({
       event: "rate_limited",
       scope: "spa_fallback",
       method: "GET",

@@ -1,5 +1,6 @@
 // @ts-check
 import { describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerStravaWebhook } from "../registerStravaWebhook.js";
@@ -12,18 +13,18 @@ import { registerStravaWebhook } from "../registerStravaWebhook.js";
 const PATH = "/webhooks/strava";
 const CONFIG = { verifyToken: "verify-me", subscriptionId: 77 };
 
-// The config holds the two fields the webhook reads; a logger of vi.fn()s is not
-// pino's, and the stub service holds the one call the webhook makes, so each is
-// cast through unknown.
+// The config holds the two fields the webhook reads, and the stub service holds
+// the one call the webhook makes, so the service is cast through unknown; the
+// logger is a real one that writes nothing.
 /**
  * @param {{ config?: { verifyToken: string | null, subscriptionId: number | null } | null, handleEvent?: import("vitest").Mock }} [options]
  */
 const buildApp = ({ config = CONFIG, handleEvent = vi.fn(async () => "create") } = {}) => {
   const app = express();
   app.use(express.json());
-  const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
+  const log = pino({ level: "silent" });
   app.use((req, _res, next) => {
-    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (log));
+    req.log = log;
     next();
   });
   const scheduled = [];

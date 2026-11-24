@@ -1,5 +1,6 @@
 // @ts-check
 import { describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerStravaRoutes } from "../registerStravaRoutes.js";
@@ -30,11 +31,25 @@ const stubService = (overrides = {}) => ({
   ...overrides
 });
 
-// The user holds the id the routes read; a logger of vi.fn()s is not pino's, and
-// the stub service holds the calls these routes make, so each is cast through
-// unknown; the config holds the one field these routes read.
 /**
- * @param {{ service?: ReturnType<typeof stubService>, configured?: boolean, user?: object | null, log?: Record<string, import("vitest").Mock> }} [options]
+ * A real logger that writes nothing, with its three log methods spied on.
+ * @returns {{ logger: import("pino").Logger, error: import("vitest").MockInstance, warn: import("vitest").MockInstance, info: import("vitest").MockInstance }}
+ */
+const spiedLogger = () => {
+  const logger = pino({ level: "silent" });
+  return {
+    logger,
+    error: vi.spyOn(logger, "error"),
+    warn: vi.spyOn(logger, "warn"),
+    info: vi.spyOn(logger, "info")
+  };
+};
+
+// The user holds the id the routes read, and the stub service holds the calls
+// these routes make, so each is cast through unknown; the config holds the one
+// field these routes read.
+/**
+ * @param {{ service?: ReturnType<typeof stubService>, configured?: boolean, user?: object | null, log?: ReturnType<typeof spiedLogger> }} [options]
  */
 const buildApp = ({
   service = stubService(),
@@ -44,9 +59,9 @@ const buildApp = ({
 } = {}) => {
   const app = express();
   app.use(express.json());
-  const logger = log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+  const logger = log || spiedLogger();
   app.use((req, _res, next) => {
-    req.log = /** @type {import("pino").Logger} */ (/** @type {unknown} */ (logger));
+    req.log = logger.logger;
     next();
   });
   const signedIn = (req, res, next) => {
