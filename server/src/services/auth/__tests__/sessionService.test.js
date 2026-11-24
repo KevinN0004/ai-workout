@@ -1,17 +1,29 @@
-import { describe, expect, test, vi } from "vitest";
+// @ts-check
+import pino from "pino";
+import { describe, expect, test } from "vitest";
 import { createSessionService, withTimeout } from "../sessionService.js";
 
+// Each request here holds only the cookie header the session reads, and each
+// user only the fields the session check reads.
+/** @typedef {import("../authUserService.js").AuthUser} AuthUser */
+
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const cleanText = (value, maxLen = 500) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
-const createLogger = () => ({
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn()
-});
+// A real logger that writes nothing.
+const createLogger = () => pino({ level: "silent" });
 
+/** @param {Partial<Parameters<typeof createSessionService>[0]>} [overrides] */
 const buildService = (overrides = {}) =>
   createSessionService({
     cleanText,
@@ -74,18 +86,23 @@ describe("initSessionStore", () => {
   test("still issues working sessions after falling back", async () => {
     const service = buildService({
       redisConnectTimeoutMs: 300,
-      findUserById: async (userId) => ({ id: userId, email: "fallback@example.com" })
+      findUserById: async (userId) =>
+        /** @type {AuthUser} */ ({ id: userId, email: "fallback@example.com" })
     });
     await service.initSessionStore({ REDIS_HOST: "127.0.0.1", REDIS_PORT: "1" });
 
     const token = await service.createSession("user-123");
     expect(token).toMatch(/^[0-9a-f]{48}$/);
 
-    const user = await service.getSessionUser({ headers: { cookie: `sid=${token}` } });
+    const user = await service.getSessionUser(
+      /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } })
+    );
     expect(user).toEqual({ id: "user-123", email: "fallback@example.com" });
 
     await service.deleteSession(token);
-    const afterDelete = await service.getSessionUser({ headers: { cookie: `sid=${token}` } });
+    const afterDelete = await service.getSessionUser(
+      /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } })
+    );
     expect(afterDelete).toBeNull();
   }, 15000);
 
@@ -112,15 +129,16 @@ describe("initSessionStore", () => {
 describe("passwordChangedAt invalidation", () => {
   test("a session created before the password changed is rejected and deleted", async () => {
     const service = buildService({
-      findUserById: async () => ({
-        id: "user-1",
-        email: "person@example.com",
-        passwordChangedAt: new Date(Date.now() + 5_000).toISOString()
-      })
+      findUserById: async () =>
+        /** @type {AuthUser} */ ({
+          id: "user-1",
+          email: "person@example.com",
+          passwordChangedAt: new Date(Date.now() + 5_000).toISOString()
+        })
     });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
     expect(await service.getSessionUser(req)).toBeNull();
     // Rejecting is not enough -- the dead token must not linger in the store.
@@ -129,30 +147,32 @@ describe("passwordChangedAt invalidation", () => {
 
   test("a session created after the password changed survives", async () => {
     const service = buildService({
-      findUserById: async () => ({
-        id: "user-1",
-        email: "person@example.com",
-        passwordChangedAt: new Date(Date.now() - 5_000).toISOString()
-      })
+      findUserById: async () =>
+        /** @type {AuthUser} */ ({
+          id: "user-1",
+          email: "person@example.com",
+          passwordChangedAt: new Date(Date.now() - 5_000).toISOString()
+        })
     });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
 
   test("a user who has never changed their password keeps their session", async () => {
     const service = buildService({
-      findUserById: async () => ({
-        id: "user-1",
-        email: "person@example.com",
-        passwordChangedAt: null
-      })
+      findUserById: async () =>
+        /** @type {AuthUser} */ ({
+          id: "user-1",
+          email: "person@example.com",
+          passwordChangedAt: null
+        })
     });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
@@ -166,7 +186,7 @@ describe("passwordChangedAt invalidation", () => {
     const service = buildService({ findUserById: async () => null });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
     expect(await service.getSessionUser(req)).toBeNull();
     expect(await service.getSessionByToken(token)).toBeNull();
@@ -174,15 +194,16 @@ describe("passwordChangedAt invalidation", () => {
 
   test("an empty-string timestamp is treated as absent, not as epoch zero", async () => {
     const service = buildService({
-      findUserById: async () => ({
-        id: "user-1",
-        email: "person@example.com",
-        passwordChangedAt: ""
-      })
+      findUserById: async () =>
+        /** @type {AuthUser} */ ({
+          id: "user-1",
+          email: "person@example.com",
+          passwordChangedAt: ""
+        })
     });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
 
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
@@ -192,20 +213,25 @@ describe("passwordChangedAt invalidation", () => {
     // stamping passwordChangedAt, so the two can share a millisecond. Strict `<` is what
     // lets that session live; `<=` would sign the user out the moment they
     // changed their password.
+    /** @type {string | null} */
     let changedAt = null;
     const service = buildService({
-      findUserById: async () => ({
-        id: "user-1",
-        email: "person@example.com",
-        passwordChangedAt: changedAt
-      })
+      findUserById: async () =>
+        /** @type {AuthUser} */ ({
+          id: "user-1",
+          email: "person@example.com",
+          passwordChangedAt: changedAt
+        })
     });
     await service.initSessionStore({});
     const token = await service.createSession("user-1");
     const session = await service.getSessionByToken(token);
-    changedAt = new Date(session.createdAt).toISOString();
+    // The session just created is in the store.
+    changedAt = new Date(
+      /** @type {NonNullable<typeof session>} */ (session).createdAt
+    ).toISOString();
 
-    const req = { headers: { cookie: `sid=${token}` } };
+    const req = /** @type {import("express").Request} */ ({ headers: { cookie: `sid=${token}` } });
     expect(await service.getSessionUser(req)).toMatchObject({ id: "user-1" });
   });
 });

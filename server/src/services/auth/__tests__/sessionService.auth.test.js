@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createSessionService } from "../sessionService.js";
 
@@ -9,14 +11,31 @@ import { createSessionService } from "../sessionService.js";
 // HttpOnly and the CSRF one deliberately is not, because the client has to
 // read it to echo it back -- and the double-submit check that compares them.
 
+// Each fake request and response holds only the fields the service reads and
+// writes, and a response's body is read only after a guard has answered with it.
+/** @typedef {import("express").Response & { body: ErrorBody }} FakeResponse */
+/** @typedef {import("../../http/errorResponseService.js").ErrorBody} ErrorBody */
+/** @typedef {ReturnType<typeof createSessionService>} SessionService */
+
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const cleanText = (value, maxLen = 500) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
+/** @type {import("pino").Logger} */
 let logger;
+/** @type {import("vitest").Mock} */
 let findUserById;
 
+/** @param {Partial<Parameters<typeof createSessionService>[0]>} [overrides] */
 const buildService = (overrides = {}) =>
   createSessionService({
     cleanText,
@@ -51,24 +70,31 @@ const buildRes = () => {
       return res;
     })
   };
-  return res;
+  return /** @type {FakeResponse} */ (/** @type {unknown} */ (res));
 };
 
+/** @param {FakeResponse} res */
 const cookiesOf = (res) => {
   const value = res.getHeader("Set-Cookie");
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 };
 
-const buildReq = (overrides = {}) => ({
-  method: "GET",
-  headers: {},
-  log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
-  ...overrides
-});
+/** @param {Partial<import("express").Request>} [overrides] */
+const buildReq = (overrides = {}) => {
+  // A real logger that writes nothing, its warn spied on.
+  const log = pino({ level: "silent" });
+  vi.spyOn(log, "warn");
+  return /** @type {import("express").Request} */ ({
+    method: "GET",
+    headers: {},
+    log,
+    ...overrides
+  });
+};
 
 beforeEach(() => {
-  logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  logger = pino({ level: "silent" });
   findUserById = vi.fn(async (userId) => ({ id: userId, email: "a@b.com" }));
 });
 
@@ -221,6 +247,7 @@ describe("cookies", () => {
 });
 
 describe("the session lifecycle", () => {
+  /** @param {SessionService} service */
   const withSession = async (service) => {
     const token = await service.createSession("u-1");
     return buildReq({ headers: { cookie: `sid=${token}` } });
@@ -395,6 +422,10 @@ describe("ensureCsrfTokenCookie", () => {
 });
 
 describe("requireCsrfToken", () => {
+  /**
+   * @param {SessionService} service
+   * @param {{ method: string, cookie?: string, header?: string }} request
+   */
   const send = (service, { method, cookie, header }) => {
     const req = buildReq({
       method,
@@ -468,12 +499,16 @@ describe("requireCsrfToken", () => {
 
     service.requireCsrfToken(req, buildRes(), vi.fn());
 
-    expect(req.log.warn.mock.calls[0][0].path).toBe("/api/thing");
+    // buildReq spies on each request's warn.
+    expect(
+      /** @type {import("vitest").MockInstance} */ (/** @type {unknown} */ (req.log.warn)).mock
+        .calls[0][0].path
+    ).toBe("/api/thing");
   });
 
   test("survives a request with no logger attached", () => {
     const service = buildService();
-    const req = { method: "POST", headers: {} };
+    const req = /** @type {import("express").Request} */ ({ method: "POST", headers: {} });
     const res = buildRes();
 
     expect(() => service.requireCsrfToken(req, res, vi.fn())).not.toThrow();

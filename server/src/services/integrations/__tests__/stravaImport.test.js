@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { STRENGTH_SPORTS, decideImport, deletionsFrom } from "../stravaImport.js";
 
@@ -5,6 +6,7 @@ import { STRENGTH_SPORTS, decideImport, deletionsFrom } from "../stravaImport.js
 // "The import rules"): a delete here wins, an import already here stays, and a
 // strength-type activity gives way to a workout logged in the app that day.
 
+/** @param {string | null} sport */
 const workoutOf = (sport) => ({ externalId: "9001", sport });
 
 describe("decideImport", () => {

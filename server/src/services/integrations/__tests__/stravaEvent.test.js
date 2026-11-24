@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { readEvent } from "../stravaEvent.js";
 
@@ -15,6 +16,10 @@ const EVENT = {
   subscription_id: 77,
   event_time: 1794600000
 };
+
+// Each body cast below is EVENT with one field changed that does not stop it
+// being an event, so readEvent reads it.
+/** @typedef {NonNullable<ReturnType<typeof readEvent>>} StravaEvent */
 
 describe("readEvent", () => {
   test("an activity event", () => {
@@ -46,7 +51,7 @@ describe("readEvent", () => {
     ["no updates", undefined],
     ["a title change", { title: "Renamed" }]
   ])("%s is no deauthorization", (_label, updates) => {
-    expect(readEvent({ ...EVENT, updates }).deauthorized).toBe(false);
+    expect(/** @type {StravaEvent} */ (readEvent({ ...EVENT, updates })).deauthorized).toBe(false);
   });
 
   test("ids given as digits are read", () => {
@@ -79,7 +84,7 @@ describe("readEvent", () => {
     ["too large to be exact", 2 ** 60],
     ["digits too large to be exact", "9999999999999999"]
   ])("an object id that is %s is none", (_label, object_id) => {
-    expect(readEvent({ ...EVENT, object_id }).objectId).toBeNull();
+    expect(/** @type {StravaEvent} */ (readEvent({ ...EVENT, object_id })).objectId).toBeNull();
   });
 
   test("the types are text, cut short, and blank when they are not", () => {
@@ -87,6 +92,8 @@ describe("readEvent", () => {
       objectType: "",
       aspectType: ""
     });
-    expect(readEvent({ ...EVENT, object_type: "x".repeat(100) }).objectType).toHaveLength(20);
+    expect(
+      /** @type {StravaEvent} */ (readEvent({ ...EVENT, object_type: "x".repeat(100) })).objectType
+    ).toHaveLength(20);
   });
 });

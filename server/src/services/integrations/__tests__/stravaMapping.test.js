@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { positiveOrNull, sportLabel, toWorkout } from "../stravaMapping.js";
 

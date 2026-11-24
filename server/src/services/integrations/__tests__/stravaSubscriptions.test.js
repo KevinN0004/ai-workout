@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { runWebhookCommand } from "../stravaSubscriptions.js";
 
@@ -13,18 +14,27 @@ const ENV = {
   STRAVA_BASE_URL: "http://strava.test"
 };
 
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
 const answer = (status, body) =>
   new Response(body === undefined ? null : JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" }
   });
 
+/**
+ * @param {string[]} argv
+ * @param {{ env?: Record<string, string | undefined>, responses?: (Response | Error)[] }} [options]
+ */
 const run = async (argv, { env = ENV, responses = [] } = {}) => {
   const printed = [];
   const fetchImpl = vi.fn(async () => {
     const next = responses.shift();
     if (next instanceof Error) throw next;
-    return next;
+    // Each test queues an answer for every call it makes.
+    return /** @type {Response} */ (next);
   });
   const code = await runWebhookCommand({
     argv,
@@ -35,6 +45,7 @@ const run = async (argv, { env = ENV, responses = [] } = {}) => {
   return { code, printed, fetchImpl, text: printed.join("\n") };
 };
 
+/** @param {import("vitest").Mock} fetchImpl */
 const callOf = (fetchImpl) => {
   const [url, init = {}] = fetchImpl.mock.calls[0];
   return {

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { TokenCipherError, createTokenCipher, parseTokenKey } from "../tokenCipher.js";
 
@@ -10,6 +11,10 @@ const OTHER_KEY = Buffer.alloc(32, 7).toString("base64");
 const cipher = createTokenCipher(/** @type {Buffer} */ (parseTokenKey(KEY)));
 
 // The sealed value with one character of part `index` changed.
+/**
+ * @param {string} sealed
+ * @param {number} index
+ */
 const tamper = (sealed, index) => {
   const parts = sealed.split(".");
   const part = parts[index];
