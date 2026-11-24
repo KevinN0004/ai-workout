@@ -394,12 +394,10 @@ export default function DashboardPage({
           weatherData={weatherData}
           weatherLoading={weatherLoading}
           weatherError={weatherError}
-          weatherLastUpdatedAt={weatherLastUpdatedAt}
           refreshWeatherRecommendation={refreshWeatherRecommendation}
           airQualityData={airQualityData}
           airQualityLoading={airQualityLoading}
           airQualityError={airQualityError}
-          airQualityLastUpdatedAt={airQualityLastUpdatedAt}
           refreshAirQuality={refreshAirQuality}
           onOpenPlans={() => navigateDashView("plans")}
           onOpenMeal={() => navigateDashView("meal")}
