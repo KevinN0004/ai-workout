@@ -1,5 +1,6 @@
 // @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import { createErrorHandler } from "../errorHandler.js";
 
 // The last thing between a thrown error and the client. It was at 15%
@@ -13,8 +14,10 @@ import { createErrorHandler } from "../errorHandler.js";
 // instead, and the tests assert the middleware calls it with the cap it relies
 // on rather than asserting on the stub's own output.
 
-/** @type {import("pino").Logger & { error: import("vitest").Mock }} */
+/** @type {import("pino").Logger} */
 let logger;
+/** @type {import("vitest").MockInstance} */
+let logError;
 /** @type {import("vitest").Mock<(value: unknown, maxLen?: number) => string>} */
 let toShortText;
 /** @type {import("vitest").Mock} */
@@ -78,13 +81,12 @@ const handle = (err, { req = buildReq(), res = buildRes(), handler = build() } =
   return { req, res, next };
 };
 
-const logEntry = () => logger.error.mock.calls[0][0];
+const logEntry = () => logError.mock.calls[0][0];
 
 beforeEach(() => {
-  // A logger of vi.fn()s is not pino's, so it is cast through unknown.
-  logger = /** @type {import("pino").Logger & { error: import("vitest").Mock }} */ (
-    /** @type {unknown} */ ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })
-  );
+  // A real logger that writes nothing, its error calls spied on.
+  logger = pino({ level: "silent" });
+  logError = vi.spyOn(logger, "error");
   toShortText = vi.fn((value, maxLen = 160) =>
     typeof value === "string" ? value.trim().slice(0, maxLen) : ""
   );

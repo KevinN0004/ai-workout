@@ -1,5 +1,6 @@
 // @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerGenerateRoutes } from "../generateRoutes.js";
@@ -39,8 +40,22 @@ let saveGeneratedPlan;
 let pruneGeneratedPlans;
 
 /**
+ * A real logger that writes nothing, with its three log methods spied on.
+ * @returns {{ logger: import("pino").Logger, error: import("vitest").MockInstance, warn: import("vitest").MockInstance, info: import("vitest").MockInstance }}
+ */
+const spiedLogger = () => {
+  const logger = pino({ level: "silent" });
+  return {
+    logger,
+    error: vi.spyOn(logger, "error"),
+    warn: vi.spyOn(logger, "warn"),
+    info: vi.spyOn(logger, "info")
+  };
+};
+
+/**
  * @param {object} [overrides]
- * @param {{ user?: object, requestId?: string, log?: object }} [context]
+ * @param {{ user?: object, requestId?: string, log?: ReturnType<typeof spiedLogger> }} [context]
  */
 const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
   const app = express();
@@ -50,9 +65,7 @@ const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
     if (user)
       req.user = /** @type {import("../../services/auth/authUserService.js").AuthUser} */ (user);
     if (requestId) req.requestId = requestId;
-    req.log = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ (log || { error: vi.fn(), warn: vi.fn(), info: vi.fn() })
-    );
+    req.log = (log || spiedLogger()).logger;
     next();
   });
   registerGenerateRoutes(app, {
@@ -244,7 +257,7 @@ describe("POST /api/generate", () => {
     });
 
     test("are logged as Gemini's", async () => {
-      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const log = spiedLogger();
 
       await post(buildApp({}, { log }));
 
@@ -276,7 +289,7 @@ describe("POST /api/generate", () => {
       ["no text at all", () => generateContent.mockResolvedValue({}), "empty"]
     ])("stand in for %s, logged with the reason", async (_label, arrange, reason) => {
       arrange();
-      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const log = spiedLogger();
 
       const response = await post(buildApp({}, { log }));
 
@@ -290,7 +303,7 @@ describe("POST /api/generate", () => {
     });
 
     test("stand in when no client was built", async () => {
-      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const log = spiedLogger();
 
       await post(buildApp({ gemini: null }, { log }));
 
@@ -300,7 +313,7 @@ describe("POST /api/generate", () => {
     test("stand in when the call passes the deadline, which aborts it", async () => {
       vi.stubEnv("GEMINI_TIMEOUT_MS", "20");
       generateContent.mockImplementation(() => new Promise(() => {}));
-      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const log = spiedLogger();
 
       const response = await post(buildApp({}, { log }));
 
@@ -412,7 +425,7 @@ describe("POST /api/generate", () => {
       pruneGeneratedPlans = vi.fn(async () => {
         throw new Error("deadlock detected");
       });
-      const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
+      const log = spiedLogger();
 
       const response = await post(buildApp({}, { user: { id: "u-1" }, log }));
 

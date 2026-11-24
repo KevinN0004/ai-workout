@@ -1,5 +1,6 @@
 // @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerAirQualityRoutes } from "../registerAirQualityRoutes.js";
@@ -22,13 +23,11 @@ import {
 // maths under test are the ones that actually run in production.
 
 // The stubs stand in for what these routes never reach, so each service built
-// from them is cast through unknown to its deps. Each logger is cast through
-// unknown too: an object of no-ops, or of vi.fn()s, is not pino's.
+// from them is cast through unknown to its deps. Each logger is a real one that
+// writes nothing.
 const stubbed = {
   metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: /** @type {import("pino").Logger} */ (
-    /** @type {unknown} */ ({ info() {}, warn() {}, error() {} })
-  ),
+  logger: pino({ level: "silent" }),
   toShortText: (value) => String(value ?? "")
 };
 
@@ -630,9 +629,8 @@ describe("GET /api/air-quality/current", () => {
     // a limit of 100. A list cut short can miss the nearest station, so it is
     // logged, once per answer fetched from OpenAQ rather than per cached read.
     test("warns once when OpenAQ says it holds more stations than it sent", async () => {
-      const logger = /** @type {import("pino").Logger} */ (
-        /** @type {unknown} */ ({ info() {}, warn: vi.fn(), error() {} })
-      );
+      const logger = pino({ level: "silent" });
+      vi.spyOn(logger, "warn");
       const openAqRequest = walk({
         locations: [pm25Station(1, 100, 11)],
         meta: { found: ">1000" },
@@ -656,9 +654,8 @@ describe("GET /api/air-quality/current", () => {
     // The cached list has its stale stations dropped, so its length is not what
     // OpenAQ sent; the count the projection recorded is.
     test("judges the list by the count OpenAQ sent, not by the stations kept", async () => {
-      const logger = /** @type {import("pino").Logger} */ (
-        /** @type {unknown} */ ({ info() {}, warn: vi.fn(), error() {} })
-      );
+      const logger = pino({ level: "silent" });
+      vi.spyOn(logger, "warn");
       const openAqRequest = walk({
         locations: [pm25Station(1, 100, 11)],
         meta: { found: ">1000", returned: 1000 },
@@ -680,9 +677,8 @@ describe("GET /api/air-quality/current", () => {
       // 287 sent, 286 of them stale and dropped: complete, though only one is kept.
       ["a complete list with stale stations dropped", { found: 287, returned: 287 }, "miss"]
     ])("does not warn for %s", async (_label, meta, locationsCache) => {
-      const logger = /** @type {import("pino").Logger} */ (
-        /** @type {unknown} */ ({ info() {}, warn: vi.fn(), error() {} })
-      );
+      const logger = pino({ level: "silent" });
+      vi.spyOn(logger, "warn");
       const openAqRequest = walk({
         locations: [pm25Station(1, 100, 11)],
         meta,

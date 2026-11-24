@@ -2,12 +2,14 @@
 import express from "express";
 import request from "supertest";
 import { describe, expect, test, vi } from "vitest";
+import pino from "pino";
 import { createRequestContextMiddleware } from "../requestContext.js";
 
-// Each fixture here holds only the fields the middleware reads. The loggers are
-// cast through unknown, because a vi.fn() is not one of pino's log functions,
-// and so is the request whose x-request-id is a plain string, where Node's
-// header type also allows a list.
+// Each fixture here holds only the fields the middleware reads. The request
+// whose x-request-id is a plain string is cast through unknown, where Node's
+// header type also allows a list. Each logger is a real one that writes
+// nothing; the request logger is its child, so a spy on the parent's info
+// records the child's calls.
 
 const createResponseHarness = () => {
   const listeners = {};
@@ -33,14 +35,8 @@ describe("requestContext middleware", () => {
       requestLatencyMs: {},
       routeLatencyMs: {}
     });
-    const requestLogger = {
-      info: vi.fn()
-    };
-    const logger = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({
-        child: vi.fn(() => requestLogger)
-      })
-    );
+    const logger = pino({ level: "silent" });
+    const info = vi.spyOn(logger, "info");
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
@@ -61,6 +57,7 @@ describe("requestContext middleware", () => {
 
     middleware(req, res, next);
     expect(req.requestId).toBe("req-123");
+    expect(req.log.bindings()).toEqual({ requestId: "req-123" });
     expect(res.headers["X-Request-Id"]).toBe("req-123");
     expect(metrics.requestsTotal).toBe(1);
     expect(next).toHaveBeenCalledTimes(1);
@@ -69,7 +66,7 @@ describe("requestContext middleware", () => {
 
     expect(metrics.requestLatencyMs.count).toBe(1);
     expect(metrics.routeLatencyMs["GET /api/health"].count).toBe(1);
-    expect(requestLogger.info).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledTimes(1);
   });
 
   test("generates request id when incoming header is missing", () => {
@@ -78,11 +75,7 @@ describe("requestContext middleware", () => {
       requestLatencyMs: {},
       routeLatencyMs: {}
     });
-    const logger = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({
-        child: vi.fn(() => ({ info: vi.fn() }))
-      })
-    );
+    const logger = pino({ level: "silent" });
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
@@ -111,11 +104,7 @@ describe("requestContext middleware", () => {
       requestLatencyMs: {},
       routeLatencyMs: {}
     });
-    const logger = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({
-        child: vi.fn(() => ({ info: vi.fn() }))
-      })
-    );
+    const logger = pino({ level: "silent" });
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
@@ -146,11 +135,7 @@ describe("requestContext middleware", () => {
       requestLatencyMs: {},
       routeLatencyMs: {}
     });
-    const logger = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({
-        child: vi.fn(() => ({ info: vi.fn() }))
-      })
-    );
+    const logger = pino({ level: "silent" });
     const middleware = createRequestContextMiddleware({
       metrics,
       logger,
@@ -181,14 +166,13 @@ describe("requestContext middleware", () => {
       requestLatencyMs: {},
       routeLatencyMs: {}
     });
-    const requestLogger = { info: vi.fn() };
+    const logger = pino({ level: "silent" });
+    const info = vi.spyOn(logger, "info");
     const app = express();
     app.use(
       createRequestContextMiddleware({
         metrics,
-        logger: /** @type {import("pino").Logger} */ (
-          /** @type {unknown} */ ({ child: () => requestLogger })
-        ),
+        logger,
         toShortText: () => ""
       })
     );
@@ -196,8 +180,8 @@ describe("requestContext middleware", () => {
 
     await request(app).get("/api/weather/recommendation?latitude=40.712776&longitude=-74.005974");
 
-    expect(requestLogger.info).toHaveBeenCalledTimes(1);
-    const entry = requestLogger.info.mock.calls[0][0];
+    expect(info).toHaveBeenCalledTimes(1);
+    const entry = info.mock.calls[0][0];
     expect(entry).toMatchObject({ event: "http_request", path: "/api/weather/recommendation" });
     expect(JSON.stringify(entry)).not.toMatch(/latitude|longitude|40\.71|74\.00/);
   });

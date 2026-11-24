@@ -1,5 +1,6 @@
 // @ts-check
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
+import pino from "pino";
 import express from "express";
 import request from "supertest";
 import { registerPlanSwapRoutes } from "../registerPlanSwapRoutes.js";
@@ -42,8 +43,8 @@ const savedPlan = (overrides = {}) => {
   };
 };
 
-// The user holds the fields the routes read, and a logger of vi.fn()s is not
-// pino's, so it is cast through unknown.
+// The user holds the fields the routes read, and the logger is a real one that
+// writes nothing.
 /**
  * @param {object} [overrides]
  * @param {object} [user]
@@ -53,9 +54,7 @@ const buildApp = (overrides = {}, user = { id: "u-1" }) => {
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ (user);
-    req.log = /** @type {import("pino").Logger} */ (
-      /** @type {unknown} */ ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() })
-    );
+    req.log = pino({ level: "silent" });
     next();
   });
   registerPlanSwapRoutes(app, {
