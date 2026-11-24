@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   allowedCardioValues,
@@ -12,7 +13,7 @@ import {
   defaultDashboard,
   defaultGoals,
   defaultProfile
-} from "../dashboardDataBuildersService";
+} from "../dashboardDataBuildersService.js";
 
 // The sets a workout body carries (roadmap B1). The schema has already
 // checked them; the builder cleans them as it cleans every other field, keeps
@@ -39,7 +40,10 @@ describe("buildWorkoutSessionEntry's exercise sets", () => {
       exerciseSets: [{ name: "Pull-up", sets: [{ reps: 0, seconds: null, loadKg: 0, rpe: 10 }] }]
     });
 
-    expect(entry.exerciseSets[0].sets[0]).toEqual({ reps: 0, seconds: null, loadKg: 0, rpe: 10 });
+    // A body that sent sets builds an entry that keeps them.
+    expect(
+      /** @type {NonNullable<typeof entry.exerciseSets>} */ (entry.exerciseSets)[0].sets[0]
+    ).toEqual({ reps: 0, seconds: null, loadKg: 0, rpe: 10 });
   });
 
   // Undefined tells the repository to keep a session's stored sets; an empty
@@ -205,7 +209,14 @@ describe("buildProfile", () => {
   });
 
   test("defaults trainingDays to an array when given a non-array", () => {
-    expect(buildProfile({ trainingDays: null }).trainingDays).toEqual([]);
+    // A value the schema refuses, which a direct caller can still pass.
+    expect(
+      buildProfile(
+        /** @type {Parameters<typeof buildProfile>[0]} */ (
+          /** @type {unknown} */ ({ trainingDays: null })
+        )
+      ).trainingDays
+    ).toEqual([]);
   });
 
   // A bare string is not a one-day selection. toCleanArray used to wrap a scalar
@@ -217,7 +228,14 @@ describe("buildProfile", () => {
   // caller can still reach it and the null case above cannot tell the two
   // implementations apart.
   test("does not treat a bare string as a one-day selection", () => {
-    expect(buildProfile({ trainingDays: "Monday" }).trainingDays).toEqual([]);
+    // A value the schema refuses, which a direct caller can still pass.
+    expect(
+      buildProfile(
+        /** @type {Parameters<typeof buildProfile>[0]} */ (
+          /** @type {unknown} */ ({ trainingDays: "Monday" })
+        )
+      ).trainingDays
+    ).toEqual([]);
   });
 
   test("accepts a goal from the allowed list", () => {
@@ -253,6 +271,9 @@ describe("buildProfile", () => {
   });
 
   test("still strips genuinely unknown fields", () => {
-    expect(buildProfile({ favouriteColour: "green" })).not.toHaveProperty("favouriteColour");
+    // A field the profile does not have, which the build must drop.
+    expect(
+      buildProfile(/** @type {Parameters<typeof buildProfile>[0]} */ ({ favouriteColour: "green" }))
+    ).not.toHaveProperty("favouriteColour");
   });
 });

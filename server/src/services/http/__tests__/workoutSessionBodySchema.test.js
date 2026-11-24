@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { validateBody, workoutSessionBodySchema } from "../apiSchemaService.js";
 
@@ -6,13 +7,23 @@ import { validateBody, workoutSessionBodySchema } from "../apiSchemaService.js";
 // ranges 006_exercise_sets.sql enforces. The schema refuses what the table
 // would, so a bad set is a 400 with a reason rather than a failed insert.
 
+// Each body whose data a test reads is one the schema accepts, and each read of
+// its sets follows a body that sent them.
+/** @typedef {import("zod").output<typeof workoutSessionBodySchema>} WorkoutBody */
+/** @typedef {WorkoutBody & { exerciseSets: NonNullable<WorkoutBody["exerciseSets"]> }} WithSets */
+
 const base = { date: "2026-11-05", duration: 45 };
+/** @param {Record<string, unknown>} fields */
 const set = (fields) => ({ reps: 8, seconds: null, loadKg: 60, rpe: 8, ...fields });
+/** @param {unknown} exerciseSets */
 const withSets = (exerciseSets) => ({ ...base, exerciseSets });
+/** @param {Record<string, unknown>} fields */
 const oneSet = (fields) => withSets([{ name: "Squat", sets: [set(fields)] }]);
 
 // What validateBody answers: the parsed body, or the 400's message.
+/** @param {unknown} body */
 const parse = (body) => {
+  /** @type {string | null} */
   let error = null;
   const res = {
     status: () => res,
@@ -32,13 +43,15 @@ describe("workoutSessionBodySchema's exerciseSets", () => {
       { name: "Plank", sets: [set({ reps: null, seconds: 30, loadKg: null, rpe: null })] }
     ];
 
-    expect(parse(withSets(exerciseSets)).data.exerciseSets).toEqual(exerciseSets);
+    expect(/** @type {WithSets} */ (parse(withSets(exerciseSets)).data).exerciseSets).toEqual(
+      exerciseSets
+    );
   });
 
   test("is optional, so the old body still validates", () => {
     const { data } = parse({ ...base, exercises: ["Squat"], sets: 3, reps: 8 });
 
-    expect(data.exerciseSets).toBeUndefined();
+    expect(/** @type {WorkoutBody} */ (data).exerciseSets).toBeUndefined();
   });
 
   test("accepts a card with a name and no sets", () => {
@@ -66,20 +79,27 @@ describe("workoutSessionBodySchema's exerciseSets", () => {
   ])("reads %s as absent in every number", (_label, blank) => {
     const { data } = parse(oneSet({ loadKg: blank, rpe: blank }));
 
-    expect(data.exerciseSets[0].sets[0]).toMatchObject({ reps: 8, loadKg: null, rpe: null });
+    expect(/** @type {WithSets} */ (data).exerciseSets[0].sets[0]).toMatchObject({
+      reps: 8,
+      loadKg: null,
+      rpe: null
+    });
   });
 
   test("reads a missing key as absent", () => {
     const { data } = parse(withSets([{ name: "Squat", sets: [{ reps: 5 }] }]));
 
-    expect(data.exerciseSets[0].sets[0].reps).toBe(5);
-    expect(data.exerciseSets[0].sets[0].loadKg ?? null).toBeNull();
+    expect(/** @type {WithSets} */ (data).exerciseSets[0].sets[0].reps).toBe(5);
+    expect(/** @type {WithSets} */ (data).exerciseSets[0].sets[0].loadKg ?? null).toBeNull();
   });
 
   test("keeps 0 reps and 0 kg", () => {
     const { data } = parse(oneSet({ reps: "0", loadKg: "0" }));
 
-    expect(data.exerciseSets[0].sets[0]).toMatchObject({ reps: 0, loadKg: 0 });
+    expect(/** @type {WithSets} */ (data).exerciseSets[0].sets[0]).toMatchObject({
+      reps: 0,
+      loadKg: 0
+    });
   });
 
   test.each([

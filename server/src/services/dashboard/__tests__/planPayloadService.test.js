@@ -1,3 +1,4 @@
+// @ts-check
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
@@ -17,11 +18,20 @@ const fixtureDir = new URL("./fixtures/plans/", import.meta.url);
 const fixtures = readdirSync(fixtureDir)
   .filter((name) => name.endsWith(".txt"))
   .sort();
+/** @param {string} name */
 const readFixture = (name) => readFileSync(new URL(name, fixtureDir), "utf8");
 
+// Each payload read back below keeps its plan, as the test asserts first, and
+// each bad value is one the read must drop.
+/** @typedef {import("../planPayloadService.js").PlanPayload} PlanPayload */
+/** @typedef {import("../planPayloadService.js").Prescription} Prescription */
+
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+/** @param {...string} lines */
 const plan = (...lines) => lines.join("\n");
+/** @param {string} text */
 const days = (text) => buildPlanPayload(text).days;
+/** @param {string} text */
 const notes = (text) => buildPlanPayload(text).notes;
 
 describe("buildPlanPayload", () => {
@@ -244,6 +254,7 @@ describe("toPlanPayload", () => {
     expect(toPlanPayload(payload)).toBe(payload);
   });
 
+  /** @param {object} change */
   const withDay = (change) => {
     const payload = valid();
     payload.days[0] = { ...payload.days[0], ...change };
@@ -332,11 +343,14 @@ describe("the days' prescriptions", () => {
     ["an entry that is not an object", "bench"]
   ])("drops a list holding %s, and keeps the plan", (_label, bad) => {
     const payload = withPrescriptions(buildPlanPayload(text), [
-      { weekday: "Monday", prescriptions: [bench, bad] },
+      {
+        weekday: "Monday",
+        prescriptions: /** @type {Prescription[]} */ (/** @type {unknown} */ ([bench, bad]))
+      },
       { weekday: "Tuesday", prescriptions: [plank] }
     ]);
 
-    const read = toPlanPayload(payload);
+    const read = /** @type {PlanPayload} */ (toPlanPayload(payload));
 
     expect(read).not.toBeNull();
     expect(read.days[0]).not.toHaveProperty("prescriptions");
@@ -346,8 +360,12 @@ describe("the days' prescriptions", () => {
 
   test("drops a prescriptions value that is not a list", () => {
     const payload = buildPlanPayload(text);
-    payload.days[0].prescriptions = { bench };
+    payload.days[0].prescriptions = /** @type {Prescription[]} */ (
+      /** @type {unknown} */ ({ bench })
+    );
 
-    expect(toPlanPayload(payload).days[0]).not.toHaveProperty("prescriptions");
+    expect(/** @type {PlanPayload} */ (toPlanPayload(payload)).days[0]).not.toHaveProperty(
+      "prescriptions"
+    );
   });
 });

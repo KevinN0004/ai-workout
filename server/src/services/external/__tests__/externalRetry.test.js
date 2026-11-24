@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 
@@ -7,38 +9,53 @@ import { createExternalDataService } from "../externalDataService.js";
 //
 // Driven through fetchOpenMeteo rather than by reaching for the internal
 // helper, so the tests exercise the surface the routes actually call. The cache
-// wrapper is a pass-through so the request runs on every call.
+// wrapper is a pass-through so the request runs on every call, answering
+// { data, cache } as the real readThroughExternalCache does.
 
+/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
+
+/** @type {ExternalDataDeps["readThroughExternalCache"]} */
 const passThroughCache = async ({ requestFn }) => ({
-  payload: await requestFn(),
-  cacheStatus: "miss"
+  data: await requestFn(),
+  cache: "miss"
 });
 
+/** @param {Partial<ExternalDataDeps>} [overrides] */
 const buildService = (overrides = {}) => {
   const metrics = { externalApiFailures: {}, externalApiRetries: {} };
-  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  // A real logger that writes nothing, its warn spied on.
+  const logger = pino({ level: "silent" });
+  vi.spyOn(logger, "warn");
   const recordExternalApiLatency = vi.fn();
-  const service = createExternalDataService({
-    cleanText: (value, maxLen = 200) =>
-      typeof value === "string" ? value.trim().slice(0, maxLen) : "",
-    toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-    readThroughExternalCache: passThroughCache,
-    buildExternalCacheKey: () => "key",
-    metrics,
-    logger,
-    toShortText: (value) => String(value ?? ""),
-    recordExternalApiLatency,
-    externalApiRetries: 2,
-    externalApiRetryBaseDelayMs: 1,
-    openMeteoBaseUrl: "https://example.invalid/forecast",
-    openMeteoTimeoutMs: 50,
-    openMeteoCacheTtlSec: 60,
-    ...overrides
-  });
+  // Built with only the settings its tests reach; the rest are never read.
+  const service = createExternalDataService(
+    /** @type {ExternalDataDeps} */ ({
+      cleanText: (value, maxLen = 200) =>
+        typeof value === "string" ? value.trim().slice(0, maxLen) : "",
+      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+      readThroughExternalCache: passThroughCache,
+      buildExternalCacheKey: () => "key",
+      metrics,
+      logger,
+      toShortText: (value) => String(value ?? ""),
+      recordExternalApiLatency,
+      externalApiRetries: 2,
+      externalApiRetryBaseDelayMs: 1,
+      openMeteoBaseUrl: "https://example.invalid/forecast",
+      openMeteoTimeoutMs: 50,
+      openMeteoCacheTtlSec: 60,
+      ...overrides
+    })
+  );
   return { service, metrics, logger, recordExternalApiLatency };
 };
 
+/** @param {unknown} body */
 const okResponse = (body) => ({ ok: true, status: 200, json: async () => body });
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
 const failResponse = (status, body = {}) => ({ ok: false, status, json: async () => body });
 
 beforeEach(() => {
@@ -60,7 +77,7 @@ describe("external request retry", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(metrics.externalApiRetries.openMeteo).toBeUndefined();
-    expect(result.payload).toBeTruthy();
+    expect(result.data).toBeTruthy();
   });
 
   test("retries a 5xx up to the configured limit, then gives up", async () => {
@@ -99,7 +116,7 @@ describe("external request retry", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(metrics.externalApiRetries.openMeteo).toBe(1);
-    expect(result.payload).toBeTruthy();
+    expect(result.data).toBeTruthy();
   });
 
   test("honours a retry budget of zero", async () => {
@@ -147,9 +164,10 @@ describe("external request retry", () => {
 
     await expect(service.fetchOpenMeteo({ latitude: 1 })).rejects.toThrow();
 
-    const retryLogs = logger.warn.mock.calls.filter(
-      ([entry]) => entry?.event === "external_api_retry"
-    );
+    // buildService spies on its logger's warn.
+    const retryLogs = /** @type {import("vitest").MockInstance} */ (
+      /** @type {unknown} */ (logger.warn)
+    ).mock.calls.filter(([entry]) => entry?.event === "external_api_retry");
     expect(retryLogs).toHaveLength(2);
     expect(retryLogs.map(([entry]) => entry.attempt)).toEqual([1, 2]);
     expect(retryLogs.every(([entry]) => entry.service === "openMeteo")).toBe(true);
@@ -165,7 +183,10 @@ describe("external request retry", () => {
 
     await expect(service.fetchOpenMeteo({ latitude: 1 })).rejects.toThrow();
 
-    const waits = logger.warn.mock.calls
+    // buildService spies on its logger's warn.
+    const waits = /** @type {import("vitest").MockInstance} */ (
+      /** @type {unknown} */ (logger.warn)
+    ).mock.calls
       .filter(([entry]) => entry?.event === "external_api_retry")
       .map(([entry]) => entry.waitTimeMs);
     expect(waits).toEqual([10, 20]);
@@ -178,7 +199,8 @@ describe("external request retry", () => {
 
     await service.fetchOpenMeteo({ latitude: 1, longitude: null, extra: "", keep: "yes" });
 
-    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    // The stub takes fetch's arguments, though its own signature names none.
+    const url = new URL(String(/** @type {import("vitest").Mock} */ (fetchMock).mock.calls[0][0]));
     expect(url.searchParams.get("latitude")).toBe("1");
     expect(url.searchParams.has("longitude")).toBe(false);
     expect(url.searchParams.has("extra")).toBe(false);

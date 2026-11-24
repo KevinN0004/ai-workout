@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 
@@ -9,7 +11,15 @@ import { createExternalDataService } from "../externalDataService.js";
 // __testables bag, which does not expose these two. The alternative was
 // widening a production export to make a test possible; the factory already
 // offers a seam, so it is used instead. Every dependency below is a stub: the
-// functions under test are pure and touch none of them.
+// functions under test are pure and touch none of them, so they are cast as a
+// whole.
+//
+// OpenAQ's answers are untrusted, so the functions read them as unknown, and each
+// station fixture is typed as loosely, so a test can break one on purpose. Each
+// projection a test reads keeps a list of stations.
+/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
+/** @typedef {import("../externalDataService.js").OpenAqLocations} OpenAqLocations */
+/** @typedef {{ id: number, distance?: unknown, coordinates?: unknown, datetimeLast?: unknown, sensors: { parameter?: unknown, [field: string]: unknown }[], [field: string]: unknown }} Station */
 const {
   pm25ToUsAqi,
   pm25NowCast,
@@ -24,19 +34,23 @@ const {
   isOutdoorFriendlyNow,
   weatherCodeToText,
   buildWorkoutRecommendation
-} = createExternalDataService({
-  cleanText: (value, maxLen = 120) =>
-    typeof value === "string" ? value.trim().slice(0, maxLen) : "",
-  toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-  readThroughExternalCache: async () => ({}),
-  buildExternalCacheKey: () => "",
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: { info() {}, warn() {}, error() {} },
-  toShortText: (value) => String(value ?? ""),
-  recordExternalApiLatency: () => {},
-  externalApiRetries: 0,
-  externalApiRetryBaseDelayMs: 0
-});
+} = createExternalDataService(
+  /** @type {ExternalDataDeps} */ (
+    /** @type {unknown} */ ({
+      cleanText: (value, maxLen = 120) =>
+        typeof value === "string" ? value.trim().slice(0, maxLen) : "",
+      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
+      readThroughExternalCache: async () => ({}),
+      buildExternalCacheKey: () => "",
+      metrics: { externalApiFailures: {}, externalApiRetries: {} },
+      logger: pino({ level: "silent" }),
+      toShortText: (value) => String(value ?? ""),
+      recordExternalApiLatency: () => {},
+      externalApiRetries: 0,
+      externalApiRetryBaseDelayMs: 0
+    })
+  )
+);
 
 describe("pm25ToUsAqi", () => {
   test("returns null rather than a number for absent input", () => {
@@ -105,7 +119,8 @@ describe("pm25ToUsAqi", () => {
     const values = samples.map(pm25ToUsAqi);
     values.forEach((value, index) => {
       if (index === 0) return;
-      expect(value).toBeGreaterThanOrEqual(values[index - 1]);
+      // Every sample is a usable concentration, so each one scores.
+      expect(value).toBeGreaterThanOrEqual(/** @type {number} */ (values[index - 1]));
     });
   });
 });
@@ -115,12 +130,17 @@ describe("pm25ToUsAqi", () => {
 const NOW = new Date("2026-03-02T12:10:00Z");
 
 // One OpenAQ hourly mean, ending `hoursAgo` whole hours before 12:00Z.
+/**
+ * @param {number} hoursAgo
+ * @param {unknown} value
+ */
 const hour = (hoursAgo, value) => ({
   value,
   period: { datetimeTo: { utc: new Date(Date.UTC(2026, 2, 2, 12 - hoursAgo)).toISOString() } }
 });
 
 // Twelve hourly means, newest first; a null is an hour with no value.
+/** @param {unknown[]} values */
 const series = (values) => values.map((value, hoursAgo) => hour(hoursAgo, value));
 
 describe("pm25NowCast", () => {
@@ -203,6 +223,10 @@ describe("pm25NowCast", () => {
   // The newest hour counts while it ended within the last four hours: the
   // clock reads 12:10, so an hour ending at 08:10 is just in, 08:09:59 just out.
   test("takes a newest hour that ended exactly four hours ago, and no older", () => {
+    /**
+     * @param {string} utc
+     * @param {unknown} value
+     */
     const endingAt = (utc, value) => ({ value, period: { datetimeTo: { utc } } });
     const older = [hour(5, 12), hour(6, 12)];
 
@@ -279,6 +303,7 @@ describe("nowCastHoursQuery", () => {
   });
 
   test("asks the same thing all hour", () => {
+    /** @param {string} utc */
     const at = (utc) => nowCastHoursQuery(Date.parse(utc));
 
     expect(at("2026-03-02T12:00:00Z")).toEqual(at("2026-03-02T12:59:59Z"));
@@ -291,7 +316,12 @@ describe("nowCastHoursQuery", () => {
 // of the live answers for New York, Los Angeles and London on 2026-10-27, with
 // illustrative positions and the clock pinned at 12:10Z.
 const AT = Date.parse("2026-03-02T12:10:00Z");
+/** @param {number} hours */
 const hoursBefore = (hours) => new Date(AT - hours * 3600000).toISOString();
+/**
+ * @param {{ id: number, sensors?: string[], last?: string, latitude?: unknown, longitude?: unknown, distance?: unknown }} fields
+ * @returns {Station}
+ */
 const candidate = ({ id, sensors = ["pm25"], last, latitude, longitude, distance = null }) => ({
   id,
   name: `Station ${id}`,
@@ -356,12 +386,22 @@ describe("openAqResultsTruncated", () => {
   });
 
   test.each([[undefined], [null], ["meta"]])("is false for a meta of %j", (meta) => {
-    expect(openAqResultsTruncated(meta, 5)).toBe(false);
+    // A meta that is missing or not an object, which the check must survive.
+    expect(
+      openAqResultsTruncated(
+        /** @type {OpenAqLocations["meta"]} */ (/** @type {unknown} */ (meta)),
+        5
+      )
+    ).toBe(false);
   });
 });
 
 // One station as OpenAQ's /v3/locations returns it: every field of the
 // documented location record, most of which nothing here reads.
+/**
+ * @param {number} id
+ * @returns {Station}
+ */
 const liveStation = (id) => ({
   id,
   name: `Station ${id}`,
@@ -413,10 +453,11 @@ const LA_POINT = { latitude: 34.0522, longitude: -118.2437 };
 describe("projectOpenAqStations", () => {
   test("keeps only what the station choice and the answer read", () => {
     const projected = projectOpenAqStations(
-      {
+      // OpenAQ's whole meta, of which the projection keeps the count.
+      /** @type {OpenAqLocations} */ ({
         meta: { name: "openaq-api", website: "/", page: 1, limit: 1000, found: 287 },
         results: [liveStation(7936)]
-      },
+      }),
       LA_POINT,
       LIVE_AT
     );
@@ -455,7 +496,8 @@ describe("projectOpenAqStations", () => {
     const noPm25 = liveStation(4);
     noPm25.sensors = noPm25.sensors.slice(1);
     const noSensorList = liveStation(6);
-    noSensorList.sensors = null;
+    // A station with no sensor list, which the projection must drop.
+    noSensorList.sensors = /** @type {Station["sensors"]} */ (/** @type {unknown} */ (null));
     const fresh = liveStation(5);
 
     const projected = projectOpenAqStations(
@@ -465,7 +507,7 @@ describe("projectOpenAqStations", () => {
     );
 
     expect(projected.meta).toEqual({ found: 6, returned: 6 });
-    expect(projected.results.map((station) => station.id)).toEqual([5]);
+    expect(/** @type {Station[]} */ (projected.results).map((station) => station.id)).toEqual([5]);
   });
 
   // Freshness varies by the hour: live on 2026-10-29 Los Angeles had 206 of 287
@@ -498,10 +540,10 @@ describe("projectOpenAqStations", () => {
     );
 
     expect(projected.meta).toEqual({ found: 24, returned: 24 });
-    expect(projected.results.map((station) => station.id)).toEqual([
+    expect(/** @type {Station[]} */ (projected.results).map((station) => station.id)).toEqual([
       119, 118, 117, 116, 115, 114, 113, 112, 111, 110
     ]);
-    expect(projected.results.map((station) => station.id)).toEqual(
+    expect(/** @type {Station[]} */ (projected.results).map((station) => station.id)).toEqual(
       rankFreshPm25Stations(list, LA_POINT, LIVE_AT)
         .slice(0, 10)
         .map(({ station }) => station.id)
@@ -517,7 +559,9 @@ describe("projectOpenAqStations", () => {
 
     const projected = projectOpenAqStations({ results: list }, LA_POINT, LIVE_AT);
 
-    expect(projected.results.map((station) => station.id)).toEqual([1, 2, 3]);
+    expect(/** @type {Station[]} */ (projected.results).map((station) => station.id)).toEqual([
+      1, 2, 3
+    ]);
     expect(projected.meta).toEqual({ returned: 3 });
   });
 
@@ -538,9 +582,9 @@ describe("projectOpenAqStations", () => {
     const list = [...unknown, ...known];
     const nowhere = { latitude: null, longitude: null };
 
-    const ids = projectOpenAqStations({ results: list }, nowhere, LIVE_AT).results.map(
-      (station) => station.id
-    );
+    const ids = /** @type {Station[]} */ (
+      projectOpenAqStations({ results: list }, nowhere, LIVE_AT).results
+    ).map((station) => station.id);
 
     expect(ids).toEqual([17, 16, 15, 14, 13, 12, 11, 10, 50, 51]);
     expect(ids).toEqual(
@@ -553,10 +597,13 @@ describe("projectOpenAqStations", () => {
   // The same four hours as the route: at 02:49, 22:49 the evening before is just
   // fresh and 22:48:59 just stale.
   test("keeps a station that reported exactly four hours ago, and no older", () => {
+    /** @param {string} utc */
     const at = (utc) => {
       const station = liveStation(1);
       station.datetimeLast = { utc };
-      return projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results.length;
+      return /** @type {Station[]} */ (
+        projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results
+      ).length;
     };
 
     expect(at("2026-10-26T22:49:00Z")).toBe(1);
@@ -589,15 +636,31 @@ describe("projectOpenAqStations", () => {
       sensors: [{ id: 2, parameter: { name: "pm25" } }, { parameter: null }, null]
     };
 
-    const [station] = projectOpenAqStations({ results: [sparse] }, LA_POINT, LIVE_AT).results;
+    const [station] = /** @type {Station[]} */ (
+      projectOpenAqStations({ results: [sparse] }, LA_POINT, LIVE_AT).results
+    );
 
     expect(station).toEqual(sparse);
     expect(station).not.toHaveProperty("name");
     expect(station).not.toHaveProperty("locality");
     expect(station.coordinates).not.toHaveProperty("longitude");
     expect(station.sensors[0].parameter).not.toHaveProperty("units");
-    expect(projectOpenAqStations({ meta: { page: 1 } }, LA_POINT, LIVE_AT)).toEqual({ meta: {} });
-    expect(projectOpenAqStations({ meta: null, results: "nope" }, LA_POINT, LIVE_AT)).toEqual({
+    // A meta with only fields the projection drops, then a meta and results of
+    // the wrong shape, which it passes through.
+    expect(
+      projectOpenAqStations(
+        /** @type {OpenAqLocations} */ ({ meta: { page: 1 } }),
+        LA_POINT,
+        LIVE_AT
+      )
+    ).toEqual({ meta: {} });
+    expect(
+      projectOpenAqStations(
+        /** @type {OpenAqLocations} */ (/** @type {unknown} */ ({ meta: null, results: "nope" })),
+        LA_POINT,
+        LIVE_AT
+      )
+    ).toEqual({
       meta: null,
       results: "nope"
     });
@@ -611,15 +674,24 @@ describe("projectOpenAqStations", () => {
       sensors: [{ id: 2, parameter: { name: "pm2.5", unit: "ug/m3", display_name: "PM2.5" } }]
     };
 
-    expect(projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results[0]).toEqual(
-      station
-    );
+    expect(
+      /** @type {Station[]} */ (
+        projectOpenAqStations({ results: [station] }, LA_POINT, LIVE_AT).results
+      )[0]
+    ).toEqual(station);
   });
 
   test.each([[undefined], [null], ["not json"], [[]], [{ results: "nope", meta: 3 }]])(
     "passes %j through as it came",
     (data) => {
-      expect(projectOpenAqStations(data, LA_POINT, LIVE_AT)).toEqual(data);
+      // An answer of the wrong shape, which the projection passes through.
+      expect(
+        projectOpenAqStations(
+          /** @type {OpenAqLocations} */ (/** @type {unknown} */ (data)),
+          LA_POINT,
+          LIVE_AT
+        )
+      ).toEqual(data);
     }
   );
 
@@ -631,6 +703,7 @@ describe("projectOpenAqStations", () => {
     full[2].datetimeLast = { utc: "2025-01-01T00:00:00Z", local: "x" };
     full[3].sensors = [];
     const origin = { latitude: 34.0522, longitude: -118.2437 };
+    /** @param {ReturnType<typeof rankFreshPm25Stations>} ranked */
     const ids = (ranked) => ranked.map(({ station, distanceM }) => [station.id, distanceM]);
 
     expect(
@@ -690,6 +763,11 @@ describe("rankFreshPm25Stations", () => {
   const NYC = { latitude: 40.7128, longitude: -74.006 };
   const LA = { latitude: 34.0522, longitude: -118.2437 };
   const LONDON = { latitude: 51.5074, longitude: -0.1278 };
+  /**
+   * @param {Station[]} locations
+   * @param {Parameters<typeof rankFreshPm25Stations>[1]} [origin]
+   * @param {number} [nowMs]
+   */
   const pick = (locations, origin = NYC, nowMs = AT) =>
     rankFreshPm25Stations(locations, origin, nowMs)[0] ?? null;
 
@@ -802,6 +880,7 @@ describe("rankFreshPm25Stations", () => {
   // The same four hours NowCast allows its newest hour: at 12:10, a station
   // last reporting at 08:10 is just fresh, 08:09:59 just stale.
   test("keeps a station that reported exactly four hours ago, and no older", () => {
+    /** @param {string} utc */
     const at = (utc) => [candidate({ id: 1, last: utc, distance: 100 })];
 
     expect(pick(at("2026-03-02T08:10:00Z"))).not.toBeNull();

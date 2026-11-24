@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   generatePlanBodySchema,
@@ -23,6 +24,10 @@ import {
 // 3.25.76 running these same schemas, not written from memory.
 
 // validateBody answers through res; capture what it would have sent.
+/**
+ * @param {import("zod").ZodType} schema
+ * @param {unknown} body
+ */
 const bodyError = (schema, body) => {
   let sent = null;
   const res = {
@@ -33,7 +38,8 @@ const bodyError = (schema, body) => {
     }
   };
   validateBody({ body }, res, schema);
-  return sent?.error;
+  // The json call above sets it, which the checker does not follow into the callback.
+  return /** @type {{ error?: string } | null} */ (sent)?.error;
 };
 
 const profile = {
@@ -44,6 +50,7 @@ const profile = {
   weightKg: 70,
   sex: "Male"
 };
+/** @param {Record<string, unknown>} overrides */
 const signup = (overrides) => ({ email: "a@b.c", password: "longenough", profile, ...overrides });
 
 describe("request body messages", () => {

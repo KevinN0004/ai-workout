@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { candidatesFor, generatePlan, prescribe, readInput } from "../generatePlan.js";
 import { buildPlanPayload } from "../../dashboard/planPayloadService.js";
@@ -7,7 +8,15 @@ import { isRestDay } from "../../../../../client/src/app/plans.js";
 // (docs/specs/2026-11-03-rule-based-plans-design.md, "The generator"), with its
 // tables as cases. scripts/evals/__tests__/generatePlan.gate.test.mjs checks the
 // invariants across every combination of planner answers.
+//
+// Each weekday looked up is one the plan schedules, and each finisher read is on
+// a day that has one, so each is cast as found.
+/** @typedef {import("../generatePlan.js").PlanInput} PlanInput */
+/** @typedef {import("../generatePlan.js").PlanDay} PlanDay */
+/** @typedef {import("../generatePlan.js").ChosenExercise} ChosenExercise */
+/** @typedef {import("../exerciseLibrary.js").Exercise} Exercise */
 
+/** @param {Partial<PlanInput>} [overrides] */
 const input = (overrides = {}) => ({
   goal: "Build lean strength and energy",
   environment: "Home",
@@ -22,7 +31,12 @@ const input = (overrides = {}) => ({
   ...overrides
 });
 
+/** @param {Partial<PlanInput>} overrides */
 const trainingDays = (overrides) => generatePlan(input(overrides)).week.filter((d) => d.type);
+/**
+ * @param {string} text
+ * @param {string} weekday
+ */
 const dayLines = (text, weekday) => {
   const days = buildPlanPayload(text).days;
   return days.find((day) => day.weekday === weekday)?.lines ?? [];
@@ -123,6 +137,7 @@ describe("step 2: the training weekdays", () => {
 });
 
 describe("step 3: the day types", () => {
+  /** @type {Record<string, [Partial<PlanInput>, string[]]>} */
   const SEQUENCES = {
     "lean, intermediate": [
       { goal: "Build lean strength and energy", level: "Intermediate" },
@@ -168,7 +183,16 @@ describe("step 3: the day types", () => {
 
   test.each(
     Object.entries(SEQUENCES).flatMap(([label, [overrides, rows]]) =>
-      rows.map((row, index) => [label, index + 1, row, overrides])
+      rows.map(
+        (row, index) =>
+          // One test.each case: the label, the days, the row and the planner's fields.
+          /** @type {[string, number, string, Partial<PlanInput>]} */ ([
+            label,
+            index + 1,
+            row,
+            overrides
+          ])
+      )
     )
   )("%s, %i days: %s", (_label, days, row, overrides) => {
     expect(trainingDays({ ...overrides, days }).map((day) => day.type)).toEqual(row.split(" "));
@@ -180,6 +204,7 @@ describe("step 3: the day types", () => {
     );
   });
 
+  /** @type {[Partial<PlanInput>, number, string][]} */
   const FOCUS = [
     [{ level: "Intermediate" }, 3, "FB FB M"],
     [{ level: "Intermediate" }, 4, "U L FB M"],
@@ -234,8 +259,14 @@ describe("step 3: the day types", () => {
 });
 
 describe("step 4: the slots and the session's length", () => {
+  /**
+   * @param {Partial<PlanInput>} overrides
+   * @param {string} [weekday]
+   */
   const exercisesOn = (overrides, weekday = "Monday") =>
-    generatePlan(input(overrides)).week.find((day) => day.weekday === weekday).exercises;
+    /** @type {PlanDay} */ (
+      generatePlan(input(overrides)).week.find((day) => day.weekday === weekday)
+    ).exercises;
 
   test("a full-body day puts a leg, a push, a hinge and a pull first", () => {
     expect(exercisesOn({}).map((e) => e.pattern)).toEqual([
@@ -312,6 +343,13 @@ describe("step 4: the slots and the session's length", () => {
 });
 
 describe("step 5: choosing an exercise", () => {
+  /**
+   * @param {string} id
+   * @param {string} pattern
+   * @param {string[]} [needs]
+   * @param {string} [level]
+   * @param {Partial<Exercise>} [extra]
+   */
   const ex = (id, pattern, needs = [], level = "beginner", extra = {}) => ({
     id,
     name: id.replace(/-/g, " "),
@@ -323,7 +361,12 @@ describe("step 5: choosing an exercise", () => {
     supine: false,
     ...extra
   });
+  /**
+   * @param {string} pattern
+   * @param {string} prefix
+   */
   const fill = (pattern, prefix) => [ex(`${prefix}-a`, pattern), ex(`${prefix}-b`, pattern)];
+  /** @type {Exercise[]} */
   const base = [
     ...fill("horizontal-push", "push"),
     ...fill("hinge", "hinge"),
@@ -331,10 +374,15 @@ describe("step 5: choosing an exercise", () => {
     ...fill("single-leg", "leg"),
     ...fill("core", "core"),
     ...fill("arms", "arm"),
-    ...fill("conditioning", "cond").map((e) => ({ ...e, impact: "low" })),
+    // The map would widen the literal to a string; impact is one of two.
+    ...fill("conditioning", "cond").map((e) => ({ ...e, impact: /** @type {const} */ ("low") })),
     ...fill("balance", "bal"),
     ...fill("mobility", "mob")
   ];
+  /**
+   * @param {ReturnType<typeof ex>[]} squats
+   * @param {Partial<PlanInput>} [overrides]
+   */
   const firstSquat = (squats, overrides = {}) =>
     generatePlan(input({ days: 1, ...overrides }), [...squats, ...base]).week[2].exercises[0];
 
@@ -410,8 +458,11 @@ describe("step 5: choosing an exercise", () => {
       ex("hops", "conditioning", [], "beginner", { impact: "high" }),
       ex("steps", "conditioning", [], "beginner", { impact: "low" })
     ];
+    /** @param {Partial<PlanInput>} overrides */
     const finisher = (overrides) =>
-      generatePlan(input({ days: 1, ...overrides }), library).week[2].finisher.id;
+      /** @type {ChosenExercise} */ (
+        generatePlan(input({ days: 1, ...overrides }), library).week[2].finisher
+      ).id;
     expect(finisher({})).toBe("hops");
     expect(finisher({ injuries: "Knee" })).toBe("steps");
     expect(finisher({ health: { pregnant: true } })).toBe("steps");
@@ -419,10 +470,16 @@ describe("step 5: choosing an exercise", () => {
 });
 
 describe("step 6: the prescription", () => {
+  /** @param {Partial<PlanInput> & { weekday?: string }} overrides */
   const main = (overrides) =>
     dayLines(generatePlan(input(overrides)).text, overrides.weekday ?? "Monday");
+  /**
+   * @param {string[]} lines
+   * @param {string} heading
+   */
   const lineAfter = (lines, heading) => lines[lines.indexOf(heading) + 1];
   // The dose a line prescribes: everything after its exercise name.
+  /** @param {string} line */
   const doseOf = (line) => line.slice(line.indexOf(": ") + 2);
 
   test.each([
@@ -501,6 +558,7 @@ describe("step 6: the prescription", () => {
 });
 
 describe("step 7: conditioning", () => {
+  /** @param {Partial<PlanInput>} overrides */
   const hardDays = (overrides) =>
     generatePlan(input(overrides))
       .week.filter((day) => day.hard)
@@ -524,6 +582,7 @@ describe("step 7: conditioning", () => {
   });
 
   test("a conditioning day opens with the level's interval block", () => {
+    /** @param {string} level */
     const lines = (level) =>
       dayLines(generatePlan(input({ goal: "Cardio", days: 3, level })).text, "Wednesday");
     expect(lines("Beginner").join("\n")).toMatch(/8 x 30 seconds hard, 60 seconds easy/);
@@ -669,6 +728,11 @@ describe("step 9: rest days and the weekly target", () => {
 });
 
 describe("the edges", () => {
+  /**
+   * @param {string} id
+   * @param {string} pattern
+   * @param {Partial<Exercise>} [extra]
+   */
   const ex = (id, pattern, extra = {}) => ({
     id,
     name: id.replace(/-/g, " "),
@@ -690,7 +754,12 @@ describe("the edges", () => {
   ];
 
   test("reads missing or unusable fields as the route's defaults", () => {
-    const rules = readInput({ goal: 7, focuses: "Strength", days: undefined, duration: "x" });
+    // Answers of the wrong type, which the read must replace with defaults.
+    const rules = readInput(
+      /** @type {PlanInput} */ (
+        /** @type {unknown} */ ({ goal: 7, focuses: "Strength", days: undefined, duration: "x" })
+      )
+    );
     expect(rules).toMatchObject({ track: "lean", strengthFocus: false, days: 3, minutes: 45 });
   });
 
@@ -758,7 +827,11 @@ describe("the edges", () => {
 // prescription against its line across both sweeps.
 describe("the prescriptions", () => {
   const knee = generatePlan(input({ injuries: "Knee" })).week;
-  const day = (week, weekday) => week.find((d) => d.weekday === weekday);
+  /**
+   * @param {PlanDay[]} week
+   * @param {string} weekday
+   */
+  const day = (week, weekday) => /** @type {PlanDay} */ (week.find((d) => d.weekday === weekday));
   const older = generatePlan(
     input({ equipment: ["Bodyweight only"], level: "Beginner", days: 2, duration: 30, age: 70 })
   ).week;
@@ -894,6 +967,13 @@ describe("the prescriptions", () => {
 // not yet used. prescribe writes a prescription and its line as the generator
 // does, so a swap writes them the same way.
 describe("candidatesFor and prescribe", () => {
+  /**
+   * @param {string} id
+   * @param {string} pattern
+   * @param {string[]} [needs]
+   * @param {string} [level]
+   * @param {Partial<Exercise>} [extra]
+   */
   const ex = (id, pattern, needs = [], level = "beginner", extra = {}) => ({
     id,
     name: id.replace(/-/g, " "),
@@ -906,7 +986,9 @@ describe("candidatesFor and prescribe", () => {
     ...extra
   });
   // Home with dumbbells and a bench, at intermediate.
+  /** @param {Partial<PlanInput>} [overrides] */
   const rules = (overrides) => readInput(input(overrides));
+  /** @param {{ id: string }[]} candidates */
   const ids = (candidates) => candidates.map((candidate) => candidate.id);
 
   test("lists every entry of the pattern that fits, in priority order", () => {
@@ -972,7 +1054,8 @@ describe("candidatesFor and prescribe", () => {
 
   test("prescribe writes the prescription and line the generator writes", () => {
     const plan = generatePlan(input({ injuries: "Knee" }));
-    const monday = plan.week.find((day) => day.weekday === "Monday");
+    const monday = /** @type {PlanDay} */ (plan.week.find((day) => day.weekday === "Monday"));
+    /** @param {string} name */
     const lineOf = (name) => monday.lines.find((line) => line.startsWith(`- ${name}: `));
     const [squat, , hinge] = monday.exercises;
 
@@ -988,7 +1071,8 @@ describe("candidatesFor and prescribe", () => {
 
   test("prescribe writes a superset label before the name", () => {
     const plan = generatePlan(input());
-    const [lead] = plan.week.find((day) => day.weekday === "Monday").exercises;
+    const [lead] = /** @type {PlanDay} */ (plan.week.find((day) => day.weekday === "Monday"))
+      .exercises;
     const { line } = prescribe(lead, "main", plan.rules, "A1");
     expect(line.startsWith(`- A1. ${lead.name}: `)).toBe(true);
   });
@@ -1002,10 +1086,14 @@ describe("candidatesFor and prescribe", () => {
     const older = generatePlan(
       input({ equipment: ["Bodyweight only"], level: "Beginner", days: 2, duration: 30, age: 70 })
     ).week;
+    /**
+     * @param {PlanDay[]} week
+     * @param {string} weekday
+     */
     const pairs = (week, weekday) =>
-      week
-        .find((day) => day.weekday === weekday)
-        .prescriptions.map((prescription) => [prescription.exerciseId, prescription.role]);
+      /** @type {PlanDay} */ (week.find((day) => day.weekday === weekday)).prescriptions.map(
+        (prescription) => [prescription.exerciseId, prescription.role]
+      );
 
     expect(pairs(knee, "Monday")).toEqual([
       ["dumbbell-box-squat", "main"],

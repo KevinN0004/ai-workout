@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { generatePlan } from "../generatePlan.js";
 import {
@@ -14,6 +15,9 @@ import {
 // "The coach notes"): the notes that stand in when Gemini's cannot be used, and
 // the safety lines every plan carries whoever wrote the rest.
 
+/** @typedef {Parameters<typeof generatePlan>[0]} PlanInput */
+
+/** @param {Partial<PlanInput>} [overrides] */
 const input = (overrides = {}) => ({
   goal: "Build lean strength and energy",
   environment: "Home",
@@ -27,7 +31,9 @@ const input = (overrides = {}) => ({
   age: null,
   ...overrides
 });
+/** @param {Partial<PlanInput>} overrides */
 const fallback = (overrides) => buildFallbackNotes(generatePlan(input(overrides)));
+/** @param {Partial<PlanInput>} overrides */
 const safety = (overrides) => buildSafetyNotes(generatePlan(input(overrides)));
 
 describe("buildFallbackNotes", () => {

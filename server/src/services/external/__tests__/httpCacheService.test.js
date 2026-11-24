@@ -1,5 +1,13 @@
+// @ts-check
+import pino from "pino";
 import { describe, expect, test, vi } from "vitest";
 import { createHttpCacheService } from "../httpCacheService.js";
+
+// Each harness's metrics hold only the cache's own counters, and its fake Redis
+// only the commands the cache sends. Each logger is a real one that writes
+// nothing, its warn spied on.
+/** @typedef {Parameters<typeof createHttpCacheService>[0]} CacheDeps */
+/** @typedef {NonNullable<ReturnType<import("../../platform/rateLimitStore.js").GetRedisClient>>} RedisClient */
 
 const createCacheHarness = () => {
   const metrics = {
@@ -11,7 +19,12 @@ const createCacheHarness = () => {
       evictions: 0
     }
   };
-  const logger = { warn: vi.fn() };
+  const logger = pino({ level: "silent" });
+  vi.spyOn(logger, "warn");
+  /**
+   * @param {unknown} value
+   * @param {number} fallback
+   */
   const toPositiveInt = (value, fallback) => {
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -20,7 +33,7 @@ const createCacheHarness = () => {
     metrics,
     logger,
     cache: createHttpCacheService({
-      metrics,
+      metrics: /** @type {CacheDeps["metrics"]} */ (metrics),
       logger,
       toShortText: (value) => String(value || ""),
       toPositiveInt,
@@ -131,11 +144,17 @@ const createFakeRedis = () => {
   };
 };
 
+/** @param {{ isReady: boolean }} client */
 const createRedisCacheHarness = (client) => {
   const metrics = {
     externalCache: { hits: 0, misses: 0, staleHits: 0, writes: 0, evictions: 0 }
   };
-  const logger = { warn: vi.fn(), error: vi.fn() };
+  const logger = pino({ level: "silent" });
+  vi.spyOn(logger, "warn");
+  /**
+   * @param {unknown} value
+   * @param {number} fallback
+   */
   const toPositiveInt = (value, fallback) => {
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -144,13 +163,13 @@ const createRedisCacheHarness = (client) => {
     metrics,
     logger,
     cache: createHttpCacheService({
-      metrics,
+      metrics: /** @type {CacheDeps["metrics"]} */ (metrics),
       logger,
       toShortText: (value) => String(value || ""),
       toPositiveInt,
       maxEntries: 5,
       defaultStaleTtlSec: 60,
-      getRedisClient: () => client
+      getRedisClient: () => /** @type {RedisClient} */ (/** @type {unknown} */ (client))
     })
   };
 };
@@ -184,6 +203,7 @@ describe("httpCacheService backed by Redis", () => {
   });
 });
 
+/** @param {{ freshForMs: number, staleForMs: number, payload: unknown }} entry */
 const redisEntry = ({ freshForMs, staleForMs, payload }) => {
   const now = Date.now();
   return JSON.stringify({
@@ -218,9 +238,9 @@ describe("httpCacheService when Redis misbehaves", () => {
       requestFn: async () => ({ ok: 1 })
     });
 
-    const outages = logger.warn.mock.calls.filter(
-      ([fields]) => fields?.event === "external_cache_redis_error"
-    );
+    const outages = /** @type {import("vitest").MockInstance} */ (
+      /** @type {unknown} */ (logger.warn)
+    ).mock.calls.filter(([fields]) => fields?.event === "external_cache_redis_error");
     expect(outages).toHaveLength(1);
     expect(outages[0][0].operation).toBe("read");
   });

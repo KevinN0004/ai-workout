@@ -902,7 +902,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 266;
+  const TYPE_CHECKED_FILES = 290;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -981,6 +981,26 @@ describe("type-checked files", () => {
     const unchecked = pages.filter((source) => !checked.includes(source)).map(({ file }) => file);
     expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
   });
+
+  // D1 phase 5: every test file is checked by its workspace's test program, so a
+  // test added there is checked from its first commit
+  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, "Tests").
+  /** @param {string} workspace */
+  const expectTestsChecked = (workspace) => {
+    const tests = sources.filter(
+      ({ file }) =>
+        file.startsWith(`${workspace}/src/`) &&
+        (isTest(file) || file.startsWith("client/src/test/"))
+    );
+    expect(tests.length, "the sweep found too few test files").toBeGreaterThanOrEqual(
+      workspace === "client" ? 118 : 88
+    );
+    const unchecked = tests.filter((source) => !checked.includes(source)).map(({ file }) => file);
+    expect(unchecked, "add // @ts-check to each, below its header if it has one").toEqual([]);
+  };
+  test("every server test file is checked", () => expectTestsChecked("server"));
+  // The client's tests are checked by Task 12 of the plan, which unskips this.
+  test.skip("every client test file is checked", () => expectTestsChecked("client"));
 
   // D1 phase 5: the test program has noImplicitAny off, which leaves a `let` with
   // no initializer as any, so nothing done with it is checked. Each one in a

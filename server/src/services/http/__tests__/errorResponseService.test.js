@@ -1,4 +1,6 @@
+// @ts-check
 import express from "express";
+import pino from "pino";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { sendErrorResponse, setErrorResponseTracker } from "../errorResponseService.js";
@@ -8,16 +10,28 @@ import { createErrorHandler } from "../../../middleware/errorHandler.js";
 // masked payload, the log line, and the report to error tracking for a 5xx.
 // The tracker is a stub that records what it is given; the logger is a stub
 // on the request, as requestContext.js attaches the real one.
+//
+// Each fake request and response holds only the fields the service reads and
+// writes, and a response's body is read only after the service has sent it.
+/** @typedef {import("express").Response & { body: ErrorBody }} FakeResponse */
+/** @typedef {import("../errorResponseService.js").ErrorBody} ErrorBody */
 
+/** @type {import("vitest").Mock} */
 let capture;
 
-const buildReq = (overrides = {}) => ({
-  requestId: "req-1",
-  method: "POST",
-  originalUrl: "/api/thing",
-  log: { error: vi.fn() },
-  ...overrides
-});
+/** @param {Partial<import("express").Request>} [overrides] */
+const buildReq = (overrides = {}) => {
+  // A real logger that writes nothing, its error spied on.
+  const log = pino({ level: "silent" });
+  vi.spyOn(log, "error");
+  return /** @type {import("express").Request} */ ({
+    requestId: "req-1",
+    method: "POST",
+    originalUrl: "/api/thing",
+    log,
+    ...overrides
+  });
+};
 
 const buildRes = () => {
   const res = {
@@ -32,7 +46,7 @@ const buildRes = () => {
       return res;
     })
   };
-  return res;
+  return /** @type {FakeResponse} */ (/** @type {unknown} */ (res));
 };
 
 beforeEach(() => {
@@ -71,7 +85,11 @@ describe("reporting to error tracking", () => {
     sendErrorResponse(req, buildRes(), new Error("upstream broke"), 500);
 
     expect(capture.mock.calls[0][1].path).toBe("/api/air-quality/current");
-    expect(req.log.error.mock.calls[0][0].path).toBe("/api/air-quality/current");
+    // buildReq spies on each request's error.
+    expect(
+      /** @type {import("vitest").MockInstance} */ (/** @type {unknown} */ (req.log.error)).mock
+        .calls[0][0].path
+    ).toBe("/api/air-quality/current");
   });
 
   test("reports a 503 too", () => {
@@ -93,7 +111,13 @@ describe("reporting to error tracking", () => {
   test("reports a status that is not an integer as the 500 it answers", () => {
     const res = buildRes();
 
-    sendErrorResponse(buildReq(), res, new Error("boom"), "teapot");
+    // A status that is not a number, which the service must survive.
+    sendErrorResponse(
+      buildReq(),
+      res,
+      new Error("boom"),
+      /** @type {number} */ (/** @type {unknown} */ ("teapot"))
+    );
 
     expect(res.statusCode).toBe(500);
     expect(capture).toHaveBeenCalledWith(
@@ -135,7 +159,7 @@ describe("reporting to error tracking", () => {
     });
     app.use(
       createErrorHandler({
-        logger: { error: vi.fn() },
+        logger: pino({ level: "silent" }),
         toShortText: (value) => String(value ?? ""),
         captureException: capture
       })
