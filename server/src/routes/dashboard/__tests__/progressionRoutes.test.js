@@ -16,6 +16,9 @@ const NOW = new Date("2026-11-09T12:00:00Z");
 // The user holds the id the routes read, the stub mapper hands the doc back as
 // is, so it is cast through unknown, and the logger is a real one that writes
 // nothing.
+/**
+ * @param {Partial<Parameters<typeof registerProgressionRoutes>[1]>} [overrides]
+ */
 const buildApp = (overrides = {}) => {
   const app = express();
   app.use(express.json());
@@ -42,6 +45,9 @@ const buildApp = (overrides = {}) => {
   return app;
 };
 
+/**
+ * @param {import("express").Express} app
+ */
 const routes = (app) => [
   request(app).get("/api/dashboard/progression"),
   request(app)

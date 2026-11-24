@@ -9,11 +9,18 @@ import { prisma } from "../../../../db/prisma.js";
 // name compared case-insensitively), removal by id, and that one user cannot
 // remove another's.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -36,9 +43,19 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {object} body
+ */
 const save = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/saved-exercises").set("X-CSRF-Token", csrfToken).send(body);
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {string} id
+ */
 const remove = (agent, csrfToken, id) =>
   agent.delete(`/api/dashboard/saved-exercises/${id}`).set("X-CSRF-Token", csrfToken);
 

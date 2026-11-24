@@ -20,6 +20,9 @@ let running = [];
 // so deleting one and re-importing hands the app whatever the environment file
 // says rather than the empty allowlist the test asked for. Setting it to an
 // empty string leaves it present, which dotenv leaves alone.
+/**
+ * @param {string} [clientOrigin]
+ */
 const startApp = async (clientOrigin) => {
   vi.resetModules();
   const previous = [process.env.CLIENT_ORIGIN, process.env.CLIENT_ORIGINS];
@@ -46,10 +49,18 @@ const startApp = async (clientOrigin) => {
   return `http://127.0.0.1:${/** @type {import("node:net").AddressInfo} */ (server.address()).port}`;
 };
 
+/**
+ * @param {string} baseUrl
+ * @param {string} [origin]
+ */
 const get = (baseUrl, origin) =>
   fetch(`${baseUrl}/api/health`, origin === undefined ? {} : { headers: { Origin: origin } });
 
 // Sends a request with headers fetch will not let a test choose (Host).
+/**
+ * @param {string} baseUrl
+ * @param {Record<string, string>} headers
+ */
 const rawGet = (baseUrl, headers) =>
   new Promise((resolve, reject) => {
     const req = http.get(`${baseUrl}/api/health`, { headers }, (res) => {
@@ -61,6 +72,10 @@ const rawGet = (baseUrl, headers) =>
 
 // Sends an HTTP/1.0 request with no Host header at all, which node's server
 // accepts only for 1.0, and resolves with the status code.
+/**
+ * @param {string} baseUrl
+ * @param {string} origin
+ */
 const getWithoutHost = (baseUrl, origin) =>
   new Promise((resolve, reject) => {
     const { port } = new URL(baseUrl);

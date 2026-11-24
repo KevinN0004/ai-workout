@@ -12,11 +12,18 @@ import { buildPlanPayload } from "../../../../services/dashboard/planPayloadServ
 // dashboard the route answers with, its workouts newest first and with no
 // duplicate ids.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -39,6 +46,12 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {object} body
+ * @param {string} [path]
+ */
 const postWorkout = (agent, csrfToken, body, path = "/api/dashboard/workout-sessions") =>
   agent.post(path).set("X-CSRF-Token", csrfToken).send(body);
 
@@ -215,6 +228,9 @@ describe("POST /api/dashboard/workout-sessions", () => {
     );
 
     // Each test signs the user up before it reads the row.
+    /**
+     * @param {string} email
+     */
     const userPkOf = async (email) =>
       /** @type {import("@prisma/client").AppUser} */ (
         await prisma.appUser.findFirst({ where: { email } })
@@ -236,6 +252,9 @@ describe("POST /api/dashboard/workout-sessions", () => {
         }
       });
 
+    /**
+     * @param {Record<string, unknown>} [link]
+     */
     const workout = (link) => ({ date: "2026-05-12", focus: "Monday", duration: 30, ...link });
     const storedLink = async () => {
       const [row] = await prisma.workoutSession.findMany();

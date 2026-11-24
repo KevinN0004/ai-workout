@@ -20,6 +20,9 @@ const {
 
 const EMAILS = ["strava-import-a@example.com", "strava-import-b@example.com"];
 
+/**
+ * @param {string} email
+ */
 const createUser = (email) => prisma.appUser.create({ data: { email, passwordHash: "x" } });
 
 const RUN = {
@@ -33,11 +36,18 @@ const RUN = {
   averageHeartrate: 148.2
 };
 
+/**
+ * @param {string} userId
+ * @param {string} [date]
+ */
 const appSession = (userId, date = "2026-11-12") =>
   prisma.workoutSession.create({
     data: { userId, workoutDate: new Date(`${date}T00:00:00Z`), focus: "Upper body" }
   });
 
+/**
+ * @param {string} userId
+ */
 const rowsOf = (userId) =>
   prisma.workoutSession.findMany({ where: { userId }, orderBy: { createdAt: "asc" } });
 

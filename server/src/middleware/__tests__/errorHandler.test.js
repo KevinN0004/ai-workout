@@ -23,12 +23,18 @@ let toShortText;
 /** @type {import("vitest").Mock} */
 let captureException;
 
+/**
+ * @param {Partial<Parameters<typeof createErrorHandler>[0]>} [overrides]
+ */
 const build = (overrides = {}) =>
   createErrorHandler({ logger, toShortText, captureException, ...overrides });
 
 // statusCode and body start null, and status() and json() set them before any
 // test reads them. The handler touches nothing else on a Response, so the fake
 // is cast through unknown.
+/**
+ * @param {{ headersSent?: boolean }} [options]
+ */
 const buildRes = ({ headersSent = false } = {}) => {
   const res =
     /** @type {import("express").Response & { body: import("../../services/http/errorResponseService.js").ErrorBody }} */ (

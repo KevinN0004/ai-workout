@@ -21,6 +21,11 @@ const createUserAndPlan = async () => {
 
 // Raw SQL, so the test exercises the database's own rules rather than the
 // Prisma model's.
+/**
+ * @param {string} userId
+ * @param {string | null} planId
+ * @param {number | null} dayIndex
+ */
 const insertSession = (userId, planId, dayIndex) =>
   prisma.$executeRaw`
     insert into workout_sessions (user_id, generated_plan_id, plan_day_index)
@@ -29,6 +34,9 @@ const insertSession = (userId, planId, dayIndex) =>
 
 // $queryRaw takes its row type only as a type argument, which JavaScript cannot
 // pass, so each result here is cast to the columns its query selects.
+/**
+ * @param {string} userId
+ */
 const linkOf = async (userId) =>
   /** @type {Array<{ plan_id: string | null, plan_day_index: number | null }>} */ (
     await prisma.$queryRaw`

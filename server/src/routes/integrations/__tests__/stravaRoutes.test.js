@@ -15,6 +15,9 @@ const STATE_PATH = "/api/integrations/strava";
 const CALLBACK = `${STATE_PATH}/callback`;
 const STATE = "state-from-cookie";
 
+/**
+ * @param {Record<string, import("vitest").Mock>} [overrides]
+ */
 const stubService = (overrides = {}) => ({
   connectionState: vi.fn(async () => ({ available: true, connected: false })),
   authorizeUrl: vi.fn(
@@ -64,6 +67,11 @@ const buildApp = ({
     req.log = logger.logger;
     next();
   });
+  /**
+   * @param {import("express").Request} req
+   * @param {import("express").Response} res
+   * @param {import("express").NextFunction} next
+   */
   const signedIn = (req, res, next) => {
     if (!user) return res.status(401).json({ error: "Not signed in." });
     req.user = /** @type {import("../../../services/auth/authUserService.js").AuthUser} */ (user);
@@ -99,6 +107,11 @@ const buildApp = ({
 };
 
 // The callback with `query`, sent with the state cookie unless `cookie` says otherwise.
+/**
+ * @param {import("express").Express} app
+ * @param {Record<string, string>} query
+ * @param {string} [cookie]
+ */
 const callback = (app, query, cookie = `stravaState=${STATE}`) => {
   const call = request(app).get(`${CALLBACK}?${new URLSearchParams(query)}`);
   return cookie ? call.set("Cookie", cookie) : call;
@@ -106,8 +119,16 @@ const callback = (app, query, cookie = `stravaState=${STATE}`) => {
 
 const GOOD = { code: "code-xyz", state: STATE, scope: "read,activity:read_all" };
 
+/**
+ * @param {import("supertest").Response} response
+ */
 const redirectOf = (response) => response.headers.location;
-const cookiesOf = (response) => [].concat(response.headers["set-cookie"] || []);
+/**
+ * @param {import("supertest").Response} response
+ */
+const cookiesOf = (response) =>
+  // Set-Cookie is one string or a list of them.
+  /** @type {string[]} */ ([]).concat(response.headers["set-cookie"] || []);
 
 describe("GET /api/integrations/strava", () => {
   test("answers the service's state for the signed-in user", async () => {

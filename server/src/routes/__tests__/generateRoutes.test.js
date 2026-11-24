@@ -83,6 +83,9 @@ const buildApp = (overrides = {}, { user, requestId, log } = {}) => {
   return app;
 };
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const body = (overrides = {}) => ({
   goal: "Build lean strength and energy",
   environment: "Home",
@@ -102,9 +105,18 @@ const post = (app, payload = body()) => request(app).post("/api/generate").send(
 
 // The notes request sent to the model, and the notes section of an answer.
 const requestSent = () => generateContent.mock.calls[0][0];
+/**
+ * @param {string} text
+ */
 const notesOf = (text) =>
   text.slice(text.indexOf("Coach Notes:\n") + "Coach Notes:\n".length).split("\n");
+/**
+ * @param {Omit<Parameters<typeof generatePlan>[0], "health" | "age">} fields
+ */
 const ruleText = (fields) => generatePlan({ health: {}, age: null, ...fields }).text;
+/**
+ * @param {ReturnType<typeof spiedLogger>} log
+ */
 const noteLog = (log) =>
   log.info.mock.calls.find(([entry]) => entry?.event === "generate_notes")?.[0];
 

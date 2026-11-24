@@ -15,6 +15,9 @@ const { saveWorkoutSession } = createWorkoutSessionRepository({ prisma });
 /** @typedef {ReturnType<typeof mapWorkoutSession>} SessionEntry */
 /** @typedef {import("../workoutSessionRepository.js").WorkoutSessionRow} WorkoutSessionRow */
 
+/**
+ * @param {string} email
+ */
 const createUser = (email) =>
   prisma.appUser.create({ data: { email, passwordHash: "x", legacyUserId: email } });
 
@@ -37,6 +40,10 @@ const benchRead = tagged(bench, "horizontal-push");
 const plankRead = tagged(plank);
 
 // Each test creates the user it saves for, so every save returns the session.
+/**
+ * @param {string} userId
+ * @param {Record<string, unknown>} session
+ */
 const save = (userId, session) =>
   /** @type {Promise<SessionEntry>} */ (
     saveWorkoutSession({
@@ -45,6 +52,9 @@ const save = (userId, session) =>
     })
   );
 
+/**
+ * @param {string} userId
+ */
 const setRowsOf = (userId) =>
   prisma.exerciseSet.findMany({
     where: { userId },
@@ -85,6 +95,11 @@ describe("a session's sets", () => {
     const sessionId = /** @type {import("@prisma/client").WorkoutSession} */ (
       await prisma.workoutSession.findFirst({ where: { userId: user.id } })
     ).id;
+    /**
+     * @param {number} exerciseOrder
+     * @param {number} setNumber
+     * @param {number} reps
+     */
     const row = (exerciseOrder, setNumber, reps) => ({
       sessionId,
       userId: user.id,
@@ -213,6 +228,9 @@ describe("the exercise_sets checks", () => {
     sessionId = (await prisma.workoutSession.create({ data: { userId } })).id;
   });
 
+  /**
+   * @param {Partial<import("@prisma/client").Prisma.ExerciseSetUncheckedCreateInput>} fields
+   */
   const insert = (fields) =>
     prisma.exerciseSet.create({
       data: {
@@ -263,6 +281,9 @@ describe("the exercise_sets checks", () => {
 // every read, so the client can count sets per muscle group. A name typed by
 // hand, which the library does not hold, carries null.
 describe("each exercise's pattern", () => {
+  /**
+   * @param {...string} names
+   */
   const rows = (...names) =>
     names.map((name, exerciseOrder) => ({
       exerciseOrder,
@@ -270,6 +291,9 @@ describe("each exercise's pattern", () => {
       setNumber: 1,
       reps: 5
     }));
+  /**
+   * @param {...string} names
+   */
   const patternsOf = (...names) =>
     mapWorkoutSession(
       /** @type {WorkoutSessionRow} */ ({ exerciseSets: rows(...names) })

@@ -16,11 +16,18 @@ import { createUserRepository } from "../../../../repositories/userRepository.js
 // the calories suite also logs meals, and races one save against the other
 // through clients that pause at a barrier.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -200,8 +207,14 @@ describe("remaining user write paths", () => {
   });
 
   describe("POST /api/dashboard/calories", () => {
+    /**
+     * @param {object} body
+     */
     const postCalories = (body) =>
       agent.post("/api/dashboard/calories").set("X-CSRF-Token", csrfToken).send(body);
+    /**
+     * @param {object} body
+     */
     const postMeal = (body) =>
       agent.post("/api/dashboard/meal-logs").set("X-CSRF-Token", csrfToken).send(body);
 
@@ -348,7 +361,13 @@ describe("remaining user write paths", () => {
       };
       // A client whose transactions wait at the barrier after each call to
       // calorieEntry[method]. Everything else is the real client.
+      /**
+       * @param {string} method
+       */
       const pausingAfter = (method) => {
+        /**
+         * @param {object} delegate
+         */
         const pausingDelegate = (delegate) =>
           new Proxy(delegate, {
             get(target, prop) {
@@ -361,6 +380,9 @@ describe("remaining user write paths", () => {
               };
             }
           });
+        /**
+         * @param {import("@prisma/client").Prisma.TransactionClient} tx
+         */
         const pausingTx = (tx) =>
           new Proxy(tx, {
             get(target, prop) {

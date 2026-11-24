@@ -20,6 +20,9 @@ const ROW = "Seated cable row";
 const BOX = "Dumbbell box squat";
 const GOBLET = "Dumbbell goblet squat";
 
+/**
+ * @param {string} name
+ */
 const rx = (name) => ({
   name,
   sets: 3,
@@ -29,6 +32,9 @@ const rx = (name) => ({
   targetRpe: { min: 7, max: 8 }
 });
 
+/**
+ * @param {string[]} names
+ */
 const payloadOf = (names) => ({
   version: 1,
   days: [
@@ -43,11 +49,18 @@ const payloadOf = (names) => ({
   notes: []
 });
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -72,11 +85,18 @@ const signUp = async (agent, email) => {
 
 // Each test signs the user up before it reads the row, and the profile column
 // holds the object sign-up wrote.
+/**
+ * @param {string} email
+ */
 const userOf = (email) =>
   /** @type {Promise<import("@prisma/client").AppUser>} */ (
     prisma.appUser.findFirst({ where: { email } })
   );
 
+/**
+ * @param {string} email
+ * @param {{ names?: string[], injuries?: string }} [options]
+ */
 const savePlan = async (email, { names = [ROW, BOX], injuries = "Knee" } = {}) => {
   const user = await userOf(email);
   return prisma.generatedPlan.create({
@@ -92,6 +112,13 @@ const savePlan = async (email, { names = [ROW, BOX], injuries = "Knee" } = {}) =
 };
 
 // A workout on `date` with three sets of 10 at RPE 8 for each of `names`.
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {string} date
+ * @param {string[]} [names]
+ * @param {number} [loadKg]
+ */
 const logWorkout = async (agent, csrfToken, date, names = [ROW, BOX], loadKg = 40) => {
   const response = await agent
     .post("/api/dashboard/workout-sessions")
@@ -107,9 +134,17 @@ const logWorkout = async (agent, csrfToken, date, names = [ROW, BOX], loadKg = 4
   expect(response.status).toBe(200);
 };
 
+/**
+ * @param {import("supertest").Response} response
+ * @param {string} name
+ */
 const liftOf = (response, name) =>
   response.body.progression.lifts.find((lift) => lift.name === name);
 
+/**
+ * @param {string} weekStart
+ * @param {string} key
+ */
 const liftPath = (weekStart, key) =>
   `/api/dashboard/progression/${weekStart}/lifts/${encodeURIComponent(key)}`;
 
@@ -261,6 +296,9 @@ describe("the progression routes", () => {
 
   test("accept on an asked lift steps it up, and decline holds it", async () => {
     await trainedLastWeek();
+    /**
+     * @param {string} decision
+     */
     const answer = (decision) =>
       agent
         .put(liftPath("2026-11-09", "dumbbell box squat"))

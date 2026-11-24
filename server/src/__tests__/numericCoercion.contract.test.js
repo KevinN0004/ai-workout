@@ -18,6 +18,10 @@ import { positiveOrNull } from "../services/integrations/stravaMapping.js";
 /** @typedef {import("../repositories/workoutSessionRepository.js").WorkoutSessionRow} WorkoutSessionRow */
 
 // One set row holding `value` in `field`, read back through the mapper.
+/**
+ * @param {string} field
+ * @param {unknown} value
+ */
 const readSetField = (field, value) =>
   mapWorkoutSession(
     /** @type {WorkoutSessionRow} */ ({
@@ -49,6 +53,9 @@ const { pm25NowCast } = createExternalDataService(
 // Three hourly means of one value, ending in the three hours before `NOW`: the
 // fewest a NowCast needs, so the NowCast of a steady value is that value.
 const NOW = Date.parse("2026-03-02T12:10:00Z");
+/**
+ * @param {unknown} value
+ */
 const threeHoursOf = (value) =>
   [0, 1, 2].map((hoursAgo) => ({
     value,

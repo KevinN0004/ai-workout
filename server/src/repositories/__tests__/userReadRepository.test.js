@@ -32,6 +32,9 @@ const { saveGeneratedPlan } = createGeneratedPlanRepository({ prisma });
 /** @typedef {ReturnType<typeof import("../workoutSessionRepository.js").mapWorkoutSession>} SessionEntry */
 /** @typedef {ReturnType<typeof import("../progressMetricRepository.js").mapProgressMetric>} MetricEntry */
 
+/**
+ * @param {Record<string, any>} [overrides]
+ */
 const baseUserDoc = (overrides = {}) => ({
   userId: overrides.userId ?? crypto.randomUUID(),
   email: overrides.email ?? `shim-${crypto.randomUUID().slice(0, 8)}@example.com`,
@@ -302,6 +305,13 @@ describe("dashboard collection repositories", () => {
     return doc.userId;
   };
 
+  /**
+   * @param {Parameters<typeof loadCollectionPage>[0]["collection"]} collection
+   * @param {string} userId
+   * @param {string} sortField
+   * @param {number} [limit]
+   * @param {number} [offset]
+   */
   const page = (collection, userId, sortField, limit = 100, offset = 0) =>
     loadCollectionPage({ collection, userId, sortField, limit, offset });
 
@@ -395,9 +405,10 @@ describe("dashboard collection repositories", () => {
   });
 
   test("rejects an unknown collection rather than querying blindly", async () => {
-    await expect(page("nonsense", "whoever", "createdAt")).rejects.toThrow(
-      /Unknown dashboard collection/
-    );
+    // A collection the read does not know, which it must refuse.
+    await expect(
+      page(/** @type {Parameters<typeof page>[0]} */ ("nonsense"), "whoever", "createdAt")
+    ).rejects.toThrow(/Unknown dashboard collection/);
   });
 
   test("meal calorie total covers one date only", async () => {

@@ -26,8 +26,14 @@ const TODAY = "2026-11-13";
 // What Strava lists, as the test sets it.
 /** @type {object[]} */
 let listed;
+/**
+ * @param {string} url
+ */
 const fakeStrava = async (url) => {
   const { pathname, searchParams } = new URL(String(url));
+  /**
+   * @param {unknown} body
+   */
   const json = (body) =>
     new Response(JSON.stringify(body), {
       status: 200,
@@ -47,6 +53,10 @@ const fakeStrava = async (url) => {
   return new Response("{}", { status: 404 });
 };
 
+/**
+ * @param {number} id
+ * @param {Record<string, unknown>} [overrides]
+ */
 const activityOf = (id, overrides = {}) => ({
   id,
   name: `Run ${id}`,
@@ -58,6 +68,9 @@ const activityOf = (id, overrides = {}) => ({
   ...overrides
 });
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => String((await agent.get("/api/csrf-token")).body?.csrfToken || "");
 
 /** @type {ReturnType<typeof request.agent>} */
@@ -67,6 +80,9 @@ let csrfToken;
 /** @type {import("@prisma/client").AppUser} */
 let user;
 
+/**
+ * @param {object} [body]
+ */
 const sync = (body = {}) =>
   agent.post("/api/integrations/strava/sync").set("X-CSRF-Token", csrfToken).send(body).expect(200);
 const importsOf = () =>
@@ -74,6 +90,9 @@ const importsOf = () =>
     where: { userId: user.id, source: "strava" },
     orderBy: { externalId: "asc" }
   });
+/**
+ * @param {number} minutes
+ */
 const later = (minutes) => vi.setSystemTime(new Date(Date.now() + minutes * 60000));
 
 beforeAll(async () => {

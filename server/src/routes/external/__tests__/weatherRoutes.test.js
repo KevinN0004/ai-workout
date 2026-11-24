@@ -37,6 +37,9 @@ const { toFiniteNumber, weatherCodeToText, buildWorkoutRecommendation } = create
   )
 );
 
+/**
+ * @param {import("vitest").Mock} fetchOpenMeteo
+ */
 const buildApp = (fetchOpenMeteo) => {
   const app = express();
   registerWeatherRoutes(app, {
@@ -53,6 +56,10 @@ const buildApp = (fetchOpenMeteo) => {
 
 // A test reads what the route asked for, so the fake is cast to the Mock of the
 // call it stands in for, whose query the route passes on every call.
+/**
+ * @param {unknown} data
+ * @param {string} [cache]
+ */
 const upstream = (data, cache = "miss") =>
   /** @type {import("vitest").Mock<(query: Record<string, unknown>) => ReturnType<ReturnType<typeof createExternalDataService>["fetchOpenMeteo"]>>} */ (
     vi.fn(async () => ({ data, cache }))
@@ -60,6 +67,9 @@ const upstream = (data, cache = "miss") =>
 
 // Open-Meteo's own key names. camelCase would silently read undefined and skip
 // every gate, so the snake_case here is load-bearing.
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const currentPayload = (overrides = {}) => ({
   latitude: 40.1,
   longitude: -75.2,
@@ -81,6 +91,10 @@ const currentPayload = (overrides = {}) => ({
 // two can be driven interchangeably by the shared describe.each below. Daily
 // overrides are a separate argument; conflating them silently left the current
 // block untouched when I first wrote this.
+/**
+ * @param {Record<string, unknown>} [currentOverrides]
+ * @param {Record<string, unknown>} [dailyOverrides]
+ */
 const withDaily = (currentOverrides = {}, dailyOverrides = {}) => ({
   ...currentPayload(currentOverrides),
   daily: {
@@ -93,6 +107,9 @@ const withDaily = (currentOverrides = {}, dailyOverrides = {}) => ({
   }
 });
 
+/**
+ * @param {number} [status]
+ */
 const upstreamError = (status) => {
   /** @type {Error & { status?: number }} */
   const err = new Error("open-meteo exploded");
@@ -100,6 +117,11 @@ const upstreamError = (status) => {
   return err;
 };
 
+/**
+ * @param {import("express").Express} app
+ * @param {string} path
+ * @param {string} [query]
+ */
 const get = (app, path, query = "latitude=40.1&longitude=-75.2") =>
   request(app).get(query ? `${path}?${query}` : path);
 

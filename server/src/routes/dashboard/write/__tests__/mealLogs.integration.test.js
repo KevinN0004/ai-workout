@@ -11,11 +11,18 @@ import { createMealLogRepository } from "../../../../repositories/mealLogReposit
 // it, it is clamped to its column's ceiling, and it goes when the day's
 // meals carry no calories.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -38,6 +45,11 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {object} body
+ */
 const postMeal = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/meal-logs").set("X-CSRF-Token", csrfToken).send(body);
 
@@ -245,6 +257,9 @@ describe("POST /api/dashboard/meal-logs", () => {
   // row separately (calorie_entries_calories_check), so a day's sum can overflow it.
   // The sync clamps the entry to that ceiling, so the route answers 200.
   describe("a day whose meals exceed the calorie_entries ceiling", () => {
+    /**
+     * @param {number} count
+     */
     const logBigMeals = async (count) => {
       /** @type {import("supertest").Response | undefined} */
       let response;
@@ -291,10 +306,15 @@ describe("POST /api/dashboard/meal-logs", () => {
     // root client and the transaction client are built this way, so the sync fails
     // on the same error whether or not it runs inside the transaction; only the
     // transaction decides whether the meal survives.
+    /**
+     * @param {import("@prisma/client").Prisma.TransactionClient} client
+     */
     const failingOver = (client) => ({
       appUser: client.appUser,
       mealLog: client.mealLog,
-      $queryRaw: (...args) => client.$queryRaw(...args),
+      // The save's own arguments, passed on as it gave them.
+      $queryRaw: (...args) =>
+        client.$queryRaw(.../** @type {Parameters<typeof client.$queryRaw>} */ (args)),
       calorieEntry: {
         findFirst: (args) => client.calorieEntry.findFirst(args),
         create: () => Promise.reject(new Error("derived write failed")),
@@ -375,6 +395,9 @@ describe("POST /api/dashboard/meal-logs", () => {
     };
     // The transaction client, with mealLog.aggregate waiting at the barrier
     // once its sum is read. Everything else is the real client.
+    /**
+     * @param {import("@prisma/client").Prisma.TransactionClient} tx
+     */
     const pausingAfterSum = (tx) =>
       new Proxy(tx, {
         get(target, prop) {

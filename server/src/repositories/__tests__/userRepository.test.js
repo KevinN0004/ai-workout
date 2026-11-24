@@ -8,6 +8,9 @@ const { deleteUser, updatePasswordHash } = createUserRepository({ prisma });
 // Each read below follows the write that creates its row, so its result is cast
 // to the columns it selects.
 
+/**
+ * @param {{ legacyUserId?: string, email?: string }} [overrides]
+ */
 const createUser = async (overrides = {}) =>
   prisma.appUser.create({
     data: {

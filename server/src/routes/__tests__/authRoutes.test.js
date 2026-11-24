@@ -62,14 +62,27 @@ let logWarn;
 
 // The in-memory rows stand in for both reads: the user row the auth lookups
 // take, and the full load the profile route re-reads after a write.
+/**
+ * @param {unknown} userId
+ */
 const findUserWithDashboard = async (userId) => rows.find((row) => row.userId === userId) || null;
 const findUserRow = findUserWithDashboard;
+/**
+ * @param {unknown} email
+ */
 const findUserRowByEmail = async (email) => rows.find((row) => row.email === email) || null;
+/**
+ * @param {import("../../repositories/userReadRepository.js").NewUserDoc} [doc]
+ */
 const createUserWithDashboard = async (doc) => {
-  rows.push(doc);
-  return doc;
+  // The fake store keeps the new doc as the row its reads hand back.
+  rows.push(/** @type {UserDoc} */ (doc));
+  return /** @type {UserDoc} */ (doc);
 };
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const buildApp = (overrides = {}) => {
   const app = express();
   app.use(express.json());
@@ -109,12 +122,18 @@ const realCookieWriters = () => {
 // A real legacy record, hashed the way the pre-argon2 code did it -- the same
 // shape authUserService.test.js's identical helper builds, so verifyPassword's
 // real pbkdf2 branch accepts it rather than only a stubbed algo flag.
+/**
+ * @param {string} password
+ */
 const legacyPbkdf2Record = (password) => {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
   return { salt, hash, passwordAlgo: "pbkdf2" };
 };
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const signupBody = (overrides = {}) => ({
   email: "Person@Example.COM",
   password: "StrongPass123!",
@@ -450,6 +469,9 @@ describe("POST /api/auth/signup", () => {
 });
 
 describe("POST /api/auth/login", () => {
+  /**
+   * @param {import("express").Express} app
+   */
   const registered = async (app) => {
     await request(app).post("/api/auth/signup").send(signupBody());
     cookieCalls.session = [];
@@ -773,6 +795,11 @@ describe("POST /api/auth/password", () => {
   // the way index.js really wires it (getSessionUser -> findUserById), so it
   // is built locally from the same `sessions` / `rows` fixtures rather than
   // reusing the shared stub.
+  /**
+   * @param {import("express").Request} req
+   * @param {import("express").Response} res
+   * @param {import("express").NextFunction} next
+   */
   const realRequireAuth = async (req, res, next) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const session = sessions.find((item) => item.token === cookies.sid);
@@ -782,6 +809,9 @@ describe("POST /api/auth/password", () => {
     next();
   };
 
+  /**
+   * @param {Record<string, unknown>} [overrides]
+   */
   const passwordApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
 
   // The shared `setSessionCookie`/`setCsrfCookie` mocks only record calls in
@@ -789,6 +819,9 @@ describe("POST /api/auth/password", () => {
   // tests below, which hardcode "sid=sess-1" rather than reading a response
   // header for the same reason). So the session cookie a signup produced is
   // read back from `cookieCalls.session`, not from `res.headers["set-cookie"]`.
+  /**
+   * @param {import("express").Express} app
+   */
   const signUpAndGetCookie = async (app) => {
     await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
     const { token } = cookieCalls.session[cookieCalls.session.length - 1];
@@ -1045,6 +1078,11 @@ describe("DELETE /api/auth/me", () => {
   // row from the cookie via the same sessions/rows fixtures, mirroring
   // the POST /api/auth/password block's realRequireAuth rather than reusing the
   // shared stub.
+  /**
+   * @param {import("express").Request} req
+   * @param {import("express").Response} res
+   * @param {import("express").NextFunction} next
+   */
   const realRequireAuth = async (req, res, next) => {
     const cookies = parseCookies(req.headers.cookie || "");
     const session = sessions.find((item) => item.token === cookies.sid);
@@ -1054,6 +1092,9 @@ describe("DELETE /api/auth/me", () => {
     next();
   };
 
+  /**
+   * @param {Record<string, unknown>} [overrides]
+   */
   const deleteApp = (overrides = {}) => buildApp({ requireAuth: realRequireAuth, ...overrides });
 
   // Same reasoning as signUpAndGetCookie in the password describe block: the
@@ -1061,6 +1102,9 @@ describe("DELETE /api/auth/me", () => {
   // cookieCalls, they never write a real Set-Cookie header, so the session
   // cookie a signup or login produced is read back from cookieCalls.session
   // rather than from a response header.
+  /**
+   * @param {import("express").Express} app
+   */
   const signUpAndGetCookie = async (app) => {
     await request(app).post("/api/auth/signup").send(signupBody()).expect(200);
     const { token } = cookieCalls.session[cookieCalls.session.length - 1];

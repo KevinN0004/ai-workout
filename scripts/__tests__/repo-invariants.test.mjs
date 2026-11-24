@@ -1000,6 +1000,79 @@ describe("type-checked files", () => {
     expect(untyped, "put /** @type {T} */ on the line above each").toEqual([]);
   });
 
+  // D1 phase 5: a named helper's untyped parameter is any in the test program, so
+  // nothing passed to it is checked (decided 2026-11-23). Each helper with
+  // parameters, `const name = (...) =>` or `function name(...)` at any depth, names
+  // each one in a @param, or types itself with @type, in the JSDoc block directly
+  // above it. Inline callbacks and object methods are left any.
+  test("every named helper in a checked test file types its parameters", () => {
+    const OPENER =
+      /^\s*(?:export\s+)?(?:(?:const|let)\s+[\w$]+\s*=\s*(?:async\s+)?(?:\(|[A-Za-z_$][\w$]*\s*=>)|(?:async\s+)?function\s*\*?\s*[\w$]+\s*\()/;
+    // The text between a helper's parameter brackets, or null for a call that
+    // only looks like one (`const x = (a, b)` with no arrow or body after it).
+    const paramsOf = (lines, index) => {
+      const text = lines.slice(index, index + 30).join("\n");
+      const bare = text.match(
+        /^\s*(?:export\s+)?(?:const|let)\s+[\w$]+\s*=\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*=>/
+      );
+      if (bare) return bare[1];
+      const open = text.indexOf(
+        "(",
+        text.search(/=\s*(?:async\s+)?\(|function\s*\*?\s*[\w$]+\s*\(/)
+      );
+      for (let at = open, depth = 0; at < text.length; at += 1) {
+        if ("([{".includes(text[at])) depth += 1;
+        if (")]}".includes(text[at])) depth -= 1;
+        if (depth === 0) {
+          return /^(?:=>|\{)/.test(text.slice(at + 1).trimStart())
+            ? text.slice(open + 1, at)
+            : null;
+        }
+      }
+      return null;
+    };
+    // Splits on the commas outside brackets.
+    const split = (text) => {
+      const parts = [""];
+      let depth = 0;
+      for (const ch of text) {
+        if ("([{".includes(ch)) depth += 1;
+        if (")]}".includes(ch)) depth -= 1;
+        if (ch === "," && depth === 0) parts.push("");
+        else parts[parts.length - 1] += ch;
+      }
+      return parts.map((part) => part.trim()).filter(Boolean);
+    };
+    const docAbove = (lines, index) => {
+      if (!/\*\/\s*$/.test(lines[index - 1] ?? "")) return "";
+      let start = index - 1;
+      while (start > 0 && !lines[start].includes("/**")) start -= 1;
+      return lines.slice(start, index).join("\n");
+    };
+
+    const tests = checked.filter(({ file }) => isTest(file));
+    expect(tests.length, "the sweep found too few checked tests").toBeGreaterThanOrEqual(53);
+    const helpers = tests.flatMap(({ file, lines }) =>
+      lines.flatMap((line, index) => {
+        const text = OPENER.test(line) ? paramsOf(lines, index) : null;
+        return text === null
+          ? []
+          : [{ where: `${file}:${index + 1}`, params: split(text), doc: docAbove(lines, index) }];
+      })
+    );
+    expect(helpers.length, "the sweep found too few helpers").toBeGreaterThanOrEqual(250);
+    const untyped = helpers.flatMap(({ where, params, doc }) => {
+      if (/@type\s*\{/.test(doc)) return [];
+      const named = [...doc.matchAll(/@param\s+\{[\s\S]*?\}\s+\[?([\w$]+)/g)].map((m) => m[1]);
+      const missing = params.filter((param, at) => {
+        const name = param.match(/^(?:\.\.\.)?([A-Za-z_$][\w$]*)/)?.[1];
+        return name ? !named.includes(name) : named.length <= at;
+      });
+      return missing.length ? [`${where} ${missing.join(", ")}`] : [];
+    });
+    expect(untyped, "add a /** @param {T} name */ block above each").toEqual([]);
+  });
+
   // D1 phase 5: each answer the client reads is cast in place, the answer through
   // Wire (which fails the typecheck on a field JSON would not deliver as typed) and
   // a refusal to ErrorBody (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).

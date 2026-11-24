@@ -24,9 +24,16 @@ const {
 const EMAILS = ["strava-conn-a@example.com", "strava-conn-b@example.com"];
 const EXPIRES = new Date("2026-11-13T18:00:00Z");
 
+/**
+ * @param {string} email
+ */
 const createUser = (email) => prisma.appUser.create({ data: { email, passwordHash: "x" } });
 
 // The tokens arrive sealed; these stand for sealed values.
+/**
+ * @param {string} userId
+ * @param {Partial<Parameters<typeof saveConnection>[0]>} [overrides]
+ */
 const connection = (userId, overrides = {}) => ({
   userId,
   athleteId: 4242,
@@ -37,6 +44,10 @@ const connection = (userId, overrides = {}) => ({
   ...overrides
 });
 
+/**
+ * @param {string} userId
+ * @param {Partial<import("@prisma/client").Prisma.WorkoutSessionUncheckedCreateInput>} [overrides]
+ */
 const session = (userId, overrides = {}) =>
   prisma.workoutSession.create({
     data: { userId, workoutDate: new Date("2026-11-12T00:00:00Z"), ...overrides }

@@ -155,6 +155,9 @@ describe("resolvePostgresConfig", () => {
 });
 
 describe("keeping the password out of the status", () => {
+  /**
+   * @param {string} databaseUrl
+   */
   const safeFor = (databaseUrl) => resolvePostgresConfig({ DATABASE_URL: databaseUrl });
 
   test("both the user and the password are replaced", () => {
@@ -208,6 +211,9 @@ describe("keeping the password out of the status", () => {
 });
 
 describe("reading the SSL switches", () => {
+  /**
+   * @param {Record<string, string | null | undefined>} env
+   */
   const sslFor = (env) => resolvePostgresConfig({ DATABASE_URL: "postgres://u:p@host/db", ...env });
 
   test.each([["1"], ["true"], ["yes"], ["on"], ["TRUE"], ["  On  "]])(

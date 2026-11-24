@@ -140,7 +140,10 @@ Phases 3 and 4's rules hold, for source and tests alike:
   - **A `let` with no initializer is `any`**, so nothing done with it is checked. Each one
     in a checked test file names its type on the line above (decided 2026-11-23), and a
     repo-invariant test holds that.
-  - **An empty `[]` and a helper's untyped parameter stay `any`.**
+  - **A named helper's parameter would be `any` too**, so each helper in a checked test
+    file, `const name = (...) =>` or `function name(...)` at any depth, types each
+    parameter with `@param` (decided 2026-11-23), and a repo-invariant test holds that. An
+    empty `[]`, an inline callback's parameter and an object method's stay `any`.
   - **A field read through a JavaScript function's return type is not checked**, such as
     `ReturnType<typeof mapUser>`. TypeScript gives a `.js` file's object literals an open
     type, so a misspelled field reads as `any`.

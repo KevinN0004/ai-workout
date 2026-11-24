@@ -30,6 +30,9 @@ const FIELDS = {
   focuses: []
 };
 
+/**
+ * @param {Partial<typeof FIELDS>} [overrides]
+ */
 const savedPlan = (overrides = {}) => {
   const fields = { ...FIELDS, ...overrides };
   const plan = generatePlan({ ...fields, health: {}, age: null });
@@ -107,6 +110,10 @@ describe("the plan swap routes without a database", () => {
     );
     const older = rulesForPlan(plan, { age: 70, area: null });
     const younger = rulesForPlan(plan, { age: null, area: null });
+    /**
+     * @param {Parameters<typeof prescribe>[2]} rules
+     * @param {string} name
+     */
     const doseOf = (rules, name) =>
       prescribe(
         // Each name comes from the library's own swaps.
