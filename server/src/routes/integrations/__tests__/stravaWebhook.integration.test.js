@@ -38,9 +38,17 @@ let activities;
 let refreshRefused;
 /** @type {string[]} */
 let stravaCalls;
+/**
+ * @param {string | URL | Request} url
+ * @param {RequestInit} [init]
+ */
 const fakeStrava = async (url, init = {}) => {
   const { pathname } = new URL(String(url));
   stravaCalls.push(pathname);
+  /**
+   * @param {number} status
+   * @param {unknown} body
+   */
   const json = (status, body) =>
     new Response(JSON.stringify(body), {
       status,
@@ -64,6 +72,10 @@ const fakeStrava = async (url, init = {}) => {
   return json(404, {});
 };
 
+/**
+ * @param {string} id
+ * @param {Record<string, unknown>} [overrides]
+ */
 const runOf = (id, overrides = {}) => ({
   id: Number(id),
   name: "Lunch run",
@@ -76,6 +88,9 @@ const runOf = (id, overrides = {}) => ({
   ...overrides
 });
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const eventOf = (overrides = {}) => ({
   object_type: "activity",
   object_id: 6001,
@@ -87,6 +102,9 @@ const eventOf = (overrides = {}) => ({
   ...overrides
 });
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => String((await agent.get("/api/csrf-token")).body?.csrfToken || "");
 
 // Signs up and connects through the routes, as a browser would.
@@ -125,7 +143,13 @@ const connectedUser = async () => {
   );
 };
 
+/**
+ * @param {object} body
+ */
 const post = (body) => request(app).post("/webhooks/strava").send(body).expect(200);
+/**
+ * @param {string} userId
+ */
 const importsOf = (userId) =>
   prisma.workoutSession.findMany({ where: { userId, source: "strava" } });
 // Lets the event handled after a response run to its end.

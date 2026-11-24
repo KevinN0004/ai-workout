@@ -19,6 +19,9 @@ import { buildWorkoutSessionEntry } from "../../../../services/dashboard/dashboa
 // through unknown. The logger is a real one that writes nothing, its warn calls
 // spied on.
 /** @typedef {Parameters<typeof registerWorkoutAndGoalRoutes>[1]} Deps */
+/**
+ * @param {{ saveWorkoutSession: import("vitest").Mock }} options
+ */
 const buildApp = ({ saveWorkoutSession }) => {
   const log = pino({ level: "silent" });
   const warn = vi.spyOn(log, "warn");
@@ -49,11 +52,18 @@ const buildApp = ({ saveWorkoutSession }) => {
   return { app, warn };
 };
 
+/**
+ * @param {import("express").Express} app
+ * @param {object} body
+ */
 const post = (app, body) =>
   request(app)
     .post("/api/dashboard/workout-sessions")
     .send({ date: "2026-05-12", duration: 30, ...body });
 
+/**
+ * @param {import("vitest").MockInstance} warn
+ */
 const linkDropped = (warn) =>
   warn.mock.calls.some(([entry]) => entry?.event === "workout_plan_link_dropped");
 

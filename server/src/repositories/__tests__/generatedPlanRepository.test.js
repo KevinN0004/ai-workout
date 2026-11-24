@@ -36,10 +36,20 @@ const { findUserWithDashboard } = createUserReadRepository({ prisma });
 /** @typedef {NonNullable<Awaited<ReturnType<typeof saveGeneratedPlan>>>} SavedPlan */
 /** @typedef {import("@prisma/client").GeneratedPlan} GeneratedPlan */
 
+/**
+ * @param {string} email
+ * @param {string} [legacyUserId]
+ */
 const createUser = (email, legacyUserId) =>
   prisma.appUser.create({ data: { email, passwordHash: "x", legacyUserId } });
 
 // One plan a second, oldest first, so creation order is the read order reversed.
+/**
+ * @param {string} userId
+ * @param {number} count
+ * @param {string} prefix
+ * @param {{ sameTime?: boolean }} [options]
+ */
 const seedPlans = (userId, count, prefix, { sameTime = false } = {}) =>
   prisma.generatedPlan.createMany({
     data: Array.from({ length: count }, (_, index) => ({
@@ -50,12 +60,18 @@ const seedPlans = (userId, count, prefix, { sameTime = false } = {}) =>
     }))
   });
 
+/**
+ * @param {string} userId
+ */
 const plansOf = async (userId) =>
   (await prisma.generatedPlan.findMany({ where: { userId }, select: { legacyId: true } }))
     .map((row) => row.legacyId)
     .sort();
 
 // The plans the dashboard reads for this user, through the real read.
+/**
+ * @param {string} userId
+ */
 const readSetOf = async (userId) =>
   /** @type {LoadedUser} */ (await findUserWithDashboard(userId)).dashboard.plans
     .map((plan) => plan.id)
@@ -70,6 +86,9 @@ afterAll(async () => {
 });
 
 describe("the plan's structure", () => {
+  /**
+   * @param {string} userId
+   */
   const storedPayloadOf = async (userId) =>
     /** @type {Pick<GeneratedPlan, "planPayload">} */ (
       await prisma.generatedPlan.findFirst({ where: { userId }, select: { planPayload: true } })
@@ -200,6 +219,9 @@ describe("findPlanForUser and rewritePlan", () => {
     });
     return { user, row };
   };
+  /**
+   * @param {string} id
+   */
   const textOf = async (id) =>
     /** @type {Pick<GeneratedPlan, "planText">} */ (
       await prisma.generatedPlan.findUnique({ where: { id }, select: { planText: true } })
@@ -257,6 +279,10 @@ describe("findPlanForUser and rewritePlan", () => {
     /** @type {(value?: unknown) => void} */
     let firstRead;
     const firstHasRead = new Promise((resolve) => (firstRead = resolve));
+    /**
+     * @param {string} suffix
+     * @param {boolean} [wait]
+     */
     const appending = (suffix, wait) => async (plan) => {
       if (wait) {
         firstRead();
@@ -282,6 +308,9 @@ describe("findPlanForUser and rewritePlan", () => {
   // Each step waits until Postgres shows the expected sessions blocked on a lock.
   test("finds no plan when the plan is deleted while it waits for the lock", async () => {
     const { user, row } = await seedPlan("rewrite-deleted@example.com");
+    /**
+     * @param {number} count
+     */
     const blockedOnLocks = async (count) => {
       for (;;) {
         const [{ blocked }] = /** @type {Array<{ blocked: number }>} */ (

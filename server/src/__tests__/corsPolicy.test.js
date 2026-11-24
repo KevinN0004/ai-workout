@@ -21,6 +21,10 @@ const fakeRequest = (origin, headers = { host: "api.example.com" }, protocol = "
 });
 
 // Runs the delegate and then the origin check it returns, as cors does.
+/**
+ * @param {{ corsOptionsDelegate: Function }} policy
+ * @param {ReturnType<typeof fakeRequest>} req
+ */
 const decide = (policy, req) =>
   new Promise((resolve) => {
     policy.corsOptionsDelegate(req, (err, options) => {
@@ -130,6 +134,9 @@ describe("createCorsPolicy outside production", () => {
 // X-Forwarded-Proto only when trust proxy is set (index.js sets it in production,
 // where Render terminates TLS). These run the production policy (development
 // false, so any own origin counts) through real express.
+/**
+ * @param {{ trustProxy: boolean }} options
+ */
 const appWith = ({ trustProxy }) => {
   const app = express();
   if (trustProxy) app.set("trust proxy", 1);
@@ -139,6 +146,10 @@ const appWith = ({ trustProxy }) => {
   return app;
 };
 
+/**
+ * @param {import("express").Express} app
+ * @param {Record<string, string>} headers
+ */
 const probe = (app, headers) => {
   const req = request(app).get("/api/health");
   for (const [name, value] of Object.entries(headers)) req.set(name, value);

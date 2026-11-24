@@ -55,6 +55,9 @@ const { mergeCacheStatuses } = createHttpCacheService(
   )
 );
 
+/**
+ * @param {import("vitest").Mock} wgerRequest
+ */
 const buildWgerApp = (wgerRequest) => {
   const app = express();
   registerWgerRoutes(app, {
@@ -70,6 +73,9 @@ const buildWgerApp = (wgerRequest) => {
   return app;
 };
 
+/**
+ * @param {import("vitest").Mock} mealDbRequest
+ */
 const buildMealDbApp = (mealDbRequest) => {
   const app = express();
   registerMealDbRoutes(app, {
@@ -81,6 +87,9 @@ const buildMealDbApp = (mealDbRequest) => {
   return app;
 };
 
+/**
+ * @param {number} status
+ */
 const upstreamError = (status) => {
   /** @type {Error & { status?: number }} */
   const err = new Error("wger exploded");
@@ -88,12 +97,21 @@ const upstreamError = (status) => {
   return err;
 };
 
+/**
+ * @param {unknown[]} list
+ * @param {string} [cache]
+ */
 const results = (list, cache = "miss") => ({ data: { results: list }, cache });
 
 // The routes pass their options on every call, so the Mock's are required.
 /** @typedef {import("vitest").Mock<(endpoint: string, options: { query: Record<string, unknown> }) => ReturnType<ReturnType<typeof createExternalDataService>["wgerRequest"]>>} WgerRequestMock */
 
 // An exerciseinfo record in the shape mapWgerExercise expects.
+/**
+ * @param {number} id
+ * @param {string} name
+ * @param {Record<string, unknown>} [overrides]
+ */
 const exercise = (id, name, overrides = {}) => ({
   id,
   category: { id: 10, name: "Chest" },
@@ -189,11 +207,19 @@ describe("GET /api/wger/meta", () => {
 describe("GET /api/wger/exercises", () => {
   // A test reads what the route asked for, so each fake whose calls are read is
   // cast to the Mock of the call it stands in for.
+  /**
+   * @param {unknown[]} list
+   * @param {Record<string, unknown>} [extra]
+   */
   const listUpstream = (list, extra = {}) =>
     /** @type {WgerRequestMock} */ (
       vi.fn(async () => ({ data: { results: list, count: 120, ...extra }, cache: "miss" }))
     );
 
+  /**
+   * @param {import("express").Express} app
+   * @param {string} [query]
+   */
   const get = (app, query = "") =>
     request(app).get(`/api/wger/exercises${query ? `?${query}` : ""}`);
 
@@ -484,8 +510,16 @@ describe("GET /api/wger/exercises/:id", () => {
 });
 
 describe("GET /api/mealdb/search", () => {
+  /**
+   * @param {unknown[]} list
+   * @param {string} [cache]
+   */
   const meals = (list, cache = "miss") => ({ data: { meals: list }, cache });
 
+  /**
+   * @param {string} id
+   * @param {string} title
+   */
   const meal = (id, title) => ({
     idMeal: id,
     strMeal: title,
@@ -494,6 +528,10 @@ describe("GET /api/mealdb/search", () => {
     strArea: "Italian"
   });
 
+  /**
+   * @param {import("express").Express} app
+   * @param {string} [query]
+   */
   const get = (app, query = "query=penne") => request(app).get(`/api/mealdb/search?${query}`);
 
   test("returns the mapped meals", async () => {

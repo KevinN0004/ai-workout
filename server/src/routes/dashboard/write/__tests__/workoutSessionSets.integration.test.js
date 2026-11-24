@@ -10,11 +10,18 @@ import { prisma } from "../../../../db/prisma.js";
 // test signs up, and workoutSessions.integration.test.js already spends most
 // of the auth limiter's 25 a window, which each file gets afresh.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -37,6 +44,11 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {object} body
+ */
 const postWorkout = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/workout-sessions").set("X-CSRF-Token", csrfToken).send(body);
 

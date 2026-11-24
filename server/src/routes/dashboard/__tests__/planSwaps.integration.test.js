@@ -44,11 +44,18 @@ const generated = () => {
   return { text, payload: withPrescriptions(buildPlanPayload(text), plan.week) };
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -72,6 +79,10 @@ const signUp = async (agent, email) => {
 };
 
 // The plan saved for the user with `email`, as the generate route saves one.
+/**
+ * @param {string} email
+ * @param {{ structured?: boolean }} [options]
+ */
 const savePlan = async (email, { structured = true } = {}) => {
   // Each test signs the user up before it saves a plan.
   const user = /** @type {import("@prisma/client").AppUser} */ (
@@ -96,10 +107,29 @@ const savePlan = async (email, { structured = true } = {}) => {
   });
 };
 
-const pathOf = (planId) => `/api/dashboard/plans/${encodeURIComponent(planId)}/swaps`;
+/**
+ * @param {string | null} planId
+ */
+const pathOf = (planId) =>
+  // A plan's legacy id: savePlan and each test set one, so it is never null here.
+  `/api/dashboard/plans/${encodeURIComponent(/** @type {string} */ (planId))}/swaps`;
+/**
+ * @param {string | null} planId
+ * @param {string} exercise
+ * @param {string} [area]
+ */
 const optionsPath = (planId, exercise, area) =>
   `${pathOf(planId)}?exercise=${encodeURIComponent(exercise)}${area ? `&area=${encodeURIComponent(area)}` : ""}`;
-const mondayOf = (plan) => plan.payload.days.find((day) => day.weekday === "Monday");
+/**
+ * @param {ReturnType<typeof mapGeneratedPlan>} plan
+ */
+const mondayOf = (plan) =>
+  // Every plan here is saved with its structure, whose Monday holds prescriptions.
+  /** @type {import("../../../services/dashboard/planPayloadService.js").PlanDay & { prescriptions: import("../../../services/dashboard/planPayloadService.js").Prescription[] }} */ (
+    /** @type {import("../../../services/dashboard/planPayloadService.js").PlanPayload} */ (
+      plan.payload
+    ).days.find((day) => day.weekday === "Monday")
+  );
 
 describe("the plan swap routes", () => {
   /** @type {ReturnType<typeof request.agent>} */
@@ -110,7 +140,14 @@ describe("the plan swap routes", () => {
   let row;
   const EMAIL = "plan-swaps@example.com";
 
+  /**
+   * @param {string} path
+   * @param {object} body
+   */
   const post = (path, body) => agent.post(path).set("X-CSRF-Token", csrfToken).send(body);
+  /**
+   * @param {object} body
+   */
   const swap = (body) => post(pathOf(row.legacyId), body);
 
   beforeAll(async () => {
@@ -216,7 +253,10 @@ describe("the plan swap routes", () => {
     expect(response.status).toBe(200);
     const [first] = mondayOf(response.body.plan).prescriptions;
     expect(first).toMatchObject({ name: SUMO, swapReason: null });
-    expect(first.swappedFrom.prescription.name).toBe(GOBLET);
+    // The swap just made records the prescription it replaced.
+    expect(
+      /** @type {NonNullable<typeof first.swappedFrom>} */ (first.swappedFrom).prescription.name
+    ).toBe(GOBLET);
 
     const dashboard = await agent.get("/api/dashboard");
     const [plan] = dashboard.body.dashboard.plans;

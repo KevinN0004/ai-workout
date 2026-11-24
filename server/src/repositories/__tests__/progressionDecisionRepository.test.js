@@ -156,6 +156,12 @@ describe("progressionDecisionRepository", () => {
 describe("the progression_decisions table", () => {
   // Raw SQL, so the test exercises the database's own rules rather than the
   // Prisma model's.
+  /**
+   * @param {string} userId
+   * @param {string} weekStart
+   * @param {string} liftKey
+   * @param {string} decision
+   */
   const insert = (userId, weekStart, liftKey, decision) =>
     prisma.$executeRaw`
       insert into progression_decisions (user_id, week_start, lift_key, decision)

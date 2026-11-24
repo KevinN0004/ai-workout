@@ -17,7 +17,11 @@ const getCsp = async () => {
   return String(response.headers["content-security-policy"] || "");
 };
 
-/** Reads one directive's value out of the policy string. */
+/**
+ * Reads one directive's value out of the policy string.
+ * @param {string} policy
+ * @param {string} name
+ */
 const directive = (policy, name) => {
   const found = policy
     .split(";")
@@ -104,6 +108,9 @@ describe("the policy's Sentry allowances", () => {
   // imported app. The key is always assigned, never deleted: index.js calls
   // dotenv.config() at module scope and dotenv fills in absent keys, so a
   // deleted one would hand the app whatever server/.env says.
+  /**
+   * @param {string} value
+   */
   const cspWithClientDsn = async (value) => {
     vi.resetModules();
     const previous = process.env.VITE_SENTRY_DSN;

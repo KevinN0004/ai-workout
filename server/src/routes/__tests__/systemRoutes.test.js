@@ -12,6 +12,9 @@ import { registerSystemRoutes } from "../systemRoutes.js";
 
 // The metrics hold the counters the route reads, and the Postgres status the
 // fields it reports.
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const buildApp = (overrides = {}) => {
   const app = express();
   registerSystemRoutes(app, {
@@ -126,6 +129,9 @@ describe("GET /api/metrics", () => {
 });
 
 describe("GET /api/ready reports which store sessions are using", () => {
+  /**
+   * @param {Record<string, unknown>} overrides
+   */
   const readyWith = (overrides) =>
     request(buildApp({ redisConfigured: () => true, ...overrides })).get("/api/ready");
 

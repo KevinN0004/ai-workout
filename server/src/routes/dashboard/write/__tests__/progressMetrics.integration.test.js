@@ -9,11 +9,18 @@ import { prisma } from "../../../../db/prisma.js";
 // id, the validation, and that each user sees only their own metrics. It
 // asserts observable behaviour only, not how the repository writes the row.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -36,6 +43,11 @@ const signUp = async (agent, email) => {
   return getCsrf(agent);
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ * @param {object} body
+ */
 const postMetric = (agent, csrfToken, body) =>
   agent.post("/api/dashboard/progress-metrics").set("X-CSRF-Token", csrfToken).send(body);
 

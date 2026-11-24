@@ -47,6 +47,9 @@ const buildApp = ({ config = CONFIG, handleEvent = vi.fn(async () => "create") }
   return { app, handleEvent, scheduled, log, limiterCalls };
 };
 
+/**
+ * @param {Record<string, string>} query
+ */
 const setup = (query) => `${PATH}?${new URLSearchParams(query)}`;
 
 describe("GET /webhooks/strava, the subscription's setup check", () => {

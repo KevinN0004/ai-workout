@@ -63,6 +63,9 @@ let running = [];
 // dotenv.config() at module scope and dotenv fills in keys that are absent, so
 // deleting one would hand the app whatever server/.env says rather than the
 // value the test asked for.
+/**
+ * @param {string} limited
+ */
 const startApp = async (limited) => {
   vi.resetModules();
   const keys = [...LIMIT_KEYS, "CLIENT_DIST_PATH", "GEMINI_API_KEY"];
@@ -99,6 +102,10 @@ const startApp = async (limited) => {
 // The limiters are registered before the CSRF middleware, so an unauthenticated
 // POST with no token still reaches them. Under the limit these answer 403; over
 // it they answer 429, which is the only part these tests assert on.
+/**
+ * @param {string} baseUrl
+ * @param {string} path
+ */
 const post = (baseUrl, path) =>
   fetch(`${baseUrl}${path}`, {
     method: "POST",
@@ -111,6 +118,10 @@ const post = (baseUrl, path) =>
 // cookie with the header, so any matching pair passes. fetch cannot choose
 // its source address, hence http.request.
 const CSRF = "rate-limit-test-token";
+/**
+ * @param {string} baseUrl
+ * @param {{ localAddress?: string, csrf?: boolean }} [options]
+ */
 const postGenerate = (baseUrl, { localAddress = "127.0.0.1", csrf = true } = {}) =>
   new Promise((resolve, reject) => {
     const body = JSON.stringify({});
@@ -142,6 +153,10 @@ const postGenerate = (baseUrl, { localAddress = "127.0.0.1", csrf = true } = {})
     req.end(body);
   });
 
+/**
+ * @param {string} baseUrl
+ * @param {string} path
+ */
 const del = (baseUrl, path) =>
   fetch(`${baseUrl}${path}`, {
     method: "DELETE",

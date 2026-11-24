@@ -30,6 +30,10 @@ const cipher = createTokenCipher(KEY);
 let stravaCalls;
 /** @type {boolean} */
 let revokeFails;
+/**
+ * @param {string | URL | Request} url
+ * @param {RequestInit} [init]
+ */
 const fakeStrava = async (url, init = {}) => {
   const path = new URL(String(url)).pathname;
   stravaCalls.push({ path, body: String(init.body || "") });
@@ -51,10 +55,17 @@ const fakeStrava = async (url, init = {}) => {
   return new Response("{}", { status: 404 });
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => String((await agent.get("/api/csrf-token")).body?.csrfToken || "");
 
 // The token first: supertest closes its shared server once no request is
 // pending, so a request built before another one finishes is sent to nothing.
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -79,6 +90,10 @@ const signUp = async (agent, email) => {
 
 // Connects the signed-in `agent` through the routes, as a browser would, and
 // answers where Strava's return landed.
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} csrfToken
+ */
 const connectThrough = async (agent, csrfToken) => {
   const started = await agent
     .post("/api/integrations/strava/connect")
@@ -94,6 +109,9 @@ const connectThrough = async (agent, csrfToken) => {
 };
 
 // Each test signs the user up and connects before it reads the rows.
+/**
+ * @param {string} email
+ */
 const userOf = (email) =>
   /** @type {Promise<import("@prisma/client").AppUser>} */ (
     prisma.appUser.findFirst({ where: { email } })

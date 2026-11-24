@@ -8,6 +8,9 @@ const createLogger = () => ({
   error: vi.fn()
 });
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const buildDeps = (overrides = {}) => {
   const order = [];
   const httpServer = {

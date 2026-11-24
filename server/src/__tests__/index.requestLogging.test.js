@@ -18,6 +18,9 @@ vi.mock("pino", async (importOriginal) => {
   const actual = /** @type {typeof import("pino")} */ (await importOriginal());
   const realPino = actual.default;
   const sink = { write: (line) => lines.push(JSON.parse(line)) };
+  /**
+   * @param {import("pino").LoggerOptions} options
+   */
   const capturing = (options) => realPino(options, sink);
   capturing.stdTimeFunctions = realPino.stdTimeFunctions;
   return { ...actual, default: capturing };

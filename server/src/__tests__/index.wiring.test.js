@@ -61,6 +61,10 @@ const WIRING_TEST_EMAILS = [
   "wiring-plan-prune@example.test"
 ];
 
+/**
+ * @param {string | null} headerValue
+ * @param {string} cookieName
+ */
 const extractCookieFromHeader = (headerValue, cookieName) => {
   const raw = String(headerValue || "");
   const match = raw.match(new RegExp(`${cookieName}=([^;,\\s]+)`));
@@ -68,6 +72,9 @@ const extractCookieFromHeader = (headerValue, cookieName) => {
   return `${cookieName}=${match[1]}`;
 };
 
+/**
+ * @param {string} [sidCookie]
+ */
 const fetchCsrf = async (sidCookie) => {
   const response = await fetch(`${baseUrl}/api/csrf-token`, {
     headers: sidCookie ? { Cookie: sidCookie } : {}
@@ -100,6 +107,10 @@ const withCsrf = async (path, method, { sidCookie, body } = {}) => {
   });
 };
 
+/**
+ * @param {string} email
+ * @param {string} password
+ */
 const signUp = async (email, password) => {
   const response = await withCsrf("/api/auth/signup", "POST", {
     body: {
@@ -253,6 +264,9 @@ describe("account management routes are wired into the real app", () => {
     // Two genuinely distinct tokens, or the rest of this test proves nothing.
     expect(secondSession).not.toBe(firstSession);
 
+    /**
+     * @param {string} cookie
+     */
     const meWith = async (cookie) =>
       (await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: cookie } })).status;
 

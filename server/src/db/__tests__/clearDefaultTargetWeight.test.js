@@ -16,6 +16,10 @@ const migrationSql = () =>
   readFile(new URL(`../../../db/postgres/${MIGRATION}`, import.meta.url), "utf8");
 
 // Raw SQL, so the goals are stored as the text gives them, key order included.
+/**
+ * @param {string} name
+ * @param {string} goalsJson
+ */
 const createUser = async (name, goalsJson) => {
   await prisma.$executeRaw`
     insert into app_users (email, password_hash, goals)
@@ -24,6 +28,9 @@ const createUser = async (name, goalsJson) => {
 };
 
 // Each test creates the user it reads, and fails at once if the row is missing.
+/**
+ * @param {string} name
+ */
 const goalsOf = async (name) =>
   /** @type {import("@prisma/client").AppUser} */ (
     await prisma.appUser.findFirst({ where: { email: name + EMAIL_SUFFIX } })

@@ -42,6 +42,9 @@ const OUT_OF_THE_WAY = 1000;
 // Each logger is a real one that writes nothing, the request logger's warn
 // calls spied on; the metrics hold the one counter the static client moves.
 
+/**
+ * @param {{ limit?: number }} [options]
+ */
 const buildApp = ({ limit = OUT_OF_THE_WAY } = {}) => {
   const app = express();
   const metrics = /** @type {import("../services/platform/metricsService.js").Metrics} */ ({

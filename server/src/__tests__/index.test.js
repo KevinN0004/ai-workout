@@ -33,6 +33,10 @@ const {
 let server;
 let baseUrl = "";
 
+/**
+ * @param {string | null} headerValue
+ * @param {string} cookieName
+ */
 const extractCookieFromHeader = (headerValue, cookieName) => {
   const raw = String(headerValue || "");
   const match = raw.match(new RegExp(`${cookieName}=([^;,\\s]+)`));
@@ -40,6 +44,9 @@ const extractCookieFromHeader = (headerValue, cookieName) => {
   return `${cookieName}=${match[1]}`;
 };
 
+/**
+ * @param {string | URL | Request} input
+ */
 const toRequestUrl = (input) => {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();

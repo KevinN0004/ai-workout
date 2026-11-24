@@ -2,6 +2,9 @@
 import { describe, expect, test, vi } from "vitest";
 import { applyMigrations } from "../postgresMigrations.js";
 
+/**
+ * @param {unknown} sql
+ */
 const firstWord = (sql) => String(sql).trim().split(/\s+/)[0].toLowerCase();
 
 /**
@@ -16,6 +19,9 @@ const createFakePool = ({ failOnSqlContaining = null } = {}) => {
   const checkedOut = [];
   let seq = 0;
 
+  /**
+   * @param {string} tag
+   */
   const makeClient = (tag) => ({
     tag,
     released: false,

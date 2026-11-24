@@ -9,11 +9,18 @@ import { prisma } from "../../../db/prisma.js";
 // generic read path, loadCollectionPage in
 // repositories/dashboardCollectionRepository.js, so they are covered together.
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ * @param {string} email
+ */
 const signUp = async (agent, email) => {
   const csrfToken = await getCsrf(agent);
   const response = await agent
@@ -56,6 +63,9 @@ describe("dashboard collection reads", () => {
     csrfToken = await signUp(agent, "collection-reads@example.com");
   });
 
+  /**
+   * @param {number} count
+   */
   const seedWorkouts = async (count) => {
     for (let index = 0; index < count; index += 1) {
       const response = await agent

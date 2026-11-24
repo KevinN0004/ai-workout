@@ -4,11 +4,17 @@ import request from "supertest";
 import { app } from "../index.js";
 import { prisma } from "../db/prisma.js";
 
+/**
+ * @param {ReturnType<typeof request.agent>} agent
+ */
 const getCsrf = async (agent) => {
   const response = await agent.get("/api/csrf-token");
   return String(response.body?.csrfToken || "");
 };
 
+/**
+ * @param {string | URL | Request} input
+ */
 const toRequestUrl = (input) => {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();

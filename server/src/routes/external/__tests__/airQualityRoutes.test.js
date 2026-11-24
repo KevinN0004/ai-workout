@@ -109,17 +109,30 @@ const buildApp = (openAqRequest, { requestId, logger = stubbed.logger } = {}) =>
 
 // A sensor as OpenAQ describes it on the location, and a reading that refers
 // back to it by id. The route has to join the two to learn what was measured.
+/**
+ * @param {number | undefined} id
+ * @param {string} name
+ * @param {string} [units]
+ */
 const sensor = (id, name, units = "ug/m3") => ({
   id,
   parameter: { name, units, displayName: openAqParameterLabel(name) }
 });
 
+/**
+ * @param {number | undefined} sensorsId
+ * @param {unknown} value
+ * @param {string} [utc]
+ */
 const reading = (sensorsId, value, utc = "2026-03-02T10:00:00Z") => ({
   sensorsId,
   value,
   datetime: { utc }
 });
 
+/**
+ * @param {Record<string, unknown>} [overrides]
+ */
 const station = (overrides = {}) => ({
   id: 42,
   name: "Riverside Monitor",
@@ -134,18 +147,28 @@ const station = (overrides = {}) => ({
 });
 
 // A station that last reported `hoursAgo` hours before the pinned 12:10Z.
+/**
+ * @param {number} hoursAgo
+ */
 const reportedAgo = (hoursAgo) => ({
   utc: new Date(Date.parse("2026-03-02T12:10:00Z") - hoursAgo * 3600000).toISOString()
 });
 
 // One OpenAQ hourly mean, ending `hoursAgo` whole hours before 12:00Z. The
 // clock is pinned at 12:10Z below, so hour 0 is ten minutes old.
+/**
+ * @param {number} hoursAgo
+ * @param {unknown} value
+ */
 const hour = (hoursAgo, value) => ({
   value,
   period: { datetimeTo: { utc: new Date(Date.UTC(2026, 2, 2, 12 - hoursAgo)).toISOString() } }
 });
 
 // Three steady hours of `value`: the fewest a NowCast of that value needs.
+/**
+ * @param {unknown} value
+ */
 const steadyHours = (value) => [hour(0, value), hour(1, value), hour(2, value)];
 
 // Three upstream calls in order: the location lookup, that location's latest
@@ -167,6 +190,10 @@ const upstream = ({
     .mockResolvedValueOnce({ data: { results: latest }, cache: latestCache })
     .mockResolvedValueOnce({ data: { results: hours }, cache: hoursCache });
 
+/**
+ * @param {import("express").Express} app
+ * @param {string} [query]
+ */
 const get = (app, query = "latitude=40.1&longitude=-75.2") => {
   const path = query ? `/api/air-quality/current?${query}` : "/api/air-quality/current";
   return request(app).get(path);
@@ -287,6 +314,9 @@ describe("GET /api/air-quality/current", () => {
       const capped = projectOpenAqStations(whole, point);
       expect(capped.results).toHaveLength(10);
 
+      /**
+       * @param {unknown} data
+       */
       const answerFrom = async (data) => {
         const openAqRequest = vi
           .fn()
@@ -339,6 +369,9 @@ describe("GET /api/air-quality/current", () => {
           ]
         })
       ];
+      /**
+       * @param {unknown} locationData
+       */
       const answerFrom = async (locationData) => {
         const openAqRequest = vi
           .fn()
@@ -434,6 +467,11 @@ describe("GET /api/air-quality/current", () => {
   // of the nearest candidates in turn, at most three, and takes the first whose
   // PM2.5 reading is itself fresh.
   describe("the walk over candidates", () => {
+    /**
+     * @param {number} id
+     * @param {number} distance
+     * @param {number} sensorId
+     */
     const pm25Station = (id, distance, sensorId) =>
       station({ id, name: `Station ${id}`, distance, sensors: [sensor(sensorId, "pm25")] });
 
@@ -453,6 +491,9 @@ describe("GET /api/air-quality/current", () => {
       if (hours) openAqRequest.mockResolvedValueOnce({ data: { results: hours }, cache: "miss" });
       return openAqRequest;
     };
+    /**
+     * @param {number} status
+     */
     const failure = (status) => Object.assign(new Error("openaq exploded"), { status });
     const STALE = "2026-01-10T08:00:00Z";
 
@@ -803,6 +844,9 @@ describe("GET /api/air-quality/current", () => {
           station({ id: 1576, datetimeLast: { utc: "2016-01-01T00:00:00Z" } })
         ]
       };
+      /**
+       * @param {unknown} data
+       */
       const answerFrom = async (data) => {
         const openAqRequest = vi.fn().mockResolvedValueOnce({ data, cache: "hit" });
         const response = await get(buildApp(openAqRequest));
@@ -1302,6 +1346,9 @@ describe("GET /api/air-quality/current", () => {
   // The dashboard renders this panel from a 200, so a failing upstream returns
   // a degraded body instead and the rest of the page still works.
   describe("when OpenAQ is down", () => {
+    /**
+     * @param {number} [status]
+     */
     const upstreamError = (status) => {
       /** @type {Error & { status?: number }} */
       const err = new Error("openaq exploded");
