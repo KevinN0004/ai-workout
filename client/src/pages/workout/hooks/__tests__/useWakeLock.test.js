@@ -3,21 +3,27 @@
  * again whenever the page is shown, let go on unmount, every refusal ignored,
  * and nothing at all in a browser without navigator.wakeLock.
  */
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import useWakeLock from "../useWakeLock";
 
 const sentinel = () => ({ release: vi.fn(() => Promise.resolve()) });
 
+// A test gives the page a wake lock and a visibility, and takes both away
+// again; the lock it grants is resolved later, so its resolver is cast there.
+/** @param {import("vitest").Mock} request */
 const stubWakeLock = (request) =>
   Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
 
+/** @param {string} state */
 const setVisibility = (state) =>
   Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
 
 // Lets the request's promise chain settle.
 const settle = () => act(async () => {});
 
+/** @param {string} state */
 const changeVisibility = async (state) => {
   setVisibility(state);
   document.dispatchEvent(new Event("visibilitychange"));
@@ -25,8 +31,8 @@ const changeVisibility = async (state) => {
 };
 
 afterEach(() => {
-  delete navigator.wakeLock;
-  delete document.visibilityState;
+  delete (/** @type {{ wakeLock?: unknown }} */ (navigator).wakeLock);
+  delete (/** @type {{ visibilityState?: unknown }} */ (document).visibilityState);
 });
 
 describe("useWakeLock", () => {
@@ -76,6 +82,7 @@ describe("useWakeLock", () => {
 
   test("a lock granted after the page closed is let go at once", async () => {
     const lock = sentinel();
+    /** @type {((value: unknown) => void) | undefined} */
     let grant;
     stubWakeLock(vi.fn(() => new Promise((resolve) => (grant = resolve))));
 
@@ -84,7 +91,7 @@ describe("useWakeLock", () => {
     unmount();
     expect(lock.release).not.toHaveBeenCalled();
 
-    grant(lock);
+    /** @type {(value: unknown) => void} */ (grant)(lock);
     await settle();
     expect(lock.release).toHaveBeenCalledTimes(1);
   });

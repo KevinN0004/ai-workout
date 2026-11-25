@@ -902,7 +902,7 @@ describe("type-checked files", () => {
   // the header's own block comment, so a misplaced one leaves a file unchecked
   // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
   // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 402;
+  const TYPE_CHECKED_FILES = 409;
   const WORKSPACES = ["client", "server"];
   const PRAGMA = "// @ts-check";
 
@@ -999,8 +999,7 @@ describe("type-checked files", () => {
     expect(unchecked, "add // @ts-check to each, below its header if it has one").toEqual([]);
   };
   test("every server test file is checked", () => expectTestsChecked("server"));
-  // The client's tests are checked by Task 12 of the plan, which unskips this.
-  test.skip("every client test file is checked", () => expectTestsChecked("client"));
+  test("every client test file is checked", () => expectTestsChecked("client"));
 
   // D1 phase 5: the test program has noImplicitAny off, which leaves a `let` with
   // no initializer as any, so nothing done with it is checked. Each one in a

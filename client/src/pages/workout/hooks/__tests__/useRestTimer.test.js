@@ -3,12 +3,14 @@
  * time, catches up when the page is shown again, and calls onEnd once per rest,
  * only when it sees the end within 5 seconds of it.
  */
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useRestTimer from "../useRestTimer";
 
 const NOW = Date.UTC(2026, 10, 9, 17, 0, 0);
 
+/** @param {number} ms */
 const tick = (ms) =>
   act(() => {
     vi.advanceTimersByTime(ms);
@@ -18,6 +20,7 @@ const showPage = () =>
     document.dispatchEvent(new Event("visibilitychange"));
   });
 // A locked phone: the clock moves on, but no timer runs.
+/** @param {number} ms */
 const lockFor = (ms) => vi.setSystemTime(Date.now() + ms);
 
 beforeEach(() => {

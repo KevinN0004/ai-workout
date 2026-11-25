@@ -4,9 +4,12 @@
  * where there is navigator.vibrate. Each test loads the module afresh, since it
  * keeps its one AudioContext for the page's life.
  */
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+/** @type {typeof import("../restAlert.js")} */
 let restAlert;
+/** @type {FakeAudioContext[]} */
 let contexts;
 
 /** An AudioContext that records what is played through it. */
@@ -40,7 +43,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete navigator.vibrate;
+  // A test that gave the navigator a vibrate takes it away again.
+  delete (/** @type {{ vibrate?: unknown }} */ (navigator).vibrate);
 });
 
 describe("restAlert", () => {
