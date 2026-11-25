@@ -80,7 +80,7 @@ const connectionRow = (overrides = {}) => ({
 const fakeConnections = (row, { underLock } = {}) => {
   /** @type {{ row: ConnectionRow | null, locks: number, updates: { tx: unknown, accessToken: string, refreshToken: string, expiresAt: Date }[], reconnects: number, holder?: string, unknownUser?: boolean, saved?: { userId: string, athleteId: number, athleteName: string, accessToken: string, refreshToken: string }, synced?: Date, failed?: string, removedAll?: number }} */
   const state = { row, locks: 0, updates: [], reconnects: 0 };
-  return {
+  return /** @satisfies {{ [K in keyof StravaDeps["connections"]]?: unknown } & { state: unknown }} */ ({
     state,
     findConnection: async () => (state.row ? { ...state.row } : null),
     withRefreshLock: async (_args, fn) => {
@@ -128,7 +128,7 @@ const fakeConnections = (row, { underLock } = {}) => {
       state.row = null;
       return { removed: 2 };
     }
-  };
+  });
 };
 
 // `unchanged` lists the imports a save finds already up to date, and `held`
@@ -143,7 +143,7 @@ const fakeImports = ({
 } = {}) => {
   /** @type {{ saved: { externalId: string }[], removed: string[], dayChecks: string[], since: string[] }} */
   const state = { saved: [], removed: [], dayChecks: [], since: [] };
-  return {
+  return /** @satisfies {{ [K in keyof StravaDeps["imports"]]?: unknown } & { state: unknown }} */ ({
     state,
     isDeletedHere: async ({ externalId }) => deleted.includes(externalId),
     hasImport: async ({ externalId }) => existing.includes(externalId),
@@ -164,7 +164,7 @@ const fakeImports = ({
       state.removed.push(externalId);
       return 1;
     }
-  };
+  });
 };
 
 /** @param {{ row?: ConnectionRow | null, underLock?: ConnectionRow | null, imports?: ReturnType<typeof fakeImports>, responses?: Response[], config?: StravaConfig }} [options] */

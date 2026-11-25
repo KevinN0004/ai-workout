@@ -21,18 +21,19 @@ const buildApp = (overrides = {}, user = { id: "u-1" }) => {
     req.log = pino({ level: "silent" });
     next();
   });
-  const deps = {
-    requireAuth: (req, res, next) => {
-      if (!user) return res.status(401).json({ error: "Not signed in." });
-      req.user = user;
-      next();
-    },
-    deleteImportById: vi.fn(async () => true),
-    findUserWithDashboard: vi.fn(async () => ({ userId: "u-1" })),
-    mapDbDocToUser: (doc) => doc,
-    buildDashboardResponse: vi.fn(async () => ({ dashboard: { workoutSessions: [] } })),
-    ...overrides
-  };
+  const deps =
+    /** @satisfies {{ [K in keyof Parameters<typeof registerWorkoutAndGoalRoutes>[1]]?: unknown }} */ ({
+      requireAuth: (req, res, next) => {
+        if (!user) return res.status(401).json({ error: "Not signed in." });
+        req.user = user;
+        next();
+      },
+      deleteImportById: vi.fn(async () => true),
+      findUserWithDashboard: vi.fn(async () => ({ userId: "u-1" })),
+      mapDbDocToUser: (doc) => doc,
+      buildDashboardResponse: vi.fn(async () => ({ dashboard: { workoutSessions: [] } })),
+      ...overrides
+    });
   // The stubs cover the delete route alone, so the deps are cast through unknown.
   registerWorkoutAndGoalRoutes(
     app,

@@ -18,21 +18,22 @@ const STATE = "state-from-cookie";
 /**
  * @param {Record<string, import("vitest").Mock>} [overrides]
  */
-const stubService = (overrides = {}) => ({
-  connectionState: vi.fn(async () => ({ available: true, connected: false })),
-  authorizeUrl: vi.fn(
-    ({ redirectUri, state }) => `https://strava.test/authorize?r=${redirectUri}&s=${state}`
-  ),
-  connect: vi.fn(async () => "connected"),
-  disconnect: vi.fn(async () => ({ removed: 3, revokeError: null })),
-  sync: vi.fn(async () => ({
-    imported: 1,
-    updated: 0,
-    removed: 0,
-    lastSyncedAt: "2026-11-13T10:00:00.000Z"
-  })),
-  ...overrides
-});
+const stubService = (overrides = {}) =>
+  /** @satisfies {{ [K in keyof ReturnType<typeof import("../../../services/integrations/stravaService.js").createStravaService>]?: unknown }} */ ({
+    connectionState: vi.fn(async () => ({ available: true, connected: false })),
+    authorizeUrl: vi.fn(
+      ({ redirectUri, state }) => `https://strava.test/authorize?r=${redirectUri}&s=${state}`
+    ),
+    connect: vi.fn(async () => "connected"),
+    disconnect: vi.fn(async () => ({ removed: 3, revokeError: null })),
+    sync: vi.fn(async () => ({
+      imported: 1,
+      updated: 0,
+      removed: 0,
+      lastSyncedAt: "2026-11-13T10:00:00.000Z"
+    })),
+    ...overrides
+  });
 
 /**
  * A real logger that writes nothing, with its three log methods spied on.
