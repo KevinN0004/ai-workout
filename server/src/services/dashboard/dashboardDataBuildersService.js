@@ -60,6 +60,22 @@ export const toNullableNumber = (value, min, max) => {
 };
 
 /**
+ * A positive integer, or `fallback`. index.js reads every positive integer
+ * setting with it, and hands it to generateRoutes.js and the HTTP cache. It
+ * guards absent input before it coerces: the `> 0` would also reject the 0 that
+ * `Number(null)` and `Number("")` make, but only by accident of the range, and a
+ * copy of this shape for a range that includes 0 needs the guard to be right.
+ *
+ * @param {unknown} value
+ * @param {number} fallback
+ */
+export const toPositiveInt = (value, fallback) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+/**
  * Cleans a list of strings, or a single string, with cleanText: empties are
  * dropped and the first `maxItems` kept.
  *

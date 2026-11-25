@@ -4,6 +4,7 @@ import express from "express";
 import request from "supertest";
 import { registerWeatherRoutes } from "../registerWeatherRoutes.js";
 import { createExternalDataService } from "../../../services/external/externalDataService.js";
+import { externalDataDeps } from "../../../services/external/__tests__/externalDeps.js";
 import { isUpstreamFailureStatus } from "../../../services/platform/platformHealthService.js";
 import {
   cleanText,
@@ -18,24 +19,9 @@ import {
 // dependency is the real injected function, so the recommendation under test is
 // the one that runs in production.
 
-// The stubs stand in for what these routes never reach, so the service built
-// from them is cast through unknown to its deps.
-const { toFiniteNumber, weatherCodeToText, buildWorkoutRecommendation } = createExternalDataService(
-  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
-    /** @type {unknown} */ ({
-      cleanText,
-      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-      readThroughExternalCache: async () => ({}),
-      buildExternalCacheKey: () => "",
-      metrics: { externalApiFailures: {}, externalApiRetries: {} },
-      logger: { info() {}, warn() {}, error() {} },
-      toShortText: (value) => String(value ?? ""),
-      recordExternalApiLatency: () => {},
-      externalApiRetries: 0,
-      externalApiRetryBaseDelayMs: 0
-    })
-  )
-);
+// The service is built from the app's real dependencies.
+const { toFiniteNumber, weatherCodeToText, buildWorkoutRecommendation } =
+  createExternalDataService(externalDataDeps());
 
 /**
  * @param {import("vitest").Mock} fetchOpenMeteo

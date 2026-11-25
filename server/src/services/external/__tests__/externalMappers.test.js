@@ -1,8 +1,7 @@
 // @ts-check
-import pino from "pino";
 import { describe, expect, test } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
-import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuildersService.js";
+import { externalDataDeps } from "./externalDeps.js";
 
 // The pure mappers that shape every upstream payload before it reaches a
 // client: the wger exercise mapper and its translation picker, the MealDB
@@ -10,27 +9,9 @@ import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuilde
 // on. These were the bulk of what was left uncovered in externalDataService --
 // its retry layer, weather and AQI maths are covered elsewhere.
 
-/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
-
 const { mapWgerExercise, mapMealDbMeal, normalizePlainText, parseMultiNumberQuery } =
-  // The mappers are pure and read none of these stubs, so they are cast as a whole.
-  createExternalDataService(
-    /** @type {ExternalDataDeps} */ (
-      /** @type {unknown} */ ({
-        cleanText,
-        toNullableNumber,
-        readThroughExternalCache: async () => ({}),
-        buildExternalCacheKey: () => "",
-        metrics: { externalApiFailures: {}, externalApiRetries: {} },
-        logger: pino({ level: "silent" }),
-        toShortText: (value) => String(value ?? ""),
-        recordExternalApiLatency: () => {},
-        externalApiRetries: 0,
-        externalApiRetryBaseDelayMs: 0,
-        wgerDefaultLanguage: 2
-      })
-    )
-  );
+  // Built from the app's real dependencies.
+  createExternalDataService(externalDataDeps());
 
 describe("normalizePlainText", () => {
   // wger descriptions arrive as HTML and are rendered as plain text.

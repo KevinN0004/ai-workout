@@ -1,7 +1,7 @@
 // @ts-check
-import pino from "pino";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
+import { externalDataDeps } from "./externalDeps.js";
 
 // Air-quality maths from externalDataService. These decide whether a user is
 // told to train outdoors, so a wrong breakpoint is health advice rather than a
@@ -10,14 +10,11 @@ import { createExternalDataService } from "../externalDataService.js";
 // Built through the real factory rather than reached through index.js's
 // __testables bag, which does not expose these two. The alternative was
 // widening a production export to make a test possible; the factory already
-// offers a seam, so it is used instead. Every dependency below is a stub: the
-// functions under test are pure and touch none of them, so they are cast as a
-// whole.
+// offers a seam, so it is used instead, with the app's real dependencies.
 //
 // OpenAQ's answers are untrusted, so the functions read them as unknown, and each
 // station fixture is typed as loosely, so a test can break one on purpose. Each
 // projection a test reads keeps a list of stations.
-/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
 /** @typedef {import("../externalDataService.js").OpenAqLocations} OpenAqLocations */
 /** @typedef {{ id: number, distance?: unknown, coordinates?: unknown, datetimeLast?: unknown, sensors: { parameter?: unknown, [field: string]: unknown }[], [field: string]: unknown }} Station */
 const {
@@ -34,23 +31,7 @@ const {
   isOutdoorFriendlyNow,
   weatherCodeToText,
   buildWorkoutRecommendation
-} = createExternalDataService(
-  /** @type {ExternalDataDeps} */ (
-    /** @type {unknown} */ ({
-      cleanText: (value, maxLen = 120) =>
-        typeof value === "string" ? value.trim().slice(0, maxLen) : "",
-      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-      readThroughExternalCache: async () => ({}),
-      buildExternalCacheKey: () => "",
-      metrics: { externalApiFailures: {}, externalApiRetries: {} },
-      logger: pino({ level: "silent" }),
-      toShortText: (value) => String(value ?? ""),
-      recordExternalApiLatency: () => {},
-      externalApiRetries: 0,
-      externalApiRetryBaseDelayMs: 0
-    })
-  )
-);
+} = createExternalDataService(externalDataDeps());
 
 describe("pm25ToUsAqi", () => {
   test("returns null rather than a number for absent input", () => {
