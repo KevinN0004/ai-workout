@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   MAX_CARDS,
@@ -19,9 +20,20 @@ import {
 // The Log workout form's set log (roadmap B1): exercise cards, each with set
 // rows held as typed strings, turned into the API's exerciseSets on save.
 
+/**
+ * @param {string} name
+ * @param {Partial<ReturnType<typeof newCard>["sets"][number]>[]} rows
+ * @param {Parameters<typeof newCard>[0]} [fields]
+ */
 const card = (name, rows, fields = {}) => {
   const base = newCard({ name, ...fields });
-  return { ...base, sets: rows.map((row) => ({ ...base.sets[0], key: Math.random(), ...row })) };
+  // A row key only has to differ from its neighbours, which a random number does.
+  return /** @type {ReturnType<typeof newCard>} */ (
+    /** @type {unknown} */ ({
+      ...base,
+      sets: rows.map((row) => ({ ...base.sets[0], key: Math.random(), ...row }))
+    })
+  );
 };
 
 describe("the cards and rows", () => {
@@ -95,7 +107,8 @@ describe("the load's unit", () => {
     ["0", "imperial", 0],
     ["0", "metric", 0]
   ])("%s typed under %s saves as %s kg", (typed, system, kg) => {
-    expect(toLoadKg(typed, system)).toBe(kg);
+    // Each row names one of the two systems.
+    expect(toLoadKg(typed, /** @type {"imperial" | "metric"} */ (system))).toBe(kg);
   });
 
   test.each([
@@ -114,7 +127,8 @@ describe("the load's unit", () => {
     [0, "imperial", "0"],
     [null, "metric", ""]
   ])("%s kg shows under %s as %j", (kg, system, shown) => {
-    expect(fromLoadKg(kg, system)).toBe(shown);
+    // Each row names one of the two systems.
+    expect(fromLoadKg(kg, /** @type {"imperial" | "metric"} */ (system))).toBe(shown);
   });
 });
 
@@ -182,21 +196,24 @@ describe("toExerciseSets, on save", () => {
     expect(exerciseSets[0].sets[0]).toMatchObject({ reps: 0, loadKg: 0 });
   });
 
-  test.each([
-    ["a load with no reps", { amount: "", load: "100" }, "reps", "Enter reps or seconds"],
-    ["an RPE with no reps", { amount: "", rpe: "8" }, "reps", "Enter reps or seconds"],
-    ["a fraction of a rep", { amount: "8.5" }, "reps", "Reps are a whole number from 0 to 200"],
-    ["201 reps", { amount: "201" }, "reps", "Reps are a whole number from 0 to 200"],
-    [
-      "a hold of 0 seconds",
-      { amount: "0" },
-      "seconds",
-      "Seconds are a whole number from 1 to 3600"
-    ],
-    ["a load past 1000 kg", { amount: "5", load: "1000.5" }, "reps", "Load is from 0 to 1000 kg"],
-    ["a negative load", { amount: "5", load: "-5" }, "reps", "Load is from 0 to 1000 kg"],
-    ["RPE 11", { amount: "5", rpe: "11" }, "reps", "RPE is from 1 to 10"]
-  ])("names the row for %s", (_label, row, kind, message) => {
+  // Each row's kind is one of the two.
+  test.each(
+    /** @type {[string, Partial<ReturnType<typeof newCard>["sets"][number]>, "reps" | "seconds", string][]} */ ([
+      ["a load with no reps", { amount: "", load: "100" }, "reps", "Enter reps or seconds"],
+      ["an RPE with no reps", { amount: "", rpe: "8" }, "reps", "Enter reps or seconds"],
+      ["a fraction of a rep", { amount: "8.5" }, "reps", "Reps are a whole number from 0 to 200"],
+      ["201 reps", { amount: "201" }, "reps", "Reps are a whole number from 0 to 200"],
+      [
+        "a hold of 0 seconds",
+        { amount: "0" },
+        "seconds",
+        "Seconds are a whole number from 1 to 3600"
+      ],
+      ["a load past 1000 kg", { amount: "5", load: "1000.5" }, "reps", "Load is from 0 to 1000 kg"],
+      ["a negative load", { amount: "5", load: "-5" }, "reps", "Load is from 0 to 1000 kg"],
+      ["RPE 11", { amount: "5", rpe: "11" }, "reps", "RPE is from 1 to 10"]
+    ])
+  )("names the row for %s", (_label, row, kind, message) => {
     const cards = [card("Squat", [row], { kind })];
 
     const { errors } = toExerciseSets(cards, "metric");
@@ -222,6 +239,7 @@ describe("toExerciseSets, on save", () => {
 });
 
 describe("formatExerciseLine, in Logs", () => {
+  /** @param {...(number | null)[]} rows */
   const sets = (...rows) =>
     rows.map(([reps, loadKg, rpe]) => ({ reps, seconds: null, loadKg, rpe }));
 

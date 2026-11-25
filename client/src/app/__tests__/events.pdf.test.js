@@ -1,3 +1,4 @@
+// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Hoisted so vi.mock (which is itself hoisted) can close over these.
@@ -27,9 +28,17 @@ const { createAppEventHandlers } = await import("../events.js");
 // The factory destructures a large dependency bag but only reads it inside the
 // individual handlers, so the PDF path needs nothing but `result` and the error
 // setter its failure branch calls.
+/** @param {string} result */
 const buildHandlers = (result) => {
   const setError = vi.fn();
-  return { ...createAppEventHandlers({ result, setError }), setError };
+  return {
+    ...createAppEventHandlers(
+      /** @type {import("../events.js").AppEventDeps} */ (
+        /** @type {unknown} */ ({ result, setError })
+      )
+    ),
+    setError
+  };
 };
 
 describe("downloadPlanPdf", () => {

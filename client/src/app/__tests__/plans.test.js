@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   PLAN_PAYLOAD_VERSION,
@@ -15,6 +16,7 @@ import {
 // uses for "today". Previously 25% covered, and the only thing standing between
 // a model that phrases its output slightly differently and an empty plan.
 
+/** @param {...string} lines */
 const plan = (...lines) => lines.join("\n");
 
 const weekPlan = plan(
@@ -260,6 +262,7 @@ describe("parsePlanSections", () => {
 });
 
 describe("extractLatestPlanByWeekday", () => {
+  /** @param {string} planText */
   const dashboard = (planText) => ({ plans: [{ plan: planText }] });
 
   test("groups the lines under each weekday", () => {
@@ -374,6 +377,7 @@ describe("extractLatestPlanByWeekday", () => {
 
 // A structure the server would save: deliberately unlike any text it is paired
 // with below, so a test can tell which of the two was read.
+/** @param {Record<string, unknown>} [overrides] */
 const savedPayload = (overrides = {}) => ({
   version: PLAN_PAYLOAD_VERSION,
   days: [{ index: 0, weekday: "Tuesday", title: "Tuesday - Pull", lines: ["From the payload"] }],
@@ -399,6 +403,7 @@ describe("readPlan", () => {
   });
 
   // Anything the server would not have saved is read as no structure at all.
+  /** @param {Record<string, unknown>} change */
   const withDay = (change) => savedPayload({ days: [{ ...savedPayload().days[0], ...change }] });
 
   test.each([
@@ -421,6 +426,11 @@ describe("readPlan", () => {
 });
 
 describe("planByWeekday", () => {
+  /**
+   * @param {number} index
+   * @param {string | null} weekday
+   * @param {string[]} lines
+   */
   const day = (index, weekday, lines) => ({ index, weekday, title: weekday || "Your plan", lines });
 
   test("maps each weekday to its lines, merging a repeated weekday in order", () => {
@@ -446,9 +456,15 @@ describe("planByWeekday", () => {
 // what a session's planDayIndex points into.
 describe("savedPlanDays", () => {
   test("is a plan's saved days when its structure is valid", () => {
-    expect(savedPlanDays({ plan: "Monday\nText", payload: savedPayload() })).toEqual(
-      savedPayload().days
-    );
+    // A saved plan carries its text too, which its days are not read from.
+    expect(
+      savedPlanDays(
+        /** @type {Parameters<typeof savedPlanDays>[0]} */ ({
+          plan: "Monday\nText",
+          payload: savedPayload()
+        })
+      )
+    ).toEqual(savedPayload().days);
   });
 
   test.each([
@@ -472,14 +488,16 @@ describe("isRestDay", () => {
       import: "default",
       eager: true
     })
-  ).map(([path, text]) => [path.split("/").pop(), text]);
+    // Each fixture is its file name and its text.
+  ).map(([path, text]) => /** @type {[string, string]} */ ([path.split("/").pop(), text]));
 
   test("reads the eight fixtures", () => {
     expect(fixtures).toHaveLength(8);
   });
 
   test.each(fixtures)("%s trains on as many days as its profile asked for", (name, text) => {
-    const asked = Number(/-(\d)d[-.]/.exec(name)[1]);
+    // Each fixture's name holds its day count.
+    const asked = Number(/** @type {RegExpExecArray} */ (/-(\d)d[-.]/.exec(name))[1]);
     const { days } = parsePlanSections(text);
 
     expect(days).toHaveLength(7);

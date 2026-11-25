@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { fetchWithTimeout } from "../network.js";
 import { getConnection, markAnswered, markUnanswered } from "../connection.js";

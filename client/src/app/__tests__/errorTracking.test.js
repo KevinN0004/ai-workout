@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import * as Sentry from "@sentry/react";
 import { initErrorTracking } from "../errorTracking.js";
@@ -13,32 +14,52 @@ vi.mock("@sentry/react", () => ({
 
 const DSN = "https://publickey@o123.ingest.us.sentry.io/456";
 
-const initConfig = () => Sentry.init.mock.calls[0][0];
+// vi.mock above replaces the SDK's functions with mocks.
+/** @typedef {import("vitest").Mock} Mock */
+
+const initConfig = () =>
+  /** @type {Mock} */ (/** @type {unknown} */ (Sentry.init)).mock.calls[0][0];
 
 // A loader the test controls, so it decides when the SDK "arrives".
 const deferredLoad = () => {
+  /** @type {(() => void) | undefined} */
   let arrive;
+  /** @type {((reason?: unknown) => void) | undefined} */
   let fail;
   const pending = new Promise((resolve, reject) => {
     arrive = () => resolve(Sentry);
     fail = reject;
   });
-  return { load: () => pending, arrive, fail };
+  // The promise runs its executor at once, so both are set by here.
+  return {
+    load: () => pending,
+    arrive: /** @type {() => void} */ (arrive),
+    fail: /** @type {(reason?: unknown) => void} */ (fail)
+  };
 };
 
+/** @param {ErrorEventInit} init */
 const throwOnWindow = (init) => window.dispatchEvent(new ErrorEvent("error", init));
 
 // jsdom has no PromiseRejectionEvent, so the reason rides a plain event.
+/** @param {unknown} reason */
 const rejectOnWindow = (reason) => {
   const event = new Event("unhandledrejection");
-  event.reason = reason;
+  /** @type {Event & { reason?: unknown }} */ (event).reason = reason;
   window.dispatchEvent(event);
 };
 
 // The very handlers that were added, not merely some handler of that type.
+/**
+ * @param {import("vitest").MockInstance} added
+ * @param {import("vitest").MockInstance} removed
+ */
 const expectListenersReleased = (added, removed) => {
   for (const type of ["error", "unhandledrejection"]) {
-    const [, handler] = added.mock.calls.find(([addedType]) => addedType === type);
+    // Each type was added before the test releases it.
+    const [, handler] = /** @type {unknown[]} */ (
+      added.mock.calls.find(([addedType]) => addedType === type)
+    );
     expect(removed).toHaveBeenCalledWith(type, handler);
   }
 };
@@ -127,7 +148,9 @@ describe("initErrorTracking", () => {
     arrive();
     await expect(started).resolves.toBe(true);
 
-    expect(Sentry.captureException.mock.calls).toEqual([[crash], ["Script error."], [rejection]]);
+    expect(
+      /** @type {Mock} */ (/** @type {unknown} */ (Sentry.captureException)).mock.calls
+    ).toEqual([[crash], ["Script error."], [rejection]]);
   });
 
   test("stops listening once the SDK's own handlers are running", async () => {
@@ -155,7 +178,10 @@ describe("initErrorTracking", () => {
     await started;
 
     expect(Sentry.captureException).toHaveBeenCalledTimes(10);
-    expect(Sentry.captureException.mock.calls[0][0].message).toBe("frame 0");
+    expect(
+      /** @type {Mock} */ (/** @type {unknown} */ (Sentry.captureException)).mock.calls[0][0]
+        .message
+    ).toBe("frame 0");
   });
 
   test("gives up quietly when the SDK chunk cannot load", async () => {

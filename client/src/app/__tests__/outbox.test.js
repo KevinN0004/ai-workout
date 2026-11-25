@@ -3,12 +3,18 @@
  * confirmed, oldest first, one entry per replay key, and a write that reports
  * whether storage took it.
  */
+// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { addToOutbox, clearOutbox, readOutbox, removeFromOutbox } from "../outbox.js";
 import { OUTBOX_CACHE_PREFIX } from "../constants.js";
 
 const ada = { email: "ada@example.com" };
 const grace = { email: "grace@example.com" };
+/**
+ * @param {string} clientId
+ * @param {Partial<import("../outbox.js").OutboxEntry>} [extra]
+ * @returns {import("../outbox.js").OutboxEntry}
+ */
 const entry = (clientId, extra = {}) => ({
   clientId,
   type: "workout",

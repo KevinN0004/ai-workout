@@ -2,20 +2,32 @@
  * Pins postLog, which sends one log and throws with the answer's status, and
  * sendLog, which retries once with a fresh CSRF token when the guard refused it.
  */
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { postLog, sendLog } from "../sendLog.js";
 
-const answer = (status, body) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  json: async () => {
-    if (body === undefined) throw new Error("not json");
-    return body;
-  }
-});
+// Each answer holds only ok, status and json, which is all postLog reads, and
+// each send's answer only the fields its test compares.
+/** @typedef {import("../network.js").ApiFetch} ApiFetch */
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
+const answer = (status, body) =>
+  /** @type {Response} */ (
+    /** @type {unknown} */ ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => {
+        if (body === undefined) throw new Error("not json");
+        return body;
+      }
+    })
+  );
 
 describe("postLog", () => {
   test("posts the body as JSON and resolves to the server's answer", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => answer(200, { dashboard: { workouts: [] } }));
 
     const data = await postLog(
@@ -31,7 +43,10 @@ describe("postLog", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" }
     });
-    expect(JSON.parse(options.body)).toEqual({ id: "k1" });
+    // postLog sends its body as a JSON string.
+    expect(JSON.parse(/** @type {string} */ (/** @type {RequestInit} */ (options).body))).toEqual({
+      id: "k1"
+    });
   });
 
   test("throws the server's error with its status", async () => {
@@ -82,7 +97,13 @@ describe("sendLog", () => {
   test("hands back the data of a send that worked", async () => {
     const ensureCsrfToken = vi.fn();
 
-    const outcome = await sendLog(async () => ({ dashboard: {} }), ensureCsrfToken);
+    const outcome = await sendLog(
+      async () =>
+        /** @type {import("../network.js").Wire<import("../sendLog.js").LogSavedResponse>} */ (
+          /** @type {unknown} */ ({ dashboard: {} })
+        ),
+      ensureCsrfToken
+    );
 
     expect(outcome).toEqual({ data: { dashboard: {} } });
     expect(ensureCsrfToken).not.toHaveBeenCalled();

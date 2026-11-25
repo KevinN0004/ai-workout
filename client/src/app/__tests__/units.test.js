@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   getLocalDateKey,
@@ -105,6 +106,10 @@ describe("getRegionFromLocale", () => {
 });
 
 describe("getPreferredMeasurementSystem", () => {
+  /**
+   * @param {string[] | undefined} languages
+   * @param {string} [language]
+   */
   const withLanguages = (languages, language) => {
     vi.stubGlobal("navigator", { languages, language });
   };

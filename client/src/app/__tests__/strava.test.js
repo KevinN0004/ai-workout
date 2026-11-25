@@ -2,6 +2,7 @@
  * Pins the Strava requests Settings makes (roadmap C2): each one's path, method
  * and body over apiFetch, what each returns, and the message a refusal throws.
  */
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import {
   disconnectStrava,
@@ -12,7 +13,14 @@ import {
   syncStrava
 } from "../strava";
 
-const respond = (body, ok = true) => ({ ok, json: async () => body });
+// Each answer holds only ok and json, which is all the client reads.
+/** @typedef {import("../network.js").ApiFetch} ApiFetch */
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const respond = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 const STATE = {
   available: true,
   connected: true,
@@ -29,6 +37,7 @@ describe("the Strava requests", () => {
       { url: "https://www.strava.com/oauth/authorize?x=1" },
       { skipped: true }
     ];
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond(answers.shift()));
 
     expect(await fetchStravaState(apiFetch)).toEqual(STATE);
@@ -50,14 +59,19 @@ describe("the Strava requests", () => {
   });
 
   test("the quiet sync says it is not manual", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond({ imported: 0, updated: 0, removed: 0 }));
 
     await syncStrava(apiFetch, { manual: false });
 
-    expect(apiFetch.mock.calls[0][1].body).toBe(JSON.stringify({ manual: false }));
+    // Each send passes its options.
+    expect(/** @type {RequestInit} */ (apiFetch.mock.calls[0][1]).body).toBe(
+      JSON.stringify({ manual: false })
+    );
   });
 
   test("disconnecting deletes the connection", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond({ ok: true }));
 
     expect(await disconnectStrava(apiFetch)).toEqual({ ok: true });
@@ -67,6 +81,7 @@ describe("the Strava requests", () => {
 
 describe("a refused request", () => {
   test("throws the server's message", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond({ error: "Strava is not available." }, false));
 
     await expect(fetchStravaState(apiFetch)).rejects.toThrow("Strava is not available.");
@@ -78,12 +93,18 @@ describe("a refused request", () => {
   });
 
   test("throws a fixed message when the refusal says nothing readable", async () => {
-    const apiFetch = vi.fn(async () => ({
-      ok: false,
-      json: async () => {
-        throw new SyntaxError("not JSON");
-      }
-    }));
+    /** @type {import("vitest").Mock<ApiFetch>} */
+    const apiFetch = vi.fn(
+      async () =>
+        /** @type {Response} */ (
+          /** @type {unknown} */ ({
+            ok: false,
+            json: async () => {
+              throw new SyntaxError("not JSON");
+            }
+          })
+        )
+    );
 
     await expect(fetchStravaState(apiFetch)).rejects.toThrow(
       "Could not load your Strava connection. Try again."

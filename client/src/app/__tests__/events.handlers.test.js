@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";
@@ -12,10 +13,23 @@ import {
   WEATHER_CACHE_PREFIX
 } from "../constants";
 
-const jsonResponse = (body, ok = true) => ({
-  ok,
-  json: async () => body
-});
+// The fake deps hold only the members these handlers read, each function a
+// mock; each answer only ok and json, and each event only preventDefault, which
+// is all the handlers read of them.
+/** @typedef {import("../events.js").AppEventDeps} AppEventDeps */
+/** @typedef {Omit<import("vitest").Mocked<AppEventDeps>, "apiFetch"> & { apiFetch: import("vitest").Mock }} FakeDeps */
+
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const jsonResponse = (body, ok = true) =>
+  /** @type {Response} */ (
+    /** @type {unknown} */ ({
+      ok,
+      json: async () => body
+    })
+  );
 
 // The form's exercise cards: two filled, the first typed in pounds, and one
 // wholly blank, which a save drops.
@@ -29,32 +43,40 @@ const workoutCards = () => {
   ];
 };
 
+// An override replaces a fake with what one test needs, so it is cast with them.
+/** @param {{ [K in keyof AppEventDeps]?: unknown }} [overrides] */
 const buildDeps = (overrides = {}) => {
-  const deps = {
-    apiFetch: vi.fn(async () => jsonResponse({ dashboard: { workouts: [] } })),
-    queueOptimisticLogCommit: vi.fn(),
-    setWorkoutForm: vi.fn(),
-    setWorkoutModalOpen: vi.fn(),
-    setCalorieForm: vi.fn(),
-    setDashboard: vi.fn(),
-    setDashError: vi.fn(),
-    showDashboardToast: vi.fn(),
-    captureAccount: () => () => true,
-    flushOptimisticOperations: vi.fn(async () => {}),
-    workoutForm: {
-      date: "2026-03-01",
-      focus: "Push",
-      duration: "45",
-      exerciseSets: workoutCards(),
-      notes: "felt good"
-    },
-    calorieForm: { calories: "2200" },
-    ...overrides
+  const deps = /** @type {FakeDeps} */ (
+    /** @type {unknown} */ ({
+      apiFetch: vi.fn(async () => jsonResponse({ dashboard: { workouts: [] } })),
+      queueOptimisticLogCommit: vi.fn(),
+      setWorkoutForm: vi.fn(),
+      setWorkoutModalOpen: vi.fn(),
+      setCalorieForm: vi.fn(),
+      setDashboard: vi.fn(),
+      setDashError: vi.fn(),
+      showDashboardToast: vi.fn(),
+      captureAccount: () => () => true,
+      flushOptimisticOperations: vi.fn(async () => {}),
+      workoutForm: {
+        date: "2026-03-01",
+        focus: "Push",
+        duration: "45",
+        exerciseSets: workoutCards(),
+        notes: "felt good"
+      },
+      calorieForm: { calories: "2200" },
+      ...overrides
+    })
+  );
+  return {
+    deps,
+    handlers: createAppEventHandlers(deps)
   };
-  return { deps, handlers: createAppEventHandlers(deps) };
 };
 
-const submitEvent = () => ({ preventDefault: vi.fn() });
+const submitEvent = () =>
+  /** @type {import("react").FormEvent} */ (/** @type {unknown} */ ({ preventDefault: vi.fn() }));
 
 describe("submitWorkout", () => {
   // Loads are typed in the region's unit; pin an imperial one, so the
@@ -172,7 +194,10 @@ describe("submitWorkout", () => {
 
     await handlers.submitWorkout(submitEvent());
 
-    const reset = deps.setWorkoutForm.mock.calls.at(-1)[0];
+    // The save ends by resetting the form to a fresh one.
+    const reset = /** @type {import("../exerciseSets.js").WorkoutForm} */ (
+      /** @type {unknown[]} */ (deps.setWorkoutForm.mock.calls.at(-1))[0]
+    );
     expect(reset).toMatchObject({ focus: "", duration: "", notes: "", planId: null });
     expect(reset.exerciseSets).toHaveLength(1);
     expect(reset.exerciseSets[0].name).toBe("");
@@ -247,7 +272,12 @@ describe("saveExerciseToPlan", () => {
   test("sends an empty object when no payload is supplied", async () => {
     const { deps, handlers } = buildDeps();
 
-    await handlers.saveExerciseToPlan();
+    // Nothing at all, which the save sends as {}.
+    await handlers.saveExerciseToPlan(
+      /** @type {Parameters<typeof handlers.saveExerciseToPlan>[0]} */ (
+        /** @type {unknown} */ (undefined)
+      )
+    );
 
     expect(deps.apiFetch.mock.calls[0][1].body).toBe("{}");
   });
@@ -324,7 +354,12 @@ describe("deleteImportedWorkout", () => {
 // test above mocks that queue -- so the closure, and the failure handling
 // inside it, was never run. These capture it and drive it directly.
 describe("the optimistic log requests", () => {
-  const queuedRequest = (queueMock) => queueMock.mock.calls.at(-1)[0].request;
+  /** @param {FakeDeps["queueOptimisticLogCommit"]} queueMock */
+  const queuedRequest = (queueMock) =>
+    // The submit has just queued its commit.
+    /** @type {Parameters<AppEventDeps["queueOptimisticLogCommit"]>} */ (
+      queueMock.mock.calls.at(-1)
+    )[0].request;
 
   const mealForm = {
     date: "2026-03-01",
@@ -353,7 +388,8 @@ describe("the optimistic log requests", () => {
 
       await queuedRequest(deps.queueOptimisticLogCommit)();
 
-      const [url, options] = deps.apiFetch.mock.calls.at(-1);
+      // The queued request has just been sent.
+      const [url, options] = /** @type {[string, RequestInit]} */ (deps.apiFetch.mock.calls.at(-1));
       expect(url).toBe(path);
       expect(options.method).toBe("POST");
     });
@@ -425,7 +461,9 @@ describe("the optimistic log requests", () => {
 
     handlers.submitMealLog(submitEvent());
 
-    const { item } = deps.queueOptimisticLogCommit.mock.calls.at(-1)[0];
+    const { item } = /** @type {Parameters<AppEventDeps["queueOptimisticLogCommit"]>} */ (
+      deps.queueOptimisticLogCommit.mock.calls.at(-1)
+    )[0];
     expect(item.name).toBe("");
     expect(item.notes).toBe("");
   });
@@ -439,7 +477,9 @@ describe("the optimistic log requests", () => {
 
     handlers.submitMealLog(submitEvent());
 
-    const { item } = deps.queueOptimisticLogCommit.mock.calls.at(-1)[0];
+    const { item } = /** @type {Parameters<AppEventDeps["queueOptimisticLogCommit"]>} */ (
+      deps.queueOptimisticLogCommit.mock.calls.at(-1)
+    )[0];
     expect(item.calories).toBeNull();
     expect(item.proteinG).toBeNull();
   });
@@ -452,7 +492,11 @@ describe("the optimistic log requests", () => {
 
     handlers.submitMealLog(submitEvent());
 
-    expect(deps.queueOptimisticLogCommit.mock.calls.at(-1)[0].item.mealType).toBe("other");
+    expect(
+      /** @type {Parameters<AppEventDeps["queueOptimisticLogCommit"]>} */ (
+        deps.queueOptimisticLogCommit.mock.calls.at(-1)
+      )[0].item.mealType
+    ).toBe("other");
   });
 });
 
@@ -468,6 +512,10 @@ describe("the optimistic log requests", () => {
 describe("each log's replay key", () => {
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+  /**
+   * @param {FakeDeps} deps
+   * @param {number} call
+   */
   const sentBody = async (deps, call) => {
     await deps.queueOptimisticLogCommit.mock.calls[call][0].request();
     return JSON.parse(deps.apiFetch.mock.calls[call][1].body);
@@ -514,6 +562,7 @@ describe("the direct write actions' fallback messages", () => {
   const goalForm = { targetWeight: "170", targetCalories: "2200", weeklyWorkouts: "4" };
   const progressForm = { date: "2026-03-01", weightLb: "170" };
 
+  /** @type {[string, string, Record<string, unknown>, unknown[]][]} */
   const cases = [
     ["submitGoals", "Unable to save goals.", { goalForm, setGoalForm: () => {} }, [submitEvent()]],
     [
@@ -1120,6 +1169,7 @@ describe("each log's outbox", () => {
 // first (docs/specs/2026-11-06-offline-ready-pwa-design.md).
 describe("signing out with entries not yet sent", () => {
   const user = { email: "person@example.com" };
+  /** @param {string} clientId */
   const keepEntry = (clientId) =>
     addToOutbox(user, {
       clientId,
@@ -1258,7 +1308,8 @@ describe("finishing an in-gym session", () => {
       planId: "plan-1",
       planDayIndex: 1
     });
-    expect(outbox.clientId).toBe(session.clientId);
+    // A session finished while signed in is kept for a replay.
+    expect(/** @type {NonNullable<typeof outbox>} */ (outbox).clientId).toBe(session.clientId);
     expect(readActiveSession(user)).toBeNull();
     expect(deps.go).toHaveBeenCalledWith("/dashboard/workouts");
   });
@@ -1482,7 +1533,10 @@ describe("replacePlan", () => {
 
     handlers.replacePlan(swapped);
 
-    const update = deps.setDashboard.mock.calls[0][0];
+    // The swap is merged in through an updater.
+    const update = /** @type {(previous: object | null) => object | null} */ (
+      deps.setDashboard.mock.calls[0][0]
+    );
     const plans = [
       { id: "plan-1", plan: "newer" },
       { id: "plan-2", plan: "as generated" }
