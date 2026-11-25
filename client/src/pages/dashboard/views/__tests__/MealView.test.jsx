@@ -1,3 +1,4 @@
+// @ts-check
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -6,6 +7,13 @@ import { MEALDB_RECOMMENDATION_QUERIES } from "../../meal/data";
 
 // The zone the run started in, restored after each test that pins its own.
 const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// The dashboard holds only the plans and goals the view reads, and the app
+// always passes a planner form and a meal form; null stands in for neither,
+// which the view reads with ?. too. So those props, and the logs a test gives,
+// are cast where they are given. Elements a test looks up are cast to the
+// element it expects, and a setter's last updater to a function.
+/** @typedef {Parameters<typeof MealView>[0]} MealViewProps */
 
 // MealView is the coordinator for the meal tab: it picks the recommendation
 // track from the account's goal text, derives the calorie band and the portion
@@ -17,6 +25,10 @@ const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // fetches, the abort handling and the normalisation under test are the ones
 // that ship -- what is faked is `fetch` alone.
 
+/**
+ * @param {string} id
+ * @param {object} [extra]
+ */
 const mealPayload = (id, extra = {}) => ({
   id,
   title: `Meal ${id}`,
@@ -27,10 +39,12 @@ const mealPayload = (id, extra = {}) => ({
 // Routes by the `query=` parameter so one query can fail while the others
 // succeed. A handler may be a function returning the JSON body, or a literal
 // response object when the point of the test is a non-ok status.
+/** @param {{ byQuery?: Record<string, unknown>, fallback?: unknown }} [options] */
 const stubFetch = ({ byQuery = {}, fallback } = {}) => {
   const fetchMock = vi.fn(async (url) => {
     const query = new URL(String(url), "http://localhost").searchParams.get("query");
-    const handler = byQuery[query] ?? fallback ?? (() => ({ meals: [] }));
+    // A URL with no query reads the key "null", which no table holds.
+    const handler = byQuery[/** @type {string} */ (query)] ?? fallback ?? (() => ({ meals: [] }));
     if (typeof handler !== "function") return handler;
     const body = await handler();
     return { ok: true, json: async () => body };
@@ -39,13 +53,18 @@ const stubFetch = ({ byQuery = {}, fallback } = {}) => {
   return fetchMock;
 };
 
+/** @param {Partial<MealViewProps>} [props] */
 const renderView = (props = {}) => {
   const handlers = { setMealLogForm: vi.fn(), submitMealLog: vi.fn((e) => e.preventDefault()) };
   const utils = render(
     <MealView
-      dashboard={{ plans: [], goals: {} }}
-      fallbackPlan={null}
-      mealLogForm={null}
+      dashboard={
+        /** @type {MealViewProps["dashboard"]} */ (
+          /** @type {unknown} */ ({ plans: [], goals: {} })
+        )
+      }
+      fallbackPlan={/** @type {MealViewProps["fallbackPlan"]} */ (/** @type {unknown} */ (null))}
+      mealLogForm={/** @type {MealViewProps["mealLogForm"]} */ (/** @type {unknown} */ (null))}
       mealLogs={[]}
       {...handlers}
       {...props}
@@ -59,6 +78,7 @@ const tablist = () => screen.getByRole("tablist", { name: "Meal course options" 
 // A course pill renders its title as a bare text node followed by a count
 // span, so the button's own text is `${title}${count}` and an exact text match
 // never hits it. Matched on the prefix instead.
+/** @param {string} title */
 const coursePill = (title) => {
   const found = within(tablist())
     .getAllByRole("button")
@@ -67,7 +87,9 @@ const coursePill = (title) => {
   return found;
 };
 
-const courseCount = (title) => coursePill(title).querySelector(".meal-course-count").textContent;
+/** @param {string} title */
+const courseCount = (title) =>
+  /** @type {Element} */ (coursePill(title).querySelector(".meal-course-count")).textContent;
 
 // Which sections are actually on screen. Read from the section headers rather
 // than by text: a course pill carries the same title, and so does every meal
@@ -75,11 +97,13 @@ const courseCount = (title) => coursePill(title).querySelector(".meal-course-cou
 const displayedSectionTitles = () =>
   Array.from(document.querySelectorAll(".meal-section-header h3")).map((h) => h.textContent);
 
+/** @param {string} title */
 const openCourse = (title) => fireEvent.click(coursePill(title));
 
 // The recommendation effect fires on mount. Its sections are filtered out of
 // the "All courses" view when they came back empty, but their course pills are
 // always rendered -- so that is what says the effect has landed.
+/** @param {keyof typeof MEALDB_RECOMMENDATION_QUERIES} [track] */
 const settled = async (track = "lean_strength") => {
   const first = MEALDB_RECOMMENDATION_QUERIES[track][0].title;
   await waitFor(() => expect(coursePill(first)).toBeTruthy());
@@ -87,11 +111,18 @@ const settled = async (track = "lean_strength") => {
 
 // `<p><strong>Goal:</strong> {value}</p>` -- the value is a sibling text node,
 // so it has to be read off the paragraph rather than matched on its own.
+/** @param {string} label */
 const contextValue = (label) =>
-  screen.getByText(label).parentElement.textContent.replace(label, "").trim();
+  /** @type {HTMLElement} */ (screen.getByText(label).parentElement).textContent
+    .replace(label, "")
+    .trim();
 
-const searchForm = () => screen.getByPlaceholderText("chicken, pasta, salmon").closest("form");
+const searchForm = () =>
+  /** @type {HTMLFormElement} */ (
+    screen.getByPlaceholderText("chicken, pasta, salmon").closest("form")
+  );
 
+/** @param {string} query */
 const searchFor = (query) => {
   fireEvent.change(screen.getByPlaceholderText("chicken, pasta, salmon"), {
     target: { value: query }
@@ -125,22 +156,29 @@ const EMPTY_FORM = {
 
 // MealView takes the log form as a prop, so a test that types into it needs
 // something to hold the state the dashboard normally holds.
+/** @param {{ initialForm: MealViewProps["mealLogForm"] } & Omit<MealViewProps, "mealLogForm" | "setMealLogForm">} props */
 function ControlledMealView({ initialForm, ...rest }) {
   const [form, setForm] = useState(initialForm);
   return <MealView mealLogForm={form} setMealLogForm={setForm} {...rest} />;
 }
 
+/** @param {MealViewProps["mealLogForm"]} [initialForm] */
 const renderControlled = (initialForm = EMPTY_FORM) =>
   render(
     <ControlledMealView
       initialForm={initialForm}
-      dashboard={{ plans: [], goals: {} }}
-      fallbackPlan={null}
+      dashboard={
+        /** @type {MealViewProps["dashboard"]} */ (
+          /** @type {unknown} */ ({ plans: [], goals: {} })
+        )
+      }
+      fallbackPlan={/** @type {MealViewProps["fallbackPlan"]} */ (/** @type {unknown} */ (null))}
       mealLogs={[]}
       submitMealLog={vi.fn((event) => event.preventDefault())}
     />
   );
 
+/** @param {import("vitest").Mock} fetchMock */
 const queriesSent = (fetchMock) =>
   fetchMock.mock.calls.map(([url]) =>
     new URL(String(url), "http://localhost").searchParams.get("query")
@@ -164,8 +202,12 @@ describe("MealView", () => {
       ["Mobility and recovery", "recovery"]
     ])("%s selects the %s queries", async (goal, track) => {
       const fetchMock = stubFetch();
-      renderView({ dashboard: { plans: [{ goal }], goals: {} } });
-      await settled(track);
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [{ goal }], goals: {} } })
+        )
+      );
+      await settled(/** @type {keyof typeof MEALDB_RECOMMENDATION_QUERIES} */ (track));
 
       const expected = MEALDB_RECOMMENDATION_QUERIES[track].map((entry) => entry.query);
       expect(
@@ -177,16 +219,27 @@ describe("MealView", () => {
 
     test("takes the goal from the account's goals when no plan carries one", async () => {
       // Each source only applies when the ones above it are absent.
-      renderView({
-        dashboard: { plans: [], goals: { goalType: "Fat loss" } },
-        fallbackPlan: { goal: "Endurance" }
-      });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [], goals: { goalType: "Fat loss" } },
+            fallbackPlan: { goal: "Endurance" }
+          })
+        )
+      );
       await settled("fat_loss");
       expect(contextValue("Goal:")).toBe("Fat loss");
     });
 
     test("uses the fallback plan when the account has no goal at all", async () => {
-      renderView({ dashboard: { plans: [], goals: {} }, fallbackPlan: { goal: "Endurance work" } });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [], goals: {} },
+            fallbackPlan: { goal: "Endurance work" }
+          })
+        )
+      );
       await settled("endurance");
       expect(contextValue("Goal:")).toBe("Endurance work");
     });
@@ -200,9 +253,13 @@ describe("MealView", () => {
 
   describe("the context strip", () => {
     test("reports the saved target and training days", async () => {
-      renderView({
-        dashboard: { plans: [{ goal: "Strength", days: 5 }], goals: { targetCalories: 2600 } }
-      });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [{ goal: "Strength", days: 5 }], goals: { targetCalories: 2600 } }
+          })
+        )
+      );
       await settled();
       expect(contextValue("Target calories:")).toBe("2600 / day");
       expect(contextValue("Weekly plan:")).toBe("5 training days");
@@ -216,13 +273,23 @@ describe("MealView", () => {
     });
 
     test("takes the weekly day count from goals when the plan has none", async () => {
-      renderView({ dashboard: { plans: [{ goal: "Strength" }], goals: { weeklyWorkouts: 6 } } });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [{ goal: "Strength" }], goals: { weeklyWorkouts: 6 } }
+          })
+        )
+      );
       await settled();
       expect(contextValue("Weekly plan:")).toBe("6 training days");
     });
 
     test("takes it from the fallback plan when neither has one", async () => {
-      renderView({ fallbackPlan: { days: 4 } });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ fallbackPlan: { days: 4 } })
+        )
+      );
       await settled();
       expect(contextValue("Weekly plan:")).toBe("4 training days");
     });
@@ -249,7 +316,11 @@ describe("MealView", () => {
           ]
         })
       });
-      renderView({ dashboard: { plans: [], goals: { targetCalories } } });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [], goals: { targetCalories } } })
+        )
+      );
       await settled();
 
       expect(within(await openFirstMeal()).getByText(expected)).toBeInTheDocument();
@@ -262,7 +333,11 @@ describe("MealView", () => {
           meals: [mealPayload("1", { portionByCalorie: { balanced: "A bowl" } })]
         })
       });
-      renderView({ dashboard: { plans: [], goals: { targetCalories: 3000 } } });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [], goals: { targetCalories: 3000 } } })
+        )
+      );
       await settled();
 
       expect(within(await openFirstMeal()).getByText("A bowl")).toBeInTheDocument();
@@ -432,7 +507,11 @@ describe("MealView", () => {
       // course usually is not in the new one. Without the reset the visitor is
       // left on a filter that matches nothing.
       stubFetch({ fallback: () => ({ meals: [mealPayload("m1")] }) });
-      const { rerender } = renderView({ dashboard: { plans: [{ goal: "Strength" }], goals: {} } });
+      const { rerender } = renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [{ goal: "Strength" }], goals: {} } })
+        )
+      );
       await settled("lean_strength");
 
       openCourse("Seafood meals");
@@ -440,9 +519,15 @@ describe("MealView", () => {
 
       rerender(
         <MealView
-          dashboard={{ plans: [{ goal: "Fat loss" }], goals: {} }}
-          fallbackPlan={null}
-          mealLogForm={null}
+          dashboard={
+            /** @type {MealViewProps["dashboard"]} */ (
+              /** @type {unknown} */ ({ plans: [{ goal: "Fat loss" }], goals: {} })
+            )
+          }
+          fallbackPlan={
+            /** @type {MealViewProps["fallbackPlan"]} */ (/** @type {unknown} */ (null))
+          }
+          mealLogForm={/** @type {MealViewProps["mealLogForm"]} */ (/** @type {unknown} */ (null))}
           mealLogs={[]}
           setMealLogForm={vi.fn()}
           submitMealLog={vi.fn()}
@@ -536,6 +621,7 @@ describe("MealView", () => {
       // usual way this breaks, and it fails silently.
       const added = vi.spyOn(window, "addEventListener");
       const removed = vi.spyOn(window, "removeEventListener");
+      /** @param {import("vitest").MockInstance} spy */
       const keydownFns = (spy) =>
         spy.mock.calls.filter(([type]) => type === "keydown").map(([, fn]) => fn);
 
@@ -567,9 +653,13 @@ describe("MealView", () => {
 
   describe("the meal log", () => {
     test("lists saved logs", async () => {
-      renderView({
-        mealLogs: [{ id: "1", date: "2026-09-01", mealType: "lunch", name: "Rice bowl" }]
-      });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            mealLogs: [{ id: "1", date: "2026-09-01", mealType: "lunch", name: "Rice bowl" }]
+          })
+        )
+      );
       await settled();
       expect(screen.getByText("2026-09-01")).toBeInTheDocument();
       expect(screen.getByText(/Lunch - Rice bowl/)).toBeInTheDocument();
@@ -578,17 +668,27 @@ describe("MealView", () => {
     test("a log saved without a type or a name still reads as a row", async () => {
       // Early rows predate the meal-type field, and a blank there would render
       // a dash with nothing after it.
-      renderView({ mealLogs: [{ id: "1", date: "2026-09-01" }] });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({ mealLogs: [{ id: "1", date: "2026-09-01" }] })
+        )
+      );
       await settled();
 
-      const row = screen.getByText("2026-09-01").parentElement;
+      const row = /** @type {HTMLElement} */ (screen.getByText("2026-09-01").parentElement);
       expect(row.textContent).toContain("Other");
       expect(row.textContent).not.toContain("Other -");
     });
 
     test("macros absent from a row read as dashes rather than zeroes", async () => {
       // `0 kcal` on a row that simply never recorded one is a made-up figure.
-      renderView({ mealLogs: [{ id: "1", date: "2026-09-01", mealType: "lunch" }] });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (
+          /** @type {unknown} */ ({
+            mealLogs: [{ id: "1", date: "2026-09-01", mealType: "lunch" }]
+          })
+        )
+      );
       await settled();
 
       expect(screen.getByText(/-- kcal \| P -- \/ C -- \/\s*F --/)).toBeInTheDocument();
@@ -609,7 +709,7 @@ describe("MealView", () => {
       // The server has returned null for collection fields before, and `null`
       // alone does not exercise the guard -- `mealLogs || []` handles that one
       // too. It is the truthy non-array that reaches `.slice` and throws.
-      renderView({ mealLogs });
+      renderView(/** @type {Partial<MealViewProps>} */ (/** @type {unknown} */ ({ mealLogs })));
       await settled();
       expect(screen.getByText("No meal logs yet.")).toBeInTheDocument();
     });
@@ -618,7 +718,9 @@ describe("MealView", () => {
       const { submitMealLog } = renderView();
       await settled();
 
-      fireEvent.submit(screen.getByText("Save meal log").closest("form"));
+      fireEvent.submit(
+        /** @type {HTMLFormElement} */ (screen.getByText("Save meal log").closest("form"))
+      );
       expect(submitMealLog).toHaveBeenCalled();
     });
 
@@ -642,7 +744,9 @@ describe("MealView", () => {
       test.each(FIELDS.map((field) => [field.label]))(
         "%s takes the value and leaves every other field alone",
         async (label) => {
-          const field = FIELDS.find((entry) => entry.label === label);
+          const field = /** @type {(typeof FIELDS)[number]} */ (
+            FIELDS.find((entry) => entry.label === label)
+          );
           renderControlled();
           await settled();
 
@@ -669,7 +773,11 @@ describe("MealView", () => {
 
           fireEvent.click(screen.getByText("Log first meal"));
 
-          expect(setMealLogForm.mock.calls.at(-1)[0]({})).toEqual({
+          expect(
+            /** @type {(previous: object) => Record<string, unknown>} */ (
+              /** @type {unknown[]} */ (setMealLogForm.mock.calls.at(-1))[0]
+            )({})
+          ).toEqual({
             date: "2026-09-10",
             mealType: "breakfast"
           });
@@ -686,7 +794,9 @@ describe("MealView", () => {
         fireEvent.click(screen.getByText("Log first meal"));
 
         expect(
-          setMealLogForm.mock.calls.at(-1)[0]({ date: "2026-01-01", mealType: "dinner" })
+          /** @type {(previous: object) => Record<string, unknown>} */ (
+            /** @type {unknown[]} */ (setMealLogForm.mock.calls.at(-1))[0]
+          )({ date: "2026-01-01", mealType: "dinner" })
         ).toEqual({ date: "2026-01-01", mealType: "dinner" });
       });
 
@@ -703,7 +813,11 @@ describe("MealView", () => {
 
           fireEvent.click(screen.getByText("Log first meal"));
 
-          expect(setMealLogForm.mock.calls.at(-1)[0]({}).date).toBe("2026-09-10");
+          expect(
+            /** @type {(previous: object) => Record<string, unknown>} */ (
+              /** @type {unknown[]} */ (setMealLogForm.mock.calls.at(-1))[0]
+            )({}).date
+          ).toBe("2026-09-10");
         } finally {
           vi.useRealTimers();
           process.env.TZ = SYSTEM_ZONE;
@@ -712,7 +826,9 @@ describe("MealView", () => {
     });
 
     test("a null mealLogForm renders the empty defaults rather than uncontrolled inputs", async () => {
-      renderView({ mealLogForm: null });
+      renderView(
+        /** @type {Partial<MealViewProps>} */ (/** @type {unknown} */ ({ mealLogForm: null }))
+      );
       await settled();
 
       expect(screen.getByPlaceholderText("Chicken rice bowl")).toHaveValue("");
@@ -755,7 +871,11 @@ describe("MealView", () => {
       await settled();
 
       // fireEvent returns false when a handler called preventDefault.
-      expect(fireEvent.submit(screen.getByText("Save meal log").closest("form"))).toBe(false);
+      expect(
+        fireEvent.submit(
+          /** @type {HTMLFormElement} */ (screen.getByText("Save meal log").closest("form"))
+        )
+      ).toBe(false);
     });
   });
 });

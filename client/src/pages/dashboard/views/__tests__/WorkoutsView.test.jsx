@@ -1,3 +1,4 @@
+// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import WorkoutsView from "../WorkoutsView";
@@ -11,6 +12,14 @@ import { markUnanswered } from "../../../../app/connection";
 // and hiding it behind a dash. This repo has shipped three bugs from that
 // distinction, so it is asserted directly.
 
+// Each row holds only the fields its list shows, and some tests give a list
+// that is absent or not a list at all, so those props are cast where given. A
+// section's name comes from a test table as a string. Elements a test looks up
+// are cast to the element it expects, and a setter's last updater to a function.
+/** @typedef {Parameters<typeof WorkoutsView>[0]} WorkoutsViewProps */
+// A row that stands in for one of any of the four lists.
+/** @typedef {WorkoutsViewProps["workouts"][number] & WorkoutsViewProps["calories"][number] & WorkoutsViewProps["mealLogs"][number] & WorkoutsViewProps["progressMetrics"][number]} AnyRow */
+
 const SECTIONS = {
   workouts: "Workout log",
   calories: "Calories log",
@@ -19,20 +28,33 @@ const SECTIONS = {
 };
 
 // Each list is scoped by its heading, since "--" and a date appear in all four.
+/** @param {string} name */
 const section = (name) =>
-  screen.getByRole("heading", { name: SECTIONS[name] }).closest(".log-section");
+  /** @type {HTMLElement} */ (
+    screen
+      .getByRole("heading", { name: SECTIONS[/** @type {keyof typeof SECTIONS} */ (name)] })
+      .closest(".log-section")
+  );
 
-const rowsIn = (name) => section(name).querySelectorAll(".log-list-row");
+/** @param {string} name */
+const rowsIn = (name) =>
+  /** @type {NodeListOf<HTMLElement>} */ (section(name).querySelectorAll(".log-list-row"));
 
+/** @param {string} name */
 const datesIn = (name) =>
   Array.from(rowsIn(name)).map((row) => row.querySelector("strong")?.textContent);
 
+// The two handlers that only a click calls are given too; each test that
+// presses Start or Delete passes its own. pagination starts null, as App's does.
+/** @param {Partial<WorkoutsViewProps>} [props] */
 const renderView = (props = {}) => {
   const handlers = {
     setWorkoutForm: vi.fn(),
     setWorkoutModalOpen: vi.fn(),
     onOpenCalories: vi.fn(),
-    onOpenMeal: vi.fn()
+    onOpenMeal: vi.fn(),
+    onStartSession: vi.fn(),
+    onDeleteImportedWorkout: vi.fn()
   };
   const utils = render(
     <WorkoutsView
@@ -40,6 +62,7 @@ const renderView = (props = {}) => {
       calories={[]}
       mealLogs={[]}
       progressMetrics={[]}
+      pagination={null}
       {...handlers}
       {...props}
     />
@@ -47,8 +70,17 @@ const renderView = (props = {}) => {
   return { ...utils, ...handlers };
 };
 
-const dated = (date, extra = {}) => ({ id: date, date, ...extra });
+/**
+ * @param {string} date
+ * @param {object} [extra]
+ */
+const dated = (date, extra = {}) =>
+  /** @type {AnyRow} */ (/** @type {unknown} */ ({ id: date, date, ...extra }));
 
+/**
+ * @param {number} count
+ * @param {string} [prefix]
+ */
 const many = (count, prefix = "2026-01") =>
   Array.from({ length: count }, (_, i) => dated(`${prefix}-${String(i + 1).padStart(2, "0")}`));
 
@@ -81,7 +113,11 @@ describe("WorkoutsView", () => {
       // is the only thing standing between one and a blank page.
       ["a BigInt zero", 0n]
     ])("a %s date sinks to the bottom rather than throwing", (_label, date) => {
-      renderView({ workouts: [{ id: "a", date }, dated("2026-01-01")] });
+      renderView(
+        /** @type {Partial<WorkoutsViewProps>} */ (
+          /** @type {unknown} */ ({ workouts: [{ id: "a", date }, dated("2026-01-01")] })
+        )
+      );
 
       expect(datesIn("workouts")).toEqual(["2026-01-01", "--"]);
     });
@@ -134,8 +170,10 @@ describe("WorkoutsView", () => {
     ];
 
     test.each(
-      ["workouts", "calories", "mealLogs", "progressMetrics"].flatMap((prop) =>
-        NOT_ARRAYS.map(([label, value]) => [prop, label, value])
+      /** @type {Array<[string, string, unknown]>} */ (
+        ["workouts", "calories", "mealLogs", "progressMetrics"].flatMap((prop) =>
+          NOT_ARRAYS.map(([label, value]) => [prop, label, value])
+        )
       )
     )("%s given %s is treated as empty rather than throwing", (prop, _label, value) => {
       const name = {
@@ -184,7 +222,11 @@ describe("WorkoutsView", () => {
       const { setWorkoutForm, setWorkoutModalOpen } = renderView();
       fireEvent.click(screen.getByText("Add workout"));
 
-      expect(setWorkoutForm.mock.calls.at(-1)[0]({ focus: "Legs" })).toEqual({
+      expect(
+        /** @type {(previous: object) => Record<string, unknown>} */ (
+          /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+        )({ focus: "Legs" })
+      ).toEqual({
         focus: "Legs",
         date: "2026-09-11",
         ...NO_PLAN_LINK
@@ -199,7 +241,11 @@ describe("WorkoutsView", () => {
       const { setWorkoutForm } = renderView();
       fireEvent.click(screen.getByText("Add workout now"));
 
-      expect(setWorkoutForm.mock.calls.at(-1)[0]({})).toEqual({
+      expect(
+        /** @type {(previous: object) => Record<string, unknown>} */ (
+          /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+        )({})
+      ).toEqual({
         date: "2026-09-11",
         ...NO_PLAN_LINK
       });
@@ -211,7 +257,9 @@ describe("WorkoutsView", () => {
       const { setWorkoutForm } = renderView();
       fireEvent.click(screen.getByText(label));
 
-      const next = setWorkoutForm.mock.calls.at(-1)[0]({
+      const next = /** @type {(previous: object) => Record<string, unknown>} */ (
+        /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+      )({
         focus: "Monday",
         planId: "plan-1",
         planDayIndex: 0,
@@ -229,7 +277,11 @@ describe("WorkoutsView", () => {
       const { setWorkoutForm } = renderView();
       fireEvent.click(screen.getByText("Add workout"));
 
-      expect(setWorkoutForm.mock.calls.at(-1)[0]({}).date).toBe("2026-09-11");
+      expect(
+        /** @type {(previous: object) => Record<string, unknown>} */ (
+          /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+        )({}).date
+      ).toBe("2026-09-11");
     });
   });
 
@@ -409,18 +461,26 @@ describe("WorkoutsView", () => {
     test("are still rendered, keyed on their position", () => {
       // Older rows predate the id column, and a duplicate React key would drop
       // all but one of them.
-      renderView({
-        workouts: [
-          { date: "2026-01-01", duration: 30 },
-          { date: "2026-01-01", duration: 45 }
-        ]
-      });
+      renderView(
+        /** @type {Partial<WorkoutsViewProps>} */ (
+          /** @type {unknown} */ ({
+            workouts: [
+              { date: "2026-01-01", duration: 30 },
+              { date: "2026-01-01", duration: 45 }
+            ]
+          })
+        )
+      );
 
       expect(rowsIn("workouts")).toHaveLength(2);
     });
 
     test("rows with neither an id nor a date are still all rendered", () => {
-      renderView({ workouts: [{ duration: 30 }, { duration: 45 }] });
+      renderView(
+        /** @type {Partial<WorkoutsViewProps>} */ (
+          /** @type {unknown} */ ({ workouts: [{ duration: 30 }, { duration: 45 }] })
+        )
+      );
 
       expect(rowsIn("workouts")).toHaveLength(2);
     });
@@ -462,12 +522,18 @@ describe("WorkoutsView", () => {
           })
         }));
         vi.stubGlobal("fetch", fetchMock);
-        renderView({ [prop]: many(3), pagination: { [prop]: { total: 5 } } });
+        renderView(
+          /** @type {Partial<WorkoutsViewProps>} */ (
+            /** @type {unknown} */ ({ [prop]: many(3), pagination: { [prop]: { total: 5 } } })
+          )
+        );
 
         fireEvent.click(within(section(name)).getByText(label));
 
         await waitFor(() => expect(rowsIn(name)).toHaveLength(5));
-        expect(String(fetchMock.mock.calls[0][0])).toBe(`${path}?limit=50&offset=3`);
+        expect(String(/** @type {unknown[]} */ (fetchMock.mock.calls[0])[0])).toBe(
+          `${path}?limit=50&offset=3`
+        );
         expect(within(section(name)).queryByText(label)).toBeNull();
       }
     );
@@ -479,7 +545,11 @@ describe("WorkoutsView", () => {
           "fetch",
           vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
         );
-        renderView({ [prop]: many(3), pagination: { [prop]: { total: 5 } } });
+        renderView(
+          /** @type {Partial<WorkoutsViewProps>} */ (
+            /** @type {unknown} */ ({ [prop]: many(3), pagination: { [prop]: { total: 5 } } })
+          )
+        );
 
         fireEvent.click(within(section(name)).getByText(label));
 
@@ -495,7 +565,11 @@ describe("WorkoutsView", () => {
       // the server, even though the server has more.
       const fetchMock = vi.fn();
       vi.stubGlobal("fetch", fetchMock);
-      renderView({ mealLogs: many(45), pagination: { mealLogs: { total: 120 } } });
+      renderView(
+        /** @type {Partial<WorkoutsViewProps>} */ (
+          /** @type {unknown} */ ({ mealLogs: many(45), pagination: { mealLogs: { total: 120 } } })
+        )
+      );
 
       fireEvent.click(screen.getByText("Show more meals"));
 
@@ -568,9 +642,16 @@ describe("progress", () => {
     vi.restoreAllMocks();
   });
 
+  /** @param {number} loadKg */
   const squat = (loadKg) => [
     { name: "Squat", pattern: "squat", sets: [{ reps: 5, seconds: null, loadKg, rpe: null }] }
   ];
+  /**
+   * @param {string | undefined} id
+   * @param {string} date
+   * @param {number} loadKg
+   * @param {string} [createdAt]
+   */
   const squatSession = (id, date, loadKg, createdAt) =>
     dated(date, { id, createdAt, exerciseSets: squat(loadKg) });
 
@@ -589,7 +670,9 @@ describe("progress", () => {
       workouts: [squatSession("w-2", "2026-11-03", 100), squatSession("w-1", "2026-10-26", 100)]
     });
 
-    const legs = screen.getByRole("rowheader", { name: "Legs" }).closest("tr");
+    const legs = /** @type {HTMLTableRowElement} */ (
+      screen.getByRole("rowheader", { name: "Legs" }).closest("tr")
+    );
     expect(Array.from(legs.cells).map((cell) => cell.textContent)).toEqual(["Legs", "1", "0.3"]);
   });
 
@@ -684,6 +767,7 @@ describe("a workout imported from Strava", () => {
     averageHeartrate: 142.4
   });
 
+  /** @param {string} locale */
   const useLocale = (locale) => {
     vi.spyOn(navigator, "languages", "get").mockReturnValue([locale]);
     vi.spyOn(navigator, "language", "get").mockReturnValue(locale);
@@ -754,6 +838,7 @@ describe("a workout imported from Strava", () => {
     });
 
     test("on confirming, deletes it by id, disabled until it answers", async () => {
+      /** @type {((value: unknown) => void) | undefined} */
       let finish;
       const onDeleteImportedWorkout = vi.fn(
         () =>
@@ -769,7 +854,7 @@ describe("a workout imported from Strava", () => {
       expect(onDeleteImportedWorkout).toHaveBeenCalledWith("import-1");
       expect(screen.getByRole("button", { name: "Deleting..." })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
-      finish({ ok: true });
+      /** @type {(value: unknown) => void} */ (finish)({ ok: true });
 
       await waitFor(() => expect(screen.queryByText(/Delete this workout\?/)).toBeNull());
     });

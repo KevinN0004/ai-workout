@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import SettingsView from "../SettingsView";
@@ -5,16 +6,31 @@ import SettingsView from "../SettingsView";
 // Prop-driven, but with real formatting underneath: the measurement system is
 // inferred from the visitor's locale, and every row falls back to "Not set"
 // rather than rendering an empty cell. Both are observably right or wrong.
+//
+// Each test gives the view only the props it reads, and a user with only the
+// email and profile the rows show, so each set of props is cast to the view's
+// props where it is given.
+/** @typedef {Parameters<typeof SettingsView>[0]} SettingsViewProps */
+// The helper gives a user of its own unless a test passes one.
+/** @typedef {Omit<SettingsViewProps, "user"> & { user?: SettingsViewProps["user"] }} RenderProps */
 
+/** @param {...string} locales */
 const useLocale = (...locales) => {
   vi.spyOn(navigator, "languages", "get").mockReturnValue(locales);
   vi.spyOn(navigator, "language", "get").mockReturnValue(locales[0]);
 };
 
-const renderView = (props = {}) =>
-  render(<SettingsView user={{ email: "a@b.c", profile: {} }} {...props} />);
+/** @param {RenderProps} [props] */
+const renderView = (props = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) =>
+  render(
+    <SettingsView
+      user={/** @type {SettingsViewProps["user"]} */ ({ email: "a@b.c", profile: {} })}
+      {...props}
+    />
+  );
 
 // Reads the value cell sitting beside a row label.
+/** @param {string} label */
 const rowValue = (label) => {
   const labelEl = screen.getByText(label);
   return labelEl.parentElement?.textContent?.replace(label, "").trim();
@@ -28,25 +44,41 @@ describe("SettingsView", () => {
   describe("measurement system from locale", () => {
     test("a US locale renders height in feet and inches", () => {
       useLocale("en-US");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 183 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 183 } } })
+        )
+      );
       expect(rowValue("Height")).toMatch(/\d+ ft \d+ in/);
     });
 
     test("a metric locale renders centimetres", () => {
       useLocale("en-GB");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 183 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 183 } } })
+        )
+      );
       expect(rowValue("Height")).toBe("183 cm");
     });
 
     test("weight follows the same system", () => {
       useLocale("en-GB");
-      renderView({ user: { email: "a@b.c", profile: { weightKg: 84 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { weightKg: 84 } } })
+        )
+      );
       expect(rowValue("Weight")).toBe("84 kg");
     });
 
     test("an imperial locale renders pounds", () => {
       useLocale("en-US");
-      renderView({ user: { email: "a@b.c", profile: { weightKg: 84 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { weightKg: 84 } } })
+        )
+      );
       expect(rowValue("Weight")).toBe("185 lb");
     });
 
@@ -54,26 +86,42 @@ describe("SettingsView", () => {
     // rollover turns that into 6 ft 0 in rather than the nonsense 5 ft 12 in.
     test("twelve rounded inches roll over into the next foot", () => {
       useLocale("en-US");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 182 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 182 } } })
+        )
+      );
       expect(rowValue("Height")).toBe("6 ft 0 in");
     });
 
     test("an underscore locale is parsed like a hyphenated one", () => {
       // Some browsers still report en_US.
       useLocale("en_US");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 183 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 183 } } })
+        )
+      );
       expect(rowValue("Height")).toMatch(/\d+ ft \d+ in/);
     });
 
     test("a bare language with no region falls back to metric", () => {
       useLocale("en");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 183 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 183 } } })
+        )
+      );
       expect(rowValue("Height")).toBe("183 cm");
     });
 
     test("the first imperial locale in the list wins", () => {
       useLocale("fr-FR", "en-US");
-      renderView({ user: { email: "a@b.c", profile: { heightCm: 183 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { heightCm: 183 } } })
+        )
+      );
       expect(rowValue("Height")).toMatch(/\d+ ft \d+ in/);
     });
   });
@@ -90,7 +138,7 @@ describe("SettingsView", () => {
 
     test("a missing email reads Not set", () => {
       useLocale("en-GB");
-      renderView({ user: { profile: {} } });
+      renderView(/** @type {RenderProps} */ (/** @type {unknown} */ ({ user: { profile: {} } })));
       expect(rowValue("Email")).toBe("Not set");
     });
 
@@ -102,12 +150,18 @@ describe("SettingsView", () => {
 
     test("a null user does not take the view down", () => {
       useLocale("en-GB");
-      expect(() => renderView({ user: null })).not.toThrow();
+      expect(() =>
+        renderView(/** @type {RenderProps} */ (/** @type {unknown} */ ({ user: null })))
+      ).not.toThrow();
     });
 
     test("body fat renders as a percentage when present", () => {
       useLocale("en-GB");
-      renderView({ user: { email: "a@b.c", profile: { bodyFat: 18.4 } } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: { bodyFat: 18.4 } } })
+        )
+      );
       expect(rowValue("Body fat")).toBe("18.4%");
     });
   });
@@ -159,7 +213,11 @@ describe("SettingsView", () => {
   describe("the account tab", () => {
     test("shows the stored email and a password row, with no Edit button", () => {
       useLocale("en-GB");
-      renderView({ user: { email: "a@b.c", profile: {} } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ user: { email: "a@b.c", profile: {} } })
+        )
+      );
 
       fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
 
@@ -170,10 +228,14 @@ describe("SettingsView", () => {
 
     test("renders the account panel beneath the rows, wired to the handlers passed in", () => {
       useLocale("en-GB");
-      renderView({
-        onChangePassword: vi.fn(),
-        onDeleteAccount: vi.fn()
-      });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({
+            onChangePassword: vi.fn(),
+            onDeleteAccount: vi.fn()
+          })
+        )
+      );
 
       fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
 
@@ -195,7 +257,7 @@ describe("SettingsView", () => {
     test("shows the Strava panel through the apiFetch passed in, beside the other rows", async () => {
       useLocale("en-GB");
       const apiFetch = stravaApi();
-      renderView({ apiFetch });
+      renderView(/** @type {RenderProps} */ (/** @type {unknown} */ ({ apiFetch })));
 
       fireEvent.click(screen.getByRole("tab", { name: /Connected Apps/ }));
 
@@ -225,7 +287,9 @@ describe("SettingsView", () => {
             ? { imported: 1, updated: 0, removed: 0, lastSyncedAt: null }
             : connected
       }));
-      renderView({ apiFetch, onStravaChange });
+      renderView(
+        /** @type {RenderProps} */ (/** @type {unknown} */ ({ apiFetch, onStravaChange }))
+      );
 
       fireEvent.click(screen.getByRole("tab", { name: /Connected Apps/ }));
       fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
@@ -236,7 +300,7 @@ describe("SettingsView", () => {
     test("no other tab reads Strava", () => {
       useLocale("en-GB");
       const apiFetch = stravaApi();
-      renderView({ apiFetch });
+      renderView(/** @type {RenderProps} */ (/** @type {unknown} */ ({ apiFetch })));
 
       fireEvent.click(screen.getByRole("tab", { name: /Account/ }));
 
@@ -248,7 +312,7 @@ describe("SettingsView", () => {
     test("opens on it when Strava's return left a result", async () => {
       useLocale("en-GB");
       window.history.replaceState(null, "", "/dashboard/settings?strava=cancelled");
-      renderView({ apiFetch: stravaApi() });
+      renderView(/** @type {RenderProps} */ (/** @type {unknown} */ ({ apiFetch: stravaApi() })));
 
       expect(screen.getByRole("tab", { name: /Connected Apps/ })).toHaveAttribute(
         "aria-selected",
@@ -263,15 +327,20 @@ describe("SettingsView", () => {
 // Everything the view shows and edits comes from the stored profile. It used to
 // take a separate `personal` prop for six of the rows, which was blank for every
 // signed-in user -- see the comment in SettingsView for why.
+/** @param {Partial<RenderProps>} [props] */
 const renderEditable = (props = {}) =>
-  renderView({
-    user: {
-      email: "a@b.c",
-      profile: { firstName: "Jordan", lastName: "Fields", age: 34 }
-    },
-    onSaveProfile: vi.fn().mockResolvedValue({ ok: true }),
-    ...props
-  });
+  renderView(
+    /** @type {RenderProps} */ (
+      /** @type {unknown} */ ({
+        user: {
+          email: "a@b.c",
+          profile: { firstName: "Jordan", lastName: "Fields", age: 34 }
+        },
+        onSaveProfile: vi.fn().mockResolvedValue({ ok: true }),
+        ...props
+      })
+    )
+  );
 
 // The six fields Tasks 1 and 2 taught the server to persist were still being
 // read from App's in-memory `personal`, which is never populated for a
@@ -279,8 +348,13 @@ const renderEditable = (props = {}) =>
 // flow that fills it can run. So Settings showed "Not set" for exactly the
 // fields this whole change set out to store.
 describe("the rows read the stored profile", () => {
+  /** @param {Record<string, unknown>} profile */
   const withProfile = (profile) =>
-    renderView({ user: { email: "a@b.c", profile }, onSaveProfile: vi.fn() });
+    renderView(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({ user: { email: "a@b.c", profile }, onSaveProfile: vi.fn() })
+      )
+    );
 
   test.each([
     ["Training", "Timeline", { timeline: "12 weeks to lose 10 lb" }, "12 weeks to lose 10 lb"],
@@ -326,7 +400,7 @@ describe("editing a tab", () => {
   // `personal`, which a signed-in user never has -- so Edit appeared, the form
   // opened blank, and saving wrote those blanks over a real profile.
   test("offers no Edit until the profile has arrived", () => {
-    renderEditable({ user: { email: "a@b.c" } });
+    renderEditable({ user: /** @type {SettingsViewProps["user"]} */ ({ email: "a@b.c" }) });
 
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
@@ -394,10 +468,12 @@ describe("editing a tab", () => {
   test("preserves fields the edited tab does not show", async () => {
     const onSaveProfile = vi.fn().mockResolvedValue({ ok: true });
     renderEditable({
-      user: {
-        email: "a@b.c",
-        profile: { firstName: "Jordan", lastName: "Fields", age: 34, cardio: "Mixed" }
-      },
+      user: /** @type {SettingsViewProps["user"]} */ (
+        /** @type {unknown} */ ({
+          email: "a@b.c",
+          profile: { firstName: "Jordan", lastName: "Fields", age: 34, cardio: "Mixed" }
+        })
+      ),
       onSaveProfile
     });
 

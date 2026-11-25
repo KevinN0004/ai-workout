@@ -1,3 +1,4 @@
+// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import TipsView from "../TipsView";
@@ -9,31 +10,55 @@ import { createDefaultPlannerForm } from "../../../../app/requestBodies";
 // itself lives in tips/recommendationUtils and is covered there, so these
 // tests drive the surrounding state machine rather than re-testing it.
 
+// The user, form and dashboard hold only what the view reads, and some tests
+// give it absent values or answers in the wrong shape on purpose, so those are
+// cast where they are given. fetch is stubbed with a plain mock, and each save
+// mock takes the save prop's own type. Elements a test looks up are cast to the
+// element it expects.
+/** @typedef {Parameters<typeof TipsView>[0]} TipsViewProps */
+
 const META = {
   categories: [{ id: 1, name: "Arms" }],
   muscles: [{ id: 2, name: "Biceps" }],
   equipment: [{ id: 3, name: "Dumbbell" }]
 };
 
+/** @param {unknown} body */
 const ok = (body) => ({ ok: true, json: async () => body });
 const failed = () => ({ ok: false, json: async () => ({}) });
 
 // Routes by URL so a test can fail one endpoint while the other succeeds.
+/** @param {{ meta?: unknown, exercises?: unknown }} [options] */
 const stubFetch = ({ meta = ok(META), exercises = ok({ results: [] }) } = {}) => {
-  const fetchMock = vi.fn(async (url) => {
-    if (String(url).includes("/api/wger/meta")) return meta;
-    return exercises;
-  });
+  const fetchMock = /** @type {import("vitest").Mock} */ (
+    vi.fn(async (url) => {
+      if (String(url).includes("/api/wger/meta")) return meta;
+      return exercises;
+    })
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 };
 
+/** @param {Partial<TipsViewProps>} [props] */
 const renderView = (props = {}) =>
   render(
     <TipsView
-      user={{ profile: { activity: "Moderate", notes: "" } }}
-      form={{ goal: "strength", days: 3, duration: 45, injuries: "" }}
-      dashboard={{ plans: [], goals: {}, savedExercises: [] }}
+      user={
+        /** @type {TipsViewProps["user"]} */ (
+          /** @type {unknown} */ ({ profile: { activity: "Moderate", notes: "" } })
+        )
+      }
+      form={
+        /** @type {TipsViewProps["form"]} */ (
+          /** @type {unknown} */ ({ goal: "strength", days: 3, duration: 45, injuries: "" })
+        )
+      }
+      dashboard={
+        /** @type {TipsViewProps["dashboard"]} */ (
+          /** @type {unknown} */ ({ plans: [], goals: {}, savedExercises: [] })
+        )
+      }
       latestPlanByWeekday={{}}
       weatherData={null}
       onSaveExerciseToPlan={vi.fn()}
@@ -102,7 +127,9 @@ describe("TipsView", () => {
     // The exercise request still went out -- a broken filter list must not
     // block browsing.
     await waitFor(() => {
-      const urls = fetch.mock.calls.map(([url]) => String(url));
+      const urls = /** @type {import("vitest").Mock} */ (
+        /** @type {unknown} */ (fetch)
+      ).mock.calls.map(([url]) => String(url));
       expect(urls.some((u) => u.includes("/api/wger/exercises"))).toBe(true);
     });
   });
@@ -131,6 +158,11 @@ describe("TipsView", () => {
   // it, switching between the three views, saving something to their plan, and
   // paging through the list.
 
+  /**
+   * @param {number} id
+   * @param {string} name
+   * @param {object} [extra]
+   */
   const exercise = (id, name, extra = {}) => ({
     id,
     name,
@@ -140,18 +172,24 @@ describe("TipsView", () => {
     ...extra
   });
 
+  /**
+   * @param {unknown[]} items
+   * @param {unknown} [meta]
+   */
   const withExercises = (items, meta = META) =>
     stubFetch({ meta: ok(meta), exercises: ok({ exercises: items }) });
 
   // The exercise request the component last made, parsed.
+  /** @param {import("vitest").Mock} fetchMock */
   const lastExerciseParams = (fetchMock) => {
     const url = fetchMock.mock.calls
       .map(([value]) => String(value))
       .filter((value) => value.includes("/api/wger/exercises"))
       .at(-1);
-    return new URL(url, "http://localhost").searchParams;
+    return new URL(/** @type {string} */ (url), "http://localhost").searchParams;
   };
 
+  /** @param {string} label */
   const setView = (label) =>
     fireEvent.change(screen.getByLabelText("View"), {
       target: { value: label }
@@ -247,7 +285,9 @@ describe("TipsView", () => {
       const fetchMock = withExercises([]);
       renderView();
       await waitFor(() =>
-        expect(screen.getByLabelText("Category").options.length).toBeGreaterThan(1)
+        expect(
+          /** @type {HTMLSelectElement} */ (screen.getByLabelText("Category")).options.length
+        ).toBeGreaterThan(1)
       );
 
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -259,7 +299,9 @@ describe("TipsView", () => {
       const fetchMock = withExercises([]);
       renderView();
       await waitFor(() =>
-        expect(screen.getByLabelText("Category").options.length).toBeGreaterThan(1)
+        expect(
+          /** @type {HTMLSelectElement} */ (screen.getByLabelText("Category")).options.length
+        ).toBeGreaterThan(1)
       );
 
       fireEvent.change(screen.getByLabelText("Category"), { target: { value: "1" } });
@@ -358,7 +400,9 @@ describe("TipsView", () => {
 
       renderView();
       await waitFor(() =>
-        expect(screen.getByLabelText("Category").options.length).toBeGreaterThan(1)
+        expect(
+          /** @type {HTMLSelectElement} */ (screen.getByLabelText("Category")).options.length
+        ).toBeGreaterThan(1)
       );
 
       fireEvent.change(screen.getByLabelText("Category"), { target: { value: "1" } });
@@ -388,32 +432,44 @@ describe("TipsView", () => {
     // supplies a full profile so only the first link was ever taken.
     test("takes the goal from the account's plans first", async () => {
       withExercises([exercise(1, "Row")]);
-      renderView({
-        dashboard: {
-          plans: [{ goal: "Fat loss" }],
-          goals: { goalType: "Endurance" },
-          savedExercises: []
-        }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: {
+              plans: [{ goal: "Fat loss" }],
+              goals: { goalType: "Endurance" },
+              savedExercises: []
+            }
+          })
+        )
+      );
 
       expect(await screen.findByText(/fat loss/)).toBeInTheDocument();
     });
 
     test("then from the account's goals", async () => {
       withExercises([exercise(1, "Row")]);
-      renderView({
-        dashboard: { plans: [], goals: { goalType: "Endurance work" }, savedExercises: [] }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [], goals: { goalType: "Endurance work" }, savedExercises: [] }
+          })
+        )
+      );
 
       expect(await screen.findByText(/endurance/)).toBeInTheDocument();
     });
 
     test("then from the form, and finally a default", async () => {
       withExercises([exercise(1, "Row")]);
-      renderView({
-        dashboard: { plans: [], goals: {}, savedExercises: [] },
-        form: { goal: "", days: 3, duration: 45, injuries: "" }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [], goals: {}, savedExercises: [] },
+            form: { goal: "", days: 3, duration: 45, injuries: "" }
+          })
+        )
+      );
 
       // The default is a lean-strength goal.
       expect(await screen.findByText(/lean strength/)).toBeInTheDocument();
@@ -426,11 +482,19 @@ describe("TipsView", () => {
       expect(() =>
         render(
           <TipsView
-            user={undefined}
-            form={undefined}
-            dashboard={undefined}
-            latestPlanByWeekday={undefined}
-            weatherData={undefined}
+            user={/** @type {TipsViewProps["user"]} */ (/** @type {unknown} */ (undefined))}
+            form={/** @type {TipsViewProps["form"]} */ (/** @type {unknown} */ (undefined))}
+            dashboard={
+              /** @type {TipsViewProps["dashboard"]} */ (/** @type {unknown} */ (undefined))
+            }
+            latestPlanByWeekday={
+              /** @type {TipsViewProps["latestPlanByWeekday"]} */ (
+                /** @type {unknown} */ (undefined)
+              )
+            }
+            weatherData={
+              /** @type {TipsViewProps["weatherData"]} */ (/** @type {unknown} */ (undefined))
+            }
             onSaveExerciseToPlan={vi.fn()}
           />
         )
@@ -440,7 +504,11 @@ describe("TipsView", () => {
 
     test("a non-array savedExercises is treated as none", async () => {
       withExercises([exercise(7, "Row")]);
-      renderView({ dashboard: { plans: [], goals: {}, savedExercises: "nope" } });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [], goals: {}, savedExercises: "nope" } })
+        )
+      );
 
       expect(await screen.findByText("Save to plan")).toBeInTheDocument();
     });
@@ -457,16 +525,25 @@ describe("TipsView", () => {
 
     test("a weather recommendation is carried into the context", async () => {
       withExercises([exercise(1, "Row")]);
-      renderView({ weatherData: { recommendation: { workoutType: "indoor" } } });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({ weatherData: { recommendation: { workoutType: "indoor" } } })
+        )
+      );
 
       expect(await screen.findByText("Smart picks for you")).toBeInTheDocument();
     });
   });
 
   describe("the payload it sends", () => {
+    /** @param {object} item */
     const save = async (item) => {
       withExercises([item]);
-      const onSaveExerciseToPlan = vi.fn(async () => ({ ok: true }));
+      const onSaveExerciseToPlan = vi.fn(
+        /** @type {TipsViewProps["onSaveExerciseToPlan"]} */ (
+          /** @type {unknown} */ (async () => ({ ok: true }))
+        )
+      );
       renderView({ onSaveExerciseToPlan });
       fireEvent.click(await screen.findByText("Save to plan"));
       await waitFor(() => expect(onSaveExerciseToPlan).toHaveBeenCalled());
@@ -523,7 +600,11 @@ describe("TipsView", () => {
       // The library renders the same tile without a recommendation, so the
       // `|| ""` fallback is only reachable from there.
       withExercises([exercise(7, "Row")]);
-      const onSaveExerciseToPlan = vi.fn(async () => ({ ok: true }));
+      const onSaveExerciseToPlan = vi.fn(
+        /** @type {TipsViewProps["onSaveExerciseToPlan"]} */ (
+          /** @type {unknown} */ (async () => ({ ok: true }))
+        )
+      );
       renderView({ onSaveExerciseToPlan });
       await screen.findByText("Smart picks for you");
       setView("library");
@@ -548,7 +629,11 @@ describe("TipsView", () => {
           videos: [{ url: "https://cdn.example/row.mp4" }]
         }
       ]);
-      const onSaveExerciseToPlan = vi.fn(async () => ({ ok: true }));
+      const onSaveExerciseToPlan = vi.fn(
+        /** @type {TipsViewProps["onSaveExerciseToPlan"]} */ (
+          /** @type {unknown} */ (async () => ({ ok: true }))
+        )
+      );
       renderView({ onSaveExerciseToPlan });
       await screen.findByText("Smart picks for you");
       setView("library");
@@ -620,8 +705,13 @@ describe("TipsView", () => {
   });
 
   describe("saving to the plan", () => {
+    /** @param {Partial<TipsViewProps>} [props] */
     const saved = (props = {}) => {
-      const onSaveExerciseToPlan = vi.fn(async () => ({ ok: true }));
+      const onSaveExerciseToPlan = vi.fn(
+        /** @type {TipsViewProps["onSaveExerciseToPlan"]} */ (
+          /** @type {unknown} */ (async () => ({ ok: true }))
+        )
+      );
       renderView({ onSaveExerciseToPlan, ...props });
       return onSaveExerciseToPlan;
     };
@@ -663,7 +753,11 @@ describe("TipsView", () => {
 
     test("falls back to a generic message when the refusal carries none", async () => {
       withExercises([exercise(7, "Row")]);
-      renderView({ onSaveExerciseToPlan: vi.fn(async () => ({ ok: false })) });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({ onSaveExerciseToPlan: vi.fn(async () => ({ ok: false })) })
+        )
+      );
       fireEvent.click(await screen.findByText("Save to plan"));
 
       expect(await screen.findByText("Couldn't save this exercise right now.")).toBeInTheDocument();
@@ -691,15 +785,23 @@ describe("TipsView", () => {
       // same condition, so nothing can call through to it and that message
       // can never appear. The guard is defensive and the message is dead.
       withExercises([exercise(7, "Row")]);
-      const onSave = vi.fn(async () => ({ ok: true }));
-      renderView({
-        onSaveExerciseToPlan: onSave,
-        dashboard: {
-          plans: [],
-          goals: {},
-          savedExercises: [{ exerciseId: 7, name: "Row" }]
-        }
-      });
+      const onSave = vi.fn(
+        /** @type {TipsViewProps["onSaveExerciseToPlan"]} */ (
+          /** @type {unknown} */ (async () => ({ ok: true }))
+        )
+      );
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            onSaveExerciseToPlan: onSave,
+            dashboard: {
+              plans: [],
+              goals: {},
+              savedExercises: [{ exerciseId: 7, name: "Row" }]
+            }
+          })
+        )
+      );
 
       const button = await screen.findByText("Saved");
       expect(button).toBeDisabled();
@@ -708,18 +810,30 @@ describe("TipsView", () => {
 
     test("a saved exercise is matched case-insensitively by name", async () => {
       withExercises([exercise(7, "Row")]);
-      renderView({
-        dashboard: { plans: [], goals: {}, savedExercises: [{ exerciseId: 7, name: "  ROW  " }] }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: {
+              plans: [],
+              goals: {},
+              savedExercises: [{ exerciseId: 7, name: "  ROW  " }]
+            }
+          })
+        )
+      );
 
       expect(await screen.findByText("Saved")).toBeInTheDocument();
     });
 
     test("a different exercise is still offered", async () => {
       withExercises([exercise(7, "Row")]);
-      renderView({
-        dashboard: { plans: [], goals: {}, savedExercises: [{ exerciseId: 9, name: "Squat" }] }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            dashboard: { plans: [], goals: {}, savedExercises: [{ exerciseId: 9, name: "Squat" }] }
+          })
+        )
+      );
 
       expect(await screen.findByText("Save to plan")).toBeInTheDocument();
     });
@@ -740,6 +854,7 @@ describe("TipsView", () => {
     });
 
     test("the button reports progress while the save is in flight", async () => {
+      /** @type {(() => void) | undefined} */
       let release;
       withExercises([exercise(7, "Row")]);
       renderView({
@@ -754,12 +869,13 @@ describe("TipsView", () => {
       fireEvent.click(await screen.findByText("Save to plan"));
 
       expect(await screen.findByText("Saving...")).toBeInTheDocument();
-      release();
+      /** @type {() => void} */ (release)();
       expect(await screen.findByText('Saved "Row" to your plan.')).toBeInTheDocument();
     });
   });
 
   describe("the exercise list", () => {
+    /** @param {number} count */
     const manyExercises = (count) =>
       Array.from({ length: count }, (_, i) => exercise(i + 1, `Exercise ${i + 1}`));
 
@@ -801,7 +917,9 @@ describe("TipsView", () => {
       withExercises(manyExercises(30));
       renderView();
       await waitFor(() =>
-        expect(screen.getByLabelText("Category").options.length).toBeGreaterThan(1)
+        expect(
+          /** @type {HTMLSelectElement} */ (screen.getByLabelText("Category")).options.length
+        ).toBeGreaterThan(1)
       );
       setView("library");
       fireEvent.click(screen.getByText("Show more exercises"));
@@ -841,15 +959,19 @@ describe("TipsView", () => {
           equipment: [{ name: "Barbell" }]
         })
       ]);
-      renderView({
-        form: {
-          goal: "Build lower body strength with barbell squats",
-          days: 3,
-          duration: 45,
-          injuries: "",
-          equipment: ["Barbell"]
-        }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            form: {
+              goal: "Build lower body strength with barbell squats",
+              days: 3,
+              duration: 45,
+              injuries: "",
+              equipment: ["Barbell"]
+            }
+          })
+        )
+      );
       await screen.findByText("Smart picks for you");
 
       const names = Array.from(document.querySelectorAll(".exercise-grid .exercise-tile h3")).map(
@@ -879,9 +1001,13 @@ describe("TipsView", () => {
 
     test("name the goal track they sorted by", async () => {
       withExercises([exercise(1, "Row")]);
-      renderView({
-        form: { goal: "Fat loss and conditioning", days: 3, duration: 45, injuries: "" }
-      });
+      renderView(
+        /** @type {Partial<TipsViewProps>} */ (
+          /** @type {unknown} */ ({
+            form: { goal: "Fat loss and conditioning", days: 3, duration: 45, injuries: "" }
+          })
+        )
+      );
 
       expect(await screen.findByText(/fat loss/)).toBeInTheDocument();
     });

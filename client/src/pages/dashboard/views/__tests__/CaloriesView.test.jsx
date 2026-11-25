@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import CaloriesView from "../CaloriesView";
@@ -8,26 +9,36 @@ import { markUnanswered } from "../../../../app/connection";
 // every list has an empty state -- so the things worth pinning are which field
 // reaches which key, which submit runs, and what each list says with nothing in
 // it.
+//
+// Each log row holds only the fields its list shows, so it is cast to its row
+// type where it is given, and a list that is absent or not a list at all goes
+// through unknown. A row a test looks up is cast to an element.
+/** @typedef {Parameters<typeof CaloriesView>[0]} CaloriesViewProps */
+/** @typedef {{ previous: object, result: unknown }} Box */
 
-const METRIC = {
-  id: "m1",
-  date: "2026-09-10",
-  weightLb: 180,
-  bodyFatPct: 18,
-  waistCm: 84,
-  restingHr: 58
-};
+const METRIC = /** @type {CaloriesViewProps["progressMetrics"][number]} */ (
+  /** @type {unknown} */ ({
+    id: "m1",
+    date: "2026-09-10",
+    weightLb: 180,
+    bodyFatPct: 18,
+    waistCm: 84,
+    restingHr: 58
+  })
+);
 
 // Each onChange hands React an updater that closes over the event and reads
 // `e.target.value` *when it runs*. These inputs are controlled by props that
 // never change here, so React restores the DOM value as soon as the event
 // settles -- and an updater invoked after that reads the restored value, not
 // the typed one. So the updater is applied inside the setter, during the event.
+/** @param {Box} box */
 const capturingSetter = (box) =>
   vi.fn((updater) => {
     box.result = typeof updater === "function" ? updater(box.previous) : updater;
   });
 
+/** @param {{ goal: Box, calorie: Box, progress: Box }} boxes */
 const setters = (boxes) => ({
   setGoalForm: capturingSetter(boxes.goal),
   setCalorieForm: capturingSetter(boxes.calorie),
@@ -39,6 +50,7 @@ const setters = (boxes) => ({
 
 const newBox = () => ({ previous: { untouched: "kept" }, result: null });
 
+/** @param {Partial<CaloriesViewProps>} [props] */
 const renderView = (props = {}) => {
   const boxes = { goal: newBox(), calorie: newBox(), progress: newBox() };
   const handlers = setters(boxes);
@@ -53,7 +65,11 @@ const renderView = (props = {}) => {
       workoutSeries={[1, 0, 1]}
       last7Keys={["2026-09-06", "2026-09-07", "2026-09-12"]}
       calorieForm={{ calories: "2100" }}
-      calories={[{ id: "c1", date: "2026-09-10", calories: 2100 }]}
+      calories={
+        /** @type {CaloriesViewProps["calories"]} */ ([
+          { id: "c1", date: "2026-09-10", calories: 2100 }
+        ])
+      }
       goalPaceText="At this pace, 3 days to reach 4 workouts."
       progressMetrics={[METRIC]}
       progressForm={{
@@ -71,6 +87,10 @@ const renderView = (props = {}) => {
   return { ...utils, ...handlers, boxes };
 };
 
+/**
+ * @param {string} label
+ * @param {string} value
+ */
 const typeInto = (label, value) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
@@ -146,10 +166,10 @@ describe("CaloriesView", () => {
 
     test("lists what has been logged", () => {
       renderView({
-        calories: [
+        calories: /** @type {CaloriesViewProps["calories"]} */ ([
           { id: "c1", date: "2026-09-10", calories: 2100 },
           { id: "c2", date: "2026-09-09", calories: 2250 }
-        ]
+        ])
       });
       const rows = document.querySelectorAll(".goal-list-row");
 
@@ -242,7 +262,7 @@ describe("CaloriesView", () => {
   describe("the progress log", () => {
     test("reports every measurement it has", () => {
       renderView({ progressMetrics: [METRIC] });
-      const row = [...document.querySelectorAll(".goal-list-row")].at(-1);
+      const row = /** @type {Element} */ ([...document.querySelectorAll(".goal-list-row")].at(-1));
 
       expect(row.textContent).toContain("W 180 lb");
       expect(row.textContent).toContain("BF 18%");
@@ -252,9 +272,11 @@ describe("CaloriesView", () => {
 
     test("stands in for each measurement it does not have", () => {
       renderView({
-        progressMetrics: [{ id: "m2", date: "2026-09-10" }]
+        progressMetrics: /** @type {CaloriesViewProps["progressMetrics"]} */ ([
+          { id: "m2", date: "2026-09-10" }
+        ])
       });
-      const row = [...document.querySelectorAll(".goal-list-row")].at(-1);
+      const row = /** @type {Element} */ ([...document.querySelectorAll(".goal-list-row")].at(-1));
 
       expect(row.textContent).toContain("W -- lb");
       expect(row.textContent).toContain("BF --%");
@@ -267,11 +289,13 @@ describe("CaloriesView", () => {
       // heart rate of 0 is nonsense, but a waist or body fat of 0 reaching the
       // list as "--" would hide a bad reading instead of showing it.
       renderView({
-        progressMetrics: [
-          { id: "m3", date: "2026-09-10", weightLb: 0, bodyFatPct: 0, waistCm: 0, restingHr: 0 }
-        ]
+        progressMetrics: /** @type {CaloriesViewProps["progressMetrics"]} */ (
+          /** @type {unknown} */ ([
+            { id: "m3", date: "2026-09-10", weightLb: 0, bodyFatPct: 0, waistCm: 0, restingHr: 0 }
+          ])
+        )
       });
-      const row = [...document.querySelectorAll(".goal-list-row")].at(-1);
+      const row = /** @type {Element} */ ([...document.querySelectorAll(".goal-list-row")].at(-1));
 
       expect(row.textContent).toContain("W 0 lb");
       expect(row.textContent).toContain("BF 0%");
@@ -298,7 +322,11 @@ describe("CaloriesView", () => {
       ["nothing at all", undefined],
       ["null", null]
     ])("says so for %s", (_label, progressMetrics) => {
-      renderView({ progressMetrics, calories: [] });
+      renderView(
+        /** @type {Partial<CaloriesViewProps>} */ (
+          /** @type {unknown} */ ({ progressMetrics, calories: [] })
+        )
+      );
 
       expect(screen.getByText("No progress metrics logged yet.")).toBeInTheDocument();
       expect(document.querySelectorAll(".goal-list-row")).toHaveLength(0);
@@ -309,7 +337,11 @@ describe("CaloriesView", () => {
       // disagreed: Array.isArray for the rows, `?.length` for the message --
       // which a string satisfies, so a non-array produced neither rows nor an
       // explanation. Both now read the same narrowed list.
-      renderView({ progressMetrics: "not a list", calories: [] });
+      renderView(
+        /** @type {Partial<CaloriesViewProps>} */ (
+          /** @type {unknown} */ ({ progressMetrics: "not a list", calories: [] })
+        )
+      );
 
       expect(document.querySelectorAll(".goal-list-row")).toHaveLength(0);
       expect(screen.getByText("No progress metrics logged yet.")).toBeInTheDocument();
@@ -319,7 +351,13 @@ describe("CaloriesView", () => {
       // This list had no guard at all and would have thrown on .map. The
       // producer never sends one, but the two lists in this view now behave
       // the same way rather than three different ways.
-      expect(() => renderView({ calories: "not a list", progressMetrics: [] })).not.toThrow();
+      expect(() =>
+        renderView(
+          /** @type {Partial<CaloriesViewProps>} */ (
+            /** @type {unknown} */ ({ calories: "not a list", progressMetrics: [] })
+          )
+        )
+      ).not.toThrow();
       expect(screen.getByText("No calories logged yet.")).toBeInTheDocument();
     });
   });

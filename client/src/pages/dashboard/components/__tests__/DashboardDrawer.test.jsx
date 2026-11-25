@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
@@ -39,7 +40,8 @@ describe("DashboardDrawer", () => {
     );
 
     const drawer = screen.getByRole("navigation");
-    const drawerLinks = drawer.querySelector(".drawer-links");
+    // Elements a test looks up are cast to the element it expects.
+    const drawerLinks = /** @type {HTMLElement} */ (drawer.querySelector(".drawer-links"));
     expect(within(drawerLinks).queryByRole("button", { name: "Settings" })).toBeNull();
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
 
@@ -49,7 +51,7 @@ describe("DashboardDrawer", () => {
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(onNavigate).toHaveBeenCalledWith("settings");
 
-    await user.click(container.querySelector(".drawer-backdrop"));
+    await user.click(/** @type {Element} */ (container.querySelector(".drawer-backdrop")));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -57,6 +59,10 @@ describe("DashboardDrawer", () => {
   // calls useCloseOnEscape itself. Before that it could only be dismissed with
   // a mouse on the backdrop or by tabbing to the Close button.
   describe("closing with Escape", () => {
+    /**
+     * @param {boolean} open
+     * @param {() => void} onClose
+     */
     const renderDrawer = (open, onClose) =>
       render(
         <DashboardDrawer
@@ -118,6 +124,7 @@ describe("DashboardDrawer", () => {
   // and closing hands focus back to the menu button.
   test("holds keyboard focus while open and returns it on close", async () => {
     const user = userEvent.setup();
+    /** @param {{ open: boolean }} props */
     const Page = ({ open }) => (
       <>
         <button type="button">Open dashboard menu</button>

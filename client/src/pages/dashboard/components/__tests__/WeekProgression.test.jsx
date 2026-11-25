@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
@@ -6,7 +7,14 @@ import { markUnanswered } from "../../../../app/connection";
 
 // The week's loads for one plan day (roadmap B4): each lift's change, its
 // reason and its controls, and the deload week's banner.
+// Each week holds only what the panel reads, so it is cast to the prop where it
+// is given. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof WeekProgression>[0]} WeekProps */
 
+/**
+ * @param {string} name
+ * @param {{ min: number, max: number } | null} [reps]
+ */
 const rx = (name, reps = { min: 8, max: 10 }) => ({
   name,
   sets: 3,
@@ -16,6 +24,11 @@ const rx = (name, reps = { min: 8, max: 10 }) => ({
   targetRpe: null
 });
 
+/**
+ * @param {string} name
+ * @param {string} change
+ * @param {object} [fields]
+ */
 const lift = (name, change, fields = {}) => ({
   name,
   key: name.toLowerCase(),
@@ -28,6 +41,10 @@ const lift = (name, change, fields = {}) => ({
   ...fields
 });
 
+/**
+ * @param {unknown[]} lifts
+ * @param {{ active: boolean, count: number, reason: string | null, decision: string | null }} [deloadWeek]
+ */
 const weekOf = (lifts, deloadWeek = { active: false, count: 2, reason: null, decision: null }) => ({
   weekStart: "2026-11-09",
   deloadWeek,
@@ -36,11 +53,12 @@ const weekOf = (lifts, deloadWeek = { active: false, count: 2, reason: null, dec
 
 const DAY = [rx("Leg press"), rx("Dumbbell box squat"), rx("Seated cable row"), rx("Plank", null)];
 
+/** @param {{ week?: unknown, prescriptions?: WeekProps["prescriptions"], system?: WeekProps["system"], error?: string }} [options] */
 const renderWeek = ({ week, prescriptions = DAY, system = "metric", error = "" } = {}) => {
   const onAnswer = vi.fn();
   render(
     <WeekProgression
-      week={week}
+      week={/** @type {WeekProps["week"]} */ (week)}
       prescriptions={prescriptions}
       system={system}
       onAnswer={onAnswer}
@@ -50,8 +68,11 @@ const renderWeek = ({ week, prescriptions = DAY, system = "metric", error = "" }
   return onAnswer;
 };
 
+/** @param {string} name */
 const itemFor = (name) =>
-  screen.getAllByRole("listitem").find((item) => item.textContent.startsWith(name));
+  /** @type {HTMLElement} */ (
+    screen.getAllByRole("listitem").find((item) => item.textContent.startsWith(name))
+  );
 
 describe("WeekProgression", () => {
   test("shows each of the day's lifts with its change and its reason, in the day's order", () => {
@@ -66,7 +87,9 @@ describe("WeekProgression", () => {
 
     expect(screen.getByRole("heading", { name: "This week's loads" })).toBeInTheDocument();
     expect(
-      screen.getAllByRole("listitem").map((item) => item.querySelector("p").textContent)
+      screen
+        .getAllByRole("listitem")
+        .map((item) => /** @type {Element} */ (item.querySelector("p")).textContent)
     ).toEqual([
       "Leg press: Up to 42.5 kg, from 40",
       "Dumbbell box squat: Up to 42.5 kg? Now 40",
@@ -80,16 +103,18 @@ describe("WeekProgression", () => {
       week: weekOf([lift("Leg press", "hold"), lift("Dumbbell box squat", "none")])
     });
 
-    expect(itemFor("Leg press").querySelector("p").textContent).toBe("Leg press: Hold at 40 kg");
-    expect(itemFor("Dumbbell box squat").querySelector("p").textContent).toBe(
-      "Dumbbell box squat: No load to set"
+    expect(/** @type {Element} */ (itemFor("Leg press").querySelector("p")).textContent).toBe(
+      "Leg press: Hold at 40 kg"
     );
+    expect(
+      /** @type {Element} */ (itemFor("Dumbbell box squat").querySelector("p")).textContent
+    ).toBe("Dumbbell box squat: No load to set");
   });
 
   test("shows loads in pounds under an imperial region", () => {
     renderWeek({ week: weekOf([lift("Leg press", "up")]), system: "imperial" });
 
-    expect(itemFor("Leg press").querySelector("p").textContent).toBe(
+    expect(/** @type {Element} */ (itemFor("Leg press").querySelector("p")).textContent).toBe(
       "Leg press: Up to 95 lb, from 90"
     );
   });
@@ -156,9 +181,9 @@ describe("WeekProgression", () => {
       })
     });
 
-    expect(screen.getByText(/^Lighter week:/).closest("p").textContent).toBe(
-      "Lighter week: Your 6th week in a row: same loads, half the sets"
-    );
+    expect(
+      /** @type {Element} */ (screen.getByText(/^Lighter week:/).closest("p")).textContent
+    ).toBe("Lighter week: Your 6th week in a row: same loads, half the sets");
     await userEvent.click(screen.getByRole("button", { name: "Train normally" }));
     expect(onAnswer).toHaveBeenCalledWith({ decision: "normal" });
   });
@@ -216,7 +241,9 @@ describe("WeekProgression", () => {
     renderWeek({ week: weekOf([lift("Plank", "up"), lift("Leg press", "up")]) });
 
     expect(
-      screen.getAllByRole("listitem").map((item) => item.querySelector("strong").textContent)
+      screen
+        .getAllByRole("listitem")
+        .map((item) => /** @type {Element} */ (item.querySelector("strong")).textContent)
     ).toEqual(["Leg press"]);
   });
 
@@ -232,7 +259,7 @@ describe("WeekProgression", () => {
     );
     const { container: empty } = render(
       <WeekProgression
-        week={weekOf([lift("Push-up", "up")])}
+        week={/** @type {WeekProps["week"]} */ (weekOf([lift("Push-up", "up")]))}
         prescriptions={[rx("Plank", null)]}
         system="metric"
         onAnswer={vi.fn()}
