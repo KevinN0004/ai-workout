@@ -1,3 +1,4 @@
+// @ts-check
 import { render } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import DashboardPage from "../DashboardPage";
@@ -20,63 +21,65 @@ import DashboardPage from "../DashboardPage";
  */
 const HOOK_ORDER_ERROR = /Rendered (more|fewer) hooks than/;
 
-const props = {
-  personal: {},
-  go: vi.fn(),
-  onLogout: vi.fn(),
-  dashboard: {
-    workouts: [],
-    workoutSessions: [],
-    mealLogs: [],
-    progressMetrics: [],
-    calories: [],
-    plans: [],
-    savedExercises: [],
-    goals: {}
-  },
-  goalForm: {},
-  setGoalForm: vi.fn(),
-  dashView: "summary",
-  setDashView: vi.fn(),
-  dashNavOpen: false,
-  setDashNavOpen: vi.fn(),
-  dashLoading: false,
-  dashError: "",
-  workoutModalOpen: false,
-  setWorkoutModalOpen: vi.fn(),
-  workoutForm: {},
-  setWorkoutForm: vi.fn(),
-  submitWorkout: vi.fn(),
-  form: {},
-  openPlannerFromProfile: vi.fn(),
-  calorieForm: {},
-  setCalorieForm: vi.fn(),
-  submitCalories: vi.fn(),
-  mealLogForm: {},
-  setMealLogForm: vi.fn(),
-  submitMealLog: vi.fn(),
-  progressForm: {},
-  setProgressForm: vi.fn(),
-  submitProgressMetric: vi.fn(),
-  submitGoals: vi.fn(),
-  weekDays: [],
-  latestPlanByWeekday: {},
-  weatherData: null,
-  weatherLoading: false,
-  weatherError: "",
-  weatherLastUpdatedAt: null,
-  refreshWeatherRecommendation: vi.fn(),
-  airQualityData: null,
-  airQualityLoading: false,
-  airQualityError: "",
-  airQualityLastUpdatedAt: null,
-  refreshAirQuality: vi.fn(),
-  onSaveExerciseToPlan: vi.fn(),
-  onRemoveSavedExercise: vi.fn(),
-  plannerModal: null,
-  dashboardToast: null,
-  clearDashboardToast: vi.fn()
-};
+// Partial on purpose, as the note above says, so it is cast as the page's props.
+const props = /** @type {import("../DashboardPage.jsx").DashboardPageProps} */ (
+  /** @type {unknown} */ ({
+    go: vi.fn(),
+    onLogout: vi.fn(),
+    dashboard: {
+      workouts: [],
+      workoutSessions: [],
+      mealLogs: [],
+      progressMetrics: [],
+      calories: [],
+      plans: [],
+      savedExercises: [],
+      goals: {}
+    },
+    goalForm: {},
+    setGoalForm: vi.fn(),
+    dashView: "summary",
+    setDashView: vi.fn(),
+    dashNavOpen: false,
+    setDashNavOpen: vi.fn(),
+    dashLoading: false,
+    dashError: "",
+    workoutModalOpen: false,
+    setWorkoutModalOpen: vi.fn(),
+    workoutForm: {},
+    setWorkoutForm: vi.fn(),
+    submitWorkout: vi.fn(),
+    form: {},
+    openPlannerFromProfile: vi.fn(),
+    calorieForm: {},
+    setCalorieForm: vi.fn(),
+    submitCalories: vi.fn(),
+    mealLogForm: {},
+    setMealLogForm: vi.fn(),
+    submitMealLog: vi.fn(),
+    progressForm: {},
+    setProgressForm: vi.fn(),
+    submitProgressMetric: vi.fn(),
+    submitGoals: vi.fn(),
+    weekDays: [],
+    latestPlanByWeekday: {},
+    weatherData: null,
+    weatherLoading: false,
+    weatherError: "",
+    weatherLastUpdatedAt: null,
+    refreshWeatherRecommendation: vi.fn(),
+    airQualityData: null,
+    airQualityLoading: false,
+    airQualityError: "",
+    airQualityLastUpdatedAt: null,
+    refreshAirQuality: vi.fn(),
+    onSaveExerciseToPlan: vi.fn(),
+    onRemoveSavedExercise: vi.fn(),
+    plannerModal: null,
+    dashboardToast: null,
+    clearDashboardToast: vi.fn()
+  })
+);
 
 describe("DashboardPage hook order", () => {
   test("signing in mid-lifecycle does not change the hook count", () => {
@@ -85,12 +88,14 @@ describe("DashboardPage hook order", () => {
       .spyOn(console, "error")
       .mockImplementation((...args) => logged.push(args.join(" ")));
 
+    /** @type {Error | null} */
     let thrown = null;
     try {
       const { rerender } = render(<DashboardPage {...props} user={null} />);
       rerender(<DashboardPage {...props} user={{ id: "u1", email: "a@b.c", profile: {} }} />);
     } catch (err) {
-      thrown = err;
+      // A render that fails throws an Error.
+      thrown = /** @type {Error} */ (err);
     } finally {
       spy.mockRestore();
     }

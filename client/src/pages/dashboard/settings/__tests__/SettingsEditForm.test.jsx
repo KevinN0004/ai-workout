@@ -1,8 +1,14 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SettingsEditForm from "../SettingsEditForm";
 import { markUnanswered } from "../../../../app/connection";
 
+// VALUES holds only the fields FIELDS shows. error and saving start where
+// SettingsView starts them.
+/** @typedef {Parameters<typeof SettingsEditForm>[0]} SettingsEditFormProps */
+
+/** @type {SettingsEditFormProps["fields"]} */
 const FIELDS = [
   { name: "name", label: "Name", type: "text", maxLength: 80 },
   { name: "age", label: "Age", type: "number", bounds: [10, 120] },
@@ -25,7 +31,7 @@ const FIELDS = [
   { name: "notes", label: "Notes", type: "textarea", maxLength: 500 }
 ];
 
-const VALUES = {
+const VALUES = /** @type {SettingsEditFormProps["values"]} */ ({
   name: "Jordan",
   age: "34",
   sex: "Female",
@@ -34,8 +40,9 @@ const VALUES = {
   heightInches: "10",
   weight: "77",
   trainingDays: ["Monday"]
-};
+});
 
+/** @param {Partial<SettingsEditFormProps>} [overrides] */
 const renderForm = (overrides = {}) =>
   render(
     <SettingsEditForm
@@ -44,6 +51,8 @@ const renderForm = (overrides = {}) =>
       measurementSystem="metric"
       onSave={() => {}}
       onCancel={() => {}}
+      error=""
+      saving={false}
       {...overrides}
     />
   );

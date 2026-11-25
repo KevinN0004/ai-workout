@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { buildPlanWeek } from "../planWeek";
 
@@ -5,6 +6,10 @@ import { buildPlanWeek } from "../planWeek";
 // what completes a planned day: a workout linked to it and dated this week, or
 // a workout with no link dated on it.
 
+// Each week built through week() has a plan, so it is built, not null.
+/** @typedef {NonNullable<ReturnType<typeof buildPlanWeek>>} PlanWeek */
+
+/** @param {string} name */
 const mainLifts = (name) => ["Main lifts:", `- ${name}: 3 x 5`];
 const restLines = ["Rest or 20-minute light walk."];
 
@@ -20,6 +25,7 @@ const DAYS = [
 ];
 
 // Saved well before the week of 2 to 8 November 2026.
+/** @param {Record<string, unknown>} [overrides] */
 const plan = (overrides = {}) => ({
   id: "plan-1",
   createdAt: new Date(2026, 9, 20, 12).toISOString(),
@@ -33,9 +39,22 @@ const MONDAY = new Date(2026, 10, 2, 9);
 const WEDNESDAY = new Date(2026, 10, 4, 9);
 const SUNDAY = new Date(2026, 10, 8, 21);
 
+// Each workout holds the id a logged one has, which the week does not read.
+/** @param {{ [K in keyof Parameters<typeof buildPlanWeek>[0]]?: unknown }} [options] */
 const week = (options) =>
-  buildPlanWeek({ plan: plan(), workouts: [], today: WEDNESDAY, ...options });
+  /** @type {PlanWeek} */ (
+    buildPlanWeek(
+      /** @type {Parameters<typeof buildPlanWeek>[0]} */ ({
+        plan: plan(),
+        workouts: [],
+        today: WEDNESDAY,
+        ...options
+      })
+    )
+  );
+/** @param {PlanWeek} result */
 const stateOf = (result) => Object.fromEntries(result.days.map((day) => [day.label, day.state]));
+/** @param {PlanWeek} result */
 const counts = ({ planned, done, missed }) => ({ planned, done, missed });
 
 describe("buildPlanWeek", () => {

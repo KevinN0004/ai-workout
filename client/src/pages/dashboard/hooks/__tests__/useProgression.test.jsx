@@ -1,31 +1,47 @@
+// @ts-check
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useProgression from "../useProgression";
 
 // Pins how the dashboard reads the week's progression (roadmap B4) and
 // answers it. apiFetch, the network boundary, is stubbed.
+//
+// The hook is given a dashboard with only the plans and sessions it reads, and
+// a fake apiFetch, so its input is cast where the hook takes it. Values set
+// inside a callback (a promise's resolver, an act's answers) are cast where
+// they are read.
+/** @typedef {Parameters<typeof useProgression>[0]} ProgressionInput */
 
 const NOW = new Date("2026-11-11T12:00:00");
 const WEEK = { weekStart: "2026-11-09", deloadWeek: { active: false }, lifts: [] };
 
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
 const respond = (body, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body });
 
 // A promise and the functions that settle it, to stage two answers out of order.
 const deferred = () => {
+  /** @type {((value: unknown) => void) | undefined} */
   let resolve;
   const promise = new Promise((done) => {
     resolve = done;
   });
-  return { promise, resolve };
+  return { promise, resolve: /** @type {(value: unknown) => void} */ (resolve) };
 };
 
+/** @param {{ planId?: string | null, sessionIds?: string[] }} [options] */
 const dashboardOf = ({ planId = "plan-1", sessionIds = ["w-1"] } = {}) => ({
   plans: planId ? [{ id: planId }] : [],
   workoutSessions: sessionIds.map((id) => ({ id }))
 });
 
+/** @param {{ [K in keyof ProgressionInput]?: unknown }} initial */
 const renderProgression = (initial) =>
-  renderHook((props) => useProgression(props), { initialProps: initial });
+  renderHook((props) => useProgression(/** @type {ProgressionInput} */ (props)), {
+    initialProps: initial
+  });
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"], now: NOW });
@@ -185,6 +201,7 @@ describe("useProgression: reading the week", () => {
 });
 
 describe("useProgression: answering", () => {
+  /** @param {unknown} apiFetch */
   const loaded = async (apiFetch) => {
     const hook = renderProgression({ dashboard: dashboardOf(), notes: "", apiFetch });
     await waitFor(() => expect(hook.result.current.progression).toEqual(WEEK));
@@ -308,6 +325,7 @@ describe("useProgression: answering", () => {
     const { result } = await loaded(apiFetch);
     const latest = { ...WEEK, lifts: [{ key: "leg press", decision: "accept" }] };
 
+    /** @type {Promise<unknown>[] | undefined} */
     let pending;
     act(() => {
       pending = [
@@ -317,11 +335,11 @@ describe("useProgression: answering", () => {
     });
     await act(async () => {
       second.resolve(respond({ progression: latest }));
-      await pending[1];
+      await /** @type {Promise<unknown>[]} */ (pending)[1];
     });
     await act(async () => {
       first.resolve(respond({ progression: WEEK }));
-      await pending[0];
+      await /** @type {Promise<unknown>[]} */ (pending)[0];
     });
 
     expect(result.current.progression).toEqual(latest);
@@ -336,6 +354,7 @@ describe("useProgression: answering", () => {
       .mockResolvedValueOnce(respond({ progression: WEEK }));
     const { result } = await loaded(apiFetch);
 
+    /** @type {Promise<unknown> | undefined} */
     let earlier;
     act(() => {
       earlier = result.current.answer({ liftKey: "leg press", decision: "undo" });

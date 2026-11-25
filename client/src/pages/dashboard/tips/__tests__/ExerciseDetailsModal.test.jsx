@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import ExerciseDetailsModal from "../ExerciseDetailsModal";
@@ -7,6 +8,10 @@ import { markUnanswered } from "../../../../app/connection";
 // fallback text for fields the wger catalogue leaves out -- category, muscles,
 // equipment and description are each optional upstream -- plus the save button,
 // which has three states and must not fire twice.
+//
+// The exercise holds only the fields the sheet reads, and each test's variant
+// of it, a field taken away or replaced, is cast to the prop where it is given.
+/** @typedef {Parameters<typeof ExerciseDetailsModal>[0]} ModalProps */
 
 const exercise = {
   id: 7,
@@ -19,11 +24,14 @@ const exercise = {
   recommendation: { reasons: ["Matches your strength focus."] }
 };
 
+/** @param {Partial<ModalProps>} [props] */
 const renderModal = (props = {}) => {
   const handlers = { onClose: vi.fn(), onSave: vi.fn() };
   const utils = render(
     <ExerciseDetailsModal
-      selectedExercise={exercise}
+      selectedExercise={
+        /** @type {ModalProps["selectedExercise"]} */ (/** @type {unknown} */ (exercise))
+      }
       isSaved={false}
       isSaving={false}
       {...handlers}
@@ -52,7 +60,11 @@ describe("ExerciseDetailsModal", () => {
   // read as unknown rather than as a blank row with a dangling label.
   describe("fallbacks for fields the catalogue omits", () => {
     test("an absent category reads as Unknown", () => {
-      renderModal({ selectedExercise: { ...exercise, category: undefined } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, category: undefined })
+        )
+      });
 
       expect(screen.getByText(/Unknown/)).toBeTruthy();
     });
@@ -62,19 +74,31 @@ describe("ExerciseDetailsModal", () => {
       ["an empty list", []],
       ["entries with no name", [{ name: "" }]]
     ])("muscles that are %s read as Not specified", (_label, muscles) => {
-      renderModal({ selectedExercise: { ...exercise, muscles } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, muscles })
+        )
+      });
 
       expect(screen.getAllByText(/Not specified/).length).toBeGreaterThan(0);
     });
 
     test("equipment that is absent reads as Not specified", () => {
-      renderModal({ selectedExercise: { ...exercise, equipment: undefined } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, equipment: undefined })
+        )
+      });
 
       expect(screen.getAllByText(/Not specified/).length).toBeGreaterThan(0);
     });
 
     test("an absent description says so rather than leaving a gap", () => {
-      renderModal({ selectedExercise: { ...exercise, description: "" } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, description: "" })
+        )
+      });
 
       expect(screen.getByText("No description provided for this exercise.")).toBeTruthy();
     });
@@ -82,10 +106,12 @@ describe("ExerciseDetailsModal", () => {
 
   test("lists at most four muscles", () => {
     renderModal({
-      selectedExercise: {
-        ...exercise,
-        muscles: [{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }]
-      }
+      selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+        /** @type {unknown} */ ({
+          ...exercise,
+          muscles: [{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }]
+        })
+      )
     });
 
     expect(screen.getByText(/A, B, C, D$/)).toBeTruthy();
@@ -99,7 +125,7 @@ describe("ExerciseDetailsModal", () => {
     ])("%s", (_label, props, label, disabled) => {
       renderModal(props);
 
-      const button = screen.getByRole("button", { name: label });
+      const button = /** @type {HTMLButtonElement} */ (screen.getByRole("button", { name: label }));
       expect(button.disabled).toBe(disabled);
     });
 
@@ -124,7 +150,11 @@ describe("ExerciseDetailsModal", () => {
       ["there is no recommendation", undefined],
       ["it carries no reasons", { reasons: [] }]
     ])("is omitted entirely when %s", (_label, recommendation) => {
-      renderModal({ selectedExercise: { ...exercise, recommendation } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, recommendation })
+        )
+      });
 
       expect(screen.queryByRole("heading", { name: "Why this was recommended" })).toBeNull();
     });
@@ -143,14 +173,16 @@ describe("ExerciseDetailsModal", () => {
 
     test("shows at most two, however many the entry carries", () => {
       renderModal({
-        selectedExercise: {
-          ...exercise,
-          videos: [
-            { id: "v1", url: "https://example.test/a.mp4" },
-            { id: "v2", url: "https://example.test/b.mp4" },
-            { id: "v3", url: "https://example.test/c.mp4" }
-          ]
-        }
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({
+            ...exercise,
+            videos: [
+              { id: "v1", url: "https://example.test/a.mp4" },
+              { id: "v2", url: "https://example.test/b.mp4" },
+              { id: "v3", url: "https://example.test/c.mp4" }
+            ]
+          })
+        )
       });
 
       expect(screen.getAllByRole("link", { name: "Watch reference video" })).toHaveLength(2);
@@ -160,7 +192,11 @@ describe("ExerciseDetailsModal", () => {
       ["absent", undefined],
       ["an empty list", []]
     ])("are omitted when %s", (_label, videos) => {
-      renderModal({ selectedExercise: { ...exercise, videos } });
+      renderModal({
+        selectedExercise: /** @type {ModalProps["selectedExercise"]} */ (
+          /** @type {unknown} */ ({ ...exercise, videos })
+        )
+      });
 
       expect(screen.queryByRole("link", { name: "Watch reference video" })).toBeNull();
     });

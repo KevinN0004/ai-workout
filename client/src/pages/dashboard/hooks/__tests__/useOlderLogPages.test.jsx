@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import useOlderLogPages from "../useOlderLogPages";
@@ -8,10 +9,21 @@ import useOlderLogPages from "../useOlderLogPages";
 
 const PATH = "/api/dashboard/meal-logs";
 
+// Each row holds only the id and date the pages read, and each answer only what
+// fetchWithTimeout and the hook read of it.
+/**
+ * @param {string} id
+ * @param {Record<string, unknown>} [extra]
+ */
 const row = (id, extra = {}) => ({ id, date: "2026-01-01", ...extra });
 
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
 const respond = (body, ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => body });
 
+/** @param {...unknown} responses */
 const stubFetch = (...responses) => {
   const fetchMock = vi.fn();
   responses.forEach((response) => fetchMock.mockResolvedValueOnce(response));
@@ -19,9 +31,23 @@ const stubFetch = (...responses) => {
   return fetchMock;
 };
 
+/** @param {{ heldItems?: unknown[], total?: number }} [options] */
 const render = ({ heldItems = [row("a"), row("b")], total } = {}) =>
-  renderHook(() => useOlderLogPages({ path: PATH, collection: "mealLogs", heldItems, total }));
+  renderHook(() =>
+    useOlderLogPages(
+      /** @type {Parameters<typeof useOlderLogPages>[0]} */ ({
+        path: PATH,
+        collection: "mealLogs",
+        heldItems,
+        total
+      })
+    )
+  );
 
+/**
+ * @param {import("vitest").Mock} fetchMock
+ * @param {number} [call]
+ */
 const requestedUrl = (fetchMock, call = 0) => String(fetchMock.mock.calls[call][0]);
 
 afterEach(() => {

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { EXERCISES } from "../../../../../server/src/services/planning/exerciseLibrary.js";
 import { GROUPS, e1rmOf, liftRecords, prSessions, weeklySets } from "../progress";
@@ -8,9 +9,18 @@ import { GROUPS, e1rmOf, liftRecords, prSessions, weeklySets } from "../progress
 
 const TODAY = "2026-11-04";
 
+// A lift done with a load has both an e1RM and a heaviest set.
+/** @typedef {import("../progress.js").LiftRecord} LiftRecord */
+/** @typedef {LiftRecord & { e1rm: NonNullable<LiftRecord["e1rm"]>, heaviest: NonNullable<LiftRecord["heaviest"]> }} LoadedRecord */
+
 let saved = 0;
 // A session as the dashboard holds it, saved after every session built before
 // it unless `createdAt` says otherwise.
+/**
+ * @param {string | null} date
+ * @param {unknown[] | undefined} exerciseSets
+ * @param {Record<string, unknown>} [fields]
+ */
 const session = (date, exerciseSets, fields = {}) => {
   saved += 1;
   return {
@@ -21,9 +31,26 @@ const session = (date, exerciseSets, fields = {}) => {
     ...fields
   };
 };
+/**
+ * @param {string} name
+ * @param {string | null} pattern
+ * @param {unknown[]} sets
+ */
 const exercise = (name, pattern, sets) => ({ name, pattern, sets });
+/**
+ * @param {number} count
+ * @param {number | null} [loadKg]
+ */
 const reps = (count, loadKg = null) => ({ reps: count, seconds: null, loadKg, rpe: null });
+/**
+ * @param {number} seconds
+ * @param {number | null} [loadKg]
+ */
 const hold = (seconds, loadKg = null) => ({ reps: null, seconds, loadKg, rpe: null });
+/**
+ * @param {number} count
+ * @param {unknown} set
+ */
 const times = (count, set) => Array.from({ length: count }, () => set);
 
 describe("GROUPS", () => {
@@ -77,6 +104,10 @@ describe("weeklySets", () => {
   });
 
   test("averages the four weeks before this one, to one decimal", () => {
+    /**
+     * @param {string} date
+     * @param {number} count
+     */
     const back = (date, count) =>
       session(date, [exercise("Pull-up", "vertical-pull", times(count, reps(8)))]);
     const sessions = [
@@ -214,9 +245,11 @@ describe("liftRecords", () => {
 
   test("the best e1RM is the highest of any set", () => {
     // 90 × 8 is 114, 100 × 3 is 110.
-    const [record] = liftRecords(
-      [session("2026-11-03", [exercise("Squat", "squat", [reps(3, 100), reps(8, 90)])])],
-      TODAY
+    const [record] = /** @type {LoadedRecord[]} */ (
+      liftRecords(
+        [session("2026-11-03", [exercise("Squat", "squat", [reps(3, 100), reps(8, 90)])])],
+        TODAY
+      )
     );
 
     expect(record.e1rm.value).toBeCloseTo(114, 6);
@@ -261,12 +294,14 @@ describe("liftRecords", () => {
   });
 
   test("a record keeps the date of the first session to reach it", () => {
-    const [record] = liftRecords(
-      [
-        session("2026-10-20", [exercise("Squat", "squat", [reps(5, 100)])]),
-        session("2026-10-27", [exercise("Squat", "squat", [reps(5, 100)])])
-      ],
-      TODAY
+    const [record] = /** @type {LoadedRecord[]} */ (
+      liftRecords(
+        [
+          session("2026-10-20", [exercise("Squat", "squat", [reps(5, 100)])]),
+          session("2026-10-27", [exercise("Squat", "squat", [reps(5, 100)])])
+        ],
+        TODAY
+      )
     );
 
     expect(record.e1rm.date).toBe("2026-10-20");
@@ -275,15 +310,17 @@ describe("liftRecords", () => {
   });
 
   test("the change is the record now against the record four weeks before today", () => {
-    const [record] = liftRecords(
-      [
-        // On the cutoff, so it is the record then.
-        session("2026-10-07", [exercise("Squat", "squat", [reps(5, 100)])]),
-        // A day after it: part of the record now, not then.
-        session("2026-10-08", [exercise("Squat", "squat", [reps(5, 102)])]),
-        session("2026-11-03", [exercise("Squat", "squat", [reps(5, 105)])])
-      ],
-      TODAY
+    const [record] = /** @type {LoadedRecord[]} */ (
+      liftRecords(
+        [
+          // On the cutoff, so it is the record then.
+          session("2026-10-07", [exercise("Squat", "squat", [reps(5, 100)])]),
+          // A day after it: part of the record now, not then.
+          session("2026-10-08", [exercise("Squat", "squat", [reps(5, 102)])]),
+          session("2026-11-03", [exercise("Squat", "squat", [reps(5, 105)])])
+        ],
+        TODAY
+      )
     );
 
     // 105 × 7/6 = 122.5 against 100 × 7/6 = 116.67.
@@ -305,16 +342,17 @@ describe("liftRecords", () => {
   });
 
   test("there is no change when the record then is missing, or the same", () => {
-    const [lateStart] = liftRecords(
-      [session("2026-10-20", [exercise("Squat", "squat", [reps(5, 100)])])],
-      TODAY
+    const [lateStart] = /** @type {LoadedRecord[]} */ (
+      liftRecords([session("2026-10-20", [exercise("Squat", "squat", [reps(5, 100)])])], TODAY)
     );
-    const [unbeaten] = liftRecords(
-      [
-        session("2026-10-01", [exercise("Squat", "squat", [reps(5, 100)])]),
-        session("2026-11-02", [exercise("Squat", "squat", [reps(5, 90)])])
-      ],
-      TODAY
+    const [unbeaten] = /** @type {LoadedRecord[]} */ (
+      liftRecords(
+        [
+          session("2026-10-01", [exercise("Squat", "squat", [reps(5, 100)])]),
+          session("2026-11-02", [exercise("Squat", "squat", [reps(5, 90)])])
+        ],
+        TODAY
+      )
     );
 
     expect(lateStart.e1rm.change).toBeNull();

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { dedupeMeals, getCalorieBand, handleImageError, normalizeMealDbMeal } from "../utils";
 import { FALLBACK_IMAGE } from "../data";
@@ -6,6 +7,11 @@ import { FALLBACK_IMAGE } from "../data";
 // meal from the MealDB proxy passes through before it reaches a card, and
 // dedupeMeals is what stops the same recipe appearing in two suggestion
 // sections at once.
+//
+// The casts give a helper what the app never builds by hand: an image event
+// with only the target it reads, a meal with a field the proxy may add, and
+// lists holding absent or malformed entries, which it must survive.
+/** @typedef {import("react").SyntheticEvent<HTMLImageElement>} ImageEvent */
 
 describe("getCalorieBand", () => {
   test.each([
@@ -31,7 +37,9 @@ describe("handleImageError", () => {
   test("swaps in the fallback image", () => {
     const target = { src: "https://example.com/broken.png", onerror: vi.fn() };
 
-    handleImageError({ currentTarget: target });
+    handleImageError(
+      /** @type {ImageEvent} */ (/** @type {unknown} */ ({ currentTarget: target }))
+    );
 
     expect(target.src).toBe(FALLBACK_IMAGE);
   });
@@ -41,13 +49,16 @@ describe("handleImageError", () => {
   test("detaches itself so a failing fallback cannot loop", () => {
     const target = { src: "", onerror: vi.fn() };
 
-    handleImageError({ currentTarget: target });
+    handleImageError(
+      /** @type {ImageEvent} */ (/** @type {unknown} */ ({ currentTarget: target }))
+    );
 
     expect(target.onerror).toBeNull();
   });
 });
 
 describe("normalizeMealDbMeal", () => {
+  /** @param {object} [overrides] any fields the proxy might send */
   const meal = (overrides = {}) => ({
     id: "52771",
     title: "Spicy Arrabiata Penne",
@@ -177,11 +188,19 @@ describe("normalizeMealDbMeal", () => {
   // The original object is spread first, so anything the proxy adds later
   // survives instead of being silently dropped here.
   test("keeps fields it does not know about", () => {
-    expect(normalizeMealDbMeal(meal({ tags: ["pasta"] })).tags).toEqual(["pasta"]);
+    expect(
+      /** @type {ReturnType<typeof normalizeMealDbMeal> & { tags?: unknown }} */ (
+        normalizeMealDbMeal(meal({ tags: ["pasta"] }))
+      ).tags
+    ).toEqual(["pasta"]);
   });
 });
 
 describe("dedupeMeals", () => {
+  /**
+   * @param {string} id
+   * @param {string} [title]
+   */
   const meal = (id, title = "Something") => ({ id, title });
 
   test("keeps the first of each repeated meal", () => {
@@ -197,7 +216,9 @@ describe("dedupeMeals", () => {
   });
 
   test("drops an entry with neither an id nor a title", () => {
-    expect(dedupeMeals([{}, meal("1"), null])).toEqual([meal("1")]);
+    expect(
+      dedupeMeals(/** @type {Array<{ id?: string, title?: string }>} */ ([{}, meal("1"), null]))
+    ).toEqual([meal("1")]);
   });
 
   // The shared set is how the suggestion sections avoid showing the same
@@ -230,6 +251,8 @@ describe("dedupeMeals", () => {
     ["not a list", "meals"],
     ["empty", []]
   ])("returns an empty list for %s input", (_label, input) => {
-    expect(dedupeMeals(input)).toEqual([]);
+    expect(
+      dedupeMeals(/** @type {Array<{ id?: string }>} */ (/** @type {unknown} */ (input)))
+    ).toEqual([]);
   });
 });

@@ -1,3 +1,4 @@
+// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -8,15 +9,63 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 // The heavy views are lazy-loaded and the at-a-glance strip is where the two
 // derived values surface, so the strip is mocked to capture them and the views
 // are stubbed to keep the render cheap.
+//
+// Each holder keeps the props its component was last rendered with, and is read
+// only after that component has rendered; beforeEach empties two of them. The
+// page always hands the header its menu handlers. Each prop the page is given
+// holds only what these tests read of it.
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {"go" | "setDashView" | "setDashNavOpen" | "setWorkoutForm" | "setWorkoutModalOpen" | "onLogout" | "clearDashboardToast"} HandlerProp */
+/** @typedef {"onSaveProfile" | "onChangePassword" | "onDeleteAccount" | "weatherErrorKind" | "airQualityErrorKind" | "onDeleteImportedWorkout" | "reloadDashboard" | "plannerModal" | "dashboardToast" | "apiFetch" | "onStartSession" | "onPlanChanged" | "dashboardPagination"} UnreachedProp */
 
-const glance = vi.hoisted(() => ({ props: null }));
-const header = vi.hoisted(() => ({ props: null }));
-const drawer = vi.hoisted(() => ({ props: null }));
-const bottomNav = vi.hoisted(() => ({ props: null }));
-const summary = vi.hoisted(() => ({ props: null }));
-const workoutsView = vi.hoisted(() => ({ props: null }));
-const plansView = vi.hoisted(() => ({ props: null }));
-const settingsView = vi.hoisted(() => ({ props: null }));
+const glance = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const header = vi.hoisted(
+  () =>
+    /** @type {{ props: Required<Parameters<typeof import("../components/DashboardHeader.jsx").default>[0]> }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const drawer = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../components/DashboardDrawer.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const bottomNav = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../components/DashboardBottomNav.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const summary = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../views/SummaryView.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const workoutsView = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../views/WorkoutsView.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const plansView = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../views/PlansView.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
+const settingsView = vi.hoisted(
+  () =>
+    /** @type {{ props: Parameters<typeof import("../views/SettingsView.jsx").default>[0] }} */ (
+      /** @type {unknown} */ ({ props: null })
+    )
+);
 
 vi.mock("../components/DashboardAtAGlance", () => ({
   default: (props) => {
@@ -92,48 +141,57 @@ import { NO_PLAN_LINK } from "../../../app/plans";
 // The zone the run started in, restored after each test that pins its own.
 const SYSTEM_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-const USER = { email: "a@b.c", profile: {} };
+const USER = /** @type {DashboardPageProps["user"]} */ ({ email: "a@b.c", profile: {} });
 
+/** @param {Partial<DashboardPageProps>} [props] */
 const renderPage = (props = {}) => {
-  const handlers = {
-    go: vi.fn(),
-    setDashView: vi.fn(),
-    setDashNavOpen: vi.fn(),
-    setWorkoutForm: vi.fn(),
-    setWorkoutModalOpen: vi.fn(),
-    onLogout: vi.fn(),
-    clearDashboardToast: vi.fn()
-  };
+  // The handlers stand in for the props no test here reaches, which stay
+  // undefined as they were; each handler is a mock.
+  const handlers =
+    /** @type {Pick<DashboardPageProps, UnreachedProp> & import("vitest").Mocked<Pick<DashboardPageProps, HandlerProp>>} */ (
+      /** @type {unknown} */ ({
+        go: vi.fn(),
+        setDashView: vi.fn(),
+        setDashNavOpen: vi.fn(),
+        setWorkoutForm: vi.fn(),
+        setWorkoutModalOpen: vi.fn(),
+        onLogout: vi.fn(),
+        clearDashboardToast: vi.fn()
+      })
+    );
   const utils = render(
     <DashboardPage
       user={USER}
-      personal={{}}
-      dashboard={{
-        workouts: [],
-        workoutSessions: [],
-        calories: [],
-        mealLogs: [],
-        plans: [],
-        goals: {}
-      }}
-      goalForm={{}}
+      dashboard={
+        /** @type {DashboardPageProps["dashboard"]} */ (
+          /** @type {unknown} */ ({
+            workouts: [],
+            workoutSessions: [],
+            calories: [],
+            mealLogs: [],
+            plans: [],
+            goals: {}
+          })
+        )
+      }
+      goalForm={/** @type {DashboardPageProps["goalForm"]} */ ({})}
       setGoalForm={vi.fn()}
       dashView="summary"
       dashNavOpen={false}
       dashLoading={false}
       dashError=""
       workoutModalOpen={false}
-      workoutForm={{}}
+      workoutForm={/** @type {DashboardPageProps["workoutForm"]} */ ({})}
       submitWorkout={vi.fn()}
-      form={{}}
+      form={/** @type {DashboardPageProps["form"]} */ ({})}
       openPlannerFromProfile={vi.fn()}
-      calorieForm={{}}
+      calorieForm={/** @type {DashboardPageProps["calorieForm"]} */ ({})}
       setCalorieForm={vi.fn()}
       submitCalories={vi.fn()}
-      mealLogForm={{}}
+      mealLogForm={/** @type {DashboardPageProps["mealLogForm"]} */ ({})}
       setMealLogForm={vi.fn()}
       submitMealLog={vi.fn()}
-      progressForm={{}}
+      progressForm={/** @type {DashboardPageProps["progressForm"]} */ ({})}
       setProgressForm={vi.fn()}
       submitProgressMetric={vi.fn()}
       submitGoals={vi.fn()}
@@ -158,21 +216,30 @@ const renderPage = (props = {}) => {
   return { ...utils, ...handlers };
 };
 
+/** @param {unknown[]} workouts */
 const withWorkouts = (workouts) => ({
-  dashboard: {
-    workouts,
-    workoutSessions: [],
-    calories: [],
-    mealLogs: [],
-    progressMetrics: [],
-    plans: [],
-    goals: {}
-  }
+  dashboard: /** @type {DashboardPageProps["dashboard"]} */ (
+    /** @type {unknown} */ ({
+      workouts,
+      workoutSessions: [],
+      calories: [],
+      mealLogs: [],
+      progressMetrics: [],
+      plans: [],
+      goals: {}
+    })
+  )
 });
 
 beforeEach(() => {
-  glance.props = null;
-  header.props = null;
+  glance.props =
+    /** @type {Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0]} */ (
+      /** @type {unknown} */ (null)
+    );
+  header.props =
+    /** @type {Required<Parameters<typeof import("../components/DashboardHeader.jsx").default>[0]>} */ (
+      /** @type {unknown} */ (null)
+    );
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 8, 11, 12, 0, 0));
 });
@@ -198,7 +265,9 @@ describe("DashboardPage", () => {
   });
 
   describe("the next workout it names", () => {
-    const nextWorkout = () => glance.props.nextWorkout;
+    // Each test here dates a workout after the pinned clock, so there is one next.
+    const nextWorkout = () =>
+      /** @type {NonNullable<typeof glance.props.nextWorkout>} */ (glance.props.nextWorkout);
 
     test("is the soonest one still ahead", () => {
       renderPage(
@@ -298,6 +367,7 @@ describe("DashboardPage", () => {
 
   describe("how it reports when a reading was taken", () => {
     const format = () => glance.props.formatRelativeUpdatedAt;
+    /** @param {number} msAgo */
     const at = (msAgo) => Date.now() - msAgo;
 
     beforeEach(() => {
@@ -482,7 +552,11 @@ describe("DashboardPage", () => {
 
       act(() => glance.props.onAddWorkout());
 
-      expect(setWorkoutForm.mock.calls.at(-1)[0]({ focus: "Legs" })).toEqual({
+      expect(
+        /** @type {(previous: object) => object} */ (
+          /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+        )({ focus: "Legs" })
+      ).toEqual({
         focus: "Legs",
         date: "2026-09-11",
         ...NO_PLAN_LINK
@@ -497,7 +571,9 @@ describe("DashboardPage", () => {
       act(() => glance.props.onAddWorkout());
 
       expect(
-        setWorkoutForm.mock.calls.at(-1)[0]({
+        /** @type {(previous: object) => object} */ (
+          /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+        )({
           planId: "plan-1",
           planDayIndex: 0,
           planDayLabel: "Monday"
@@ -509,15 +585,17 @@ describe("DashboardPage", () => {
   describe("the calorie gap it reports", () => {
     test("is the goal less the average, rounded", () => {
       renderPage({
-        dashboard: {
-          workouts: [],
-          workoutSessions: [],
-          calories: [{ id: "c", date: "2026-09-11", calories: 1800 }],
-          mealLogs: [],
-          progressMetrics: [],
-          plans: [],
-          goals: { targetCalories: 2200 }
-        }
+        dashboard: /** @type {DashboardPageProps["dashboard"]} */ (
+          /** @type {unknown} */ ({
+            workouts: [],
+            workoutSessions: [],
+            calories: [{ id: "c", date: "2026-09-11", calories: 1800 }],
+            mealLogs: [],
+            progressMetrics: [],
+            plans: [],
+            goals: { targetCalories: 2200 }
+          })
+        )
       });
 
       expect(glance.props.caloriesGap).toBe(400);
@@ -525,15 +603,17 @@ describe("DashboardPage", () => {
 
     test("goes negative when the average is over the goal", () => {
       renderPage({
-        dashboard: {
-          workouts: [],
-          workoutSessions: [],
-          calories: [{ id: "c", date: "2026-09-11", calories: 2500 }],
-          mealLogs: [],
-          progressMetrics: [],
-          plans: [],
-          goals: { targetCalories: 2200 }
-        }
+        dashboard: /** @type {DashboardPageProps["dashboard"]} */ (
+          /** @type {unknown} */ ({
+            workouts: [],
+            workoutSessions: [],
+            calories: [{ id: "c", date: "2026-09-11", calories: 2500 }],
+            mealLogs: [],
+            progressMetrics: [],
+            plans: [],
+            goals: { targetCalories: 2200 }
+          })
+        )
       });
 
       expect(glance.props.caloriesGap).toBe(-300);
@@ -584,7 +664,9 @@ describe("DashboardPage", () => {
     });
 
     test("the Logs view gets the dashboard's pagination", async () => {
-      const dashboardPagination = { mealLogs: { total: 120 } };
+      const dashboardPagination = /** @type {DashboardPageProps["dashboardPagination"]} */ (
+        /** @type {unknown} */ ({ mealLogs: { total: 120 } })
+      );
       renderPage({ dashView: "workouts", dashboardPagination });
 
       await screen.findByTestId("workouts-view");
@@ -672,7 +754,7 @@ describe("DashboardPage", () => {
   });
 
   describe("the toast", () => {
-    const toastEl = () => document.querySelector(".dashboard-toast");
+    const toastEl = () => /** @type {HTMLElement} */ (document.querySelector(".dashboard-toast"));
 
     test("is absent until there is something to say", () => {
       renderPage();
@@ -681,14 +763,23 @@ describe("DashboardPage", () => {
     });
 
     test("carries its message and defaults to the success tone", () => {
-      renderPage({ dashboardToast: { message: "Workout saved" } });
+      renderPage({
+        dashboardToast: /** @type {DashboardPageProps["dashboardToast"]} */ ({
+          message: "Workout saved"
+        })
+      });
 
       expect(toastEl().className).toContain("dashboard-toast-success");
       expect(screen.getByText("Workout saved")).toBeTruthy();
     });
 
     test("uses the tone it is given", () => {
-      renderPage({ dashboardToast: { message: "Could not save", tone: "error" } });
+      renderPage({
+        dashboardToast: /** @type {DashboardPageProps["dashboardToast"]} */ ({
+          message: "Could not save",
+          tone: "error"
+        })
+      });
 
       expect(toastEl().className).toContain("dashboard-toast-error");
       expect(toastEl().className).not.toContain("dashboard-toast-success");
@@ -699,7 +790,9 @@ describe("DashboardPage", () => {
       // cannot pull the action out from under the click.
       const onAction = vi.fn();
       const { clearDashboardToast } = renderPage({
-        dashboardToast: { message: "Workout saved", actionLabel: "Undo", onAction }
+        dashboardToast: /** @type {DashboardPageProps["dashboardToast"]} */ (
+          /** @type {unknown} */ ({ message: "Workout saved", actionLabel: "Undo", onAction })
+        )
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
@@ -714,7 +807,9 @@ describe("DashboardPage", () => {
     test("can be dismissed without running the action", () => {
       const onAction = vi.fn();
       const { clearDashboardToast } = renderPage({
-        dashboardToast: { message: "Workout saved", actionLabel: "Undo", onAction }
+        dashboardToast: /** @type {DashboardPageProps["dashboardToast"]} */ (
+          /** @type {unknown} */ ({ message: "Workout saved", actionLabel: "Undo", onAction })
+        )
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Dismiss message" }));
@@ -735,7 +830,9 @@ describe("DashboardPage", () => {
       // element rather than on its accessible name: with the label missing the
       // button would render nameless, and a name-based query would pass while
       // an empty button sat there.
-      renderPage({ dashboardToast });
+      renderPage(
+        /** @type {Partial<DashboardPageProps>} */ (/** @type {unknown} */ ({ dashboardToast }))
+      );
 
       expect(document.querySelector(".dashboard-toast-action")).toBeNull();
       expect(document.querySelector(".dashboard-toast-close")).toBeTruthy();

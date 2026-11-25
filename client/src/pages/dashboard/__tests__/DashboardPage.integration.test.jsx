@@ -1,9 +1,16 @@
+// @ts-check
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import DashboardPage from "../DashboardPage";
 
+// Each prop the harness hands the page holds only what these flows reach, and
+// each element a flow looks up is on screen, so it fails at once if one is not.
+/** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+
+// A handler none of these flows calls, so it stands in for every one.
+/** @type {(...args: any[]) => any} */
 const noop = () => {};
 
 const baseDashboard = {
@@ -21,20 +28,26 @@ const baseDashboard = {
   }
 };
 
+/** @param {{ dashboard?: unknown, apiFetch?: import("../../../app/network.js").ApiFetch }} props */
 function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
-  const [workoutForm, setWorkoutForm] = useState({
-    date: "2026-03-01",
-    focus: "",
-    duration: "",
-    exercises: "",
-    sets: "",
-    reps: "",
-    intensityRpe: "",
-    notes: ""
-  });
+  // A form from before per-set logging, which the Log workout modal still opens.
+  const [workoutForm, setWorkoutForm] = useState(
+    /** @type {DashboardPageProps["workoutForm"]} */ (
+      /** @type {unknown} */ ({
+        date: "2026-03-01",
+        focus: "",
+        duration: "",
+        exercises: "",
+        sets: "",
+        reps: "",
+        intensityRpe: "",
+        notes: ""
+      })
+    )
+  );
   const [calorieForm, setCalorieForm] = useState({ calories: "" });
   const [mealLogForm, setMealLogForm] = useState({
     date: "2026-03-01",
@@ -59,15 +72,14 @@ function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
     targetCalories: "2200",
     weeklyWorkouts: "3"
   });
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(/** @type {DashboardPageProps["dashboardToast"]} */ (null));
 
   return (
     <DashboardPage
-      user={{ email: "test@example.com" }}
-      personal={{}}
+      user={/** @type {DashboardPageProps["user"]} */ ({ email: "test@example.com" })}
       go={noop}
       onLogout={noop}
-      dashboard={dashboard}
+      dashboard={/** @type {DashboardPageProps["dashboard"]} */ (dashboard)}
       goalForm={goalForm}
       setGoalForm={setGoalForm}
       dashView={dashView}
@@ -80,14 +92,20 @@ function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
       setWorkoutModalOpen={setWorkoutModalOpen}
       workoutForm={workoutForm}
       setWorkoutForm={setWorkoutForm}
-      submitWorkout={(event) => {
-        event.preventDefault();
-        setWorkoutModalOpen(false);
-        setToast({
-          tone: "success",
-          message: "Workout saved."
-        });
-      }}
+      submitWorkout={
+        /** @type {DashboardPageProps["submitWorkout"]} */ (
+          (event) => {
+            event.preventDefault();
+            setWorkoutModalOpen(false);
+            setToast(
+              /** @type {DashboardPageProps["dashboardToast"]} */ ({
+                tone: "success",
+                message: "Workout saved."
+              })
+            );
+          }
+        )
+      }
       form={{
         goal: "Build lean strength and energy",
         environment: "Home",
@@ -127,7 +145,19 @@ function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
       plannerModal={null}
       dashboardToast={toast}
       clearDashboardToast={() => setToast(null)}
-      apiFetch={apiFetch}
+      // Only the plans flow reaches apiFetch, and it passes one.
+      apiFetch={/** @type {import("../../../app/network.js").ApiFetch} */ (apiFetch)}
+      // The props no flow here reaches, at the values the app starts them with.
+      dashboardPagination={null}
+      weatherErrorKind=""
+      airQualityErrorKind=""
+      onSaveProfile={noop}
+      onChangePassword={noop}
+      onDeleteAccount={noop}
+      onDeleteImportedWorkout={noop}
+      reloadDashboard={noop}
+      onStartSession={noop}
+      onPlanChanged={noop}
     />
   );
 }
@@ -155,7 +185,7 @@ describe("Dashboard integration flows", () => {
 
     await user.click(screen.getByRole("button", { name: /open dashboard menu/i }));
     const drawerTitle = screen.getByRole("heading", { name: /dashboard menu/i });
-    const drawer = drawerTitle.closest(".drawer");
+    const drawer = /** @type {HTMLElement} */ (drawerTitle.closest(".drawer"));
     await user.click(within(drawer).getByRole("button", { name: /^logs$/i }));
 
     expect(await screen.findByRole("heading", { name: /^logs$/i }, LAZY_VIEW)).toBeInTheDocument();
@@ -179,7 +209,7 @@ describe("Dashboard integration flows", () => {
 
     await user.click(screen.getByRole("button", { name: /add workout/i }));
     const modalTitle = screen.getByRole("heading", { name: /log workout/i });
-    const modal = modalTitle.closest(".modal");
+    const modal = /** @type {HTMLElement} */ (modalTitle.closest(".modal"));
     const modalQueries = within(modal);
     await user.type(modalQueries.getByLabelText(/duration \(minutes\)/i), "45");
     await user.click(modalQueries.getByRole("button", { name: /save workout/i }));
@@ -194,7 +224,7 @@ describe("Dashboard integration flows", () => {
 
     await user.click(screen.getByRole("button", { name: /add workout/i }));
     const modalTitle = screen.getByRole("heading", { name: /log workout/i });
-    const modal = modalTitle.closest(".modal");
+    const modal = /** @type {HTMLElement} */ (modalTitle.closest(".modal"));
     const modalQueries = within(modal);
     await user.type(modalQueries.getByLabelText(/duration \(minutes\)/i), "45");
     await user.click(modalQueries.getByRole("button", { name: /save workout/i }));
@@ -258,7 +288,14 @@ describe("Dashboard integration flows", () => {
       deloadWeek: { active: true, count: 5, reason: "Your 6th week in a row", decision: null },
       lifts: []
     };
-    const apiFetch = vi.fn(async () => ({ ok: true, json: async () => ({ progression }) }));
+    /** @type {import("vitest").Mock<import("../../../app/network.js").ApiFetch>} */
+    const apiFetch = vi.fn(
+      async () =>
+        // The answer holds only ok and json, which is all the hook reads.
+        /** @type {Response} */ (
+          /** @type {unknown} */ ({ ok: true, json: async () => ({ progression }) })
+        )
+    );
     render(
       <DashboardHarness dashboard={{ ...baseDashboard, plans: [plan] }} apiFetch={apiFetch} />
     );

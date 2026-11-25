@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { injuryOptions } from "../../../../app/constants";
 import { buildInjuryText, detectInjuryFlags } from "../recommendationUtils";
@@ -12,6 +13,7 @@ import {
 // client. Each case here must give both copies the same areas, so a name form
 // added on one side and not the other fails the suite.
 
+/** @param {string} text */
 const clientAreas = (text) => detectInjuryFlags(text).map((flag) => flag.injury);
 
 const NOTES = [
