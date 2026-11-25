@@ -36,7 +36,11 @@ const buildApp = ({ config = CONFIG, handleEvent = vi.fn(async () => "create") }
       ),
     stravaService:
       /** @type {ReturnType<typeof import("../../../services/integrations/stravaService.js").createStravaService>} */ (
-        /** @type {unknown} */ ({ handleEvent })
+        /** @type {unknown} */ (
+          /** @satisfies {{ [K in keyof ReturnType<typeof import("../../../services/integrations/stravaService.js").createStravaService>]?: unknown }} */ ({
+            handleEvent
+          })
+        )
       ),
     stravaWebhookLimiter: (_req, _res, next) => {
       limiterCalls.push(1);

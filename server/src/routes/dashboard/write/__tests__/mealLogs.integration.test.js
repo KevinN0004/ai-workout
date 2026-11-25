@@ -309,23 +309,25 @@ describe("POST /api/dashboard/meal-logs", () => {
     /**
      * @param {import("@prisma/client").Prisma.TransactionClient} client
      */
-    const failingOver = (client) => ({
-      appUser: client.appUser,
-      mealLog: client.mealLog,
-      // The save's own arguments, passed on as it gave them.
-      $queryRaw: (...args) =>
-        client.$queryRaw(.../** @type {Parameters<typeof client.$queryRaw>} */ (args)),
-      calorieEntry: {
-        findFirst: (args) => client.calorieEntry.findFirst(args),
-        create: () => Promise.reject(new Error("derived write failed")),
-        update: () => Promise.reject(new Error("derived write failed")),
-        upsert: () => Promise.reject(new Error("derived write failed"))
-      }
-    });
-    const failingPrisma = {
-      ...failingOver(prisma),
-      $transaction: (callback) => prisma.$transaction((tx) => callback(failingOver(tx)))
-    };
+    const failingOver = (client) =>
+      /** @satisfies {{ [K in keyof import("@prisma/client").PrismaClient]?: unknown }} */ ({
+        appUser: client.appUser,
+        mealLog: client.mealLog,
+        // The save's own arguments, passed on as it gave them.
+        $queryRaw: (...args) =>
+          client.$queryRaw(.../** @type {Parameters<typeof client.$queryRaw>} */ (args)),
+        calorieEntry: {
+          findFirst: (args) => client.calorieEntry.findFirst(args),
+          create: () => Promise.reject(new Error("derived write failed")),
+          update: () => Promise.reject(new Error("derived write failed")),
+          upsert: () => Promise.reject(new Error("derived write failed"))
+        }
+      });
+    const failingPrisma =
+      /** @satisfies {{ [K in keyof import("@prisma/client").PrismaClient]?: unknown }} */ ({
+        ...failingOver(prisma),
+        $transaction: (callback) => prisma.$transaction((tx) => callback(failingOver(tx)))
+      });
     // The failing client holds the delegates the save uses, so it is cast through
     // unknown; each meal below holds only the fields the save reads.
     const { saveMealLogWithDailySync } = createMealLogRepository({
