@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   PLAN_PAYLOAD_VERSION as SERVER_PLAN_PAYLOAD_VERSION,
@@ -22,9 +23,16 @@ const fixtures = Object.entries(
     eager: true
   })
 )
-  .map(([path, text]) => [path.split("/").pop(), text])
+  // Each fixture is its file name and its text.
+  .map(([path, text]) => /** @type {[string, string]} */ ([path.split("/").pop(), text]))
   .sort(([a], [b]) => a.localeCompare(b));
 
+// The rule-built plan's Monday prescribes, and each broken payload keeps its
+// plan: only its prescriptions break.
+/** @typedef {import("../../../../server/src/services/dashboard/planPayloadService.js").Prescription} Prescription */
+/** @typedef {import("../../../../server/src/services/dashboard/planPayloadService.js").PlanPayload} PlanPayload */
+
+/** @param {...string} lines */
 const plan = (...lines) => lines.join("\n");
 
 // The cases client/src/app/__tests__/plans.test.js and the server's
@@ -111,13 +119,16 @@ describe("the days' prescriptions, on the server and here", () => {
   });
   const ruleBuilt = withPrescriptions(buildPlanPayload(week.text), week.week);
   const monday = ruleBuilt.days.findIndex((day) => day.weekday === "Monday");
+  /** @param {(list: Prescription[]) => unknown} change */
   const breaking = (change) => ({
     ...ruleBuilt,
     days: ruleBuilt.days.map((day, index) =>
-      index === monday ? { ...day, prescriptions: change(day.prescriptions) } : day
+      index === monday
+        ? { ...day, prescriptions: change(/** @type {Prescription[]} */ (day.prescriptions)) }
+        : day
     )
   });
-  const [first] = ruleBuilt.days[monday].prescriptions;
+  const [first] = /** @type {Prescription[]} */ (ruleBuilt.days[monday].prescriptions);
 
   const payloads = [
     ["a rule-built plan", ruleBuilt],
@@ -145,11 +156,13 @@ describe("the days' prescriptions, on the server and here", () => {
   ];
 
   test("the rule-built plan carries prescriptions to agree on", () => {
-    expect(ruleBuilt.days[monday].prescriptions.length).toBeGreaterThan(0);
+    expect(
+      /** @type {Prescription[]} */ (ruleBuilt.days[monday].prescriptions).length
+    ).toBeGreaterThan(0);
   });
 
   test.each(payloads)("agree on %s", (_label, payload) => {
-    const server = toPlanPayload(payload);
+    const server = /** @type {PlanPayload} */ (toPlanPayload(payload));
 
     expect(savedPlanDays({ payload })).toEqual(server.days);
     expect(readPlan({ payload, text: "" }).days).toEqual(server.days);

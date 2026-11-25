@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { defaultSignupProfileForm, goalOptions } from "../constants";
 import {
@@ -20,6 +21,7 @@ import {
 
 // Each builder's JSON, as a string, so key order is pinned with every value:
 // a builder must send exactly what its caller sent inline before it existed.
+/** @param {unknown} value */
 const json = (value) => JSON.stringify(value);
 
 const authForm = { email: "a@b.co", password: "password1" };
@@ -205,9 +207,12 @@ describe("createDefaultPlannerForm", () => {
 
   test("gives each planner a fresh set of health answers", () => {
     const first = createDefaultPlannerForm();
-    first.health.pregnant = true;
+    // A new planner form always holds a set of health answers.
+    /** @type {NonNullable<typeof first.health>} */ (first.health).pregnant = true;
 
-    expect(createDefaultPlannerForm().health.pregnant).toBe(false);
+    expect(
+      /** @type {NonNullable<typeof first.health>} */ (createDefaultPlannerForm().health).pregnant
+    ).toBe(false);
   });
 
   test("is the planner body, in the order the planner sends it", () => {

@@ -2,6 +2,7 @@
  * Pins buildLinePath, the SVG path builder the dashboard's charts and the
  * walkthrough's dashboard chapter both draw with. Pure, so nothing is stubbed.
  */
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { buildLinePath } from "../linePath";
 

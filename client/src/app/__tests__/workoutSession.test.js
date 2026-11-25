@@ -3,6 +3,7 @@
  * blank, the set each "Done" would log, logging and undoing, the steppers, the
  * rest, and the save Finish queues. Days and cards are built by hand here.
  */
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   DEFAULT_REST_SECONDS,
@@ -48,6 +49,11 @@ const cards = () => [
   }),
   newCard({ name: "Plank", kind: "seconds", targets: { amount: "20-30", rpe: "" }, rows: 2 })
 ];
+// Each day is a plan day as saved, of which the session reads the title and
+// each prescription's rest.
+/** @typedef {import("../workoutSession.js").SessionDay} SessionDay */
+
+/** @param {Partial<Parameters<typeof sessionFromPlanDay>[0]>} [overrides] */
 const fromPlan = (overrides = {}) =>
   sessionFromPlanDay({
     day,
@@ -125,7 +131,9 @@ describe("a session from a plan day", () => {
     const imperial = [newCard({ name: "Row", targets: { amount: "10", rpe: "", load: "50" } })];
 
     const [row] = sessionFromPlanDay({
-      day: { ...day, prescriptions: [{ name: "Row", restSeconds: 60 }] },
+      day: /** @type {SessionDay} */ (
+        /** @type {unknown} */ ({ ...day, prescriptions: [{ name: "Row", restSeconds: 60 }] })
+      ),
       cards: imperial,
       planId: "plan-1",
       system: "imperial",
@@ -140,7 +148,12 @@ describe("a session from a plan day", () => {
     "a rest of %s is the default",
     (restSeconds) => {
       const [bench] = sessionFromPlanDay({
-        day: { ...day, prescriptions: [{ name: "Dumbbell bench press", restSeconds }] },
+        day: /** @type {SessionDay} */ (
+          /** @type {unknown} */ ({
+            ...day,
+            prescriptions: [{ name: "Dumbbell bench press", restSeconds }]
+          })
+        ),
         cards: cards().slice(0, 1),
         planId: "plan-1",
         system: "metric",
@@ -153,7 +166,12 @@ describe("a session from a plan day", () => {
 
   test("a day saved before prescriptions gets each named exercise, untargeted, at the default rest", () => {
     const [squat] = sessionFromPlanDay({
-      day: { index: 2, weekday: "Friday", title: "Legs", lines: ["- Squat: 3 x 5"] },
+      day: /** @type {SessionDay} */ ({
+        index: 2,
+        weekday: "Friday",
+        title: "Legs",
+        lines: ["- Squat: 3 x 5"]
+      }),
       cards: [newCard({ name: "Squat" })],
       planId: "plan-1",
       system: "metric",

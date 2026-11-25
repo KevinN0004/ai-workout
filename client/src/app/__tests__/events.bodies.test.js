@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { defaultPersonalForm, defaultSignupProfileForm } from "../constants";
@@ -9,49 +10,68 @@ import { logSet, sessionFromPlanDay } from "../workoutSession";
 // The exact JSON each handler sends, as a string, so key order is pinned as
 // well as every value. Each was pinned against the inline code before its body
 // moved to requestBodies.js (roadmap D1 phase 2), and the move kept them.
+//
+// The fake deps hold only the members these handlers read, each function a
+// mock; each answer only ok and json, and each event only preventDefault, which
+// is all the handlers read of them.
+/** @typedef {import("../events.js").AppEventDeps} AppEventDeps */
+/** @typedef {Omit<import("vitest").Mocked<AppEventDeps>, "apiFetch"> & { apiFetch: import("vitest").Mock }} FakeDeps */
 
-const jsonResponse = (body, ok = true) => ({ ok, json: async () => body });
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const jsonResponse = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 
-const submitEvent = () => ({ preventDefault: vi.fn() });
+const submitEvent = () =>
+  /** @type {import("react").FormEvent} */ (/** @type {unknown} */ ({ preventDefault: vi.fn() }));
 
 // The body of the nth request the handlers sent.
+/** @param {number} [call] */
 const sentBody = (call = 0) => deps.apiFetch.mock.calls[call][1].body;
 
+/** @type {FakeDeps} */
 let deps;
 
-const build = (overrides = {}) => createAppEventHandlers({ ...deps, ...overrides });
+// An override replaces a fake with what one test needs, so it is cast with them.
+/** @param {{ [K in keyof AppEventDeps]?: unknown }} [overrides] */
+const build = (overrides = {}) =>
+  createAppEventHandlers(/** @type {AppEventDeps} */ ({ ...deps, ...overrides }));
 
 beforeEach(() => {
-  deps = {
-    apiFetch: vi.fn(async () => jsonResponse({ user: { id: "u-1" }, profile: {} })),
-    go: vi.fn(),
-    toCmFromFeetInches,
-    toFeetInchesFromCm,
-    toKg,
-    heightUnit: "cm",
-    weightUnit: "kg",
-    authMode: "login",
-    authForm: { email: "a@b.co", password: "password1" },
-    authAutoSignIn: false,
-    signupProfileForm: { ...defaultSignupProfileForm },
-    signupHeightUnit: "cm",
-    signupWeightUnit: "kg",
-    setAuthForm: vi.fn(),
-    setAuthLoading: vi.fn(),
-    setAuthError: vi.fn(),
-    setSignupProfileForm: vi.fn(),
-    setSignupHeightUnit: vi.fn(),
-    setSignupWeightUnit: vi.fn(),
-    setUser: vi.fn(),
-    setDashError: vi.fn(),
-    showDashboardToast: vi.fn(),
-    captureAccount: () => () => true,
-    flushOptimisticOperations: vi.fn(async () => {}),
-    clearOptimisticOperations: vi.fn(),
-    clearDashboardDataState: vi.fn(),
-    clearDashboardToast: vi.fn(),
-    resetPersonalFlow: vi.fn()
-  };
+  deps = /** @type {FakeDeps} */ (
+    /** @type {unknown} */ ({
+      apiFetch: vi.fn(async () => jsonResponse({ user: { id: "u-1" }, profile: {} })),
+      go: vi.fn(),
+      toCmFromFeetInches,
+      toFeetInchesFromCm,
+      toKg,
+      heightUnit: "cm",
+      weightUnit: "kg",
+      authMode: "login",
+      authForm: { email: "a@b.co", password: "password1" },
+      authAutoSignIn: false,
+      signupProfileForm: { ...defaultSignupProfileForm },
+      signupHeightUnit: "cm",
+      signupWeightUnit: "kg",
+      setAuthForm: vi.fn(),
+      setAuthLoading: vi.fn(),
+      setAuthError: vi.fn(),
+      setSignupProfileForm: vi.fn(),
+      setSignupHeightUnit: vi.fn(),
+      setSignupWeightUnit: vi.fn(),
+      setUser: vi.fn(),
+      setDashError: vi.fn(),
+      showDashboardToast: vi.fn(),
+      captureAccount: () => () => true,
+      flushOptimisticOperations: vi.fn(async () => {}),
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn()
+    })
+  );
 });
 
 describe("account bodies", () => {
@@ -167,7 +187,10 @@ describe("log bodies", () => {
   const queuedBody = async () => {
     const commit = deps.queueOptimisticLogCommit.mock.calls[0][0];
     await commit.request();
-    expect(JSON.stringify(commit.outbox.body)).toBe(sentBody());
+    // A log saved while signed in is kept for a replay.
+    expect(
+      JSON.stringify(/** @type {NonNullable<typeof commit.outbox>} */ (commit.outbox).body)
+    ).toBe(sentBody());
     return sentBody();
   };
 
@@ -210,7 +233,14 @@ describe("log bodies", () => {
     const NOW = Date.UTC(2026, 10, 9, 17, 0, 0);
     vi.setSystemTime(NOW + 40 * 60 * 1000);
     const started = sessionFromPlanDay({
-      day: { index: 1, weekday: "Tuesday", title: "Lower A", lines: [], prescriptions: [] },
+      // A plan day as saved, of which the session reads the title and rests.
+      day: /** @type {import("../workoutSession.js").SessionDay} */ ({
+        index: 1,
+        weekday: "Tuesday",
+        title: "Lower A",
+        lines: [],
+        prescriptions: []
+      }),
       cards: [newCard({ name: "Squat", targets: { amount: "5", rpe: "", load: "100" } })],
       planId: "plan-1",
       system: "metric",
@@ -321,7 +351,12 @@ describe("plan and dashboard bodies", () => {
 
   test("a saved exercise is sent as the view built it, and none as {}", async () => {
     await build().saveExerciseToPlan({ exerciseId: 7, name: "Row" });
-    await build().saveExerciseToPlan(undefined);
+    // Nothing at all, which the save sends as {}.
+    await build().saveExerciseToPlan(
+      /** @type {Parameters<ReturnType<typeof build>["saveExerciseToPlan"]>[0]} */ (
+        /** @type {unknown} */ (undefined)
+      )
+    );
 
     expect(sentBody(0)).toBe('{"exerciseId":7,"name":"Row"}');
     expect(sentBody(1)).toBe("{}");

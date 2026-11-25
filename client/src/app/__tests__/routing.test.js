@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { resolveDashViewFromPath } from "../routing.js";
 

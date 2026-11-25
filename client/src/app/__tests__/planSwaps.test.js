@@ -2,15 +2,24 @@
  * Pins the plan swap requests (roadmap C4): each one's path, method and body
  * over apiFetch, the answer each returns, and the message a refusal throws.
  */
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { fetchSwapOptions, swapExercise, undoExerciseSwap } from "../planSwaps";
 
-const respond = (body, ok = true) => ({ ok, json: async () => body });
+// Each answer holds only ok and json, which is all the client reads.
+/** @typedef {import("../network.js").ApiFetch} ApiFetch */
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const respond = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 const PLAN = { id: "plan 1", payload: { days: [] } };
 
 describe("fetchSwapOptions", () => {
   test("asks for an exercise's alternatives, with the area only when there is one", async () => {
     const answer = { exercise: "Goblet squat", area: null, areas: [], alternatives: [] };
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond(answer));
 
     expect(await fetchSwapOptions(apiFetch, "plan 1", "Goblet squat", null)).toEqual(answer);
@@ -25,16 +34,19 @@ describe("fetchSwapOptions", () => {
 
 describe("swapExercise and undoExerciseSwap", () => {
   test("a swap that names an area sends it, after the two exercises", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond({ plan: PLAN }));
 
     await swapExercise(apiFetch, "plan-1", { from: "Goblet squat", to: "Box squat", area: "knee" });
 
-    expect(apiFetch.mock.calls[0][1].body).toBe(
+    // Each send passes its options.
+    expect(/** @type {RequestInit} */ (apiFetch.mock.calls[0][1]).body).toBe(
       '{"from":"Goblet squat","to":"Box squat","area":"knee"}'
     );
   });
 
   test("post the swap and the undo, and return the plan the server answers", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () => respond({ plan: PLAN }));
 
     expect(
@@ -65,6 +77,7 @@ describe("swapExercise and undoExerciseSwap", () => {
 
 describe("a refused request", () => {
   test("throws the server's message", async () => {
+    /** @type {import("vitest").Mock<ApiFetch>} */
     const apiFetch = vi.fn(async () =>
       respond({ error: "The plan has changed. Reload it and try again." }, false)
     );
@@ -90,10 +103,16 @@ describe("a refused request", () => {
       "Could not undo that swap. Try again."
     ]
   ])("throws a default for %s when the body says nothing", async (_label, run, message) => {
-    const apiFetch = vi.fn(async () => ({
-      ok: false,
-      json: async () => Promise.reject(new Error("not JSON"))
-    }));
+    /** @type {import("vitest").Mock<ApiFetch>} */
+    const apiFetch = vi.fn(
+      async () =>
+        /** @type {Response} */ (
+          /** @type {unknown} */ ({
+            ok: false,
+            json: async () => Promise.reject(new Error("not JSON"))
+          })
+        )
+    );
     await expect(run(apiFetch)).rejects.toThrow(message);
   });
 });

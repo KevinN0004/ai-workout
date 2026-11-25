@@ -1,16 +1,30 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { defaultDashboardData, mergeOptimisticDashboard } from "../dashboard.js";
 
 // Optimistic entries are built in useOptimisticLogs as
 // { type, item: { ...item, isOptimistic: true }, createdAt: Date.now() }.
+//
+// Each dashboard holds only the collections the merge touches, and each merge
+// given entries, or a dashboard, returns one.
+/** @typedef {import("../dashboard.js").Dashboard} Dashboard */
+
+/**
+ * @param {string} type
+ * @param {string} id
+ * @param {number} [createdAt]
+ */
 const entry = (type, id, createdAt) => ({ type, item: { id }, createdAt });
 
-const emptyDashboard = () => ({
-  workoutSessions: [],
-  workouts: [],
-  calories: [],
-  mealLogs: []
-});
+const emptyDashboard = () =>
+  /** @type {Dashboard} */ (
+    /** @type {unknown} */ ({
+      workoutSessions: [],
+      workouts: [],
+      calories: [],
+      mealLogs: []
+    })
+  );
 
 describe("defaultDashboardData", () => {
   // The server's defaults: a target weight is absent until the user saves one.
@@ -28,7 +42,8 @@ describe("defaultDashboardData", () => {
     const second = defaultDashboardData();
     expect(first).not.toBe(second);
     expect(first.goals).not.toBe(second.goals);
-    first.workouts.push("mutated");
+    // The defaults start empty, typed never; any value marks the array as changed.
+    first.workouts.push(/** @type {never} */ (/** @type {unknown} */ ("mutated")));
     expect(second.workouts).toEqual([]);
   });
 });
@@ -36,19 +51,26 @@ describe("defaultDashboardData", () => {
 describe("mergeOptimisticDashboard", () => {
   test("returns null when there is no dashboard and nothing pending", () => {
     expect(mergeOptimisticDashboard(null, [])).toBeNull();
-    expect(mergeOptimisticDashboard(undefined, [])).toBeNull();
+    // No dashboard at all, read as undefined.
+    expect(
+      mergeOptimisticDashboard(/** @type {null} */ (/** @type {unknown} */ (undefined)), [])
+    ).toBeNull();
   });
 
   test("returns the dashboard unchanged when nothing is pending", () => {
-    const dashboard = { ...emptyDashboard(), goals: { targetWeight: 200 } };
-    const merged = mergeOptimisticDashboard(dashboard, []);
+    const dashboard = /** @type {Dashboard} */ (
+      /** @type {unknown} */ ({ ...emptyDashboard(), goals: { targetWeight: 200 } })
+    );
+    const merged = /** @type {Dashboard} */ (mergeOptimisticDashboard(dashboard, []));
     expect(merged).toEqual(dashboard);
     // A copy, not the same reference -- App.jsx holds this in a useMemo.
     expect(merged).not.toBe(dashboard);
   });
 
   test("falls back to defaults when entries arrive before the dashboard loads", () => {
-    const merged = mergeOptimisticDashboard(null, [entry("workout", "w1", 1)]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(null, [entry("workout", "w1", 1)])
+    );
     expect(merged.goals).toEqual(defaultDashboardData().goals);
     expect(merged.workouts).toEqual([{ id: "w1" }]);
   });
@@ -60,34 +82,46 @@ describe("mergeOptimisticDashboard", () => {
   });
 
   test("a workout entry lands in both workoutSessions and workouts", () => {
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [entry("workout", "w1", 1)]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [entry("workout", "w1", 1)])
+    );
     expect(merged.workoutSessions).toEqual([{ id: "w1" }]);
     expect(merged.workouts).toEqual([{ id: "w1" }]);
   });
 
   test("a calorie entry lands only in calories", () => {
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [entry("calorie", "c1", 1)]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [entry("calorie", "c1", 1)])
+    );
     expect(merged.calories).toEqual([{ id: "c1" }]);
     expect(merged.mealLogs).toEqual([]);
     expect(merged.workouts).toEqual([]);
   });
 
   test("a meal entry lands only in mealLogs", () => {
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [entry("meal", "m1", 1)]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [entry("meal", "m1", 1)])
+    );
     expect(merged.mealLogs).toEqual([{ id: "m1" }]);
     expect(merged.calories).toEqual([]);
   });
 
   test("an unrecognised entry type is dropped rather than throwing", () => {
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [entry("sleep", "s1", 1)]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [entry("sleep", "s1", 1)])
+    );
     expect(merged.workouts).toEqual([]);
     expect(merged.calories).toEqual([]);
     expect(merged.mealLogs).toEqual([]);
   });
 
   test("pending entries are placed ahead of what the server already returned", () => {
-    const dashboard = { ...emptyDashboard(), mealLogs: [{ id: "server" }] };
-    const merged = mergeOptimisticDashboard(dashboard, [entry("meal", "pending", 1)]);
+    const dashboard = /** @type {Dashboard} */ (
+      /** @type {unknown} */ ({ ...emptyDashboard(), mealLogs: [{ id: "server" }] })
+    );
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(dashboard, [entry("meal", "pending", 1)])
+    );
     expect(merged.mealLogs).toEqual([{ id: "pending" }, { id: "server" }]);
   });
 
@@ -96,18 +130,22 @@ describe("mergeOptimisticDashboard", () => {
     (field) => {
       // The server has returned null for these fields before; spreading one
       // would throw and take the whole dashboard down.
-      const merged = mergeOptimisticDashboard({ ...emptyDashboard(), [field]: null }, [
-        entry("workout", "w1", 1)
-      ]);
+      const merged = /** @type {Dashboard} */ (
+        mergeOptimisticDashboard({ ...emptyDashboard(), [field]: null }, [
+          entry("workout", "w1", 1)
+        ])
+      );
       expect(Array.isArray(merged[field])).toBe(true);
     }
   );
 
   test("an entry with no createdAt sorts as though it were the oldest", () => {
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [
-      entry("meal", "no-timestamp", undefined),
-      entry("meal", "timestamped", 5)
-    ]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [
+        entry("meal", "no-timestamp", undefined),
+        entry("meal", "timestamped", 5)
+      ])
+    );
     // Missing timestamps read as 0, so it sorts last.
     expect(merged.mealLogs.map((item) => item.id)).toEqual(["timestamped", "no-timestamp"]);
   });
@@ -116,10 +154,12 @@ describe("mergeOptimisticDashboard", () => {
     // Exercises both sides of the `|| 0` fallback in the comparator: the case
     // above only reaches one of them, because a two-element sort calls the
     // comparator once and only `a` is missing a timestamp there.
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [
-      entry("meal", "first", undefined),
-      entry("meal", "second", undefined)
-    ]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [
+        entry("meal", "first", undefined),
+        entry("meal", "second", undefined)
+      ])
+    );
     // Array.prototype.sort is stable, so equal keys keep their input order.
     expect(merged.mealLogs.map((item) => item.id)).toEqual(["first", "second"]);
   });
@@ -129,11 +169,13 @@ describe("mergeOptimisticDashboard", () => {
     // descending and then unshift()ed each entry onto the front, undoing the
     // sort. Nothing re-sorted calories or mealLogs downstream, so meals logged
     // in quick succession genuinely rendered oldest-first.
-    const merged = mergeOptimisticDashboard(emptyDashboard(), [
-      entry("meal", "oldest", 100),
-      entry("meal", "newest", 300),
-      entry("meal", "middle", 200)
-    ]);
+    const merged = /** @type {Dashboard} */ (
+      mergeOptimisticDashboard(emptyDashboard(), [
+        entry("meal", "oldest", 100),
+        entry("meal", "newest", 300),
+        entry("meal", "middle", 200)
+      ])
+    );
     expect(merged.mealLogs.map((item) => item.id)).toEqual(["newest", "middle", "oldest"]);
   });
 });

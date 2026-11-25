@@ -3,13 +3,17 @@
  * write reported, and anything that is not a session of this version read as
  * none.
  */
+// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { clearActiveSession, readActiveSession, writeActiveSession } from "../activeSession.js";
 import { ACTIVE_SESSION_PREFIX } from "../constants.js";
 
 const ada = { email: "ada@example.com" };
 const grace = { email: "grace@example.com" };
-const session = { version: 1, clientId: "k1", exercises: [] };
+// The session holds only the fields the store keeps and reads back.
+const session = /** @type {import("../workoutSession.js").WorkoutSession} */ (
+  /** @type {unknown} */ ({ version: 1, clientId: "k1", exercises: [] })
+);
 const KEY = `${ACTIVE_SESSION_PREFIX}:ada@example.com`;
 
 afterEach(() => {

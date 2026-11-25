@@ -1,6 +1,7 @@
 /**
  * Pins describeAge's wording, and that a missing or future time has no age.
  */
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { describeAge } from "../describeAge.js";
 
@@ -26,7 +27,8 @@ describe("describeAge", () => {
   test.each([[null], [undefined], ["2026-11-07"], [Number.NaN]])(
     "a time of %s has no age",
     (then) => {
-      expect(describeAge(then, NOW)).toBeNull();
+      // A time that is not a number, which has no age.
+      expect(describeAge(/** @type {number} */ (then), NOW)).toBeNull();
     }
   );
 

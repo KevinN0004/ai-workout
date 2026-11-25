@@ -3,6 +3,7 @@
  * request got no answer, online on the next answer, and a probe of
  * /api/health every 30 seconds only while offline and watched.
  */
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // A fresh module per test, so no state carries from one test to the next. Its
@@ -12,6 +13,7 @@ let leaves = [];
 const loadStore = async () => {
   vi.resetModules();
   const store = await import("../connection.js");
+  /** @param {Parameters<typeof import("../connection.js").subscribeConnection>[0]} listener */
   const subscribeConnection = (listener) => {
     const leave = store.subscribeConnection(listener);
     leaves.push(leave);
@@ -20,6 +22,7 @@ const loadStore = async () => {
   return { ...store, subscribeConnection };
 };
 
+/** @type {boolean} */
 let onLine;
 
 beforeEach(() => {
@@ -109,7 +112,10 @@ describe("the connection store", () => {
 });
 
 describe("the probe", () => {
-  const healthChecks = () => fetch.mock.calls.filter(([url]) => url === "/api/health").length;
+  // fetch is stubbed with a mock before each test.
+  const healthChecks = () =>
+    /** @type {import("vitest").Mock} */ (fetch).mock.calls.filter(([url]) => url === "/api/health")
+      .length;
 
   test("asks /api/health every 30 seconds while offline and watched", async () => {
     const { markUnanswered, subscribeConnection } = await loadStore();
@@ -128,7 +134,9 @@ describe("the probe", () => {
     const { getConnection, markUnanswered, subscribeConnection } = await loadStore();
     subscribeConnection(() => {});
     markUnanswered();
-    fetch.mockImplementation(() => Promise.resolve({ ok: true, status: 200 }));
+    /** @type {import("vitest").Mock} */ (fetch).mockImplementation(() =>
+      Promise.resolve({ ok: true, status: 200 })
+    );
 
     await vi.advanceTimersByTimeAsync(30000);
     expect(getConnection()).toBe("online");
@@ -141,7 +149,9 @@ describe("the probe", () => {
     const { getConnection, markUnanswered, subscribeConnection } = await loadStore();
     subscribeConnection(() => {});
     markUnanswered();
-    fetch.mockImplementation(() => Promise.resolve({ ok: false, status: 503 }));
+    /** @type {import("vitest").Mock} */ (fetch).mockImplementation(() =>
+      Promise.resolve({ ok: false, status: 503 })
+    );
 
     await vi.advanceTimersByTimeAsync(30000);
 
@@ -152,16 +162,18 @@ describe("the probe", () => {
     const { markUnanswered, subscribeConnection } = await loadStore();
     subscribeConnection(() => {});
     markUnanswered();
+    /** @type {AbortSignal | undefined} */
     let signal;
-    fetch.mockImplementation((_url, options) => {
+    /** @type {import("vitest").Mock} */ (fetch).mockImplementation((_url, options) => {
       signal = options.signal;
       return new Promise(() => {});
     });
 
     await vi.advanceTimersByTimeAsync(30000);
-    expect(signal.aborted).toBe(false);
+    // The probe has called fetch, which set it.
+    expect(/** @type {AbortSignal} */ (signal).aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(10000);
-    expect(signal.aborted).toBe(true);
+    expect(/** @type {AbortSignal} */ (signal).aborted).toBe(true);
   });
 
   test("does not run while no one is watching", async () => {
@@ -208,7 +220,9 @@ describe("the probe", () => {
     expect(getConnection()).toBe("offline");
 
     onLine = true;
-    fetch.mockImplementation(() => Promise.resolve({ ok: true, status: 200 }));
+    /** @type {import("vitest").Mock} */ (fetch).mockImplementation(() =>
+      Promise.resolve({ ok: true, status: 200 })
+    );
     await vi.advanceTimersByTimeAsync(30000);
 
     expect(listener).toHaveBeenCalled();

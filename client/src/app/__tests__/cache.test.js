@@ -1,3 +1,4 @@
+// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   buildScopedCacheKey,
@@ -53,7 +54,9 @@ describe("readJsonCache", () => {
 
   test("returns null when localStorage is unavailable", () => {
     // Private browsing and some embedded webviews have no localStorage.
-    vi.spyOn(window, "localStorage", "get").mockReturnValue(undefined);
+    vi.spyOn(window, "localStorage", "get").mockReturnValue(
+      /** @type {Storage} */ (/** @type {unknown} */ (undefined))
+    );
     expect(readJsonCache("k")).toBeNull();
   });
 });
@@ -61,7 +64,8 @@ describe("readJsonCache", () => {
 describe("writeJsonCache", () => {
   test("stores the value as JSON", () => {
     writeJsonCache("k", { a: 1 });
-    expect(JSON.parse(window.localStorage.getItem("k"))).toEqual({ a: 1 });
+    // The write above stored it.
+    expect(JSON.parse(/** @type {string} */ (window.localStorage.getItem("k")))).toEqual({ a: 1 });
   });
 
   test("does nothing without a key", () => {
@@ -93,7 +97,9 @@ describe("removeJsonCache", () => {
 
   test("does nothing when localStorage is unavailable", () => {
     // Private browsing and some embedded webviews have no localStorage.
-    vi.spyOn(window, "localStorage", "get").mockReturnValue(undefined);
+    vi.spyOn(window, "localStorage", "get").mockReturnValue(
+      /** @type {Storage} */ (/** @type {unknown} */ (undefined))
+    );
     expect(() => removeJsonCache("k")).not.toThrow();
   });
 
@@ -132,6 +138,7 @@ describe("when the browser blocks site data", () => {
 });
 
 describe("readCookie", () => {
+  /** @param {string} value */
   const setCookie = (value) => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(value);
   };
@@ -173,7 +180,8 @@ describe("readCookie", () => {
 
   test.each([[""], [null], [undefined]])("returns an empty string for the name %s", (name) => {
     setCookie("token=abc");
-    expect(readCookie(name)).toBe("");
+    // A name that is not a usable string, which the read must survive.
+    expect(readCookie(/** @type {string} */ (name))).toBe("");
   });
 
   test("does not match a cookie whose name merely starts the same", () => {

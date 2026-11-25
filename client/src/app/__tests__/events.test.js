@@ -1,3 +1,4 @@
+// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { NO_PLAN_LINK } from "../plans";
@@ -16,6 +17,7 @@ const pdfDoc = {
   text: vi.fn(),
   save: vi.fn()
 };
+/** @type {import("vitest").Mock} */
 const jsPDF = vi.fn(() => pdfDoc);
 // The export has to be constructable: the module does `new jsPDF(...)`, and an
 // arrow -- which is what vi.fn hands back -- throws "is not a constructor"
@@ -33,73 +35,91 @@ vi.mock("jspdf", () => ({
 //
 // The unit conversions are the real ones from units.js, since the signup body
 // is built from them and a stub would prove nothing about what gets sent.
+//
+// The fake deps hold only the members these handlers read, each function a
+// mock; each answer only ok and json, and each event only preventDefault, which
+// is all the handlers read of them.
+/** @typedef {import("../events.js").AppEventDeps} AppEventDeps */
+/** @typedef {Omit<import("vitest").Mocked<AppEventDeps>, "apiFetch"> & { apiFetch: import("vitest").Mock }} FakeDeps */
 
-const jsonResponse = (body, ok = true) => ({ ok, json: async () => body });
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const jsonResponse = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 
+/** @type {FakeDeps} */
 let deps;
 
-const build = (overrides = {}) => createAppEventHandlers({ ...deps, ...overrides });
+// An override replaces a fake with what one test needs, so it is cast with them.
+/** @param {{ [K in keyof AppEventDeps]?: unknown }} [overrides] */
+const build = (overrides = {}) =>
+  createAppEventHandlers(/** @type {AppEventDeps} */ ({ ...deps, ...overrides }));
 
-const submitEvent = () => ({ preventDefault: vi.fn() });
+const submitEvent = () =>
+  /** @type {import("react").FormEvent} */ (/** @type {unknown} */ ({ preventDefault: vi.fn() }));
 
 beforeEach(() => {
-  deps = {
-    apiFetch: vi.fn(async () => jsonResponse({ user: { id: "u-1" } })),
-    form: {},
-    setLoading: vi.fn(),
-    setError: vi.fn(),
-    setResult: vi.fn(),
-    setResultPayload: vi.fn(),
-    setDashboard: vi.fn(),
-    closePlanner: vi.fn(),
-    isDashboardRoute: false,
-    setDashView: vi.fn(),
-    go: vi.fn(),
-    personal: {},
-    heightUnit: "cm",
-    weightUnit: "kg",
-    setAuthForm: vi.fn(),
-    setAuthMode: vi.fn(),
-    setAuthError: vi.fn(),
-    setShowPassword: vi.fn(),
-    setAuthAutoSignIn: vi.fn(),
-    setSignupHeightUnit: vi.fn(),
-    setSignupWeightUnit: vi.fn(),
-    setSignupProfileForm: vi.fn(),
-    toCmFromFeetInches,
-    toFeetInchesFromCm,
-    toKg,
-    result: "",
-    authMode: "login",
-    setAuthLoading: vi.fn(),
-    signupProfileForm: { ...defaultSignupProfileForm },
-    signupHeightUnit: "cm",
-    signupWeightUnit: "kg",
-    authForm: { email: "person@example.com", password: "StrongPass123!" },
-    setUser: vi.fn(),
-    setSignOutUnfinished: vi.fn(),
-    authAutoSignIn: false,
-    clearOptimisticOperations: vi.fn(),
-    clearDashboardDataState: vi.fn(),
-    clearDashboardToast: vi.fn(),
-    resetPersonalFlow: vi.fn(),
-    queueOptimisticLogCommit: vi.fn(),
-    workoutForm: { exercises: "" },
-    setWorkoutForm: vi.fn(),
-    setWorkoutModalOpen: vi.fn(),
-    calorieForm: {},
-    setCalorieForm: vi.fn(),
-    goalForm: {},
-    setDashError: vi.fn(),
-    showDashboardToast: vi.fn(),
-    // The account never changes in these tests unless one says so.
-    captureAccount: () => () => true,
-    flushOptimisticOperations: vi.fn(async () => {}),
-    mealLogForm: {},
-    setMealLogForm: vi.fn(),
-    progressForm: {},
-    setProgressForm: vi.fn()
-  };
+  deps = /** @type {FakeDeps} */ (
+    /** @type {unknown} */ ({
+      apiFetch: vi.fn(async () => jsonResponse({ user: { id: "u-1" } })),
+      form: {},
+      setLoading: vi.fn(),
+      setError: vi.fn(),
+      setResult: vi.fn(),
+      setResultPayload: vi.fn(),
+      setDashboard: vi.fn(),
+      closePlanner: vi.fn(),
+      isDashboardRoute: false,
+      setDashView: vi.fn(),
+      go: vi.fn(),
+      personal: {},
+      heightUnit: "cm",
+      weightUnit: "kg",
+      setAuthForm: vi.fn(),
+      setAuthMode: vi.fn(),
+      setAuthError: vi.fn(),
+      setShowPassword: vi.fn(),
+      setAuthAutoSignIn: vi.fn(),
+      setSignupHeightUnit: vi.fn(),
+      setSignupWeightUnit: vi.fn(),
+      setSignupProfileForm: vi.fn(),
+      toCmFromFeetInches,
+      toFeetInchesFromCm,
+      toKg,
+      result: "",
+      authMode: "login",
+      setAuthLoading: vi.fn(),
+      signupProfileForm: { ...defaultSignupProfileForm },
+      signupHeightUnit: "cm",
+      signupWeightUnit: "kg",
+      authForm: { email: "person@example.com", password: "StrongPass123!" },
+      setUser: vi.fn(),
+      setSignOutUnfinished: vi.fn(),
+      authAutoSignIn: false,
+      clearOptimisticOperations: vi.fn(),
+      clearDashboardDataState: vi.fn(),
+      clearDashboardToast: vi.fn(),
+      resetPersonalFlow: vi.fn(),
+      queueOptimisticLogCommit: vi.fn(),
+      workoutForm: { exercises: "" },
+      setWorkoutForm: vi.fn(),
+      setWorkoutModalOpen: vi.fn(),
+      calorieForm: {},
+      setCalorieForm: vi.fn(),
+      goalForm: {},
+      setDashError: vi.fn(),
+      showDashboardToast: vi.fn(),
+      // The account never changes in these tests unless one says so.
+      captureAccount: () => () => true,
+      flushOptimisticOperations: vi.fn(async () => {}),
+      mealLogForm: {},
+      setMealLogForm: vi.fn(),
+      progressForm: {},
+      setProgressForm: vi.fn()
+    })
+  );
 });
 
 describe("onLogout", () => {
@@ -107,6 +127,7 @@ describe("onLogout", () => {
   // session. The server refuses them once logout has ended it, and two
   // requests in flight together can land in either order.
   test("sends the pending entries before it ends the session", async () => {
+    /** @type {((value?: unknown) => void) | undefined} */
     let releaseFlush;
     const flushOptimisticOperations = vi.fn(
       () =>
@@ -121,7 +142,8 @@ describe("onLogout", () => {
     expect(flushOptimisticOperations).toHaveBeenCalledTimes(1);
     expect(deps.apiFetch).not.toHaveBeenCalled();
 
-    releaseFlush();
+    // The flush started above, so its resolver is set.
+    /** @type {(value?: unknown) => void} */ (releaseFlush)();
     await loggingOut;
 
     expect(deps.apiFetch).toHaveBeenCalledWith(
@@ -380,6 +402,7 @@ describe("onAuthSubmit", () => {
   });
 
   describe("signing up", () => {
+    /** @param {Record<string, unknown>} [overrides] */
     const signupDeps = (overrides = {}) => ({
       authMode: "signup",
       signupProfileForm: {
@@ -519,12 +542,20 @@ describe("onAuthModeChange", () => {
 });
 
 describe("form field handlers", () => {
-  const changeEvent = (name, value) => ({ target: { name, value } });
+  /**
+   * @param {string} name
+   * @param {unknown} value
+   */
+  const changeEvent = (name, value) =>
+    /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+      /** @type {unknown} */ ({ target: { name, value } })
+    );
 
   test("onAuthChange updates only the named field", () => {
     build().onAuthChange(changeEvent("email", "new@example.com"));
 
-    const updater = deps.setAuthForm.mock.calls[0][0];
+    // The handler hands its setter an updater.
+    const updater = /** @type {(previous: object) => object} */ (deps.setAuthForm.mock.calls[0][0]);
     expect(updater({ email: "old@example.com", password: "keep" })).toEqual({
       email: "new@example.com",
       password: "keep"
@@ -534,7 +565,10 @@ describe("form field handlers", () => {
   test("onSignupProfileChange updates only the named field", () => {
     build().onSignupProfileChange(changeEvent("firstName", "Jordan"));
 
-    const updater = deps.setSignupProfileForm.mock.calls[0][0];
+    // The handler hands its setter an updater.
+    const updater = /** @type {(previous: object) => object} */ (
+      deps.setSignupProfileForm.mock.calls[0][0]
+    );
     expect(updater({ firstName: "", lastName: "Kim" })).toEqual({
       firstName: "Jordan",
       lastName: "Kim"
@@ -552,11 +586,13 @@ describe("optimistic submissions", () => {
   describe("submitWorkout", () => {
     // A card per name, each with one set of six reps at RPE 8; a blank name
     // makes a wholly blank card.
+    /** @param {...string} names */
     const cards = (...names) =>
       names.map((name) => {
         const card = newCard({ name });
         return name ? { ...card, sets: [{ ...card.sets[0], amount: "6", rpe: "8" }] } : card;
       });
+    /** @param {Record<string, unknown>} [overrides] */
     const workoutForm = (overrides = {}) => ({
       date: "2026-03-02",
       focus: "Push",
@@ -741,6 +777,7 @@ describe("optimistic submissions", () => {
   });
 
   describe("submitMealLog", () => {
+    /** @param {Record<string, unknown>} [overrides] */
     const mealLogForm = (overrides = {}) => ({
       date: "2026-03-02",
       mealType: "lunch",
@@ -824,6 +861,7 @@ describe("optimistic submissions", () => {
 
 // The handlers that write directly, without the undo window.
 describe("direct submissions", () => {
+  /** @param {unknown} [dashboard] */
   const ok = (dashboard = { workouts: [] }) => jsonResponse({ dashboard });
 
   describe("submitGoals", () => {
@@ -925,7 +963,12 @@ describe("direct submissions", () => {
     test("sends an empty object when given nothing", async () => {
       deps.apiFetch.mockResolvedValue(ok());
 
-      await build().saveExerciseToPlan();
+      // Nothing at all, which the save must survive.
+      await build().saveExerciseToPlan(
+        /** @type {Parameters<ReturnType<typeof build>["saveExerciseToPlan"]>[0]} */ (
+          /** @type {unknown} */ (undefined)
+        )
+      );
 
       expect(JSON.parse(deps.apiFetch.mock.calls[0][1].body)).toEqual({});
     });
@@ -961,6 +1004,7 @@ describe("direct submissions", () => {
 describe("an answer that arrives after the account signed out", () => {
   // The account changes while the request is out: captured as the same
   // account before it, read as a different one after.
+  /** @param {unknown} body */
   const signedOutMidRequest = (body) => {
     let sameAccount = true;
     return {
@@ -1023,6 +1067,7 @@ describe("an answer that arrives after the account signed out", () => {
 // The app's main feature: send the planner form to Gemini and route the user to
 // the plan that comes back.
 describe("onSubmit", () => {
+  /** @param {Record<string, unknown>} [overrides] */
   const generated = (overrides = {}) =>
     jsonResponse({ plan: "Monday - Push\nBench press", ...overrides });
 
@@ -1111,7 +1156,10 @@ describe("onSubmit", () => {
 
       await build().onSubmit(submitEvent());
 
-      const updater = deps.setDashboard.mock.calls[0][0];
+      // A saved plan is merged in through an updater.
+      const updater = /** @type {(previous: object | null) => { plans?: unknown }} */ (
+        deps.setDashboard.mock.calls[0][0]
+      );
       expect(updater({ plans: [{ id: "p-old" }] }).plans).toEqual([savedPlan, { id: "p-old" }]);
     });
 
@@ -1120,7 +1168,10 @@ describe("onSubmit", () => {
 
       await build().onSubmit(submitEvent());
 
-      const updater = deps.setDashboard.mock.calls[0][0];
+      // A saved plan is merged in through an updater.
+      const updater = /** @type {(previous: object | null) => { plans?: unknown }} */ (
+        deps.setDashboard.mock.calls[0][0]
+      );
       expect(updater({}).plans).toEqual([savedPlan]);
     });
 
@@ -1130,7 +1181,10 @@ describe("onSubmit", () => {
 
       await build().onSubmit(submitEvent());
 
-      const updater = deps.setDashboard.mock.calls[0][0];
+      // A saved plan is merged in through an updater.
+      const updater = /** @type {(previous: object | null) => { plans?: unknown } | null} */ (
+        deps.setDashboard.mock.calls[0][0]
+      );
       expect(updater(null)).toBeNull();
     });
 
@@ -1272,6 +1326,7 @@ describe("downloadPlanPdf", () => {
 // The bridge from the signed-out planner into signup: whatever the visitor
 // already typed should not have to be typed again.
 describe("openSignupWithPrefilledProfile", () => {
+  /** @param {Record<string, unknown>} [overrides] */
   const personal = (overrides = {}) => ({
     name: "Jordan Kim",
     age: "29",
@@ -1286,7 +1341,9 @@ describe("openSignupWithPrefilledProfile", () => {
     ...overrides
   });
 
-  const profile = () => deps.setSignupProfileForm.mock.calls[0][0];
+  // The prefill hands its setter the whole profile.
+  const profile = () =>
+    /** @type {typeof defaultSignupProfileForm} */ (deps.setSignupProfileForm.mock.calls[0][0]);
 
   test("switches to signup and goes to the auth page", () => {
     build({ personal: personal() }).openSignupWithPrefilledProfile();
@@ -1415,7 +1472,8 @@ describe("fallbacks when the other side is missing", () => {
     // Asserted on the actual argument rather than with toHaveBeenCalledWith:
     // that matcher is satisfied by *any* call, and another path calls
     // setUser(null) too, so it passed whether or not this one coerced.
-    const [lastUser] = deps.setUser.mock.calls.at(-1);
+    // The auth path has just called it.
+    const [lastUser] = /** @type {unknown[]} */ (deps.setUser.mock.calls.at(-1));
     expect(lastUser).toBeNull();
     expect(lastUser).not.toBeUndefined();
   });
@@ -1428,7 +1486,8 @@ describe("fallbacks when the other side is missing", () => {
 
     await build({ authMode: "signup" }).onAuthSubmit(submitEvent());
 
-    const [lastUser] = deps.setUser.mock.calls.at(-1);
+    // The auth path has just called it.
+    const [lastUser] = /** @type {unknown[]} */ (deps.setUser.mock.calls.at(-1));
     expect(lastUser).toBeNull();
     expect(lastUser).not.toBeUndefined();
   });
@@ -1442,7 +1501,10 @@ describe("fallbacks when the other side is missing", () => {
       signupProfileForm: { ...deps.signupProfileForm, weight: "80", weightKg: "" }
     }).onAuthSubmit(submitEvent());
 
-    const body = JSON.parse(deps.apiFetch.mock.calls.at(-1)[1].body);
+    // The submit has just sent its JSON body.
+    const body = JSON.parse(
+      /** @type {[string, { body: string }]} */ (deps.apiFetch.mock.calls.at(-1))[1].body
+    );
     expect(String(body.profile.weightKg ?? body.weightKg ?? body.weight)).toContain("80");
   });
 
@@ -1455,7 +1517,10 @@ describe("fallbacks when the other side is missing", () => {
       signupProfileForm: { ...deps.signupProfileForm, weight: "", weightKg: "72" }
     }).onAuthSubmit(submitEvent());
 
-    const body = JSON.parse(deps.apiFetch.mock.calls.at(-1)[1].body);
+    // The submit has just sent its JSON body.
+    const body = JSON.parse(
+      /** @type {[string, { body: string }]} */ (deps.apiFetch.mock.calls.at(-1))[1].body
+    );
     expect(String(body.profile?.weightKg ?? body.weightKg ?? body.weight)).toContain("72");
   });
 });

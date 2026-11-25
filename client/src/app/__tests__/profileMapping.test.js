@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { personalToProfile, profileToPersonal } from "../profileMapping";
 
@@ -13,18 +14,18 @@ import { personalToProfile, profileToPersonal } from "../profileMapping";
 
 describe("personalToProfile", () => {
   test("splits the display name into first and last", () => {
-    expect(personalToProfile({ name: "Jordan Fields" })).toMatchObject({
+    expect(personalToProfile({ name: "Jordan Fields" }, undefined)).toMatchObject({
       firstName: "Jordan",
       lastName: "Fields"
     });
   });
 
   test("sends an unfilled body fat as null, not zero", () => {
-    expect(personalToProfile({ bodyFat: "" }).bodyFat).toBeNull();
+    expect(personalToProfile({ bodyFat: "" }, undefined).bodyFat).toBeNull();
   });
 
   test("keeps an entered body fat of zero", () => {
-    expect(personalToProfile({ bodyFat: "0" }).bodyFat).toBe(0);
+    expect(personalToProfile({ bodyFat: "0" }, undefined).bodyFat).toBe(0);
   });
 
   // The bug this signature exists to prevent: without the unit, 170 lb is
@@ -67,20 +68,23 @@ describe("personalToProfile", () => {
   });
 
   test("defaults to metric when no units are supplied", () => {
-    expect(personalToProfile({ weight: "77", heightCm: "180" }).weightKg).toBe(77);
+    expect(personalToProfile({ weight: "77", heightCm: "180" }, undefined).weightKg).toBe(77);
   });
 
   test("carries the training and lifestyle fields straight through", () => {
     expect(
-      personalToProfile({
-        sleep: "7 - 8 hours",
-        timeline: "3 months",
-        experience: "Intermediate",
-        nutrition: "High-protein",
-        cardio: "Mixed",
-        goal: "Mobility",
-        trainingDays: ["Monday"]
-      })
+      personalToProfile(
+        {
+          sleep: "7 - 8 hours",
+          timeline: "3 months",
+          experience: "Intermediate",
+          nutrition: "High-protein",
+          cardio: "Mixed",
+          goal: "Mobility",
+          trainingDays: ["Monday"]
+        },
+        undefined
+      )
     ).toMatchObject({
       sleep: "7 - 8 hours",
       timeline: "3 months",
@@ -93,7 +97,7 @@ describe("personalToProfile", () => {
   });
 
   test("never sends a non-array trainingDays", () => {
-    expect(personalToProfile({ trainingDays: "Monday" }).trainingDays).toEqual([]);
+    expect(personalToProfile({ trainingDays: "Monday" }, undefined).trainingDays).toEqual([]);
   });
 
   test.each([
@@ -101,7 +105,7 @@ describe("personalToProfile", () => {
     ["activity", "High"],
     ["notes", "Back injury, avoid deadlifts"]
   ])("carries a populated %s through", (field, value) => {
-    expect(personalToProfile({ [field]: value })[field]).toBe(value);
+    expect(personalToProfile({ [field]: value }, undefined)[field]).toBe(value);
   });
 });
 
@@ -129,13 +133,13 @@ describe("defensive arguments", () => {
 
 describe("profileToPersonal", () => {
   test("joins first and last into the display name", () => {
-    expect(profileToPersonal({ firstName: "Jordan", lastName: "Fields" }).name).toBe(
+    expect(profileToPersonal({ firstName: "Jordan", lastName: "Fields" }, undefined).name).toBe(
       "Jordan Fields"
     );
   });
 
   test("renders a null measurement as an empty form field, not zero", () => {
-    const personal = profileToPersonal({ age: null, weightKg: null, bodyFat: null });
+    const personal = profileToPersonal({ age: null, weightKg: null, bodyFat: null }, undefined);
 
     expect(personal.age).toBe("");
     expect(personal.weight).toBe("");
@@ -143,7 +147,7 @@ describe("profileToPersonal", () => {
   });
 
   test("keeps a stored zero visible in the form", () => {
-    expect(profileToPersonal({ bodyFat: 0 }).bodyFat).toBe("0");
+    expect(profileToPersonal({ bodyFat: 0 }, undefined).bodyFat).toBe("0");
   });
 
   test("shows weight in pounds when the imperial unit is active", () => {
@@ -155,7 +159,7 @@ describe("profileToPersonal", () => {
   });
 
   test("fills both height representations", () => {
-    const personal = profileToPersonal({ heightCm: 178 });
+    const personal = profileToPersonal({ heightCm: 178 }, undefined);
 
     expect(personal.heightCm).toBe("178");
     expect(personal.heightFeet).toBe("5");
@@ -163,7 +167,7 @@ describe("profileToPersonal", () => {
   });
 
   test("defaults trainingDays to an array", () => {
-    expect(profileToPersonal({ trainingDays: null }).trainingDays).toEqual([]);
+    expect(profileToPersonal({ trainingDays: null }, undefined).trainingDays).toEqual([]);
   });
 
   // These three were carried correctly but nothing asserted it, so deleting any
@@ -174,11 +178,11 @@ describe("profileToPersonal", () => {
     ["sex", "Female"],
     ["notes", "Back injury, avoid deadlifts"]
   ])("carries a populated %s through", (field, value) => {
-    expect(profileToPersonal({ [field]: value })[field]).toBe(value);
+    expect(profileToPersonal({ [field]: value }, undefined)[field]).toBe(value);
   });
 
   test("carries a populated activity through", () => {
-    expect(profileToPersonal({ activity: "High" }).activity).toBe("High");
+    expect(profileToPersonal({ activity: "High" }, undefined).activity).toBe("High");
   });
 
   // Not a round trip to "", and deliberately so: buildProfile falls an
@@ -186,12 +190,12 @@ describe("profileToPersonal", () => {
   // cleared activity really is stored as "Moderate", so reading it back that way
   // reports what happened rather than inventing it.
   test("fills a cleared activity with the default, mirroring the server", () => {
-    expect(profileToPersonal({ activity: "" }).activity).toBe("Moderate");
-    expect(profileToPersonal({ sex: "" }).sex).toBe("");
+    expect(profileToPersonal({ activity: "" }, undefined).activity).toBe("Moderate");
+    expect(profileToPersonal({ sex: "" }, undefined).sex).toBe("");
   });
 
   test("supplies the rest of the personal form so callers get a complete shape", () => {
-    expect(profileToPersonal({})).toHaveProperty("notes", "");
+    expect(profileToPersonal({}, undefined)).toHaveProperty("notes", "");
   });
 });
 
@@ -207,7 +211,7 @@ describe("round trips", () => {
   });
 
   test("height survives a metric round trip exactly", () => {
-    const personal = profileToPersonal({ heightCm: 181 });
+    const personal = profileToPersonal({ heightCm: 181 }, undefined);
     expect(personalToProfile(personal, { heightUnit: "cm" }).heightCm).toBe(181);
   });
 
@@ -218,14 +222,15 @@ describe("round trips", () => {
   // fixed point. This is a property of showing height in whole inches, not a
   // defect, and it is pinned here so nobody rediscovers it as a mystery.
   test("imperial height moves by at most one centimetre, once", () => {
-    const first = personalToProfile(profileToPersonal({ heightCm: 181 }), {
+    const first = personalToProfile(profileToPersonal({ heightCm: 181 }, undefined), {
       heightUnit: "ft"
     }).heightCm;
-    const second = personalToProfile(profileToPersonal({ heightCm: first }), {
+    const second = personalToProfile(profileToPersonal({ heightCm: first }, undefined), {
       heightUnit: "ft"
     }).heightCm;
 
-    expect(Math.abs(first - 181)).toBeLessThanOrEqual(1);
+    // The profile schema reads heightCm as unknown; a height of 181 cm maps to a number.
+    expect(Math.abs(/** @type {number} */ (first) - 181)).toBeLessThanOrEqual(1);
     expect(second).toBe(first);
   });
 
@@ -240,6 +245,8 @@ describe("round trips", () => {
       trainingDays: ["Monday", "Wednesday"]
     };
 
-    expect(profileToPersonal(personalToProfile(personal))).toMatchObject(personal);
+    expect(profileToPersonal(personalToProfile(personal, undefined), undefined)).toMatchObject(
+      personal
+    );
   });
 });
