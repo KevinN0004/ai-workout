@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import ProgressPanel, { PrTag } from "../ProgressPanel";
@@ -6,10 +7,18 @@ import ProgressPanel, { PrTag } from "../ProgressPanel";
 // pinned in ../../__tests__/progress.test.js. What is pinned here is what the
 // panel adds: which rows and lines it shows, in what order and words, and the
 // loads in the region's unit. "Today" is Wednesday 2026-11-04.
+//
+// Each session holds only what progress.js reads, so the list is cast to the
+// panel's sessions where it is given. A table row a test reads is cast to one.
+/** @typedef {Parameters<typeof ProgressPanel>[0]} PanelProps */
 
 const TODAY = "2026-11-04";
 
 let saved = 0;
+/**
+ * @param {string} date
+ * @param {unknown[]} exerciseSets
+ */
 const session = (date, exerciseSets) => {
   saved += 1;
   return {
@@ -19,20 +28,46 @@ const session = (date, exerciseSets) => {
     exerciseSets
   };
 };
+/**
+ * @param {string} name
+ * @param {string | null} pattern
+ * @param {unknown[]} sets
+ */
 const exercise = (name, pattern, sets) => ({ name, pattern, sets });
+/**
+ * @param {number} count
+ * @param {number | null} [loadKg]
+ */
 const reps = (count, loadKg = null) => ({ reps: count, seconds: null, loadKg, rpe: null });
+/** @param {number} seconds */
 const hold = (seconds) => ({ reps: null, seconds, loadKg: null, rpe: null });
+/**
+ * @param {number} count
+ * @param {unknown} set
+ */
 const times = (count, set) => Array.from({ length: count }, () => set);
 
+/**
+ * @param {unknown[]} sessions
+ * @param {PanelProps["measurementSystem"]} [measurementSystem]
+ */
 const renderPanel = (sessions, measurementSystem = "metric") =>
-  render(<ProgressPanel sessions={sessions} today={TODAY} measurementSystem={measurementSystem} />);
+  render(
+    <ProgressPanel
+      sessions={/** @type {PanelProps["sessions"]} */ (sessions)}
+      today={TODAY}
+      measurementSystem={measurementSystem}
+    />
+  );
 
 const setsTable = () => screen.getByRole("table", { name: "This week's sets" });
 const tableRows = () =>
   within(setsTable())
     .getAllByRole("row")
     .slice(1)
-    .map((row) => Array.from(row.cells).map((cell) => cell.textContent));
+    .map((row) =>
+      Array.from(/** @type {HTMLTableRowElement} */ (row).cells).map((cell) => cell.textContent)
+    );
 const recordLines = () =>
   within(screen.getByRole("list", { name: "Records" }))
     .getAllByRole("listitem")
@@ -40,6 +75,7 @@ const recordLines = () =>
 
 // One lift per session, each a day later than the one before, so the most
 // recently trained is the last named.
+/** @param {number} count */
 const liftsOnDays = (count) =>
   Array.from({ length: count }, (_, index) =>
     session(`2026-10-${String(index + 1).padStart(2, "0")}`, [

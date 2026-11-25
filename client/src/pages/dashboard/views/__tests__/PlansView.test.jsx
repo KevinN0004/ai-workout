@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlansView from "../PlansView";
@@ -7,7 +8,17 @@ import { buildPlanDayPrefill } from "../../planUtils";
 // Prop-driven throughout -- no fetching -- so this drives the parts a visitor
 // actually operates: the two empty states, the three callbacks the dashboard
 // hands in, and the saved-exercise paging.
+//
+// Each dashboard, plan and week holds only the fields the view reads, so it is
+// cast where it is given. The app always passes a planner form as
+// `fallbackPlan`; null stands in for one with no goal, which the view reads
+// with ?. too. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof PlansView>[0]} PlansViewProps */
+// renderView gives the view these itself unless a test passes its own.
+/** @typedef {"weekDays" | "latestPlanByWeekday" | "dashboard" | "fallbackPlan" | "openPlannerFromProfile" | "onRemoveSavedExercise" | "onOpenGuides"} Given */
+/** @typedef {Omit<PlansViewProps, Given> & Partial<Pick<PlansViewProps, Given>>} RenderProps */
 
+/** @param {string} id */
 const savedExercise = (id) => ({
   id,
   name: `Exercise ${id}`,
@@ -15,7 +26,8 @@ const savedExercise = (id) => ({
   equipment: ["Dumbbell"]
 });
 
-const renderView = (props = {}) => {
+/** @param {RenderProps} [props] */
+const renderView = (props = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) => {
   const handlers = {
     openPlannerFromProfile: vi.fn(),
     onRemoveSavedExercise: vi.fn(),
@@ -25,8 +37,12 @@ const renderView = (props = {}) => {
     <PlansView
       weekDays={[{ key: "monday", label: "Monday" }]}
       latestPlanByWeekday={{}}
-      dashboard={{ plans: [], goals: {}, savedExercises: [] }}
-      fallbackPlan={null}
+      dashboard={
+        /** @type {PlansViewProps["dashboard"]} */ (
+          /** @type {unknown} */ ({ plans: [], goals: {}, savedExercises: [] })
+        )
+      }
+      fallbackPlan={/** @type {PlansViewProps["fallbackPlan"]} */ (/** @type {unknown} */ (null))}
       {...handlers}
       {...props}
     />
@@ -34,13 +50,17 @@ const renderView = (props = {}) => {
   return { ...utils, ...handlers };
 };
 
-const withSaved = (count) => ({
-  dashboard: {
-    plans: [],
-    goals: {},
-    savedExercises: Array.from({ length: count }, (_, i) => savedExercise(String(i + 1)))
-  }
-});
+/** @param {number} count */
+const withSaved = (count) =>
+  /** @type {RenderProps & Pick<PlansViewProps, "dashboard">} */ (
+    /** @type {unknown} */ ({
+      dashboard: {
+        plans: [],
+        goals: {},
+        savedExercises: Array.from({ length: count }, (_, i) => savedExercise(String(i + 1)))
+      }
+    })
+  );
 
 describe("PlansView", () => {
   describe("empty states", () => {
@@ -50,10 +70,14 @@ describe("PlansView", () => {
     });
 
     test("the no-plan card goes away once a plan exists", () => {
-      renderView({
-        weekDays: [{ key: "monday", label: "Monday" }],
-        latestPlanByWeekday: { monday: ["Squat 5x5"] }
-      });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({
+            weekDays: [{ key: "monday", label: "Monday" }],
+            latestPlanByWeekday: { monday: ["Squat 5x5"] }
+          })
+        )
+      );
 
       expect(screen.queryByText("No weekly workout plan yet")).toBeNull();
       expect(screen.queryByText("Create weekly plan")).toBeNull();
@@ -66,7 +90,11 @@ describe("PlansView", () => {
 
     test("treats a non-array savedExercises as empty rather than throwing", () => {
       // The server has returned null for collection fields before.
-      renderView({ dashboard: { plans: [], goals: {}, savedExercises: null } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ dashboard: { plans: [], goals: {}, savedExercises: null } })
+        )
+      );
       expect(screen.getByText("No saved exercises yet")).toBeInTheDocument();
     });
   });
@@ -100,7 +128,11 @@ describe("PlansView", () => {
     });
 
     test("a missing remove handler does not break the button", () => {
-      renderView({ ...withSaved(1), onRemoveSavedExercise: undefined });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ ...withSaved(1), onRemoveSavedExercise: undefined })
+        )
+      );
       expect(() => fireEvent.click(screen.getByText("Remove"))).not.toThrow();
     });
   });
@@ -152,7 +184,9 @@ describe("PlansView", () => {
           weekDays={[{ key: "monday", label: "Monday" }]}
           latestPlanByWeekday={{}}
           {...withSaved(29)}
-          fallbackPlan={null}
+          fallbackPlan={
+            /** @type {PlansViewProps["fallbackPlan"]} */ (/** @type {unknown} */ (null))
+          }
           openPlannerFromProfile={vi.fn()}
           onRemoveSavedExercise={vi.fn()}
           onOpenGuides={vi.fn()}
@@ -169,11 +203,16 @@ describe("PlansView", () => {
   describe("the daily focus tip it picks", () => {
     const WEEK = [{ key: "monday", label: "Monday" }];
 
+    /** @param {string[]} lines */
     const tipFor = (lines) => {
-      const { unmount } = renderView({
-        weekDays: WEEK,
-        latestPlanByWeekday: { monday: lines }
-      });
+      const { unmount } = renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({
+            weekDays: WEEK,
+            latestPlanByWeekday: { monday: lines }
+          })
+        )
+      );
       const text = document.body.textContent;
       unmount();
       return text;
@@ -267,14 +306,22 @@ describe("PlansView", () => {
 
     test("count the recovery days left in the week", () => {
       const plan = { monday: ["Squat"], tuesday: ["Row"] };
-      renderView({ weekDays: FULL_WEEK, latestPlanByWeekday: plan });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ weekDays: FULL_WEEK, latestPlanByWeekday: plan })
+        )
+      );
 
       expect(screen.getByText(/Keep at least 5 recovery days this week\./)).toBeInTheDocument();
     });
 
     test("say one day in the singular", () => {
       const plan = Object.fromEntries(FULL_WEEK.slice(0, 6).map(({ key }) => [key, ["Squat"]]));
-      renderView({ weekDays: FULL_WEEK, latestPlanByWeekday: plan });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ weekDays: FULL_WEEK, latestPlanByWeekday: plan })
+        )
+      );
 
       expect(screen.getByText(/Keep at least 1 recovery day this week\./)).toBeInTheDocument();
     });
@@ -282,7 +329,11 @@ describe("PlansView", () => {
     test("still ask for one when every day is a training day", () => {
       // Zero would read as permission to train seven days a week.
       const plan = Object.fromEntries(FULL_WEEK.map(({ key }) => [key, ["Squat"]]));
-      renderView({ weekDays: FULL_WEEK, latestPlanByWeekday: plan });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ weekDays: FULL_WEEK, latestPlanByWeekday: plan })
+        )
+      );
 
       expect(screen.getByText(/Keep at least 1 recovery day this week\./)).toBeInTheDocument();
     });
@@ -296,21 +347,31 @@ describe("PlansView", () => {
 
     // The day label appears on the workout card, the meal card and the tips
     // line, so the click has to be scoped to the workout week row.
+    /** @param {string} label */
     const dayCard = (label) => {
-      const row = Array.from(document.querySelectorAll(".plan-row")).find((el) =>
-        el.textContent.startsWith("Workout week")
+      const row = /** @type {Element} */ (
+        Array.from(document.querySelectorAll(".plan-row")).find((el) =>
+          el.textContent.startsWith("Workout week")
+        )
       );
-      return Array.from(row.querySelectorAll(".hub-card-button")).find((el) =>
-        el.textContent.includes(label)
+      return /** @type {HTMLElement} */ (
+        Array.from(row.querySelectorAll(".hub-card-button")).find((el) =>
+          el.textContent.includes(label)
+        )
       );
     };
 
+    /** @param {Partial<RenderProps>} [props] */
     const openMonday = (props = {}) => {
-      const utils = renderView({
-        weekDays: WEEK,
-        latestPlanByWeekday: { monday: ["Back squat 5x5"] },
-        ...props
-      });
+      const utils = renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({
+            weekDays: WEEK,
+            latestPlanByWeekday: { monday: ["Back squat 5x5"] },
+            ...props
+          })
+        )
+      );
       fireEvent.click(dayCard("Monday"));
       return utils;
     };
@@ -357,6 +418,7 @@ describe("PlansView", () => {
       // usual way this breaks, and it fails silently.
       const added = vi.spyOn(window, "addEventListener");
       const removed = vi.spyOn(window, "removeEventListener");
+      /** @param {import("vitest").MockInstance} spy */
       const keydownFns = (spy) =>
         spy.mock.calls.filter(([type]) => type === "keydown").map(([, fn]) => fn);
 
@@ -375,7 +437,11 @@ describe("PlansView", () => {
     });
 
     test("a day with no plan opens with no workout lines rather than failing", () => {
-      renderView({ weekDays: WEEK, latestPlanByWeekday: { monday: ["Squat"] } });
+      renderView(
+        /** @type {RenderProps} */ (
+          /** @type {unknown} */ ({ weekDays: WEEK, latestPlanByWeekday: { monday: ["Squat"] } })
+        )
+      );
 
       fireEvent.click(dayCard("Tuesday"));
 
@@ -399,6 +465,7 @@ describe("logging a plan day", () => {
     lines: ["Main lifts:", "- Back Squats: 3 x 5 (Rest: 3 mins)", "- Plank: 3 x 30s"]
   };
   const tuesdayDay = { index: 1, weekday: "Tuesday", title: "Tuesday", lines: ["Rest Day"] };
+  /** @param {object} [overrides] */
   const savedPlan = (overrides = {}) => ({
     id: "plan-1",
     goal: "Build lean strength and energy",
@@ -407,18 +474,23 @@ describe("logging a plan day", () => {
     ...overrides
   });
 
+  /** @param {{ plan?: object, workoutSessions?: object[] }} [options] */
   const renderWithPlan = ({ plan = savedPlan(), workoutSessions = [] } = {}) => {
     const setWorkoutForm = vi.fn();
     const setWorkoutModalOpen = vi.fn();
     const onStartSession = vi.fn();
-    const utils = renderView({
-      weekDays: WEEK,
-      latestPlanByWeekday: { Monday: mondayDay.lines, Tuesday: tuesdayDay.lines },
-      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions },
-      setWorkoutForm,
-      setWorkoutModalOpen,
-      onStartSession
-    });
+    const utils = renderView(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({
+          weekDays: WEEK,
+          latestPlanByWeekday: { Monday: mondayDay.lines, Tuesday: tuesdayDay.lines },
+          dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions },
+          setWorkoutForm,
+          setWorkoutModalOpen,
+          onStartSession
+        })
+      )
+    );
     return { ...utils, setWorkoutForm, setWorkoutModalOpen, onStartSession };
   };
 
@@ -449,8 +521,14 @@ describe("logging a plan day", () => {
   });
   // The workout week's cards: the meals week has a card per day as well.
   const workoutWeek = () =>
-    within(screen.getByRole("heading", { name: "Workout week" }).closest("section"));
+    within(
+      /** @type {HTMLElement} */ (
+        screen.getByRole("heading", { name: "Workout week" }).closest("section")
+      )
+    );
+  /** @param {string} label */
   const card = (label) => workoutWeek().getByRole("button", { name: new RegExp(`^${label}`) });
+  /** @param {string} label */
   const openDay = (label) => fireEvent.click(card(label));
 
   test("fills the Log workout form from the day, links it, and opens it", () => {
@@ -540,11 +618,15 @@ describe("logging a plan day", () => {
   });
 
   test("labels no rest day for a weekday the plan has no lines for", () => {
-    renderView({
-      weekDays: [...WEEK, { key: "Wednesday", label: "Wed" }],
-      latestPlanByWeekday: { Monday: mondayDay.lines },
-      dashboard: { plans: [savedPlan()], goals: {}, savedExercises: [], workoutSessions: [] }
-    });
+    renderView(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({
+          weekDays: [...WEEK, { key: "Wednesday", label: "Wed" }],
+          latestPlanByWeekday: { Monday: mondayDay.lines },
+          dashboard: { plans: [savedPlan()], goals: {}, savedExercises: [], workoutSessions: [] }
+        })
+      )
+    );
 
     expect(within(card("Wed")).queryByText("Rest day")).toBeNull();
   });
@@ -585,34 +667,42 @@ describe("the week's progression", () => {
     why: "Every set reached 5 reps at RPE 8 or below on Mon 2 Nov",
     decision: null
   };
+  /** @param {{ active: boolean, count: number, reason: string | null, decision: string | null }} [deloadWeek] */
   const weekOf = (deloadWeek = { active: false, count: 1, reason: null, decision: null }) => ({
     weekStart: "2026-11-09",
     deloadWeek,
     lifts: [squatWeek]
   });
 
+  /** @param {{ progression?: object | null, progressionError?: string }} [options] */
   const renderWeek = ({ progression = weekOf(), progressionError = "" } = {}) => {
     const setWorkoutForm = vi.fn();
     const onAnswerProgression = vi.fn();
-    renderView({
-      weekDays: [{ key: "Monday", label: "Mon" }],
-      latestPlanByWeekday: { Monday: mondayDay.lines },
-      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
-      setWorkoutForm,
-      setWorkoutModalOpen: vi.fn(),
-      progression,
-      onAnswerProgression,
-      progressionError
-    });
-    fireEvent.click(
-      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
-        "button",
-        { name: /^Mon/ }
+    renderView(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({
+          weekDays: [{ key: "Monday", label: "Mon" }],
+          latestPlanByWeekday: { Monday: mondayDay.lines },
+          dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
+          setWorkoutForm,
+          setWorkoutModalOpen: vi.fn(),
+          progression,
+          onAnswerProgression,
+          progressionError
+        })
       )
+    );
+    fireEvent.click(
+      within(
+        /** @type {HTMLElement} */ (
+          screen.getByRole("heading", { name: "Workout week" }).closest("section")
+        )
+      ).getByRole("button", { name: /^Mon/ })
     );
     return { setWorkoutForm, onAnswerProgression };
   };
   const loads = () => within(screen.getByRole("region", { name: "This week's loads" }));
+  /** @param {import("vitest").Mock} setWorkoutForm */
   const loggedCards = (setWorkoutForm) => {
     fireEvent.click(screen.getByRole("button", { name: "Log this workout" }));
     return setWorkoutForm.mock.calls[0][0].exerciseSets;
@@ -727,6 +817,7 @@ describe("swapping an exercise", () => {
     area: null,
     cue: null
   };
+  /** @param {unknown} body */
   const respond = (body) => ({ ok: true, json: async () => body });
   const apiFetch = () =>
     vi.fn(async (_path, options) =>
@@ -737,20 +828,25 @@ describe("swapping an exercise", () => {
 
   const renderSwaps = () => {
     const onPlanChanged = vi.fn();
-    renderView({
-      weekDays: [{ key: "Monday", label: "Mon" }],
-      latestPlanByWeekday: { Monday: mondayDay.lines },
-      dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
-      setWorkoutForm: vi.fn(),
-      setWorkoutModalOpen: vi.fn(),
-      apiFetch: apiFetch(),
-      onPlanChanged
-    });
-    fireEvent.click(
-      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
-        "button",
-        { name: /^Mon/ }
+    renderView(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({
+          weekDays: [{ key: "Monday", label: "Mon" }],
+          latestPlanByWeekday: { Monday: mondayDay.lines },
+          dashboard: { plans: [plan], goals: {}, savedExercises: [], workoutSessions: [] },
+          setWorkoutForm: vi.fn(),
+          setWorkoutModalOpen: vi.fn(),
+          apiFetch: apiFetch(),
+          onPlanChanged
+        })
       )
+    );
+    fireEvent.click(
+      within(
+        /** @type {HTMLElement} */ (
+          screen.getByRole("heading", { name: "Workout week" }).closest("section")
+        )
+      ).getByRole("button", { name: /^Mon/ })
     );
     return { onPlanChanged };
   };
@@ -797,10 +893,11 @@ describe("swapping an exercise", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     fireEvent.click(
-      within(screen.getByRole("heading", { name: "Workout week" }).closest("section")).getByRole(
-        "button",
-        { name: /^Mon/ }
-      )
+      within(
+        /** @type {HTMLElement} */ (
+          screen.getByRole("heading", { name: "Workout week" }).closest("section")
+        )
+      ).getByRole("button", { name: /^Mon/ })
     );
     expect(screen.getByRole("button", { name: "Start workout" })).toBeInTheDocument();
   });

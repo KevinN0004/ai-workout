@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import DashboardAtAGlance from "../DashboardAtAGlance";
@@ -7,36 +8,52 @@ import DashboardAtAGlance from "../DashboardAtAGlance";
 // that render it only ever supply one shape (no workout, calories under
 // target, both ambient readings loaded and clean). Everything below is the
 // other shapes.
+//
+// DEFAULTS leaves out the two retry handlers on purpose: a card offers Retry
+// only when its handler is given. So it is checked against the rest of the
+// props and cast to the whole. Each reading a test gives holds only the fields
+// the card reads, and a card's name read from a table is cast to its key.
+// Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof DashboardAtAGlance>[0]} GlanceProps */
 
-const DEFAULTS = {
-  nextWorkout: null,
-  caloriesGap: 0,
-  avgCalories: 2000,
-  calorieGoal: 2200,
-  weatherLoading: false,
-  weatherRecommendation: null,
-  weatherError: "",
-  weatherErrorKind: "",
-  weatherLastUpdatedAt: null,
-  airQualityLoading: false,
-  airSummary: null,
-  airQualityError: "",
-  airQualityErrorKind: "",
-  airQualityLastUpdatedAt: null,
-  formatRelativeUpdatedAt: () => "just now",
-  onAddWorkout: () => {},
-  onOpenMeal: () => {},
-  onOpenTips: () => {}
-};
+const DEFAULTS = /** @type {GlanceProps} */ (
+  /** @type {unknown} */ (
+    /** @satisfies {Omit<GlanceProps, "refreshWeatherRecommendation" | "refreshAirQuality">} */ ({
+      nextWorkout: null,
+      caloriesGap: 0,
+      avgCalories: 2000,
+      calorieGoal: 2200,
+      weatherLoading: false,
+      weatherRecommendation: null,
+      weatherError: "",
+      weatherErrorKind: "",
+      weatherLastUpdatedAt: null,
+      airQualityLoading: false,
+      airSummary: null,
+      airQualityError: "",
+      airQualityErrorKind: "",
+      airQualityLastUpdatedAt: null,
+      formatRelativeUpdatedAt: () => "just now",
+      onAddWorkout: () => {},
+      onOpenMeal: () => {},
+      onOpenTips: () => {}
+    })
+  )
+);
 
+/** @param {Partial<GlanceProps>} [props] */
 const renderGlance = (props = {}) => render(<DashboardAtAGlance {...DEFAULTS} {...props} />);
 
 // The four cards are in a fixed order and only the first has a heading that
 // changes, so they are addressed by position rather than by name.
 const CARDS = { workout: 0, calories: 1, weather: 2, air: 3 };
+/** @param {keyof typeof CARDS} name */
 const card = (name) => screen.getAllByRole("article")[CARDS[name]];
+/** @param {keyof typeof CARDS} name */
 const headline = (name) => card(name).querySelector(".dashboard-glance-value")?.textContent;
+/** @param {keyof typeof CARDS} name */
 const note = (name) => card(name).querySelectorAll("p.muted")[0]?.textContent;
+/** @param {keyof typeof CARDS} name */
 const updated = (name) => card(name).querySelector(".dashboard-glance-updated")?.textContent;
 
 describe("DashboardAtAGlance", () => {
@@ -57,7 +74,12 @@ describe("DashboardAtAGlance", () => {
       ["Latest", "Latest workout", "45 min logged"]
     ])("names a %s session and says whether it is planned", (context, heading, duration) => {
       renderGlance({
-        nextWorkout: { context, date: "Mon 5 May", focus: "Push", duration: 45 }
+        nextWorkout: /** @type {GlanceProps["nextWorkout"]} */ ({
+          context,
+          date: "Mon 5 May",
+          focus: "Push",
+          duration: 45
+        })
       });
 
       expect(within(card("workout")).getByRole("heading")).toHaveTextContent(heading);
@@ -66,7 +88,9 @@ describe("DashboardAtAGlance", () => {
     });
 
     test("stands in for each missing part of a session rather than rendering a gap", () => {
-      renderGlance({ nextWorkout: { context: "Upcoming" } });
+      renderGlance({
+        nextWorkout: /** @type {GlanceProps["nextWorkout"]} */ ({ context: "Upcoming" })
+      });
 
       expect(headline("workout")).toBe("Date pending - General");
       expect(note("workout")).toBe("-- min planned");
@@ -76,7 +100,14 @@ describe("DashboardAtAGlance", () => {
       // `duration || "--"` cannot tell a zero from an absent value. Harmless
       // here -- a zero-minute session is not a session -- but pinned so the
       // guard is not mistaken for a finite check later.
-      renderGlance({ nextWorkout: { context: "Today", date: "Mon", focus: "Pull", duration: 0 } });
+      renderGlance({
+        nextWorkout: /** @type {GlanceProps["nextWorkout"]} */ ({
+          context: "Today",
+          date: "Mon",
+          focus: "Pull",
+          duration: 0
+        })
+      });
 
       expect(note("workout")).toBe("-- min logged");
     });
@@ -126,7 +157,7 @@ describe("DashboardAtAGlance", () => {
         "Not checked yet"
       ]
     ])("reports %s", (_label, props, expected) => {
-      renderGlance(props);
+      renderGlance(/** @type {Partial<GlanceProps>} */ (/** @type {unknown} */ (props)));
 
       expect(headline("weather")).toBe(expected);
     });
@@ -140,14 +171,16 @@ describe("DashboardAtAGlance", () => {
       ["the error when there is no summary", { weatherError: "Lookup failed" }, "Lookup failed"],
       ["a placeholder when there is neither", {}, "No weather update yet."]
     ])("notes %s", (_label, props, expected) => {
-      renderGlance(props);
+      renderGlance(/** @type {Partial<GlanceProps>} */ (/** @type {unknown} */ (props)));
 
       expect(note("weather")).toBe(expected);
     });
 
     test("prefers the summary over the error when both arrive", () => {
       renderGlance({
-        weatherRecommendation: { summary: "Clear, 18C" },
+        weatherRecommendation: /** @type {GlanceProps["weatherRecommendation"]} */ ({
+          summary: "Clear, 18C"
+        }),
         weatherError: "Lookup failed"
       });
 
@@ -165,7 +198,7 @@ describe("DashboardAtAGlance", () => {
       ],
       ["the measured level", { airSummary: { level: "Moderate" } }, "Moderate"]
     ])("reports %s", (_label, props, expected) => {
-      renderGlance(props);
+      renderGlance(/** @type {Partial<GlanceProps>} */ (/** @type {unknown} */ (props)));
 
       expect(headline("air")).toBe(expected);
     });
@@ -173,7 +206,11 @@ describe("DashboardAtAGlance", () => {
     test("a reading with no level falls through to the not-checked wording", () => {
       // The server always sets a level, so this is the component's contract
       // rather than a state the app produces.
-      renderGlance({ airSummary: { guidance: "Fine for outdoor training" } });
+      renderGlance({
+        airSummary: /** @type {GlanceProps["airSummary"]} */ ({
+          guidance: "Fine for outdoor training"
+        })
+      });
 
       expect(headline("air")).toBe("Not checked yet");
     });
@@ -191,7 +228,7 @@ describe("DashboardAtAGlance", () => {
       ],
       ["a placeholder when there is neither", {}, "No air quality guidance available."]
     ])("notes %s", (_label, props, expected) => {
-      renderGlance(props);
+      renderGlance(/** @type {Partial<GlanceProps>} */ (/** @type {unknown} */ (props)));
 
       expect(note("air")).toBe(expected);
     });
@@ -201,10 +238,12 @@ describe("DashboardAtAGlance", () => {
   // a visitor scans, names each: our request failed; the browser gave no
   // position, so nothing was requested; or the summary view has not loaded
   // yet. The note underneath carries the detail in every case.
-  describe.each([
-    ["weather", "weatherError", "weatherErrorKind"],
-    ["air", "airQualityError", "airQualityErrorKind"]
-  ])("the %s card without a reading", (name, errorProp, kindProp) => {
+  describe.each(
+    /** @type {Array<[keyof typeof CARDS, string, string]>} */ ([
+      ["weather", "weatherError", "weatherErrorKind"],
+      ["air", "airQualityError", "airQualityErrorKind"]
+    ])
+  )("the %s card without a reading", (name, errorProp, kindProp) => {
     test.each([
       [
         "a request that failed",
@@ -256,7 +295,9 @@ describe("DashboardAtAGlance", () => {
       };
       renderGlance({ ...props, ...handlers });
 
-      const retry = document.querySelector(".dashboard-glance-retry");
+      const retry = /** @type {HTMLButtonElement} */ (
+        document.querySelector(".dashboard-glance-retry")
+      );
       fireEvent.click(retry);
 
       expect(handlers[handlerName]).toHaveBeenCalledTimes(1);
@@ -294,7 +335,9 @@ describe("DashboardAtAGlance", () => {
         weatherLoading: true,
         refreshWeatherRecommendation: vi.fn()
       });
-      const retry = document.querySelector(".dashboard-glance-retry");
+      const retry = /** @type {HTMLButtonElement} */ (
+        document.querySelector(".dashboard-glance-retry")
+      );
 
       expect(retry).toBeDisabled();
       expect(retry.textContent).toBe("Retrying...");
@@ -303,7 +346,9 @@ describe("DashboardAtAGlance", () => {
 
     test("the retry is enabled and named plainly when idle", () => {
       renderGlance({ weatherError: "Lookup failed", refreshWeatherRecommendation: vi.fn() });
-      const retry = document.querySelector(".dashboard-glance-retry");
+      const retry = /** @type {HTMLButtonElement} */ (
+        document.querySelector(".dashboard-glance-retry")
+      );
 
       expect(retry).not.toBeDisabled();
       expect(retry.textContent).toBe("Retry");

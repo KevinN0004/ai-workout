@@ -1,10 +1,13 @@
+// @ts-check
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import DashboardHeader from "../DashboardHeader";
 
+// The user holds only the email the header shows.
+/** @typedef {Parameters<typeof DashboardHeader>[0]} HeaderProps */
 const baseProps = {
-  user: { email: "tester@example.com" },
+  user: /** @type {HeaderProps["user"]} */ ({ email: "tester@example.com" }),
   go: vi.fn(),
   onOpenMenu: vi.fn(),
   onNavigateSummary: vi.fn(),

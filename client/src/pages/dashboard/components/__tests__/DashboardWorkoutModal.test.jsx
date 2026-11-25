@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -23,14 +24,18 @@ const squat = () => {
 // the rest of the form alone: a copy-paste slip between two adjacent updaters
 // would silently overwrite the wrong field and nothing else would notice.
 
-const workoutForm = {
+// The form holds what the modal shows, not the plan-day link a plan's Log
+// workout adds. Inputs a test reads are cast to the element they are.
+/** @typedef {Parameters<typeof DashboardWorkoutModal>[0]} ModalProps */
+const workoutForm = /** @type {ModalProps["workoutForm"]} */ ({
   date: "2026-03-02",
   duration: "45",
   focus: "Strength",
   exerciseSets: [squat()],
   notes: "Felt strong."
-};
+});
 
+/** @param {Partial<ModalProps>} [props] */
 const renderModal = (props = {}) => {
   const handlers = {
     setWorkoutForm: vi.fn(),
@@ -58,8 +63,12 @@ const SENTINEL = Object.fromEntries(
   Object.keys(workoutForm).map((key) => [key, key === "exerciseSets" ? [] : "__unwritten__"])
 );
 
+/** @param {import("vitest").Mock} setWorkoutForm */
 const keysWrittenBy = (setWorkoutForm) => {
-  const updater = setWorkoutForm.mock.calls.at(-1)[0];
+  // The last call holds the updater the modal handed the setter.
+  const updater = /** @type {(previous: object) => Record<string, unknown>} */ (
+    /** @type {unknown[]} */ (setWorkoutForm.mock.calls.at(-1))[0]
+  );
   const next = updater(SENTINEL);
   return Object.keys(SENTINEL).filter((key) => next[key] !== SENTINEL[key]);
 };
@@ -81,9 +90,13 @@ describe("DashboardWorkoutModal", () => {
   test("shows the current form values", () => {
     renderModal();
 
-    expect(screen.getByLabelText("Duration (minutes)").value).toBe("45");
-    expect(screen.getByLabelText("Focus").value).toBe("Strength");
-    expect(screen.getByLabelText("Notes").value).toBe("Felt strong.");
+    expect(
+      /** @type {HTMLInputElement} */ (screen.getByLabelText("Duration (minutes)")).value
+    ).toBe("45");
+    expect(/** @type {HTMLInputElement} */ (screen.getByLabelText("Focus")).value).toBe("Strength");
+    expect(/** @type {HTMLTextAreaElement} */ (screen.getByLabelText("Notes")).value).toBe(
+      "Felt strong."
+    );
   });
 
   // One case per field, and the assertion is exactly one key -- so a swapped
@@ -185,6 +198,7 @@ describe("DashboardWorkoutModal", () => {
 // shows, adding and removing sets and exercises, and the save stopping beside
 // a set it cannot log.
 describe("the exercise cards", () => {
+  /** @param {{ initial?: ModalProps["workoutForm"], onSubmit?: ModalProps["onSubmit"], onClose?: () => void }} props */
   function Stateful({
     initial = workoutForm,
     onSubmit = vi.fn((e) => e.preventDefault()),
@@ -201,7 +215,9 @@ describe("the exercise cards", () => {
       />
     );
   }
-  const input = (name) => screen.getByLabelText(name);
+  /** @param {string} name */
+  const input = (name) => /** @type {HTMLInputElement} */ (screen.getByLabelText(name));
+  /** @param {string} name */
   const button = (name) => screen.getByRole("button", { name });
 
   test("names each card's inputs by set and exercise, with the plan's targets as placeholders", () => {

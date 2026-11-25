@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SummaryView from "../SummaryView";
@@ -7,34 +8,43 @@ import SummaryView from "../SummaryView";
 // which is the one piece of real logic in the file, and that the view survives
 // the empty and partial data a new account actually has. A dashboard that
 // white-screens on an empty profile is a worse bug than a wrong number.
+//
+// So baseProps is that new account, holding only what the view reads, and each
+// test's overrides, often data absent or in the wrong shape on purpose, are
+// cast to the props where they are given. Elements a test looks up are cast to
+// the element it expects.
+/** @typedef {Parameters<typeof SummaryView>[0]} SummaryViewProps */
 
 const noop = () => {};
 
-const baseProps = {
-  form: { equipment: [], focuses: [] },
-  openPlannerFromProfile: noop,
-  last7Workouts: [],
-  avgCalories: 0,
-  weeklyGoal: 3,
-  workoutProgress: 0,
-  calorieGoal: 2200,
-  calorieProgress: 0,
-  workouts: [],
-  buildLinePath: () => "M0,0",
-  trendRanges: {},
-  todayRecommendation: null,
-  weeklyTrends: {},
-  weatherData: null,
-  weatherLoading: false,
-  weatherError: "",
-  refreshWeatherRecommendation: noop,
-  airQualityData: null,
-  airQualityLoading: false,
-  airQualityError: "",
-  refreshAirQuality: noop,
-  onOpenPlans: noop
-};
+const baseProps = /** @type {SummaryViewProps} */ (
+  /** @type {unknown} */ ({
+    form: { equipment: [], focuses: [] },
+    openPlannerFromProfile: noop,
+    last7Workouts: [],
+    avgCalories: 0,
+    weeklyGoal: 3,
+    workoutProgress: 0,
+    calorieGoal: 2200,
+    calorieProgress: 0,
+    workouts: [],
+    buildLinePath: () => "M0,0",
+    trendRanges: {},
+    todayRecommendation: null,
+    weeklyTrends: {},
+    weatherData: null,
+    weatherLoading: false,
+    weatherError: "",
+    refreshWeatherRecommendation: noop,
+    airQualityData: null,
+    airQualityLoading: false,
+    airQualityError: "",
+    refreshAirQuality: noop,
+    onOpenPlans: noop
+  })
+);
 
+/** @param {Partial<SummaryViewProps>} [overrides] */
 const renderView = (overrides = {}) => render(<SummaryView {...baseProps} {...overrides} />);
 
 const latestWeightStat = () => screen.getByText("Latest weight").parentElement;
@@ -52,14 +62,18 @@ describe("SummaryView", () => {
     // would be inventing a contract to satisfy a test.
     test("renders with no ambient data and an empty planner form", () => {
       expect(() =>
-        renderView({
-          form: {},
-          todayRecommendation: null,
-          weatherData: null,
-          airQualityData: null,
-          weeklyTrends: {},
-          trendRanges: {}
-        })
+        renderView(
+          /** @type {Partial<SummaryViewProps>} */ (
+            /** @type {unknown} */ ({
+              form: {},
+              todayRecommendation: null,
+              weatherData: null,
+              airQualityData: null,
+              weeklyTrends: {},
+              trendRanges: {}
+            })
+          )
+        )
       ).not.toThrow();
     });
 
@@ -74,14 +88,24 @@ describe("SummaryView", () => {
       // one too. It takes a truthy non-array to reach `.join`, and a string
       // has a length but no join, which takes the whole dashboard down.
       expect(() =>
-        renderView({ form: { environment: "Home", equipment: value, focuses: value } })
+        renderView(
+          /** @type {Partial<SummaryViewProps>} */ (
+            /** @type {unknown} */ ({
+              form: { environment: "Home", equipment: value, focuses: value }
+            })
+          )
+        )
       ).not.toThrow();
     });
   });
 
   describe("trend badges", () => {
     // Rendered through weeklyTrends, which is where the badge helper is used.
-    const withTrend = (weeklyTrends) => renderView({ weeklyTrends }).container;
+    /** @param {object} weeklyTrends */
+    const withTrend = (weeklyTrends) =>
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ weeklyTrends }))
+      ).container;
 
     test("shows a plus sign and up tone for a gain", () => {
       const container = withTrend({ workouts: 3 });
@@ -155,8 +179,10 @@ describe("SummaryView", () => {
       const refreshAirQuality = vi.fn();
       const { container } = renderView({ refreshWeatherRecommendation, refreshAirQuality });
 
-      fireEvent.click(container.querySelector('[aria-label*="weather" i]'));
-      fireEvent.click(container.querySelector('[aria-label*="air" i]'));
+      fireEvent.click(
+        /** @type {Element} */ (container.querySelector('[aria-label*="weather" i]'))
+      );
+      fireEvent.click(/** @type {Element} */ (container.querySelector('[aria-label*="air" i]')));
 
       expect(refreshWeatherRecommendation).toHaveBeenCalled();
       expect(refreshAirQuality).toHaveBeenCalled();
@@ -169,19 +195,33 @@ describe("SummaryView", () => {
 
   describe("today's recommendation", () => {
     test("names the weekday it is for", () => {
-      renderView({ todayRecommendation: { weekday: "Monday", workoutLines: [], mealPlan: null } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            todayRecommendation: { weekday: "Monday", workoutLines: [], mealPlan: null }
+          })
+        )
+      );
       expect(screen.getByText("Monday recommendations")).toBeInTheDocument();
     });
 
     test("falls back to Today when the weekday is missing", () => {
-      renderView({ todayRecommendation: { workoutLines: [] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ todayRecommendation: { workoutLines: [] } })
+        )
+      );
       expect(screen.getByText("Today recommendations")).toBeInTheDocument();
     });
 
     test("lists the workout lines", () => {
-      renderView({
-        todayRecommendation: { weekday: "Monday", workoutLines: ["Squat 5x5", "Row 3x8"] }
-      });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            todayRecommendation: { weekday: "Monday", workoutLines: ["Squat 5x5", "Row 3x8"] }
+          })
+        )
+      );
 
       expect(screen.getByText("Squat 5x5")).toBeInTheDocument();
       expect(screen.getByText("Row 3x8")).toBeInTheDocument();
@@ -193,21 +233,29 @@ describe("SummaryView", () => {
     ])("a trainingDay of %s is labelled %s", (trainingDay, label) => {
       // The same meal card serves both, and mislabelling it tells the visitor
       // to eat for a session they are not doing.
-      renderView({
-        todayRecommendation: { weekday: "Monday", workoutLines: [], mealPlan: { trainingDay } }
-      });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            todayRecommendation: { weekday: "Monday", workoutLines: [], mealPlan: { trainingDay } }
+          })
+        )
+      );
 
       expect(screen.getByText(label)).toBeInTheDocument();
     });
   });
 
   describe("the weather card", () => {
-    const weather = (overrides = {}) => ({
-      current: { temperatureC: 14, weatherText: "Cloudy" },
-      recommendation: { workoutType: "outdoor", weatherText: "Cloudy", reasons: ["Mild"] },
-      daily: [{ date: "2026-09-12" }, { date: "2026-09-13" }],
-      ...overrides
-    });
+    /** @param {object} [overrides] */
+    const weather = (overrides = {}) =>
+      /** @type {SummaryViewProps["weatherData"]} */ (
+        /** @type {unknown} */ ({
+          current: { temperatureC: 14, weatherText: "Cloudy" },
+          recommendation: { workoutType: "outdoor", weatherText: "Cloudy", reasons: ["Mild"] },
+          daily: [{ date: "2026-09-12" }, { date: "2026-09-13" }],
+          ...overrides
+        })
+      );
 
     test("reports an outdoor day", () => {
       renderView({ weatherData: weather() });
@@ -298,12 +346,16 @@ describe("SummaryView", () => {
   });
 
   describe("the air quality card", () => {
-    const air = (overrides = {}) => ({
-      summary: { level: "Good", aqi: 21 },
-      location: { name: "Station 1", city: "Springfield" },
-      pollutants: [{ code: "pm25", label: "PM2.5", value: 5, unit: "ug/m3", measuredAt: "x" }],
-      ...overrides
-    });
+    /** @param {object} [overrides] */
+    const air = (overrides = {}) =>
+      /** @type {SummaryViewProps["airQualityData"]} */ (
+        /** @type {unknown} */ ({
+          summary: { level: "Good", aqi: 21 },
+          location: { name: "Station 1", city: "Springfield" },
+          pollutants: [{ code: "pm25", label: "PM2.5", value: 5, unit: "ug/m3", measuredAt: "x" }],
+          ...overrides
+        })
+      );
 
     test("shows the level", () => {
       renderView({ airQualityData: air() });
@@ -375,19 +427,24 @@ describe("SummaryView", () => {
       longitude: -122.27,
       distanceM: 1200
     };
-    const reading = (summary) => ({
-      location: station,
-      summary: {
-        level: "Moderate",
-        workoutType: "outdoor",
-        guidance: "Guidance text.",
-        primaryPollutant: "PM2.5",
-        pm25: 12,
-        ...summary
-      },
-      pollutants: []
-    });
+    /** @param {object} summary */
+    const reading = (summary) =>
+      /** @type {SummaryViewProps["airQualityData"]} */ (
+        /** @type {unknown} */ ({
+          location: station,
+          summary: {
+            level: "Moderate",
+            workoutType: "outdoor",
+            guidance: "Guidance text.",
+            primaryPollutant: "PM2.5",
+            pm25: 12,
+            ...summary
+          },
+          pollutants: []
+        })
+      );
     // The line under the guidance: pollutant, reading and any AQI.
+    /** @param {HTMLElement} container */
     const aqiLine = (container) =>
       Array.from(container.querySelectorAll("p")).find((p) => p.textContent.includes("ug/m3"))
         ?.textContent;
@@ -481,21 +538,36 @@ describe("SummaryView", () => {
 
   describe("the weekly trend figures", () => {
     test("shows the latest logged weight when there is one", () => {
-      renderView({ weeklyTrends: { latestWeight: 181.4, weightDelta: -1.2 } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ weeklyTrends: { latestWeight: 181.4, weightDelta: -1.2 } })
+        )
+      );
       expect(screen.getByText(/181/)).toBeInTheDocument();
     });
 
     test("a zero weight is shown as logged", () => {
       // `??` again: a logged 0 is wrong data, but hiding it makes it look like
       // no reading instead of a bad row.
-      renderView({ weeklyTrends: { latestWeight: 0 } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ weeklyTrends: { latestWeight: 0 } })
+        )
+      );
 
       expect(latestWeightStat()).toHaveTextContent("0 lb");
     });
 
     // It used to show the target in its place, and "0 lb" with neither.
     test("shows no weight, rather than the target or 0 lb, with none logged", () => {
-      renderView({ weeklyTrends: {}, weightProgress: { state: "progress", target: 175 } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            weeklyTrends: {},
+            weightProgress: { state: "progress", target: 175 }
+          })
+        )
+      );
 
       expect(latestWeightStat()).toHaveTextContent("--");
       expect(latestWeightStat()).not.toHaveTextContent("lb");
@@ -503,6 +575,11 @@ describe("SummaryView", () => {
   });
 
   describe("this week's plan", () => {
+    /**
+     * @param {string} key
+     * @param {string} label
+     * @param {string} state
+     */
     const day = (key, label, state) => ({ key, label, date: "", state });
     const planWeek = {
       planned: 3,
@@ -518,7 +595,8 @@ describe("SummaryView", () => {
         day("Sunday", "Sun", "rest")
       ]
     };
-    const planBlock = () => screen.getByText(/planned days done/).closest(".progress-block");
+    const planBlock = () =>
+      /** @type {HTMLElement} */ (screen.getByText(/planned days done/).closest(".progress-block"));
 
     test("counts the planned days done and missed", () => {
       renderView({ planWeek });
@@ -564,9 +642,14 @@ describe("SummaryView", () => {
 
     // Roadmap B4: the week's progression says when this is a deload week.
     test("adds the deload week when one is due and not trained normally", () => {
-      const planLine = () => planBlock().querySelector(".progress-label").textContent;
+      const planLine = () =>
+        /** @type {Element} */ (planBlock().querySelector(".progress-label")).textContent;
 
-      renderView({ planWeek, deloadWeek: { active: true, decision: null } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ planWeek, deloadWeek: { active: true, decision: null } })
+        )
+      );
       expect(planLine()).toBe("This week's plan: 1 of 3 planned days done, 1 missed, deload week.");
     });
 
@@ -575,7 +658,9 @@ describe("SummaryView", () => {
       ["a deload week trained normally", { active: true, decision: "normal" }],
       ["no week read", null]
     ])("leaves it out for %s", (_label, deloadWeek) => {
-      renderView({ planWeek, deloadWeek });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ planWeek, deloadWeek }))
+      );
 
       expect(planBlock()).toHaveTextContent("1 of 3 planned days done, 1 missed.");
       expect(planBlock()).not.toHaveTextContent("deload");
@@ -583,7 +668,8 @@ describe("SummaryView", () => {
   });
 
   describe("the target weight", () => {
-    const targetBlock = () => screen.getByText(/^Target weight/).closest(".progress-block");
+    const targetBlock = () =>
+      /** @type {HTMLElement} */ (screen.getByText(/^Target weight/).closest(".progress-block"));
     const bar = () => targetBlock().querySelector(".progress-bar span");
 
     test("asks for one when none is saved, and opens the goals view", () => {
@@ -637,14 +723,18 @@ describe("SummaryView", () => {
     };
 
     test("opens on the week", () => {
-      renderView({ trendRanges: ranges });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ trendRanges: ranges }))
+      );
 
       expect(screen.getByText("Last 7 days of trend data.")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
     });
 
     test("switching to the month swaps the figures and the copy", () => {
-      renderView({ trendRanges: ranges });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ trendRanges: ranges }))
+      );
 
       fireEvent.click(screen.getByText("Month"));
 
@@ -654,7 +744,9 @@ describe("SummaryView", () => {
     });
 
     test("switching back returns to the week", () => {
-      renderView({ trendRanges: ranges });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ trendRanges: ranges }))
+      );
 
       fireEvent.click(screen.getByText("Month"));
       fireEvent.click(screen.getByText("Week"));
@@ -663,14 +755,20 @@ describe("SummaryView", () => {
     });
 
     test("the active range is marked", () => {
-      renderView({ trendRanges: ranges });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ trendRanges: ranges }))
+      );
 
       expect(screen.getByText("Week")).toHaveClass("active");
       expect(screen.getByText("Month")).not.toHaveClass("active");
     });
 
     test("a range with no data falls back to the week rather than blanking", () => {
-      renderView({ trendRanges: { week: ranges.week } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ trendRanges: { week: ranges.week } })
+        )
+      );
 
       fireEvent.click(screen.getByText("Month"));
 
@@ -679,7 +777,9 @@ describe("SummaryView", () => {
     });
 
     test("no ranges at all still renders zeroes rather than NaN", () => {
-      renderView({ trendRanges: {} });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (/** @type {unknown} */ ({ trendRanges: {} }))
+      );
 
       expect(document.body.textContent).not.toMatch(/NaN/);
     });
@@ -687,30 +787,56 @@ describe("SummaryView", () => {
 
   describe("the planner overview", () => {
     test("lists the chosen equipment", () => {
-      renderView({ form: { environment: "Home", equipment: ["Dumbbells", "Bands"], focuses: [] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            form: { environment: "Home", equipment: ["Dumbbells", "Bands"], focuses: [] }
+          })
+        )
+      );
       expect(screen.getByText("Dumbbells, Bands")).toBeInTheDocument();
     });
 
     test("says so when nothing is chosen at home", () => {
-      renderView({ form: { environment: "Home", equipment: [], focuses: [] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ form: { environment: "Home", equipment: [], focuses: [] } })
+        )
+      );
       expect(screen.getByText("No equipment selected yet.")).toBeInTheDocument();
     });
 
     test("a commercial gym is asked about rooms rather than equipment", () => {
       // The same card serves both, and "no equipment" reads as broken to
       // someone who has a whole gym.
-      renderView({ form: { environment: "Commercial", equipment: [], focuses: [] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            form: { environment: "Commercial", equipment: [], focuses: [] }
+          })
+        )
+      );
 
       expect(screen.getByText("No rooms or operations selected yet.")).toBeInTheDocument();
     });
 
     test("lists the chosen focuses", () => {
-      renderView({ form: { environment: "Home", equipment: [], focuses: ["Strength", "Core"] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            form: { environment: "Home", equipment: [], focuses: ["Strength", "Core"] }
+          })
+        )
+      );
       expect(screen.getByText("Strength, Core")).toBeInTheDocument();
     });
 
     test("prompts for a focus when none are chosen", () => {
-      renderView({ form: { environment: "Home", equipment: [], focuses: [] } });
+      renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({ form: { environment: "Home", equipment: [], focuses: [] } })
+        )
+      );
       expect(screen.getByText("Pick a focus")).toBeInTheDocument();
     });
   });
@@ -719,30 +845,42 @@ describe("SummaryView", () => {
     test("shows the focus beside the date when there is one", () => {
       // Driven by `workouts`, not `last7Workouts` -- the latter feeds the
       // weekly progress figures rather than this list.
-      const { container } = renderView({
-        workouts: [{ id: "1", date: "2026-09-01", focus: "Legs", duration: 45 }]
-      });
+      const { container } = renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            workouts: [{ id: "1", date: "2026-09-01", focus: "Legs", duration: 45 }]
+          })
+        )
+      );
 
       expect(container.textContent).toContain("- Legs");
     });
 
     test("omits it when there is none", () => {
-      const { container } = renderView({
-        workouts: [{ id: "1", date: "2026-09-01", duration: 45 }]
-      });
+      const { container } = renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            workouts: [{ id: "1", date: "2026-09-01", duration: 45 }]
+          })
+        )
+      );
 
       expect(container.textContent).toContain("2026-09-01");
       expect(container.textContent).not.toContain("- undefined");
     });
 
     test("shows at most four", () => {
-      const { container } = renderView({
-        workouts: Array.from({ length: 6 }, (_, i) => ({
-          id: String(i),
-          date: `2026-09-0${i + 1}`,
-          duration: 45
-        }))
-      });
+      const { container } = renderView(
+        /** @type {Partial<SummaryViewProps>} */ (
+          /** @type {unknown} */ ({
+            workouts: Array.from({ length: 6 }, (_, i) => ({
+              id: String(i),
+              date: `2026-09-0${i + 1}`,
+              duration: 45
+            }))
+          })
+        )
+      );
 
       expect(container.querySelectorAll(".summary-list-row")).toHaveLength(4);
     });
