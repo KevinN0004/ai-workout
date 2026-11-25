@@ -1,3 +1,4 @@
+// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import PreviewStage from "../PreviewStage";
@@ -13,10 +14,25 @@ import { PREVIEW_TOC_SWITCH_MS } from "../constants";
 // `scrollToChapter` and the state setters that only the flow hook would
 // normally call.
 
-const derived = vi.hoisted(() => ({ chapters: null }));
-const flow = vi.hoisted(() => ({ args: null, clear: null }));
-const particles = vi.hoisted(() => ({ args: null, clear: null }));
-const outline = vi.hoisted(() => ({ args: null }));
+// Each holder keeps what its stub was last given, and beforeEach fills or
+// empties it before each test, so each is typed once and its resets are cast.
+// The profile holds no fields, and the card a test reads is rendered by then.
+/** @typedef {Parameters<typeof PreviewStage>[0]} PreviewStageProps */
+/** @typedef {{ args: Parameters<typeof import("../hooks/usePreviewChapterFlow.js").default>[0], clear: import("vitest").Mock }} FlowHolder */
+/** @typedef {{ args: Parameters<typeof import("../hooks/usePreviewWeekParticleAnimation.js").default>[0], clear: import("vitest").Mock }} ParticlesHolder */
+/** @typedef {{ args: Parameters<typeof import("../hooks/usePreviewWeekOutline.js").default>[0] }} OutlineHolder */
+const derived = vi.hoisted(
+  () => /** @type {{ chapters: typeof CHAPTERS }} */ (/** @type {unknown} */ ({ chapters: null }))
+);
+const flow = vi.hoisted(
+  () => /** @type {FlowHolder} */ (/** @type {unknown} */ ({ args: null, clear: null }))
+);
+const particles = vi.hoisted(
+  () => /** @type {ParticlesHolder} */ (/** @type {unknown} */ ({ args: null, clear: null }))
+);
+const outline = vi.hoisted(
+  () => /** @type {OutlineHolder} */ (/** @type {unknown} */ ({ args: null }))
+);
 
 vi.mock("../components/PreviewPersonalChapter", () => ({
   default: (props) => (
@@ -96,10 +112,11 @@ vi.mock("../hooks/usePreviewDerivedData", () => ({
   }
 }));
 
+/** @param {Partial<PreviewStageProps>} [props] */
 const renderPreview = (props = {}) =>
   render(
     <PreviewStage
-      personal={{}}
+      personal={/** @type {PreviewStageProps["personal"]} */ (/** @type {unknown} */ ({}))}
       form={{}}
       heightUnit="cm"
       weightUnit="kg"
@@ -111,19 +128,21 @@ const renderPreview = (props = {}) =>
     />
   );
 
-const card = () => document.querySelector(".preview-step-card");
+const card = () => /** @type {HTMLElement} */ (document.querySelector(".preview-step-card"));
 const chips = () => screen.getAllByRole("tab");
 // Drives the navigation the flow hook would normally drive, with an index the
 // table of contents cannot produce.
+/** @param {number} index */
 const jumpTo = (index) => act(() => flow.args.scrollToChapter(index));
 
+/** @type {import("vitest").Mock} */
 let scrollIntoView;
 
 beforeEach(() => {
   derived.chapters = CHAPTERS;
-  flow.args = null;
-  particles.args = null;
-  outline.args = null;
+  flow.args = /** @type {FlowHolder["args"]} */ (/** @type {unknown} */ (null));
+  particles.args = /** @type {ParticlesHolder["args"]} */ (/** @type {unknown} */ (null));
+  outline.args = /** @type {OutlineHolder["args"]} */ (/** @type {unknown} */ (null));
   flow.clear = vi.fn();
   particles.clear = vi.fn();
   scrollIntoView = vi.fn();
@@ -311,6 +330,7 @@ describe("PreviewStage", () => {
     test("puts preview-smooth-scroll on <html> before it scrolls", () => {
       // That class's rules decide how the scroll moves, so it must be there
       // when the scroll starts.
+      /** @type {boolean | null} */
       let classOnScroll = null;
       scrollIntoView.mockImplementation(() => {
         classOnScroll = document.documentElement.classList.contains("preview-smooth-scroll");

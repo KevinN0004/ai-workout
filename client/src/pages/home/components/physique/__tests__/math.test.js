@@ -1,5 +1,9 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { clamp, interpolateBandWidth, mirrorX, toFiniteNumber } from "../math";
+
+// Input the helpers must survive, an absent fallback or a band list that is not
+// a list, is cast through unknown.
 
 describe("clamp", () => {
   test("returns the value untouched when it sits inside the range", () => {
@@ -69,7 +73,12 @@ describe("toFiniteNumber", () => {
   });
 
   test("returns the fallback unchanged when it is undefined", () => {
-    expect(toFiniteNumber("nope", undefined)).toBeUndefined();
+    expect(
+      toFiniteNumber(
+        "nope",
+        /** @type {Parameters<typeof toFiniteNumber>[1]} */ (/** @type {unknown} */ (undefined))
+      )
+    ).toBeUndefined();
   });
 });
 
@@ -81,9 +90,23 @@ describe("interpolateBandWidth", () => {
   ];
 
   test("returns 0 for missing or empty band lists", () => {
-    expect(interpolateBandWidth(undefined, 50)).toBe(0);
+    expect(
+      interpolateBandWidth(
+        /** @type {Parameters<typeof interpolateBandWidth>[0]} */ (
+          /** @type {unknown} */ (undefined)
+        ),
+        50
+      )
+    ).toBe(0);
     expect(interpolateBandWidth([], 50)).toBe(0);
-    expect(interpolateBandWidth("not-an-array", 50)).toBe(0);
+    expect(
+      interpolateBandWidth(
+        /** @type {Parameters<typeof interpolateBandWidth>[0]} */ (
+          /** @type {unknown} */ ("not-an-array")
+        ),
+        50
+      )
+    ).toBe(0);
   });
 
   test("clamps to the first band above the top of the range", () => {

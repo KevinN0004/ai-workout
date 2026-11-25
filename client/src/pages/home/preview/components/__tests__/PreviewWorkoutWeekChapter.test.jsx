@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PreviewWorkoutWeekChapter from "../PreviewWorkoutWeekChapter";
@@ -9,6 +10,13 @@ import { PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../../constants";
 // through. The typed text arrives from injected getters, so this asserts what
 // the component asks for and what it does with the answer, not the typing.
 
+// The offsets here are numbers, where the outline hook writes percent strings
+// ("12.000%"); the chapter places a line at each either way, so they are cast.
+// The typing stubs hand back the text they are given, which the chapter only
+// passes as a string. Each element a test reads is rendered by then.
+/** @typedef {Parameters<typeof PreviewWorkoutWeekChapter>[0]} ChapterProps */
+
+/** @param {object} [overrides] */
 const day = (overrides = {}) => ({
   day: "Monday",
   session: "Upper Strength",
@@ -19,23 +27,32 @@ const day = (overrides = {}) => ({
   ...overrides
 });
 
+/** @param {Partial<ChapterProps>} [props] */
 const renderChapter = (props = {}) =>
   render(
     <PreviewWorkoutWeekChapter
-      previewWeekLineOffsets={{ horizontal: [0, 40, 80], vertical: [0, 60, 120] }}
+      previewWeekLineOffsets={
+        /** @type {ChapterProps["previewWeekLineOffsets"]} */ (
+          /** @type {unknown} */ ({ horizontal: [0, 40, 80], vertical: [0, 60, 120] })
+        )
+      }
       previewWeekStage={6}
       previewWeekTypingProgress={1}
       previewWeekPlan={[day()]}
       previewWeekTableWrapRef={{ current: null }}
       previewWeekParticleLayerRef={{ current: null }}
-      getPreviewWeekHeaderTypedText={(text) => text}
-      getPreviewWeekTypedText={(text) => text}
+      getPreviewWeekHeaderTypedText={(text) => /** @type {string} */ (text)}
+      getPreviewWeekTypedText={(text) => /** @type {string} */ (text)}
       {...props}
     />
   );
 
 const root = () => screen.getByLabelText("Generated weekly workout preview");
 
+/**
+ * @param {number} stage
+ * @param {Partial<ChapterProps>} [extra]
+ */
 const classesAt = (stage, extra = {}) => {
   const { unmount } = renderChapter({ previewWeekStage: stage, ...extra });
   const className = root().className;
@@ -117,8 +134,14 @@ describe("PreviewWorkoutWeekChapter", () => {
     });
 
     test("a single line is both edges at once", () => {
-      renderChapter({ previewWeekLineOffsets: { horizontal: [0], vertical: [0] } });
-      const only = document.querySelector(".preview-week-outline-line.horizontal");
+      renderChapter(
+        /** @type {Partial<ChapterProps>} */ (
+          /** @type {unknown} */ ({ previewWeekLineOffsets: { horizontal: [0], vertical: [0] } })
+        )
+      );
+      const only = /** @type {HTMLElement} */ (
+        document.querySelector(".preview-week-outline-line.horizontal")
+      );
 
       expect(only.className).toContain("is-top-edge");
       expect(only.className).toContain("is-bottom-edge");
@@ -193,7 +216,9 @@ describe("PreviewWorkoutWeekChapter", () => {
 
     test("lists every highlight the day carries", () => {
       renderChapter();
-      const cell = document.querySelector(".preview-week-highlights-cell");
+      const cell = /** @type {HTMLElement} */ (
+        document.querySelector(".preview-week-highlights-cell")
+      );
 
       expect(within(cell).getByText("Strength emphasis")).toBeInTheDocument();
       expect(within(cell).getByText("Main lift")).toBeInTheDocument();
@@ -248,14 +273,16 @@ describe("PreviewWorkoutWeekChapter", () => {
     // zero height, and the whole table jumps as the typing fills it in.
     test("an untyped cell holds its height with a non-breaking space", () => {
       renderChapter({ getPreviewWeekTypedText: () => "" });
-      const cell = document.querySelector("td.preview-week-day-cell p");
+      const cell = /** @type {HTMLElement} */ (
+        document.querySelector("td.preview-week-day-cell p")
+      );
 
       expect(cell.textContent).toBe(" ");
     });
 
     test("an untyped row label does too", () => {
       renderChapter({ getPreviewWeekHeaderTypedText: () => "" });
-      const label = document.querySelector(".preview-week-row-label");
+      const label = /** @type {HTMLElement} */ (document.querySelector(".preview-week-row-label"));
 
       expect(label.textContent).toBe(" ");
     });
@@ -272,7 +299,9 @@ describe("PreviewWorkoutWeekChapter", () => {
 
     test("a typed highlight is marked typed", () => {
       renderChapter();
-      const item = document.querySelector(".preview-week-highlights li");
+      const item = /** @type {HTMLElement} */ (
+        document.querySelector(".preview-week-highlights li")
+      );
 
       expect(item.className).toBe("is-typed");
     });

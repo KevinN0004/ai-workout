@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import usePreviewWeekParticleAnimation from "../usePreviewWeekParticleAnimation";
@@ -21,10 +22,18 @@ import {
 // a given area produces, which content is picked up, and what happens when the
 // timeline reports it has finished.
 
-const timelines = vi.hoisted(() => ({ options: [] }));
+// The timelines the hook creates are recorded, and a test ends one through its
+// onComplete. The hook's input holds setup's elements and mocks, so it is cast
+// once; a target or player that has gone away is cast through unknown. A table,
+// layer or cell a test reads exists by then, so each is cast to the element.
+/** @typedef {{ left?: number, top?: number, width?: number, height?: number }} Rect */
+/** @typedef {Parameters<typeof usePreviewWeekParticleAnimation>[0]} AnimationInput */
+const timelines = vi.hoisted(
+  () => /** @type {{ options: Array<{ onComplete: () => void }> }} */ ({ options: [] })
+);
 
 vi.mock("animejs", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = /** @type {typeof import("animejs")} */ (await importOriginal());
   return {
     ...actual,
     createTimeline: (options) => {
@@ -34,6 +43,7 @@ vi.mock("animejs", async (importOriginal) => {
   };
 });
 
+/** @param {Rect} rect */
 const rectOf =
   ({ left = 0, top = 0, width = 100, height = 40 }) =>
   () => ({
@@ -48,6 +58,7 @@ const rectOf =
     toJSON: () => ({})
   });
 
+/** @param {boolean} reduced */
 const stubMatchMedia = (reduced) => {
   vi.stubGlobal(
     "matchMedia",
@@ -65,6 +76,7 @@ const stubMatchMedia = (reduced) => {
 
 // A wrap containing a table, with a rect on every element the hook measures.
 // `cells` is a list of {tag, rect} describing what the table holds.
+/** @param {{ wrapRect?: Rect, cells?: Array<{ tag: string, rect: Rect }>, withTable?: boolean }} [options] */
 const buildTable = ({
   wrapRect = { width: 800, height: 400 },
   cells = [],
@@ -96,12 +108,17 @@ const layerEl = () => {
   return layer;
 };
 
+/**
+ * @param {string} tag
+ * @param {Rect} rect
+ */
 const cell = (tag, rect) => ({ tag, rect });
 
 // One 100x40 cell is 4000px2 of area; at 1500px2 per particle that rounds to 3,
 // which the min count lifts to 4.
 const DEFAULT_CELLS = [cell("td", { left: 0, top: 0, width: 100, height: 40 })];
 
+/** @param {{ chapter?: string, stage?: number, cells?: Array<{ tag: string, rect: Rect }>, wrapRect?: Rect, withTable?: boolean, withWrap?: boolean, withLayer?: boolean, dashboardPreviewChapterIndex?: number, workoutWeekChapterIndex?: number, stepIndex?: number }} [options] */
 const setup = ({
   chapter = "workout-week",
   stage = 6,
@@ -117,18 +134,21 @@ const setup = ({
   const wrap = withWrap ? buildTable({ wrapRect, cells, withTable }) : null;
   const layer = withLayer ? layerEl() : null;
 
-  const props = {
-    previewWeekTableWrapRef: { current: wrap },
-    previewWeekParticleLayerRef: { current: layer },
-    previewWeekParticlePlayersRef: { current: [] },
-    previewWeekParticleTargetsRef: { current: [] },
-    previewFillTimeoutsRef: { current: [] },
-    dashboardPreviewChapterIndex,
-    workoutWeekChapterIndex,
-    previewStepIndexRef: { current: stepIndex },
-    scrollToChapter: vi.fn(),
-    setPreviewWeekStage: vi.fn()
-  };
+  const props =
+    /** @type {Omit<AnimationInput, "activePreviewChapterId" | "previewWeekStage" | "setPreviewWeekStage"> & { setPreviewWeekStage: import("vitest").Mock }} */ (
+      /** @type {unknown} */ ({
+        previewWeekTableWrapRef: { current: wrap },
+        previewWeekParticleLayerRef: { current: layer },
+        previewWeekParticlePlayersRef: { current: [] },
+        previewWeekParticleTargetsRef: { current: [] },
+        previewFillTimeoutsRef: { current: [] },
+        dashboardPreviewChapterIndex,
+        workoutWeekChapterIndex,
+        previewStepIndexRef: { current: stepIndex },
+        scrollToChapter: vi.fn(),
+        setPreviewWeekStage: vi.fn()
+      })
+    );
 
   const view = renderHook(
     ({ activePreviewChapterId, previewWeekStage }) =>
@@ -139,8 +159,16 @@ const setup = ({
   return { ...view, props, wrap, layer };
 };
 
-const particlesIn = (layer) => layer.querySelectorAll(".preview-week-particle");
-const chunksIn = (layer) => layer.querySelectorAll(".preview-week-chunk");
+/** @param {HTMLElement | null} layer */
+const particlesIn = (layer) =>
+  /** @type {NodeListOf<HTMLElement>} */ (
+    /** @type {HTMLElement} */ (layer).querySelectorAll(".preview-week-particle")
+  );
+/** @param {HTMLElement | null} layer */
+const chunksIn = (layer) =>
+  /** @type {NodeListOf<HTMLElement>} */ (
+    /** @type {HTMLElement} */ (layer).querySelectorAll(".preview-week-chunk")
+  );
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -309,7 +337,7 @@ describe("usePreviewWeekParticleAnimation", () => {
       // The fallbacks are for the transparent cells. A cell that is actually
       // painted has to break into chunks of its own colour.
       const wrap = buildTable({ cells: [cell("td", { width: 100, height: 40 })] });
-      const td = wrap.querySelector("td");
+      const td = /** @type {HTMLElement} */ (wrap.querySelector("td"));
       td.style.backgroundColor = "rgb(10, 20, 30)";
       td.style.borderTopColor = "rgb(40, 50, 60)";
       document.body.appendChild(wrap);
@@ -346,7 +374,10 @@ describe("usePreviewWeekParticleAnimation", () => {
     ])("a random draw of %s shapes the debris", (draw, radius, borderStyle) => {
       // Both the particle shape and whether a chunk carries a border are coin
       // flips. Pinning the draw is the only way either side is ever seen.
-      Math.random.mockReturnValue(draw);
+      // beforeEach spies on Math.random.
+      /** @type {import("vitest").Mock} */ (/** @type {unknown} */ (Math.random)).mockReturnValue(
+        draw
+      );
       const { layer } = setup();
 
       expect(particlesIn(layer)[0].style.borderRadius).toBe(radius);
@@ -369,13 +400,16 @@ describe("usePreviewWeekParticleAnimation", () => {
   });
 
   describe("when the dissolve finishes", () => {
-    const complete = () => act(() => timelines.options.at(-1).onComplete());
+    const complete = () =>
+      act(() => /** @type {{ onComplete: () => void }} */ (timelines.options.at(-1)).onComplete());
 
     test("moves the week on to the final stage", () => {
       const { props } = setup();
       complete();
 
-      const [updater] = props.setPreviewWeekStage.mock.calls.at(-1);
+      const [updater] = /** @type {[(stage: number) => number]} */ (
+        /** @type {unknown} */ (props.setPreviewWeekStage.mock.calls.at(-1))
+      );
       expect(updater(6)).toBe(7);
     });
 
@@ -384,7 +418,9 @@ describe("usePreviewWeekParticleAnimation", () => {
       const { props } = setup();
       complete();
 
-      const [updater] = props.setPreviewWeekStage.mock.calls.at(-1);
+      const [updater] = /** @type {[(stage: number) => number]} */ (
+        /** @type {unknown} */ (props.setPreviewWeekStage.mock.calls.at(-1))
+      );
       expect(updater(9)).toBe(9);
     });
 
@@ -455,7 +491,7 @@ describe("usePreviewWeekParticleAnimation", () => {
       // The cells are the real table, not copies. Leaving willChange and a
       // clip-path on them would keep the table hidden after the animation.
       const { wrap, rerender } = setup();
-      const td = wrap.querySelector("td");
+      const td = /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (wrap).querySelector("td"));
       expect(td.style.willChange).not.toBe("");
 
       rerender({ activePreviewChapterId: "dashboard-preview", previewWeekStage: 0 });
@@ -489,14 +525,20 @@ describe("usePreviewWeekParticleAnimation", () => {
     test("tolerates a target that has gone away", () => {
       // The table can unmount between the animation starting and the cleanup.
       const { result, props } = setup();
-      props.previewWeekParticleTargetsRef.current = [null, undefined];
+      props.previewWeekParticleTargetsRef.current =
+        /** @type {AnimationInput["previewWeekParticleTargetsRef"]["current"]} */ (
+          /** @type {unknown} */ ([null, undefined])
+        );
 
       expect(() => act(() => result.current.clearPreviewWeekParticleAnimation())).not.toThrow();
     });
 
     test("tolerates a player with no cancel", () => {
       const { result, props } = setup();
-      props.previewWeekParticlePlayersRef.current = [null, {}];
+      props.previewWeekParticlePlayersRef.current =
+        /** @type {AnimationInput["previewWeekParticlePlayersRef"]["current"]} */ (
+          /** @type {unknown} */ ([null, {}])
+        );
 
       expect(() => act(() => result.current.clearPreviewWeekParticleAnimation())).not.toThrow();
     });
@@ -514,7 +556,7 @@ describe("usePreviewWeekParticleAnimation", () => {
 
       act(() => result.current.clearPreviewWeekParticleAnimation());
 
-      expect(layer.children).toHaveLength(0);
+      expect(/** @type {HTMLElement} */ (layer).children).toHaveLength(0);
     });
   });
 });

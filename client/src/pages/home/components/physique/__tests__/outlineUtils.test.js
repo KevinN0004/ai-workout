@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   buildSmoothClosedPath,
@@ -5,6 +6,13 @@ import {
   simplifyPerimeterByImportance
 } from "../outlineUtils";
 
+// Input that is not a point list, which each function must survive, is cast
+// through unknown.
+
+/**
+ * @param {number} count
+ * @param {number} [step]
+ */
 const straightLine = (count, step = 5) =>
   Array.from({ length: count }, (_, index) => ({
     id: `p-${index}`,
@@ -12,6 +20,7 @@ const straightLine = (count, step = 5) =>
     y: 100
   }));
 
+/** @param {string} path */
 const countSegments = (path) => (path.match(/ C /g) || []).length;
 
 describe("selectImportantSegmentPoints", () => {
@@ -22,8 +31,20 @@ describe("selectImportantSegmentPoints", () => {
   });
 
   test("returns an empty array for non-array input", () => {
-    expect(selectImportantSegmentPoints(undefined)).toEqual([]);
-    expect(selectImportantSegmentPoints("nope")).toEqual([]);
+    expect(
+      selectImportantSegmentPoints(
+        /** @type {Parameters<typeof selectImportantSegmentPoints>[0]} */ (
+          /** @type {unknown} */ (undefined)
+        )
+      )
+    ).toEqual([]);
+    expect(
+      selectImportantSegmentPoints(
+        /** @type {Parameters<typeof selectImportantSegmentPoints>[0]} */ (
+          /** @type {unknown} */ ("nope")
+        )
+      )
+    ).toEqual([]);
   });
 
   test("always keeps the first and last point", () => {
@@ -75,7 +96,13 @@ describe("simplifyPerimeterByImportance", () => {
   });
 
   test("returns an empty array for non-array input", () => {
-    expect(simplifyPerimeterByImportance(null)).toEqual([]);
+    expect(
+      simplifyPerimeterByImportance(
+        /** @type {Parameters<typeof simplifyPerimeterByImportance>[0]} */ (
+          /** @type {unknown} */ (null)
+        )
+      )
+    ).toEqual([]);
   });
 
   test("reduces a dense straight run and keeps the endpoints", () => {
@@ -98,7 +125,13 @@ describe("simplifyPerimeterByImportance", () => {
 describe("buildSmoothClosedPath", () => {
   test("returns an empty string for missing or empty input", () => {
     expect(buildSmoothClosedPath([])).toBe("");
-    expect(buildSmoothClosedPath(undefined)).toBe("");
+    expect(
+      buildSmoothClosedPath(
+        /** @type {Parameters<typeof buildSmoothClosedPath>[0]} */ (
+          /** @type {unknown} */ (undefined)
+        )
+      )
+    ).toBe("");
   });
 
   test("emits a degenerate closed path for one point", () => {

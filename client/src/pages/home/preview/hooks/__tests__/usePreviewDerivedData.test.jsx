@@ -1,3 +1,4 @@
+// @ts-check
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import usePreviewDerivedData from "../usePreviewDerivedData";
@@ -12,22 +13,30 @@ import {
 // from the profile the visitor has typed so far, which is testable directly;
 // the animation-progress arguments only select which slice of text is shown.
 
+// The profile and form a test gives hold only the fields it sets, so each
+// input to the hook is cast to its input type. A day a test finds is there,
+// and so are the targets the hook captures, so both lookups are cast.
+/** @param {object} [overrides] */
 const render = (overrides = {}) =>
   renderHook(() =>
-    usePreviewDerivedData({
-      personal: {},
-      form: {},
-      weightUnit: "kg",
-      toFeetInchesFromCm,
-      toLb,
-      resolvedHeightCm: null,
-      resolvedWeightKg: null,
-      previewStepIndex: 0,
-      previewWeekStage: 0,
-      previewWeekHeaderTypingProgress: 0,
-      previewWeekTypingProgress: 0,
-      ...overrides
-    })
+    usePreviewDerivedData(
+      /** @type {Parameters<typeof usePreviewDerivedData>[0]} */ (
+        /** @type {unknown} */ ({
+          personal: {},
+          form: {},
+          weightUnit: "kg",
+          toFeetInchesFromCm,
+          toLb,
+          resolvedHeightCm: null,
+          resolvedWeightKg: null,
+          previewStepIndex: 0,
+          previewWeekStage: 0,
+          previewWeekHeaderTypingProgress: 0,
+          previewWeekTypingProgress: 0,
+          ...overrides
+        })
+      )
+    )
   ).result.current;
 
 describe("usePreviewDerivedData", () => {
@@ -92,7 +101,9 @@ describe("usePreviewDerivedData", () => {
       const { activePreviewProfile } = render();
 
       expect(
-        Number(activePreviewProfile.heightCm) > 0 || activePreviewProfile.heightCm === ""
+        // heightCm is always a number; the test also accepts the "" of an unentered one.
+        Number(activePreviewProfile.heightCm) > 0 ||
+          /** @type {unknown} */ (activePreviewProfile.heightCm) === ""
       ).toBe(true);
       expect(activePreviewProfile).toBeTruthy();
     });
@@ -500,14 +511,18 @@ describe("usePreviewDerivedData", () => {
 
     test("the session duration and environment come from the form", () => {
       const { previewWeekPlan } = render({ form: { duration: "35", environment: "Home" } });
-      const training = previewWeekPlan.find((day) => day.isTraining);
+      const training = /** @type {(typeof previewWeekPlan)[number]} */ (
+        previewWeekPlan.find((day) => day.isTraining)
+      );
 
       expect(training.meta).toBe("35 min - Home");
     });
 
     test("a zero duration falls back rather than showing 0 min", () => {
       const { previewWeekPlan } = render({ form: { duration: "0" } });
-      const training = previewWeekPlan.find((day) => day.isTraining);
+      const training = /** @type {(typeof previewWeekPlan)[number]} */ (
+        previewWeekPlan.find((day) => day.isTraining)
+      );
 
       expect(training.meta).toBe(`${JOHN_DOE.duration} min - ${JOHN_DOE.environment}`);
     });
@@ -517,7 +532,9 @@ describe("usePreviewDerivedData", () => {
         personal: { trainingDays: ["Monday"] },
         form: { days: "1" }
       });
-      const rest = previewWeekPlan.find((day) => !day.isTraining);
+      const rest = /** @type {(typeof previewWeekPlan)[number]} */ (
+        previewWeekPlan.find((day) => !day.isTraining)
+      );
 
       expect(rest.meta).toContain("Mobility");
       expect(rest.highlights.length).toBeGreaterThan(0);
@@ -525,7 +542,9 @@ describe("usePreviewDerivedData", () => {
 
     test("the chosen focuses drive the training highlights", () => {
       const { previewWeekPlan } = render({ form: { focuses: ["Mobility"] } });
-      const training = previewWeekPlan.find((day) => day.isTraining);
+      const training = /** @type {(typeof previewWeekPlan)[number]} */ (
+        previewWeekPlan.find((day) => day.isTraining)
+      );
 
       expect(training.highlights[0]).toBe("Mobility emphasis");
     });
@@ -543,6 +562,7 @@ describe("usePreviewDerivedData", () => {
     // The label is rendered in the visitor's own units, so these pin a metric
     // locale and read kilograms. jsdom's ambient locale is en-US, which
     // reports pounds and makes every comparison against 80 meaningless.
+    /** @param {object} overrides */
     const metricTarget = (overrides) => {
       vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-GB"]);
       vi.spyOn(navigator, "language", "get").mockReturnValue("en-GB");
@@ -601,11 +621,14 @@ describe("usePreviewDerivedData", () => {
           personal: { trainingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
           form: { days: "5" }
         });
+        /** @param {string} day */
         const trainsOn = (day) => previewWeekPlan.find((plan) => plan.day === day)?.isTraining;
 
         expect(previewDashboardSummary.todayName).toBe("Friday");
         expect([trainsOn("Saturday"), trainsOn("Sunday")]).toEqual([false, false]);
-        expect(previewDashboardSummary.nextTrainingPlan.day).toBe("Monday");
+        expect(/** @type {{ day: string }} */ (previewDashboardSummary.nextTrainingPlan).day).toBe(
+          "Monday"
+        );
       });
     });
 
@@ -838,35 +861,44 @@ describe("usePreviewDerivedData", () => {
     // the visitor's edits would restart the sequence with different values.
     const { rerender, result } = renderHook(
       ({ personal }) =>
-        usePreviewDerivedData({
-          personal,
-          form: {},
-          weightUnit: "kg",
-          toFeetInchesFromCm,
-          toLb,
-          resolvedHeightCm: null,
-          resolvedWeightKg: null,
-          previewStepIndex: 0,
-          previewWeekStage: 0,
-          previewWeekHeaderTypingProgress: 0,
-          previewWeekTypingProgress: 0
-        }),
+        usePreviewDerivedData(
+          /** @type {Parameters<typeof usePreviewDerivedData>[0]} */ (
+            /** @type {unknown} */ ({
+              personal,
+              form: {},
+              weightUnit: "kg",
+              toFeetInchesFromCm,
+              toLb,
+              resolvedHeightCm: null,
+              resolvedWeightKg: null,
+              previewStepIndex: 0,
+              previewWeekStage: 0,
+              previewWeekHeaderTypingProgress: 0,
+              previewWeekTypingProgress: 0
+            })
+          )
+        ),
       { initialProps: { personal: { name: "First" } } }
     );
 
-    const captured = result.current.previewInitialTargetsRef.current;
+    const captured = /** @type {{ name?: string }} */ (
+      result.current.previewInitialTargetsRef.current
+    );
     expect(captured.name).toBe("First");
 
     rerender({ personal: { name: "Second" } });
 
     expect(result.current.previewPersonalTargets.name).toBe("Second");
     expect(result.current.previewInitialTargetsRef.current).toBe(captured);
-    expect(result.current.previewInitialTargetsRef.current.name).toBe("First");
+    expect(
+      /** @type {{ name?: string }} */ (result.current.previewInitialTargetsRef.current).name
+    ).toBe("First");
   });
 
   describe("an imperial visitor", () => {
     // usesImperialUnits is read once on mount, so the locale has to be in
     // place before the hook renders.
+    /** @param {...string} locales */
     const useLocale = (...locales) => {
       vi.spyOn(navigator, "languages", "get").mockReturnValue(locales);
       vi.spyOn(navigator, "language", "get").mockReturnValue(locales[0]);
@@ -916,6 +948,7 @@ describe("usePreviewDerivedData", () => {
     // Must be a constructible function: the hook calls `new Intl.DateTimeFormat()`,
     // and an arrow function throws there, which would silently land every one of
     // these tests in the catch below instead of the branch it names.
+    /** @param {string} locale */
     const stubIntlLocale = (locale) =>
       vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function stubbed() {
         return { resolvedOptions: () => ({ locale }) };
@@ -938,6 +971,10 @@ describe("usePreviewDerivedData", () => {
     // These pin the language list and the single language to *different*
     // regions, and stub the ambient format to a metric one, so each fallback
     // is distinguishable from the one after it.
+    /**
+     * @param {string[]} languages
+     * @param {string} language
+     */
     const stubLanguages = (languages, language) => {
       vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
       vi.spyOn(navigator, "language", "get").mockReturnValue(language);

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { PREVIEW_TYPING_MAX_MS, PREVIEW_TYPING_MIN_MS, PREVIEW_WEEK_DAY_ORDER } from "../constants";
 import {
@@ -9,6 +10,9 @@ import {
   roundTo
 } from "../utils";
 
+// Input each helper must survive, absent or of the wrong type, is cast through
+// unknown.
+
 describe("normalizePreviewTrainingDay", () => {
   test("accepts full names, short forms and odd casing", () => {
     expect(normalizePreviewTrainingDay("monday")).toBe("Monday");
@@ -19,8 +23,20 @@ describe("normalizePreviewTrainingDay", () => {
   test("returns an empty string for anything unrecognised", () => {
     expect(normalizePreviewTrainingDay("caturday")).toBe("");
     expect(normalizePreviewTrainingDay("")).toBe("");
-    expect(normalizePreviewTrainingDay(null)).toBe("");
-    expect(normalizePreviewTrainingDay(undefined)).toBe("");
+    expect(
+      normalizePreviewTrainingDay(
+        /** @type {Parameters<typeof normalizePreviewTrainingDay>[0]} */ (
+          /** @type {unknown} */ (null)
+        )
+      )
+    ).toBe("");
+    expect(
+      normalizePreviewTrainingDay(
+        /** @type {Parameters<typeof normalizePreviewTrainingDay>[0]} */ (
+          /** @type {unknown} */ (undefined)
+        )
+      )
+    ).toBe("");
   });
 });
 
@@ -58,9 +74,25 @@ describe("getPreviewTypingStepMs", () => {
   });
 
   test("treats junk input as a single character rather than dividing by zero", () => {
-    expect(Number.isFinite(getPreviewTypingStepMs("abc"))).toBe(true);
+    expect(
+      Number.isFinite(
+        getPreviewTypingStepMs(
+          /** @type {Parameters<typeof getPreviewTypingStepMs>[0]} */ (
+            /** @type {unknown} */ ("abc")
+          )
+        )
+      )
+    ).toBe(true);
     expect(Number.isFinite(getPreviewTypingStepMs(0))).toBe(true);
-    expect(Number.isFinite(getPreviewTypingStepMs(null))).toBe(true);
+    expect(
+      Number.isFinite(
+        getPreviewTypingStepMs(
+          /** @type {Parameters<typeof getPreviewTypingStepMs>[0]} */ (
+            /** @type {unknown} */ (null)
+          )
+        )
+      )
+    ).toBe(true);
   });
 });
 
@@ -98,8 +130,16 @@ describe("getPreviewWeekdayName", () => {
   });
 
   test("falls back to the first day when given something that is not a date", () => {
-    expect(getPreviewWeekdayName(null)).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
-    expect(getPreviewWeekdayName({})).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
+    expect(
+      getPreviewWeekdayName(
+        /** @type {Parameters<typeof getPreviewWeekdayName>[0]} */ (/** @type {unknown} */ (null))
+      )
+    ).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
+    expect(
+      getPreviewWeekdayName(
+        /** @type {Parameters<typeof getPreviewWeekdayName>[0]} */ (/** @type {unknown} */ ({}))
+      )
+    ).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
     expect(getPreviewWeekdayName(new Date("not a date"))).toBe(PREVIEW_WEEK_DAY_ORDER[0]);
   });
 });

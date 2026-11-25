@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH, buildPhysiqueSilhouetteGeometry } from "../geometry";
 
@@ -5,9 +6,13 @@ import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH, buildPhysiqueSilhouetteGeometry } from "
 // is truthy under vitest but its `data` bag is undefined, and the module wrote
 // to `import.meta.hot.data` without guarding it -- so merely importing the file
 // threw, and 965 lines went uncovered as a result.
+//
+// Input the builder must survive, null among it, is cast through unknown.
 
+/** @param {unknown} value */
 const finite = (value) => Number.isFinite(value);
 
+/** @param {unknown} points */
 const allPointsFinite = (points) =>
   Array.isArray(points) && points.every((point) => finite(point?.x) && finite(point?.y));
 
@@ -23,7 +28,13 @@ describe("buildPhysiqueSilhouetteGeometry", () => {
 
   test("treats null and an empty object the same as no argument", () => {
     const bare = buildPhysiqueSilhouetteGeometry();
-    expect(buildPhysiqueSilhouetteGeometry(null).outlinePath).toBe(bare.outlinePath);
+    expect(
+      buildPhysiqueSilhouetteGeometry(
+        /** @type {Parameters<typeof buildPhysiqueSilhouetteGeometry>[0]} */ (
+          /** @type {unknown} */ (null)
+        )
+      ).outlinePath
+    ).toBe(bare.outlinePath);
     expect(buildPhysiqueSilhouetteGeometry({}).outlinePath).toBe(bare.outlinePath);
   });
 

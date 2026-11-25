@@ -1,12 +1,22 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { buildPhysiquePalette } from "../palette";
 
-const fallback = { fillHue: 200, fillSaturation: 50, fillLightness: 40 };
+// The fallback holds only the three fill channels the palette reads.
+const fallback = /** @type {Parameters<typeof buildPhysiquePalette>[1]} */ ({
+  fillHue: 200,
+  fillSaturation: 50,
+  fillLightness: 40
+});
 
 // Pulls the three hsla channels out so assertions read as numbers rather than
 // as string matching against the whole colour.
+/** @param {string} value */
 const hsla = (value) => {
-  const [, h, s, l] = value.match(/hsla\(([\d.]+), ([\d.]+)%, ([\d.]+)%/).map(Number);
+  // Every token the palette emits is an hsla colour.
+  const [, h, s, l] = /** @type {RegExpMatchArray} */ (
+    value.match(/hsla\(([\d.]+), ([\d.]+)%, ([\d.]+)%/)
+  ).map(Number);
   return { h, s, l };
 };
 

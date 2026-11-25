@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import PreviewDashboardChapter from "../PreviewDashboardChapter";
@@ -7,6 +8,11 @@ import PreviewDashboardChapter from "../PreviewDashboardChapter";
 // eight-stage reveal, where a threshold off by one shows the visitor a panel
 // before the step that produces it, and the stand-ins each panel falls back to
 // when its slice of the summary is empty.
+
+// The summary's next plan holds only what the chapter shows, so the summary
+// is cast where it is given. Each heading a test names has a panel, so each
+// lookup is cast to the element it finds.
+/** @typedef {Parameters<typeof PreviewDashboardChapter>[0]} ChapterProps */
 
 const SUMMARY = {
   goalText: "Build lean strength",
@@ -54,30 +60,52 @@ const SUMMARY = {
   ]
 };
 
+/**
+ * @param {object} [overrides]
+ * @param {number} [previewDashboardStage]
+ */
 const renderChapter = (overrides = {}, previewDashboardStage = 8) =>
   render(
     <PreviewDashboardChapter
-      previewDashboardSummary={{ ...SUMMARY, ...overrides }}
+      previewDashboardSummary={
+        /** @type {ChapterProps["previewDashboardSummary"]} */ (
+          /** @type {unknown} */ ({ ...SUMMARY, ...overrides })
+        )
+      }
       previewDashboardStage={previewDashboardStage}
     />
   );
 
 // Each panel is revealed by an is-visible class on the section wrapping its
 // heading.
-const panelFor = (headingText) => screen.getByText(headingText).closest("section");
+/** @param {string} headingText */
+const panelFor = (headingText) =>
+  /** @type {HTMLElement} */ (screen.getByText(headingText).closest("section"));
+/** @param {string} headingText */
 const isVisible = (headingText) => panelFor(headingText).className.includes("is-visible");
 
 // Scoped versions, for the comparisons that render twice and so cannot use
 // document-wide queries.
+/**
+ * @param {HTMLElement} container
+ * @param {string} headingText
+ */
 const panelIn = (container, headingText) =>
-  [...container.querySelectorAll("h3, h4")]
-    .find((node) => node.textContent === headingText)
-    .closest("section");
+  /** @type {HTMLElement} */ (
+    /** @type {Element} */ (
+      [...container.querySelectorAll("h3, h4")].find((node) => node.textContent === headingText)
+    ).closest("section")
+  );
+/**
+ * @param {HTMLElement} container
+ * @param {string} headingText
+ */
 const isVisibleIn = (container, headingText) =>
   panelIn(container, headingText).className.includes("is-visible");
 
 // Heading text -> the stage that reveals it, in the order the walkthrough
 // plays them.
+/** @type {Array<[string, number]>} */
 const PANELS = [
   ["Today's training snapshot", 1],
   ["Monday recommendations", 2],
@@ -213,7 +241,9 @@ describe("PreviewDashboardChapter", () => {
       expect(within(chart).getByRole("img", { name: `${title} trend` })).toBeTruthy();
       expect(chart.querySelector(`.${lineClassName}`)).toBeTruthy();
       // A real path, not an empty attribute.
-      expect(chart.querySelector("path").getAttribute("d")).toMatch(/^M[\d.]/);
+      expect(/** @type {Element} */ (chart.querySelector("path")).getAttribute("d")).toMatch(
+        /^M[\d.]/
+      );
     });
 
     test("each chart gets a different shape, so none is drawing another's data", () => {
@@ -254,7 +284,11 @@ describe("PreviewDashboardChapter", () => {
 
     test("fills each progress bar to its own percentage", () => {
       renderChapter({ workoutProgress: 50, calorieProgress: 98 });
-      const bars = [...document.querySelectorAll(".preview-dashboard-progress span")];
+      const bars = [
+        .../** @type {NodeListOf<HTMLElement>} */ (
+          document.querySelectorAll(".preview-dashboard-progress span")
+        )
+      ];
 
       expect(bars.map((bar) => bar.style.width)).toEqual(["50%", "98%"]);
     });
