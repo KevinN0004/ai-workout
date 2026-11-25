@@ -123,13 +123,15 @@ describe("registerClientStatic", () => {
     const mounted = registerClientStatic(
       express(),
       /** @type {NonNullable<Parameters<typeof registerClientStatic>[1]>} */ (
-        /** @type {unknown} */ ({
-          express,
-          existsSync: () => false,
-          distPath: "/nowhere",
-          logger: pino({ level: "silent" }),
-          onMissing
-        })
+        /** @type {unknown} */ (
+          /** @satisfies {{ [K in keyof NonNullable<Parameters<typeof registerClientStatic>[1]>]?: unknown }} */ ({
+            express,
+            existsSync: () => false,
+            distPath: "/nowhere",
+            logger: pino({ level: "silent" }),
+            onMissing
+          })
+        )
       )
     );
 

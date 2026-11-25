@@ -39,7 +39,7 @@ const readyClient = () =>
 
 const spyStore = () => {
   const calls = [];
-  return {
+  return /** @satisfies {{ [K in keyof RedisStore]?: unknown } & { calls: unknown }} */ ({
     calls,
     init() {},
     async increment(key) {
@@ -52,7 +52,7 @@ const spyStore = () => {
     async resetKey(key) {
       calls.push(["resetKey", key]);
     }
-  };
+  });
 };
 
 describe("createRateLimitStore with a ready Redis client", () => {
@@ -73,14 +73,14 @@ describe("createRateLimitStore with a ready Redis client", () => {
 
 describe("createRateLimitStore when Redis fails mid-request", () => {
   test("keeps counting in memory instead of rejecting", async () => {
-    const failing = {
+    const failing = /** @satisfies {{ [K in keyof RedisStore]?: unknown }} */ ({
       init() {},
       async increment() {
         throw new Error("READONLY You can't write against a read only replica.");
       },
       async decrement() {},
       async resetKey() {}
-    };
+    });
     const store = createRateLimitStore({
       getClient: readyClient,
       createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (failing))
@@ -99,14 +99,14 @@ describe("createRateLimitStore when Redis fails mid-request", () => {
     const logger = pino({ level: "silent" });
     /** @type {import("vitest").MockInstance} */
     const error = vi.spyOn(logger, "error");
-    const failing = {
+    const failing = /** @satisfies {{ [K in keyof RedisStore]?: unknown }} */ ({
       init() {},
       async increment() {
         throw new Error("connection lost");
       },
       async decrement() {},
       async resetKey() {}
-    };
+    });
     const store = createRateLimitStore({
       getClient: readyClient,
       createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (failing)),

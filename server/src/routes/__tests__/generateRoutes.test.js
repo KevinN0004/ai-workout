@@ -31,7 +31,11 @@ const NOTES = "Progress one rep at a time.\nSleep well.\nWalk on rest days.";
 const generateContent = vi.fn();
 // The client holds only the call the route makes, so it is cast through unknown.
 const gemini = /** @type {import("@google/genai").GoogleGenAI} */ (
-  /** @type {unknown} */ ({ models: { generateContent } })
+  /** @type {unknown} */ (
+    /** @satisfies {{ models: { [K in keyof import("@google/genai").GoogleGenAI["models"]]?: unknown } }} */ ({
+      models: { generateContent }
+    })
+  )
 );
 
 /** @type {import("vitest").Mock} */

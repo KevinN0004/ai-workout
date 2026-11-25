@@ -37,16 +37,18 @@ const buildApp = ({ saveWorkoutSession }) => {
   registerWorkoutAndGoalRoutes(
     app,
     /** @type {Deps} */ (
-      /** @type {unknown} */ ({
-        requireAuth: (_req, _res, next) => next(),
-        validateBody,
-        workoutSessionBodySchema,
-        buildWorkoutSessionEntry,
-        saveWorkoutSession,
-        findUserWithDashboard: async () => ({ id: "u-1" }),
-        mapDbDocToUser: (doc) => doc,
-        buildDashboardResponse: async () => ({ dashboard: {} })
-      })
+      /** @type {unknown} */ (
+        /** @satisfies {{ [K in keyof Deps]?: unknown }} */ ({
+          requireAuth: (_req, _res, next) => next(),
+          validateBody,
+          workoutSessionBodySchema,
+          buildWorkoutSessionEntry,
+          saveWorkoutSession,
+          findUserWithDashboard: async () => ({ id: "u-1" }),
+          mapDbDocToUser: (doc) => doc,
+          buildDashboardResponse: async () => ({ dashboard: {} })
+        })
+      )
     )
   );
   return { app, warn };
