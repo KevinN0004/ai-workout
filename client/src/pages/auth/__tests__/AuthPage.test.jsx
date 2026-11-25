@@ -1,44 +1,51 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import AuthPage from "../AuthPage";
 
-const baseProps = {
-  gradient: {},
-  authMode: "login",
-  onAuthModeChange: vi.fn(),
-  go: vi.fn(),
-  onAuthSubmit: vi.fn((event) => event.preventDefault()),
-  authForm: { email: "user@example.com", password: "password123" },
-  onAuthChange: vi.fn(),
-  signupProfileForm: {
-    firstName: "Jordan",
-    lastName: "Lee",
-    age: "28",
-    sex: "Male",
-    heightCm: "175",
-    heightFeet: "5",
-    heightInches: "9",
-    weight: "160",
-    activity: "Moderate",
-    notes: ""
-  },
-  onSignupProfileChange: vi.fn(),
-  signupHeightUnit: "ft",
-  setSignupHeightUnit: vi.fn(),
-  signupWeightUnit: "lb",
-  setSignupWeightUnit: vi.fn(),
-  toCmFromFeetInches: vi.fn(() => "175"),
-  toFeetInchesFromCm: vi.fn(() => ({ feet: "5", inches: "9" })),
-  toKg: vi.fn(() => "73"),
-  toLb: vi.fn(() => "160"),
-  showPassword: false,
-  setShowPassword: vi.fn(),
-  authAutoSignIn: false,
-  setAuthAutoSignIn: vi.fn(),
-  authLoading: false,
-  authError: ""
-};
+// The signup form holds the fields these tests drive, without the weightKg and
+// bodyFat the app's form also carries, so the props are cast to the page's.
+// Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof AuthPage>[0]} AuthPageProps */
+const baseProps = /** @type {AuthPageProps} */ (
+  /** @type {unknown} */ ({
+    gradient: {},
+    authMode: "login",
+    onAuthModeChange: vi.fn(),
+    go: vi.fn(),
+    onAuthSubmit: vi.fn((event) => event.preventDefault()),
+    authForm: { email: "user@example.com", password: "password123" },
+    onAuthChange: vi.fn(),
+    signupProfileForm: {
+      firstName: "Jordan",
+      lastName: "Lee",
+      age: "28",
+      sex: "Male",
+      heightCm: "175",
+      heightFeet: "5",
+      heightInches: "9",
+      weight: "160",
+      activity: "Moderate",
+      notes: ""
+    },
+    onSignupProfileChange: vi.fn(),
+    signupHeightUnit: "ft",
+    setSignupHeightUnit: vi.fn(),
+    signupWeightUnit: "lb",
+    setSignupWeightUnit: vi.fn(),
+    toCmFromFeetInches: vi.fn(() => "175"),
+    toFeetInchesFromCm: vi.fn(() => ({ feet: "5", inches: "9" })),
+    toKg: vi.fn(() => "73"),
+    toLb: vi.fn(() => "160"),
+    showPassword: false,
+    setShowPassword: vi.fn(),
+    authAutoSignIn: false,
+    setAuthAutoSignIn: vi.fn(),
+    authLoading: false,
+    authError: ""
+  })
+);
 
 describe("AuthPage", () => {
   test("renders login mode and handles close/password/remember actions", async () => {
@@ -110,19 +117,27 @@ describe("AuthPage", () => {
   // carry the value across rather than reinterpret it -- 175 cm becoming "175
   // lb" is the kind of thing nothing else would catch. Every toggle reports its
   // conversion through onSignupProfileChange, so the calls are what is asserted.
+  /** @param {Partial<AuthPageProps>} [overrides] */
   const renderSignup = (overrides = {}) =>
     render(<AuthPage {...baseProps} authMode="signup" {...overrides} />);
 
+  /** @param {import("vitest").Mock} onSignupProfileChange */
   const fieldWrites = (onSignupProfileChange) =>
     onSignupProfileChange.mock.calls.map(([event]) => [event.target.name, event.target.value]);
 
   // These buttons sit inside a <label>, so their accessible name is the label's
   // text rather than their own ("Height Height units", not "ft/in"). Picked by
   // text content within their own group instead.
+  /**
+   * @param {string} group
+   * @param {string} text
+   */
   const unitButton = (group, text) =>
-    within(screen.getByRole("group", { name: group }))
-      .getAllByRole("button")
-      .find((button) => button.textContent === text);
+    /** @type {HTMLElement} */ (
+      within(screen.getByRole("group", { name: group }))
+        .getAllByRole("button")
+        .find((button) => button.textContent === text)
+    );
 
   describe("switching height units", () => {
     test("moving to feet and inches converts what was typed in centimetres", () => {
@@ -252,7 +267,7 @@ describe("AuthPage", () => {
       // The bounds are the unit's, so leaving them behind would let a visitor
       // enter 60 lb or reject a legitimate 300 lb.
       renderSignup({ signupWeightUnit });
-      const input = document.querySelector('[name="weight"]');
+      const input = /** @type {Element} */ (document.querySelector('[name="weight"]'));
 
       expect(input.getAttribute("min")).toBe(min);
       expect(input.getAttribute("max")).toBe(max);
@@ -268,14 +283,19 @@ describe("AuthPage", () => {
       render(<AuthPage {...baseProps} showPassword={showPassword} />);
       const button = screen.getByRole("button", { name: label });
 
-      expect(document.querySelector('[name="password"]').getAttribute("type")).toBe(type);
+      expect(
+        /** @type {Element} */ (document.querySelector('[name="password"]')).getAttribute("type")
+      ).toBe(type);
       expect(button.getAttribute("aria-pressed")).toBe(String(showPassword));
     });
 
     test("the two states show different icons", () => {
       const { container: hidden } = render(<AuthPage {...baseProps} showPassword={false} />);
       const { container: shown } = render(<AuthPage {...baseProps} showPassword />);
-      const iconOf = (root) => root.querySelector(".password-visibility-btn svg").innerHTML.length;
+      /** @param {HTMLElement} root */
+      const iconOf = (root) =>
+        /** @type {Element} */ (root.querySelector(".password-visibility-btn svg")).innerHTML
+          .length;
 
       expect(iconOf(hidden)).not.toBe(iconOf(shown));
     });
@@ -294,7 +314,9 @@ describe("AuthPage", () => {
         <AuthPage {...baseProps} authMode={authMode} authLoading={authLoading} />
       );
 
-      expect(container.querySelector('button[type="submit"].cta').textContent).toBe(expected);
+      expect(
+        /** @type {Element} */ (container.querySelector('button[type="submit"].cta')).textContent
+      ).toBe(expected);
     });
 
     test("is disabled only while working", () => {
@@ -306,8 +328,12 @@ describe("AuthPage", () => {
       const { container: signup } = render(<AuthPage {...baseProps} authMode="signup" />);
       const { container: login } = render(<AuthPage {...baseProps} authMode="login" />);
 
-      expect(signup.querySelector('button[type="submit"].cta').className).toContain("full");
-      expect(login.querySelector('button[type="submit"].cta').className).not.toContain("full");
+      expect(
+        /** @type {Element} */ (signup.querySelector('button[type="submit"].cta')).className
+      ).toContain("full");
+      expect(
+        /** @type {Element} */ (login.querySelector('button[type="submit"].cta')).className
+      ).not.toContain("full");
     });
   });
 
@@ -334,9 +360,12 @@ describe("AuthPage", () => {
   });
 
   describe("switching between login and signup", () => {
+    /** @param {string} text */
     const modeButton = (text) =>
-      [...document.querySelectorAll(".auth-mode-switch button, .auth-tabs button, button")].find(
-        (button) => button.textContent === text && button.getAttribute("type") === "button"
+      /** @type {Element} */ (
+        [...document.querySelectorAll(".auth-mode-switch button, .auth-tabs button, button")].find(
+          (button) => button.textContent === text && button.getAttribute("type") === "button"
+        )
       );
 
     test.each([

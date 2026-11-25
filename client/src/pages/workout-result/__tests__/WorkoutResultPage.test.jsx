@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import WorkoutResultPage from "../WorkoutResultPage";
@@ -9,8 +10,21 @@ import WorkoutResultPage from "../WorkoutResultPage";
 // (missing days, a day with no lines, ragged line counts, blank lines) is one
 // the parser can actually produce.
 
-const day = (title, lines) => ({ title, lines });
+// A day holds only its title and lines, so it is cast to the page's day, and
+// sections the page must survive (null, or days and notes that are not lists)
+// go through unknown. Each row and wrap a test reads is rendered by then, so
+// each lookup is cast to the element it finds.
+/** @typedef {Parameters<typeof WorkoutResultPage>[0]} ResultProps */
+/**
+ * @param {string} title
+ * @param {unknown} lines usually a list, but a test may give a single string
+ */
+const day = (title, lines) =>
+  /** @type {NonNullable<ResultProps["planSections"]>["days"][number]} */ (
+    /** @type {unknown} */ ({ title, lines })
+  );
 
+/** @param {Partial<Parameters<typeof WorkoutResultPage>[0]>} [props] */
 const renderPage = (props = {}) => {
   const handlers = {
     go: vi.fn(),
@@ -35,7 +49,9 @@ const showHorizontal = () => fireEvent.click(screen.getByText("Horizontal"));
 // The row a `<th scope="row">` label sits in, so a test can read that row's
 // cells. Matched by role rather than by text: the horizontal layout derives its
 // row label from the line itself, so the same string is often in the row twice.
-const rowFor = (label) => screen.getByRole("rowheader", { name: label }).closest("tr");
+/** @param {string} label */
+const rowFor = (label) =>
+  /** @type {HTMLTableRowElement} */ (screen.getByRole("rowheader", { name: label }).closest("tr"));
 
 describe("WorkoutResultPage", () => {
   describe("no generated plan", () => {
@@ -182,6 +198,7 @@ describe("WorkoutResultPage", () => {
     });
 
     describe("the row label it derives", () => {
+      /** @param {string[]} lines */
       const labelOf = (lines) => {
         renderPage({ planSections: { days: [day("Monday", lines)], notes: [] } });
         showHorizontal();
@@ -230,6 +247,10 @@ describe("WorkoutResultPage", () => {
   describe("column density", () => {
     // The wrap element carries the counts to CSS as custom properties; they are
     // what stops a twelve-exercise day rendering as one very long column.
+    /**
+     * @param {number} lineCount
+     * @param {number} [dayCount]
+     */
     const densityOf = (lineCount, dayCount = 1) => {
       const lines = Array.from({ length: lineCount }, (_, i) => `Line ${i + 1}`);
       const { container } = renderPage({
@@ -238,7 +259,7 @@ describe("WorkoutResultPage", () => {
           notes: []
         }
       });
-      const wrap = container.querySelector(".plan-result-table-wrap");
+      const wrap = /** @type {HTMLElement} */ (container.querySelector(".plan-result-table-wrap"));
       return {
         days: wrap.style.getPropertyValue("--plan-day-count"),
         cols: wrap.style.getPropertyValue("--plan-vertical-line-cols")
@@ -261,7 +282,7 @@ describe("WorkoutResultPage", () => {
 
     test("reports one day even when there are none, since zero would divide by zero in CSS", () => {
       const { container } = renderPage({ planSections: { days: [], notes: [] } });
-      const wrap = container.querySelector(".plan-result-table-wrap");
+      const wrap = /** @type {HTMLElement} */ (container.querySelector(".plan-result-table-wrap"));
       expect(wrap.style.getPropertyValue("--plan-day-count")).toBe("1");
     });
   });
@@ -280,19 +301,31 @@ describe("WorkoutResultPage", () => {
     });
 
     test("a non-array notes field is treated as none", () => {
-      renderPage({ planSections: { days: [], notes: "Hydrate" } });
+      renderPage(
+        /** @type {Partial<ResultProps>} */ (
+          /** @type {unknown} */ ({ planSections: { days: [], notes: "Hydrate" } })
+        )
+      );
       expect(screen.queryByRole("region", { name: "Coach notes" })).toBeNull();
     });
   });
 
   describe("a missing planSections", () => {
     test("null does not take the page down", () => {
-      expect(() => renderPage({ planSections: null })).not.toThrow();
+      expect(() =>
+        renderPage(
+          /** @type {Partial<ResultProps>} */ (/** @type {unknown} */ ({ planSections: null }))
+        )
+      ).not.toThrow();
       expect(screen.getByText("No structured day-by-day sections were found.")).toBeInTheDocument();
     });
 
     test("a days field that is not an array is treated as no days", () => {
-      renderPage({ planSections: { days: "Monday", notes: [] } });
+      renderPage(
+        /** @type {Partial<ResultProps>} */ (
+          /** @type {unknown} */ ({ planSections: { days: "Monday", notes: [] } })
+        )
+      );
       expect(rowFor("Plan")).toBeTruthy();
     });
   });

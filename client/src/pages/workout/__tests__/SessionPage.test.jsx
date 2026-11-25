@@ -3,6 +3,7 @@
  * pre-filled, stepped and logged with Done, Undo, moving between exercises,
  * adding one, Finish, Cancel and leaving, and the rest timer, sound and wake lock.
  */
+// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -35,8 +36,19 @@ const planned = () =>
     now: NOW
   });
 
+// Only the swap tests open a swap, so the rest give the page no apiFetch or
+// onPlanChanged; their handlers are cast to include both. The audio and device
+// fakes hold only what the page calls, and the stored flags a test reads exist.
+/** @typedef {Parameters<typeof SessionPage>[0]} SessionProps */
+/**
+ * @param {SessionProps["initialSession"]} [initialSession]
+ * @param {SessionProps["system"]} [system]
+ */
 const renderPage = (initialSession = planned(), system = "metric") => {
-  const handlers = { onFinish: vi.fn(), onDiscard: vi.fn(), onLeave: vi.fn() };
+  const handlers =
+    /** @type {Pick<SessionProps, "apiFetch" | "onPlanChanged"> & import("vitest").Mocked<Pick<SessionProps, "onFinish" | "onDiscard" | "onLeave">>} */ (
+      /** @type {unknown} */ ({ onFinish: vi.fn(), onDiscard: vi.fn(), onLeave: vi.fn() })
+    );
   render(<SessionPage user={user} initialSession={initialSession} system={system} {...handlers} />);
   return handlers;
 };
@@ -307,17 +319,22 @@ class FakeAudioContext {
 }
 
 describe("SessionPage's rest timer, sound and screen", () => {
+  /** @param {number} ms */
   const tick = (ms) =>
     act(() => {
       vi.advanceTimersByTime(ms);
     });
+  /** @param {string} name */
   const press = (name) => fireEvent.click(screen.getByRole("button", { name }));
   const liveRegion = () => document.querySelector(".session-page [aria-live='polite']");
+  /** @type {import("vitest").Mock} */
   let vibrate;
 
   beforeEach(() => {
     vi.useFakeTimers({ now: NOW });
-    window.AudioContext = FakeAudioContext;
+    window.AudioContext = /** @type {typeof AudioContext} */ (
+      /** @type {unknown} */ (FakeAudioContext)
+    );
     beeps = 0;
     vibrate = vi.fn(() => true);
     Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
@@ -325,9 +342,9 @@ describe("SessionPage's rest timer, sound and screen", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    delete window.AudioContext;
-    delete navigator.vibrate;
-    delete navigator.wakeLock;
+    delete (/** @type {{ AudioContext?: unknown }} */ (window).AudioContext);
+    delete (/** @type {{ vibrate?: unknown }} */ (navigator).vibrate);
+    delete (/** @type {{ wakeLock?: unknown }} */ (navigator).wakeLock);
   });
 
   test("Done starts the exercise's rest, and the live region says so once", () => {
@@ -410,7 +427,9 @@ describe("SessionPage's rest timer, sound and screen", () => {
 
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(beeps).toBe(0);
-    expect(JSON.parse(window.localStorage.getItem("ai-workout-session-sound-v1"))).toBe(false);
+    expect(
+      JSON.parse(/** @type {string} */ (window.localStorage.getItem("ai-workout-session-sound-v1")))
+    ).toBe(false);
   });
 
   test("Sound starts off when the device remembers it off, and turns back on", () => {
@@ -425,7 +444,9 @@ describe("SessionPage's rest timer, sound and screen", () => {
 
     expect(sound).toHaveAttribute("aria-pressed", "true");
     expect(beeps).toBe(1);
-    expect(JSON.parse(window.localStorage.getItem("ai-workout-session-sound-v1"))).toBe(true);
+    expect(
+      JSON.parse(/** @type {string} */ (window.localStorage.getItem("ai-workout-session-sound-v1")))
+    ).toBe(true);
   });
 
   test("a rest already over when the page opens shows Rest over, with no late alert", () => {
@@ -467,6 +488,10 @@ describe("SessionPage's rest timer, sound and screen", () => {
         onFinish={vi.fn()}
         onDiscard={vi.fn()}
         onLeave={vi.fn()}
+        apiFetch={/** @type {SessionProps["apiFetch"]} */ (/** @type {unknown} */ (undefined))}
+        onPlanChanged={
+          /** @type {SessionProps["onPlanChanged"]} */ (/** @type {unknown} */ (undefined))
+        }
       />
     );
     await act(async () => {});
@@ -504,14 +529,22 @@ describe("swapping an exercise on the in-gym screen", () => {
       days: [{ index: 0, weekday: "Monday", title: "Upper A", lines: [], prescriptions: [sumo] }]
     }
   };
+  /** @param {unknown} body */
   const respond = (body) => ({ ok: true, json: async () => body });
+  /** @param {unknown} answered */
   const swapFetch = (answered) =>
-    vi.fn(async (_path, options) =>
-      options?.method === "POST"
-        ? respond({ plan: answered })
-        : respond({ areas: ["knee"], alternatives: [SUMO] })
+    /** @type {import("vitest").Mock} */ (
+      vi.fn(async (_path, options) =>
+        options?.method === "POST"
+          ? respond({ plan: answered })
+          : respond({ areas: ["knee"], alternatives: [SUMO] })
+      )
     );
 
+  /**
+   * @param {SessionProps["initialSession"]} [initialSession]
+   * @param {unknown} [answered]
+   */
   const renderSwaps = (initialSession = planned(), answered = swappedPlan) => {
     const handlers = {
       onFinish: vi.fn(),

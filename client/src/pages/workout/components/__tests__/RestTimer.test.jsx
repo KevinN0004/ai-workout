@@ -2,17 +2,20 @@
  * Pins the session page's rest timer (roadmap B6): the time left as digits,
  * −15 s, +15 s and Skip rest, and "Rest over" with no buttons once it ends.
  */
+// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import RestTimer from "../RestTimer";
 
 const NOW = Date.UTC(2026, 10, 9, 17, 0, 0);
 
+/** @param {number} ms */
 const tick = (ms) =>
   act(() => {
     vi.advanceTimersByTime(ms);
   });
 
+/** @param {number} [restEndsAt] */
 const renderTimer = (restEndsAt = NOW + 90_000) => {
   const handlers = { onAdjust: vi.fn(), onSkip: vi.fn(), onEnd: vi.fn() };
   render(<RestTimer restEndsAt={restEndsAt} {...handlers} />);
