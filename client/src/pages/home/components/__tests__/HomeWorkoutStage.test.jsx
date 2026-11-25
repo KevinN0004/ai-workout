@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -20,7 +21,13 @@ const SAMPLE_PLAN = [
   { day: "Wednesday", blocks: ["Bench press 5x5"] }
 ];
 
-const renderStage = (overrides = {}) =>
+// The helper gives the stage everything but its refs, which no test needs, so
+// its own props are optional to a test and each test's props are cast to the
+// stage's. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof HomeWorkoutStage>[0]} StageProps */
+/** @typedef {Omit<StageProps, "samplePlan" | "isIntroTransitioning" | "isStageTransitioning" | "onBack" | "openPlannerFromProfile"> & Partial<Pick<StageProps, "samplePlan" | "isIntroTransitioning" | "isStageTransitioning" | "onBack" | "openPlannerFromProfile">>} RenderProps */
+/** @param {RenderProps} [overrides] */
+const renderStage = (overrides = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) =>
   render(
     <HomeWorkoutStage
       samplePlan={SAMPLE_PLAN}
@@ -38,7 +45,7 @@ const generateButton = () => screen.getByRole("button", { name: "Generate Workou
 describe("HomeWorkoutStage", () => {
   test("opens the planner when Generate Workout is clicked", () => {
     const openPlannerFromProfile = vi.fn();
-    renderStage({ openPlannerFromProfile });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ openPlannerFromProfile })));
 
     fireEvent.click(generateButton());
 
@@ -47,7 +54,7 @@ describe("HomeWorkoutStage", () => {
 
   test("calls onBack when the back arrow is clicked", () => {
     const onBack = vi.fn();
-    renderStage({ onBack });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ onBack })));
 
     fireEvent.click(backButton());
 
@@ -71,12 +78,16 @@ describe("HomeWorkoutStage", () => {
   });
 
   test("disables going back while the intro is transitioning", () => {
-    renderStage({ isIntroTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isIntroTransitioning: true }))
+    );
     expect(backButton()).toBeDisabled();
   });
 
   test("disables going back while a stage transition is running", () => {
-    renderStage({ isStageTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isStageTransitioning: true }))
+    );
     expect(backButton()).toBeDisabled();
   });
 
@@ -86,12 +97,16 @@ describe("HomeWorkoutStage", () => {
   });
 
   test("shows the error line when generation fails", () => {
-    renderStage({ error: "Gemini is unavailable." });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ error: "Gemini is unavailable." }))
+    );
     expect(screen.getByText("Gemini is unavailable.")).toHaveClass("error");
   });
 
   test("treats an empty error string as no error", () => {
-    const { container } = renderStage({ error: "" });
+    const { container } = renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ error: "" }))
+    );
     expect(container.querySelector(".error")).toBeNull();
   });
 
@@ -100,28 +115,34 @@ describe("HomeWorkoutStage", () => {
     const cards = container.querySelectorAll(".plan-card");
 
     expect(cards).toHaveLength(2);
-    expect(within(cards[0]).getByRole("heading", { name: "Monday" })).toBeInTheDocument();
     expect(
-      within(cards[0])
+      within(/** @type {HTMLElement} */ (cards[0])).getByRole("heading", { name: "Monday" })
+    ).toBeInTheDocument();
+    expect(
+      within(/** @type {HTMLElement} */ (cards[0]))
         .getAllByRole("listitem")
         .map((li) => li.textContent)
     ).toEqual(["Back squat 5x5", "Barbell row 3x8"]);
     expect(
-      within(cards[1])
+      within(/** @type {HTMLElement} */ (cards[1]))
         .getAllByRole("listitem")
         .map((li) => li.textContent)
     ).toEqual(["Bench press 5x5"]);
   });
 
   test("renders no cards for an empty plan", () => {
-    const { container } = renderStage({ samplePlan: [] });
+    const { container } = renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ samplePlan: [] }))
+    );
     expect(container.querySelectorAll(".plan-card")).toHaveLength(0);
   });
 
   test("forwards the refs the stage animation measures", () => {
     const workoutShellRef = createRef();
     const workoutPanelRef = createRef();
-    renderStage({ workoutShellRef, workoutPanelRef });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ workoutShellRef, workoutPanelRef }))
+    );
 
     expect(workoutShellRef.current).toHaveClass("workout-stage-shell");
     expect(workoutPanelRef.current).toHaveClass("workout-stage-panel");

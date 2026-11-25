@@ -1,3 +1,4 @@
+// @ts-check
 import { renderHook } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import useBodyModel from "../useBodyModel";
@@ -7,6 +8,14 @@ import useBodyModel from "../useBodyModel";
 // A stub that returned 0 would hand the hook a number where the app hands it an
 // empty string, which is exactly the difference the guard in toNumberOrNull
 // turns on -- so the stub would quietly test something the app never does.
+// The converters are the test's own and do not round, so they return numbers
+// where app/units.js's return text; the hook reads either through
+// toNumberOrNull. So each input to the hook, profile and converters together,
+// is cast to its input type.
+/**
+ * @param {unknown} feetValue
+ * @param {unknown} inchesValue
+ */
 const toCmFromFeetInches = (feetValue, inchesValue) => {
   const feet = Number(feetValue);
   const inches = Number(inchesValue);
@@ -19,6 +28,10 @@ const toCmFromFeetInches = (feetValue, inchesValue) => {
 // the string "0" is not falsy -- so an entered zero reaches the hook as a zero
 // rather than as nothing, which is the distinction the `> 0` check downstream
 // exists to make.
+/**
+ * @param {unknown} weightValue
+ * @param {string} unit
+ */
 const toKg = (weightValue, unit) => {
   if (!weightValue) return "";
   const weight = Number(weightValue);
@@ -44,21 +57,26 @@ const BASE_PERSONAL = {
   notes: ""
 };
 
+/** @param {{ personal?: object, heightUnit?: string, weightUnit?: string }} [overrides] */
 const renderBodyModel = (overrides = {}) => {
   const personal = { ...BASE_PERSONAL, ...(overrides.personal || {}) };
   const heightUnit = overrides.heightUnit || "ft";
   const weightUnit = overrides.weightUnit || "lb";
 
   return renderHook(() =>
-    useBodyModel({
-      personal,
-      heightUnit,
-      weightUnit,
-      toCmFromFeetInches,
-      toKg,
-      silhouetteViewHeight: 430,
-      silhouetteFloorInset: 18
-    })
+    useBodyModel(
+      /** @type {Parameters<typeof useBodyModel>[0]} */ (
+        /** @type {unknown} */ ({
+          personal,
+          heightUnit,
+          weightUnit,
+          toCmFromFeetInches,
+          toKg,
+          silhouetteViewHeight: 430,
+          silhouetteFloorInset: 18
+        })
+      )
+    )
   );
 };
 
@@ -74,15 +92,19 @@ describe("useBodyModel -> visualizer mapping", () => {
   test("adjusts silhouette dimensions when personal metrics change", () => {
     const { result, rerender } = renderHook(
       ({ personal }) =>
-        useBodyModel({
-          personal,
-          heightUnit: "ft",
-          weightUnit: "lb",
-          toCmFromFeetInches,
-          toKg,
-          silhouetteViewHeight: 430,
-          silhouetteFloorInset: 18
-        }),
+        useBodyModel(
+          /** @type {Parameters<typeof useBodyModel>[0]} */ (
+            /** @type {unknown} */ ({
+              personal,
+              heightUnit: "ft",
+              weightUnit: "lb",
+              toCmFromFeetInches,
+              toKg,
+              silhouetteViewHeight: 430,
+              silhouetteFloorInset: 18
+            })
+          )
+        ),
       {
         initialProps: {
           personal: { ...BASE_PERSONAL, weight: "150", heightFeet: "5", heightInches: "6" }
@@ -163,6 +185,7 @@ describe("useBodyModel -> visualizer mapping", () => {
 // exist for -- and the case CLAUDE.md records three shipped bugs from, because
 // `Number("")` and `Number(null)` are both 0 and both finite.
 describe("absent and unusable inputs", () => {
+  /** @param {{ personal?: object, heightUnit?: string, weightUnit?: string }} overrides */
   const model = (overrides) => renderBodyModel(overrides).result.current;
 
   describe("body fat", () => {
@@ -186,17 +209,21 @@ describe("absent and unusable inputs", () => {
       // The two spellings of "not given" used to disagree, which is what made
       // the old behaviour hard to see.
       const personal = { ...BASE_PERSONAL, heightFeet: "5", heightInches: "11", weight: "180" };
-      delete personal.bodyFat;
+      delete (/** @type {{ bodyFat?: string }} */ (personal).bodyFat);
       const absent = renderHook(() =>
-        useBodyModel({
-          personal,
-          heightUnit: "ft",
-          weightUnit: "lb",
-          toCmFromFeetInches,
-          toKg,
-          silhouetteViewHeight: 430,
-          silhouetteFloorInset: 18
-        })
+        useBodyModel(
+          /** @type {Parameters<typeof useBodyModel>[0]} */ (
+            /** @type {unknown} */ ({
+              personal,
+              heightUnit: "ft",
+              weightUnit: "lb",
+              toCmFromFeetInches,
+              toKg,
+              silhouetteViewHeight: 430,
+              silhouetteFloorInset: 18
+            })
+          )
+        )
       ).result.current;
       const empty = model({
         personal: { bodyFat: "", heightFeet: "5", heightInches: "11", weight: "180" }
@@ -209,17 +236,21 @@ describe("absent and unusable inputs", () => {
       // The same field as undefined rather than "" takes the other path, which
       // is what shows the coercion is the cause rather than the intent.
       const personal = { ...BASE_PERSONAL, heightFeet: "5", heightInches: "11", weight: "180" };
-      delete personal.bodyFat;
+      delete (/** @type {{ bodyFat?: string }} */ (personal).bodyFat);
       const { result } = renderHook(() =>
-        useBodyModel({
-          personal,
-          heightUnit: "ft",
-          weightUnit: "lb",
-          toCmFromFeetInches,
-          toKg,
-          silhouetteViewHeight: 430,
-          silhouetteFloorInset: 18
-        })
+        useBodyModel(
+          /** @type {Parameters<typeof useBodyModel>[0]} */ (
+            /** @type {unknown} */ ({
+              personal,
+              heightUnit: "ft",
+              weightUnit: "lb",
+              toCmFromFeetInches,
+              toKg,
+              silhouetteViewHeight: 430,
+              silhouetteFloorInset: 18
+            })
+          )
+        )
       );
 
       expect(result.current.effectiveBodyFat).toBeGreaterThan(10);
@@ -355,6 +386,7 @@ describe("absent and unusable inputs", () => {
       heightInches: "",
       weight: "65"
     };
+    /** @param {object} overrides */
     const base = (overrides) =>
       model({ personal: { ...complete, ...overrides }, heightUnit: "cm", weightUnit: "kg" });
 
@@ -390,7 +422,9 @@ describe("absent and unusable inputs", () => {
   });
 
   describe("the descriptive scores", () => {
+    /** @param {object} overrides */
     const shape = (overrides) => model({ personal: overrides }).silhouetteShape;
+    /** @param {object} overrides */
     const signature = (overrides) => model({ personal: overrides }).silhouetteRenderSignature;
 
     // None of these scores are returned, so they are asserted through the

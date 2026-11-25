@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -20,17 +21,26 @@ import { SILHOUETTE_GEOMETRY_REV } from "../PhysiqueSilhouette2D";
 // The real PhysiqueSilhouette2D is rendered rather than stubbed, so the shape
 // that reaches the geometry is the one the app passes.
 
-const SHAPE = {
-  heightCm: 178,
-  weightKg: 77,
-  shoulderHalf: 62,
-  waistHalf: 44,
-  hipHalf: 50,
-  fatScore: 0.3,
-  muscleScore: 0.5
-};
+// The helper gives the stage everything but its refs, which no test needs, so
+// its own props are optional to a test and each test's props are cast to the
+// stage's. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof HomeVisualizerStage>[0]} StageProps */
+/** @typedef {Omit<StageProps, "visualLabel" | "silhouetteRenderSignature" | "silhouetteShape" | "isIntroTransitioning" | "isStageTransitioning" | "onBack" | "onContinue"> & Partial<Pick<StageProps, "visualLabel" | "silhouetteRenderSignature" | "silhouetteShape" | "isIntroTransitioning" | "isStageTransitioning" | "onBack" | "onContinue">>} RenderProps */
+// The shape holds the sizes and scores the stage passes on.
+const SHAPE = /** @type {StageProps["silhouetteShape"]} */ (
+  /** @type {unknown} */ ({
+    heightCm: 178,
+    weightKg: 77,
+    shoulderHalf: 62,
+    waistHalf: 44,
+    hipHalf: 50,
+    fatScore: 0.3,
+    muscleScore: 0.5
+  })
+);
 
-const renderStage = (overrides = {}) =>
+/** @param {RenderProps} [overrides] */
+const renderStage = (overrides = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) =>
   render(
     <HomeVisualizerStage
       visualLabel="Physique preview for a 178 cm profile"
@@ -106,7 +116,7 @@ describe("HomeVisualizerStage", () => {
 
   test("calls onBack when Back is clicked", () => {
     const onBack = vi.fn();
-    renderStage({ onBack });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ onBack })));
 
     fireEvent.click(backButton());
 
@@ -115,7 +125,7 @@ describe("HomeVisualizerStage", () => {
 
   test("calls onContinue when Continue is clicked", () => {
     const onContinue = vi.fn();
-    renderStage({ onContinue });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ onContinue })));
 
     fireEvent.click(continueButton());
 
@@ -130,14 +140,18 @@ describe("HomeVisualizerStage", () => {
   });
 
   test("disables both controls while the intro is transitioning", () => {
-    renderStage({ isIntroTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isIntroTransitioning: true }))
+    );
 
     expect(backButton()).toBeDisabled();
     expect(continueButton()).toBeDisabled();
   });
 
   test("disables both controls while a stage transition is running", () => {
-    renderStage({ isStageTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isStageTransitioning: true }))
+    );
 
     expect(backButton()).toBeDisabled();
     expect(continueButton()).toBeDisabled();
@@ -152,7 +166,7 @@ describe("HomeVisualizerStage", () => {
 
   test("forwards the panel ref the stage animation measures", () => {
     const visualPanelRef = createRef();
-    renderStage({ visualPanelRef });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ visualPanelRef })));
 
     expect(visualPanelRef.current).toHaveClass("visualizer-only-panel");
   });

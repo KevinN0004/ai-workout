@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -13,7 +14,13 @@ import { APP_BRAND_TAGLINE } from "../../../../app/constants";
 // The tagline is asserted against the shared constant rather than a copy of its
 // text, so renaming the brand cannot leave this test pinning the old wording.
 
-const renderStage = (overrides = {}) =>
+// The helper gives the stage everything but its refs, which no test needs, so
+// its own props are optional to a test and each test's props are cast to the
+// stage's. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof HomeIntroStage>[0]} StageProps */
+/** @typedef {Omit<StageProps, "stageDirection" | "isIntroTransitioning" | "isStageTransitioning" | "onGetStarted"> & Partial<Pick<StageProps, "stageDirection" | "isIntroTransitioning" | "isStageTransitioning" | "onGetStarted">>} RenderProps */
+/** @param {RenderProps} [overrides] */
+const renderStage = (overrides = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) =>
   render(
     <HomeIntroStage
       stageDirection="forward"
@@ -34,7 +41,7 @@ describe("HomeIntroStage", () => {
 
   test("calls onGetStarted when the call to action is clicked", () => {
     const onGetStarted = vi.fn();
-    renderStage({ onGetStarted });
+    renderStage(/** @type {RenderProps} */ (/** @type {unknown} */ ({ onGetStarted })));
 
     fireEvent.click(getStartedButton());
 
@@ -47,18 +54,26 @@ describe("HomeIntroStage", () => {
   });
 
   test("disables the call to action while the intro is transitioning", () => {
-    renderStage({ isIntroTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isIntroTransitioning: true }))
+    );
     expect(getStartedButton()).toBeDisabled();
   });
 
   test("disables the call to action while a stage transition is running", () => {
-    renderStage({ isStageTransitioning: true });
+    renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ isStageTransitioning: true }))
+    );
     expect(getStartedButton()).toBeDisabled();
   });
 
   test("marks the panel with the direction the stage is moving", () => {
     const introPanelRef = createRef();
-    renderStage({ introPanelRef, stageDirection: "back" });
+    renderStage(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({ introPanelRef, stageDirection: "back" })
+      )
+    );
 
     expect(introPanelRef.current).toHaveClass("stage-back");
     expect(introPanelRef.current).not.toHaveClass("stage-forward");
@@ -66,12 +81,20 @@ describe("HomeIntroStage", () => {
 
   test("flags the panel as transitioning only while the intro animates", () => {
     const introPanelRef = createRef();
-    const { rerender } = renderStage({ introPanelRef });
+    const { rerender } = renderStage(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ introPanelRef }))
+    );
     expect(introPanelRef.current).not.toHaveClass("intro-transitioning");
 
     rerender(
       <HomeIntroStage
         introPanelRef={introPanelRef}
+        introTitleRef={
+          /** @type {StageProps["introTitleRef"]} */ (/** @type {unknown} */ (undefined))
+        }
+        introButtonRef={
+          /** @type {StageProps["introButtonRef"]} */ (/** @type {unknown} */ (undefined))
+        }
         stageDirection="forward"
         isIntroTransitioning
         isStageTransitioning={false}
@@ -86,7 +109,11 @@ describe("HomeIntroStage", () => {
     const introPanelRef = createRef();
     const introTitleRef = createRef();
     const introButtonRef = createRef();
-    renderStage({ introPanelRef, introTitleRef, introButtonRef });
+    renderStage(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({ introPanelRef, introTitleRef, introButtonRef })
+      )
+    );
 
     expect(introPanelRef.current).toBeInstanceOf(HTMLElement);
     expect(introTitleRef.current).toHaveTextContent(APP_BRAND_TAGLINE);

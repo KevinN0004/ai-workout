@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import usePreviewChapterFlow from "../usePreviewChapterFlow";
@@ -40,6 +41,7 @@ const FILL_ORDER = ["name", "sex", "age", "trainingDays"];
 const FILL_START_DELAY_MS = 420;
 const FILL_STEP_MS = 220;
 
+/** @param {boolean} reduced */
 const stubMatchMedia = (reduced) => {
   vi.stubGlobal(
     "matchMedia",
@@ -56,6 +58,10 @@ const stubMatchMedia = (reduced) => {
 };
 
 // Everything the hook writes to, captured as the page would see it.
+// A test's targets hold only the fields it fills, and its setters record into
+// `state`, so the hook's input is cast once, where setup builds it.
+/** @typedef {Parameters<typeof usePreviewChapterFlow>[0]} FlowInput */
+/** @param {{ chapter?: string, generateChapterIndex?: number, workoutWeekChapterIndex?: number, targets?: object, fillOrder?: string[], initialTargets?: object | null, initialFillOrder?: string[] | null }} [options] */
 const setup = ({
   chapter = "personal-info",
   generateChapterIndex = -1,
@@ -79,29 +85,33 @@ const setup = ({
   const setFilled = vi.fn((next) => {
     state.filledFields = typeof next === "function" ? next(state.filledFields) : next;
   });
+  /** @param {string} key */
   const setter = (key) =>
     vi.fn((value) => {
       state[key] = value;
     });
 
-  const props = {
-    generateChapterIndex,
-    workoutWeekChapterIndex,
-    previewInitialTargetsRef: { current: initialTargets },
-    previewInitialFillOrderRef: { current: initialFillOrder },
-    previewPersonalTargets: targets,
-    previewFillOrder: fillOrder,
-    previewFillTimeoutsRef: { current: [] },
-    scrollToChapter: vi.fn(),
-    setPreviewFilledFields: setFilled,
-    setPreviewPersonalCollapsed: setter("personalCollapsed"),
-    setPreviewPersonalShifted: setter("personalShifted"),
-    setPreviewBuilderStage: setter("builderStage"),
-    setPreviewWeekStage: setter("weekStage"),
-    setPreviewDashboardStage: setter("dashboardStage"),
-    setPreviewWeekHeaderTypingProgress: setter("weekHeaderTypingProgress"),
-    setPreviewWeekTypingProgress: setter("weekTypingProgress")
-  };
+  const props =
+    /** @type {Omit<FlowInput, "activePreviewChapterId" | "setPreviewFilledFields"> & { setPreviewFilledFields: import("vitest").Mock }} */ (
+      /** @type {unknown} */ ({
+        generateChapterIndex,
+        workoutWeekChapterIndex,
+        previewInitialTargetsRef: { current: initialTargets },
+        previewInitialFillOrderRef: { current: initialFillOrder },
+        previewPersonalTargets: targets,
+        previewFillOrder: fillOrder,
+        previewFillTimeoutsRef: { current: [] },
+        scrollToChapter: vi.fn(),
+        setPreviewFilledFields: setFilled,
+        setPreviewPersonalCollapsed: setter("personalCollapsed"),
+        setPreviewPersonalShifted: setter("personalShifted"),
+        setPreviewBuilderStage: setter("builderStage"),
+        setPreviewWeekStage: setter("weekStage"),
+        setPreviewDashboardStage: setter("dashboardStage"),
+        setPreviewWeekHeaderTypingProgress: setter("weekHeaderTypingProgress"),
+        setPreviewWeekTypingProgress: setter("weekTypingProgress")
+      })
+    );
 
   const view = renderHook(
     ({ activePreviewChapterId }) => usePreviewChapterFlow({ ...props, activePreviewChapterId }),
@@ -111,6 +121,7 @@ const setup = ({
   return { ...view, state, props };
 };
 
+/** @param {number} ms */
 const advance = (ms) => act(() => vi.advanceTimersByTime(ms));
 
 beforeEach(() => {

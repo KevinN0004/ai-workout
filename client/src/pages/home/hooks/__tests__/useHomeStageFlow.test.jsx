@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useHomeStageFlow from "../useHomeStageFlow";
@@ -6,10 +7,19 @@ import useHomeStageFlow from "../useHomeStageFlow";
 // whole output of the morph arithmetic. Recording them turns "it did not
 // throw" into an assertion about where the morph actually travels. The real
 // library still runs underneath -- only the call is observed.
-const anime = vi.hoisted(() => ({ adds: [], animates: [] }));
+// Each animejs call the hook makes is recorded, and the tests read its params.
+// A clone or panel a test reads exists by then, so each lookup is cast to the
+// element it is, and a stage no flow has goes through unknown.
+/** @typedef {{ target: unknown, params: Record<string, unknown> }} AnimeCall */
+/** @typedef {ReturnType<typeof useHomeStageFlow>} HomeStageFlow */
+/** @typedef {{ current: HomeStageFlow }} FlowResult */
+/** @typedef {Parameters<HomeStageFlow["goToStage"]>[0]} HomeStage */
+const anime = vi.hoisted(
+  () => /** @type {{ adds: AnimeCall[], animates: AnimeCall[] }} */ ({ adds: [], animates: [] })
+);
 
 vi.mock("animejs", async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = /** @type {typeof import("animejs")} */ (await importOriginal());
   return {
     ...actual,
     // The visualizer's pulse is a lone animate call, recorded the same way.
@@ -20,10 +30,16 @@ vi.mock("animejs", async (importOriginal) => {
     createTimeline: (...args) => {
       const timeline = actual.createTimeline(...args);
       const add = timeline.add.bind(timeline);
-      timeline.add = (target, params, position) => {
-        anime.adds.push({ target, params });
-        return add(target, params, position);
-      };
+      // add is overloaded; the recorder takes its widest form and passes each
+      // call on as it came.
+      timeline.add = /** @type {typeof timeline.add} */ (
+        /** @type {unknown} */ (
+          (target, params, position) => {
+            anime.adds.push({ target, params });
+            return add(target, params, position);
+          }
+        )
+      );
       return timeline;
     }
   };
@@ -41,6 +57,7 @@ vi.mock("animejs", async (importOriginal) => {
 // `getBoundingClientRect` on the panels, and recording what the hook hands to
 // animejs, puts the whole morph under test -- see "the stage morph" below.
 
+/** @param {boolean} reduced */
 const stubMatchMedia = (reduced) => {
   vi.stubGlobal(
     "matchMedia",
@@ -56,6 +73,7 @@ const stubMatchMedia = (reduced) => {
   );
 };
 
+/** @param {Partial<Parameters<typeof useHomeStageFlow>[0]>} [overrides] */
 const render = (overrides = {}) => {
   const onResetPersonalFlow = vi.fn();
   const result = renderHook(() =>
@@ -117,7 +135,9 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
 
       act(() => result.current.goToStage("visualizer"));
-      act(() => result.current.goToStage("nonsense"));
+      act(() =>
+        result.current.goToStage(/** @type {HomeStage} */ (/** @type {unknown} */ ("nonsense")))
+      );
 
       expect(result.current.stageDirection).toBe("backward");
     });
@@ -205,6 +225,7 @@ describe("useHomeStageFlow", () => {
     // guards on rect size -- only on the refs existing -- so the state machine
     // runs without any stubbing at all. These cover the machine; the geometry
     // is covered under "the stage morph".
+    /** @param {FlowResult} result */
     const attachPanels = (result) => {
       const panel = document.createElement("div");
       const title = document.createElement("h1");
@@ -288,8 +309,13 @@ describe("useHomeStageFlow", () => {
   });
 
   describe("onGetStarted", () => {
+    /** @type {HTMLElement[]} */
     const panels = [];
 
+    /**
+     * @param {FlowResult} result
+     * @param {{ title?: boolean, button?: boolean, inPage?: boolean }} [options]
+     */
     const attachIntro = (result, { title = true, button = true, inPage = false } = {}) => {
       const panel = document.createElement("div");
       if (inPage) {
@@ -433,6 +459,10 @@ describe("useHomeStageFlow", () => {
   // comes back is fake; the arithmetic on top of it, the retry budget and the
   // teardown are the ones that ship.
   describe("the stage morph", () => {
+    /**
+     * @param {HTMLElement} el
+     * @param {{ left?: number, top?: number, width?: number, height?: number }} [rect]
+     */
     const withRect = (el, { left = 0, top = 0, width = 640, height = 400 } = {}) => {
       el.getBoundingClientRect = () => ({
         left,
@@ -450,6 +480,11 @@ describe("useHomeStageFlow", () => {
 
     const attached = [];
 
+    /**
+     * @param {FlowResult} result
+     * @param {string} refName
+     * @param {{ left?: number, top?: number, width?: number, height?: number } | null} [rect]
+     */
     const attach = (result, refName, rect) => {
       const el = document.createElement("div");
       el.className = refName;
@@ -464,11 +499,12 @@ describe("useHomeStageFlow", () => {
     // from its source by selector. The fixed positioning and the stacking
     // order are what the hook puts on the clone and only on the clone.
     const clones = () =>
-      Array.from(document.body.children).filter(
+      Array.from(/** @type {HTMLCollectionOf<HTMLElement>} */ (document.body.children)).filter(
         (el) => el.style?.position === "fixed" && el.style?.zIndex === "40"
       );
 
     // Two nested frames before the timeline starts, plus one per retry.
+    /** @param {number} count */
     const frames = (count) => {
       for (let i = 0; i < count; i += 1) act(() => vi.advanceTimersByTime(16));
     };
@@ -483,6 +519,10 @@ describe("useHomeStageFlow", () => {
       vi.useRealTimers();
     });
 
+    /**
+     * @param {FlowResult} result
+     * @param {{ from?: HomeStage, to?: HomeStage, sourceRect?: { left?: number, top?: number, width?: number, height?: number } | null, targetRect?: { left?: number, top?: number, width?: number, height?: number } | null }} [options]
+     */
     const startMorph = (
       result,
       { from = "intro", to = "personal", sourceRect, targetRect } = {}
@@ -497,7 +537,7 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
       startMorph(result, { sourceRect: { left: 40, top: 80, width: 600, height: 320 } });
 
-      const clone = clones().at(-1);
+      const clone = /** @type {HTMLElement} */ (clones().at(-1));
       expect(clone).toBeTruthy();
       expect(clone.style.position).toBe("fixed");
       expect(clone.style.left).toBe("40px");
@@ -510,7 +550,7 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
       startMorph(result);
 
-      expect(clones().at(-1).style.pointerEvents).toBe("none");
+      expect(/** @type {HTMLElement} */ (clones().at(-1)).style.pointerEvents).toBe("none");
     });
 
     test("the clone inherits the panel's own chrome rather than a hardcoded default", () => {
@@ -526,7 +566,7 @@ describe("useHomeStageFlow", () => {
 
       act(() => result.current.transitionToStageFromTrigger("personal"));
 
-      const clone = clones().at(-1);
+      const clone = /** @type {HTMLElement} */ (clones().at(-1));
       expect(clone.style.borderRadius).toBe("8px");
       expect(clone.style.borderColor).toBe("rgb(1, 2, 3)");
       expect(clone.style.color).toBe("rgb(4, 5, 6)");
@@ -539,7 +579,7 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
       startMorph(result);
 
-      expect(clones().at(-1).style.borderRadius).toBe("24px");
+      expect(/** @type {HTMLElement} */ (clones().at(-1)).style.borderRadius).toBe("24px");
     });
 
     test("darkens the fill for the visualizer-to-workout hand-off", () => {
@@ -553,14 +593,18 @@ describe("useHomeStageFlow", () => {
 
       // The CSSOM drops a fully opaque alpha, so `rgba(14, 14, 14, 1)` in the
       // source reads back as `rgb(14, 14, 14)` here and in a browser alike.
-      expect(clones().at(-1).style.backgroundColor).toBe("rgb(14, 14, 14)");
+      expect(/** @type {HTMLElement} */ (clones().at(-1)).style.backgroundColor).toBe(
+        "rgb(14, 14, 14)"
+      );
     });
 
     test("uses the standard fill for every other hand-off", () => {
       const { result } = render();
       startMorph(result);
 
-      expect(clones().at(-1).style.backgroundColor).toBe("rgb(28, 28, 28)");
+      expect(/** @type {HTMLElement} */ (clones().at(-1)).style.backgroundColor).toBe(
+        "rgb(28, 28, 28)"
+      );
     });
 
     test("changes the stage at once rather than waiting for the animation", () => {
@@ -583,7 +627,7 @@ describe("useHomeStageFlow", () => {
       act(() => vi.advanceTimersByTime(1400));
 
       expect(result.current.isStageTransitioning).toBe(false);
-      expect(clones().at(-1).style.opacity).toBe("0");
+      expect(/** @type {HTMLElement} */ (clones().at(-1)).style.opacity).toBe("0");
     });
 
     test("removes the clone once the crossfade has finished", () => {
@@ -683,6 +727,7 @@ describe("useHomeStageFlow", () => {
       // These paths only run when the real page chrome is mounted. Every
       // earlier test leaves the document bare, so each takes the `: null`
       // side and the hook falls back to guesses about the viewport.
+      /** @param {{ withContent?: boolean }} [options] */
       const buildPage = ({ withContent = true } = {}) => {
         const page = document.createElement("div");
         page.className = "home-page";
@@ -778,7 +823,11 @@ describe("useHomeStageFlow", () => {
       const { result } = render();
       attach(result, "introPanelRef", { width: 600, height: 320 });
 
-      act(() => result.current.transitionToStageFromTrigger("nonsense"));
+      act(() =>
+        result.current.transitionToStageFromTrigger(
+          /** @type {HomeStage} */ (/** @type {unknown} */ ("nonsense"))
+        )
+      );
       frames(12);
 
       expect(result.current.homeStage).toBe("nonsense");
@@ -787,7 +836,11 @@ describe("useHomeStageFlow", () => {
 
     // What the morph animates towards. Recorded off the animejs call, so these
     // are the numbers the animation actually receives.
-    const morphOf = (clone) => anime.adds.find((entry) => entry.target === clone)?.params;
+    /** @param {unknown} clone */
+    const morphOf = (clone) =>
+      /** @type {Record<string, unknown>} */ (
+        anime.adds.find((entry) => entry.target === clone)?.params
+      );
 
     describe("where the morph travels", () => {
       test("to the size the incoming panel reports, once it can be measured", () => {
@@ -796,7 +849,7 @@ describe("useHomeStageFlow", () => {
         attach(result, "personalPanelRef", { left: 10, top: 20, width: 900, height: 600 });
 
         act(() => result.current.transitionToStageFromTrigger("personal"));
-        const clone = clones().at(-1);
+        const clone = /** @type {HTMLElement} */ (clones().at(-1));
         frames(2);
 
         const params = morphOf(clone);
@@ -812,7 +865,7 @@ describe("useHomeStageFlow", () => {
         attach(result, "personalPanelRef", { left: 10, top: 20, width: 900, height: 600 });
 
         act(() => result.current.transitionToStageFromTrigger("personal"));
-        const clone = clones().at(-1);
+        const clone = /** @type {HTMLElement} */ (clones().at(-1));
         frames(2);
 
         expect(morphOf(clone).translateX).toEqual([0, -30]);
@@ -848,7 +901,7 @@ describe("useHomeStageFlow", () => {
         });
 
         act(() => result.current.transitionToStageFromTrigger("personal"));
-        const clone = clones().at(-1);
+        const clone = /** @type {HTMLElement} */ (clones().at(-1));
         frames(12);
 
         expect(morphOf(clone).width).toEqual(["600px", "880px"]);
@@ -883,7 +936,7 @@ describe("useHomeStageFlow", () => {
         attach(result, "workoutShellRef", null);
 
         act(() => result.current.transitionToStageFromTrigger("workout"));
-        const clone = clones().at(-1);
+        const clone = /** @type {HTMLElement} */ (clones().at(-1));
         frames(12);
 
         expect(morphOf(clone).width).toEqual(["600px", "940px"]);
@@ -898,7 +951,7 @@ describe("useHomeStageFlow", () => {
         act(() => result.current.goToStage("visualizer"));
 
         act(() => result.current.transitionToStageFromTrigger("workout"));
-        const clone = clones().at(-1);
+        const clone = /** @type {HTMLElement} */ (clones().at(-1));
         frames(12);
 
         expect(morphOf(clone).width).toEqual(["880px", "940px"]);
@@ -1010,6 +1063,10 @@ describe("useHomeStageFlow", () => {
   });
 
   describe("the visualizer stage animation", () => {
+    /**
+     * @param {FlowResult} result
+     * @param {{ withSurfaces?: boolean }} [options]
+     */
     const buildVisualPanel = (result, { withSurfaces = true } = {}) => {
       const panel = document.createElement("div");
       if (withSurfaces) {
@@ -1058,7 +1115,7 @@ describe("useHomeStageFlow", () => {
       try {
         act(() => result.current.goToStage("visualizer"));
 
-        const panel = result.current.visualPanelRef.current;
+        const panel = /** @type {HTMLDivElement} */ (result.current.visualPanelRef.current);
         const surface = panel.querySelector(".physique-render-surface");
         expect(anime.adds.map(({ target }) => target)).toEqual([
           panel.querySelector(".visual-stage"),
@@ -1081,11 +1138,17 @@ describe("useHomeStageFlow", () => {
       try {
         act(() => result.current.goToStage("visualizer"));
 
-        const panel = result.current.visualPanelRef.current;
+        const panel = /** @type {HTMLDivElement} */ (result.current.visualPanelRef.current);
         expect(anime.adds).toEqual([]);
         expect(anime.animates).toEqual([]);
-        expect(panel.querySelector(".visual-stage").getAttribute("style")).toBeNull();
-        expect(panel.querySelector(".physique-render-surface").getAttribute("style")).toBeNull();
+        expect(
+          /** @type {Element} */ (panel.querySelector(".visual-stage")).getAttribute("style")
+        ).toBeNull();
+        expect(
+          /** @type {Element} */ (panel.querySelector(".physique-render-surface")).getAttribute(
+            "style"
+          )
+        ).toBeNull();
       } finally {
         cleanup();
       }

@@ -1,3 +1,4 @@
+// @ts-check
 import { render } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "../PhysiqueSilhouette2D";
@@ -6,9 +7,14 @@ import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "../PhysiqueSilhou
 // that module, and merely importing it threw under vitest. Covered now that the
 // HMR guard is fixed.
 
+// The component always renders its svg and outline path, so each lookup is
+// cast to the element it finds. A shape a test gives holds only what it varies.
+/** @typedef {Parameters<typeof PhysiqueSilhouette2D>[0]} SilhouetteProps */
+
+/** @param {SilhouetteProps["shape"]} shape */
 const renderSvg = (shape) => {
   const { container } = render(<PhysiqueSilhouette2D shape={shape} />);
-  return container.querySelector("svg");
+  return /** @type {SVGSVGElement} */ (container.querySelector("svg"));
 };
 
 describe("PhysiqueSilhouette2D", () => {
@@ -30,10 +36,12 @@ describe("PhysiqueSilhouette2D", () => {
   });
 
   test("draws an outline path with no NaN in it", () => {
-    const path = renderSvg({}).querySelector("path.physique-outline-line");
+    const path = /** @type {SVGPathElement} */ (
+      renderSvg({}).querySelector("path.physique-outline-line")
+    );
 
     expect(path).toBeTruthy();
-    const d = path.getAttribute("d");
+    const d = /** @type {string} */ (path.getAttribute("d"));
     expect(d.startsWith("M ")).toBe(true);
     expect(d).not.toMatch(/NaN|Infinity|undefined/);
   });
@@ -46,19 +54,24 @@ describe("PhysiqueSilhouette2D", () => {
   });
 
   test("redraws when the shape changes", () => {
-    const narrow = renderSvg({ shoulderHalf: 32 })
-      .querySelector("path.physique-outline-line")
-      .getAttribute("d");
-    const wide = renderSvg({ shoulderHalf: 70 })
-      .querySelector("path.physique-outline-line")
-      .getAttribute("d");
+    const narrow = /** @type {Element} */ (
+      renderSvg({ shoulderHalf: 32 }).querySelector("path.physique-outline-line")
+    ).getAttribute("d");
+    const wide = /** @type {Element} */ (
+      renderSvg({ shoulderHalf: 70 }).querySelector("path.physique-outline-line")
+    ).getAttribute("d");
 
     expect(narrow).not.toBe(wide);
   });
 
   test("survives a missing shape prop", () => {
-    const { container } = render(<PhysiqueSilhouette2D />);
-    const path = container.querySelector("path.physique-outline-line");
+    // The prop is required, so its absence is given as undefined, cast.
+    const { container } = render(
+      <PhysiqueSilhouette2D
+        shape={/** @type {SilhouetteProps["shape"]} */ (/** @type {unknown} */ (undefined))}
+      />
+    );
+    const path = /** @type {Element} */ (container.querySelector("path.physique-outline-line"));
 
     expect(path.getAttribute("d")).not.toMatch(/NaN|undefined/);
   });

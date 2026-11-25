@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PreviewPersonalChapter from "../PreviewPersonalChapter";
@@ -9,6 +10,9 @@ import { TRAINING_DAY_OPTIONS } from "../../constants";
 // toggles, and the six builder stages -- a threshold off by one shows the
 // visitor a step of the sequence that has not happened yet.
 
+// Each part a test reads is rendered by then, so each lookup is cast to the
+// element it finds. A filled value of the wrong type goes through unknown.
+/** @param {Partial<Parameters<typeof PreviewPersonalChapter>[0]>} [props] */
 const renderChapter = (props = {}) =>
   render(
     <PreviewPersonalChapter
@@ -23,10 +27,13 @@ const renderChapter = (props = {}) =>
     />
   );
 
-const sequence = () => document.querySelector(".preview-personal-sequence");
-const shell = () => document.querySelector(".preview-personal-form-shell");
-const track = () => document.querySelector(".preview-builder-track");
+const sequence = () =>
+  /** @type {HTMLElement} */ (document.querySelector(".preview-personal-sequence"));
+const shell = () =>
+  /** @type {HTMLElement} */ (document.querySelector(".preview-personal-form-shell"));
+const track = () => /** @type {HTMLElement} */ (document.querySelector(".preview-builder-track"));
 
+/** @param {string} name */
 const field = (name) => document.querySelector(`[name="${name}"]`);
 
 describe("PreviewPersonalChapter", () => {
@@ -58,7 +65,11 @@ describe("PreviewPersonalChapter", () => {
     ])("a %s value is treated as empty rather than stringified", (_label, value) => {
       // The fill sequence writes strings; anything else is a bug upstream, and
       // rendering "[object Object]" into the name box would advertise it.
-      renderChapter({ previewFilledFields: { name: value } });
+      renderChapter(
+        /** @type {Partial<Parameters<typeof PreviewPersonalChapter>[0]>} */ (
+          /** @type {unknown} */ ({ previewFilledFields: { name: value } })
+        )
+      );
 
       expect(field("name")).toHaveValue("");
     });
@@ -74,7 +85,9 @@ describe("PreviewPersonalChapter", () => {
       renderChapter();
 
       // fireEvent.submit returns false when a handler called preventDefault.
-      expect(fireEvent.submit(document.querySelector("form"))).toBe(false);
+      expect(
+        fireEvent.submit(/** @type {HTMLFormElement} */ (document.querySelector("form")))
+      ).toBe(false);
     });
 
     test("the selects are inert, so clicking through the demo cannot change it", () => {
@@ -135,7 +148,9 @@ describe("PreviewPersonalChapter", () => {
       ["ft", "pos-0"]
     ])("the height toggle in %s sits at %s", (heightUnit, expected) => {
       renderChapter({ heightUnit });
-      const toggle = document.querySelector(".metric-height .unit-toggle");
+      const toggle = /** @type {HTMLElement} */ (
+        document.querySelector(".metric-height .unit-toggle")
+      );
 
       expect(toggle.className).toContain(expected);
     });
@@ -145,7 +160,9 @@ describe("PreviewPersonalChapter", () => {
       ["lb", "pos-0"]
     ])("the weight toggle in %s sits at %s", (weightUnit, expected) => {
       renderChapter({ weightUnit });
-      const toggle = document.querySelector(".field-weight .unit-toggle");
+      const toggle = /** @type {HTMLElement} */ (
+        document.querySelector(".field-weight .unit-toggle")
+      );
 
       expect(toggle.className).toContain(expected);
     });
@@ -243,12 +260,18 @@ describe("PreviewPersonalChapter", () => {
   });
 
   describe("the builder stages", () => {
+    /**
+     * @param {number} stage
+     * @param {string} selector
+     */
     const visibleAt = (stage, selector) => {
       const { unmount } = renderChapter({
         previewBuilderStage: stage,
         previewPersonalShifted: true
       });
-      const visible = document.querySelector(selector).className.includes("is-visible");
+      const visible = /** @type {HTMLElement} */ (
+        document.querySelector(selector)
+      ).className.includes("is-visible");
       unmount();
       return visible;
     };
@@ -287,7 +310,9 @@ describe("PreviewPersonalChapter", () => {
         ".preview-builder-slot.focus",
         ".preview-builder-generating"
       ].forEach((selector) => {
-        expect(document.querySelector(selector).className).toContain("is-visible");
+        expect(/** @type {HTMLElement} */ (document.querySelector(selector)).className).toContain(
+          "is-visible"
+        );
       });
     });
   });

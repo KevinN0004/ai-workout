@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, test } from "vitest";
@@ -21,7 +22,13 @@ const SAMPLE_PLAN = [
   { day: "Wednesday", blocks: ["Bench press 5x5"] }
 ];
 
-const renderMeasure = (overrides = {}) =>
+// The helper gives the stage everything but its refs, which no test needs, so
+// its own props are optional to a test and each test's props are cast to the
+// stage's. Elements a test looks up are cast to the element it expects.
+/** @typedef {Parameters<typeof HomeWorkoutMeasure>[0]} StageProps */
+/** @typedef {Omit<StageProps, "samplePlan"> & Partial<Pick<StageProps, "samplePlan">>} RenderProps */
+/** @param {RenderProps} [overrides] */
+const renderMeasure = (overrides = /** @type {RenderProps} */ (/** @type {unknown} */ ({}))) =>
   render(<HomeWorkoutMeasure samplePlan={SAMPLE_PLAN} {...overrides} />);
 
 describe("HomeWorkoutMeasure", () => {
@@ -54,14 +61,22 @@ describe("HomeWorkoutMeasure", () => {
     const cards = container.querySelectorAll(".plan-card");
 
     expect(cards).toHaveLength(2);
-    expect(within(cards[0]).getByText("Monday")).toBeInTheDocument();
-    expect(within(cards[0]).getByText("Back squat 5x5")).toBeInTheDocument();
-    expect(within(cards[0]).getByText("Barbell row 3x8")).toBeInTheDocument();
-    expect(within(cards[1]).getByText("Bench press 5x5")).toBeInTheDocument();
+    expect(within(/** @type {HTMLElement} */ (cards[0])).getByText("Monday")).toBeInTheDocument();
+    expect(
+      within(/** @type {HTMLElement} */ (cards[0])).getByText("Back squat 5x5")
+    ).toBeInTheDocument();
+    expect(
+      within(/** @type {HTMLElement} */ (cards[0])).getByText("Barbell row 3x8")
+    ).toBeInTheDocument();
+    expect(
+      within(/** @type {HTMLElement} */ (cards[1])).getByText("Bench press 5x5")
+    ).toBeInTheDocument();
   });
 
   test("renders nothing for an empty plan without failing", () => {
-    const { container } = renderMeasure({ samplePlan: [] });
+    const { container } = renderMeasure(
+      /** @type {RenderProps} */ (/** @type {unknown} */ ({ samplePlan: [] }))
+    );
 
     expect(container.querySelectorAll(".plan-card")).toHaveLength(0);
   });
@@ -69,7 +84,11 @@ describe("HomeWorkoutMeasure", () => {
   test("forwards the refs the stage animation measures", () => {
     const workoutMeasureShellRef = createRef();
     const workoutMeasureRef = createRef();
-    renderMeasure({ workoutMeasureShellRef, workoutMeasureRef });
+    renderMeasure(
+      /** @type {RenderProps} */ (
+        /** @type {unknown} */ ({ workoutMeasureShellRef, workoutMeasureRef })
+      )
+    );
 
     expect(workoutMeasureShellRef.current).toHaveClass("workout-stage-shell");
     expect(workoutMeasureRef.current).toHaveClass("workout-stage-panel");

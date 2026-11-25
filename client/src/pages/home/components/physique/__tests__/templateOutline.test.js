@@ -1,8 +1,13 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { buildTemplateOutline } from "../templateOutline";
 
 // 693 lines with no coverage. Unlike geometry.js, nothing blocked importing
 // this -- it is a pure module with one export, so it was simply never tested.
+//
+// The bundled template always yields an outline, which the first test asserts,
+// so build casts away the null. A model a test gives, often out of range or not
+// numeric on purpose, is cast with the rest of the input.
 
 const FALLBACK = {
   shoulderHalf: 46,
@@ -27,8 +32,22 @@ const FALLBACK = {
   fillLightness: 50
 };
 
+/**
+ * @param {object} [model]
+ * @param {number} [width]
+ * @param {number} [height]
+ */
 const build = (model = FALLBACK, width = 430, height = 430) =>
-  buildTemplateOutline({ model, fallback: FALLBACK, viewboxWidth: width, viewboxHeight: height });
+  /** @type {NonNullable<ReturnType<typeof buildTemplateOutline>>} */ (
+    buildTemplateOutline(
+      /** @type {Parameters<typeof buildTemplateOutline>[0]} */ ({
+        model,
+        fallback: FALLBACK,
+        viewboxWidth: width,
+        viewboxHeight: height
+      })
+    )
+  );
 
 describe("buildTemplateOutline", () => {
   test("returns a path and its marker points", () => {

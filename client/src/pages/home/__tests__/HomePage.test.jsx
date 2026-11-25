@@ -1,3 +1,4 @@
+// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import HomePage from "../HomePage";
@@ -7,8 +8,25 @@ import HomePage from "../HomePage";
 // stage is mounted, what the stage shell is wearing while it moves, and the two
 // handlers it owns -- the training-day toggle and the submit gate.
 
-const flow = vi.hoisted(() => ({ state: null }));
-const stages = vi.hoisted(() => ({ personal: null, visualizer: null, workout: null }));
+// Each holder keeps what its stub was last given, and is read only after the
+// page has rendered; beforeEach empties the stage holders. The page props and
+// the profile a test gives hold only what the page reads, so they are cast
+// where given. Lookups are cast to the element they find, and a setter's last
+// updater to a function.
+/** @typedef {Parameters<typeof HomePage>[0]} HomePageProps */
+/** @typedef {{ personal: Parameters<typeof import("../components/HomePersonalStage.jsx").default>[0], visualizer: Parameters<typeof import("../components/HomeVisualizerStage.jsx").default>[0], workout: Parameters<typeof import("../components/HomeWorkoutStage.jsx").default>[0] }} Stages */
+const flow = vi.hoisted(
+  () =>
+    /** @type {{ state: ReturnType<typeof flowState> }} */ (
+      /** @type {unknown} */ ({ state: null })
+    )
+);
+const stages = vi.hoisted(
+  () =>
+    /** @type {Stages} */ (
+      /** @type {unknown} */ ({ personal: null, visualizer: null, workout: null })
+    )
+);
 
 vi.mock("../components/HomeIntroStage", () => ({
   default: (props) => (
@@ -52,6 +70,7 @@ vi.mock("../hooks/useBodyModel", () => ({
   })
 }));
 
+/** @param {object} [overrides] */
 const flowState = (overrides = {}) => ({
   visualPanelRef: { current: null },
   introPanelRef: { current: null },
@@ -77,6 +96,10 @@ const flowState = (overrides = {}) => ({
 
 const setPersonal = vi.fn();
 
+/**
+ * @param {object} [overrides]
+ * @param {Partial<HomePageProps>} [props]
+ */
 const renderHome = (overrides = {}, props = {}) => {
   flow.state = flowState(overrides);
   return render(
@@ -88,7 +111,11 @@ const renderHome = (overrides = {}, props = {}) => {
       form={{}}
       personalMode="basic"
       setPersonalMode={vi.fn()}
-      personal={{ trainingDays: ["Monday"] }}
+      personal={
+        /** @type {HomePageProps["personal"]} */ (
+          /** @type {unknown} */ ({ trainingDays: ["Monday"] })
+        )
+      }
       onPersonalChange={vi.fn()}
       onResetPersonalFlow={vi.fn()}
       heightUnit="cm"
@@ -102,21 +129,21 @@ const renderHome = (overrides = {}, props = {}) => {
       toLb={vi.fn()}
       openPlannerFromProfile={vi.fn()}
       error=""
-      samplePlan={[{ day: "Monday" }]}
+      samplePlan={/** @type {HomePageProps["samplePlan"]} */ ([{ day: "Monday" }])}
       plannerModal={<div data-testid="planner-modal" />}
       {...props}
     />
   );
 };
 
-const shell = () => document.querySelector(".home-stage");
+const shell = () => /** @type {HTMLElement} */ (document.querySelector(".home-stage"));
 const STAGES = ["intro", "preview", "personal", "visualizer", "workout"];
 
 beforeEach(() => {
   setPersonal.mockClear();
-  stages.personal = null;
-  stages.visualizer = null;
-  stages.workout = null;
+  stages.personal = /** @type {Stages["personal"]} */ (/** @type {unknown} */ (null));
+  stages.visualizer = /** @type {Stages["visualizer"]} */ (/** @type {unknown} */ (null));
+  stages.workout = /** @type {Stages["workout"]} */ (/** @type {unknown} */ (null));
 });
 
 describe("HomePage", () => {
@@ -225,11 +252,24 @@ describe("HomePage", () => {
   });
 
   describe("choosing training days", () => {
+    /**
+     * @param {string} day
+     * @param {unknown} current a saved profile can hold anything here
+     */
     const toggle = (day, current) => {
-      renderHome({ homeStage: "personal" }, { personal: { trainingDays: current } });
+      renderHome(
+        { homeStage: "personal" },
+        {
+          personal: /** @type {HomePageProps["personal"]} */ (
+            /** @type {unknown} */ ({ trainingDays: current })
+          )
+        }
+      );
       act(() => stages.personal.toggleTrainingDay(day));
       // setPersonal is called with an updater; run it against the same state.
-      return setPersonal.mock.calls.at(-1)[0]({ trainingDays: current });
+      return /** @type {(previous: object) => Record<string, unknown>} */ (
+        /** @type {unknown[]} */ (setPersonal.mock.calls.at(-1))[0]
+      )({ trainingDays: current });
     };
 
     test("adds a day that is not chosen yet", () => {
@@ -259,7 +299,9 @@ describe("HomePage", () => {
     test("leaves the rest of the profile alone", () => {
       renderHome({ homeStage: "personal" });
       act(() => stages.personal.toggleTrainingDay("Friday"));
-      const next = setPersonal.mock.calls.at(-1)[0]({ name: "Ada", trainingDays: [] });
+      const next = /** @type {(previous: object) => Record<string, unknown>} */ (
+        /** @type {unknown[]} */ (setPersonal.mock.calls.at(-1))[0]
+      )({ name: "Ada", trainingDays: [] });
 
       expect(next.name).toBe("Ada");
     });
@@ -280,10 +322,15 @@ describe("HomePage", () => {
   });
 
   describe("submitting the profile", () => {
+    /** @param {object} overrides */
     const submit = (overrides) => {
       renderHome({ homeStage: "personal", ...overrides });
       const event = { preventDefault: vi.fn() };
-      act(() => stages.personal.onPersonalSubmit(event));
+      act(() =>
+        stages.personal.onPersonalSubmit(
+          /** @type {import("react").FormEvent<HTMLFormElement>} */ (/** @type {unknown} */ (event))
+        )
+      );
       return { event, flowState: flow.state };
     };
 

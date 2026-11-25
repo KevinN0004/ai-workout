@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import usePreviewWeekOutline from "../usePreviewWeekOutline";
@@ -8,6 +9,12 @@ import usePreviewWeekOutline from "../usePreviewWeekOutline";
 // the arithmetic on top of it, the guards that stop it running on nothing, and
 // the identity check that keeps it from looping.
 
+// The week plan a test gives holds only what the outline reads, so the hook's
+// input is cast to its input type. A setter's last updater, read from the
+// mock, is cast to a function.
+/** @typedef {{ left?: number, top?: number, width?: number, height?: number }} Rect */
+
+/** @param {Rect} rect */
 const rectOf =
   ({ left = 0, top = 0, width = 100, height = 100 }) =>
   () => ({
@@ -25,6 +32,7 @@ const rectOf =
 // A wrap containing a table of `rows` rows and `cols` header cells, with every
 // element measured. Rows are stacked evenly down the wrap; header cells are
 // spread evenly across it.
+/** @param {{ wrap?: Rect, rows?: number, cols?: number, tableRect?: { left: number, top: number, width: number, height: number }, withTable?: boolean }} [options] */
 const buildTable = ({
   wrap: wrapRect = { width: 200, height: 100 },
   rows = 2,
@@ -71,16 +79,20 @@ const buildTable = ({
   return wrapEl;
 };
 
+/** @type {Element[]} */
 let observed;
+/** @type {FakeResizeObserver[]} */
 let observerInstances;
 
 class FakeResizeObserver {
+  /** @param {(entries: unknown[], observer: FakeResizeObserver) => void} callback */
   constructor(callback) {
     this.callback = callback;
     this.disconnected = false;
     observerInstances.push(this);
   }
 
+  /** @param {Element} element */
   observe(element) {
     observed.push(element);
   }
@@ -94,6 +106,7 @@ class FakeResizeObserver {
   }
 }
 
+/** @param {{ chapter?: string, previewWeekPlan?: unknown[], wrapEl?: HTMLElement | null, setPreviewWeekLineOffsets?: import("vitest").Mock }} [options] */
 const setup = ({
   chapter = "workout-week",
   previewWeekPlan = [],
@@ -102,18 +115,26 @@ const setup = ({
 } = {}) => {
   const view = renderHook(
     ({ activePreviewChapterId }) =>
-      usePreviewWeekOutline({
-        activePreviewChapterId,
-        previewWeekPlan,
-        previewWeekTableWrapRef: { current: wrapEl },
-        setPreviewWeekLineOffsets
-      }),
+      usePreviewWeekOutline(
+        /** @type {Parameters<typeof usePreviewWeekOutline>[0]} */ (
+          /** @type {unknown} */ ({
+            activePreviewChapterId,
+            previewWeekPlan,
+            previewWeekTableWrapRef: { current: wrapEl },
+            setPreviewWeekLineOffsets
+          })
+        )
+      ),
     { initialProps: { activePreviewChapterId: chapter } }
   );
   return { ...view, setPreviewWeekLineOffsets, wrapEl };
 };
 
 // The hook writes through an updater, so the value is read by applying it.
+/**
+ * @param {import("vitest").Mock} setter
+ * @param {{ horizontal: number[], vertical: number[] }} [current]
+ */
 const offsetsFrom = (setter, current = { horizontal: [], vertical: [] }) => {
   const updater = setter.mock.calls.at(-1)?.[0];
   return typeof updater === "function" ? updater(current) : updater;
@@ -302,7 +323,9 @@ describe("usePreviewWeekOutline", () => {
         horizontal: [...measured.horizontal],
         vertical: [...measured.vertical]
       };
-      const updater = setPreviewWeekLineOffsets.mock.calls.at(-1)[0];
+      const updater = /** @type {(previous: object) => object} */ (
+        /** @type {unknown[]} */ (setPreviewWeekLineOffsets.mock.calls.at(-1))[0]
+      );
 
       expect(updater(equalButDistinct)).toBe(equalButDistinct);
     });
@@ -311,7 +334,9 @@ describe("usePreviewWeekOutline", () => {
       const { setPreviewWeekLineOffsets } = setup();
       frame();
 
-      const updater = setPreviewWeekLineOffsets.mock.calls.at(-1)[0];
+      const updater = /** @type {(previous: object) => object} */ (
+        /** @type {unknown[]} */ (setPreviewWeekLineOffsets.mock.calls.at(-1))[0]
+      );
       const stale = { horizontal: ["0.000%", "99.000%", "100.000%"], vertical: [] };
 
       expect(updater(stale)).not.toBe(stale);
@@ -321,7 +346,9 @@ describe("usePreviewWeekOutline", () => {
       const { setPreviewWeekLineOffsets } = setup();
       frame();
 
-      const updater = setPreviewWeekLineOffsets.mock.calls.at(-1)[0];
+      const updater = /** @type {(previous: object) => object} */ (
+        /** @type {unknown[]} */ (setPreviewWeekLineOffsets.mock.calls.at(-1))[0]
+      );
       const shorter = { horizontal: ["0.000%"], vertical: ["0.000%"] };
 
       expect(updater(shorter)).not.toBe(shorter);
@@ -332,7 +359,9 @@ describe("usePreviewWeekOutline", () => {
       frame();
 
       const first = offsetsFrom(setPreviewWeekLineOffsets);
-      const updater = setPreviewWeekLineOffsets.mock.calls.at(-1)[0];
+      const updater = /** @type {(previous: object) => object} */ (
+        /** @type {unknown[]} */ (setPreviewWeekLineOffsets.mock.calls.at(-1))[0]
+      );
       const movedVertical = {
         horizontal: [...first.horizontal],
         vertical: first.vertical.map((value, index) => (index === 1 ? "99.000%" : value))
@@ -350,7 +379,10 @@ describe("usePreviewWeekOutline", () => {
 
       expect(observed).toHaveLength(2);
       expect(observed[0]).toBe(wrapEl);
-      expect(observed[1]).toBe(wrapEl.querySelector(".preview-week-table"));
+      // setup builds a table unless a test passes its own wrap.
+      expect(observed[1]).toBe(
+        /** @type {HTMLElement} */ (wrapEl).querySelector(".preview-week-table")
+      );
     });
 
     test("a resize triggers another measure", () => {

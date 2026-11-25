@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import HomePersonalStage from "../HomePersonalStage";
@@ -7,28 +8,39 @@ import { toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "../../../../
 // not: each one converts what the visitor has already typed and writes it back
 // before switching, so a mistake there silently loses their entry. The real
 // converters are used rather than stubs, since they are the ones that ship.
+//
+// The profile a test gives holds only the fields it reads, so it is cast where
+// it is given. `user={null}` is cast too: HomePageProps' user type drops the
+// null the app passes when nobody is signed in. Elements a test looks up are
+// cast to the element it expects, and a setter's last updater to a function.
+/** @typedef {Parameters<typeof HomePersonalStage>[0]} StageProps */
 
 const TRAINING_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
-const basePersonal = (overrides = {}) => ({
-  name: "",
-  age: "",
-  heightCm: "",
-  heightFeet: "",
-  heightInches: "",
-  weight: "",
-  sex: "",
-  activity: "",
-  sleep: "",
-  timeline: "",
-  experience: "",
-  nutrition: "",
-  cardio: "",
-  notes: "",
-  trainingDays: [],
-  ...overrides
-});
+/** @param {object} [overrides] */
+const basePersonal = (overrides = {}) =>
+  /** @type {StageProps["personal"]} */ (
+    /** @type {unknown} */ ({
+      name: "",
+      age: "",
+      heightCm: "",
+      heightFeet: "",
+      heightInches: "",
+      weight: "",
+      sex: "",
+      activity: "",
+      sleep: "",
+      timeline: "",
+      experience: "",
+      nutrition: "",
+      cardio: "",
+      notes: "",
+      trainingDays: [],
+      ...overrides
+    })
+  );
 
+/** @param {Partial<StageProps>} [props] */
 const renderStage = (props = {}) => {
   const handlers = {
     setPersonalMode: vi.fn(),
@@ -46,7 +58,7 @@ const renderStage = (props = {}) => {
     <HomePersonalStage
       personalPanelRef={{ current: null }}
       personalMode="basic"
-      user={null}
+      user={/** @type {StageProps["user"]} */ (/** @type {unknown} */ (null))}
       personal={basePersonal(props.personal)}
       heightUnit="cm"
       toFeetInchesFromCm={toFeetInchesFromCm}
@@ -65,11 +77,13 @@ const renderStage = (props = {}) => {
   return { ...utils, ...handlers };
 };
 
-const panel = () => document.querySelector(".personal-panel");
+const panel = () => /** @type {HTMLElement} */ (document.querySelector(".personal-panel"));
+/** @param {string} name */
 const button = (name) => screen.getByRole("button", { name });
 // The unit buttons live inside a <label>, so their accessible name is the
 // label text plus the group's aria-label ("Height Height units"), not the
 // glyph on the button. They are selected by their own text instead.
+/** @param {string} label */
 const unitButton = (label) => {
   const found = Array.from(document.querySelectorAll(".unit-toggle button")).find(
     (el) => el.textContent.trim() === label
@@ -78,7 +92,14 @@ const unitButton = (label) => {
   return found;
 };
 // The updater the component last handed to setPersonal, applied to a form.
-const applyLast = (setPersonal, prev) => setPersonal.mock.calls.at(-1)[0](prev);
+/**
+ * @param {import("vitest").Mock} setPersonal
+ * @param {object} prev
+ */
+const applyLast = (setPersonal, prev) =>
+  /** @type {(previous: object) => Record<string, unknown>} */ (
+    /** @type {unknown[]} */ (setPersonal.mock.calls.at(-1))[0]
+  )(prev);
 
 describe("HomePersonalStage", () => {
   describe("basic and advanced modes", () => {
@@ -127,7 +148,9 @@ describe("HomePersonalStage", () => {
     });
 
     test("a signed-out visitor is offered a way in", () => {
-      const { go } = renderStage({ user: null });
+      const { go } = renderStage(
+        /** @type {Partial<StageProps>} */ (/** @type {unknown} */ ({ user: null }))
+      );
 
       fireEvent.click(button("Login / Sign up"));
 
@@ -138,10 +161,14 @@ describe("HomePersonalStage", () => {
   describe("switching height units", () => {
     test("centimetres are converted before switching to feet", () => {
       // Otherwise the visitor switches units and finds the field blank.
-      const { setPersonal, setHeightUnit } = renderStage({
-        heightUnit: "cm",
-        personal: { heightCm: "183" }
-      });
+      const { setPersonal, setHeightUnit } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({
+            heightUnit: "cm",
+            personal: { heightCm: "183" }
+          })
+        )
+      );
 
       fireEvent.click(unitButton("ft/in"));
 
@@ -153,10 +180,14 @@ describe("HomePersonalStage", () => {
     });
 
     test("feet and inches are converted back before switching to centimetres", () => {
-      const { setPersonal, setHeightUnit } = renderStage({
-        heightUnit: "ft",
-        personal: { heightFeet: "6", heightInches: "0" }
-      });
+      const { setPersonal, setHeightUnit } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({
+            heightUnit: "ft",
+            personal: { heightFeet: "6", heightInches: "0" }
+          })
+        )
+      );
 
       fireEvent.click(unitButton("cm"));
 
@@ -168,7 +199,11 @@ describe("HomePersonalStage", () => {
 
     test("an empty height converts to an empty one rather than a zero", () => {
       // A visitor who switches units before typing must not be handed a 0.
-      const { setPersonal } = renderStage({ heightUnit: "cm", personal: { heightCm: "" } });
+      const { setPersonal } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({ heightUnit: "cm", personal: { heightCm: "" } })
+        )
+      );
 
       fireEvent.click(unitButton("ft/in"));
 
@@ -185,7 +220,11 @@ describe("HomePersonalStage", () => {
     ])(
       "clicking %s while it is already the unit keeps what was typed",
       (heightUnit, label, typed) => {
-        const { setPersonal, setHeightUnit } = renderStage({ heightUnit, personal: typed });
+        const { setPersonal, setHeightUnit } = renderStage(
+          /** @type {Partial<StageProps>} */ (
+            /** @type {unknown} */ ({ heightUnit, personal: typed })
+          )
+        );
 
         fireEvent.click(unitButton(label));
 
@@ -219,10 +258,14 @@ describe("HomePersonalStage", () => {
 
   describe("switching weight units", () => {
     test("kilograms are converted before switching to pounds", () => {
-      const { setPersonal, setWeightUnit } = renderStage({
-        weightUnit: "kg",
-        personal: { weight: "80" }
-      });
+      const { setPersonal, setWeightUnit } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({
+            weightUnit: "kg",
+            personal: { weight: "80" }
+          })
+        )
+      );
 
       fireEvent.click(unitButton("lb"));
 
@@ -231,10 +274,14 @@ describe("HomePersonalStage", () => {
     });
 
     test("pounds are converted back before switching to kilograms", () => {
-      const { setPersonal, setWeightUnit } = renderStage({
-        weightUnit: "lb",
-        personal: { weight: "176" }
-      });
+      const { setPersonal, setWeightUnit } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({
+            weightUnit: "lb",
+            personal: { weight: "176" }
+          })
+        )
+      );
 
       fireEvent.click(unitButton("kg"));
 
@@ -243,7 +290,11 @@ describe("HomePersonalStage", () => {
     });
 
     test("an empty weight stays empty", () => {
-      const { setPersonal } = renderStage({ weightUnit: "kg", personal: { weight: "" } });
+      const { setPersonal } = renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({ weightUnit: "kg", personal: { weight: "" } })
+        )
+      );
 
       fireEvent.click(unitButton("lb"));
 
@@ -268,7 +319,11 @@ describe("HomePersonalStage", () => {
     });
 
     test("marks the chosen days", () => {
-      renderStage({ personal: { trainingDays: ["Monday", "Friday"] } });
+      renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({ personal: { trainingDays: ["Monday", "Friday"] } })
+        )
+      );
 
       const active = Array.from(document.querySelectorAll(".day-toggle-btn.active")).map(
         (el) => el.textContent
@@ -278,7 +333,13 @@ describe("HomePersonalStage", () => {
 
     test("a non-array trainingDays is treated as none rather than throwing", () => {
       // `"Monday".includes(day)` would match on substrings if the guard went.
-      expect(() => renderStage({ personal: { trainingDays: "Monday" } })).not.toThrow();
+      expect(() =>
+        renderStage(
+          /** @type {Partial<StageProps>} */ (
+            /** @type {unknown} */ ({ personal: { trainingDays: "Monday" } })
+          )
+        )
+      ).not.toThrow();
       expect(document.querySelectorAll(".day-toggle-btn.active")).toHaveLength(0);
     });
 
@@ -322,7 +383,9 @@ describe("HomePersonalStage", () => {
     test("submitting reports it without reloading the page", () => {
       const { onPersonalSubmit } = renderStage({ isPersonalComplete: true });
 
-      expect(fireEvent.submit(document.querySelector("form"))).toBe(false);
+      expect(
+        fireEvent.submit(/** @type {HTMLFormElement} */ (document.querySelector("form")))
+      ).toBe(false);
       expect(onPersonalSubmit).toHaveBeenCalled();
     });
 
@@ -344,7 +407,11 @@ describe("HomePersonalStage", () => {
 
   describe("the fields themselves", () => {
     test("show what the visitor has entered", () => {
-      renderStage({ personal: { name: "Ada", notes: "Knee sensitivity" } });
+      renderStage(
+        /** @type {Partial<StageProps>} */ (
+          /** @type {unknown} */ ({ personal: { name: "Ada", notes: "Knee sensitivity" } })
+        )
+      );
 
       expect(document.querySelector('[name="name"]')).toHaveValue("Ada");
       expect(document.querySelector('[name="notes"]')).toHaveValue("Knee sensitivity");
@@ -354,10 +421,16 @@ describe("HomePersonalStage", () => {
       // One handler serves every field, so the name is what routes the value.
       const { onPersonalChange } = renderStage();
 
-      fireEvent.change(document.querySelector('[name="name"]'), { target: { value: "Ada" } });
+      fireEvent.change(/** @type {Element} */ (document.querySelector('[name="name"]')), {
+        target: { value: "Ada" }
+      });
 
       expect(onPersonalChange).toHaveBeenCalled();
-      expect(onPersonalChange.mock.calls.at(-1)[0].target.name).toBe("name");
+      expect(
+        /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+          /** @type {unknown[]} */ (onPersonalChange.mock.calls.at(-1))[0]
+        ).target.name
+      ).toBe("name");
     });
 
     test("the panel ref is handed back for the stage animation to measure", () => {
