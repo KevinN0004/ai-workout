@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "../App";
@@ -50,8 +51,10 @@ const DASHBOARD = {
   goals: { targetWeight: 160, targetCalories: 2200, weeklyWorkouts: 3 }
 };
 
+/** @type {{ url: string, opts: { method?: string, body?: string } | undefined }[]} */
 let calls;
 
+/** @param {typeof PROFILE | null} [profile] */
 const stubApi = (profile = PROFILE) => {
   calls = [];
   vi.stubGlobal(
@@ -86,6 +89,7 @@ const openSettings = async () => {
 
 // Reads the value cell beside a row label, distinguishing the label element
 // from any other occurrence of the same text elsewhere on the dashboard.
+/** @param {string} label */
 const rowValue = (label) => {
   const el = screen.queryAllByText(label).find((node) => node.className === "muted");
   return el?.parentElement?.textContent?.replace(label, "").trim();
@@ -153,7 +157,12 @@ describe("and edits it", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(profilePost()).toBeTruthy(), { timeout: 3000 });
-    expect(JSON.parse(profilePost().opts.body).experience).toBe("Advanced");
+    // The save has just posted, as the wait above shows.
+    expect(
+      JSON.parse(
+        /** @type {{ opts: { body: string } }} */ (/** @type {unknown} */ (profilePost())).opts.body
+      ).experience
+    ).toBe("Advanced");
   });
 
   // Editing one tab must not blank the rest of the profile. These are all
@@ -174,7 +183,12 @@ describe("and edits it", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(profilePost()).toBeTruthy(), { timeout: 3000 });
-    expect(JSON.parse(profilePost().opts.body)[field]).toEqual(expected);
+    // The save has just posted, as the wait above shows.
+    expect(
+      JSON.parse(
+        /** @type {{ opts: { body: string } }} */ (/** @type {unknown} */ (profilePost())).opts.body
+      )[field]
+    ).toEqual(expected);
   });
 
   // The whole point of the hydration guard: no profile means nothing to edit,

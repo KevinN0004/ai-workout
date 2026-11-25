@@ -1,9 +1,27 @@
+// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const home = vi.hoisted(() => ({ props: null }));
-const dash = vi.hoisted(() => ({ props: null }));
-const planner = vi.hoisted(() => ({ props: null }));
+// Each holder keeps the props its page was last rendered with, and is read only
+// after that page has rendered; a test that empties one sets it back to null.
+// Each fake event holds only what a handler reads of it, and each session check
+// is answered from the queue its test filled.
+/** @typedef {import("../pages/home/HomePage.jsx").HomePageProps} HomePageProps */
+/** @typedef {import("../pages/dashboard/DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
+/** @typedef {import("../app/components/PlannerSetupModal.jsx").PlannerSetupModalProps} PlannerSetupModalProps */
+/** @typedef {import("../pages/auth/AuthPage.jsx").AuthPageProps} AuthPageProps */
+/** @typedef {import("../pages/workout-result/WorkoutResultPage.jsx").WorkoutResultPageProps} WorkoutResultPageProps */
+/** @typedef {import("../pages/workout/SessionPage.jsx").SessionPageProps} SessionPageProps */
+
+const home = vi.hoisted(
+  () => /** @type {{ props: HomePageProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
+const dash = vi.hoisted(
+  () => /** @type {{ props: DashboardPageProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
+const planner = vi.hoisted(
+  () => /** @type {{ props: PlannerSetupModalProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
 
 vi.mock("../app/components/PlannerSetupModal", () => ({
   default: (props) => {
@@ -19,7 +37,9 @@ vi.mock("../pages/home/HomePage", () => ({
   }
 }));
 
-const auth = vi.hoisted(() => ({ props: null }));
+const auth = vi.hoisted(
+  () => /** @type {{ props: AuthPageProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
 vi.mock("../pages/auth/AuthPage", () => ({
   default: (props) => {
     auth.props = props;
@@ -34,7 +54,9 @@ vi.mock("../pages/dashboard/DashboardPage", () => ({
   }
 }));
 
-const resultPage = vi.hoisted(() => ({ props: null }));
+const resultPage = vi.hoisted(
+  () => /** @type {{ props: WorkoutResultPageProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
 vi.mock("../pages/workout-result/WorkoutResultPage", () => ({
   default: (props) => {
     resultPage.props = props;
@@ -42,7 +64,9 @@ vi.mock("../pages/workout-result/WorkoutResultPage", () => ({
   }
 }));
 
-const sessionPage = vi.hoisted(() => ({ props: null }));
+const sessionPage = vi.hoisted(
+  () => /** @type {{ props: SessionPageProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
 vi.mock("../pages/workout/SessionPage", () => ({
   default: (props) => {
     sessionPage.props = props;
@@ -50,7 +74,10 @@ vi.mock("../pages/workout/SessionPage", () => ({
   }
 }));
 
-const workerUpdate = vi.hoisted(() => ({ ready: false, reload: null }));
+const workerUpdate = vi.hoisted(
+  () =>
+    /** @type {{ ready: boolean, reload: (() => void) | null }} */ ({ ready: false, reload: null })
+);
 vi.mock("../app/hooks/useWorkerUpdate", () => ({
   default: () => ({ ready: workerUpdate.ready, reload: workerUpdate.reload })
 }));
@@ -62,24 +89,35 @@ import { addToOutbox, readOutbox } from "../app/outbox";
 import { readActiveSession, writeActiveSession } from "../app/activeSession";
 import { addExercise, blankSession, logSet } from "../app/workoutSession";
 
+/** @param {string} path */
 const setPath = (path) => {
   window.history.pushState({}, "", path);
 };
 
 // The session lookup fires on mount whatever the route, so every test needs a
 // fetch that settles.
+/** @param {(...args: any[]) => unknown} impl */
 const stubSession = (impl) => vi.stubGlobal("fetch", vi.fn(impl));
 // A refusal is a 401 unless the test names another status.
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ * @param {number} [status]
+ */
 const sessionResponse =
   (body, ok = true, status = ok ? 200 : 401) =>
   async () => ({ ok, status, json: async () => body });
 
 const SESSION_NOTICE = /can't reach the server to check your sign-in/i;
-const sessionLookups = () => fetch.mock.calls.filter(([url]) => url === "/api/auth/me").length;
+// fetch is stubbed with a mock before each test.
+const sessionLookups = () =>
+  /** @type {import("vitest").Mock} */ (fetch).mock.calls.filter(([url]) => url === "/api/auth/me")
+    .length;
 
 // The session effect is three microtasks deep (fetch, json, setUser). Until it
 // settles, `user` is still its initial null -- so asserting "nobody is signed
 // in" without flushing first passes before the lookup has even been read.
+/** @param {string} path */
 const renderSettled = async (path) => {
   setPath(path);
   const utils = render(<App />);
@@ -91,6 +129,7 @@ const renderSettled = async (path) => {
   return utils;
 };
 
+/** @param {string} locale */
 const useLocale = (locale) => {
   vi.spyOn(navigator, "languages", "get").mockReturnValue([locale]);
   vi.spyOn(navigator, "language", "get").mockReturnValue(locale);
@@ -98,8 +137,8 @@ const useLocale = (locale) => {
 
 describe("App", () => {
   beforeEach(() => {
-    home.props = null;
-    dash.props = null;
+    home.props = /** @type {HomePageProps} */ (/** @type {unknown} */ (null));
+    dash.props = /** @type {DashboardPageProps} */ (/** @type {unknown} */ (null));
     stubSession(sessionResponse({}, false));
     // A signed-in test keeps its user on the device; the next test starts
     // with none, or a session check with no answer would sign that user in.
@@ -317,7 +356,9 @@ describe("App", () => {
         sessionResponse({ user: { email: "ada@example.com" } })
       ];
       stubSession((url) =>
-        url === "/api/auth/me" ? answers.shift()() : sessionResponse({}, false)()
+        url === "/api/auth/me"
+          ? /** @type {() => Promise<unknown>} */ (answers.shift())()
+          : sessionResponse({}, false)()
       );
       await renderSettled("/dashboard");
 
@@ -353,6 +394,7 @@ describe("App", () => {
     test("asks less often the longer the server cannot answer", async () => {
       stubSession(sessionResponse({}, false, 503));
       await renderSettled("/");
+      /** @param {number} ms */
       const lookupsAfter = async (ms) => {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(ms);
@@ -381,6 +423,7 @@ describe("App", () => {
     });
 
     test("an answer that arrives after App is gone schedules nothing", async () => {
+      /** @type {((value: unknown) => void) | undefined} */
       let answer;
       stubSession((url) =>
         url === "/api/auth/me"
@@ -394,7 +437,12 @@ describe("App", () => {
 
       unmount();
       await act(async () => {
-        answer({ ok: false, status: 503, json: async () => ({}) });
+        // The check above has started, so its resolver is set.
+        /** @type {(value: unknown) => void} */ (answer)({
+          ok: false,
+          status: 503,
+          json: async () => ({})
+        });
         await vi.advanceTimersByTimeAsync(60000);
       });
 
@@ -411,8 +459,13 @@ describe("App", () => {
     const KEPT = "Entries you log are saved on this device and sent when you reconnect.";
     const OFFLINE_NOTICE = `Offline — showing your data from 2 h ago. ${KEPT}`;
     const cachedSession = () => JSON.parse(localStorage.getItem(SESSION_CACHE_KEY) || "null");
+    /** @param {{ email: string }} user */
     const cacheSession = (user) =>
       localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ user }));
+    /**
+     * @param {{ email: string }} user
+     * @param {number} updatedAt
+     */
     const cacheDashboard = (user, updatedAt) =>
       localStorage.setItem(
         `${DASHBOARD_CACHE_PREFIX}:${user.email}`,
@@ -462,7 +515,11 @@ describe("App", () => {
       const grace = { email: "grace@example.com" };
       cacheSession(ada);
       const answers = [noAnswer, noAnswer, sessionResponse({ user: grace })];
-      stubSession((url) => (url === "/api/auth/me" ? answers.shift()() : noAnswer()));
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? /** @type {() => Promise<unknown>} */ (answers.shift())()
+          : noAnswer()
+      );
       await renderSettled("/dashboard");
       expect(dash.props.user).toEqual(ada);
 
@@ -483,7 +540,11 @@ describe("App", () => {
     test("a 401 after that signs the kept user out and forgets them", async () => {
       cacheSession(ada);
       const answers = [noAnswer, noAnswer, sessionResponse({}, false)];
-      stubSession((url) => (url === "/api/auth/me" ? answers.shift()() : noAnswer()));
+      stubSession((url) =>
+        url === "/api/auth/me"
+          ? /** @type {() => Promise<unknown>} */ (answers.shift())()
+          : noAnswer()
+      );
       await renderSettled("/dashboard");
       expect(dash.props.user).toEqual(ada);
 
@@ -509,6 +570,7 @@ describe("App", () => {
     });
 
     test("a 401 does not sign out someone who signed in while it was on its way", async () => {
+      /** @type {((value: unknown) => void) | undefined} */
       let answerCheck;
       stubSession((url) =>
         url === "/api/auth/me"
@@ -522,12 +584,21 @@ describe("App", () => {
         setPath("/auth");
         render(<App />);
         await act(async () => {
-          await auth.props.onAuthSubmit({ preventDefault: () => {} });
+          await auth.props.onAuthSubmit(
+            /** @type {import("react").FormEvent} */ (
+              /** @type {unknown} */ ({ preventDefault: () => {} })
+            )
+          );
         });
         expect(dash.props?.user ?? null).toEqual(ada);
 
         await act(async () => {
-          answerCheck({ ok: false, status: 401, json: async () => ({}) });
+          // The check above has started, so its resolver is set.
+          /** @type {(value: unknown) => void} */ (answerCheck)({
+            ok: false,
+            status: 401,
+            json: async () => ({})
+          });
         });
 
         expect(dash.props.user).toEqual(ada);
@@ -541,11 +612,15 @@ describe("App", () => {
     test("a check with no answer does not replace someone who signed in meanwhile", async () => {
       cacheSession({ email: "grace@example.com" });
       const setItem = Storage.prototype.setItem;
-      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (key, value) {
-        if (key === SESSION_CACHE_KEY)
-          throw new DOMException("Quota exceeded", "QuotaExceededError");
-        return setItem.call(this, key, value);
-      });
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(
+        /** @this {Storage} */
+        function (key, value) {
+          if (key === SESSION_CACHE_KEY)
+            throw new DOMException("Quota exceeded", "QuotaExceededError");
+          return setItem.call(this, key, value);
+        }
+      );
+      /** @type {((reason: unknown) => void) | undefined} */
       let failCheck;
       stubSession((url) =>
         url === "/api/auth/me"
@@ -559,11 +634,16 @@ describe("App", () => {
         setPath("/auth");
         render(<App />);
         await act(async () => {
-          await auth.props.onAuthSubmit({ preventDefault: () => {} });
+          await auth.props.onAuthSubmit(
+            /** @type {import("react").FormEvent} */ (
+              /** @type {unknown} */ ({ preventDefault: () => {} })
+            )
+          );
         });
 
         await act(async () => {
-          failCheck(new TypeError("Failed to fetch"));
+          // The check above has started, so its rejecter is set.
+          /** @type {(reason: unknown) => void} */ (failCheck)(new TypeError("Failed to fetch"));
         });
 
         expect(dash.props.user).toEqual(ada);
@@ -600,7 +680,9 @@ describe("App", () => {
   // dashboard is handed.
   describe("Strava", () => {
     const ada = { email: "ada@example.com" };
-    const callsTo = (path) => fetch.mock.calls.filter(([url]) => url === path);
+    /** @param {string} path */
+    const callsTo = (path) =>
+      /** @type {import("vitest").Mock} */ (fetch).mock.calls.filter(([url]) => url === path);
 
     beforeEach(() => {
       document.cookie = "csrfToken=strava-token";
@@ -611,6 +693,7 @@ describe("App", () => {
       localStorage.clear();
     });
 
+    /** @param {unknown} syncAnswer */
     const signedIn = (syncAnswer) =>
       stubSession((url) => {
         if (url === "/api/auth/me") return sessionResponse({ user: ada })();
@@ -685,7 +768,9 @@ describe("App", () => {
         await Promise.resolve();
       });
 
-      const sent = fetch.mock.calls.filter(([url]) => url === "/api/dashboard/workout-sessions");
+      const sent = /** @type {import("vitest").Mock} */ (fetch).mock.calls.filter(
+        ([url]) => url === "/api/dashboard/workout-sessions"
+      );
       expect(sent).toHaveLength(1);
       expect(JSON.parse(sent[0][1].body)).toEqual({ id: "k1", focus: "Kept" });
       expect(readOutbox(ada)).toEqual([]);
@@ -758,7 +843,7 @@ describe("App", () => {
       );
 
     beforeEach(() => {
-      sessionPage.props = null;
+      sessionPage.props = /** @type {SessionPageProps} */ (/** @type {unknown} */ (null));
       document.cookie = "csrfToken=session-token";
     });
 
@@ -980,7 +1065,13 @@ describe("App", () => {
     test("resetting clears what was typed and returns to the basic form", () => {
       setPath("/");
       render(<App />);
-      act(() => home.props.onPersonalChange({ target: { name: "name", value: "Ada" } }));
+      act(() =>
+        home.props.onPersonalChange(
+          /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "name", value: "Ada" } })
+          )
+        )
+      );
       act(() => home.props.setPersonalMode("advanced"));
       expect(home.props.personal.name).toBe("Ada");
 
@@ -996,8 +1087,20 @@ describe("App", () => {
       setPath("/");
       render(<App />);
 
-      act(() => home.props.onPersonalChange({ target: { name: "age", value: "34" } }));
-      act(() => home.props.onPersonalChange({ target: { name: "sex", value: "female" } }));
+      act(() =>
+        home.props.onPersonalChange(
+          /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "age", value: "34" } })
+          )
+        )
+      );
+      act(() =>
+        home.props.onPersonalChange(
+          /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "sex", value: "female" } })
+          )
+        )
+      );
 
       expect(home.props.personal.age).toBe("34");
       expect(home.props.personal.sex).toBe("female");
@@ -1006,9 +1109,21 @@ describe("App", () => {
     test("setting one field leaves the others alone", () => {
       setPath("/");
       render(<App />);
-      act(() => home.props.onPersonalChange({ target: { name: "age", value: "34" } }));
+      act(() =>
+        home.props.onPersonalChange(
+          /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "age", value: "34" } })
+          )
+        )
+      );
 
-      act(() => home.props.onPersonalChange({ target: { name: "age", value: "35" } }));
+      act(() =>
+        home.props.onPersonalChange(
+          /** @type {import("react").ChangeEvent<HTMLInputElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "age", value: "35" } })
+          )
+        )
+      );
 
       expect(home.props.personal.age).toBe("35");
       expect(home.props.personal.sex).toBe("");
@@ -1022,7 +1137,13 @@ describe("App", () => {
       act(() => home.props.openPlannerFromProfile());
       const original = planner.props.form.goal;
 
-      act(() => planner.props.onChange({ target: { name: "goal", value: "Run a marathon" } }));
+      act(() =>
+        planner.props.onChange(
+          /** @type {import("react").ChangeEvent<HTMLSelectElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "goal", value: "Run a marathon" } })
+          )
+        )
+      );
       expect(planner.props.form.goal).toBe("Run a marathon");
 
       act(() => home.props.openPlannerFromProfile());
@@ -1143,7 +1264,13 @@ describe("App", () => {
 
       // Awaited: submitMealLog is async, and an act scope left open holds back
       // every render in the tests after this one.
-      await act(async () => dash.props.submitMealLog({ preventDefault() {} }));
+      await act(async () =>
+        dash.props.submitMealLog(
+          /** @type {import("react").FormEvent} */ (
+            /** @type {unknown} */ ({ preventDefault() {} })
+          )
+        )
+      );
       await act(async () => {
         await dash.props.onLogout();
       });
@@ -1217,7 +1344,11 @@ describe("App", () => {
         act(() => home.props.go("/auth"));
 
         await act(async () => {
-          await auth.props.onAuthSubmit({ preventDefault() {} });
+          await auth.props.onAuthSubmit(
+            /** @type {import("react").FormEvent} */ (
+              /** @type {unknown} */ ({ preventDefault() {} })
+            )
+          );
         });
 
         expect(dash.props.user).toEqual({ email: "ada@example.com" });
@@ -1271,7 +1402,13 @@ describe("App", () => {
       await renderSettled("/");
 
       act(() => home.props.openPlannerFromProfile());
-      await act(async () => planner.props.onSubmit({ preventDefault() {} }));
+      await act(async () =>
+        planner.props.onSubmit(
+          /** @type {import("react").MouseEvent<HTMLButtonElement>} */ (
+            /** @type {unknown} */ ({ preventDefault() {} })
+          )
+        )
+      );
 
       await waitFor(() =>
         expect(resultPage.props?.planSections).toEqual({

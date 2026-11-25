@@ -3,43 +3,68 @@
  * while online; a run stops at the first that has to wait, drops one the
  * server refuses, and ends with one toast for what it saved.
  */
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useOutboxReplay from "../useOutboxReplay";
 import { addToOutbox, readOutbox } from "../../outbox";
 import { markUnanswered } from "../../connection";
 
+// The fake options hold every member the hook reads, each function a mock, with
+// apiFetch a loose one; each answer only ok, status and json.
+/** @typedef {import("../useOutboxReplay.js").OutboxReplayOptions} OutboxReplayOptions */
+/** @typedef {Omit<import("vitest").Mocked<OutboxReplayOptions>, "apiFetch"> & { apiFetch: import("vitest").Mock }} FakeDeps */
+
 const ada = { email: "ada@example.com" };
-const keep = (clientId, type = "workout") =>
+// A kept entry of a real log type, sent to its own route under /api/dashboard.
+/**
+ * @param {string} clientId
+ * @param {import("../../outbox.js").LogType} [type]
+ * @param {string} [route]
+ */
+const keep = (clientId, type = "workout", route = type) =>
   addToOutbox(ada, {
     clientId,
     type,
-    url: `/api/dashboard/${type}`,
+    url: `/api/dashboard/${route}`,
     body: { id: clientId },
     item: { id: `op-${clientId}` },
     queuedAt: 1
   });
-const answer = (status, body = {}) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  json: async () => body
-});
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
+const answer = (status, body = {}) =>
+  /** @type {Response} */ (
+    /** @type {unknown} */ ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body
+    })
+  );
+/** @param {string} clientId */
 const saved = (clientId) => answer(200, { dashboard: { saved: clientId } });
+/** @param {import("vitest").Mock} apiFetch */
 const sentIds = (apiFetch) => apiFetch.mock.calls.map(([, options]) => JSON.parse(options.body).id);
 
+/** @type {FakeDeps} */
 let deps;
+/** @param {{ [K in keyof OutboxReplayOptions]?: unknown }} [overrides] */
 const render = (overrides = {}) => {
-  deps = {
-    user: ada,
-    apiFetch: vi.fn(async (_url, options) => saved(JSON.parse(options.body).id)),
-    ensureCsrfToken: vi.fn(async () => "fresh"),
-    captureAccount: () => () => true,
-    setDashboard: vi.fn(),
-    setDashError: vi.fn(),
-    showDashboardToast: vi.fn(),
-    removeQueuedEntry: vi.fn(),
-    ...overrides
-  };
+  deps = /** @type {FakeDeps} */ (
+    /** @type {unknown} */ ({
+      user: ada,
+      apiFetch: vi.fn(async (_url, options) => saved(JSON.parse(options.body).id)),
+      ensureCsrfToken: vi.fn(async () => "fresh"),
+      captureAccount: () => () => true,
+      setDashboard: vi.fn(),
+      setDashError: vi.fn(),
+      showDashboardToast: vi.fn(),
+      removeQueuedEntry: vi.fn(),
+      ...overrides
+    })
+  );
   return renderHook(() => useOutboxReplay(deps));
 };
 const settle = () =>
@@ -61,7 +86,7 @@ afterEach(() => {
 describe("useOutboxReplay", () => {
   test("sends every kept entry, oldest first, and says how many were saved", async () => {
     keep("k1");
-    keep("k2", "meal-logs");
+    keep("k2", "meal", "meal-logs");
     render();
     await settle();
 
@@ -85,6 +110,7 @@ describe("useOutboxReplay", () => {
   test("sends one at a time: the next waits for the answer before it", async () => {
     keep("k1");
     keep("k2");
+    /** @type {((value: unknown) => void) | undefined} */
     let answerFirst;
     render({
       apiFetch: vi
@@ -101,7 +127,8 @@ describe("useOutboxReplay", () => {
     expect(deps.apiFetch).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      answerFirst(saved("k1"));
+      // The first send has started, so its resolver is set.
+      /** @type {(value: unknown) => void} */ (answerFirst)(saved("k1"));
       await vi.advanceTimersByTimeAsync(0);
     });
 
@@ -152,11 +179,11 @@ describe("useOutboxReplay", () => {
   });
 
   test("falls back to a message naming the entry when the refusal has none", async () => {
-    keep("k1", "calories");
+    keep("k1", "calorie", "calories");
     render({ apiFetch: vi.fn(async () => answer(400)) });
     await settle();
 
-    expect(deps.setDashError).toHaveBeenCalledWith("Unable to save calories.");
+    expect(deps.setDashError).toHaveBeenCalledWith("Unable to save calorie.");
   });
 
   test("does nothing while offline, and sends once the connection is back", async () => {

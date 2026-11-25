@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useOptimisticLogs from "../useOptimisticLogs";
@@ -11,17 +12,34 @@ import { addToOutbox, readOutbox } from "../../outbox";
 // What makes it worth testing is that it decides what a user sees about data
 // that is not saved yet -- and, when a save fails, whether the entry they typed
 // quietly stays on screen looking saved.
+//
+// Each hook is given only the options its test reaches, and each toast a test
+// reads is one the hook has just shown, with its action set.
+/** @typedef {import("../useOptimisticLogs.js").OptimisticLogsOptions} OptimisticLogsOptions */
+/** @typedef {import("../useOptimisticLogs.js").Toast & { onAction: () => void }} ShownToast */
 
+/** @type {import("vitest").Mock} */
 let setDashboard;
+/** @type {import("vitest").Mock} */
 let setDashError;
 
+/** @param {Partial<OptimisticLogsOptions>} [extra] */
 const render = (extra = {}) => {
-  const hook = renderHook(() => useOptimisticLogs({ setDashboard, setDashError, ...extra }));
+  const hook = renderHook(() =>
+    useOptimisticLogs(
+      /** @type {OptimisticLogsOptions} */ ({ setDashboard, setDashError, ...extra })
+    )
+  );
   return hook;
 };
 
+/**
+ * @param {unknown} result
+ * @param {Partial<import("../useOptimisticLogs.js").LogCommit>} [overrides]
+ * @returns {import("../useOptimisticLogs.js").LogCommit}
+ */
 const queue = (result, overrides = {}) => ({
-  type: "meal log",
+  type: "meal",
   item: { id: "op-1", title: "Porridge" },
   request: vi.fn(async () => result),
   pendingMessage: "Saved locally.",
@@ -146,6 +164,7 @@ describe("queueOptimisticLogCommit", () => {
   });
 
   describe("when the save fails", () => {
+    /** @param {string} [message] */
     const failing = (message = "network down") =>
       queue(undefined, {
         request: vi.fn(async () => {
@@ -188,7 +207,7 @@ describe("queueOptimisticLogCommit", () => {
       act(() => result.current.queueOptimisticLogCommit(options));
       await runUndoWindow();
 
-      expect(setDashError).toHaveBeenLastCalledWith("Unable to save meal log.");
+      expect(setDashError).toHaveBeenLastCalledWith("Unable to save meal.");
     });
 
     test("does not touch the dashboard", async () => {
@@ -204,8 +223,9 @@ describe("queueOptimisticLogCommit", () => {
 
 describe("undo", () => {
   // Undo is reachable only through the pending toast's action.
+  /** @param {{ current: ReturnType<typeof useOptimisticLogs> }} result */
   const undoVia = (result) => {
-    act(() => result.current.dashboardToast.onAction());
+    act(() => /** @type {ShownToast} */ (result.current.dashboardToast).onAction());
   };
 
   test("is offered on the pending toast", () => {
@@ -217,7 +237,9 @@ describe("undo", () => {
       message: "Saved locally.",
       actionLabel: "Undo"
     });
-    expect(typeof result.current.dashboardToast.onAction).toBe("function");
+    expect(typeof (/** @type {ShownToast} */ (result.current.dashboardToast).onAction)).toBe(
+      "function"
+    );
   });
 
   test("removes the entry", () => {
@@ -265,7 +287,9 @@ describe("undo", () => {
     );
     undoVia(result);
 
-    expect(result.current.dashboardToast.message).toBe("Update undone.");
+    expect(/** @type {ShownToast} */ (result.current.dashboardToast).message).toBe(
+      "Update undone."
+    );
   });
 
   // Once the window has closed the request is in flight, and pretending it can
@@ -275,7 +299,7 @@ describe("undo", () => {
     const options = queue({ dashboard: { workouts: [] } });
 
     act(() => result.current.queueOptimisticLogCommit(options));
-    const pendingToast = result.current.dashboardToast;
+    const pendingToast = /** @type {ShownToast} */ (result.current.dashboardToast);
     await runUndoWindow();
 
     act(() => pendingToast.onAction());
@@ -288,7 +312,7 @@ describe("undo", () => {
     const { result } = render();
 
     act(() => result.current.queueOptimisticLogCommit(queue({ dashboard: {} })));
-    const toast = result.current.dashboardToast;
+    const toast = /** @type {ShownToast} */ (result.current.dashboardToast);
     act(() => toast.onAction());
     act(() => toast.onAction());
 
@@ -301,7 +325,7 @@ describe("undo", () => {
     const second = queue({ dashboard: {} }, { item: { id: "op-2", title: "Eggs" } });
 
     act(() => result.current.queueOptimisticLogCommit(first));
-    const firstToast = result.current.dashboardToast;
+    const firstToast = /** @type {ShownToast} */ (result.current.dashboardToast);
     act(() => result.current.queueOptimisticLogCommit(second));
 
     act(() => firstToast.onAction());
@@ -363,11 +387,16 @@ describe("toasts", () => {
     expect(result.current.dashboardToast).toBeNull();
   });
 
-  test.each([
-    ["zero", 0],
-    ["negative", -5],
-    ["not a number", "soon"]
-  ])("falls back to the default for a %s duration", (_label, durationMs) => {
+  // The last row is a string on purpose: a duration that is not a number.
+  test.each(
+    /** @type {[string, number][]} */ (
+      /** @type {unknown} */ ([
+        ["zero", 0],
+        ["negative", -5],
+        ["not a number", "soon"]
+      ])
+    )
+  )("falls back to the default for a %s duration", (_label, durationMs) => {
     const { result } = render();
 
     act(() => result.current.showDashboardToast("Saved.", "success", { durationMs }));
@@ -382,11 +411,12 @@ describe("toasts", () => {
     act(() =>
       result.current.showDashboardToast("Saved.", "success", {
         actionLabel: "Undo",
-        onAction: "nope"
+        // An action that is not a function, which the toast must ignore.
+        onAction: /** @type {() => void} */ (/** @type {unknown} */ ("nope"))
       })
     );
 
-    expect(result.current.dashboardToast.onAction).toBeNull();
+    expect(/** @type {ShownToast} */ (result.current.dashboardToast).onAction).toBeNull();
   });
 
   // A newer toast replaces an older one, and the older one's timer must not
@@ -473,13 +503,20 @@ describe("unmounting", () => {
 // A request the test releases by hand, so a logout can be staged while it is
 // still out.
 const deferred = () => {
+  /** @type {((value: unknown) => void) | undefined} */
   let resolve;
+  /** @type {((reason: unknown) => void) | undefined} */
   let reject;
   const promise = new Promise((res, rej) => {
     resolve = res;
     reject = rej;
   });
-  return { promise, resolve, reject };
+  // The promise runs its executor at once, so both are set by here.
+  return {
+    promise,
+    resolve: /** @type {(value: unknown) => void} */ (resolve),
+    reject: /** @type {(reason: unknown) => void} */ (reject)
+  };
 };
 
 describe("captureAccount", () => {
@@ -586,6 +623,7 @@ describe("flushOptimisticOperations", () => {
     await runUndoWindow();
 
     let settled = false;
+    /** @type {Promise<void> | undefined} */
     let flushing;
     act(() => {
       flushing = result.current.flushOptimisticOperations().then(() => {
@@ -692,6 +730,10 @@ describe("once the send has started", () => {
 describe("an answer that arrives while a later entry offers Undo", () => {
   // Entry one is sent at 4.5 s and answers when the test says; entry two is
   // queued at 2 s, so its Undo toast is up, and its window open, until 6.5 s.
+  /**
+   * @param {{ current: ReturnType<typeof useOptimisticLogs> }} result
+   * @param {() => Promise<unknown>} request
+   */
   const stage = async (result, request) => {
     act(() => result.current.queueOptimisticLogCommit(queue(undefined, { request })));
     await act(async () => {
@@ -756,7 +798,7 @@ describe("an answer that arrives while a later entry offers Undo", () => {
       vi.fn(() => pending.promise)
     );
 
-    act(() => result.current.dashboardToast.onAction());
+    act(() => /** @type {ShownToast} */ (result.current.dashboardToast).onAction());
     await act(async () => {
       pending.resolve({ dashboard: {} });
     });
@@ -792,10 +834,15 @@ describe("keeping an entry for later", () => {
     url: "/api/dashboard/meal-logs",
     body: { id: "k1", name: "Porridge" }
   };
+  /**
+   * @param {number | undefined} status none for a request that got no answer
+   * @param {string} [message]
+   */
   const failingWith = (status, message = "Server unavailable.") =>
     vi.fn(async () => {
       throw Object.assign(new Error(message), status === undefined ? {} : { status });
     });
+  /** @param {{ email: string }} user */
   const keptFor = (user) => readOutbox(user);
 
   afterEach(() => {
@@ -821,7 +868,7 @@ describe("keeping an entry for later", () => {
     expect(keptFor(ada)).toEqual([
       expect.objectContaining({
         clientId: "k1",
-        type: "meal log",
+        type: "meal",
         url: "/api/dashboard/meal-logs",
         body: { id: "k1", name: "Porridge" },
         item: { id: "op-1", title: "Porridge" }
@@ -904,7 +951,7 @@ describe("keeping an entry for later", () => {
         queue(undefined, { request: failingWith(undefined), outbox })
       )
     );
-    const undo = result.current.dashboardToast.onAction;
+    const undo = /** @type {ShownToast} */ (result.current.dashboardToast).onAction;
     await runUndoWindow();
 
     act(() => undo());
@@ -963,7 +1010,11 @@ describe("keeping an entry for later", () => {
     addToOutbox(ada, { ...outbox, type: "meal", item: { id: "op-9" }, queuedAt: 1 });
     let user = ada;
     const { result, rerender } = renderHook(() =>
-      useOptimisticLogs({ setDashboard, setDashError, user })
+      useOptimisticLogs(
+        /** @type {OptimisticLogsOptions} */ (
+          /** @type {unknown} */ ({ setDashboard, setDashError, user })
+        )
+      )
     );
 
     user = { ...ada, profile: { firstName: "Ada" } };

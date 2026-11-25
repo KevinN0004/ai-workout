@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toKmOrMi, toNumberOrNull } from "../app/units";
@@ -19,6 +20,8 @@ import { e1rmOf } from "../pages/dashboard/progress";
 //
 // Add a row when you add a numeric helper.
 
+// The three ways an upstream spells "no reading", each one a row.
+/** @type {[string, null | "" | undefined][]} */
 const ABSENT = [
   ["null", null],
   ["an empty string", ""],
@@ -96,7 +99,8 @@ describe.each(helpers)("$name", ({ call, absent }) => {
 //   "0". Pinned here because it shares the risk, not the shape:
 describe("fromLoadKg (app/exerciseSets)", () => {
   test.each(ABSENT)("shows %s as no load", (_label, value) => {
-    expect(fromLoadKg(value, "metric")).toBe("");
+    // A blank string is one spelling of absent, which a stored load can arrive as.
+    expect(fromLoadKg(/** @type {number | null | undefined} */ (value), "metric")).toBe("");
   });
 
   test("shows a measured 0 kg as 0", () => {

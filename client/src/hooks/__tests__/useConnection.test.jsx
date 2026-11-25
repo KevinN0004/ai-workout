@@ -2,6 +2,7 @@
  * Pins useConnection: it reads the connection store and re-renders when the
  * store changes.
  */
+// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 import useConnection from "../useConnection";

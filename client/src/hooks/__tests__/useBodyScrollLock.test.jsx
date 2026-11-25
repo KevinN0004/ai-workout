@@ -1,7 +1,9 @@
+// @ts-check
 import { render } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 import useBodyScrollLock from "../useBodyScrollLock";
 
+/** @param {{ locked: boolean }} props */
 function LockHarness({ locked }) {
   useBodyScrollLock(locked);
   return <div>lock</div>;
@@ -51,11 +53,12 @@ describe("useBodyScrollLock", () => {
     // global is genuinely absent. Stubbed to undefined, the two read alike and
     // the weaker check passes, which is a surviving mutant rather than a test.
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
-    delete globalThis.document;
+    // The global is taken away for the test and put back after it.
+    delete (/** @type {{ document?: Document }} */ (globalThis).document);
     try {
       expect(() => view.unmount()).not.toThrow();
     } finally {
-      Object.defineProperty(globalThis, "document", descriptor);
+      Object.defineProperty(globalThis, "document", /** @type {PropertyDescriptor} */ (descriptor));
     }
   });
 });

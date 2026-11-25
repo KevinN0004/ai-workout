@@ -1,3 +1,4 @@
+// @ts-check
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { equipmentOptionsByEnv } from "../app/constants";
@@ -13,7 +14,12 @@ import { equipmentOptionsByEnv } from "../app/constants";
 // The handlers live inside App and are handed to the planner modal, so the
 // modal is mocked to capture them and HomePage is mocked to render it.
 
-const planner = vi.hoisted(() => ({ props: null }));
+// The holder keeps the props the modal was last rendered with, and is read only
+// after the modal has rendered; beforeEach empties it.
+/** @typedef {import("../app/components/PlannerSetupModal.jsx").PlannerSetupModalProps} PlannerSetupModalProps */
+const planner = vi.hoisted(
+  () => /** @type {{ props: PlannerSetupModalProps }} */ (/** @type {unknown} */ ({ props: null }))
+);
 
 vi.mock("../app/components/PlannerSetupModal", () => ({
   default: (props) => {
@@ -39,12 +45,14 @@ const SPECIFIC = COMMERCIAL.filter((option) => option !== FULL);
 
 const equipment = () => planner.props.form.equipment;
 
+/** @param {string} environment */
 const setEnvironment = (environment) => act(() => planner.props.onEnvironmentChange(environment));
 
+/** @param {string} item */
 const toggle = (item) => act(() => planner.props.toggleEquipment(item));
 
 beforeEach(async () => {
-  planner.props = null;
+  planner.props = /** @type {PlannerSetupModalProps} */ (/** @type {unknown} */ (null));
   window.history.pushState({}, "", "/");
   // Signed out: the session check answers 401.
   vi.stubGlobal(
@@ -232,7 +240,14 @@ describe("the planner's equipment picker", () => {
     test("a field change updates only that field", () => {
       const before = planner.props.form.goal;
 
-      act(() => planner.props.onChange({ target: { name: "duration", value: "30" } }));
+      // The change event holds only the target the handler reads.
+      act(() =>
+        planner.props.onChange(
+          /** @type {import("react").ChangeEvent<HTMLSelectElement>} */ (
+            /** @type {unknown} */ ({ target: { name: "duration", value: "30" } })
+          )
+        )
+      );
 
       expect(planner.props.form.duration).toBe("30");
       expect(planner.props.form.goal).toBe(before);
@@ -275,14 +290,22 @@ describe("the planner's equipment picker", () => {
       });
 
       act(() => planner.props.setHealthAnswer("symptoms", false));
-      expect(planner.props.form.health.symptoms).toBe(false);
+      // The planner form always holds a set of health answers.
+      expect(
+        /** @type {NonNullable<typeof planner.props.form.health>} */ (planner.props.form.health)
+          .symptoms
+      ).toBe(false);
     });
 
     test("closing the planner clears the health answers too", () => {
       act(() => planner.props.setHealthAnswer("pregnant", true));
       act(() => planner.props.closePlanner());
 
-      expect(planner.props.form.health.pregnant).toBe(false);
+      // The planner form always holds a set of health answers.
+      expect(
+        /** @type {NonNullable<typeof planner.props.form.health>} */ (planner.props.form.health)
+          .pregnant
+      ).toBe(false);
     });
 
     test("a focus toggle adds and removes", () => {
