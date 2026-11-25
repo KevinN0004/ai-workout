@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { deloadSets, liftKeyOf } from "../planUtils";
 import {

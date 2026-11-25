@@ -2,13 +2,24 @@
  * Pins ExerciseTile's Save button: its three labels, what it hands onSave, and
  * that it waits for a connection while offline.
  */
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import ExerciseTile from "../ExerciseTile";
 import { markUnanswered } from "../../../../app/connection";
 
-const exercise = { id: 7, name: "Barbell Squat", category: { name: "Legs" }, equipment: [] };
+// The exercise holds only the fields the tile reads.
+/** @typedef {Parameters<typeof ExerciseTile>[0]} TileProps */
+const exercise = /** @type {TileProps["exercise"]} */ (
+  /** @type {unknown} */ ({
+    id: 7,
+    name: "Barbell Squat",
+    category: { name: "Legs" },
+    equipment: []
+  })
+);
 
+/** @param {Partial<TileProps>} [props] */
 const renderTile = (props = {}) => {
   const handlers = { onOpen: vi.fn(), onSave: vi.fn() };
   render(

@@ -1,3 +1,4 @@
+// @ts-check
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -10,9 +11,18 @@ import { markUnanswered } from "../../../../app/connection";
 // disconnect behind a confirm, and the result Strava's return leaves in the
 // query. apiFetch is faked per route; the server's answers are pinned in
 // server/src/routes/integrations/__tests__.
+//
+// The fake apiFetch answers whatever a route's function gives it, so it is a
+// plain mock; the one cast is the deferred resolver, which the promise sets.
+/** @typedef {Awaited<ReturnType<typeof import("../../../../app/strava.js").fetchStravaState>>} StravaState */
 
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
 const respond = (body, ok = true) => ({ ok, json: async () => body });
 
+/** @type {StravaState} */
 const CONNECTED = {
   available: true,
   connected: true,
@@ -26,6 +36,7 @@ const AUTHORIZE_URL = "https://www.strava.com/oauth/authorize?client_id=1";
 
 // A fake apiFetch: `routes` maps "METHOD path" to a function giving the
 // response, so a test can change what a route answers between calls.
+/** @param {Record<string, () => unknown>} routes */
 const fakeApi = (routes) =>
   vi.fn(async (path, options) => {
     const key = `${options?.method || "GET"} ${path}`;
@@ -33,10 +44,12 @@ const fakeApi = (routes) =>
     return routes[key]();
   });
 
+/** @param {StravaState} state */
 const stateRoute = (state) => ({ "GET /api/integrations/strava": () => respond(state) });
 
 // `onImportsChange` is App's reloadDashboard: a sync that changed workouts, or
 // a disconnect, leaves the dashboard's copy stale.
+/** @param {import("vitest").Mock} apiFetch */
 const renderPanel = (apiFetch) => {
   const onImportsChange = vi.fn();
   const utils = render(
@@ -47,11 +60,12 @@ const renderPanel = (apiFetch) => {
 
 // A promise the test settles when it chooses.
 const deferred = () => {
+  /** @type {((value: unknown) => void) | undefined} */
   let resolve;
   const promise = new Promise((done) => {
     resolve = done;
   });
-  return { promise, resolve };
+  return { promise, resolve: /** @type {(value: unknown) => void} */ (resolve) };
 };
 
 beforeEach(() => {
@@ -215,6 +229,10 @@ describe("connected", () => {
 describe("Sync now", () => {
   // The panel reads the state again after a sync, so the route answers the
   // second state from then on.
+  /**
+   * @param {unknown} answer
+   * @param {StravaState} [after]
+   */
   const syncing = (answer, after = CONNECTED) => {
     let state = CONNECTED;
     const sync = deferred();

@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useMealDbSearch from "../useMealDbSearch";
@@ -8,21 +9,35 @@ import { MEALDB_RECOMMENDATION_QUERIES } from "../data";
 // handling is the part worth having: switching query quickly cancels the
 // in-flight request, and a cancelled request must not surface as an error the
 // user sees.
+//
+// The casts give the hook a track read as a plain string, including one no
+// goal has, and a submit event with only the preventDefault it calls.
+/** @typedef {import("../../planUtils.js").Track} Track */
 
+/**
+ * @param {string} id
+ * @param {string} [title]
+ */
 const meal = (id, title = `Meal ${id}`) => ({ id, title, image: "https://example.com/a.jpg" });
 
+/** @param {unknown[]} meals */
 const mealsResponse = (meals) => ({ ok: true, json: async () => ({ meals }) });
 
+/** @param {Track} track */
 const sectionsFor = (track) =>
   MEALDB_RECOMMENDATION_QUERIES[track] || MEALDB_RECOMMENDATION_QUERIES.lean_strength;
 
+/** @type {import("vitest").Mock} */
 let fetchMock;
 
 // Requests the search effect made, as opposed to the recommendation ones.
+/** @param {string} query */
 const searchCalls = (query) =>
   fetchMock.mock.calls.filter(([url]) => url.includes(`query=${query}`));
 
-const render = (track = "lean_strength") => renderHook(() => useMealDbSearch(track));
+/** @param {string} [track] */
+const render = (track = "lean_strength") =>
+  renderHook(() => useMealDbSearch(/** @type {Track} */ (track)));
 
 beforeEach(() => {
   fetchMock = vi.fn(async () => mealsResponse([]));
@@ -258,7 +273,10 @@ describe("searching", () => {
 });
 
 describe("submitMealDbSearch", () => {
-  const submitEvent = () => ({ preventDefault: vi.fn() });
+  const submitEvent = () =>
+    /** @type {import("react").FormEvent & { preventDefault: import("vitest").Mock }} */ (
+      /** @type {unknown} */ ({ preventDefault: vi.fn() })
+    );
 
   test("promotes the typed input to the active query and empties the box", async () => {
     const { result } = render();

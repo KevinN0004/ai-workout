@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
@@ -8,7 +9,10 @@ import { markUnanswered } from "../../../../app/connection";
 // deleting the account. Both handlers resolve to { ok } / { ok, error } and
 // never throw -- see client/src/app/events.js -- so every branch here is
 // driven by the resolved value rather than by a thrown error.
+//
+// A resolver set inside a promise executor is cast where the test calls it.
 
+/** @param {Partial<Parameters<typeof SettingsAccountPanel>[0]>} [props] */
 const renderPanel = (props = {}) =>
   render(<SettingsAccountPanel onChangePassword={vi.fn()} onDeleteAccount={vi.fn()} {...props} />);
 
@@ -117,6 +121,7 @@ describe("SettingsAccountPanel", () => {
     // resolved before the next assertion runs.
     test("disables the submit button while a change is in flight, so a double-click cannot fire two requests", async () => {
       const user = userEvent.setup();
+      /** @type {((value: unknown) => void) | undefined} */
       let resolveChange;
       const onChangePassword = vi.fn(
         () =>
@@ -133,7 +138,7 @@ describe("SettingsAccountPanel", () => {
       expect(screen.getByRole("button", { name: "Changing..." })).toBeDisabled();
       expect(onChangePassword).toHaveBeenCalledTimes(1);
 
-      resolveChange({ ok: true });
+      /** @type {(value: unknown) => void} */ (resolveChange)({ ok: true });
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Change password" })).toBeEnabled()
       );
@@ -258,6 +263,7 @@ describe("SettingsAccountPanel", () => {
     // pending state is actually observed rather than already resolved.
     test("disables the confirm button while a deletion is in flight, so a double-click cannot fire two requests", async () => {
       const user = userEvent.setup();
+      /** @type {((value: unknown) => void) | undefined} */
       let resolveDelete;
       const onDeleteAccount = vi.fn(
         () =>
@@ -274,7 +280,10 @@ describe("SettingsAccountPanel", () => {
       expect(screen.getByRole("button", { name: "Deleting..." })).toBeDisabled();
       expect(onDeleteAccount).toHaveBeenCalledTimes(1);
 
-      resolveDelete({ ok: false, error: "Incorrect password." });
+      /** @type {(value: unknown) => void} */ (resolveDelete)({
+        ok: false,
+        error: "Incorrect password."
+      });
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Confirm deletion" })).toBeEnabled()
       );

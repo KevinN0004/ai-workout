@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   buildPlanDayPrefill,
@@ -17,6 +18,12 @@ import { EXERCISES } from "../../../../../server/src/services/planning/exerciseL
 
 // The eight real Gemini answers the server's plan tests are built on, loaded by
 // Vite as text: under jsdom, node:fs cannot find them from import.meta.url.
+//
+// Each day here holds only the title and lines (and prescriptions) a pre-fill
+// reads, each fixture day looked up is one of the eight, and each card a
+// pre-fill opens from a prescription has targets.
+/** @typedef {import("../../../app/plans.js").PlanDay} PlanDay */
+/** @typedef {ReturnType<typeof buildPlanDayPrefill>["exerciseSets"][number]} Card */
 const realDays = Object.entries(
   import.meta.glob("../../../../../server/src/services/dashboard/__tests__/fixtures/plans/*.txt", {
     query: "?raw",
@@ -24,12 +31,21 @@ const realDays = Object.entries(
     eager: true
   })
 ).flatMap(([path, text]) =>
-  parsePlanSections(text).days.map((day) => [`${path.split("/").pop()} ${day.title}`, day])
+  parsePlanSections(text).days.map(
+    (day) => /** @type {[string, PlanDay]} */ ([`${path.split("/").pop()} ${day.title}`, day])
+  )
 );
+/**
+ * @param {string} fixture
+ * @param {string} weekday
+ */
 const realDay = (fixture, weekday) =>
-  realDays.find(([label]) => label === `${fixture} ${weekday}`)[1];
+  /** @type {[string, PlanDay]} */ (
+    realDays.find(([label]) => label === `${fixture} ${weekday}`)
+  )[1];
 
 // The names of the exercise cards a pre-fill opens with.
+/** @param {ReturnType<typeof buildPlanDayPrefill>} prefill */
 const namesOf = (prefill) => prefill.exerciseSets.map((card) => card.name);
 
 describe("buildPlanDayPrefill", () => {
@@ -67,10 +83,10 @@ describe("buildPlanDayPrefill", () => {
   });
 
   test("drops a bracketed aside, and the comma in it", () => {
-    const day = {
+    const day = /** @type {PlanDay} */ ({
       title: "Tuesday",
       lines: ["- Cable Rows (Close grip, focus on upright posture): 3 x 10"]
-    };
+    });
 
     expect(namesOf(buildPlanDayPrefill(day))).toEqual(["Cable Rows"]);
   });
@@ -78,19 +94,21 @@ describe("buildPlanDayPrefill", () => {
   // A card holds its name whole, so a comma in it no longer splits it in two
   // ("One-arm dumbbell row, hand on a bench" is one library exercise).
   test("leaves out a rest line, and keeps a name that holds a comma", () => {
-    const day = {
+    const day = /** @type {PlanDay} */ ({
       title: "Monday",
       lines: ["- Rest: 30 seconds", "- Squats, then lunges: 3 x 10", "- Plank: 3 x 30s"]
-    };
+    });
 
     expect(namesOf(buildPlanDayPrefill(day))).toEqual(["Squats, then lunges", "Plank"]);
   });
 
   test("opens each card with one empty set row", () => {
-    const [card] = buildPlanDayPrefill({
-      title: "Monday",
-      lines: ["- Plank: 3 x 30s"]
-    }).exerciseSets;
+    const [card] = buildPlanDayPrefill(
+      /** @type {PlanDay} */ ({
+        title: "Monday",
+        lines: ["- Plank: 3 x 30s"]
+      })
+    ).exerciseSets;
 
     expect(card).toMatchObject({ name: "Plank", kind: "reps", targets: null });
     expect(card.sets).toHaveLength(1);
@@ -100,16 +118,16 @@ describe("buildPlanDayPrefill", () => {
   // The server keeps an exercise of at most 140 characters, so a longer name
   // is left out rather than cut into a different name.
   test("leaves out a name longer than the 140 characters an exercise can hold", () => {
-    const day = {
+    const day = /** @type {PlanDay} */ ({
       title: "Monday",
       lines: [`- ${"x".repeat(141)}: 3 x 10`, `- ${"y".repeat(140)}: 3 x 10`]
-    };
+    });
 
     expect(namesOf(buildPlanDayPrefill(day))).toEqual(["y".repeat(140)]);
   });
 
   test("keeps the whole day as notes, cut at 500 characters", () => {
-    const day = { title: "Monday", lines: ["Warmup:", "x".repeat(600)] };
+    const day = /** @type {PlanDay} */ ({ title: "Monday", lines: ["Warmup:", "x".repeat(600)] });
 
     expect(buildPlanDayPrefill(day).notes).toBe(`Warmup:\n${"x".repeat(492)}`);
   });
@@ -185,6 +203,7 @@ describe("buildPlanDayPrefill", () => {
   // placeholders. A target is a placeholder, never a value: every row opens
   // empty.
   describe("from a rule-built day's prescriptions", () => {
+    /** @param {Record<string, unknown>} fields */
     const prescription = (fields) => ({
       name: "Dumbbell bench press",
       sets: 3,
@@ -194,11 +213,13 @@ describe("buildPlanDayPrefill", () => {
       targetRpe: { min: 8, max: 9 },
       ...fields
     });
-    const day = (prescriptions) => ({
-      title: "Monday - Full body A",
-      lines: ["- Dumbbell bench press: 3 x 8-10 (Rest 90s, stop 2 reps short of failure)"],
-      prescriptions
-    });
+    /** @param {unknown[]} prescriptions */
+    const day = (prescriptions) =>
+      /** @type {PlanDay} */ ({
+        title: "Monday - Full body A",
+        lines: ["- Dumbbell bench press: 3 x 8-10 (Rest 90s, stop 2 reps short of failure)"],
+        prescriptions
+      });
 
     test("opens a card per prescription, with its rows and its targets", () => {
       const [card] = buildPlanDayPrefill(day([prescription({})])).exerciseSets;
@@ -266,6 +287,7 @@ describe("buildPlanDayPrefill", () => {
         seconds: { min: 20, max: 30 },
         targetRpe: null
       });
+      /** @param {Record<string, unknown>} fields */
       const lift = (fields) => ({
         name: "Dumbbell bench press",
         key: "dumbbell bench press",
@@ -277,13 +299,27 @@ describe("buildPlanDayPrefill", () => {
         decision: null,
         ...fields
       });
-      const weekOf = (lifts, deloadWeek = { active: false, decision: null }) => ({
-        weekStart: "2026-11-09",
-        deloadWeek,
-        lifts
-      });
+      /**
+       * @param {unknown[]} lifts
+       * @param {{ active: boolean, decision: string | null }} [deloadWeek]
+       */
+      const weekOf = (lifts, deloadWeek = { active: false, decision: null }) =>
+        /** @type {Parameters<typeof buildPlanDayPrefill>[1]} */ (
+          /** @type {unknown} */ ({
+            weekStart: "2026-11-09",
+            deloadWeek,
+            lifts
+          })
+        );
+      /**
+       * @param {Parameters<typeof buildPlanDayPrefill>[1]} week
+       * @param {"metric" | "imperial"} [system]
+       * @param {unknown[]} [prescriptions]
+       */
       const cardsOf = (week, system = "metric", prescriptions = [prescription({}), hold]) =>
-        buildPlanDayPrefill(day(prescriptions), week, system).exerciseSets;
+        /** @type {(Card & { targets: NonNullable<Card["targets"]> })[]} */ (
+          buildPlanDayPrefill(day(prescriptions), week, system).exerciseSets
+        );
 
       test("a lift's card has the week's load as its placeholder, in the region's unit", () => {
         const [metric] = cardsOf(weekOf([lift({})]));

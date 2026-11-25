@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { EDITABLE_TABS, fieldsForTab } from "../settingsFields";
 import {
@@ -11,6 +12,9 @@ import {
   defaultPersonalForm
 } from "../../../../app/constants";
 import { toLb } from "../../../../app/units";
+
+// Each field a test looks up is on its tab, with the input type its name gives it.
+/** @typedef {import("../settingsFields.js").SettingsField} SettingsField */
 
 describe("settingsFields", () => {
   test("marks exactly the three real tabs editable", () => {
@@ -48,14 +52,20 @@ describe("settingsFields", () => {
     ["lifestyle", "nutrition", () => nutritionOptions],
     ["lifestyle", "cardio", () => cardioOptions]
   ])("the %s tab's %s field reuses the shared list", (tab, name, expected) => {
-    expect(fieldsForTab(tab).find((field) => field.name === name).options).toBe(expected());
+    expect(
+      /** @type {Extract<SettingsField, { options: string[] }>} */ (
+        fieldsForTab(tab).find((field) => field.name === name)
+      ).options
+    ).toBe(expected());
   });
 
   // weekDays is a list of { label, key } objects, not strings. The multiselect
   // stores day keys, which is what buildProfile's trainingDays receives, so the
   // options must be the keys rather than the whole objects.
   test("offers training days as plain day-name strings", () => {
-    const days = fieldsForTab("training").find((field) => field.name === "trainingDays");
+    const days = /** @type {Extract<SettingsField, { type: "multiselect" }>} */ (
+      fieldsForTab("training").find((field) => field.name === "trainingDays")
+    );
 
     expect(days.options).toContain("Monday");
     expect(days.options.every((option) => typeof option === "string")).toBe(true);
@@ -72,7 +82,9 @@ describe("settingsFields", () => {
   // materially wrong `lb: [58, 850]` pass, which would reject weights the
   // server accepts at both ends.
   test("declares weight bounds for both units, the pound range converted from the kilogram one", () => {
-    const weight = fieldsForTab("profile").find((field) => field.name === "weight");
+    const weight = /** @type {Extract<SettingsField, { type: "weight" }>} */ (
+      fieldsForTab("profile").find((field) => field.name === "weight")
+    );
 
     expect(weight.type).toBe("weight");
     expect(weight.bounds.kg).toEqual([25, 400]);
@@ -80,7 +92,9 @@ describe("settingsFields", () => {
   });
 
   test("declares height bounds for both units", () => {
-    const height = fieldsForTab("profile").find((field) => field.name === "heightCm");
+    const height = /** @type {Extract<SettingsField, { type: "height" }>} */ (
+      fieldsForTab("profile").find((field) => field.name === "heightCm")
+    );
 
     expect(height.type).toBe("height");
     expect(height.bounds.cm).toEqual([100, 260]);
@@ -100,7 +114,9 @@ describe("settingsFields", () => {
       ft,
       in: inches,
       cm
-    } = fieldsForTab("profile").find((field) => field.name === "heightCm").bounds;
+    } = /** @type {Extract<SettingsField, { type: "height" }>} */ (
+      fieldsForTab("profile").find((field) => field.name === "heightCm")
+    ).bounds;
     const lowestImperialCm = Math.round(ft[0] * 30.48 + inches[0] * 2.54);
     const highestImperialCm = Math.round(ft[1] * 30.48 + inches[1] * 2.54);
 
@@ -113,10 +129,26 @@ describe("settingsFields", () => {
   test("mirrors the server's metric ranges exactly", () => {
     const profile = fieldsForTab("profile");
 
-    expect(profile.find((f) => f.name === "age").bounds).toEqual([10, 120]);
-    expect(profile.find((f) => f.name === "bodyFat").bounds).toEqual([3, 70]);
-    expect(profile.find((f) => f.name === "heightCm").bounds.cm).toEqual([100, 260]);
-    expect(profile.find((f) => f.name === "weight").bounds.kg).toEqual([25, 400]);
+    expect(
+      /** @type {Extract<SettingsField, { type: "number" }>} */ (
+        profile.find((f) => f.name === "age")
+      ).bounds
+    ).toEqual([10, 120]);
+    expect(
+      /** @type {Extract<SettingsField, { type: "number" }>} */ (
+        profile.find((f) => f.name === "bodyFat")
+      ).bounds
+    ).toEqual([3, 70]);
+    expect(
+      /** @type {Extract<SettingsField, { type: "height" }>} */ (
+        profile.find((f) => f.name === "heightCm")
+      ).bounds.cm
+    ).toEqual([100, 260]);
+    expect(
+      /** @type {Extract<SettingsField, { type: "weight" }>} */ (
+        profile.find((f) => f.name === "weight")
+      ).bounds.kg
+    ).toEqual([25, 400]);
   });
 
   test("returns nothing for a read-only tab", () => {
@@ -156,6 +188,10 @@ describe("the field set itself", () => {
     ["training", "timeline", 60],
     ["lifestyle", "notes", 500]
   ])("the %s tab's %s field stops at the server's limit", (tab, name, maxLength) => {
-    expect(fieldsForTab(tab).find((field) => field.name === name).maxLength).toBe(maxLength);
+    expect(
+      /** @type {Extract<SettingsField, { maxLength: number }>} */ (
+        fieldsForTab(tab).find((field) => field.name === name)
+      ).maxLength
+    ).toBe(maxLength);
   });
 });

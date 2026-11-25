@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   buildContextCategories,
@@ -19,18 +20,32 @@ import {
 // The injury penalty is the part that matters. Everything else changes what is
 // suggested; that decides whether someone with a bad knee is shown pistol
 // squats.
+//
+// The casts give a function input it would not get from the app: a track or
+// form read from a test table as a plain string, a form with only the fields
+// under test, and absent or malformed values, which it must survive.
+/** @typedef {import("../recommendationUtils.js").RecommendationContext} RecommendationContext */
+/** @typedef {Parameters<typeof buildContextCategories>[0]} CategoriesInput */
+/** @typedef {Parameters<typeof buildEquipmentKeywords>[0]} EquipmentInput */
+/** @typedef {Parameters<typeof buildGuideCards>[0]} GuideSettings */
+// A flag a test builds may leave out its penalty, which then costs the standard 7.
+/** @typedef {Omit<import("../recommendationUtils.js").InjuryFlag, "penalty"> & { penalty?: number }} TestFlag */
+/** @typedef {Omit<RecommendationContext, "injuryFlags"> & { injuryFlags: TestFlag[] }} TestContext */
 
-const context = (overrides = {}) => ({
-  preferredCategories: [],
-  weatherMode: "",
-  equipmentKeywords: [],
-  homeMode: false,
-  goalTokens: [],
-  todayTokens: [],
-  injuryFlags: [],
-  ...overrides
-});
+/** @param {Partial<TestContext>} [overrides] */
+const context = (overrides = {}) =>
+  /** @type {RecommendationContext} */ ({
+    preferredCategories: [],
+    weatherMode: "",
+    equipmentKeywords: [],
+    homeMode: false,
+    goalTokens: [],
+    todayTokens: [],
+    injuryFlags: [],
+    ...overrides
+  });
 
+/** @param {object} [overrides] any fields, including malformed ones */
 const exercise = (overrides = {}) => ({
   name: "Barbell Bench Press",
   description: "A horizontal press for the chest.",
@@ -88,7 +103,7 @@ describe("resolveMediaUrl", () => {
     ["null", null],
     ["undefined", undefined]
   ])("returns an empty string for %s", (_label, input) => {
-    expect(resolveMediaUrl(input)).toBe("");
+    expect(resolveMediaUrl(/** @type {string | undefined} */ (input))).toBe("");
   });
 });
 
@@ -159,13 +174,19 @@ describe("buildContextCategories", () => {
     ["endurance", "Cardio"],
     ["recovery", "Abs"]
   ])("starts from the %s track", (track, expected) => {
-    const categories = buildContextCategories({ track, goalText: "", todayLines: [] });
+    const categories = buildContextCategories(
+      /** @type {CategoriesInput} */ ({ track, goalText: "", todayLines: [] })
+    );
 
     expect(categories[0]).toBe(expected);
   });
 
   test("falls back to lean_strength for an unknown track", () => {
-    const categories = buildContextCategories({ track: "nonsense", goalText: "", todayLines: [] });
+    const categories = buildContextCategories(
+      /** @type {CategoriesInput} */ (
+        /** @type {unknown} */ ({ track: "nonsense", goalText: "", todayLines: [] })
+      )
+    );
 
     expect(categories).toEqual(
       buildContextCategories({ track: "lean_strength", goalText: "", todayLines: [] })
@@ -216,9 +237,19 @@ describe("buildContextCategories", () => {
   // ("ab" in "cable", "run" in "crunches") used to favour the wrong category.
   // Each row names a track whose own categories lack the one the false match
   // added, so the row can tell the two behaviours apart.
+  /**
+   * @param {string} track
+   * @param {string} line
+   */
   const withLine = (track, line) =>
-    buildContextCategories({ track, goalText: "", todayLines: [line] });
-  const without = (track) => buildContextCategories({ track, goalText: "", todayLines: [] });
+    buildContextCategories(
+      /** @type {CategoriesInput} */ ({ track, goalText: "", todayLines: [line] })
+    );
+  /** @param {string} track */
+  const without = (track) =>
+    buildContextCategories(
+      /** @type {CategoriesInput} */ ({ track, goalText: "", todayLines: [] })
+    );
 
   test.each([
     ["Cable fly", "lean_strength"],
@@ -251,22 +282,30 @@ describe("buildContextCategories", () => {
 
 describe("buildEquipmentKeywords", () => {
   test("maps a selection onto its keywords", () => {
-    const keywords = buildEquipmentKeywords({ form: { equipment: ["Dumbbells"] } });
+    const keywords = buildEquipmentKeywords(
+      /** @type {EquipmentInput} */ ({ form: { equipment: ["Dumbbells"] } })
+    );
 
     expect(keywords).toEqual(expect.arrayContaining(["dumbbell", "kettlebell"]));
   });
 
   test("merges several selections without repeating", () => {
-    const keywords = buildEquipmentKeywords({
-      form: { equipment: ["Dumbbells", "Kettlebell"] }
-    });
+    const keywords = buildEquipmentKeywords(
+      /** @type {EquipmentInput} */ ({
+        form: { equipment: ["Dumbbells", "Kettlebell"] }
+      })
+    );
 
     expect(keywords).toEqual(uniqueList(keywords));
     expect(keywords).toContain("dumbbell");
   });
 
   test("ignores a selection it does not recognise", () => {
-    expect(buildEquipmentKeywords({ form: { equipment: ["Moon boots"] } })).toEqual([]);
+    expect(
+      buildEquipmentKeywords(
+        /** @type {EquipmentInput} */ ({ form: { equipment: ["Moon boots"] } })
+      )
+    ).toEqual([]);
   });
 
   // Someone training at home who listed no equipment still gets bodyweight
@@ -296,7 +335,9 @@ describe("buildEquipmentKeywords", () => {
     ["equipment is not a list", { form: { equipment: "Dumbbells" } }],
     ["the form is missing", {}]
   ])("returns an empty list when %s", (_label, input) => {
-    expect(buildEquipmentKeywords(input)).toEqual([]);
+    expect(
+      buildEquipmentKeywords(/** @type {EquipmentInput} */ (/** @type {unknown} */ (input)))
+    ).toEqual([]);
   });
 });
 
@@ -395,11 +436,15 @@ describe("detectInjuryFlags", () => {
     ["undefined", undefined],
     ["a note naming no injury", "feeling great today"]
   ])("returns nothing for %s", (_label, input) => {
-    expect(detectInjuryFlags(input)).toEqual([]);
+    expect(detectInjuryFlags(/** @type {string} */ (input))).toEqual([]);
   });
 });
 
 describe("scoreExercise", () => {
+  /**
+   * @param {Parameters<typeof scoreExercise>[0]} ex
+   * @param {Partial<TestContext>} ctx
+   */
   const scoreOf = (ex, ctx) => scoreExercise(ex, context(ctx)).score;
 
   test("scores zero against an empty context", () => {
@@ -624,11 +669,17 @@ describe("scoreExercise", () => {
 
   test("survives an exercise with nothing on it", () => {
     expect(() => scoreExercise({}, context())).not.toThrow();
-    expect(() => scoreExercise(undefined, context())).not.toThrow();
+    expect(() =>
+      scoreExercise(
+        /** @type {Parameters<typeof scoreExercise>[0]} */ (/** @type {unknown} */ (undefined)),
+        context()
+      )
+    ).not.toThrow();
   });
 });
 
 describe("buildGuideCards", () => {
+  /** @param {Partial<GuideSettings>} [overrides] */
   const cards = (overrides = {}) =>
     buildGuideCards({
       track: "lean_strength",
@@ -640,6 +691,10 @@ describe("buildGuideCards", () => {
       ...overrides
     });
 
+  /**
+   * @param {ReturnType<typeof buildGuideCards>} list
+   * @param {string} title
+   */
   const textOf = (list, title) => list.find((card) => card.title === title)?.text || "";
 
   test("always returns the same six cards", () => {
@@ -670,7 +725,9 @@ describe("buildGuideCards", () => {
     ["recovery", /submax/],
     ["lean_strength", /Progress top sets/]
   ])("gives %s its own load advice", (track, pattern) => {
-    expect(textOf(cards({ track }), "Load Progression")).toMatch(pattern);
+    expect(
+      textOf(cards(/** @type {Partial<GuideSettings>} */ ({ track })), "Load Progression")
+    ).toMatch(pattern);
   });
 
   test.each([

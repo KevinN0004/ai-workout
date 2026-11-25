@@ -1,6 +1,12 @@
+// @ts-check
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useDashboardMetrics from "../useDashboardMetrics";
+
+// Each input holds only the dashboard rows and form fields these metrics read,
+// and each week asked about has a plan, so it is built.
+/** @typedef {Parameters<typeof useDashboardMetrics>[0]} MetricsInput */
+/** @typedef {Extract<ReturnType<typeof useDashboardMetrics>["weightProgress"], { percent: number }>} MeasuredProgress */
 
 const weekDays = [
   { label: "Mon", key: "Monday" },
@@ -56,13 +62,17 @@ describe("useDashboardMetrics", () => {
     };
 
     const { result } = renderHook(() =>
-      useDashboardMetrics({
-        dashboard,
-        goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
-        formGoal: "Fat loss + conditioning",
-        weekDays,
-        latestPlanByWeekday: { Monday: ["Squat"] }
-      })
+      useDashboardMetrics(
+        /** @type {MetricsInput} */ (
+          /** @type {unknown} */ ({
+            dashboard,
+            goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
+            formGoal: "Fat loss + conditioning",
+            weekDays,
+            latestPlanByWeekday: { Monday: ["Squat"] }
+          })
+        )
+      )
     );
 
     expect(result.current.workouts).toHaveLength(1);
@@ -79,21 +89,25 @@ describe("useDashboardMetrics", () => {
 
   test("buildLinePath returns svg path for empty and populated values", () => {
     const { result } = renderHook(() =>
-      useDashboardMetrics({
-        dashboard: {
-          workouts: [],
-          workoutSessions: [],
-          calories: [],
-          mealLogs: [],
-          progressMetrics: [],
-          plans: [],
-          goals: { targetWeight: 160, targetCalories: 2200, weeklyWorkouts: 3 }
-        },
-        goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
-        formGoal: "",
-        weekDays,
-        latestPlanByWeekday: {}
-      })
+      useDashboardMetrics(
+        /** @type {MetricsInput} */ (
+          /** @type {unknown} */ ({
+            dashboard: {
+              workouts: [],
+              workoutSessions: [],
+              calories: [],
+              mealLogs: [],
+              progressMetrics: [],
+              plans: [],
+              goals: { targetWeight: 160, targetCalories: 2200, weeklyWorkouts: 3 }
+            },
+            goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
+            formGoal: "",
+            weekDays,
+            latestPlanByWeekday: {}
+          })
+        )
+      )
     );
 
     const emptyPath = result.current.buildLinePath([]);
@@ -108,25 +122,30 @@ describe("useDashboardMetrics", () => {
   // the date handling, the deduplication, and the week-over-week deltas -- the
   // parts that decide what number the visitor is actually shown.
 
+  /** @param {{ dashboard?: object, [key: string]: unknown }} [overrides] */
   const render = (overrides = {}) =>
     renderHook(() =>
-      useDashboardMetrics({
-        dashboard: {
-          workouts: [],
-          workoutSessions: [],
-          calories: [],
-          mealLogs: [],
-          progressMetrics: [],
-          plans: [],
-          goals: {},
-          ...overrides.dashboard
-        },
-        goalForm: {},
-        formGoal: "",
-        weekDays,
-        latestPlanByWeekday: {},
-        ...overrides
-      })
+      useDashboardMetrics(
+        /** @type {MetricsInput} */ (
+          /** @type {unknown} */ ({
+            dashboard: {
+              workouts: [],
+              workoutSessions: [],
+              calories: [],
+              mealLogs: [],
+              progressMetrics: [],
+              plans: [],
+              goals: {},
+              ...overrides.dashboard
+            },
+            goalForm: {},
+            formGoal: "",
+            weekDays,
+            latestPlanByWeekday: {},
+            ...overrides
+          })
+        )
+      )
     ).result.current;
 
   describe("date handling", () => {
@@ -651,6 +670,7 @@ describe("useDashboardMetrics", () => {
       // Two training days, so the rest bonus is absent from both and only the
       // training load can explain the difference. Comparing a session against
       // a rest day does not discriminate: losing the bonus alone is enough.
+      /** @param {number} duration */
       const scoreFor = (duration) => {
         const metrics = render({
           dashboard: { workouts: [{ id: "a", date: "2026-03-02", duration }] }
@@ -688,15 +708,20 @@ describe("useDashboardMetrics", () => {
   // width (`width: ${calorieProgress}%`), so the UI shows "NaN" and an invalid
   // style rather than degrading.
   describe("an unparseable reading", () => {
+    /** @param {unknown} dashboard */
     const buildMetrics = (dashboard) =>
       renderHook(() =>
-        useDashboardMetrics({
-          dashboard,
-          goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
-          formGoal: "Fat loss",
-          weekDays,
-          latestPlanByWeekday: {}
-        })
+        useDashboardMetrics(
+          /** @type {MetricsInput} */ (
+            /** @type {unknown} */ ({
+              dashboard,
+              goalForm: { targetCalories: "2200", weeklyWorkouts: "3" },
+              formGoal: "Fat loss",
+              weekDays,
+              latestPlanByWeekday: {}
+            })
+          )
+        )
       ).result.current;
 
     test("does not poison the weekly calorie average", () => {
@@ -767,7 +792,9 @@ describe("useDashboardMetrics", () => {
       });
 
       expect(metrics.planWeek).toMatchObject({ planned: 1, done: 1, missed: 0 });
-      expect(metrics.planWeek.days[0]).toMatchObject({ key: "Monday", state: "done" });
+      expect(
+        /** @type {NonNullable<typeof metrics.planWeek>} */ (metrics.planWeek).days[0]
+      ).toMatchObject({ key: "Monday", state: "done" });
     });
 
     test("is null with no plan", () => {
@@ -778,8 +805,13 @@ describe("useDashboardMetrics", () => {
   // The target weight is absent until the user saves one, and absent must
   // never read as a target of 0 lb.
   describe("progress toward the target weight", () => {
+    /** @param {...[string, unknown]} entries */
     const weights = (...entries) =>
       entries.map(([date, weightLb], index) => ({ id: `p${index}`, date, weightLb }));
+    /**
+     * @param {unknown} targetWeight
+     * @param {unknown[]} [progressMetrics]
+     */
     const progressFor = (targetWeight, progressMetrics = []) =>
       render({ dashboard: { goals: { targetWeight }, progressMetrics } }).weightProgress;
 
@@ -836,11 +868,14 @@ describe("useDashboardMetrics", () => {
     test("rounds what is left to a tenth of a pound", () => {
       const progress = progressFor(175, weights(["2026-02-01", 190], ["2026-03-01", 182.37]));
 
-      expect(progress.remaining).toBe(7.4);
+      // Weights are logged, so the progress is measured.
+      expect(/** @type {MeasuredProgress} */ (progress).remaining).toBe(7.4);
     });
 
     test("is 0% with one weight logged, or after moving away from the target", () => {
-      expect(progressFor(175, weights(["2026-03-01", 182])).percent).toBe(0);
+      expect(
+        /** @type {MeasuredProgress} */ (progressFor(175, weights(["2026-03-01", 182]))).percent
+      ).toBe(0);
       expect(progressFor(175, weights(["2026-02-01", 180], ["2026-03-01", 185]))).toMatchObject({
         state: "progress",
         remaining: 10,
