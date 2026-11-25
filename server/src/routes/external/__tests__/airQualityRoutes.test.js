@@ -6,6 +6,10 @@ import request from "supertest";
 import { registerAirQualityRoutes } from "../registerAirQualityRoutes.js";
 import { createExternalDataService } from "../../../services/external/externalDataService.js";
 import { createHttpCacheService } from "../../../services/external/httpCacheService.js";
+import {
+  externalDataDeps,
+  httpCacheDeps
+} from "../../../services/external/__tests__/externalDeps.js";
 import { isUpstreamFailureStatus } from "../../../services/platform/platformHealthService.js";
 import {
   cleanText,
@@ -22,14 +26,9 @@ import {
 // dependency is the real function the server injects, so the parsing and AQI
 // maths under test are the ones that actually run in production.
 
-// The stubs stand in for what these routes never reach, so each service built
-// from them is cast through unknown to its deps. Each logger is a real one that
-// writes nothing.
-const stubbed = {
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: pino({ level: "silent" }),
-  toShortText: (value) => String(value ?? "")
-};
+// Each service is built from the app's real dependencies, and each logger is a
+// real one that writes nothing.
+const silentLogger = pino({ level: "silent" });
 
 const {
   extractOpenAqMeasurement,
@@ -45,39 +44,15 @@ const {
   aqiBand,
   openAqParameterLabel,
   toFiniteNumber
-} = createExternalDataService(
-  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
-    /** @type {unknown} */ ({
-      ...stubbed,
-      cleanText,
-      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-      readThroughExternalCache: async () => ({}),
-      buildExternalCacheKey: () => "",
-      recordExternalApiLatency: () => {},
-      externalApiRetries: 0,
-      externalApiRetryBaseDelayMs: 0
-    })
-  )
-);
+} = createExternalDataService(externalDataDeps());
 
-const { mergeCacheStatuses } = createHttpCacheService(
-  /** @type {Parameters<typeof createHttpCacheService>[0]} */ (
-    /** @type {unknown} */ ({
-      ...stubbed,
-      // Number.isInteger has just passed the value.
-      toPositiveInt: (value, fallback) =>
-        Number.isInteger(value) ? /** @type {number} */ (value) : fallback,
-      maxEntries: 10,
-      defaultStaleTtlSec: 60
-    })
-  )
-);
+const { mergeCacheStatuses } = createHttpCacheService(httpCacheDeps());
 
 /**
  * @param {ReturnType<typeof createExternalDataService>["openAqRequest"]} openAqRequest
  * @param {{ requestId?: string, logger?: import("pino").Logger }} [options]
  */
-const buildApp = (openAqRequest, { requestId, logger = stubbed.logger } = {}) => {
+const buildApp = (openAqRequest, { requestId, logger = silentLogger } = {}) => {
   const app = express();
   app.use((req, _res, next) => {
     if (requestId) req.requestId = requestId;

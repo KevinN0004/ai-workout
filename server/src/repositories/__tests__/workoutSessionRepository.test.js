@@ -1,5 +1,6 @@
 // @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";
 import { createWorkoutSessionRepository, mapWorkoutSession } from "../workoutSessionRepository.js";
 
@@ -325,19 +326,16 @@ describe("each exercise's pattern", () => {
 // five as null, and a missing number stays null rather than 0.
 describe("a session's Strava fields", () => {
   test("an import carries them", () => {
-    // The two numbers are Decimal columns, which toNumberOrNull reads as their
-    // text, so strings stand in for them, cast through unknown.
+    // The two numbers are Decimal columns, given as the Decimals Prisma returns.
     expect(
       mapWorkoutSession(
-        /** @type {WorkoutSessionRow} */ (
-          /** @type {unknown} */ ({
-            source: "strava",
-            externalId: "9001",
-            sport: "Run",
-            distanceMeters: "5012.4",
-            averageHeartrate: "148.2"
-          })
-        )
+        /** @type {WorkoutSessionRow} */ ({
+          source: "strava",
+          externalId: "9001",
+          sport: "Run",
+          distanceMeters: new Prisma.Decimal("5012.4"),
+          averageHeartrate: new Prisma.Decimal("148.2")
+        })
       )
     ).toMatchObject({
       source: "strava",

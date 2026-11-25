@@ -76,7 +76,8 @@ import {
   isCompleteSignupProfile,
   toCleanArray,
   toCleanNameArray,
-  toNullableNumber
+  toNullableNumber,
+  toPositiveInt
 } from "./services/dashboard/dashboardDataBuildersService.js";
 import {
   createSessionService,
@@ -275,21 +276,6 @@ const csrfHeaderName = "x-csrf-token";
 const csrfUnsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const cookieSecure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-
-// Reads every positive integer setting, here and, through the deps object, in
-// generateRoutes.js. Guards before it coerces. The `> 0` below would also reject
-// the 0 that `Number(null)` and `Number("")` produce, but only by accident of the
-// range; a copy of this shape for a range that includes 0 needs the guard to be
-// right.
-/**
- * @param {unknown} value
- * @param {number} fallback
- */
-const toPositiveInt = (value, fallback) => {
-  if (value === null || value === undefined || value === "") return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-};
 
 const recordExternalApiLatency = createExternalApiLatencyRecorder({ metrics, cleanText });
 

@@ -8,6 +8,7 @@ import { __testables as apiSchema } from "../services/http/apiSchemaService.js";
 import { __testables as indexTestables } from "../index.js";
 import { validateEnv } from "../services/platform/envValidationService.js";
 import { createExternalDataService } from "../services/external/externalDataService.js";
+import { externalDataDeps } from "../services/external/__tests__/externalDeps.js";
 import { mapWorkoutSession } from "../repositories/workoutSessionRepository.js";
 import { readSet } from "../services/planning/progression.js";
 import { parseSubscriptionId } from "../services/integrations/stravaConfig.js";
@@ -29,26 +30,9 @@ const readSetField = (field, value) =>
     })
   ).exerciseSets[0].sets[0][field];
 
-// The NowCast is pure, so it is built through the factory with stub
-// dependencies rather than widening index.js's __testables for it. It reads none
-// of them, so the stubs, narrower than the deps they stand in for, are cast
-// through unknown.
-const { pm25NowCast } = createExternalDataService(
-  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
-    /** @type {unknown} */ ({
-      cleanText: (value) => (typeof value === "string" ? value : ""),
-      toNullableNumber,
-      readThroughExternalCache: async () => ({}),
-      buildExternalCacheKey: () => "",
-      metrics: { externalApiFailures: {}, externalApiRetries: {} },
-      logger: { info() {}, warn() {}, error() {} },
-      toShortText: (value) => String(value ?? ""),
-      recordExternalApiLatency: () => {},
-      externalApiRetries: 0,
-      externalApiRetryBaseDelayMs: 0
-    })
-  )
-);
+// The NowCast is pure, so it is built through the factory, from the app's real
+// dependencies, rather than widening index.js's __testables for it.
+const { pm25NowCast } = createExternalDataService(externalDataDeps());
 
 // Three hourly means of one value, ending in the three hours before `NOW`: the
 // fewest a NowCast needs, so the NowCast of a steady value is that value.

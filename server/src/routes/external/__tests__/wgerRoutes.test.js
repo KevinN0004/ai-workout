@@ -6,6 +6,10 @@ import { registerWgerRoutes } from "../registerWgerRoutes.js";
 import { registerMealDbRoutes } from "../registerMealDbRoutes.js";
 import { createExternalDataService } from "../../../services/external/externalDataService.js";
 import { createHttpCacheService } from "../../../services/external/httpCacheService.js";
+import {
+  externalDataDeps,
+  httpCacheDeps
+} from "../../../services/external/__tests__/externalDeps.js";
 import { isUpstreamFailureStatus } from "../../../services/platform/platformHealthService.js";
 import { cleanText } from "../../../services/dashboard/dashboardDataBuildersService.js";
 
@@ -18,42 +22,10 @@ import { cleanText } from "../../../services/dashboard/dashboardDataBuildersServ
 // Only wgerRequest and mealDbRequest are stubbed; they are the network
 // boundary. Everything else is the real injected function.
 
-// The stubs stand in for what these routes never reach, so each service built
-// from them is cast through unknown to its deps.
-const stubbed = {
-  metrics: { externalApiFailures: {}, externalApiRetries: {} },
-  logger: { info() {}, warn() {}, error() {} },
-  toShortText: (value) => String(value ?? "")
-};
+// Each service is built from the app's real dependencies.
+const service = createExternalDataService(externalDataDeps());
 
-const service = createExternalDataService(
-  /** @type {Parameters<typeof createExternalDataService>[0]} */ (
-    /** @type {unknown} */ ({
-      ...stubbed,
-      cleanText,
-      toNullableNumber: (value) => (Number.isFinite(Number(value)) ? Number(value) : null),
-      readThroughExternalCache: async () => ({}),
-      buildExternalCacheKey: () => "",
-      recordExternalApiLatency: () => {},
-      externalApiRetries: 0,
-      externalApiRetryBaseDelayMs: 0,
-      wgerDefaultLanguage: 2
-    })
-  )
-);
-
-const { mergeCacheStatuses } = createHttpCacheService(
-  /** @type {Parameters<typeof createHttpCacheService>[0]} */ (
-    /** @type {unknown} */ ({
-      ...stubbed,
-      // Number.isInteger has just passed the value.
-      toPositiveInt: (value, fallback) =>
-        Number.isInteger(value) ? /** @type {number} */ (value) : fallback,
-      maxEntries: 10,
-      defaultStaleTtlSec: 60
-    })
-  )
-);
+const { mergeCacheStatuses } = createHttpCacheService(httpCacheDeps());
 
 /**
  * @param {import("vitest").Mock} wgerRequest
