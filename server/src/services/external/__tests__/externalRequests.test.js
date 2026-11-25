@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuildersService.js";
@@ -15,41 +17,49 @@ import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuilde
 // externalRetry.test.js drives fetchOpenMeteo's happy and retry paths; its
 // guard and timeout paths are covered here.
 
+/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
+
 // Matches the real readThroughExternalCache contract: callers destructure
 // { data, cache }, not the { payload, cacheStatus } the cache stores internally.
+/** @type {ExternalDataDeps["readThroughExternalCache"]} */
 const passThroughCache = async ({ requestFn }) => ({
   data: await requestFn(),
   cache: "miss"
 });
 
+/** @param {Partial<ExternalDataDeps>} [overrides] */
 const buildRequesters = (overrides = {}) =>
-  createExternalDataService({
-    cleanText,
-    toNullableNumber,
-    readThroughExternalCache: passThroughCache,
-    buildExternalCacheKey: (service, parts) => `${service}:${JSON.stringify(parts)}`,
-    metrics: { externalApiFailures: {}, externalApiRetries: {} },
-    logger: { info() {}, warn() {}, error() {} },
-    toShortText: (value) => String(value ?? ""),
-    recordExternalApiLatency: () => {},
-    externalApiRetries: 0,
-    externalApiRetryBaseDelayMs: 0,
-    wgerBaseUrl: "https://wger.example/api/v2/",
-    wgerTimeoutMs: 50,
-    wgerCacheTtlSec: 60,
-    mealDbBaseUrl: "https://mealdb.example/api/1/",
-    mealDbTimeoutMs: 50,
-    mealDbCacheTtlSec: 60,
-    openMeteoBaseUrl: "https://openmeteo.example/v1/forecast",
-    openMeteoTimeoutMs: 50,
-    openMeteoCacheTtlSec: 60,
-    openAqBaseUrl: "https://openaq.example/v3/",
-    openAqApiKey: "test-key",
-    openAqTimeoutMs: 50,
-    openAqCacheTtlSec: 60,
-    ...overrides
-  });
+  // Built with only the settings its tests reach; the rest are never read.
+  createExternalDataService(
+    /** @type {ExternalDataDeps} */ ({
+      cleanText,
+      toNullableNumber,
+      readThroughExternalCache: passThroughCache,
+      buildExternalCacheKey: (service, parts) => `${service}:${JSON.stringify(parts)}`,
+      metrics: { externalApiFailures: {}, externalApiRetries: {} },
+      logger: pino({ level: "silent" }),
+      toShortText: (value) => String(value ?? ""),
+      recordExternalApiLatency: () => {},
+      externalApiRetries: 0,
+      externalApiRetryBaseDelayMs: 0,
+      wgerBaseUrl: "https://wger.example/api/v2/",
+      wgerTimeoutMs: 50,
+      wgerCacheTtlSec: 60,
+      mealDbBaseUrl: "https://mealdb.example/api/1/",
+      mealDbTimeoutMs: 50,
+      mealDbCacheTtlSec: 60,
+      openMeteoBaseUrl: "https://openmeteo.example/v1/forecast",
+      openMeteoTimeoutMs: 50,
+      openMeteoCacheTtlSec: 60,
+      openAqBaseUrl: "https://openaq.example/v3/",
+      openAqApiKey: "test-key",
+      openAqTimeoutMs: 50,
+      openAqCacheTtlSec: 60,
+      ...overrides
+    })
+  );
 
+/** @param {unknown} body */
 const okJson = (body) => ({
   ok: true,
   status: 200,
@@ -57,6 +67,10 @@ const okJson = (body) => ({
   text: async () => JSON.stringify(body)
 });
 
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
 const failJson = (status, body = {}) => ({
   ok: false,
   status,
@@ -71,6 +85,7 @@ const abortingFetch = () =>
     throw err;
   });
 
+/** @param {import("vitest").Mock} fetchMock */
 const urlOf = (fetchMock) => new URL(String(fetchMock.mock.calls[0][0]));
 
 afterEach(() => {
@@ -141,7 +156,10 @@ describe("wgerRequest", () => {
 
     await buildRequesters({ wgerApiToken: "secret-token" }).wgerRequest("exerciseinfo/");
 
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: "Token secret-token" });
+    // The stub takes fetch's arguments, though its own signature names none.
+    expect(/** @type {import("vitest").Mock} */ (fetchMock).mock.calls[0][1].headers).toEqual({
+      Authorization: "Token secret-token"
+    });
   });
 
   // wger's public catalogue works unauthenticated, so no token is not an error.
@@ -151,7 +169,10 @@ describe("wgerRequest", () => {
 
     await buildRequesters({ wgerApiToken: "" }).wgerRequest("exerciseinfo/");
 
-    expect(fetchMock.mock.calls[0][1].headers).toBeUndefined();
+    // The stub takes fetch's arguments, though its own signature names none.
+    expect(
+      /** @type {import("vitest").Mock} */ (fetchMock).mock.calls[0][1].headers
+    ).toBeUndefined();
   });
 
   test("returns the parsed body", async () => {
@@ -340,6 +361,10 @@ describe("mealDbRequest", () => {
 
 // OpenAQ reads the body with text() and parses it itself, rather than json(),
 // so it needs a response shape the json-based helpers above do not provide.
+/**
+ * @param {number} status
+ * @param {string} body
+ */
 const rawText = (status, body) => ({
   ok: status >= 200 && status < 300,
   status,
@@ -352,6 +377,7 @@ describe("openAqRequest", () => {
   // that value shows what a lookup would leave in memory or Redis.
   const keepingCache = () => {
     const stored = [];
+    /** @type {ExternalDataDeps["readThroughExternalCache"]} */
     const readThroughExternalCache = async ({ requestFn }) => {
       const data = await requestFn();
       stored.push(data);
@@ -436,7 +462,10 @@ describe("openAqRequest", () => {
 
     await buildRequesters().openAqRequest("locations");
 
-    expect(fetchMock.mock.calls[0][1].headers["X-API-Key"]).toBe("test-key");
+    // The stub takes fetch's arguments, though its own signature names none.
+    expect(
+      /** @type {import("vitest").Mock} */ (fetchMock).mock.calls[0][1].headers["X-API-Key"]
+    ).toBe("test-key");
     expect(urlOf(fetchMock).search).toBe("");
   });
 

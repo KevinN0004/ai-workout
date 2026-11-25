@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { describe, expect, test } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuildersService.js";
@@ -8,20 +10,27 @@ import { cleanText, toNullableNumber } from "../../dashboard/dashboardDataBuilde
 // on. These were the bulk of what was left uncovered in externalDataService --
 // its retry layer, weather and AQI maths are covered elsewhere.
 
+/** @typedef {import("../externalDataService.js").ExternalDataDeps} ExternalDataDeps */
+
 const { mapWgerExercise, mapMealDbMeal, normalizePlainText, parseMultiNumberQuery } =
-  createExternalDataService({
-    cleanText,
-    toNullableNumber,
-    readThroughExternalCache: async () => ({}),
-    buildExternalCacheKey: () => "",
-    metrics: { externalApiFailures: {}, externalApiRetries: {} },
-    logger: { info() {}, warn() {}, error() {} },
-    toShortText: (value) => String(value ?? ""),
-    recordExternalApiLatency: () => {},
-    externalApiRetries: 0,
-    externalApiRetryBaseDelayMs: 0,
-    wgerDefaultLanguage: 2
-  });
+  // The mappers are pure and read none of these stubs, so they are cast as a whole.
+  createExternalDataService(
+    /** @type {ExternalDataDeps} */ (
+      /** @type {unknown} */ ({
+        cleanText,
+        toNullableNumber,
+        readThroughExternalCache: async () => ({}),
+        buildExternalCacheKey: () => "",
+        metrics: { externalApiFailures: {}, externalApiRetries: {} },
+        logger: pino({ level: "silent" }),
+        toShortText: (value) => String(value ?? ""),
+        recordExternalApiLatency: () => {},
+        externalApiRetries: 0,
+        externalApiRetryBaseDelayMs: 0,
+        wgerDefaultLanguage: 2
+      })
+    )
+  );
 
 describe("normalizePlainText", () => {
   // wger descriptions arrive as HTML and are rendered as plain text.
@@ -94,6 +103,11 @@ describe("parseMultiNumberQuery", () => {
 });
 
 describe("mapWgerExercise", () => {
+  /**
+   * @param {number | null} language
+   * @param {string} name
+   * @param {Record<string, unknown>} [overrides]
+   */
   const translation = (language, name, overrides = {}) => ({
     language,
     name,
@@ -101,6 +115,7 @@ describe("mapWgerExercise", () => {
     ...overrides
   });
 
+  /** @param {Record<string, unknown>} [overrides] */
   const exercise = (overrides = {}) => ({
     id: 192,
     uuid: "abc-123",
@@ -182,7 +197,8 @@ describe("mapWgerExercise", () => {
         exercise({
           translations: [translation(null, "Unlabelled"), translation(2, "Bench Press")]
         }),
-        null
+        // A null preference, which the picker must match to a null language.
+        /** @type {number} */ (/** @type {unknown} */ (null))
       );
 
       expect(result.name).toBe("Unlabelled");
@@ -294,6 +310,7 @@ describe("mapWgerExercise", () => {
 });
 
 describe("mapMealDbMeal", () => {
+  /** @param {Record<string, unknown>} [overrides] */
   const meal = (overrides = {}) => ({
     idMeal: "52771",
     strMeal: "Spicy Arrabiata Penne",

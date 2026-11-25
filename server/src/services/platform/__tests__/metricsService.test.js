@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   createExternalApiLatencyRecorder,
@@ -11,6 +12,10 @@ import {
 // privates in a 778-line file, reachable only by booting the whole app. Moving
 // them here is what made them assertable.
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const cleanText = (value, maxLen = 120) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
@@ -60,7 +65,10 @@ describe("recordLatencyStats", () => {
   });
 
   test("does nothing, and does not throw, without a bucket", () => {
-    expect(() => recordLatencyStats(null, 40)).not.toThrow();
+    // No bucket at all, which the record must survive.
+    expect(() =>
+      recordLatencyStats(/** @type {undefined} */ (/** @type {unknown} */ (null)), 40)
+    ).not.toThrow();
     expect(() => recordLatencyStats(undefined, 40)).not.toThrow();
   });
 });
@@ -161,7 +169,8 @@ describe("createExternalApiLatencyRecorder", () => {
     const { metrics, record } = build();
     const before = Object.keys(metrics.externalApiLatencyMs).length;
 
-    record(serviceName, 25);
+    // A name that is not usable, which the record must drop.
+    record(/** @type {string} */ (serviceName), 25);
 
     expect(Object.keys(metrics.externalApiLatencyMs).length).toBe(before);
   });

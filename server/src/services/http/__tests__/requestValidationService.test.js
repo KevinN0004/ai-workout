@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { getSchemaValidationMessage, validateSchemaInput } from "../requestValidationService.js";
@@ -19,7 +20,10 @@ describe("requestValidationService", () => {
     // than or equal to 18", zod 4 says ">=18"), so pin only what this module
     // owns: the dotted path joined to zod's message. The bound itself reaches
     // the reader in both.
-    expect(message).toBe(`profile.age: ${result.error.issues[0].message}`);
+    // The parse failed, as the test asserts above, so it carries its error.
+    expect(message).toBe(
+      `profile.age: ${/** @type {import("zod").ZodError} */ (result.error).issues[0].message}`
+    );
     expect(message).toMatch(/18/);
   });
 

@@ -1,18 +1,26 @@
+// @ts-check
 import express from "express";
 import rateLimit from "express-rate-limit";
 import request from "supertest";
-import { describe, expect, test } from "vitest";
+import pino from "pino";
+import { describe, expect, test, vi } from "vitest";
 import { createRateLimitStore } from "../rateLimitStore.js";
 
 // The five limiters in index.js are built at module scope, but Redis connects
 // later inside startServer(). So the store cannot capture a client at
 // construction time -- it resolves one per call and must keep counting when
 // there is none, or a Redis outage turns every /api request into a 500.
+//
+// Each init is given only the window the store reads, and each fake client and
+// store holds only what the store calls.
+/** @typedef {import("express-rate-limit").Options} Options */
+/** @typedef {NonNullable<ReturnType<import("../rateLimitStore.js").GetRedisClient>>} RedisClient */
+/** @typedef {import("rate-limit-redis").RedisStore} RedisStore */
 
 describe("createRateLimitStore without a Redis client", () => {
   test("counts hits in memory when no client is available", async () => {
     const store = createRateLimitStore({ getClient: () => null });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     // Read totalHits immediately: MemoryStore hands back a live reference to its
     // own record, so holding the object and asserting later sees the mutated count.
@@ -24,7 +32,10 @@ describe("createRateLimitStore without a Redis client", () => {
   });
 });
 
-const readyClient = () => ({ isReady: true, sendCommand: async () => 1 });
+const readyClient = () =>
+  /** @type {RedisClient} */ (
+    /** @type {unknown} */ ({ isReady: true, sendCommand: async () => 1 })
+  );
 
 const spyStore = () => {
   const calls = [];
@@ -49,9 +60,9 @@ describe("createRateLimitStore with a ready Redis client", () => {
     const redis = spyStore();
     const store = createRateLimitStore({
       getClient: readyClient,
-      createRedisStore: () => redis
+      createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (redis))
     });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     const result = await store.increment("ip-1");
 
@@ -72,9 +83,9 @@ describe("createRateLimitStore when Redis fails mid-request", () => {
     };
     const store = createRateLimitStore({
       getClient: readyClient,
-      createRedisStore: () => failing
+      createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (failing))
     });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     const first = (await store.increment("ip-1")).totalHits;
     const second = (await store.increment("ip-1")).totalHits;
@@ -84,7 +95,10 @@ describe("createRateLimitStore when Redis fails mid-request", () => {
   });
 
   test("reports the outage once rather than on every request", async () => {
-    const errors = [];
+    // A real logger that writes nothing, its error spied on.
+    const logger = pino({ level: "silent" });
+    /** @type {import("vitest").MockInstance} */
+    const error = vi.spyOn(logger, "error");
     const failing = {
       init() {},
       async increment() {
@@ -95,18 +109,18 @@ describe("createRateLimitStore when Redis fails mid-request", () => {
     };
     const store = createRateLimitStore({
       getClient: readyClient,
-      createRedisStore: () => failing,
-      logger: { error: (fields) => errors.push(fields) }
+      createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (failing)),
+      logger
     });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     await store.increment("ip-1");
     await store.increment("ip-1");
     await store.increment("ip-1");
 
-    expect(errors).toHaveLength(1);
-    expect(errors[0].event).toBe("rate_limit_store_error");
-    expect(errors[0].error).toBe("connection lost");
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0].event).toBe("rate_limit_store_error");
+    expect(error.mock.calls[0][0].error).toBe("connection lost");
   });
 });
 
@@ -115,9 +129,9 @@ describe("createRateLimitStore delegation for the other store methods", () => {
     const redis = spyStore();
     const store = createRateLimitStore({
       getClient: readyClient,
-      createRedisStore: () => redis
+      createRedisStore: () => /** @type {RedisStore} */ (/** @type {unknown} */ (redis))
     });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     await store.decrement("ip-1");
     await store.resetKey("ip-2");
@@ -130,7 +144,7 @@ describe("createRateLimitStore delegation for the other store methods", () => {
 
   test("passes decrement and resetKey to memory when there is no client", async () => {
     const store = createRateLimitStore({ getClient: () => null });
-    store.init({ windowMs: 60_000 });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     await store.increment("ip-1");
     await store.increment("ip-1");
@@ -165,8 +179,10 @@ describe("createRateLimitStore default Redis store", () => {
       }
     };
 
-    const store = createRateLimitStore({ getClient: () => client });
-    store.init({ windowMs: 60_000 });
+    const store = createRateLimitStore({
+      getClient: () => /** @type {RedisClient} */ (/** @type {unknown} */ (client))
+    });
+    store.init(/** @type {Options} */ ({ windowMs: 60_000 }));
 
     const result = await store.increment("ip-1");
 
@@ -189,6 +205,7 @@ describe("createRateLimitStore beside another limiter", () => {
   test("two limiters on one request are not reported as double counting", async () => {
     const reported = [];
     const logger = { error: (error) => reported.push(error), warn: () => {} };
+    /** @param {string} scope */
     const limiter = (scope) =>
       rateLimit({
         windowMs: 60_000,

@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { StravaError, createStravaClient } from "../stravaClient.js";
 
@@ -17,6 +18,10 @@ const CONFIG = {
 
 const SECRETS = ["test-client-secret", "access-xyz", "refresh-xyz", "code-xyz"];
 
+/**
+ * @param {number} status
+ * @param {unknown} [body]
+ */
 const answer = (status, body = {}) =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), {
     status,
@@ -24,11 +29,13 @@ const answer = (status, body = {}) =>
   });
 
 // A client over a fetch that answers `responses` in turn, and the calls it saw.
+/** @param {...(Response | Error)} responses */
 const clientWith = (...responses) => {
   const fetchImpl = vi.fn(async () => {
     const next = responses.shift();
     if (next instanceof Error) throw next;
-    return next;
+    // Each test queues an answer for every call it makes.
+    return /** @type {Response} */ (next);
   });
   return { client: createStravaClient({ config: CONFIG, fetchImpl }), fetchImpl };
 };
@@ -42,6 +49,10 @@ const TOKENS = {
 };
 
 // The call `index` as { url, method, headers, form }.
+/**
+ * @param {import("vitest").Mock} fetchImpl
+ * @param {number} [index]
+ */
 const callOf = (fetchImpl, index = 0) => {
   const [url, init = {}] = fetchImpl.mock.calls[index];
   const body = init.body ? Object.fromEntries(new URLSearchParams(String(init.body))) : null;

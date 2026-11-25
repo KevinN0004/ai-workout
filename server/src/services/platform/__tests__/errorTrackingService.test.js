@@ -1,3 +1,5 @@
+// @ts-check
+import pino from "pino";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const sentry = vi.hoisted(() => ({
@@ -23,10 +25,15 @@ vi.mock("@sentry/node", () => {
 
 const { initErrorTracking, __testables } = await import("../errorTrackingService.js");
 
+/**
+ * @param {unknown} value
+ * @param {number} [maxLen]
+ */
 const toShortText = (value, maxLen = 160) =>
   typeof value === "string" ? value.trim().slice(0, maxLen) : "";
 
-const createLogger = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
+// A real logger that writes nothing.
+const createLogger = () => pino({ level: "silent" });
 
 beforeEach(() => {
   vi.clearAllMocks();

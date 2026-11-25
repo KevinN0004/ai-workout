@@ -3,6 +3,7 @@
  * the alternatives to one of its exercises, a swap on every day it is on, and
  * the undo, on plans generated and saved as the generate route saves them.
  */
+// @ts-check
 import { describe, expect, test } from "vitest";
 import { generatePlan, prescribe } from "../generatePlan.js";
 import { buildFallbackNotes, buildSafetyNotes } from "../fallbackNotes.js";
@@ -10,6 +11,19 @@ import { EXERCISES } from "../exerciseLibrary.js";
 import { buildPlanPayload, withPrescriptions } from "../../dashboard/planPayloadService.js";
 import { SWAP_AREAS, applySwap, rulesForPlan, swapOptions, undoSwap } from "../swaps.js";
 
+// Each swap, list of options and undo a test reads is one the rules allow, each
+// day read is a training day saved with prescriptions, and each name looked up
+// is on that day or in the library, so each is cast as found.
+/** @typedef {Parameters<typeof generatePlan>[0]} PlanInput */
+/** @typedef {import("../exerciseLibrary.js").Exercise} Exercise */
+/** @typedef {import("../swaps.js").SwapOption} SwapOption */
+/** @typedef {import("../swaps.js").SwapResult} SwapResult */
+/** @typedef {import("../../dashboard/planPayloadService.js").PlanPayload} PlanPayload */
+/** @typedef {import("../../dashboard/planPayloadService.js").PlanDay} PlanDay */
+/** @typedef {import("../../dashboard/planPayloadService.js").Prescription} Prescription */
+/** @typedef {PlanDay & { prescriptions: Prescription[] }} DayWithPrescriptions */
+
+/** @param {Partial<PlanInput>} [overrides] */
 const fields = (overrides = {}) => ({
   goal: "Build lean strength and energy",
   environment: "Home",
@@ -25,6 +39,11 @@ const fields = (overrides = {}) => ({
 // A plan as the generate route saves it and mapGeneratedPlan returns it: the
 // planner's fields, the text with its rule-written notes, and the payload with
 // each weekday's prescriptions. The health answers shape it and are not kept.
+/**
+ * @param {Partial<PlanInput>} [overrides]
+ * @param {PlanInput["health"]} [health]
+ * @param {number | null} [age]
+ */
 const savedPlan = (overrides = {}, health = {}, age = null) => {
   const input = fields(overrides);
   const plan = generatePlan({ ...input, health, age });
@@ -39,11 +58,26 @@ const savedPlan = (overrides = {}, health = {}, age = null) => {
 };
 
 const NO_AREA = { age: null, area: null };
-const dayOf = (plan, weekday) => plan.payload.days.find((day) => day.weekday === weekday);
-const entryNamed = (name) => EXERCISES.find((entry) => entry.name === name);
-const optionNames = (options) => options.map((option) => option.name);
+/**
+ * @param {{ payload: PlanPayload | null }} plan
+ * @param {string} weekday
+ */
+const dayOf = (plan, weekday) =>
+  /** @type {DayWithPrescriptions} */ (
+    /** @type {PlanPayload} */ (plan.payload).days.find((day) => day.weekday === weekday)
+  );
+/** @param {string} name */
+const entryNamed = (name) =>
+  /** @type {Exercise} */ (EXERCISES.find((entry) => entry.name === name));
+/** @param {SwapOption[] | null} options */
+const optionNames = (options) => /** @type {SwapOption[]} */ (options).map((option) => option.name);
+/**
+ * @param {PlanDay} day
+ * @param {string} name
+ */
 const lineFor = (day, name) =>
   day.lines.find((line) => new RegExp(`^- (?:[A-Z]\\d\\. )?${name}: `).test(line));
+/** @param {{ plan: string }} plan */
 const textLines = (plan) => plan.plan.split("\n");
 
 // Beginner, two days of 30 minutes: Monday's lifts are supersets, and its ramp-up
@@ -100,10 +134,12 @@ describe("rulesForPlan", () => {
 describe("swapOptions", () => {
   test("offers the exercise's pattern, without itself or anything on its days", () => {
     const plan = beginner();
-    const options = swapOptions(plan, GOBLET, rulesForPlan(plan, NO_AREA));
+    const options = /** @type {SwapOption[]} */ (
+      swapOptions(plan, GOBLET, rulesForPlan(plan, NO_AREA))
+    );
     const onItsDays = plan.payload.days
       .filter((day) => day.prescriptions?.some((p) => p.name === GOBLET))
-      .flatMap((day) => day.prescriptions.map((p) => p.name));
+      .flatMap((day) => /** @type {Prescription[]} */ (day.prescriptions).map((p) => p.name));
 
     expect(options.length).toBeGreaterThan(0);
     for (const name of optionNames(options)) {
@@ -115,10 +151,14 @@ describe("swapOptions", () => {
 
   test("gives each option its equipment, and a regression's area and cue", () => {
     const plan = savedPlan();
-    const name = dayOf(plan, "Monday").prescriptions.find(
-      (p) => entryNamed(p.name).pattern === "horizontal-push"
+    const name = /** @type {Prescription} */ (
+      dayOf(plan, "Monday").prescriptions.find(
+        (p) => entryNamed(p.name).pattern === "horizontal-push"
+      )
     ).name;
-    const options = swapOptions(plan, name, rulesForPlan(plan, { age: null, area: "shoulder" }));
+    const options = /** @type {SwapOption[]} */ (
+      swapOptions(plan, name, rulesForPlan(plan, { age: null, area: "shoulder" }))
+    );
 
     for (const option of options) {
       expect(entryNamed(option.name).flags.shoulder).not.toBe("avoid");
@@ -136,8 +176,10 @@ describe("swapOptions", () => {
 
   test("an area leaves out what bothers it", () => {
     const plan = savedPlan();
-    const name = dayOf(plan, "Monday").prescriptions.find(
-      (p) => entryNamed(p.name).pattern === "horizontal-push"
+    const name = /** @type {Prescription} */ (
+      dayOf(plan, "Monday").prescriptions.find(
+        (p) => entryNamed(p.name).pattern === "horizontal-push"
+      )
     ).name;
     const plain = optionNames(swapOptions(plan, name, rulesForPlan(plan, NO_AREA)));
     const shoulder = optionNames(
@@ -185,9 +227,13 @@ describe("applySwap", () => {
   test("rewrites the prescription and its line, keeping the superset label", () => {
     const plan = beginner();
     const rules = rulesForPlan(plan, NO_AREA);
-    const swapped = applySwap(plan, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules);
+    const swapped = /** @type {SwapResult} */ (
+      applySwap(plan, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules)
+    );
     const before = dayOf(plan, "Monday");
-    const after = swapped.payload.days.find((day) => day.weekday === "Monday");
+    const after = /** @type {DayWithPrescriptions} */ (
+      swapped.payload.days.find((day) => day.weekday === "Monday")
+    );
     const original = before.prescriptions.find((p) => p.name === GOBLET);
     const fresh = prescribe(
       { ...entryNamed("Dumbbell sumo squat"), regressed: false },
@@ -214,9 +260,15 @@ describe("applySwap", () => {
   test("renames the ramp-up for a loaded lift, and drops it for a bodyweight one", () => {
     const plan = beginner();
     const rules = rulesForPlan(plan, NO_AREA);
+    /** @param {{ payload: PlanPayload | null }} swapped */
     const ramp = (swapped) =>
       dayOf(swapped, "Monday").lines.filter((line) => line.startsWith("- Ramp-up: "));
-    const asPlan = (result) => ({ ...plan, ...result, plan: result.planText });
+    /** @param {SwapResult | null} result */
+    const asPlan = (result) => ({
+      ...plan,
+      .../** @type {SwapResult} */ (result),
+      plan: /** @type {SwapResult} */ (result).planText
+    });
 
     const sumo = asPlan(
       applySwap(plan, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules)
@@ -254,10 +306,12 @@ describe("applySwap", () => {
 
   test("rewrites the plan text's lines too, and nothing else in it", () => {
     const plan = beginner();
-    const result = applySwap(
-      plan,
-      { from: GOBLET, to: "Dumbbell sumo squat", area: null },
-      rulesForPlan(plan, NO_AREA)
+    const result = /** @type {SwapResult} */ (
+      applySwap(
+        plan,
+        { from: GOBLET, to: "Dumbbell sumo squat", area: null },
+        rulesForPlan(plan, NO_AREA)
+      )
     );
     const rebuilt = buildPlanPayload(result.planText);
 
@@ -278,13 +332,20 @@ describe("applySwap", () => {
     };
     const library = [...EXERCISES, extra];
     const rules = rulesForPlan(plan, NO_AREA);
-    const result = applySwap(plan, { from: row, to: "Test row", area: null }, rules, library);
+    const result = /** @type {SwapResult} */ (
+      applySwap(plan, { from: row, to: "Test row", area: null }, rules, library)
+    );
     const chosen = { ...extra, regressed: false };
     const occurrences = result.payload.days.flatMap((day) =>
       (day.prescriptions ?? []).filter((p) => p.name === "Test row")
     );
 
-    expect(occurrences.map((p) => p.swappedFrom.prescription.role)).toEqual(["main", "accessory"]);
+    // Each occurrence is one the swap just made, so it records its original.
+    expect(
+      occurrences.map(
+        (p) => /** @type {NonNullable<typeof p.swappedFrom>} */ (p.swappedFrom).prescription.role
+      )
+    ).toEqual(["main", "accessory"]);
     expect(occurrences.map(({ swappedFrom: _s, swapReason: _r, ...p }) => p)).toEqual([
       prescribe(chosen, "main", rules).prescription,
       prescribe(chosen, "accessory", rules).prescription
@@ -293,39 +354,53 @@ describe("applySwap", () => {
 
   test("records the area named as the reason", () => {
     const plan = savedPlan();
-    const name = dayOf(plan, "Monday").prescriptions.find(
-      (p) => entryNamed(p.name).pattern === "horizontal-push"
+    const name = /** @type {Prescription} */ (
+      dayOf(plan, "Monday").prescriptions.find(
+        (p) => entryNamed(p.name).pattern === "horizontal-push"
+      )
     ).name;
     const rules = rulesForPlan(plan, { age: null, area: "shoulder" });
-    const result = applySwap(
-      plan,
-      { from: name, to: "Incline push-up, hands on a counter", area: "shoulder" },
-      rules
+    const result = /** @type {SwapResult} */ (
+      applySwap(
+        plan,
+        { from: name, to: "Incline push-up, hands on a counter", area: "shoulder" },
+        rules
+      )
     );
-    const swapped = result.payload.days
-      .flatMap((day) => day.prescriptions ?? [])
-      .find((p) => p.name === "Incline push-up, hands on a counter");
+    const swapped = /** @type {Prescription} */ (
+      result.payload.days
+        .flatMap((day) => day.prescriptions ?? [])
+        .find((p) => p.name === "Incline push-up, hands on a counter")
+    );
     expect(swapped.swapReason).toBe("shoulder");
   });
 
   test("a second swap keeps the first original, and swapping back is the original", () => {
     const plan = beginner();
     const rules = rulesForPlan(plan, NO_AREA);
-    const first = applySwap(plan, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules);
+    const first = /** @type {SwapResult} */ (
+      applySwap(plan, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules)
+    );
     const once = { ...plan, payload: first.payload, plan: first.planText };
-    const second = applySwap(
-      once,
-      { from: "Dumbbell sumo squat", to: "Bodyweight squat", area: "wrist" },
-      rulesForPlan(once, { age: null, area: "wrist" })
+    const second = /** @type {SwapResult} */ (
+      applySwap(
+        once,
+        { from: "Dumbbell sumo squat", to: "Bodyweight squat", area: "wrist" },
+        rulesForPlan(once, { age: null, area: "wrist" })
+      )
     );
     const twice = { ...plan, payload: second.payload, plan: second.planText };
     const monday = dayOf(twice, "Monday").prescriptions[0];
 
     expect(monday.name).toBe("Bodyweight squat");
-    expect(monday.swappedFrom.prescription.name).toBe(GOBLET);
+    expect(
+      /** @type {NonNullable<typeof monday.swappedFrom>} */ (monday.swappedFrom).prescription.name
+    ).toBe(GOBLET);
     expect(monday.swapReason).toBe("wrist");
 
-    const back = applySwap(twice, { from: "Bodyweight squat", to: GOBLET, area: null }, rules);
+    const back = /** @type {SwapResult} */ (
+      applySwap(twice, { from: "Bodyweight squat", to: GOBLET, area: null }, rules)
+    );
     expect(back.payload).toEqual(plan.payload);
     expect(back.planText).toBe(plan.plan);
   });
@@ -349,7 +424,9 @@ describe("applySwap", () => {
       );
     }
     const rules = rulesForPlan(old, NO_AREA);
-    const result = applySwap(old, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules);
+    const result = /** @type {SwapResult} */ (
+      applySwap(old, { from: GOBLET, to: "Dumbbell sumo squat", area: null }, rules)
+    );
     const fresh = prescribe(
       { ...entryNamed("Dumbbell sumo squat"), regressed: false },
       "main",
@@ -362,8 +439,10 @@ describe("applySwap", () => {
 
     // An accessory's dose is not its entry's main dose, so it stays an accessory.
     const hinge = "Dumbbell Romanian deadlift";
-    const [alternative] = swapOptions(old, hinge, rules);
-    const accessory = applySwap(old, { from: hinge, to: alternative.name, area: null }, rules);
+    const [alternative] = /** @type {SwapOption[]} */ (swapOptions(old, hinge, rules));
+    const accessory = /** @type {SwapResult} */ (
+      applySwap(old, { from: hinge, to: alternative.name, area: null }, rules)
+    );
     expect(
       dayOf({ payload: accessory.payload }, "Monday").prescriptions.find(
         (p) => p.name === alternative.name
@@ -381,11 +460,17 @@ describe("applySwap", () => {
       70
     );
     const rules = rulesForPlan(plan, { age: 70, area: null });
-    const balance = dayOf(plan, "Monday").prescriptions.find((p) => p.role === null);
-    const [alternative] = swapOptions(plan, balance.name, rules);
-    const result = applySwap(plan, { from: balance.name, to: alternative.name, area: null }, rules);
-    const swapped = dayOf({ payload: result.payload }, "Monday").prescriptions.find(
-      (p) => p.name === alternative.name
+    const balance = /** @type {Prescription} */ (
+      dayOf(plan, "Monday").prescriptions.find((p) => p.role === null)
+    );
+    const [alternative] = /** @type {SwapOption[]} */ (swapOptions(plan, balance.name, rules));
+    const result = /** @type {SwapResult} */ (
+      applySwap(plan, { from: balance.name, to: alternative.name, area: null }, rules)
+    );
+    const swapped = /** @type {Prescription} */ (
+      dayOf({ payload: result.payload }, "Monday").prescriptions.find(
+        (p) => p.name === alternative.name
+      )
     );
 
     expect(entryNamed(alternative.name).pattern).toBe("balance");
@@ -415,10 +500,12 @@ describe("undoSwap", () => {
   test("puts back the plan as it was generated, payload and text", () => {
     const plan = beginner();
     const rules = rulesForPlan(plan, NO_AREA);
-    const bodyweight = applySwap(plan, { from: GOBLET, to: "Bodyweight squat", area: null }, rules);
+    const bodyweight = /** @type {SwapResult} */ (
+      applySwap(plan, { from: GOBLET, to: "Bodyweight squat", area: null }, rules)
+    );
     const swapped = { ...plan, payload: bodyweight.payload, plan: bodyweight.planText };
 
-    const undone = undoSwap(swapped, "Bodyweight squat");
+    const undone = /** @type {SwapResult} */ (undoSwap(swapped, "Bodyweight squat"));
 
     expect(undone.payload).toEqual(plan.payload);
     expect(undone.planText).toBe(plan.plan);

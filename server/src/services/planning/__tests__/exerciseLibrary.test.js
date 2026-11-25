@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   AREAS,
@@ -13,7 +14,13 @@ import {
 // spec's (docs/specs/2026-11-03-rule-based-plans-design.md, "The exercise
 // library"); the generator relies on each of them.
 
+/** @typedef {import("../exerciseLibrary.js").Exercise} Exercise */
+
 const byId = new Map(EXERCISES.map((entry) => [entry.id, entry]));
+/**
+ * @param {Exercise} entry
+ * @param {string} area
+ */
 const isOk = (entry, area) => !entry.flags[area];
 const LEVEL_RANK = { beginner: 0, intermediate: 1, advanced: 2 };
 
@@ -63,12 +70,16 @@ describe("the library's entries", () => {
 
 describe("the regressions", () => {
   const regressions = EXERCISES.flatMap((entry) =>
-    Object.entries(entry.regressions).map(([area, regression]) => [
-      `${entry.id} for ${area}`,
-      entry,
-      area,
-      regression
-    ])
+    Object.entries(entry.regressions).map(
+      ([area, regression]) =>
+        // Each row is one test.each case: its label, the entry, the area, the regression.
+        /** @type {[string, Exercise, string, { id: string, cue: string }]} */ ([
+          `${entry.id} for ${area}`,
+          entry,
+          area,
+          regression
+        ])
+    )
   );
 
   test("exist", () => {
@@ -78,7 +89,8 @@ describe("the regressions", () => {
   test.each(regressions)(
     "%s is an entry of the same pattern, ok for the area, needing no more and no harder",
     (_label, entry, area, regression) => {
-      const target = byId.get(regression.id);
+      // The test asserts first that the entry is there.
+      const target = /** @type {Exercise} */ (byId.get(regression.id));
       expect(target, `no entry ${regression.id}`).toBeDefined();
       expect(target.id).not.toBe(entry.id);
       expect(target.pattern).toBe(entry.pattern);
@@ -152,6 +164,10 @@ describe("the avoid table", () => {
     hip: ["pistol", "sumo squat"],
     pregnancy: ["jump", "jumps", "jumping", "burpee", "burpees", "sprint", "sprints"]
   };
+  /**
+   * @param {Exercise} entry
+   * @param {string[]} phrases
+   */
   const names = (entry, phrases) =>
     phrases.some((phrase) => new RegExp(String.raw`\b${phrase}\b`, "i").test(entry.name));
 
@@ -196,7 +212,8 @@ describe("the old keyword false positives", () => {
     ["dumbbell-triceps-kickback", ["hip"]],
     ["seated-hamstring-curl", ["wrist", "elbow"]]
   ])("%s is ok for %j", (id, areas) => {
-    const entry = byId.get(id);
+    // The test asserts first that the entry is there.
+    const entry = /** @type {Exercise} */ (byId.get(id));
     expect(entry, id).toBeDefined();
     for (const area of areas) expect(isOk(entry, area)).toBe(true);
   });

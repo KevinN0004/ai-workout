@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   STEPS,
@@ -17,9 +18,23 @@ import {
 // on Monday 9 Nov, the week before runs from 2 to 8 Nov, and the four weeks
 // before the week start on 12 Oct.
 
+// A plan with a payload always builds a progression, so each read of one built
+// from such a plan is cast as built, and each lift read is one the plan prescribes.
+/** @typedef {Parameters<typeof buildProgression>[0]} BuildInput */
+/** @typedef {import("../progression.js").Progression} Progression */
+/** @typedef {import("../progression.js").LiftWeek} LiftWeek */
+/** @typedef {import("../../dashboard/planPayloadService.js").Prescription} Prescription */
+/** @typedef {(number | null)[][]} Sets */
+
 const TODAY = "2026-11-11";
 const ROW = "Seated cable row";
 
+/**
+ * @param {string} name
+ * @param {number} [sets]
+ * @param {number} [min]
+ * @param {number} [max]
+ */
 const rx = (name, sets = 3, min = 8, max = 10) => ({
   name,
   sets,
@@ -38,6 +53,10 @@ const plank = {
   targetRpe: null
 };
 
+/**
+ * @param {Prescription[]} prescriptions
+ * @param {{ level?: string, injuries?: string }} [options]
+ */
 const planOf = (prescriptions, { level = "Intermediate", injuries = "None" } = {}) => ({
   level,
   injuries,
@@ -52,6 +71,10 @@ const planOf = (prescriptions, { level = "Intermediate", injuries = "None" } = {
 
 // A session on `date`, each exercise's sets given as [reps, loadKg, rpe].
 let saveOrder = 0;
+/**
+ * @param {string} date
+ * @param {Record<string, Sets>} [exercises]
+ */
 const session = (date, exercises = {}) => {
   saveOrder += 1;
   return {
@@ -66,12 +89,18 @@ const session = (date, exercises = {}) => {
 };
 
 // Three sets of `reps` at `loadKg` and `rpe`.
+/**
+ * @param {number | null} loadKg
+ * @param {number | null} [rpe]
+ * @param {number} [reps]
+ */
 const three = (loadKg, rpe = 8, reps = 10) => [
   [reps, loadKg, rpe],
   [reps, loadKg, rpe],
   [reps, loadKg, rpe]
 ];
 
+/** @param {Partial<BuildInput>} [overrides] */
 const build = (overrides = {}) =>
   buildProgression({
     plan: planOf([rx(ROW)]),
@@ -82,9 +111,20 @@ const build = (overrides = {}) =>
     ...overrides
   });
 
-const liftOf = (progression, name = ROW) => progression.lifts.find((lift) => lift.name === name);
+/**
+ * @param {Progression | null} progression
+ * @param {string} [name]
+ */
+const liftOf = (progression, name = ROW) =>
+  /** @type {LiftWeek} */ (
+    /** @type {Progression} */ (progression).lifts.find((lift) => lift.name === name)
+  );
 
 // The Mondays of `count` weeks in a row, the last on `last`.
+/**
+ * @param {number} count
+ * @param {string} [last]
+ */
 const mondays = (count, last = "2026-11-02") =>
   Array.from({ length: count }, (_, index) => {
     const date = new Date(`${last}T00:00:00Z`);
@@ -170,7 +210,9 @@ describe("buildProgression: the plan and its lifts", () => {
   });
 
   test("answers the week's shape", () => {
-    const progression = build({ sessions: [session("2026-11-02", { [ROW]: three(60) })] });
+    const progression = /** @type {Progression} */ (
+      build({ sessions: [session("2026-11-02", { [ROW]: three(60) })] })
+    );
     expect(progression).toEqual({
       weekStart: "2026-11-09",
       deloadWeek: { active: false, count: 1, reason: null, decision: null },
@@ -191,17 +233,20 @@ describe("buildProgression: the plan and its lifts", () => {
 
   test("a plan saved before prescriptions has a week but no lifts", () => {
     const plan = planOf([]);
-    delete plan.payload.days[0].prescriptions;
+    // A day saved before prescriptions existed has none.
+    delete (/** @type {{ prescriptions?: unknown }} */ (plan.payload.days[0]).prescriptions);
     expect(build({ plan })).toMatchObject({ weekStart: "2026-11-09", lifts: [] });
   });
 
   test("a prescription in seconds is not a lift", () => {
-    const progression = build({ plan: planOf([rx(ROW), plank]) });
+    const progression = /** @type {Progression} */ (build({ plan: planOf([rx(ROW), plank]) }));
     expect(progression.lifts.map((lift) => lift.name)).toEqual([ROW]);
   });
 
   test("a lift prescribed twice appears once, under its first prescription", () => {
-    const progression = build({ plan: planOf([rx(ROW, 3), rx("seated cable row", 4)]) });
+    const progression = /** @type {Progression} */ (
+      build({ plan: planOf([rx(ROW, 3), rx("seated cable row", 4)]) })
+    );
     expect(progression.lifts).toHaveLength(1);
     expect(progression.lifts[0]).toMatchObject({ name: ROW, sets: 3 });
   });
@@ -222,10 +267,12 @@ describe("buildProgression: the plan and its lifts", () => {
   });
 
   test("a bodyweight lift gets no target, even when logged with a load", () => {
-    const progression = build({
-      plan: planOf([rx("Push-up")]),
-      sessions: [session("2026-11-02", { "Push-up": three(10) })]
-    });
+    const progression = /** @type {Progression} */ (
+      build({
+        plan: planOf([rx("Push-up")]),
+        sessions: [session("2026-11-02", { "Push-up": three(10) })]
+      })
+    );
     expect(liftOf(progression, "Push-up")).toMatchObject({
       change: "none",
       kg: null,
@@ -236,10 +283,12 @@ describe("buildProgression: the plan and its lifts", () => {
 
   test("an inverted row is bodyweight, though it needs a barbell to hang from", () => {
     const name = "Inverted row under a racked barbell";
-    const progression = build({
-      plan: planOf([rx(name)]),
-      sessions: [session("2026-11-02", { [name]: three(10) })]
-    });
+    const progression = /** @type {Progression} */ (
+      build({
+        plan: planOf([rx(name)]),
+        sessions: [session("2026-11-02", { [name]: three(10) })]
+      })
+    );
     expect(liftOf(progression, name)).toMatchObject({ change: "none", kg: null });
   });
 
@@ -247,8 +296,12 @@ describe("buildProgression: the plan and its lifts", () => {
   const weekBefore = session("2026-11-03", { "Leg press": three(80) });
 
   test("a load 28 days before the week counts, and one 29 days before does not", () => {
-    const counted = build({ sessions: [session("2026-10-12", { [ROW]: three(60) }), weekBefore] });
-    const past = build({ sessions: [session("2026-10-11", { [ROW]: three(60) }), weekBefore] });
+    const counted = /** @type {Progression} */ (
+      build({ sessions: [session("2026-10-12", { [ROW]: three(60) }), weekBefore] })
+    );
+    const past = /** @type {Progression} */ (
+      build({ sessions: [session("2026-10-11", { [ROW]: three(60) }), weekBefore] })
+    );
     expect(liftOf(counted).change).toBe("up");
     expect(liftOf(past).change).toBe("none");
   });
@@ -355,10 +408,12 @@ describe("buildProgression: the working load and the step up", () => {
 
 describe("buildProgression: the lift deload", () => {
   test("no workout in the week before deloads every lift", () => {
-    const progression = build({
-      plan: planOf([rx(ROW), rx("Leg press")]),
-      sessions: [session("2026-10-26", { [ROW]: three(60), "Leg press": three(100, 9, 8) })]
-    });
+    const progression = /** @type {Progression} */ (
+      build({
+        plan: planOf([rx(ROW), rx("Leg press")]),
+        sessions: [session("2026-10-26", { [ROW]: three(60), "Leg press": three(100, 9, 8) })]
+      })
+    );
     for (const lift of progression.lifts) {
       expect(lift.change).toBe("deload");
       expect(lift.why).toBe("No workout logged last week; about 10% lighter to rebuild");
@@ -379,6 +434,7 @@ describe("buildProgression: the lift deload", () => {
   });
 
   // Nine reps, short of the top, so that no session of a run could step up.
+  /** @param {...[string, number, number | null]} sessions */
   const run = (...sessions) =>
     liftOf(
       build({
@@ -455,7 +511,9 @@ describe("buildProgression: the lift deload", () => {
 });
 
 describe("buildProgression: rounding in each unit", () => {
+  /** @param {Sets} sets */
   const lastWeek = (sets) => liftOf(build({ sessions: [session("2026-11-02", { [ROW]: sets })] }));
+  /** @param {number} loadKg */
   const missed = (loadKg) =>
     liftOf(build({ sessions: [session("2026-10-26", { [ROW]: three(loadKg, 8, 9) })] }));
 
@@ -507,10 +565,18 @@ describe("buildProgression: rounding in each unit", () => {
 describe("buildProgression: the deload week", () => {
   // One workout each Monday of `count` weeks in a row, the last in the week
   // before; the last one steps the row up if the lift rules apply.
+  /**
+   * @param {number} count
+   * @param {string} [last]
+   */
   const weeks = (count, last = "2026-11-02") =>
     mondays(count, last).map((date) => session(date, { [ROW]: three(60) }));
+  /**
+   * @param {BuildInput["sessions"]} sessions
+   * @param {string} [level]
+   */
   const deloadWeekOf = (sessions, level = "Intermediate") =>
-    build({ plan: planOf([rx(ROW)], { level }), sessions }).deloadWeek;
+    /** @type {Progression} */ (build({ plan: planOf([rx(ROW)], { level }), sessions })).deloadWeek;
 
   test("five counted weeks before this one make it a deload week, four do not", () => {
     expect(deloadWeekOf(weeks(5))).toEqual({
@@ -562,10 +628,12 @@ describe("buildProgression: the deload week", () => {
   });
 
   test("in a deload week each lift holds at its load, at half the sets", () => {
-    const progression = build({
-      plan: planOf([rx(ROW), rx("Leg press", 5)]),
-      sessions: weeks(5)
-    });
+    const progression = /** @type {Progression} */ (
+      build({
+        plan: planOf([rx(ROW), rx("Leg press", 5)]),
+        sessions: weeks(5)
+      })
+    );
     expect(liftOf(progression)).toMatchObject({
       change: "hold",
       kg: { from: 60, target: 60 },
@@ -594,6 +662,11 @@ describe("buildProgression: the deload week", () => {
 describe("buildProgression: asked first", () => {
   const BOX = "Dumbbell box squat";
   const GOBLET = "Dumbbell goblet squat";
+  /**
+   * @param {string} name
+   * @param {Sets} sets
+   * @param {BuildInput["plan"]} [plan]
+   */
   const lastWeek = (name, sets, plan) =>
     liftOf(build({ plan, sessions: [session("2026-11-02", { [name]: sets })] }), name);
 
@@ -642,6 +715,11 @@ describe("buildProgression: answers", () => {
     plan: planOf([rx(BOX)], { injuries: "Knee" }),
     sessions: [session("2026-11-02", { [BOX]: three(20) })]
   };
+  /**
+   * @param {Partial<BuildInput>} setup
+   * @param {string} decision
+   * @param {string} [name]
+   */
   const answer = (setup, decision, name = ROW) =>
     liftOf(build({ ...setup, decisions: { [liftKeyOf(name)]: decision } }), name);
 
@@ -694,12 +772,17 @@ describe("buildProgression: answers", () => {
 
   test("normal turns a deload week into a usual one, on the lift rules", () => {
     const sessions = mondays(5).map((date) => session(date, { [ROW]: three(60) }));
-    const progression = build({ sessions, decisions: { "": "normal" } });
+    const progression = /** @type {Progression} */ (
+      build({ sessions, decisions: { "": "normal" } })
+    );
     expect(progression.deloadWeek).toMatchObject({ active: true, decision: "normal" });
     expect(liftOf(progression)).toMatchObject({ change: "up", sets: 3 });
   });
 
   test("normal outside a deload week is ignored", () => {
-    expect(build({ ...lastWeek, decisions: { "": "normal" } }).deloadWeek.decision).toBeNull();
+    expect(
+      /** @type {Progression} */ (build({ ...lastWeek, decisions: { "": "normal" } })).deloadWeek
+        .decision
+    ).toBeNull();
   });
 });
