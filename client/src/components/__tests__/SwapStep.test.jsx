@@ -3,6 +3,7 @@
  * rules, an area that narrows them, the swap, and every way it can fail.
  * apiFetch, the network boundary, is stubbed.
  */
+// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SwapStep from "../SwapStep";
@@ -25,28 +26,43 @@ const BOX = {
 };
 const PLAN = { id: "plan-1", payload: { days: [] } };
 
-const respond = (body, ok = true) => ({ ok, json: async () => body });
+// Each answer holds only ok and json, which is all the step reads, and each
+// request it makes passes its options.
+/** @typedef {import("../../app/network.js").ApiFetch} ApiFetch */
+
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const respond = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 const deferred = () => {
+  /** @type {((value: unknown) => void) | undefined} */
   let resolve;
   const promise = new Promise((done) => {
     resolve = done;
   });
-  return { promise, resolve };
+  // The promise runs its executor at once, so resolve is set by here.
+  return { promise, resolve: /** @type {(value: unknown) => void} */ (resolve) };
 };
 
 // Answers the alternatives by the area asked about, and a swap with PLAN.
+/** @param {Record<string, unknown[]>} [byArea] */
 const fetchFor = (byArea = { "": [SUMO, BODYWEIGHT], knee: [BOX] }) =>
-  vi.fn(async (path, options) => {
-    if (options?.method === "POST") return respond({ plan: PLAN });
-    const area = new URL(path, "http://x").searchParams.get("area") ?? "";
-    return respond({
-      exercise: "Dumbbell goblet squat",
-      area: area || null,
-      areas: AREAS,
-      alternatives: byArea[area]
-    });
-  });
+  /** @type {import("vitest").Mock<ApiFetch>} */ (
+    vi.fn(async (path, options) => {
+      if (options?.method === "POST") return respond({ plan: PLAN });
+      const area = new URL(path, "http://x").searchParams.get("area") ?? "";
+      return respond({
+        exercise: "Dumbbell goblet squat",
+        area: area || null,
+        areas: AREAS,
+        alternatives: byArea[area]
+      });
+    })
+  );
 
+/** @param {import("vitest").Mock<ApiFetch>} [apiFetch] */
 const renderStep = (apiFetch = fetchFor()) => {
   const handlers = { onSwapped: vi.fn(), onBack: vi.fn() };
   render(
@@ -120,6 +136,7 @@ describe("SwapStep", () => {
   });
 
   test("a failure for an area since changed is dropped too", async () => {
+    /** @type {((reason: unknown) => void) | undefined} */
     let fail;
     const late = new Promise((_resolve, reject) => {
       fail = reject;
@@ -135,7 +152,12 @@ describe("SwapStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "Knee" }));
     fireEvent.click(screen.getByRole("button", { name: "Knee" }));
     await screen.findByRole("button", { name: /^Bodyweight squat/ });
-    await act(async () => fail(new Error("Could not load the alternatives. Try again.")));
+    // The request above has started, so its rejecter is set.
+    await act(async () =>
+      /** @type {(reason: unknown) => void} */ (fail)(
+        new Error("Could not load the alternatives. Try again.")
+      )
+    );
 
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -148,9 +170,10 @@ describe("SwapStep", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^Box squat to a chair/ }));
 
     await waitFor(() => expect(onSwapped).toHaveBeenCalledWith(PLAN, "Box squat to a chair"));
-    const [path, request] = apiFetch.mock.calls.at(-1);
+    const [path, request] = /** @type {Parameters<ApiFetch>} */ (apiFetch.mock.calls.at(-1));
     expect(path).toBe("/api/dashboard/plans/plan-1/swaps");
-    expect(JSON.parse(request.body)).toEqual({
+    // The swap posts its JSON body.
+    expect(JSON.parse(/** @type {string} */ (/** @type {RequestInit} */ (request).body))).toEqual({
       from: "Dumbbell goblet squat",
       to: "Box squat to a chair",
       area: "knee"

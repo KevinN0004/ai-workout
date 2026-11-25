@@ -3,10 +3,17 @@
  * boundary: `ready` follows the module's needRefresh, and `reload` activates
  * the waiting worker and reloads.
  */
+// @ts-check
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const plugin = vi.hoisted(() => ({ needRefresh: false, updateServiceWorker: null }));
+const plugin = vi.hoisted(
+  () =>
+    /** @type {{ needRefresh: boolean, updateServiceWorker: (() => Promise<void>) | null }} */ ({
+      needRefresh: false,
+      updateServiceWorker: null
+    })
+);
 
 vi.mock("virtual:pwa-register/react", () => ({
   useRegisterSW: () => ({

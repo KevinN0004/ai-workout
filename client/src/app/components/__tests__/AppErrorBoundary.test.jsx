@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";

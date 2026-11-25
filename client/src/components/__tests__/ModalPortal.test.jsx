@@ -1,11 +1,16 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import ModalPortal from "../ModalPortal";
 
+// None of these presses Escape, so the close handler is never called, and focus
+// is on a control wherever a test presses a key on it.
+const noop = () => {};
+
 describe("ModalPortal", () => {
   test("renders nothing when closed", () => {
     const { container } = render(
-      <ModalPortal open={false}>
+      <ModalPortal open={false} onClose={noop}>
         <div>Hidden modal</div>
       </ModalPortal>
     );
@@ -16,7 +21,7 @@ describe("ModalPortal", () => {
 
   test("portals content to body and manages body lock when open", () => {
     const { container, unmount } = render(
-      <ModalPortal open>
+      <ModalPortal open onClose={noop}>
         <div>Visible modal</div>
       </ModalPortal>
     );
@@ -95,7 +100,7 @@ describe("ModalPortal", () => {
     // throw when there is no handler.
     test("survives Escape with no handler supplied", () => {
       render(
-        <ModalPortal open>
+        <ModalPortal open onClose={noop}>
           <div>Visible modal</div>
         </ModalPortal>
       );
@@ -108,10 +113,11 @@ describe("ModalPortal", () => {
   // focus moves into the modal, cannot Tab out to the page behind, and goes
   // back to the opener on close. useFocusTrap's own tests cover the edges.
   describe("holding focus", () => {
+    /** @param {{ open: boolean }} props */
     const Page = ({ open }) => (
       <>
         <button type="button">Opener</button>
-        <ModalPortal open={open}>
+        <ModalPortal open={open} onClose={noop}>
           <div role="dialog" aria-label="Example">
             <button type="button">Close</button>
             <button type="button">Save</button>
@@ -128,7 +134,7 @@ describe("ModalPortal", () => {
       view.rerender(<Page open />);
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
 
-      fireEvent.keyDown(document.activeElement, { key: "Tab" });
+      fireEvent.keyDown(/** @type {Element} */ (document.activeElement), { key: "Tab" });
       screen.getByRole("button", { name: "Behind" }).focus();
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
 
@@ -141,7 +147,8 @@ describe("ModalPortal", () => {
     test("wraps the modal in an element that draws no box", () => {
       render(<Page open />);
 
-      const wrapper = screen.getByRole("dialog").parentElement;
+      // The dialog sits in its wrapper.
+      const wrapper = /** @type {HTMLElement} */ (screen.getByRole("dialog").parentElement);
       expect(wrapper.parentElement).toBe(document.body);
       expect(wrapper.style.display).toBe("contents");
     });

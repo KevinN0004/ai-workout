@@ -1,3 +1,4 @@
+// @ts-check
 import { act } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -30,6 +31,9 @@ test("a crash in App leaves a message in #root, not an empty page", async () => 
     await import("../main.jsx");
   });
 
-  expect(document.getElementById("root").textContent).toContain("Reload the page to try again.");
+  // The test adds #root before it imports main.jsx.
+  expect(/** @type {HTMLElement} */ (document.getElementById("root")).textContent).toContain(
+    "Reload the page to try again."
+  );
   expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: "App crashed" }));
 });

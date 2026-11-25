@@ -2,13 +2,21 @@
  * Pins StartSessionConfirm: shown only while a new session waits, it names the
  * open one, and offers Resume, Discard and start, and a way out.
  */
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import StartSessionConfirm from "../StartSessionConfirm";
 
-const openSession = { startedAt: Date.UTC(2026, 10, 9, 17, 5, 0), exercises: [{ sets: [1, 2] }] };
+// The open session holds only what the prompt reads: when it started, and its sets.
+const openSession = /** @type {import("../../workoutSession.js").WorkoutSession} */ (
+  /** @type {unknown} */ ({
+    startedAt: Date.UTC(2026, 10, 9, 17, 5, 0),
+    exercises: [{ sets: [1, 2] }]
+  })
+);
 
+/** @param {Partial<import("../StartSessionConfirm.jsx").StartSessionConfirmProps>} [props] */
 const renderConfirm = (props = {}) => {
   const handlers = { onResume: vi.fn(), onReplace: vi.fn(), onCancel: vi.fn() };
   render(<StartSessionConfirm openSession={openSession} waiting {...handlers} {...props} />);

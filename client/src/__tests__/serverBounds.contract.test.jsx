@@ -1,3 +1,4 @@
+// @ts-check
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import AuthPage from "../pages/auth/AuthPage";
@@ -32,7 +33,15 @@ import { newCard, toLoadKg } from "../app/exerciseSets";
 // accepts. Feet and inches, and pounds, are converted before they are sent,
 // and settingsFields.test.js pins how; the imperial ranges of the three forms
 // are held to sign-up's below.
+//
+// Each form handed to a render holds only the fields that render reads, and the
+// test fails at once if an input it looks up is missing.
 
+// A server schema field, as the test uses one: it only asks whether a value parses.
+/** @typedef {{ safeParse: (value: unknown) => { success: boolean } }} SchemaField */
+
+// A handler none of these renders calls, so it stands in for every one.
+/** @type {(...args: any[]) => any} */
 const noop = () => {};
 
 const renderCaloriesView = () =>
@@ -94,12 +103,17 @@ const setFields = apiSchema.exerciseSetFields;
 afterEach(() => {
   vi.restoreAllMocks();
 });
+/** @param {{ kind?: "reps" | "seconds", locale?: string }} [options] */
 const renderWorkoutModal = ({ kind = "reps", locale = "en-GB" } = {}) => {
   vi.spyOn(navigator, "languages", "get").mockReturnValue([locale]);
   return render(
     <DashboardWorkoutModal
       open
-      workoutForm={{ exerciseSets: [newCard({ name: "Squat", kind })] }}
+      workoutForm={
+        /** @type {import("../app/exerciseSets.js").WorkoutForm} */ ({
+          exerciseSets: [newCard({ name: "Squat", kind })]
+        })
+      }
       setWorkoutForm={noop}
       onClose={noop}
       onSubmit={noop}
@@ -108,17 +122,37 @@ const renderWorkoutModal = ({ kind = "reps", locale = "en-GB" } = {}) => {
 };
 const renderWorkoutHold = () => renderWorkoutModal({ kind: "seconds" });
 
+/**
+ * @param {string} [heightUnit]
+ * @param {string} [weightUnit]
+ */
 const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
   render(
     <HomePersonalStage
       personalPanelRef={{ current: null }}
       personalMode="basic"
       setPersonalMode={noop}
-      user={null}
+      // Signed out. The page's user type intersects CacheUser with an object,
+      // which drops the null the app passes when nobody is signed in.
+      user={
+        /** @type {import("../pages/home/HomePage.jsx").HomePageProps["user"]} */ (
+          /** @type {unknown} */ (null)
+        )
+      }
       onLogout={noop}
       go={noop}
       onPersonalSubmit={noop}
-      personal={{ heightCm: "", heightFeet: "", heightInches: "", weight: "", trainingDays: [] }}
+      personal={
+        /** @type {import("../pages/home/HomePage.jsx").HomePageProps["personal"]} */ (
+          /** @type {unknown} */ ({
+            heightCm: "",
+            heightFeet: "",
+            heightInches: "",
+            weight: "",
+            trainingDays: []
+          })
+        )
+      }
       onPersonalChange={noop}
       heightUnit={heightUnit}
       setHeightUnit={noop}
@@ -138,6 +172,10 @@ const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
     />
   );
 
+/**
+ * @param {string} [heightUnit]
+ * @param {string} [weightUnit]
+ */
 const renderWalkthroughForm = (heightUnit = "cm", weightUnit = "kg") =>
   render(
     <PreviewPersonalChapter
@@ -151,6 +189,10 @@ const renderWalkthroughForm = (heightUnit = "cm", weightUnit = "kg") =>
     />
   );
 
+/**
+ * @param {string} [signupHeightUnit]
+ * @param {string} [signupWeightUnit]
+ */
 const renderSignup = (signupHeightUnit = "cm", signupWeightUnit = "kg") =>
   render(
     <AuthPage
@@ -161,7 +203,14 @@ const renderSignup = (signupHeightUnit = "cm", signupWeightUnit = "kg") =>
       onAuthSubmit={noop}
       authForm={{ email: "", password: "" }}
       onAuthChange={noop}
-      signupProfileForm={{ heightCm: "", heightFeet: "", heightInches: "", weight: "" }}
+      signupProfileForm={
+        /** @type {import("../pages/auth/AuthPage.jsx").AuthPageProps["signupProfileForm"]} */ ({
+          heightCm: "",
+          heightFeet: "",
+          heightInches: "",
+          weight: ""
+        })
+      }
       onSignupProfileChange={noop}
       signupHeightUnit={signupHeightUnit}
       setSignupHeightUnit={noop}
@@ -180,11 +229,15 @@ const renderSignup = (signupHeightUnit = "cm", signupWeightUnit = "kg") =>
     />
   );
 
-const byLabel = (label) => () => screen.getByLabelText(label);
+/** @param {string} label */
+const byLabel = (label) => () => /** @type {HTMLInputElement} */ (screen.getByLabelText(label));
 // The sign-up inputs sit in labels that also hold the unit toggle, so their
 // label text is ambiguous; their names are not.
-const byName = (name) => () => document.querySelector(`input[name="${name}"]`);
+/** @param {string} name */
+const byName = (name) => () =>
+  /** @type {HTMLInputElement} */ (document.querySelector(`input[name="${name}"]`));
 
+/** @type {[string, () => unknown, () => HTMLInputElement, SchemaField][]} */
 const INPUTS = [
   [
     "Goal: daily calories",
@@ -278,9 +331,15 @@ const INPUTS = [
   ]
 ];
 
+/**
+ * @param {SchemaField} field
+ * @param {unknown} value
+ */
 const accepts = (field, value) => field.safeParse(value).success;
+/** @param {HTMLInputElement} input */
 const stepOf = (input) => (input.step ? Number(input.step) : 1);
 // 2 - 0.1 and 250 + 0.1 must be the decimals they look like.
+/** @param {number} value */
 const nudge = (value) => Number(value.toFixed(4));
 
 describe("client input bounds match the server's", () => {
@@ -322,7 +381,9 @@ describe("client input bounds match the server's", () => {
   // converted as the save converts them, must land inside the server's range.
   test("Workout: a set's load in pounds converts into the server's range", () => {
     renderWorkoutModal({ locale: "en-US" });
-    const input = screen.getByLabelText("Set 1 load in lb, Squat");
+    const input = /** @type {HTMLInputElement} */ (
+      screen.getByLabelText("Set 1 load in lb, Squat")
+    );
 
     expect(setFields.loadKg.safeParse(toLoadKg(input.min, "imperial")).success).toBe(true);
     expect(setFields.loadKg.safeParse(toLoadKg(input.max, "imperial")).success).toBe(true);
@@ -330,8 +391,9 @@ describe("client input bounds match the server's", () => {
 
   test("Goal: the weekly workouts offered are every count the server accepts", () => {
     renderCaloriesView();
-    const offered = Array.from(screen.getByLabelText("Weekly workouts").options, (option) =>
-      Number(option.value)
+    const offered = Array.from(
+      /** @type {HTMLSelectElement} */ (screen.getByLabelText("Weekly workouts")).options,
+      (option) => Number(option.value)
     );
     const accepted = Array.from({ length: 15 }, (_, count) => count).filter((count) =>
       accepts(goalsBodySchema.shape.weeklyWorkouts, count)

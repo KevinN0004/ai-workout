@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { describe, expect, test } from "vitest";
@@ -5,6 +6,8 @@ import useFocusTrap from "../useFocusTrap";
 
 // An overlay with three controls, beside a page with two of its own. The
 // overlay is rendered only while open, as ModalPortal and the drawer are.
+// Focus is on a control wherever a test presses a key on it.
+/** @param {{ open: boolean, name?: string, controls?: string[] }} props */
 function Harness({ open, name = "overlay", controls = ["First", "Middle", "Last"] }) {
   const ref = useRef(null);
   useFocusTrap(open, ref);
@@ -19,6 +22,7 @@ function Harness({ open, name = "overlay", controls = ["First", "Middle", "Last"
   ) : null;
 }
 
+/** @param {{ children?: import("react").ReactNode }} props */
 function Page({ children }) {
   return (
     <>
@@ -29,9 +33,14 @@ function Page({ children }) {
   );
 }
 
+/** @param {string} name */
 const button = (name) => screen.getByRole("button", { name });
 
 // A Tab keypress as the trap sees it, then the focus the browser would move.
+/**
+ * @param {HTMLElement} target
+ * @param {{ shiftKey?: boolean }} [options]
+ */
 const tabTo = (target, { shiftKey = false } = {}) => {
   fireEvent.keyDown(document.activeElement || document.body, { key: "Tab", shiftKey });
   target.focus();
@@ -71,7 +80,9 @@ describe("useFocusTrap", () => {
     render(<Page>{<Harness open />}</Page>);
     button("overlay Last").focus();
 
-    const allowed = fireEvent.keyDown(document.activeElement, { key: "Tab" });
+    const allowed = fireEvent.keyDown(/** @type {Element} */ (document.activeElement), {
+      key: "Tab"
+    });
 
     expect(allowed).toBe(false);
     expect(document.activeElement).toBe(button("overlay First"));
@@ -81,7 +92,10 @@ describe("useFocusTrap", () => {
     render(<Page>{<Harness open />}</Page>);
     button("overlay First").focus();
 
-    const allowed = fireEvent.keyDown(document.activeElement, { key: "Tab", shiftKey: true });
+    const allowed = fireEvent.keyDown(/** @type {Element} */ (document.activeElement), {
+      key: "Tab",
+      shiftKey: true
+    });
 
     expect(allowed).toBe(false);
     expect(document.activeElement).toBe(button("overlay Last"));
@@ -91,9 +105,18 @@ describe("useFocusTrap", () => {
     render(<Page>{<Harness open />}</Page>);
     button("overlay Middle").focus();
 
-    expect(fireEvent.keyDown(document.activeElement, { key: "Tab" })).toBe(true);
-    expect(fireEvent.keyDown(document.activeElement, { key: "Tab", shiftKey: true })).toBe(true);
-    expect(fireEvent.keyDown(document.activeElement, { key: "Enter" })).toBe(true);
+    expect(fireEvent.keyDown(/** @type {Element} */ (document.activeElement), { key: "Tab" })).toBe(
+      true
+    );
+    expect(
+      fireEvent.keyDown(/** @type {Element} */ (document.activeElement), {
+        key: "Tab",
+        shiftKey: true
+      })
+    ).toBe(true);
+    expect(
+      fireEvent.keyDown(/** @type {Element} */ (document.activeElement), { key: "Enter" })
+    ).toBe(true);
   });
 
   // A browser reports a control hidden by CSS through checkVisibility; jsdom
@@ -104,7 +127,9 @@ describe("useFocusTrap", () => {
     hidden.checkVisibility = () => false;
     button("overlay Middle").focus();
 
-    expect(fireEvent.keyDown(document.activeElement, { key: "Tab" })).toBe(false);
+    expect(fireEvent.keyDown(/** @type {Element} */ (document.activeElement), { key: "Tab" })).toBe(
+      false
+    );
     expect(document.activeElement).toBe(button("overlay First"));
   });
 
@@ -117,6 +142,7 @@ describe("useFocusTrap", () => {
   });
 
   test("skips a disabled control and one taken out of the tab order", () => {
+    /** @param {{ open: boolean }} props */
     function Mixed({ open }) {
       const ref = useRef(null);
       useFocusTrap(open, ref);
@@ -144,6 +170,7 @@ describe("useFocusTrap", () => {
   // The selector cannot see that a control sits in a disabled fieldset, but
   // the control refuses focus, and the next one is tried.
   test("moves past a control that refuses focus", () => {
+    /** @param {{ open: boolean }} props */
     function Fieldset({ open }) {
       const ref = useRef(null);
       useFocusTrap(open, ref);
@@ -169,11 +196,13 @@ describe("useFocusTrap", () => {
   test("leaves focus where it is if the overlay already holds it", () => {
     // Effects run in the order they are declared, so this one focuses the
     // field before the trap's runs, as a modal's own focus call would.
+    /** @param {{ open: boolean }} props */
     function AutoFocused({ open }) {
       const ref = useRef(null);
       const field = useRef(null);
       useEffect(() => {
-        field.current.focus();
+        // The field is rendered with the overlay, so the ref is set here.
+        /** @type {HTMLElement} */ (/** @type {unknown} */ (field.current)).focus();
       }, []);
       useFocusTrap(open, ref);
       return (
@@ -195,6 +224,7 @@ describe("useFocusTrap", () => {
   // A hidden or inert control is never the edge Tab wraps at: if it were,
   // Tab from the last control that can really take focus would walk out.
   test("does not count a control inside something hidden or inert as the last one", () => {
+    /** @param {{ open: boolean }} props */
     function Collapsed({ open }) {
       const ref = useRef(null);
       useFocusTrap(open, ref);
@@ -227,7 +257,7 @@ describe("useFocusTrap", () => {
   // into the overlay rather than starting from wherever the browser chooses.
   test("Tab with focus on the body goes straight back in", () => {
     render(<Page>{<Harness open />}</Page>);
-    document.activeElement.blur();
+    /** @type {HTMLElement} */ (document.activeElement).blur();
     expect(document.activeElement).toBe(document.body);
 
     expect(fireEvent.keyDown(document.body, { key: "Tab" })).toBe(false);
@@ -245,6 +275,7 @@ describe("useFocusTrap", () => {
   });
 
   test("does not reach for an opener that is gone", () => {
+    /** @param {{ open: boolean, showOpener: boolean }} props */
     function Swap({ open, showOpener }) {
       return (
         <>
@@ -273,6 +304,7 @@ describe("useFocusTrap", () => {
   });
 
   test("with two overlays open, only the newer one holds focus until it closes", () => {
+    /** @param {boolean} second */
     const both = (second) => (
       <Page>
         <Harness open name="lower" />
@@ -289,7 +321,9 @@ describe("useFocusTrap", () => {
     // The lower trap must not treat the upper overlay as outside itself: a
     // Tab between the upper overlay's own controls is the browser's to move.
     button("upper Middle").focus();
-    expect(fireEvent.keyDown(document.activeElement, { key: "Tab" })).toBe(true);
+    expect(fireEvent.keyDown(/** @type {Element} */ (document.activeElement), { key: "Tab" })).toBe(
+      true
+    );
     expect(document.activeElement).toBe(button("upper Middle"));
 
     view.rerender(both(false));

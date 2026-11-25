@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import useStravaSync from "../useStravaSync";
@@ -7,11 +8,20 @@ import { markAnswered, markUnanswered } from "../../connection";
 // docs/specs/2026-11-12-strava-import-design.md, "The client"): once per entry,
 // a reload only when something changed, and never a word when it fails.
 
-const respond = (body, ok = true) => ({ ok, json: async () => body });
+// Each answer holds only ok and json, which is all the hook reads.
+/** @typedef {import("../../network.js").ApiFetch} ApiFetch */
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const respond = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 
 const ACCOUNT = "dashboard:a@b.c";
 
+/** @param {{ answer?: unknown, accountKey?: string, isDashboardRoute?: boolean }} [options] */
 const renderSync = ({ answer = { imported: 0, updated: 0, removed: 0 }, ...props } = {}) => {
+  /** @type {import("vitest").Mock<ApiFetch>} */
   const apiFetch = vi.fn(async () => (typeof answer === "function" ? answer() : respond(answer)));
   const reloadDashboard = vi.fn();
   const initial = { accountKey: ACCOUNT, isDashboardRoute: true, ...props };
@@ -21,6 +31,7 @@ const renderSync = ({ answer = { imported: 0, updated: 0, removed: 0 }, ...props
   return { ...hook, apiFetch, reloadDashboard, initial };
 };
 
+/** @param {import("vitest").Mock<ApiFetch>} apiFetch */
 const syncCalls = (apiFetch) =>
   apiFetch.mock.calls.filter(([path]) => path === "/api/integrations/strava/sync");
 
@@ -29,7 +40,10 @@ describe("when it syncs", () => {
     const { apiFetch } = renderSync();
 
     await waitFor(() => expect(syncCalls(apiFetch)).toHaveLength(1));
-    expect(apiFetch.mock.calls[0][1].body).toBe(JSON.stringify({ manual: false }));
+    // Each sync passes its options.
+    expect(/** @type {RequestInit} */ (apiFetch.mock.calls[0][1]).body).toBe(
+      JSON.stringify({ manual: false })
+    );
   });
 
   test("not again while moving between dashboard views", async () => {

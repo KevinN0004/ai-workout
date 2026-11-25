@@ -1,3 +1,4 @@
+// @ts-check
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useDashboardData from "../useDashboardData";
@@ -6,6 +7,9 @@ import useDashboardData from "../useDashboardData";
 // load, and the error text the user actually sees. Untested until now, and the
 // most user-facing of the remaining gaps -- a bug here is wrong data on screen
 // rather than a wrong animation.
+//
+// Each hook is given only the props its test reaches, each answer holds only ok
+// and json, and each fake dashboard or reading only the fields its test reads.
 
 const CACHE_KEY = "dashboard:test-user";
 const WEATHER_KEY = "weather:test-user";
@@ -18,6 +22,7 @@ const setGoalForm = vi.fn();
 // The ambient loads go through navigator.geolocation before they can request
 // anything, so most of the failure modes are reached from here rather than
 // from fetch. Resolving and rejecting are both callback-style.
+/** @param {{ position?: unknown, error?: unknown }} [options] */
 const stubGeolocation = ({
   position = { coords: { latitude: 40.1, longitude: -75.2 } },
   error
@@ -32,6 +37,10 @@ const stubGeolocation = ({
   });
 };
 
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
 const jsonResponse = (body, ok = true) => ({
   ok,
   json: async () => body
@@ -40,17 +49,20 @@ const jsonResponse = (body, ok = true) => ({
 // A response the test releases by hand, so two overlapping requests can be
 // made to answer in whichever order the test is about.
 const deferred = () => {
+  /** @type {((value: unknown) => void) | undefined} */
   let resolve;
   const promise = new Promise((r) => {
     resolve = r;
   });
-  return { promise, resolve };
+  // The promise runs its executor at once, so resolve is set by here.
+  return { promise, resolve: /** @type {(value: unknown) => void} */ (resolve) };
 };
 
 // Props are built once per render() call, not once per React render. setGoalForm
 // is in the load effect's dependency array, so handing it a fresh vi.fn() on
 // every render re-triggers the effect forever and each pass cancels the last --
 // loading never clears and no error is ever recorded.
+/** @param {Record<string, unknown>} [overrides] */
 const render = (overrides = {}) => {
   const props = {
     user,
@@ -62,7 +74,9 @@ const render = (overrides = {}) => {
     setGoalForm: vi.fn(),
     ...overrides
   };
-  return renderHook(() => useDashboardData(props));
+  return renderHook(() =>
+    useDashboardData(/** @type {Parameters<typeof useDashboardData>[0]} */ (props))
+  );
 };
 
 beforeEach(() => {
@@ -92,6 +106,7 @@ describe("useDashboardData", () => {
   // saved stays blank, so saving only the calories cannot save a default target
   // with them: the server leaves a blank target as it was.
   describe("filling the goals form", () => {
+    /** @param {unknown} goals */
     const loadGoals = async (goals) => {
       vi.stubGlobal(
         "fetch",
@@ -100,7 +115,8 @@ describe("useDashboardData", () => {
       const fillGoalForm = vi.fn();
       render({ setGoalForm: fillGoalForm });
       await waitFor(() => expect(fillGoalForm).toHaveBeenCalled());
-      return fillGoalForm.mock.calls.at(-1)[0];
+      // The load has just filled the form.
+      return /** @type {unknown[]} */ (fillGoalForm.mock.calls.at(-1))[0];
     };
 
     test("leaves the target blank when none is saved", async () => {
@@ -125,6 +141,7 @@ describe("useDashboardData", () => {
   });
 
   test("does not fetch without a signed-in user", async () => {
+    /** @type {import("vitest").Mock} */
     const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -134,6 +151,7 @@ describe("useDashboardData", () => {
   });
 
   test("does not fetch away from a dashboard route", async () => {
+    /** @type {import("vitest").Mock} */
     const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -171,6 +189,7 @@ describe("useDashboardData", () => {
         return gate.promise;
       })
     );
+    /** @param {string} dashboardCacheKey */
     const props = (dashboardCacheKey) => ({
       user,
       isDashboardRoute: true,
@@ -196,7 +215,9 @@ describe("useDashboardData", () => {
       gates[1].resolve(jsonResponse({ dashboard: { marker: "second" } }));
     });
     await waitFor(() => expect(result.current.dashLoading).toBe(false));
-    expect(result.current.dashboard.marker).toBe("second");
+    expect(
+      /** @type {{ marker?: string }} */ (/** @type {unknown} */ (result.current.dashboard)).marker
+    ).toBe("second");
     expect(result.current.dashError).toBe("");
   });
 
@@ -228,7 +249,8 @@ describe("useDashboardData", () => {
       const { result } = render();
 
       await waitFor(() => expect(result.current.dashboard).toEqual(dashboard));
-      const stored = JSON.parse(window.localStorage.getItem(CACHE_KEY));
+      // The load has just stored it.
+      const stored = JSON.parse(/** @type {string} */ (window.localStorage.getItem(CACHE_KEY)));
       expect(stored.dashboard).toEqual(dashboard);
     });
 
@@ -251,7 +273,9 @@ describe("useDashboardData", () => {
       const { result } = render();
 
       await waitFor(() => expect(result.current.dashboard).toEqual(cached));
-      expect(JSON.parse(window.localStorage.getItem(CACHE_KEY)).updatedAt).toBe(savedAt);
+      expect(
+        JSON.parse(/** @type {string} */ (window.localStorage.getItem(CACHE_KEY))).updatedAt
+      ).toBe(savedAt);
 
       const fresh = { workouts: [{ id: "fresh" }], goals: {} };
       await act(async () => {
@@ -259,7 +283,9 @@ describe("useDashboardData", () => {
       });
 
       await waitFor(() => expect(result.current.dashboard).toEqual(fresh));
-      expect(JSON.parse(window.localStorage.getItem(CACHE_KEY)).updatedAt).toBeGreaterThan(savedAt);
+      expect(
+        JSON.parse(/** @type {string} */ (window.localStorage.getItem(CACHE_KEY))).updatedAt
+      ).toBeGreaterThan(savedAt);
     });
 
     test("survives unparseable cached JSON", async () => {
@@ -405,6 +431,7 @@ describe("useDashboardData", () => {
       const first = { workouts: [{ id: "w1" }], goals: {} };
       const second = { workouts: [{ id: "w1" }, { id: "w2" }], goals: {} };
       const answers = [first, second];
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ dashboard: answers.shift() }));
       vi.stubGlobal("fetch", fetchMock);
       const { result } = render();
@@ -417,6 +444,7 @@ describe("useDashboardData", () => {
     });
 
     test("keeps the load's own guards: off the dashboard it fetches nothing", async () => {
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
       vi.stubGlobal("fetch", fetchMock);
       const { result } = render({ isDashboardRoute: false });
@@ -473,21 +501,27 @@ describe("useDashboardData", () => {
 // Both go through the browser's geolocation before they can ask the server, so
 // most of what can go wrong happens before the request does.
 describe("ambient data", () => {
+  /** @param {number} code */
   const geoError = (code) => ({ code, message: `geo ${code}` });
 
+  /** @param {Record<string, unknown>} [overrides] */
   const ambient = (overrides = {}) =>
     render({ weatherCacheKey: WEATHER_KEY, airCacheKey: AIR_KEY, ...overrides });
 
   describe("locating the user", () => {
     test("asks the server for the coordinates it was given", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ recommendation: {} }));
       vi.stubGlobal("fetch", fetchMock);
       const { result } = ambient();
 
       await act(async () => result.current.loadWeatherRecommendation());
 
-      const url = fetchMock.mock.calls.find(([u]) => u.includes("/api/weather"))[0];
+      // The load has just asked the route.
+      const url = /** @type {[string]} */ (
+        fetchMock.mock.calls.find(([u]) => u.includes("/api/weather"))
+      )[0];
       expect(url).toContain("latitude=40.1");
       expect(url).toContain("longitude=-75.2");
     });
@@ -500,13 +534,17 @@ describe("ambient data", () => {
       ["loadAirQuality", "/api/air-quality/current"]
     ])("%s sends the coordinates rounded to two decimal places", async (loader, path) => {
       stubGeolocation({ position: { coords: { latitude: 40.712776, longitude: -74.005974 } } });
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ summary: {}, recommendation: {} }));
       vi.stubGlobal("fetch", fetchMock);
       const { result } = ambient();
 
       await act(async () => result.current[loader]());
 
-      const url = fetchMock.mock.calls.find(([u]) => String(u).startsWith(path))[0];
+      // The load has just asked the route.
+      const url = /** @type {[string]} */ (
+        fetchMock.mock.calls.find(([u]) => String(u).startsWith(path))
+      )[0];
       const query = new URL(url, "http://localhost").searchParams;
       expect(query.get("latitude")).toBe("40.71");
       expect(query.get("longitude")).toBe("-74.01");
@@ -562,6 +600,7 @@ describe("ambient data", () => {
 
     test("does not call the server when locating fails", async () => {
       stubGeolocation({ error: geoError(1) });
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({}));
       vi.stubGlobal("fetch", fetchMock);
       const { result } = ambient();
@@ -582,6 +621,7 @@ describe("ambient data", () => {
       "a position the browser %s is a location failure, not a failed lookup",
       async (_label, geo) => {
         stubGeolocation(geo);
+        /** @type {import("vitest").Mock} */
         const fetchMock = vi.fn(async () => jsonResponse({}));
         vi.stubGlobal("fetch", fetchMock);
         const { result } = ambient();
@@ -669,7 +709,8 @@ describe("ambient data", () => {
       await act(async () => result.current.loadWeatherRecommendation());
 
       await waitFor(() => expect(result.current.weatherData).toBeTruthy());
-      const stored = JSON.parse(window.localStorage.getItem(WEATHER_KEY));
+      // The load has just stored it.
+      const stored = JSON.parse(/** @type {string} */ (window.localStorage.getItem(WEATHER_KEY)));
       expect(stored.data).toEqual({ recommendation: {} });
     });
 
@@ -829,7 +870,9 @@ describe("ambient data", () => {
       );
       const { result } = ambient();
 
+      /** @type {Promise<unknown> | undefined} */
       let first;
+      /** @type {Promise<unknown> | undefined} */
       let second;
       await act(async () => {
         first = result.current[method]();
@@ -870,7 +913,9 @@ describe("ambient data", () => {
         );
         const { result } = ambient();
 
+        /** @type {Promise<unknown> | undefined} */
         let first;
+        /** @type {Promise<unknown> | undefined} */
         let second;
         await act(async () => {
           first = result.current[method]();
@@ -1009,6 +1054,7 @@ describe("ambient data", () => {
       "a position the browser %s is a location failure, not a failed lookup",
       async (_label, geo) => {
         stubGeolocation(geo);
+        /** @type {import("vitest").Mock} */
         const fetchMock = vi.fn(async () => jsonResponse({}));
         vi.stubGlobal("fetch", fetchMock);
         const { result } = ambient();
@@ -1231,6 +1277,7 @@ describe("ambient data", () => {
   describe("loading on arrival", () => {
     test("fetches both readings when the dashboard opens", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({}));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -1246,6 +1293,7 @@ describe("ambient data", () => {
 
     test("does not fetch when ambient data was not asked for", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ dashboard: {} }));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -1257,6 +1305,7 @@ describe("ambient data", () => {
 
     test("does not fetch away from the dashboard", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({}));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -1268,6 +1317,7 @@ describe("ambient data", () => {
 
     test("does not fetch without a signed-in user", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({}));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -1289,6 +1339,7 @@ describe("ambient data", () => {
         JSON.stringify({ data: { recommendation: {} }, updatedAt: 1 })
       );
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({}));
       vi.stubGlobal("fetch", fetchMock);
 
@@ -1306,6 +1357,7 @@ describe("ambient data", () => {
     // hold the reading loaded earlier.
     test("does not refetch when returning to the dashboard in the same session", async () => {
       stubGeolocation();
+      /** @type {import("vitest").Mock} */
       const fetchMock = vi.fn(async () => jsonResponse({ recommendation: {} }));
       vi.stubGlobal("fetch", fetchMock);
 

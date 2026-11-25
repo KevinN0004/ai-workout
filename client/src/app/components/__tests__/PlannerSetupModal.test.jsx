@@ -1,3 +1,4 @@
+// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlannerSetupModal from "../PlannerSetupModal";
@@ -9,7 +10,11 @@ import { equipmentOptionsByEnv, quickFocuses } from "../../constants";
 // component calls; what is untested is the surface that calls them -- which
 // step shows what, which tile reads as selected, and that every option gets a
 // thumbnail rather than a broken image.
+//
+// Each element a test looks up is on screen, so it fails at once if one is
+// missing, and each setter a test reads back was just handed its value.
 
+/** @param {Partial<import("../PlannerSetupModal.jsx").PlannerSetupModalProps>} [props] */
 const renderModal = (props = {}) => {
   const handlers = {
     setPlannerStep: vi.fn(),
@@ -44,8 +49,13 @@ const renderModal = (props = {}) => {
 };
 
 const dialog = () => screen.getByRole("dialog");
+/** @param {string} label */
 const tile = (label) =>
-  Array.from(document.querySelectorAll(".equip-card")).find((el) => el.textContent.includes(label));
+  /** @type {HTMLElement} */ (
+    Array.from(document.querySelectorAll(".equip-card")).find((el) =>
+      /** @type {string} */ (el.textContent).includes(label)
+    )
+  );
 
 describe("PlannerSetupModal", () => {
   describe("whether it is on screen at all", () => {
@@ -105,7 +115,9 @@ describe("PlannerSetupModal", () => {
 
       fireEvent.click(within(dialog()).getByLabelText("Back"));
 
-      const updater = setPlannerStep.mock.calls.at(-1)[0];
+      const updater = /** @type {(step: number) => number} */ (
+        /** @type {unknown[]} */ (setPlannerStep.mock.calls.at(-1))[0]
+      );
       expect(updater(2)).toBe(1);
       expect(updater(1)).toBe(1);
     });
@@ -211,7 +223,7 @@ describe("PlannerSetupModal", () => {
         const environment = equipmentOptionsByEnv.Home.includes(item) ? "Home" : "Commercial";
         const { unmount } = renderModal({ plannerStep: 1, form: formWith({ environment }) });
 
-        const image = tile(item).querySelector("img");
+        const image = /** @type {HTMLImageElement} */ (tile(item).querySelector("img"));
         expect(image).toBeTruthy();
         expect(image.getAttribute("src")).toBeTruthy();
         unmount();
@@ -267,7 +279,11 @@ describe("PlannerSetupModal", () => {
       });
 
       expect(onChange).toHaveBeenCalled();
-      expect(onChange.mock.calls.at(-1)[0].target.name).toBe("days");
+      expect(
+        /** @type {{ target: { name: string } }} */ (
+          /** @type {unknown[]} */ (onChange.mock.calls.at(-1))[0]
+        ).target.name
+      ).toBe("days");
     });
 
     test("the equipment grid is not on this step", () => {
@@ -291,7 +307,9 @@ describe("PlannerSetupModal", () => {
 
       // The label is a span inside the button; the state class is on the
       // button itself.
-      expect(within(dialog()).getByText(chosen).closest("button").className).toContain("active");
+      expect(
+        /** @type {HTMLElement} */ (within(dialog()).getByText(chosen).closest("button")).className
+      ).toContain("active");
     });
 
     test("clicking one reports it", () => {
@@ -381,9 +399,11 @@ describe("PlannerSetupModal", () => {
     test.each([[1], [2], [3]])("step %i offers to continue rather than submit", (plannerStep) => {
       const { setPlannerStep, onSubmit } = renderModal({ plannerStep });
 
-      const next = within(dialog())
-        .getAllByRole("button")
-        .find((button) => /next|continue/i.test(button.textContent));
+      const next = /** @type {HTMLElement} */ (
+        within(dialog())
+          .getAllByRole("button")
+          .find((button) => /next|continue/i.test(/** @type {string} */ (button.textContent)))
+      );
       expect(next).toBeTruthy();
 
       fireEvent.click(next);
@@ -395,12 +415,16 @@ describe("PlannerSetupModal", () => {
     test("continuing moves one step, never past the last", () => {
       const { setPlannerStep } = renderModal({ plannerStep: 1 });
 
-      const next = within(dialog())
-        .getAllByRole("button")
-        .find((button) => /next|continue/i.test(button.textContent));
+      const next = /** @type {HTMLElement} */ (
+        within(dialog())
+          .getAllByRole("button")
+          .find((button) => /next|continue/i.test(/** @type {string} */ (button.textContent)))
+      );
       fireEvent.click(next);
 
-      const updater = setPlannerStep.mock.calls.at(-1)[0];
+      const updater = /** @type {(step: number) => number} */ (
+        /** @type {unknown[]} */ (setPlannerStep.mock.calls.at(-1))[0]
+      );
       expect(updater(1)).toBe(2);
       expect(updater(3)).toBe(4);
       expect(updater(4)).toBe(4);
@@ -409,9 +433,11 @@ describe("PlannerSetupModal", () => {
     test("the last step submits instead", () => {
       const { onSubmit } = renderModal({ plannerStep: 4 });
 
-      const submit = within(dialog())
-        .getAllByRole("button")
-        .find((button) => button.className.includes("cta"));
+      const submit = /** @type {HTMLElement} */ (
+        within(dialog())
+          .getAllByRole("button")
+          .find((button) => button.className.includes("cta"))
+      );
 
       fireEvent.click(submit);
 
@@ -423,9 +449,11 @@ describe("PlannerSetupModal", () => {
       // to the model.
       renderModal({ plannerStep: 4, loading: true });
 
-      const submit = within(dialog())
-        .getAllByRole("button")
-        .find((button) => button.className.includes("cta"));
+      const submit = /** @type {HTMLElement} */ (
+        within(dialog())
+          .getAllByRole("button")
+          .find((button) => button.className.includes("cta"))
+      );
 
       expect(submit).toBeDisabled();
     });
@@ -433,15 +461,18 @@ describe("PlannerSetupModal", () => {
     test("and enabled when it is not", () => {
       renderModal({ plannerStep: 4, loading: false });
 
-      const submit = within(dialog())
-        .getAllByRole("button")
-        .find((button) => button.className.includes("cta"));
+      const submit = /** @type {HTMLElement} */ (
+        within(dialog())
+          .getAllByRole("button")
+          .find((button) => button.className.includes("cta"))
+      );
 
       expect(submit).not.toBeDisabled();
     });
   });
 });
 
+/** @param {Record<string, unknown>} overrides */
 function formWith(overrides) {
   return {
     environment: "Home",

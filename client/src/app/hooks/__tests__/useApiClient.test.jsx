@@ -1,3 +1,4 @@
+// @ts-check
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useApiClient from "../useApiClient";
@@ -8,6 +9,7 @@ import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "../../constants";
 // CSRF guard and the credentials default, so a regression is either a request
 // the server refuses or one that arrives without the session cookie.
 
+/** @param {string} value */
 const setCookie = (value) => {
   document.cookie = `${CSRF_COOKIE_NAME}=${value}`;
 };
@@ -19,13 +21,24 @@ const clearCookies = () => {
   }
 };
 
-const jsonResponse = (body, ok = true) => ({ ok, json: async () => body });
+// Each answer holds only ok and json, which is all the client reads.
+/**
+ * @param {unknown} body
+ * @param {boolean} [ok]
+ */
+const jsonResponse = (body, ok = true) =>
+  /** @type {Response} */ (/** @type {unknown} */ ({ ok, json: async () => body }));
 
 const render = () => renderHook(() => useApiClient()).result;
 
 // The Headers instance the hook built, from a given fetch call.
+/**
+ * @param {import("vitest").Mock} fetchMock
+ * @param {number} [call]
+ */
 const headersOf = (fetchMock, call = 0) => fetchMock.mock.calls[call][1].headers;
 
+/** @type {import("vitest").Mock} */
 let fetchMock;
 
 beforeEach(() => {
@@ -288,6 +301,10 @@ describe("apiFetch", () => {
             });
           })
       );
+    /**
+     * @param {Promise<unknown>} promise
+     * @param {number} ms
+     */
     const settledBy = async (promise, ms) => {
       const outcome = promise.then(
         () => "answered",
@@ -330,7 +347,8 @@ describe("apiFetch", () => {
 
       expect(await settledBy(request, 15000)).toBe("Request timed out. Please try again.");
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(fetch.mock.calls[0][0]).toBe("/api/csrf-token");
+      // fetch is stubbed with a mock before each test.
+      expect(/** @type {import("vitest").Mock} */ (fetch).mock.calls[0][0]).toBe("/api/csrf-token");
     });
 
     test("does not hand timeoutMs on to fetch", async () => {
