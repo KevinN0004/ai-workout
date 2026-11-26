@@ -1,7 +1,7 @@
 # Type-checking the pages and the tests, then checkJs on (roadmap lane D1, phase 5 and M4), design
 
-Status: **decided 2026-11-19** with the owner, measured. The plan is
-`docs/plans/2026-11-19-pages-tests-and-checkjs.md`. Phase 4 is
+Status: **applied** 2026-11-26, M4 reached in #457. Decided 2026-11-19 with the owner,
+measured. The plan is `docs/plans/2026-11-19-pages-tests-and-checkjs.md`. Phase 4 is
 `docs/specs/2026-11-17-server-source-types-design.md`, whose decision 3 left the client's use
 of the server's response typedefs to this phase.
 

@@ -7,8 +7,8 @@ Accepted. Decided by the owner on 2026-11-02 for roadmap lane D1. The design is
 
 Files stay `.js` and `.jsx`, and their types live in JSDoc comments. TypeScript 7 checks a
 file once `// @ts-check` is on its own line below its header, with `strict` on and `checkJs`
-off, so files opt in one at a time. `npm run typecheck` runs in CI. Roadmap milestone M4 turns
-`checkJs` on for every file and retires the pragmas.
+off, so files opt in one at a time. `npm run typecheck` runs in CI. Roadmap milestone M4
+turned `checkJs` on for every file and retired the pragmas on 2026-11-26 (#457).
 
 ## Options
 
@@ -40,16 +40,18 @@ Probed on 7.0.2, the release current on 2026-11-02, in a scratch project:
 
 ## Guards
 
-`scripts/__tests__/repo-invariants.test.mjs`, "type-checked files":
+`scripts/__tests__/repo-invariants.test.mjs`, "type-checked files", since M4:
 
-- every `// @ts-check` comes before its file's first statement, and none is written inside
-  a block comment;
-- `TYPE_CHECKED_FILES` equals the number of checked files. Checking a file raises it, and
-  lowering it takes a PR that says why, so a pragma dropped to quiet an error shows in review;
-- both tsconfigs keep `strict` true and `checkJs` false;
-- CI runs `npm run typecheck`.
+- each of the four configs (`tsconfig.json` and `tsconfig.test.json` in each workspace) has
+  `strict` and `checkJs` on, and each source config keeps the tests out of its program;
+- no file under either `src` carries a `@ts-check` or `@ts-nocheck` pragma;
+- each test config is its source config with `noImplicitAny: false`, and each workspace's
+  `typecheck` runs both programs;
+- CI runs `npm run typecheck`, after `prisma generate`.
 
-Each was mutation-tested when it landed, along with a type error in each checked file. All
+Until M4, a pragma-position test, `TYPE_CHECKED_FILES` and a sweep per area (the client's
+data layer, the server, the pages, each workspace's tests) did this one file at a time. Each
+guard was mutation-tested when it landed, along with a type error in each checked file. All
 were caught.
 
 ## The readability SOP
@@ -57,8 +59,8 @@ were caught.
 `docs/code-readability-sop.md`, rule 2, banned JSDoc types because nothing checked them. In
 a checked file `npm run typecheck` checks every one, so they cannot drift. There, each
 parameter the checker cannot infer gets a `@param {Type}` line below the prose summary. A
-`@returns {Type}` is added only where the inferred return is wider than the truth. Unchecked
-files keep the ban.
+`@returns {Type}` is added only where the inferred return is wider than the truth. Since M4
+every file is checked, so the ban is gone.
 
 ## Types shared across the workspaces (phase 2)
 
@@ -156,3 +158,52 @@ one defect the types showed.
 - **What the proof caught.** Wrapping `a?.b` in a cast splits the optional chain, so the cast
   goes on `a`. Prettier can move a cast's comment out of `...(x || y)`, so a cast is re-read
   after formatting. An untyped `@param deps` line shadows a typed one written after it.
+
+## The pages, the tests and checkJs on (phase 5 and M4)
+
+Decided 2026-11-19, `docs/specs/2026-11-19-pages-tests-and-checkjs-design.md`, and applied
+over #433 to #457, which the plan lists. Every file under `client/src` and `server/src`,
+source and tests, is checked: the client's pages, both workspaces' tests, and then M4, which
+turned `checkJs` on in all four configs and removed all 409 pragmas. Each PR was proved
+annotation only by syntax trees identical to `main`'s, a byte-identical client build and the
+same test counts and coverage, except where a PR says what it changed and why.
+
+- **Two programs per workspace.** `tsconfig.json` is the source program and leaves the tests
+  out. `tsconfig.test.json` extends it, takes the tests in, and turns `noImplicitAny` off, so a
+  mock's untyped parameter may stay `any` while a fixture or a call is still checked against
+  the real types. Full strict would have added about 2,450 annotations, mostly on `vi.fn`
+  callbacks (the owner's choice).
+- **What `noImplicitAny: false` also leaves open, and what holds it.** A `let` with no
+  initializer and a named helper's parameter would be `any`, so each `let` in a test names
+  its type and each helper types its parameters, both held by repo-invariant tests (decided
+  2026-11-23). A field read through a JavaScript function's inferred return type is not
+  checked, so a misspelled one reads as `any`; that stays open.
+- **Source passes both programs.** The test program checks each source file a test imports
+  under its relaxed options, so 21 server declarations gained a type there.
+- **`@types/supertest`** is a server dev dependency, so each `supertest` call and the answer
+  it reads are checked.
+- **The client reads each answer through its type.** A success read is cast in place to
+  `Wire<XResponse>`, which is `T` when no field of it is `any`, `Date` or `Decimal` and fails
+  the typecheck otherwise, naming the field. An error read is cast to `ErrorBody`, beside the
+  server's error sender. A repo-invariant test holds every `.json()` read in the client to one
+  or the other.
+- **Patterns,** beside phase 3's A to F and phase 4's G to M:
+  - N: an answer read, cast in place through `Wire`.
+  - O: an error read, cast to `ErrorBody`.
+  - P: a test fixture declared with its type, or cast in place where it is deliberately
+    partial, one comment per file; deliberately bad input goes through `unknown`.
+  - Q: a DOM lookup in a test, cast to the element the test expects.
+  - R: a mock typed as the function it stands in for.
+- **Test fakes** (the owner's choice, 2026-11-25). A logger is a real silent pino with spies.
+  A stub service or partial dependency object is checked by `@satisfies` before its cast,
+  where its type lets a member's name be checked. The services built from stubs are built
+  from the app's real dependencies, through `services/external/__tests__/externalDeps.js`,
+  for which `toPositiveInt` moved from `index.js` to `dashboardDataBuildersService.js`.
+- **What the proof caught.** Prettier moves a cast off a JSX spread in every form, so a
+  spread is never cast; a test's partial props are cast where they are given. A cast keeps a
+  literal such as `false`, so a whole fixture can fail a cast that a declared `@type` passes.
+  A tag on a stub function does not reach its parameters, and the redis client's `keyof` is
+  effectively `string`, so neither is tagged.
+- **What stays out:** `e2e/`, `scripts/`, `server/scripts/` and the config files
+  (`vite.config.js`, `vitest.config.js`, `eslint.config.js`, `playwright.config.js`,
+  `server/vitest.setup.js`).

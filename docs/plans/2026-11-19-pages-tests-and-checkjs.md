@@ -15,7 +15,41 @@ design are not repeated here except where a task needs the exact form.
 Testing Library, Express 5.3, Prisma 7.10, supertest 7.3, acorn with acorn-jsx, Playwright,
 gh CLI.
 
-**Status:** not started. Every file, line and count below was read or measured on `6ea2274`.
+**Status: done 2026-11-26** (#433 to #457, all live; main `0f74ef6`). Every file, line and
+count below was read or measured on `6ea2274`. Every `.js` and `.jsx` file under
+`client/src` and `server/src` is checked with `checkJs` on and no pragma left (M4, #457). Each
+annotation PR's syntax trees matched `main`'s, its client build was byte-identical and its
+test counts and coverage matched, so there was no floor PR. These are the places the work
+departs from the text below.
+
+- **#434, outside the plan.** A new advisory on `effect` (under the Prisma CLI) failed every
+  PR's audit, so a root `overrides` pins a patched release, and the withdrawn picomatch
+  allowlist entry was dropped (the owner's choice).
+- **#435, the reads.** `LogSavedResponse` is a union, not a `@template`; `sendLog` returns a
+  discriminated union; `planSwaps.js` and `strava.js`'s `send` return `Promise<unknown>`,
+  each export casting what it reads.
+- **#436, a page.** `AuthPage`'s `rows="3"` became `rows={3}` with a test for it (the owner's
+  choice), the one string-valued numeric attribute in the client.
+- **Tests, more than the plan's PRs.** The plan's PRs 8 to 12 became 14: #441, #442, #447
+  and #448 for the server tests, #449 and #450 for Task 11, and #451, #454, #455 and #456
+  for Task 12, which measured over 450 errors and was split by folder. Between them came
+  guards and practices the owner decided on 2026-11-23 to 2026-11-25:
+  - #443 types each uninitialized `let` in a test, and #446 each named helper's parameters,
+    each held by a repo-invariant test;
+  - #445 gives the tests real silent loggers;
+  - #452 checks stub services and partial deps with `@satisfies`, and #453 builds the
+    external services from real deps (`toPositiveInt` moved from `index.js` to
+    `dashboardDataBuildersService.js` for it).
+- **#444, a defect.** `SummaryView` stopped being passed two update times it never shows.
+- **Fixtures fixed in passing (F)**, each listed in its PR: the external retry test's cache
+  fake, a missing `.js` import, the `"meal log"` and route-segment log types, and a stale
+  `personal` prop in three page tests.
+- **Found, not changed:** `HomePageProps["user"]` drops `null`; `DashboardAtAGlanceProps`
+  requires two retry handlers the component treats as optional; the integration test's
+  pre-B1 workout form and the week chapter's numeric outline offsets are stale fixtures.
+- **#457, M4.** 409 files, not 408: the extra one is #453's helper. The `let` and helper
+  guards, which postdate the plan, now read every test file; the config guard keeps the
+  source configs' `exclude` check.
 
 ---
 
