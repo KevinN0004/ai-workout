@@ -11,7 +11,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 //
 // Each holder keeps the props its component was last rendered with, and is read
 // only after that component has rendered; beforeEach empties two of them. The
-// page always hands the header its menu handlers. Each prop the page is given
+// page always hands the header its menu handlers, and the glance strip its two
+// refresh handlers. Each prop the page is given
 // holds only what these tests read of it.
 /** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */
 /** @typedef {"go" | "setDashView" | "setDashNavOpen" | "setWorkoutForm" | "setWorkoutModalOpen" | "onLogout" | "clearDashboardToast"} HandlerProp */
@@ -19,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const glance = vi.hoisted(
   () =>
-    /** @type {{ props: Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0] }} */ (
+    /** @type {{ props: Required<Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0]> }} */ (
       /** @type {unknown} */ ({ props: null })
     )
 );
@@ -232,7 +233,7 @@ const withWorkouts = (workouts) => ({
 
 beforeEach(() => {
   glance.props =
-    /** @type {Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0]} */ (
+    /** @type {Required<Parameters<typeof import("../components/DashboardAtAGlance.jsx").default>[0]>} */ (
       /** @type {unknown} */ (null)
     );
   header.props =

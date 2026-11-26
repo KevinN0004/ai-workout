@@ -8,37 +8,33 @@ import DashboardAtAGlance from "../DashboardAtAGlance";
 // target, both ambient readings loaded and clean). Everything below is the
 // other shapes.
 //
-// DEFAULTS leaves out the two retry handlers on purpose: a card offers Retry
-// only when its handler is given. So it is checked against the rest of the
-// props and cast to the whole. Each reading a test gives holds only the fields
-// the card reads, and a card's name read from a table is cast to its key.
+// DEFAULTS leaves out the two retry handlers, which are optional: a card offers
+// Retry only when its handler is given. Each reading a test gives holds only the
+// fields the card reads, and a card's name read from a table is cast to its key.
 // Elements a test looks up are cast to the element it expects.
 /** @typedef {Parameters<typeof DashboardAtAGlance>[0]} GlanceProps */
 
-const DEFAULTS = /** @type {GlanceProps} */ (
-  /** @type {unknown} */ (
-    /** @satisfies {Omit<GlanceProps, "refreshWeatherRecommendation" | "refreshAirQuality">} */ ({
-      nextWorkout: null,
-      caloriesGap: 0,
-      avgCalories: 2000,
-      calorieGoal: 2200,
-      weatherLoading: false,
-      weatherRecommendation: null,
-      weatherError: "",
-      weatherErrorKind: "",
-      weatherLastUpdatedAt: null,
-      airQualityLoading: false,
-      airSummary: null,
-      airQualityError: "",
-      airQualityErrorKind: "",
-      airQualityLastUpdatedAt: null,
-      formatRelativeUpdatedAt: () => "just now",
-      onAddWorkout: () => {},
-      onOpenMeal: () => {},
-      onOpenTips: () => {}
-    })
-  )
-);
+/** @type {GlanceProps} */
+const DEFAULTS = {
+  nextWorkout: null,
+  caloriesGap: 0,
+  avgCalories: 2000,
+  calorieGoal: 2200,
+  weatherLoading: false,
+  weatherRecommendation: null,
+  weatherError: "",
+  weatherErrorKind: "",
+  weatherLastUpdatedAt: null,
+  airQualityLoading: false,
+  airSummary: null,
+  airQualityError: "",
+  airQualityErrorKind: "",
+  airQualityLastUpdatedAt: null,
+  formatRelativeUpdatedAt: () => "just now",
+  onAddWorkout: () => {},
+  onOpenMeal: () => {},
+  onOpenTips: () => {}
+};
 
 /** @param {Partial<GlanceProps>} [props] */
 const renderGlance = (props = {}) => render(<DashboardAtAGlance {...DEFAULTS} {...props} />);

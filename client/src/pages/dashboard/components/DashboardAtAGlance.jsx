@@ -19,13 +19,13 @@
  * @property {DashboardData["weatherError"]} weatherError
  * @property {DashboardData["weatherErrorKind"]} weatherErrorKind
  * @property {DashboardData["weatherLastUpdatedAt"]} weatherLastUpdatedAt
- * @property {DashboardData["loadWeatherRecommendation"]} refreshWeatherRecommendation
+ * @property {DashboardData["loadWeatherRecommendation"]} [refreshWeatherRecommendation]
  * @property {DashboardData["airQualityLoading"]} airQualityLoading
  * @property {NonNullable<DashboardData["airQualityData"]>["summary"] | null} airSummary
  * @property {DashboardData["airQualityError"]} airQualityError
  * @property {DashboardData["airQualityErrorKind"]} airQualityErrorKind
  * @property {DashboardData["airQualityLastUpdatedAt"]} airQualityLastUpdatedAt
- * @property {DashboardData["loadAirQuality"]} refreshAirQuality
+ * @property {DashboardData["loadAirQuality"]} [refreshAirQuality]
  * @property {(timestamp: number | null) => string} formatRelativeUpdatedAt
  * @property {() => void} onAddWorkout
  * @property {() => void} onOpenMeal
