@@ -9,10 +9,9 @@ import { PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../../constants";
 // through. The typed text arrives from injected getters, so this asserts what
 // the component asks for and what it does with the answer, not the typing.
 
-// The offsets here are numbers, where the outline hook writes percent strings
-// ("12.000%"); the chapter places a line at each either way, so they are cast.
-// The typing stubs hand back the text they are given, which the chapter only
-// passes as a string. Each element a test reads is rendered by then.
+// The offsets are percent strings, as the outline hook writes them. The typing
+// stubs hand back the text they are given, which the chapter only passes as a
+// string. Each element a test reads is rendered by then.
 /** @typedef {Parameters<typeof PreviewWorkoutWeekChapter>[0]} ChapterProps */
 
 /** @param {object} [overrides] */
@@ -30,11 +29,10 @@ const day = (overrides = {}) => ({
 const renderChapter = (props = {}) =>
   render(
     <PreviewWorkoutWeekChapter
-      previewWeekLineOffsets={
-        /** @type {ChapterProps["previewWeekLineOffsets"]} */ (
-          /** @type {unknown} */ ({ horizontal: [0, 40, 80], vertical: [0, 60, 120] })
-        )
-      }
+      previewWeekLineOffsets={{
+        horizontal: ["0.000%", "50.000%", "100.000%"],
+        vertical: ["0.000%", "50.000%", "100.000%"]
+      }}
       previewWeekStage={6}
       previewWeekTypingProgress={1}
       previewWeekPlan={[day()]}
@@ -133,11 +131,7 @@ describe("PreviewWorkoutWeekChapter", () => {
     });
 
     test("a single line is both edges at once", () => {
-      renderChapter(
-        /** @type {Partial<ChapterProps>} */ (
-          /** @type {unknown} */ ({ previewWeekLineOffsets: { horizontal: [0], vertical: [0] } })
-        )
-      );
+      renderChapter({ previewWeekLineOffsets: { horizontal: ["0.000%"], vertical: ["0.000%"] } });
       const only = /** @type {HTMLElement} */ (
         document.querySelector(".preview-week-outline-line.horizontal")
       );
