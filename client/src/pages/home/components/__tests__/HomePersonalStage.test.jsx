@@ -9,9 +9,8 @@ import { toCmFromFeetInches, toFeetInchesFromCm, toKg, toLb } from "../../../../
 // converters are used rather than stubs, since they are the ones that ship.
 //
 // The profile a test gives holds only the fields it reads, so it is cast where
-// it is given. `user={null}` is cast too: HomePageProps' user type drops the
-// null the app passes when nobody is signed in. Elements a test looks up are
-// cast to the element it expects, and a setter's last updater to a function.
+// it is given. Elements a test looks up are cast to the element it expects, and
+// a setter's last updater to a function.
 /** @typedef {Parameters<typeof HomePersonalStage>[0]} StageProps */
 
 const TRAINING_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -57,7 +56,7 @@ const renderStage = (props = {}) => {
     <HomePersonalStage
       personalPanelRef={{ current: null }}
       personalMode="basic"
-      user={/** @type {StageProps["user"]} */ (/** @type {unknown} */ (null))}
+      user={null}
       personal={basePersonal(props.personal)}
       heightUnit="cm"
       toFeetInchesFromCm={toFeetInchesFromCm}

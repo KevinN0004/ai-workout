@@ -29,7 +29,7 @@ import HomeWorkoutMeasure from "./components/HomeWorkoutMeasure";
  * planner's opener, error, sample plan and modal.
  * @typedef {object} HomePageProps
  * @property {import("react").CSSProperties} gradient
- * @property {import("../../app/cache.js").CacheUser & { email?: string }} user
+ * @property {import("../../app/cache.js").CacheUser} user
  * @property {ReturnType<typeof import("../../app/events.js").createAppEventHandlers>["onLogout"]} onLogout
  * @property {(path: string) => void} go
  * @property {AppEventDeps["form"]} form

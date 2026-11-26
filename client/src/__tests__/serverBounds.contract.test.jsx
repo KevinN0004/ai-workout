@@ -131,13 +131,8 @@ const renderHomeForm = (heightUnit = "cm", weightUnit = "kg") =>
       personalPanelRef={{ current: null }}
       personalMode="basic"
       setPersonalMode={noop}
-      // Signed out. The page's user type intersects CacheUser with an object,
-      // which drops the null the app passes when nobody is signed in.
-      user={
-        /** @type {import("../pages/home/HomePage.jsx").HomePageProps["user"]} */ (
-          /** @type {unknown} */ (null)
-        )
-      }
+      // Signed out.
+      user={null}
       onLogout={noop}
       go={noop}
       onPersonalSubmit={noop}
