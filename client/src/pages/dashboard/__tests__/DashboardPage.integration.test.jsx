@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import DashboardPage from "../DashboardPage";
+import { newWorkoutForm } from "../../../app/exerciseSets";
 
 // Each prop the harness hands the page holds only what these flows reach, and
 // each element a flow looks up is on screen, so it fails at once if one is not.
@@ -32,21 +33,11 @@ function DashboardHarness({ dashboard = baseDashboard, apiFetch }) {
   const [dashView, setDashView] = useState("summary");
   const [dashNavOpen, setDashNavOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
-  // A form from before per-set logging, which the Log workout modal still opens.
-  const [workoutForm, setWorkoutForm] = useState(
-    /** @type {DashboardPageProps["workoutForm"]} */ (
-      /** @type {unknown} */ ({
-        date: "2026-03-01",
-        focus: "",
-        duration: "",
-        exercises: "",
-        sets: "",
-        reps: "",
-        intensityRpe: "",
-        notes: ""
-      })
-    )
-  );
+  // The form as App starts it, on the date the other forms here use.
+  const [workoutForm, setWorkoutForm] = useState(() => ({
+    ...newWorkoutForm(),
+    date: "2026-03-01"
+  }));
   const [calorieForm, setCalorieForm] = useState({ calories: "" });
   const [mealLogForm, setMealLogForm] = useState({
     date: "2026-03-01",

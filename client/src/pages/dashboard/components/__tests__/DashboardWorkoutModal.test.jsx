@@ -98,6 +98,19 @@ describe("DashboardWorkoutModal", () => {
     );
   });
 
+  // The cards are read only from a list, so anything else shows the empty state
+  // rather than throwing.
+  test("a form whose exercise list is not a list shows no exercises", () => {
+    renderModal({
+      workoutForm: /** @type {ModalProps["workoutForm"]} */ (
+        /** @type {unknown} */ ({ ...workoutForm, exerciseSets: undefined })
+      )
+    });
+
+    expect(screen.getByText("No exercises yet.")).toBeInTheDocument();
+    expect(document.querySelectorAll(".set-log-card")).toHaveLength(0);
+  });
+
   // One case per field, and the assertion is exactly one key -- so a swapped
   // updater fails, and so does one that writes two keys at once.
   describe("each field writes only its own key", () => {
