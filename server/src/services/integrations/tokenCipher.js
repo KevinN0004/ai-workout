@@ -3,7 +3,6 @@
  * (docs/specs/2026-11-12-strava-import-design.md, "Tokens"). A sealed value is
  * `v1.<nonce>.<ciphertext>.<tag>` in base64, and any change to it fails to open.
  */
-// @ts-check
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 const VERSION = "v1";

@@ -2,7 +2,6 @@
  * The dashboard as App renders it: the loaded dashboard with the optimistic log
  * entries from useOptimisticLogs laid over it.
  */
-// @ts-check
 
 /**
  * The dashboard the server answers with, as `GET /api/dashboard` sends it.

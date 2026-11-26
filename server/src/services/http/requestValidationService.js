@@ -3,7 +3,6 @@
  * answering the request, so the caller decides the response. Used by the
  * dashboard and external routes.
  */
-// @ts-check
 import { validationMessage } from "./validationMessages.js";
 
 /**

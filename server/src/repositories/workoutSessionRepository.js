@@ -3,7 +3,6 @@
  * returns, what every session read selects with it, and the save, which keeps
  * a link to a plan day only when that day exists in one of the user's plans.
  */
-// @ts-check
 import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { EXERCISES } from "../services/planning/exerciseLibrary.js";
 import { dateOnlyToDate, toDateOnly, toIso, toJsonArray, toNumberOrNull } from "./rowValues.js";

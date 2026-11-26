@@ -3,7 +3,6 @@
  * and chunks that drift up and fade, played as one animejs timeline, after
  * which the walkthrough moves on to the dashboard. Called by PreviewStage.
  */
-// @ts-check
 import { createTimeline } from "animejs";
 import { useCallback, useEffect } from "react";
 import {

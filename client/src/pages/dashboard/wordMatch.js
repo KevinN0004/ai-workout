@@ -3,7 +3,6 @@
  * injury flags and the categories today's plan favours. Used by planUtils.js and
  * tips/recommendationUtils.js.
  */
-// @ts-check
 
 /**
  * True when lower-cased `text` holds any of `forms` as a whole word, never

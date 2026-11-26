@@ -3,7 +3,6 @@
  * the OAuth code exchange, the refresh and the revoke, and the athlete's activities.
  * Every failure is a StravaError of one kind, whose text never holds a credential.
  */
-// @ts-check
 
 /**
  * @typedef {"unauthorized" | "not_found" | "rate_limited" | "capacity" | "unavailable"} StravaErrorKind

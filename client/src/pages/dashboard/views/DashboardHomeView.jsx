@@ -3,7 +3,6 @@
  * at /dashboard/home: neither the drawer nor the bottom nav lists it. Rendered
  * by DashboardPage, which loads it lazily.
  */
-// @ts-check
 import "./DashboardHomeView.css";
 
 /** @typedef {import("../DashboardPage.jsx").DashboardPageProps} DashboardPageProps */

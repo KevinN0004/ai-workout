@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, describe, expect, test } from "vitest";
 import { disconnectPrisma, prisma } from "../prisma.js";
 

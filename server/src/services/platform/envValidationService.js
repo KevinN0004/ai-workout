@@ -3,7 +3,6 @@
  * (outside the test suites) before its own module-scope reads of process.env,
  * and exits on any error. Imported modules such as prisma.js read it earlier.
  */
-// @ts-check
 import { parseSubscriptionId } from "../integrations/stravaConfig.js";
 import { parseTokenKey } from "../integrations/tokenCipher.js";
 

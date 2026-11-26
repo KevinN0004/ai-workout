@@ -1,4 +1,3 @@
-// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events";
 import { NO_PLAN_LINK } from "../plans";

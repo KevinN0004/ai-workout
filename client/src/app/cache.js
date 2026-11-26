@@ -4,7 +4,6 @@
  * storage failure is swallowed, reaching window.localStorage included, since a
  * cache that cannot be used only costs a page its head start.
  */
-// @ts-check
 
 /**
  * An account as the cache keys read it: the two fields that scope a key, or

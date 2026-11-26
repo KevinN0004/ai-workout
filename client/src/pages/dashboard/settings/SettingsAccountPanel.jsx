@@ -2,7 +2,6 @@
  * The Account tab's forms: change the password, and delete the account behind
  * a confirmation step. Rendered by SettingsView on that tab.
  */
-// @ts-check
 import { useEffect, useRef, useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";

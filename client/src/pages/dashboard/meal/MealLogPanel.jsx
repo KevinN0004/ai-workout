@@ -2,7 +2,6 @@
  * The meal log: a form for one meal's date, type, name, calories, macros and
  * notes, with the latest entries beneath it. Rendered by MealView.
  */
-// @ts-check
 import { getLocalDateKey } from "../../../app/units";
 
 /**

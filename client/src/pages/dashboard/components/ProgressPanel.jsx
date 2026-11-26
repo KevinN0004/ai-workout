@@ -3,7 +3,6 @@
  * against the four weeks before, and each lift's records, from progress.js;
  * and the PR tag a workout row shows for a session that set a record.
  */
-// @ts-check
 import { useId, useMemo, useState } from "react";
 import { fromLoadKg } from "../../../app/exerciseSets";
 import { liftRecords, weeklySets } from "../progress";

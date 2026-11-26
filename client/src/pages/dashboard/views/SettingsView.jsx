@@ -3,7 +3,6 @@
  * editing in place for three of them, and the account panel. Rendered by
  * DashboardPage, which loads it lazily.
  */
-// @ts-check
 import { useMemo, useState } from "react";
 import { getPreferredMeasurementSystem } from "../../../app/units";
 import { profileToPersonal } from "../../../app/profileMapping";

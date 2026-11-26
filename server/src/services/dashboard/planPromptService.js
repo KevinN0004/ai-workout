@@ -3,7 +3,6 @@
  * message holding the client's answers, fenced, then the plan the rule-based
  * generator built. The generate route sends it.
  */
-// @ts-check
 
 // Sent as the system instruction, apart from the client data and the plan in
 // the user message. The claims it forbids are where the FDA's General Wellness

@@ -3,7 +3,6 @@
  * exercise, the line a swapped one carries with its Undo, and both disabled
  * offline. apiFetch, the network boundary, is stubbed.
  */
-// @ts-check
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import PlanDaySwaps from "../PlanDaySwaps";

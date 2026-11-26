@@ -3,7 +3,6 @@
  * (docs/specs/2026-11-12-strava-import-design.md, "Settings, the server's
  * environment"). Null means the server has no Strava, and its routes answer 404.
  */
-// @ts-check
 import { parseTokenKey } from "./tokenCipher.js";
 
 const STRAVA_WEB = "https://www.strava.com";

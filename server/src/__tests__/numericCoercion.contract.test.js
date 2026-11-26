@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { toNumberOrNull } from "../repositories/rowValues.js";
 import { toNullableNumber } from "../services/dashboard/dashboardDataBuildersService.js";

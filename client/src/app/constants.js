@@ -3,7 +3,6 @@
  * dashboard's route map, and the cache, undo-window and CSRF settings. Several
  * option lists must match the server's; the note above them says which.
  */
-// @ts-check
 export const APP_BRAND_NAME = "PATH";
 export const APP_BRAND_EXPANSION = "Personalized AI Training Hub";
 export const APP_BRAND_TAGLINE = "Your guide for this journey.";

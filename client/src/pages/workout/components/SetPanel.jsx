@@ -2,7 +2,6 @@
  * The set being logged on the session page: steppers for the reps (or seconds)
  * and the load, the optional RPE, and Done (roadmap B6).
  */
-// @ts-check
 import { useState } from "react";
 import { fromLoadKg } from "../../../app/exerciseSets";
 import { draftFor, stepAmount, stepLoad } from "../../../app/workoutSession";

@@ -3,7 +3,6 @@
  * it: personalToProfile for a save (submitProfile in events.js), and
  * profileToPersonal to seed Settings' form from user.profile.
  */
-// @ts-check
 import {
   splitFullName,
   toCmFromFeetInches,

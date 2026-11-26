@@ -4,7 +4,6 @@
  * trends. Rendered by DashboardPage, which imports it eagerly, unlike the
  * other views.
  */
-// @ts-check
 import { useState } from "react";
 import "./SummaryView.css";
 

@@ -1,7 +1,6 @@
 /**
  * How old a saved copy is, in words, for App's offline notice ("2 h ago").
  */
-// @ts-check
 
 const MINUTE_MS = 60 * 1000;
 

@@ -3,7 +3,6 @@
  * logout, the dashboard's logs, goals and saved exercises, and the account
  * settings. App rebuilds them from its current state on every render.
  */
-// @ts-check
 import { clearActiveSession, readActiveSession, writeActiveSession } from "./activeSession";
 import { buildScopedCacheKey, removeJsonCache } from "./cache";
 import {

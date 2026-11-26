@@ -1,4 +1,3 @@
-// @ts-check
 import express from "express";
 import pino from "pino";
 import request from "supertest";

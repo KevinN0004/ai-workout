@@ -1,4 +1,3 @@
-// @ts-check
 import pino from "pino";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createSessionService, SessionStoreUnavailableError } from "../sessionService.js";

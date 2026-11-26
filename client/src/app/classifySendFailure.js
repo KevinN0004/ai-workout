@@ -2,7 +2,6 @@
  * What becomes of a workout, meal or calorie entry whose send failed, read by
  * useOptimisticLogs and useOutboxReplay.
  */
-// @ts-check
 
 // The message the server's CSRF guard answers a refused token with
 // (server/src/services/auth/sessionService.js).

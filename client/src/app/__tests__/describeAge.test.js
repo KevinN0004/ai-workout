@@ -1,7 +1,6 @@
 /**
  * Pins describeAge's wording, and that a missing or future time has no age.
  */
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { describeAge } from "../describeAge.js";
 

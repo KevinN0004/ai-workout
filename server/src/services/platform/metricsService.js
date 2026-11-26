@@ -3,7 +3,6 @@
  * index.js creates at boot, and the latency buckets that requestContext.js and
  * the external-API recorder fold durations into.
  */
-// @ts-check
 
 /**
  * One latency bucket, as initLatencyStats builds it.

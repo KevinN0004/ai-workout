@@ -1,4 +1,3 @@
-// @ts-check
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {

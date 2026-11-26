@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { EXERCISES } from "../../../../../server/src/services/planning/exerciseLibrary.js";
 import { GROUPS, e1rmOf, liftRecords, prSessions, weeklySets } from "../progress";

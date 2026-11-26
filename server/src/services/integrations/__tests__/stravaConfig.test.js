@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { readStravaConfig } from "../stravaConfig.js";
 

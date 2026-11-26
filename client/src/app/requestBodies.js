@@ -3,7 +3,6 @@
  * typed against that route's schema (roadmap D1 phase 2). Each builds exactly
  * what its caller sent inline before, key order included.
  */
-// @ts-check
 import { goalOptions } from "./constants";
 import { toCmFromFeetInches, toKg } from "./units";
 

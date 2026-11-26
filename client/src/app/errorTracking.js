@@ -3,7 +3,6 @@
  * VITE_SENTRY_DSN. main.jsx starts it before the first render; the SDK is in
  * errorTrackingSdk.js, fetched only when a DSN is set.
  */
-// @ts-check
 
 // Enough to report a crash on mount. A render loop failing every frame would
 // otherwise queue hundreds of copies of one error.

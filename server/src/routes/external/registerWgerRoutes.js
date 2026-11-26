@@ -2,7 +2,6 @@
  * The wger exercise-database routes: the filter lists, exercise search, and one
  * exercise's details. Registered by externalRoutes.js.
  */
-// @ts-check
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {

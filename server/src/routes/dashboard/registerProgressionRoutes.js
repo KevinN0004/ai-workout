@@ -3,7 +3,6 @@
  * change, settle an asked step up or train a deload week normally. Registered
  * by dashboardRoutes.js.
  */
-// @ts-check
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {
   allowedWeekStarts,

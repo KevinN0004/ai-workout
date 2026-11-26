@@ -3,7 +3,6 @@
  * digits, −15 s, +15 s and Skip rest, and "Rest over" once it ends. The digits
  * are not announced; the page's live region says when a rest starts and ends.
  */
-// @ts-check
 import clockText from "../clockText";
 import useRestTimer from "../hooks/useRestTimer";
 

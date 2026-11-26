@@ -2,7 +2,6 @@
  * Prisma-native persistence for progress metrics: the row mapper the API
  * returns, and the save.
  */
-// @ts-check
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 

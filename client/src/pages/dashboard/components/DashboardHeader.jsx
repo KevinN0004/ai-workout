@@ -2,7 +2,6 @@
  * The dashboard's header: the drawer's menu button, the "Hub" title and the
  * profile menu. Rendered by DashboardPage, which owns the profile menu's state.
  */
-// @ts-check
 
 /**
  * What DashboardPage passes the header: the user and navigation, and, when

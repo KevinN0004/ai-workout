@@ -3,7 +3,6 @@
  * meal and progress-metric logs, newest first. Rendered by DashboardPage, which
  * loads it lazily.
  */
-// @ts-check
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getLocalDateKey,

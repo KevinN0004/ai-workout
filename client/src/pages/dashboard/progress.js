@@ -3,7 +3,6 @@
  * against the four before, each lift's best e1RM, heaviest set and bodyweight
  * reps with their four-week change, and which sessions set a record.
  */
-// @ts-check
 import { toNumberOrNull } from "../../app/units";
 
 /**

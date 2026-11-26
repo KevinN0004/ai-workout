@@ -3,7 +3,6 @@
  * sessions logged before the week: a step up, a hold or a deload, and a deload
  * week when one is due (docs/specs/2026-11-06-adaptive-progression-design.md).
  */
-// @ts-check
 
 import { toNumberOrNull } from "../../repositories/rowValues.js";
 import { EXERCISES } from "./exerciseLibrary.js";

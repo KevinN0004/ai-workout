@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { DEFAULT_GEMINI_MODEL, NOTES_INSTRUCTION, buildNotesPrompt } from "../planPromptService.js";
 

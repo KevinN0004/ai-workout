@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 // /api/generate needs a Gemini client to get past its first check, and index.js

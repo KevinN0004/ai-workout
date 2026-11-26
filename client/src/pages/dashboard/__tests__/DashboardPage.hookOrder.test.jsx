@@ -1,4 +1,3 @@
-// @ts-check
 import { render } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import DashboardPage from "../DashboardPage";

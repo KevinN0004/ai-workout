@@ -1,7 +1,6 @@
 // Real dependencies for building the external-data and HTTP-cache services in a
 // test: the app's own text and number helpers, fresh metrics, a silent logger and
 // an in-memory cache with no Redis. No test calls the upstream hosts named here.
-// @ts-check
 import pino from "pino";
 import {
   cleanText,

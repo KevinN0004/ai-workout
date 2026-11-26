@@ -3,7 +3,6 @@
  * and add one by name (roadmap B6, C4). Folded away until opened, except while
  * the session has no exercises.
  */
-// @ts-check
 import { useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";

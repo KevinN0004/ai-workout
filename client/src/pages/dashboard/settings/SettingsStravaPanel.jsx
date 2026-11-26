@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md): connect with Strava's own
  * button, the connection and its last sync, Sync now, and the disconnect.
  */
-// @ts-check
 import { useEffect, useRef, useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";

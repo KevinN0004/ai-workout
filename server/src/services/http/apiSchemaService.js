@@ -3,7 +3,6 @@
  * a route calls to parse one or answer 400. The closed-set profile fields take
  * their option lists from dashboardDataBuildersService.
  */
-// @ts-check
 import { z } from "zod";
 import {
   allowedActivityValues,

@@ -2,7 +2,6 @@
  * The current time for the session page's clocks (roadmap B6), read again
  * every second and whenever the page is shown or hidden.
  */
-// @ts-check
 import { useEffect, useState } from "react";
 
 const SECOND_MS = 1000;

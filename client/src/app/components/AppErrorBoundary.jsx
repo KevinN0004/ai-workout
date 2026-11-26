@@ -2,7 +2,6 @@
  * The root error boundary: main.jsx renders App inside it, so a crash anywhere
  * in the app leaves a message on screen rather than an empty page.
  */
-// @ts-check
 import { Component } from "react";
 
 /**

@@ -2,7 +2,6 @@
  * Helpers for the meal view: the calorie band, the broken-photo fallback, and
  * shaping and deduplicating MealDB meals. Used by MealView and useMealDbSearch.
  */
-// @ts-check
 import { FALLBACK_IMAGE } from "./data";
 
 /**

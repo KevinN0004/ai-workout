@@ -3,7 +3,6 @@
  * chapter draw their series with. useDashboardMetrics hands it to the
  * dashboard's views; PreviewDashboardChapter imports it directly.
  */
-// @ts-check
 
 /**
  * An SVG path ("M x,y L x,y ...") through `values`, one point per value, spread

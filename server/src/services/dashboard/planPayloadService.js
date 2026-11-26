@@ -3,7 +3,6 @@
  * the generate route when it saves a plan, and checked by the plan repository
  * whenever it stores or reads one. The rules are those of client/src/app/plans.js.
  */
-// @ts-check
 
 /**
  * One day of a plan: its position, the weekday its heading opens with (null for

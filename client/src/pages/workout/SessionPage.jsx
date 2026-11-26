@@ -3,7 +3,6 @@
  * its next set logged with Done, a rest timer that buzzes and beeps, the sets
  * done with Undo, the exercise list, and Finish or Cancel. Kept on the device.
  */
-// @ts-check
 import { useState } from "react";
 import "./SessionPage.css";
 import { readJsonCache, writeJsonCache } from "../../app/cache";

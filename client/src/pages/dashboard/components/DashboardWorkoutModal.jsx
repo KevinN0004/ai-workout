@@ -3,7 +3,6 @@
  * Rendered by DashboardPage; opened by the Add workout buttons, which date the form
  * today and clear any plan-day link, and by PlansView's Log this workout.
  */
-// @ts-check
 import { useMemo, useState } from "react";
 import ModalPortal from "../../../components/ModalPortal";
 import { getPreferredMeasurementSystem } from "../../../app/units";

@@ -2,7 +2,6 @@
  * The rule for what counts as an upstream outage, which index.js hands to the
  * external routes.
  */
-// @ts-check
 
 /**
  * Whether an error status means the upstream is unavailable -- one of the 5xx

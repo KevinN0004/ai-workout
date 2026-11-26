@@ -2,7 +2,6 @@
  * The app's one Prisma client, over the pg driver adapter. index.js injects it
  * into every repository, connects it at startup and disconnects it on shutdown.
  */
-// @ts-check
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import dotenv from "dotenv";

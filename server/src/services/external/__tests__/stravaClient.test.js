@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { StravaError, createStravaClient } from "../stravaClient.js";
 

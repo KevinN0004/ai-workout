@@ -2,7 +2,6 @@
  * The dashboard's Goal view: calories and progress metrics, each with its form
  * and log, and the goals form. Rendered by DashboardPage, which loads it lazily.
  */
-// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import "./CaloriesView.css";

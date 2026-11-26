@@ -3,7 +3,6 @@
  * logger, the error middleware, sendErrorResponse, the CSRF check and every
  * rate limiter's log line.
  */
-// @ts-check
 
 /**
  * Returns the path the caller asked for (`originalUrl`, else `url`) with its

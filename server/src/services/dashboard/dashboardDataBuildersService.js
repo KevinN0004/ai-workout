@@ -4,7 +4,6 @@
  * workout, meal, metric, saved-exercise and profile bodies. index.js hands
  * these to the routes; apiSchemaService reads the lists.
  */
-// @ts-check
 import crypto from "crypto";
 
 /** @typedef {NonNullable<ReturnType<typeof import("../../repositories/userReadRepository.js").mapUser>>["dashboard"]} MappedDashboard */

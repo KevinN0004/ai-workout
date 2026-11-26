@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import {
   PLAN_PAYLOAD_VERSION as SERVER_PLAN_PAYLOAD_VERSION,

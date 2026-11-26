@@ -2,7 +2,6 @@
  * The write routes for workout sessions, daily calories and goals, and the
  * delete of an imported workout. Registered by registerDashboardWriteRoutes.js.
  */
-// @ts-check
 import crypto from "crypto";
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 import { validateParams, workoutParamsSchema } from "../validation.js";

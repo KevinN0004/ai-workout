@@ -3,7 +3,6 @@
  * a titled MealDB search per section, run by useMealDbSearch. Also the key of
  * MealView's "All courses" option.
  */
-// @ts-check
 export const COURSE_ALL_KEY = "all-courses";
 
 export const MEALDB_RECOMMENDATION_QUERIES = {

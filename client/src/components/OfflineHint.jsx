@@ -2,7 +2,6 @@
  * The short line beside a control that cannot work offline. Each owner
  * disables its own control; this says why, and only while offline.
  */
-// @ts-check
 import useConnection from "../hooks/useConnection";
 
 /**

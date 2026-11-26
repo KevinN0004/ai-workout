@@ -3,7 +3,6 @@
  * and the profile's age into a week of training, written in the plan text format
  * every reader parses (docs/specs/2026-11-03-rule-based-plans-design.md, "The generator").
  */
-// @ts-check
 
 import { buildInjuryText, detectInjuryAreas } from "./injuryRules.js";
 import { EXERCISES, LEVELS, capabilitiesFor } from "./exerciseLibrary.js";

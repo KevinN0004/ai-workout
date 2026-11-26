@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md): a usable access token,
  * refreshed under the user's lock, and importing or removing one activity.
  */
-// @ts-check
 import { StravaError, createStravaClient } from "../external/stravaClient.js";
 import { readEvent } from "./stravaEvent.js";
 import { decideImport, deletionsFrom } from "./stravaImport.js";

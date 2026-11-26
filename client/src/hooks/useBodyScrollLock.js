@@ -2,7 +2,6 @@
  * Stops the page scrolling behind an open modal, through the `no-scroll` class
  * on body (base.css). Used by ModalPortal.
  */
-// @ts-check
 import { useEffect } from "react";
 
 // Shared by every caller, so with two modals open the page stays locked until

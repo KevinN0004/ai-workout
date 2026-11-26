@@ -1,4 +1,3 @@
-// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import useOlderLogPages from "../useOlderLogPages";

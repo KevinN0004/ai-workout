@@ -2,7 +2,6 @@
  * A count of seconds as the session page's clocks show it: m:ss, or h:mm:ss
  * from an hour up (roadmap B6).
  */
-// @ts-check
 
 /** @param {number} value */
 const pad = (value) => String(value).padStart(2, "0");

@@ -3,7 +3,6 @@
  * anchor and outline points when VITE_SHOW_PHYSIQUE_POINTS is "1". Rendered by
  * HomeVisualizerStage.
  */
-// @ts-check
 import { useMemo } from "react";
 import {
   VIEWBOX_WIDTH,

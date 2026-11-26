@@ -1,4 +1,3 @@
-// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import pino from "pino";
 import { createErrorHandler } from "../errorHandler.js";

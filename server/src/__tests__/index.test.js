@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { app, __testables } from "../index.js";
 import { prisma } from "../db/prisma.js";

@@ -2,7 +2,6 @@
  * Measures the preview's week table so the outline its chapter draws sits on
  * the table's real row and column edges. Called by PreviewStage.
  */
-// @ts-check
 import { useEffect } from "react";
 import { clamp } from "../utils";
 

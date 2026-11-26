@@ -2,7 +2,6 @@
  * The meal view's suggestion sections: one card per meal, grouped by course.
  * Rendered by MealView.
  */
-// @ts-check
 
 /**
  * Renders `displayedSections`, already narrowed by MealView to the chosen

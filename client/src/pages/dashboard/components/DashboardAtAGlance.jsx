@@ -2,7 +2,6 @@
  * The dashboard's "Today at a glance" panel: four status cards and three
  * shortcuts. DashboardPage renders it above the active view, on every view.
  */
-// @ts-check
 
 /** @typedef {ReturnType<typeof import("../../../app/hooks/useDashboardData.js").default>} DashboardData */
 

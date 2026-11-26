@@ -1,4 +1,3 @@
-// @ts-check
 import fs from "fs";
 import http from "http";
 import os from "os";

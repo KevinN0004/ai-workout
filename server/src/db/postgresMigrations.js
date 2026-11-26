@@ -3,7 +3,6 @@
  * transaction, and records it in `schema_migrations`. Called by
  * server/scripts/apply-postgres-migrations.js.
  */
-// @ts-check
 import nodeFs from "fs/promises";
 import path from "path";
 

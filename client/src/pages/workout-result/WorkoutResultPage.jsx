@@ -3,7 +3,6 @@
  * visitor can turn between a vertical and a horizontal layout, with its coach
  * notes and a PDF download. Rendered by App.
  */
-// @ts-check
 import { useMemo, useState } from "react";
 import { APP_BRAND_NAME } from "../../app/constants";
 import "./WorkoutResultPage.css";

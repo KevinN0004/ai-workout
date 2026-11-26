@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 
 // index.js wires one forwarder to the error tracker into both 5xx paths: the

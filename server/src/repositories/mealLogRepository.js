@@ -4,7 +4,6 @@
  * calorie entry derived from each day's meals, whose source marker and lock
  * userRepository's manual calorie save shares.
  */
-// @ts-check
 import { dateOnlyToDate, toDateOnly, toIso, toNumberOrNull } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 

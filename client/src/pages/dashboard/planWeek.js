@@ -3,7 +3,6 @@
  * which of its training days are done, missed, today's or still to come.
  * Called by useDashboardMetrics for the summary's weekly card.
  */
-// @ts-check
 import { weekDays } from "../../app/constants";
 import { isRestDay, readPlan } from "../../app/plans";
 

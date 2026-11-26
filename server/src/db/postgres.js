@@ -3,7 +3,6 @@
  * schema through the pool; index.js opens it at startup as a probe, and the
  * readiness route reports its status. Prisma keeps its own connection (prisma.js).
  */
-// @ts-check
 /** @type {import("pg").Pool | null} */
 let postgresPool = null;
 

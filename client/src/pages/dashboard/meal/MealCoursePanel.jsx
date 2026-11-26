@@ -2,7 +2,6 @@
  * The meal view's course picker: one pill per course, each with its meal count.
  * Rendered by MealView.
  */
-// @ts-check
 
 /**
  * `courseOptions` is MealView's list, "All courses" first and then one entry per

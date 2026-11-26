@@ -3,7 +3,6 @@
  * description, why it was recommended and its videos, with a Save button.
  * Rendered by TipsView.
  */
-// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";

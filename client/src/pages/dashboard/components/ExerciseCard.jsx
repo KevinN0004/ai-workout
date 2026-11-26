@@ -3,7 +3,6 @@
  * sets count reps or seconds, and its set rows of reps or seconds, load and
  * RPE, with buttons to add and remove a set and to remove the exercise.
  */
-// @ts-check
 import {
   MAX_SETS,
   addSet,

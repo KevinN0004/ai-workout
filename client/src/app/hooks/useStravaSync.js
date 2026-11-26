@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md, "The client"). Called once, by
  * App.
  */
-// @ts-check
 import { useEffect, useRef } from "react";
 import useConnection from "../../hooks/useConnection";
 import { syncChangedWorkouts, syncStrava } from "../strava";

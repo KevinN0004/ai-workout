@@ -3,7 +3,6 @@
  * the alternatives to one of its exercises, a swap on every day it is on, and
  * the undo, on plans generated and saved as the generate route saves them.
  */
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { generatePlan, prescribe } from "../generatePlan.js";
 import { buildFallbackNotes, buildSafetyNotes } from "../fallbackNotes.js";

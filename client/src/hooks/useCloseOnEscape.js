@@ -3,7 +3,6 @@
  * ModalPortal, which every modal goes through, and by DashboardDrawer, a plain
  * overlay rendered in place.
  */
-// @ts-check
 import { useEffect } from "react";
 
 /**

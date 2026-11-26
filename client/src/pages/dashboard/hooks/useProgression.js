@@ -3,7 +3,6 @@
  * newest plan, read from the server and answered there. Called by
  * DashboardPage, above its signed-out return.
  */
-// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liftDecisionBody, weekDecisionBody } from "../../../app/requestBodies";
 import { getLocalDateKey } from "../../../app/units";

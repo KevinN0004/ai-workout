@@ -3,7 +3,6 @@
  * boundary: `ready` follows the module's needRefresh, and `reload` activates
  * the waiting worker and reloads.
  */
-// @ts-check
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 

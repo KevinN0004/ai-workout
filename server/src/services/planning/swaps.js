@@ -3,7 +3,6 @@
  * saved plan's alternatives to one exercise under the rules it was built with,
  * a swap on every day the exercise is on, and the undo. Pure; the routes store.
  */
-// @ts-check
 
 import { EXERCISES } from "./exerciseLibrary.js";
 import { healthFromNotes } from "./fallbackNotes.js";

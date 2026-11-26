@@ -1,4 +1,3 @@
-// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import ProgressPanel, { PrTag } from "../ProgressPanel";

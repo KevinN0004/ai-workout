@@ -4,7 +4,6 @@
  * dashboard collection, each capped on read by COLLECTION_LIMITS
  * (findUserWithDashboard). Only generated plans are pruned, after each save.
  */
-// @ts-check
 import { toDateOnly, toIso, toJsonArray, toJsonObject } from "./rowValues.js";
 import { userIdWhere } from "./userLookup.js";
 import { mapProgressMetric } from "./progressMetricRepository.js";

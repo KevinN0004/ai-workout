@@ -3,7 +3,6 @@
  * used, the safety lines every plan carries whoever wrote the rest, and the
  * health rules those lines say applied (docs/specs/2026-11-03-rule-based-plans-design.md).
  */
-// @ts-check
 
 /** @typedef {ReturnType<typeof import("./generatePlan.js").generatePlan>} GeneratedPlan */
 

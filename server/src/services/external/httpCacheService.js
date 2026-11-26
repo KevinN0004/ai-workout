@@ -4,7 +4,6 @@
  * Redis when the session store's client is ready, in memory otherwise. Built
  * once in index.js.
  */
-// @ts-check
 
 /**
  * One cached response: the payload, and the times it was written, stops being

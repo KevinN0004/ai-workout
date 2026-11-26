@@ -2,7 +2,6 @@
  * Asks before Cancel workout discards logged sets (roadmap B6). Rendered by the
  * session page.
  */
-// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 
 /**

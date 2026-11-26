@@ -3,7 +3,6 @@
  * rows as typed strings, the rules for adding and removing them, the save's
  * conversion to the API's exerciseSets in kg, and the Logs line for a session.
  */
-// @ts-check
 import { NO_PLAN_LINK } from "./plans";
 import { getLocalDateKey, toNumberOrNull } from "./units";
 

@@ -2,7 +2,6 @@
  * The preview walkthrough's table of contents: a chip per chapter, the current
  * one widened to show its title. Rendered by PreviewStage.
  */
-// @ts-check
 
 /** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */
 

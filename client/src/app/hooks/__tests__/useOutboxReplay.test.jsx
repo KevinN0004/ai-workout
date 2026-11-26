@@ -3,7 +3,6 @@
  * while online; a run stops at the first that has to wait, drops one the
  * server refuses, and ends with one toast for what it saved.
  */
-// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useOutboxReplay from "../useOutboxReplay";

@@ -3,7 +3,6 @@
  * bundler splits it into a chunk that is only fetched when a DSN is set. See
  * errorTracking.js for why it is not imported directly.
  */
-// @ts-check
 export {
   browserTracingIntegration,
   captureException,

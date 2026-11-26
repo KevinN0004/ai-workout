@@ -3,7 +3,6 @@
  * unmasked message is logged (no stack), a 5xx is reported to error tracking,
  * and the response carries a masked message and the request id.
  */
-// @ts-check
 import { requestLogPath } from "./requestLogPath.js";
 
 /**

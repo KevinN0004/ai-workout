@@ -1,4 +1,3 @@
-// @ts-check
 import { readFileSync } from "node:fs";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { prisma } from "../../db/prisma.js";

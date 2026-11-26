@@ -3,7 +3,6 @@
  * played chapter by chapter, from Personal Info to the dashboard, beside a
  * table of contents for jumping between them. Rendered by HomePage.
  */
-// @ts-check
 import { useEffect, useRef, useState } from "react";
 import { createDefaultPreviewWeekLineOffsets, PREVIEW_TOC_SWITCH_MS } from "./constants";
 import PreviewToc from "./components/PreviewToc";

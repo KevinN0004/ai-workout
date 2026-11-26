@@ -2,7 +2,6 @@
  * Routes that save an exercise to the user's dashboard and remove one from it.
  * Registered by registerDashboardWriteRoutes.js.
  */
-// @ts-check
 import { savedExerciseParamsSchema, validateParams } from "../validation.js";
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 

@@ -3,7 +3,6 @@
  * write reported, and anything that is not a session of this version read as
  * none.
  */
-// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { clearActiveSession, readActiveSession, writeActiveSession } from "../activeSession.js";
 import { ACTIVE_SESSION_PREFIX } from "../constants.js";

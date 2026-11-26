@@ -4,7 +4,6 @@
  * injected so the sequence can be tested by direct call: Windows does not
  * deliver POSIX signals to Node the way the Linux CI runner does.
  */
-// @ts-check
 
 /**
  * Returns the handler index.js runs on SIGTERM and SIGINT. A second signal

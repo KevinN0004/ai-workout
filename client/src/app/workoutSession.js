@@ -3,7 +3,6 @@
  * change to it, as pure functions of a session. Kept on the device by
  * activeSession.js, and saved at Finish through events.js's queueWorkout.
  */
-// @ts-check
 import { fromLoadKg, toLoadKg } from "./exerciseSets";
 import { getLocalDateKey, toNumberOrNull } from "./units";
 

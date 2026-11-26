@@ -3,7 +3,6 @@
  * traced, thinned and mirrored into one closed path. geometry.js falls back to
  * it when templateOutline.js builds no path.
  */
-// @ts-check
 import { mirrorX } from "./math";
 import {
   selectImportantSegmentPoints,

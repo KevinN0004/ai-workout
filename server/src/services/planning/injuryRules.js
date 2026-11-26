@@ -3,7 +3,6 @@
  * body areas the plan generator's exercise library is tagged by. The Guides
  * view keeps its own copy (recommendationUtils.js), held equal by a contract test.
  */
-// @ts-check
 
 /** The areas text can name, in the order they are tried: lower back before back. */
 export const INJURY_AREAS = ["lower back", "back", "knee", "shoulder", "hip", "wrist", "elbow"];

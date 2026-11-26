@@ -1,4 +1,3 @@
-// @ts-check
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import usePreviewDerivedData from "../usePreviewDerivedData";

@@ -1,4 +1,3 @@
-// @ts-check
 import pino from "pino";
 import { describe, expect, test, vi } from "vitest";
 import { createHttpCacheService } from "../httpCacheService.js";

@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md, "The import rules"), as pure
  * functions of the activity and what the user already has.
  */
-// @ts-check
 
 /** The sport types that a workout logged in the app that day already covers. */
 export const STRENGTH_SPORTS = new Set(["WeightTraining", "Workout", "Crossfit"]);

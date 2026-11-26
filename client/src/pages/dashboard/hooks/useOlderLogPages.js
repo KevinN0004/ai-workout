@@ -3,7 +3,6 @@
  * view (WorkoutsView) calls it for meal logs and for progress metrics, and it
  * fetches each older page from that collection's paged GET route.
  */
-// @ts-check
 import { useState } from "react";
 import { fetchWithTimeout } from "../../../app/network";
 

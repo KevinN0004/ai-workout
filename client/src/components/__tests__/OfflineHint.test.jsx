@@ -2,7 +2,6 @@
  * Pins OfflineHint: it says "You're offline" only while the connection store
  * reads offline, and follows it as it changes.
  */
-// @ts-check
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import OfflineHint from "../OfflineHint";

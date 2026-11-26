@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { STRENGTH_SPORTS, decideImport, deletionsFrom } from "../stravaImport.js";
 

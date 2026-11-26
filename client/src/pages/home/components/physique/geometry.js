@@ -3,7 +3,6 @@
  * colours and debug anchors PhysiqueSilhouette2D draws. Every position and size
  * is in SVG user units of the fixed view box below, with y measured down.
  */
-// @ts-check
 import { clamp, mirrorX, toFiniteNumber, interpolateBandWidth } from "./math";
 import { buildSymmetricOutline } from "./outlineGeometry";
 import { appendDefaultGuides } from "./guideLayout";

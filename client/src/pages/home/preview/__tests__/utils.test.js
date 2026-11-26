@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { PREVIEW_TYPING_MAX_MS, PREVIEW_TYPING_MIN_MS, PREVIEW_WEEK_DAY_ORDER } from "../constants";
 import {

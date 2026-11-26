@@ -896,15 +896,14 @@ describe("the decision records", () => {
 });
 
 describe("type-checked files", () => {
-  // Lane D1 checks JavaScript one file at a time: a file is checked when a line
-  // reading `// @ts-check` comes before its first statement. TypeScript ignores
-  // the pragma anywhere else without a word, below the first import or inside
-  // the header's own block comment, so a misplaced one leaves a file unchecked
-  // while it looks checked. TYPE_CHECKED_FILES pins how many files are checked:
-  // raise it with each file you check, and lower it only in a PR that says why.
-  const TYPE_CHECKED_FILES = 409;
+  // Milestone M4 of lane D1: every file under client/src and server/src is checked,
+  // by the source program or the test program, because checkJs is on in all four
+  // configs. A pragma would now say nothing, so none is written
+  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).
   const WORKSPACES = ["client", "server"];
-  const PRAGMA = "// @ts-check";
+  const CONFIGS = WORKSPACES.flatMap((workspace) =>
+    ["tsconfig.json", "tsconfig.test.json"].map((name) => `${workspace}/${name}`)
+  );
 
   const sources = execFileSync("git", ["ls-files", "-z", "--", "client/src", "server/src"], {
     cwd: repoRoot,
@@ -916,98 +915,42 @@ describe("type-checked files", () => {
       file,
       lines: readFileSync(path.join(repoRoot, file), "utf8").split(/\r?\n/)
     }));
-  const checked = sources.filter(({ lines }) => lines.some((line) => line.trim() === PRAGMA));
-  const withoutComments = (text) =>
-    text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-
-  test("every // @ts-check comes before its file's first statement", () => {
-    const misplaced = checked
-      .filter(({ lines }) => {
-        const before = lines.slice(
-          0,
-          lines.findIndex((line) => line.trim() === PRAGMA)
-        );
-        return withoutComments(before.join("\n")).trim() !== "";
-      })
-      .map(({ file }) => file);
-    expect(
-      misplaced,
-      "move // @ts-check up to directly below the header: TypeScript ignores it after the first statement"
-    ).toEqual([]);
-    const inBlock = sources
-      .filter(({ lines }) => lines.some((line) => /^\s*\*\s*@ts-check\b/.test(line)))
-      .map(({ file }) => file);
-    expect(
-      inBlock,
-      "write @ts-check as its own // line below the header: TypeScript ignores it inside a block comment"
-    ).toEqual([]);
-  });
-
-  test("TYPE_CHECKED_FILES matches the files that are checked", () => {
-    expect(
-      checked.length,
-      "raise TYPE_CHECKED_FILES with each file you check; lower it only in a PR that says why"
-    ).toBe(TYPE_CHECKED_FILES);
-  });
-
-  // D1 phase 3: the client's data layer is checked whole, so a file added there is
-  // checked from its first commit (docs/specs/2026-11-16-client-data-layer-types-design.md).
-  const DATA_LAYER = /^client\/src\/(?:(?:app|hooks|components)\/|(?:App|main)\.jsx$)/;
   const isTest = (file) => /(?:^|\/)__tests__\/|\.test\.[cm]?jsx?$/.test(file);
 
-  test("every source file in the client's data layer is checked", () => {
-    const layer = sources.filter(({ file }) => DATA_LAYER.test(file) && !isTest(file));
-    expect(layer.length, "the sweep found too few data-layer files").toBeGreaterThanOrEqual(43);
-    const unchecked = layer.filter((source) => !checked.includes(source)).map(({ file }) => file);
-    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
+  // A source config keeps the tests out, which the test config, extending it with
+  // an empty exclude, takes in; strict and checkJs hold in both.
+  test.each(CONFIGS)("%s checks every file it includes, strictly", (config) => {
+    const raw = JSON.parse(stripJsonComments(readFileSync(path.join(repoRoot, config), "utf8")));
+    const base = config.endsWith(".test.json")
+      ? JSON.parse(
+          stripJsonComments(readFileSync(path.join(repoRoot, config.replace(".test", "")), "utf8"))
+        )
+      : { compilerOptions: {} };
+    const options = { ...base.compilerOptions, ...raw.compilerOptions };
+    expect(options.strict, "strict is what makes the check worth having").toBe(true);
+    expect(options.checkJs, "checkJs checks every file; nothing opts in").toBe(true);
+    if (!config.endsWith(".test.json")) {
+      expect(raw.exclude, "the tests are the test program's").toEqual(
+        expect.arrayContaining(["src/**/*.test.js", "src/**/__tests__/**"])
+      );
+    }
   });
 
-  // D1 phase 4: the server's source is checked whole, so a file added there is
-  // checked from its first commit (docs/specs/2026-11-17-server-source-types-design.md).
-  test("every source file in the server is checked", () => {
-    const server = sources.filter(({ file }) => file.startsWith("server/src/") && !isTest(file));
-    expect(server.length, "the sweep found too few server files").toBeGreaterThanOrEqual(75);
-    const unchecked = server.filter((source) => !checked.includes(source)).map(({ file }) => file);
-    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
+  test("no file under either src carries a type-check pragma", () => {
+    expect(sources.length, "the sweep found too few files").toBeGreaterThanOrEqual(408);
+    const marked = sources
+      .filter(({ lines }) => lines.some((line) => /^\s*\/\/\s*@ts-(?:check|nocheck)\b/.test(line)))
+      .map(({ file }) => file);
+    expect(marked, "remove the pragma: checkJs checks the file already").toEqual([]);
   });
-
-  // D1 phase 5: the client's pages are checked whole, so a page file added there
-  // is checked from its first commit (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md).
-  test("every page file is checked", () => {
-    const pages = sources.filter(
-      ({ file }) => file.startsWith("client/src/pages/") && !isTest(file)
-    );
-    expect(pages.length, "the sweep found too few page files").toBeGreaterThanOrEqual(84);
-    const unchecked = pages.filter((source) => !checked.includes(source)).map(({ file }) => file);
-    expect(unchecked, "add // @ts-check below the header of each").toEqual([]);
-  });
-
-  // D1 phase 5: every test file is checked by its workspace's test program, so a
-  // test added there is checked from its first commit
-  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, "Tests").
-  /** @param {string} workspace */
-  const expectTestsChecked = (workspace) => {
-    const tests = sources.filter(
-      ({ file }) =>
-        file.startsWith(`${workspace}/src/`) &&
-        (isTest(file) || file.startsWith("client/src/test/"))
-    );
-    expect(tests.length, "the sweep found too few test files").toBeGreaterThanOrEqual(
-      workspace === "client" ? 118 : 88
-    );
-    const unchecked = tests.filter((source) => !checked.includes(source)).map(({ file }) => file);
-    expect(unchecked, "add // @ts-check to each, below its header if it has one").toEqual([]);
-  };
-  test("every server test file is checked", () => expectTestsChecked("server"));
-  test("every client test file is checked", () => expectTestsChecked("client"));
 
   // D1 phase 5: the test program has noImplicitAny off, which leaves a `let` with
   // no initializer as any, so nothing done with it is checked. Each one in a
-  // checked test file names its type on the line above
+  // test file names its type on the line above
   // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, "Tests").
-  test("every uninitialized let in a checked test file names its type", () => {
-    const tests = checked.filter(({ file }) => isTest(file));
-    expect(tests.length, "the sweep found too few checked tests").toBeGreaterThanOrEqual(53);
+  test("every uninitialized let in a test file names its type", () => {
+    const tests = sources.filter(({ file }) => isTest(file));
+    expect(tests.length, "the sweep found too few tests").toBeGreaterThanOrEqual(53);
     const untyped = tests.flatMap(({ file, lines }) =>
       lines.flatMap((line, index) =>
         /^\s*let [A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)*;\s*$/.test(line) &&
@@ -1024,7 +967,7 @@ describe("type-checked files", () => {
   // parameters, `const name = (...) =>` or `function name(...)` at any depth, names
   // each one in a @param, or types itself with @type, in the JSDoc block directly
   // above it. Inline callbacks and object methods are left any.
-  test("every named helper in a checked test file types its parameters", () => {
+  test("every named helper in a test file types its parameters", () => {
     const OPENER =
       /^\s*(?:export\s+)?(?:(?:const|let)\s+[\w$]+\s*=\s*(?:async\s+)?(?:\(|[A-Za-z_$][\w$]*\s*=>)|(?:async\s+)?function\s*\*?\s*[\w$]+\s*\()/;
     // The text between a helper's parameter brackets, or null for a call that
@@ -1069,8 +1012,8 @@ describe("type-checked files", () => {
       return lines.slice(start, index).join("\n");
     };
 
-    const tests = checked.filter(({ file }) => isTest(file));
-    expect(tests.length, "the sweep found too few checked tests").toBeGreaterThanOrEqual(53);
+    const tests = sources.filter(({ file }) => isTest(file));
+    expect(tests.length, "the sweep found too few tests").toBeGreaterThanOrEqual(53);
     const helpers = tests.flatMap(({ file, lines }) =>
       lines.flatMap((line, index) => {
         const text = OPENER.test(line) ? paramsOf(lines, index) : null;
@@ -1111,20 +1054,6 @@ describe("type-checked files", () => {
       .filter(({ cast }) => !cast || !(cast === "ErrorBody" || cast.includes("Wire<")))
       .map(({ file, cast }) => `${file}: ${cast ?? "no cast"}`);
     expect(bad, "cast each answer to Wire<XResponse> and each refusal to ErrorBody").toEqual([]);
-  });
-
-  // The source program keeps strict on, and leaves the tests to their own program
-  // (docs/specs/2026-11-19-pages-tests-and-checkjs-design.md, decision 2).
-  test.each(WORKSPACES)("%s/tsconfig.json keeps strict on and checkJs off", (workspace) => {
-    const file = path.join(repoRoot, workspace, "tsconfig.json");
-    expect(existsSync(file), `${workspace}/tsconfig.json is missing`).toBe(true);
-    const config = JSON.parse(stripJsonComments(readFileSync(file, "utf8")));
-    const { compilerOptions = {} } = config;
-    expect(compilerOptions.strict, "strict is what makes the check worth having").toBe(true);
-    expect(compilerOptions.checkJs, "files opt in one at a time until milestone M4").toBe(false);
-    expect(config.exclude, "the tests are the test program's").toEqual(
-      expect.arrayContaining(["src/**/*.test.js", "src/**/__tests__/**"])
-    );
   });
 
   // Tests are checked as strictly as source, except that a mock's untyped parameter
@@ -1188,16 +1117,16 @@ describe("type-checked files", () => {
     );
   });
 
-  // A body type no checked client file names checks nothing: the client's
-  // builders in requestBodies.js (and personalToProfile) are what it types.
-  test("every body typedef is named by a checked client file", () => {
-    const clientText = checked
-      .filter(({ file }) => file.startsWith("client/"))
+  // A body type no client file names checks nothing: the client's builders in
+  // requestBodies.js (and personalToProfile) are what it types.
+  test("every body typedef is named by a client file", () => {
+    const clientText = sources
+      .filter(({ file }) => file.startsWith("client/") && !isTest(file))
       .map(({ lines }) => lines.join("\n"))
       .join("\n");
     const unnamed = bodyTypedefs
       .map(({ name }) => name)
       .filter((name) => name && !new RegExp(`\\.${name}\\b`).test(clientText));
-    expect(unnamed, "name each body type in a checked client file").toEqual([]);
+    expect(unnamed, "name each body type in a client file").toEqual([]);
   });
 });

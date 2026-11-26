@@ -3,7 +3,6 @@
  * with the toast, the workout modal and App's planner modal. Rendered by App
  * on /dashboard and every path under it.
  */
-// @ts-check
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import SummaryView from "./views/SummaryView";
 import DashboardHeader from "./components/DashboardHeader";

@@ -3,7 +3,6 @@
  * on each, and on a swapped one what it replaced and why, with an Undo. Both
  * need the server, so both are disabled offline.
  */
-// @ts-check
 import { useState } from "react";
 import { undoExerciseSwap } from "../../../app/planSwaps";
 import OfflineHint from "../../../components/OfflineHint";

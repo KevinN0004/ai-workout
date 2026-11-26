@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma.js";

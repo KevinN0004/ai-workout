@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md): one row per user and per
  * athlete, its sync marks, and the lock that serialises a user's token refreshes.
  */
-// @ts-check
 import { getUserPk } from "./userLookup.js";
 
 /**

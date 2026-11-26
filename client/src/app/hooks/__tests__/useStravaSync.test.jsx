@@ -1,4 +1,3 @@
-// @ts-check
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import useStravaSync from "../useStravaSync";

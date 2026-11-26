@@ -1,4 +1,3 @@
-// @ts-check
 import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";

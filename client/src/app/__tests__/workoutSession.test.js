@@ -3,7 +3,6 @@
  * blank, the set each "Done" would log, logging and undoing, the steppers, the
  * rest, and the save Finish queues. Days and cards are built by hand here.
  */
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   DEFAULT_REST_SECONDS,

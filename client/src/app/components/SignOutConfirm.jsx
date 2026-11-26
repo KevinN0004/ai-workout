@@ -2,7 +2,6 @@
  * Asks before a sign-out that would lose entries kept on the device and not
  * yet sent (docs/specs/2026-11-06-offline-ready-pwa-design.md). Rendered by App.
  */
-// @ts-check
 import ModalPortal from "../../components/ModalPortal";
 
 /**

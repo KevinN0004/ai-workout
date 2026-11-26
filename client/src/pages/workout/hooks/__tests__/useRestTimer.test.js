@@ -3,7 +3,6 @@
  * time, catches up when the page is shown again, and calls onEnd once per rest,
  * only when it sees the end within 5 seconds of it.
  */
-// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useRestTimer from "../useRestTimer";

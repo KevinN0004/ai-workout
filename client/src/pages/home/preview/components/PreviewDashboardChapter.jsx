@@ -3,7 +3,6 @@
  * dashboard's summary view, filled from usePreviewDerivedData's figures, whose
  * cards appear one stage at a time. Rendered by PreviewStage.
  */
-// @ts-check
 import { buildLinePath } from "../../../../app/linePath";
 
 /** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */

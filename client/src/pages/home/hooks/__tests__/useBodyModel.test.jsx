@@ -1,4 +1,3 @@
-// @ts-check
 import { renderHook } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import useBodyModel from "../useBodyModel";

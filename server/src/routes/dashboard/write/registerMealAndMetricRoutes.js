@@ -2,7 +2,6 @@
  * POST routes for meal logs and progress metrics. Registered by
  * registerDashboardWriteRoutes.js.
  */
-// @ts-check
 import { sendErrorResponse } from "../../../services/http/errorResponseService.js";
 
 /** @typedef {import("../../../services/auth/authUserService.js").AuthUser} AuthUser */

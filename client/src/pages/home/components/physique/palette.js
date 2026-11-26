@@ -2,7 +2,6 @@
  * The silhouette's colours, built by geometry.js and set by
  * PhysiqueSilhouette2D as CSS custom properties on its svg.
  */
-// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 
 /**

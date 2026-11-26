@@ -4,7 +4,6 @@
  * where there is navigator.vibrate. Each test loads the module afresh, since it
  * keeps its one AudioContext for the page's life.
  */
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 /** @type {typeof import("../restAlert.js")} */

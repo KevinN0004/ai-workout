@@ -3,7 +3,6 @@
  * exercises, the meals week and the week's tips. Rendered by DashboardPage,
  * which loads it lazily.
  */
-// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { buildPlanDayPrefill, buildWeeklyMealPlan } from "../planUtils";
 import { isRestDay, savedPlanDays } from "../../../app/plans";
