@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH, buildPhysiqueSilhouetteGeometry } from "../geometry";
 

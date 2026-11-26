@@ -1,4 +1,3 @@
-// @ts-check
 /**
  * Pins toJsonArray and toJsonObject from rowValues.js: a value of the expected
  * shape passes through as the same object, and anything else, a JSON-looking

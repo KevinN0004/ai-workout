@@ -3,7 +3,6 @@
  * meal entry shows at once, waits out an undo window, and only then is sent.
  * Called once, by App.
  */
-// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { classifySendFailure } from "../classifySendFailure";
 import { OPTIMISTIC_UNDO_WINDOW_MS } from "../constants";

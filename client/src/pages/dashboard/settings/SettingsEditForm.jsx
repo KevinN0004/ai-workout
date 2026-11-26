@@ -2,7 +2,6 @@
  * The edit form for one settings tab, built from that tab's descriptors in
  * settingsFields.js. Rendered by SettingsView while the tab is being edited.
  */
-// @ts-check
 import { useState } from "react";
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";

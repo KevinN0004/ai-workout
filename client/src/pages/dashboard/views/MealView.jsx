@@ -3,7 +3,6 @@
  * suggestions for the visitor's goal. Rendered by DashboardPage, which loads it
  * lazily.
  */
-// @ts-check
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectTrack } from "../planUtils";
 import { COURSE_ALL_KEY } from "../meal/data";

@@ -3,7 +3,6 @@
  * kept per account in localStorage until useOutboxReplay sends them
  * (docs/specs/2026-11-06-offline-ready-pwa-design.md).
  */
-// @ts-check
 import { buildScopedCacheKey, readJsonCache, removeJsonCache } from "./cache";
 import { OUTBOX_CACHE_PREFIX } from "./constants";
 

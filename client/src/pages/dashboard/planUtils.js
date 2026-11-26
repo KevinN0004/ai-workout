@@ -3,7 +3,6 @@
  * week of meals (meal, plans and tips views, useDashboardMetrics), and the
  * workout form's pre-fill from a plan day, shaped by the week's progression.
  */
-// @ts-check
 import { newCard } from "../../app/exerciseSets";
 import { isRestDay } from "../../app/plans";
 import { hasWord } from "./wordMatch";

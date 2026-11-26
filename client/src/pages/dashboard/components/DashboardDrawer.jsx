@@ -2,7 +2,6 @@
  * The dashboard's slide-in navigation drawer, opened from the header's menu
  * button. Rendered by DashboardPage; whether it is open is App's state.
  */
-// @ts-check
 import { useRef } from "react";
 import useCloseOnEscape from "../../../hooks/useCloseOnEscape";
 import useFocusTrap from "../../../hooks/useFocusTrap";

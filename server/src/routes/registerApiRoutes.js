@@ -3,7 +3,6 @@
  * rate limiters and the CSRF check, with a flat object of every repository,
  * service and helper the routes use.
  */
-// @ts-check
 import { registerAuthRoutes } from "./authRoutes.js";
 import { registerDashboardRoutes } from "./dashboardRoutes.js";
 import { registerExternalRoutes } from "./externalRoutes.js";

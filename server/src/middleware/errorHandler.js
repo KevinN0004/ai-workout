@@ -2,7 +2,6 @@
  * The app's last-resort error middleware, mounted last in index.js. It answers
  * any error a handler throws or passes to `next(err)` instead of answering itself.
  */
-// @ts-check
 import { requestLogPath } from "../services/http/requestLogPath.js";
 
 /**

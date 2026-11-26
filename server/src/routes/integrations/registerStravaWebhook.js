@@ -3,7 +3,6 @@
  * "The webhook"): the subscription's setup check, and each event, answered at
  * once and handled after. Mounted by index.js ahead of the /api CSRF check.
  */
-// @ts-check
 import { tokensMatch } from "../../services/auth/sessionService.js";
 
 const PATH = "/webhooks/strava";

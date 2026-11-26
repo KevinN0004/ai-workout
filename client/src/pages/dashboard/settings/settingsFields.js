@@ -3,7 +3,6 @@
  * options or bounds. Read by SettingsView, which renders them through
  * SettingsEditForm.
  */
-// @ts-check
 import {
   activityOptions,
   cardioOptions,

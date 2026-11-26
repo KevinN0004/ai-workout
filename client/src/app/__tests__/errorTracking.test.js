@@ -1,4 +1,3 @@
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import * as Sentry from "@sentry/react";
 import { initErrorTracking } from "../errorTracking.js";

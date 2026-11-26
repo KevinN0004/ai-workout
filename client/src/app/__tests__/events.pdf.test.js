@@ -1,4 +1,3 @@
-// @ts-check
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Hoisted so vi.mock (which is itself hoisted) can close over these.

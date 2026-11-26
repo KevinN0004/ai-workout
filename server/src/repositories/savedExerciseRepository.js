@@ -3,7 +3,6 @@
  * has -- the same external exercise id, or the same name ignoring case --
  * updates that row instead of adding a second.
  */
-// @ts-check
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 

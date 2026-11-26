@@ -3,7 +3,6 @@
  * outlineGeometry.js (the outline built from geometry.js's anchors) and
  * templateOutline.js (the outline morphed from the SVG template).
  */
-// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 
 /** @typedef {import("./math.js").PhysiquePoint} PhysiquePoint */

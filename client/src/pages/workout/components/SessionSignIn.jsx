@@ -2,7 +2,6 @@
  * What /workout shows with nobody signed in (roadmap B6): a session is kept per
  * account, so there is none to open until someone signs in. Rendered by App.
  */
-// @ts-check
 import "../SessionPage.css";
 
 /**

@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { toFiniteNumber } from "../pages/home/components/physique/math";
 import { toKmOrMi, toNumberOrNull } from "../app/units";

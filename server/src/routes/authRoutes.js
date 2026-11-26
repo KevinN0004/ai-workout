@@ -3,7 +3,6 @@
  * password change, account deletion and logout. Registered by registerApiRoutes;
  * the rate limiters and CSRF check in front of them are mounted in index.js.
  */
-// @ts-check
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { sessionErrorStatus } from "../services/auth/sessionService.js";

@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import request from "supertest";
 import { app } from "../../../../index.js";

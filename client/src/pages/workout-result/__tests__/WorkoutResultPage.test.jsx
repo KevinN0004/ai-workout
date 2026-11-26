@@ -1,4 +1,3 @@
-// @ts-check
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import WorkoutResultPage from "../WorkoutResultPage";

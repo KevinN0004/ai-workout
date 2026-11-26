@@ -4,7 +4,6 @@
  * (outside production, only when it is loopback). index.cors.test.js exercises
  * it through the running app, and corsPolicy.test.js the rest.
  */
-// @ts-check
 
 /** @param {string} origin */
 const isLoopbackOrigin = (origin) => {

@@ -39,15 +39,10 @@ that constant, which review should refuse.
 Every exported function, component and hook has a `/** */` comment directly above it, in
 prose: what it is for, what it returns, and anything it assumes.
 
-- In a file without `// @ts-check`, use `@param` only for a shape the reader cannot guess —
-  a factory's dependency object, an options bag — and do not restate a parameter the name
-  already explains. Write no `@returns {string}`-style types there: nothing checks them, so
-  they drift.
-- In a file with `// @ts-check`, `npm run typecheck` checks every JSDoc type, so they cannot
-  drift. Give each parameter the checker cannot infer a `@param {Type} name` line below the
-  prose, and add a `@returns {Type}` only where the inferred return is wider than the truth.
-  The pragma goes on its own line below the header, before the first statement
-  ([decision record 0017](adr/0017-type-checking-through-jsdoc.md)).
+- Every file is checked (`checkJs` is on; [decision record 0017](adr/0017-type-checking-through-jsdoc.md)),
+  so `npm run typecheck` checks each JSDoc type and none can drift. Give each parameter the
+  checker cannot infer a `@param {Type} name` line below the prose, and add a
+  `@returns {Type}` only where the inferred return is wider than the truth.
 - A checked component's props are typed by its `@param`: inline for up to three props,
   `@param {{ open: boolean, onClose: () => void }} props`, and as a `<Name>Props` typedef,
   one `@property` per prop, for more. The typedef goes directly above the component's own

@@ -2,7 +2,6 @@
  * Pins postLog, which sends one log and throws with the answer's status, and
  * sendLog, which retries once with a fresh CSRF token when the guard refused it.
  */
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { postLog, sendLog } from "../sendLog.js";
 

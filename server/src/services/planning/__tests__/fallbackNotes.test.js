@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { generatePlan } from "../generatePlan.js";
 import {

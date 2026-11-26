@@ -3,7 +3,6 @@
  * equipment, the weather and an injury note score a wger exercise, and the
  * training-guide cards. Used by TipsView and the tips components.
  */
-// @ts-check
 import { hasWord } from "../wordMatch.js";
 
 /** @typedef {import("../planUtils.js").Track} Track */

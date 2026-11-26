@@ -1,4 +1,3 @@
-// @ts-check
 // Unit tests for corsPolicy.js: the production fallback, and trust proxy on, which
 // index.cors.test.js cannot reach because it imports index.js with NODE_ENV=test.
 import cors from "cors";

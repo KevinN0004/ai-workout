@@ -3,7 +3,6 @@
  * B4): one row per user, week and lift, or '' for the week's own answer. Reads
  * take one week's rows, and the full unique key lets a save upsert.
  */
-// @ts-check
 import { dateOnlyToDate } from "./rowValues.js";
 import { getUserPk } from "./userLookup.js";
 

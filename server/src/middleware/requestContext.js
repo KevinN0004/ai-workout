@@ -3,7 +3,6 @@
  * metrics recorded when the response finishes. index.js mounts it first, so
  * every later middleware and route can use `req.requestId` and `req.log`.
  */
-// @ts-check
 import crypto from "crypto";
 import { requestLogPath } from "../services/http/requestLogPath.js";
 import { recordLatencyStats } from "../services/platform/metricsService.js";

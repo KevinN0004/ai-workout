@@ -4,7 +4,6 @@
  * see metricsGuard), and the CSRF token for a client with no cookie to read it
  * from. Registered by registerApiRoutes.
  */
-// @ts-check
 import crypto from "crypto";
 
 /**

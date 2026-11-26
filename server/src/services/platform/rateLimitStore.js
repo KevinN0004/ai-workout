@@ -2,7 +2,6 @@
  * The store behind index.js's rate limiters: counts in Redis when the session
  * store's client is ready, and in memory otherwise.
  */
-// @ts-check
 import { MemoryStore } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 

@@ -4,7 +4,6 @@
  * measurement system, today's local date key, height and weight conversion, and
  * reading a value that may be absent as a number or null.
  */
-// @ts-check
 
 /**
  * The regions that measure height in feet and inches and weight in pounds.

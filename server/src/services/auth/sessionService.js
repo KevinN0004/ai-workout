@@ -4,7 +4,6 @@
  * is a 503, never a fallback to memory), the session and CSRF cookies, and the
  * middleware requiring a signed-in user or a matching CSRF token. Built in index.js.
  */
-// @ts-check
 import crypto from "crypto";
 import { createClient } from "redis";
 import { sendErrorResponse } from "../http/errorResponseService.js";

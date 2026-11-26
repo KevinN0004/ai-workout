@@ -1,4 +1,3 @@
-// @ts-check
 import http from "node:http";
 import net from "node:net";
 import { afterEach, describe, expect, test, vi } from "vitest";

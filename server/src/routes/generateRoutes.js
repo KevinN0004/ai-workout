@@ -3,7 +3,6 @@
  * rule-based generator, asks Gemini for its coach notes (rule-written notes stand
  * in when it cannot), and saves the plan for a signed-in caller.
  */
-// @ts-check
 import crypto from "crypto";
 import { sendErrorResponse } from "../services/http/errorResponseService.js";
 import { collapseWhitespace } from "../services/dashboard/dashboardDataBuildersService.js";

@@ -2,7 +2,6 @@
  * GET /api/mealdb/search: meal search against TheMealDB, answered with mapped
  * meals. Registered by externalRoutes.js.
  */
-// @ts-check
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { mealDbSearchQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";

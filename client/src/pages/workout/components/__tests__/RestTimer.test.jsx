@@ -2,7 +2,6 @@
  * Pins the session page's rest timer (roadmap B6): the time left as digits,
  * −15 s, +15 s and Skip rest, and "Rest over" with no buttons once it ends.
  */
-// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import RestTimer from "../RestTimer";

@@ -3,7 +3,6 @@
  * (roadmap B6): resume the open one, or discard it and start the new one.
  * Rendered by App.
  */
-// @ts-check
 import ModalPortal from "../../components/ModalPortal";
 import { loggedSetCount, startedAtText } from "../workoutSession";
 

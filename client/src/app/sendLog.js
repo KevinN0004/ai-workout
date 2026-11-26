@@ -2,7 +2,6 @@
  * Sending one workout, meal or calorie entry: the first time, from the log
  * handlers in events.js, and again from the outbox, by useOutboxReplay.
  */
-// @ts-check
 import { classifySendFailure } from "./classifySendFailure";
 
 /** @typedef {import("../../../server/src/services/http/errorResponseService.js").ErrorBody} ErrorBody */

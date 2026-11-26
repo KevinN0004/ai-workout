@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md, "The webhook"): create, view or
  * delete the app's one subscription. server/scripts/strava-webhook.js runs it.
  */
-// @ts-check
 
 const STRAVA_WEB = "https://www.strava.com";
 const USAGE = [

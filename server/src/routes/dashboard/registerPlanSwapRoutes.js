@@ -3,7 +3,6 @@
  * its exercises, the swap, and the undo, each under the rules the plan was built
  * with (services/planning/swaps.js). Registered by dashboardRoutes.js.
  */
-// @ts-check
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 import {
   SWAP_AREAS,

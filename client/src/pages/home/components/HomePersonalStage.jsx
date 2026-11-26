@@ -2,7 +2,6 @@
  * The home page's profile form, in Basic and Advanced modes, with the account
  * controls. Rendered by HomePage while its stage is "personal".
  */
-// @ts-check
 
 /** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
 /** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */

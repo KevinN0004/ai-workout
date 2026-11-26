@@ -3,7 +3,6 @@
  * logs and progress metrics. One generic loadCollectionPage serves all three,
  * because dashboardCollectionService drives them through a single code path.
  */
-// @ts-check
 import { userIdWhere } from "./userLookup.js";
 import { mapWorkoutSession, WORKOUT_SESSION_INCLUDE } from "./workoutSessionRepository.js";
 import { mapMealLog } from "./mealLogRepository.js";

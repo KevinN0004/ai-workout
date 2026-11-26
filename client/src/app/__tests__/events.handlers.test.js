@@ -1,4 +1,3 @@
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createAppEventHandlers } from "../events.js";
 import { buildScopedCacheKey } from "../cache.js";

@@ -1,4 +1,3 @@
-// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { describe, expect, test } from "vitest";

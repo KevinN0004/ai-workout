@@ -3,7 +3,6 @@
  * origin. index.js mounts it after the API routes and before the error handler.
  * Same origin is a constraint here, not a convenience: see registerClientStatic.
  */
-// @ts-check
 import path from "path";
 import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";

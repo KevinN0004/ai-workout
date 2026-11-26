@@ -2,7 +2,6 @@
  * The /auth page: one form for logging in and for signing up, the sign-up mode
  * revealing the profile fields above the email and password. Rendered by App.
  */
-// @ts-check
 import { APP_BRAND_EXPANSION, APP_BRAND_NAME } from "../../app/constants";
 import "./AuthPage.css";
 

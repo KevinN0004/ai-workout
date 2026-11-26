@@ -2,7 +2,6 @@
  * Groups the /api/dashboard routes, which live in routes/dashboard/. Called by
  * registerApiRoutes.
  */
-// @ts-check
 import { registerDashboardReadRoutes } from "./dashboard/registerDashboardReadRoutes.js";
 import { registerDashboardWriteRoutes } from "./dashboard/registerDashboardWriteRoutes.js";
 import { registerPlanSwapRoutes } from "./dashboard/registerPlanSwapRoutes.js";

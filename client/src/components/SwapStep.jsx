@@ -3,7 +3,6 @@
  * alternatives under the plan's rules, an area that bothers to narrow them, and
  * the swap. Shared: the plan hub's day details and the in-gym screen show it.
  */
-// @ts-check
 import { useEffect, useState } from "react";
 import "./SwapStep.css";
 import { fetchSwapOptions, swapExercise } from "../app/planSwaps";

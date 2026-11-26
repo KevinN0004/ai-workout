@@ -4,7 +4,6 @@
  * complete, and the silhouette shape PhysiqueSilhouette2D draws. Called by
  * HomePage.
  */
-// @ts-check
 import { useMemo } from "react";
 import { toNumberOrNull } from "../../../app/units";
 

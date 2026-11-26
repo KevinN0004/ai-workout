@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md, "Data"). What Strava leaves out
  * stays absent, and every value fits the workout_sessions checks.
  */
-// @ts-check
 
 // The workout_sessions limits: the session's 5-360 minute check, the logging
 // form's 500-character notes and 80-character focus, and 008's 60-character sport.

@@ -3,7 +3,6 @@
  * again whenever the page is shown, let go on unmount, every refusal ignored,
  * and nothing at all in a browser without navigator.wakeLock.
  */
-// @ts-check
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import useWakeLock from "../useWakeLock";

@@ -2,7 +2,6 @@
  * The dashboard's bottom navigation bar: shortcuts to five views, which
  * responsive.css shows only on narrow screens. Rendered by DashboardPage.
  */
-// @ts-check
 const MOBILE_NAV_ITEMS = [
   { key: "summary", label: "Home" },
   { key: "workouts", label: "Logs" },

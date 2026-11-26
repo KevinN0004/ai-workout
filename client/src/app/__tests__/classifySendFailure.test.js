@@ -2,7 +2,6 @@
  * Pins what happens to a log whose send failed, one row per outcome in the
  * spec's table (docs/specs/2026-11-06-offline-ready-pwa-design.md).
  */
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { classifySendFailure } from "../classifySendFailure.js";
 

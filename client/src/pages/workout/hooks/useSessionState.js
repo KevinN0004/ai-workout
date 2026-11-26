@@ -2,7 +2,6 @@
  * The open in-gym session as the session page's state, written to the device
  * on every change (roadmap B6).
  */
-// @ts-check
 import { useCallback, useState } from "react";
 import { writeActiveSession } from "../../../app/activeSession";
 

@@ -2,7 +2,6 @@
  * The dashboard's read routes: the whole dashboard in one response, and one
  * paginated route per collection. Registered by dashboardRoutes.js.
  */
-// @ts-check
 import { dashboardPaginationQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 

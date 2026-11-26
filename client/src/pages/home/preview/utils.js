@@ -3,7 +3,6 @@
  * and rounding, the typing cadence and random draws. Used by the walkthrough's
  * hooks.
  */
-// @ts-check
 import {
   PREVIEW_TYPING_MAX_MS,
   PREVIEW_TYPING_MIN_MS,

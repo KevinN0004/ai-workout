@@ -1,4 +1,3 @@
-// @ts-check
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import PreviewDashboardChapter from "../PreviewDashboardChapter";

@@ -3,7 +3,6 @@
  * an exercise's alternatives in a saved plan, the swap and the undo, over App's
  * apiFetch. Each returns what the server answers, or throws its message.
  */
-// @ts-check
 import { planSwapBody, planUndoBody } from "./requestBodies";
 
 const OPTIONS_FAILED = "Could not load the alternatives. Try again.";

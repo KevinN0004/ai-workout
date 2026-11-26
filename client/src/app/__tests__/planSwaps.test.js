@@ -2,7 +2,6 @@
  * Pins the plan swap requests (roadmap C4): each one's path, method and body
  * over apiFetch, the answer each returns, and the message a refusal throws.
  */
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { fetchSwapOptions, swapExercise, undoExerciseSwap } from "../planSwaps";
 

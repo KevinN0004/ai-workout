@@ -2,7 +2,6 @@
  * Maps a URL path to the dashboard view it names. App uses it to pick the view
  * on load and on every route change.
  */
-// @ts-check
 import { DASHBOARD_ROUTE_VIEW_MAP } from "./constants";
 
 /**

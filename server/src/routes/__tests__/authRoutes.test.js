@@ -1,4 +1,3 @@
-// @ts-check
 import crypto from "crypto";
 import express from "express";
 import request from "supertest";

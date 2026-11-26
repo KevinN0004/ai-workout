@@ -2,7 +2,6 @@
  * Whether the page can reach the server, fed by every request (network.js)
  * and read by useConnection, which disables the writes that cannot wait.
  */
-// @ts-check
 
 // While offline, how often to ask the server whether it is back, and how long
 // one ask waits for an answer, in milliseconds.

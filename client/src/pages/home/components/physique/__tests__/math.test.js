@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { clamp, interpolateBandWidth, mirrorX, toFiniteNumber } from "../math";
 

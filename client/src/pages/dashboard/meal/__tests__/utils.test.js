@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import { dedupeMeals, getCalorieBand, handleImageError, normalizeMealDbMeal } from "../utils";
 import { FALLBACK_IMAGE } from "../data";

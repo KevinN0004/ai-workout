@@ -2,7 +2,6 @@
  * Sends the outbox: the workout, meal and calorie entries kept on the device
  * because their first send failed. Called once, by App.
  */
-// @ts-check
 import { useCallback, useEffect, useRef } from "react";
 import useConnection from "../../hooks/useConnection";
 import { classifySendFailure } from "../classifySendFailure";

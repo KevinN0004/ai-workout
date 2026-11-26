@@ -3,7 +3,6 @@
  * them per account, and keeping a stale response from overwriting a newer one.
  * Called once, by App.
  */
-// @ts-check
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readJsonCache, writeJsonCache } from "../cache";
 import { fetchWithTimeout } from "../network";

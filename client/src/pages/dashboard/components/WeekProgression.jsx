@@ -3,7 +3,6 @@
  * lift's load in the region's unit, its change and why, with Undo, or Go up and
  * Keep, and the deload week's banner with Train normally.
  */
-// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import { liftKeyOf } from "../planUtils";

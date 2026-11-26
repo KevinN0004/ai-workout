@@ -4,7 +4,6 @@
  * dashboard reads (userReadRepository.js), and a swap's read and locked rewrite.
  * A foreign key to a plan must be ON DELETE SET NULL, so a prune never blocks.
  */
-// @ts-check
 import { toPlanPayload } from "../services/dashboard/planPayloadService.js";
 import { toIso, toJsonArray } from "./rowValues.js";
 import { getUserPk, legacyOrIdWhere } from "./userLookup.js";

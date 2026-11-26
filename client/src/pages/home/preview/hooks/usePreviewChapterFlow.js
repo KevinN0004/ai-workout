@@ -4,7 +4,6 @@
  * state, and Personal Info and Generate then move on to the next chapter by
  * themselves. Called by PreviewStage.
  */
-// @ts-check
 import { useCallback, useEffect } from "react";
 import {
   PREVIEW_INSTANT_FIELDS,

@@ -3,7 +3,6 @@
  * wires every repository and service into the routes. Exports `app` for the
  * test suites; the guard at the bottom runs `startServer` only outside them.
  */
-// @ts-check
 import { existsSync } from "fs";
 import express from "express";
 import cors from "cors";

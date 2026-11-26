@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md): a session with source
  * 'strava', one per activity, and the list of activities deleted here.
  */
-// @ts-check
 import { dateOnlyToDate, toDateOnly, toNumberOrNull } from "./rowValues.js";
 import { getUserPk, legacyOrIdWhere } from "./userLookup.js";
 

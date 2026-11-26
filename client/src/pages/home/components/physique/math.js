@@ -3,7 +3,6 @@
  * clamping, mirroring across the centre line, absent-safe coercion and
  * interpolation between width bands.
  */
-// @ts-check
 
 /**
  * A point in the silhouette's view box. An outline's points carry the id of

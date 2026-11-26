@@ -4,7 +4,6 @@
  * it is paced by. Read throughout the walkthrough, and by HomePage for the
  * personal stage's training days.
  */
-// @ts-check
 // The days the Training days toggles offer, Monday first. HomePage's personal
 // stage stores the picked ones as they are in `personal.trainingDays`; the
 // walkthrough's personal chapter shows the same toggles, which do nothing

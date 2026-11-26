@@ -4,7 +4,6 @@
  * match the model. geometry.js prefers it to the anchor outline whenever it
  * builds.
  */
-// @ts-check
 import { clamp, toFiniteNumber } from "./math";
 import { buildSmoothClosedPath, selectImportantSegmentPoints } from "./outlineUtils";
 import templateSvgRaw from "./assets/template-outline.svg?raw";

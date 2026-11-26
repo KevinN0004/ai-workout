@@ -3,7 +3,6 @@
  * physique silhouette and the workout stage, one at a time, with the planner
  * modal App builds. Rendered by App for any path it does not route elsewhere.
  */
-// @ts-check
 // First on purpose, ahead of PreviewStage: imported after it, this sheet would
 // follow PreviewStage.css in the built stylesheet and reorder the cascade.
 import "./HomePage.css";

@@ -3,7 +3,6 @@
  * rules, an area that narrows them, the swap, and every way it can fail.
  * apiFetch, the network boundary, is stubbed.
  */
-// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import SwapStep from "../SwapStep";

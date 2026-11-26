@@ -206,14 +206,12 @@ the cache.
   fails on a source file without a header unless `file-header-allowlist.json` lists it,
   and on any header over four lines of text. That list is empty and only shrinks, and
   `ALLOWLIST_SIZE` in the test pins its length — never add to it.
-- **Type checking is per file, through JSDoc**
-  ([0017](docs/adr/0017-type-checking-through-jsdoc.md)). A file is checked when
-  `// @ts-check` is on its own line below its header, before the first statement:
-  TypeScript ignores it anywhere else, silently. Checking a file raises
-  `TYPE_CHECKED_FILES` in `repo-invariants.test.mjs`, and in a checked file every parameter
-  the checker cannot infer gets a `@param {Type}` (`docs/code-readability-sop.md`, rule 2).
-  Client source names server code only inside a JSDoc `import()` type, as the request bodies
-  in `app/requestBodies.js` do; runtime imports of server code stay in tests.
+- **Type checking is through JSDoc, with `checkJs` on**
+  ([0017](docs/adr/0017-type-checking-through-jsdoc.md)). Every file under `client/src` and
+  `server/src` is checked, tests by `tsconfig.test.json` with implicit `any` allowed; there
+  is no pragma. Every parameter the checker cannot infer gets a `@param {Type}`
+  (`docs/code-readability-sop.md`, rule 2). Client source names server code only inside a
+  JSDoc `import()` type; runtime imports of server code stay in tests.
 - Validate user input at system boundaries
 - Sanitize file paths to prevent directory traversal
 - Server config is env-driven — see the Environment Variables table in `README.md`
@@ -235,7 +233,7 @@ npm run test:coverage    # the same suites with a v8 coverage report
 npm run test:e2e         # Playwright smoke suite (NOT part of `npm test`)
 npm run test:e2e:ui      # the same suite in Playwright's UI mode
 npm run knip             # unused files, exports and dependencies (exit 0 = clean)
-npm run typecheck        # tsc, strict, over each workspace's `// @ts-check` files
+npm run typecheck        # tsc, strict, both programs in each workspace
 npm run lint             # eslint . across both workspaces
 npm run lint:fix         # eslint . --fix
 ```

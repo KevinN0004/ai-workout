@@ -2,7 +2,6 @@
  * Pins ExerciseTile's Save button: its three labels, what it hands onSave, and
  * that it waits for a connection while offline.
  */
-// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import ExerciseTile from "../ExerciseTile";

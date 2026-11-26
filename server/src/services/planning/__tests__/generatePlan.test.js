@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { candidatesFor, generatePlan, prescribe, readInput } from "../generatePlan.js";
 import { buildPlanPayload } from "../../dashboard/planPayloadService.js";

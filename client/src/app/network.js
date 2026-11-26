@@ -3,7 +3,6 @@
  * useOlderLogPages'), App's session check and every apiFetch request. Each
  * request also tells the connection store whether it got an answer.
  */
-// @ts-check
 import { markAnswered, markUnanswered } from "./connection";
 
 /**

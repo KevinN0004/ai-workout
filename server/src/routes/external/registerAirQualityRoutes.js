@@ -3,7 +3,6 @@
  * current, its latest readings, and the EPA NowCast of its PM2.5 hourly means scored
  * as a US AQI with a training recommendation. Registered by externalRoutes.js.
  */
-// @ts-check
 import { airQualityQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 

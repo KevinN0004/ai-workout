@@ -3,7 +3,6 @@
  * request got no answer, online on the next answer, and a probe of
  * /api/health every 30 seconds only while offline and watched.
  */
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // A fresh module per test, so no state carries from one test to the next. Its

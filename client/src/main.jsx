@@ -2,7 +2,6 @@
  * The client's entry point, loaded by index.html: starts error tracking, then
  * renders App, inside the root error boundary, into #root under StrictMode.
  */
-// @ts-check
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";

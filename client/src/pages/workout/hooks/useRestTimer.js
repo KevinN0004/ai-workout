@@ -2,7 +2,6 @@
  * The running rest on the session page (roadmap B6): the seconds left, from the
  * rest's end time and the clock, and one call to onEnd when it ends in time.
  */
-// @ts-check
 import { useEffect, useEffectEvent, useRef } from "react";
 import useNow from "./useNow";
 

@@ -2,7 +2,6 @@
  * Validation messages in the wording zod 3 gave them, which the client shows
  * users verbatim. Both request formatters pass validationMessage to safeParse.
  */
-// @ts-check
 
 // JSON only ever delivers these shapes. zod 3 named NaN "nan", which is what a
 // coerced non-numeric query value becomes.

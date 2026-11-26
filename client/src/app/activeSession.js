@@ -2,7 +2,6 @@
  * The open in-gym session, kept in localStorage per account so a closed tab or
  * a dead battery loses nothing (roadmap B6). Written on every change.
  */
-// @ts-check
 import { buildScopedCacheKey, readJsonCache, removeJsonCache } from "./cache";
 import { ACTIVE_SESSION_PREFIX } from "./constants";
 

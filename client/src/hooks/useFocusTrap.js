@@ -3,7 +3,6 @@
  * and DashboardDrawer. Focus moves in when it opens, cannot Tab out, and goes
  * back to whatever opened it when it closes.
  */
-// @ts-check
 import { useEffect } from "react";
 
 // What Tab can reach. A control that is disabled, taken out of the tab order,

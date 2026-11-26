@@ -3,7 +3,6 @@
  * at startup, the error middleware and sendErrorResponse report 5xx errors
  * through it, and the shutdown handler flushes it.
  */
-// @ts-check
 
 /**
  * The request a 5xx came from, as captureException tags it.

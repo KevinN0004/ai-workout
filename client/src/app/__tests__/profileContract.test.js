@@ -1,4 +1,3 @@
-// @ts-check
 import { describe, expect, test } from "vitest";
 import { personalToProfile, profileToPersonal } from "../profileMapping";
 import { defaultPersonalForm } from "../constants";

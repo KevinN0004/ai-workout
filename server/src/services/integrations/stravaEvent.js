@@ -3,7 +3,6 @@
  * "The webhook"). Events are unsigned, so the body is anyone's: ids are positive
  * whole numbers or nothing, and a malformed body is no event.
  */
-// @ts-check
 
 // How much of a type is kept: Strava's are "activity", "athlete", "create",
 // "update" and "delete", and anything longer is only logged.

@@ -3,7 +3,6 @@
  * planner, and the sample weekly plan. Rendered by HomePage while its stage is
  * "workout".
  */
-// @ts-check
 
 /** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
 /** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */

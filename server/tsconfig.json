@@ -1,14 +1,14 @@
 {
   // Type-checks the server's JavaScript (roadmap lane D1, decision record 0017).
-  // A file is checked when `// @ts-check` sits below its header; every other
-  // file is read for its types and reports nothing. Node runs the sources as
-  // they are, so nothing is built from this file. `lib` leaves out the DOM, and
-  // `types` loads Node's from @types/node, held at the major of the oldest Node
-  // that `engines` allows, so a checked file cannot use an API that Node lacks.
+  // Every file under `src` is checked (milestone M4); there is no pragma to add.
+  // Node runs the sources as they are, so nothing is built from this file.
+  // `lib` leaves out the DOM, and `types` loads Node's from @types/node, held at
+  // the major of the oldest Node that `engines` allows, so no file can use an
+  // API that Node lacks.
   // The tests are checked by `tsconfig.test.json`.
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,

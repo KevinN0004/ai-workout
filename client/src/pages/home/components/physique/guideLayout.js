@@ -2,7 +2,6 @@
  * The skeleton and muscle guide segments of the physique silhouette, added by
  * geometry.js once it has placed the landmarks they join.
  */
-// @ts-check
 import { clamp } from "./math";
 
 /**

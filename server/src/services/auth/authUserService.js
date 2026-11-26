@@ -3,7 +3,6 @@
  * over userReadRepository, argon2id hashing, and verification of argon2id and
  * legacy pbkdf2 hashes. Built once in index.js.
  */
-// @ts-check
 import argon2 from "argon2";
 import crypto from "crypto";
 import { promisify } from "util";

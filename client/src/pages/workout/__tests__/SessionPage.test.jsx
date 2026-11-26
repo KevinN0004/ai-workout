@@ -3,7 +3,6 @@
  * pre-filled, stepped and logged with Done, Undo, moving between exercises,
  * adding one, Finish, Cancel and leaving, and the rest timer, sound and wake lock.
  */
-// @ts-check
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";

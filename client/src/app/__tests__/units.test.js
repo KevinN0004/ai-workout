@@ -1,4 +1,3 @@
-// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   getLocalDateKey,

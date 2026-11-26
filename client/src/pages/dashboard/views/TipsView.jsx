@@ -3,7 +3,6 @@
  * training guide, and the full exercise list, each exercise savable to the
  * plan. Rendered by DashboardPage, which loads it lazily.
  */
-// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { savedExerciseBody } from "../../../app/requestBodies";
 import { detectTrack } from "../planUtils";

@@ -2,7 +2,6 @@
  * The alert at the end of a rest on the session page (roadmap B6): a short
  * beep through Web Audio, unlocked by a tap, and a buzz where the phone can.
  */
-// @ts-check
 
 const BEEP_HZ = 880;
 const BEEP_SECONDS = 0.2;

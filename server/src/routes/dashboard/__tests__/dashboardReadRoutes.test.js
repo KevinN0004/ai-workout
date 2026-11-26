@@ -1,4 +1,3 @@
-// @ts-check
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, test, vi } from "vitest";

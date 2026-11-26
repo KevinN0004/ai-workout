@@ -4,7 +4,6 @@
  * rest of the stored dashboard. Built once in index.js over
  * dashboardCollectionRepository's reader.
  */
-// @ts-check
 
 // The three collections, and the field each one's pages are ordered by.
 const COLLECTION_SORT_FIELDS = {

@@ -4,7 +4,6 @@
  * rules (planPayloadService), and tells its rest days apart. Used by App and the
  * dashboard for the plan views, the meal plan and the link to a plan day.
  */
-// @ts-check
 
 /**
  * One day of a plan: its position, the weekday its heading opens with (null for

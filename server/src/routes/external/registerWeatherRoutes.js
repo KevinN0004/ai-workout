@@ -2,7 +2,6 @@
  * The Open-Meteo routes: current conditions, and current conditions with a
  * training recommendation and a daily forecast. Registered by externalRoutes.js.
  */
-// @ts-check
 import { coordinateQuerySchema, validateQuery } from "./validation.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";
 

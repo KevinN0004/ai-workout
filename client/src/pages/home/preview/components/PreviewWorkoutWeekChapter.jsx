@@ -3,7 +3,6 @@
  * as a table that draws its outline, types in its headers and then its cells,
  * and breaks apart into particles. Rendered by PreviewStage.
  */
-// @ts-check
 import { PREVIEW_WEEK_LINE_STAGGER_MS, PREVIEW_WEEK_TEXT_ROW_CONFIG } from "../constants";
 
 /** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */

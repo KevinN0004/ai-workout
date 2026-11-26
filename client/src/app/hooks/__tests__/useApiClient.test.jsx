@@ -1,4 +1,3 @@
-// @ts-check
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import useApiClient from "../useApiClient";

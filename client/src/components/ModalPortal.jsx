@@ -2,7 +2,6 @@
  * The portal every modal in the app renders through, from the planner modal
  * in app/components to the dashboard's own.
  */
-// @ts-check
 import { useRef } from "react";
 import { createPortal } from "react-dom";
 import useBodyScrollLock from "../hooks/useBodyScrollLock";

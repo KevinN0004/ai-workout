@@ -2,7 +2,6 @@
  * Registers the app's service worker, through vite-plugin-pwa's React module,
  * and reports when a new version is waiting. Called once, by App.
  */
-// @ts-check
 import { useRegisterSW } from "virtual:pwa-register/react";
 
 /**

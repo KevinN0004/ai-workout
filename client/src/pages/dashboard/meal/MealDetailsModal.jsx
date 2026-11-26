@@ -2,7 +2,6 @@
  * The meal details modal: one meal's photo, summary, ingredients and recipe
  * links. Rendered by MealView, and open while a meal card is selected.
  */
-// @ts-check
 import ModalPortal from "../../../components/ModalPortal";
 
 /**

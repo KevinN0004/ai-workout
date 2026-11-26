@@ -3,7 +3,6 @@
  * the connection's state, the authorize link, the sync and the disconnect, over
  * App's apiFetch. Each returns what the server answers, or throws its message.
  */
-// @ts-check
 
 const BASE = "/api/integrations/strava";
 const STATE_FAILED = "Could not load your Strava connection. Try again.";

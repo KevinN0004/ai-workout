@@ -2,7 +2,6 @@
  * MealDB state for the meal view: the visitor's own recipe search, and the
  * suggestion sections for their goal track. Called by MealView.
  */
-// @ts-check
 import { useEffect, useMemo, useState } from "react";
 import { MEALDB_RECOMMENDATION_QUERIES } from "./data";
 import { dedupeMeals, normalizeMealDbMeal } from "./utils";

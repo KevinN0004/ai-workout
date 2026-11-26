@@ -3,7 +3,6 @@
  * so useHomeStageFlow can measure the workout panel's size before that stage is
  * mounted.
  */
-// @ts-check
 
 /** @typedef {ReturnType<typeof import("../hooks/useHomeStageFlow.js").default>} HomeStageFlow */
 /** @typedef {import("../HomePage.jsx").HomePageProps} HomePageProps */

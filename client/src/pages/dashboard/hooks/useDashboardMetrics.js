@@ -3,7 +3,6 @@
  * averages and goal progress, the week and month trend series, today's planned
  * workout and meals, and this week of the plan. Called by DashboardPage.
  */
-// @ts-check
 import { useMemo } from "react";
 import { buildWeeklyMealPlan } from "../planUtils";
 import { buildPlanWeek } from "../planWeek";

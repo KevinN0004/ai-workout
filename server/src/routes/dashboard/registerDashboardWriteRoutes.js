@@ -2,7 +2,6 @@
  * Groups the dashboard's write routes, which live in dashboard/write/. Called by
  * dashboardRoutes.js.
  */
-// @ts-check
 import { registerMealAndMetricRoutes } from "./write/registerMealAndMetricRoutes.js";
 import { registerSavedExerciseRoutes } from "./write/registerSavedExerciseRoutes.js";
 import { registerWorkoutAndGoalRoutes } from "./write/registerWorkoutAndGoalRoutes.js";

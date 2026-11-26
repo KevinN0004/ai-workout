@@ -1,4 +1,3 @@
-// @ts-check
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";

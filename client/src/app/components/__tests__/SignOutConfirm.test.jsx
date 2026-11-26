@@ -2,7 +2,6 @@
  * Pins SignOutConfirm: it asks only while entries are unsent, names how many,
  * and every way out but Sign out anyway keeps the visitor signed in.
  */
-// @ts-check
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";

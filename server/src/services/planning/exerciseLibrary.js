@@ -3,7 +3,6 @@
  * by pattern, equipment, level and how it suits each body area, and the
  * capabilities each planner label supplies (docs/specs/2026-11-03-rule-based-plans-design.md).
  */
-// @ts-check
 
 import { INJURY_AREAS } from "./injuryRules.js";
 

@@ -2,7 +2,6 @@
  * The notice App shows over every page about the session or a new version,
  * fixed at the foot of the screen so it moves nothing on the page beneath it.
  */
-// @ts-check
 import "../styles/notice.css";
 
 /**

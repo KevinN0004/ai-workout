@@ -1,4 +1,3 @@
-// @ts-check
 import pino from "pino";
 import { describe, expect, test } from "vitest";
 import { createSessionService, withTimeout } from "../sessionService.js";

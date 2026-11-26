@@ -2,7 +2,6 @@
  * Query and params schemas for the external-data routes (weather, air quality,
  * wger and TheMealDB), and the helpers that validate a request against them.
  */
-// @ts-check
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 

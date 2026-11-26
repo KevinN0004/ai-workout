@@ -1,4 +1,3 @@
-// @ts-check
 import { render } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import PhysiqueSilhouette2D, { SILHOUETTE_GEOMETRY_REV } from "../PhysiqueSilhouette2D";

@@ -3,7 +3,6 @@
  * confirmed, oldest first, one entry per replay key, and a write that reports
  * whether storage took it.
  */
-// @ts-check
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { addToOutbox, clearOutbox, readOutbox, removeFromOutbox } from "../outbox.js";
 import { OUTBOX_CACHE_PREFIX } from "../constants.js";

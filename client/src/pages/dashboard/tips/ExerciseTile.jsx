@@ -3,7 +3,6 @@
  * category, name, equipment and the top reason, with a Save button. Rendered by
  * TipsView.
  */
-// @ts-check
 import OfflineHint from "../../../components/OfflineHint";
 import useConnection from "../../../hooks/useConnection";
 import { getExerciseImage } from "./recommendationUtils";

@@ -1,4 +1,3 @@
-// @ts-check
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createExternalDataService } from "../externalDataService.js";
 import { externalDataDeps } from "./externalDeps.js";

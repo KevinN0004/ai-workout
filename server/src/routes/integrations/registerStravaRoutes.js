@@ -3,7 +3,6 @@
  * docs/specs/2026-11-12-strava-import-design.md): the state Settings shows, the
  * authorize link, Strava's return, the catch-up sync, and the disconnect.
  */
-// @ts-check
 import { randomBytes } from "node:crypto";
 import { tokensMatch } from "../../services/auth/sessionService.js";
 import { sendErrorResponse } from "../../services/http/errorResponseService.js";

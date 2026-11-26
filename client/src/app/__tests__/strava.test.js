@@ -2,7 +2,6 @@
  * Pins the Strava requests Settings makes (roadmap C2): each one's path, method
  * and body over apiFetch, what each returns, and the message a refusal throws.
  */
-// @ts-check
 import { describe, expect, test, vi } from "vitest";
 import {
   disconnectStrava,

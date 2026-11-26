@@ -4,7 +4,6 @@
  * values and relation lists to arrays and objects. An absent date or number
  * reads as "" or null, never as 0, and an absent list or object as empty.
  */
-// @ts-check
 
 /**
  * A timestamp as an ISO string, or "" when there is none.

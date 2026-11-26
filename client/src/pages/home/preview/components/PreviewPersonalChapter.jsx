@@ -4,7 +4,6 @@
  * in and then collapses into a label beside Environment and Focus. Rendered by
  * PreviewStage for both chapters.
  */
-// @ts-check
 import { TRAINING_DAY_OPTIONS } from "../constants";
 
 /** @typedef {import("../PreviewStage.jsx").PreviewDerivedData} PreviewDerivedData */

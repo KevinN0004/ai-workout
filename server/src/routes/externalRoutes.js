@@ -2,7 +2,6 @@
  * Groups the routes that serve third-party data, which live in routes/external/.
  * Called by registerApiRoutes.
  */
-// @ts-check
 import { registerAirQualityRoutes } from "./external/registerAirQualityRoutes.js";
 import { registerMealDbRoutes } from "./external/registerMealDbRoutes.js";
 import { registerWeatherRoutes } from "./external/registerWeatherRoutes.js";

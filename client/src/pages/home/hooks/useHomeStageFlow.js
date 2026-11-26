@@ -3,7 +3,6 @@
  * entered, and the animations between stages -- the intro's button growing into
  * a panel, and a morph from one stage's panel to the next. Called by HomePage.
  */
-// @ts-check
 import { useEffect, useRef, useState } from "react";
 import { animate, createTimeline } from "animejs";
 

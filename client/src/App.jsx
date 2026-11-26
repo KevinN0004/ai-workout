@@ -2,7 +2,6 @@
  * The app shell: owns the route, the signed-in user and the form state the
  * pages share, and renders the page for the current path. Rendered by main.jsx.
  */
-// @ts-check
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import AuthPage from "./pages/auth/AuthPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";

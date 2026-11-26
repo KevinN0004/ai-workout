@@ -1,4 +1,3 @@
-// @ts-check
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 // What the app's real logger writes for a weather request that carries the

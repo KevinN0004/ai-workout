@@ -2,7 +2,6 @@
  * Query and params schemas for the dashboard routes, and the helpers that
  * validate a request against them.
  */
-// @ts-check
 import { z } from "zod";
 import { validateSchemaInput } from "../../services/http/requestValidationService.js";
 import { SWAP_AREAS } from "../../services/planning/swaps.js";

@@ -1,4 +1,3 @@
-// @ts-check
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import HomePage from "../HomePage";

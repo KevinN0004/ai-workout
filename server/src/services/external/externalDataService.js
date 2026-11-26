@@ -3,7 +3,6 @@
  * one cached, retrying request, plus the helpers that turn their payloads into
  * this API's readings and advice. Built once in index.js.
  */
-// @ts-check
 
 /**
  * One request through readThroughExternalCache, as this service makes it.

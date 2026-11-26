@@ -4,7 +4,6 @@
  * figures, the values to type, the chapters, and layout widths. Called by
  * PreviewStage.
  */
-// @ts-check
 import { useMemo, useRef } from "react";
 import {
   JOHN_DOE_PREVIEW_PROFILE,

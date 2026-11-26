@@ -2,7 +2,6 @@
  * The time since the session started, under its title on the session page,
  * counting each second (roadmap B6).
  */
-// @ts-check
 import clockText from "../clockText";
 import useNow from "../hooks/useNow";
 
